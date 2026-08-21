@@ -1,0 +1,32 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "misco-research-harness"
+version = "0.1.0"
+description = "Local research execution control plane with explicit context isolation"
+requires-python = ">=3.12"
+dependencies = [
+  "pydantic>=2.11,<3",
+  "PyYAML>=6.0.2,<7",
+]
+
+[project.scripts]
+rh = "misco_harness.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8.4,<9", "ruff>=0.12,<1"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/misco_harness"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+
+[tool.ruff.lint]
+select = ["S101"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101"]

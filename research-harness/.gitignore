@@ -1,0 +1,20 @@
+.venv/
+.pytest_cache/
+.ruff_cache/
+.testdeps/
+.rh/
+intake/drop/*
+!intake/drop/.gitkeep
+profile-repo/
+__pycache__/
+*.py[cod]
+
+# Local environment and secret-bearing files
+.env
+.env.*
+
+# Editor and OS-local files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

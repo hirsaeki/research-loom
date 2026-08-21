@@ -1,0 +1,35 @@
+schema_model: SourceCapture + EvidenceCitation
+schema_version: "0.3"
+capture_required:
+  - capture_id
+  - source_id
+  - canonical_locator
+  - acquired_at
+  - original_path
+  - original_sha256
+  - text_snapshot_path
+  - text_snapshot_sha256
+citation_required:
+  - evidence_id
+  - capture_id
+  - captured_statement
+  - excerpt
+  - excerpt_locator
+  - evidence_status
+  - evidence_kind
+  - support_scope
+  - source_type
+  - source_quality
+  - study_role
+writer_axes:
+  evidence_status: [VERIFIED, LEAD_ONLY, UNVERIFIED, CLAIM_NOT_SUPPORTED, CAPTURE_UNAVAILABLE]
+  writer_use_mode: [DIRECT_QUOTE, ATTRIBUTED_PARAPHRASE, AGGREGATE_SYNTHESIS, LEAD_ONLY, BLOCKED]
+  verbatim_use_status: [QUOTABLE, LICENSED, REVIEW_REQUIRED, PROHIBITED]
+constraints:
+  - "Capture identity is canonical_locator + original_sha256; changed bytes create a new Capture."
+  - "The original artifact and UTF-8 full-text rendition are immutable and both SHA-256 verified."
+  - "Every Citation excerpt must occur in its referenced Capture text.txt."
+  - "Missing bibliography is represented per field as UNAVAILABLE or NOT_APPLICABLE and does not invalidate Capture."
+  - "Only VERIFIED Evidence can resolve a Finding or Evidence Gap."
+  - "Review citations cannot be counted as independent primary evidence without the cited original Capture."
+  - "QUOTABLE candidates pass published, purpose, necessity, clear distinction, relationship, minimality, and attribution checks."

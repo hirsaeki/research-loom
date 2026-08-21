@@ -1,0 +1,147 @@
+[
+  {
+    "path": "Layer_A_CLEAN_RUNTIME_SOURCE_PACK/01_PUBLICATION_STYLE_CONTRACT.json",
+    "sha256": "b6264a091d2a4a460b94d76f6557d3eae996968509c4e948560810fde84737c7",
+    "bytes": 32989
+  },
+  {
+    "path": "Layer_A_CLEAN_RUNTIME_SOURCE_PACK/01_PUBLICATION_STYLE_CONTRACT.md",
+    "sha256": "9d61671a8f0acabc743b6e858ea01a0df3933ef78ca540b013afabd3f3a02e09",
+    "bytes": 30882
+  },
+  {
+    "path": "Layer_A_CLEAN_RUNTIME_SOURCE_PACK/02_PUBLICATION_LANE_IO_CONTRACT.md",
+    "sha256": "fd771f67321eccc1f1f0161659211ce17aa26d48a60d1c5b0fab36c30dab9e6d",
+    "bytes": 6835
+  },
+  {
+    "path": "Layer_A_CLEAN_RUNTIME_SOURCE_PACK/03_RHETORICAL_PATTERN_LIBRARY.md",
+    "sha256": "7c7df3e8e0a65c71c018a46eaa7a5fb9573f5642ec725520a1ba64fd3b6d807e",
+    "bytes": 12364
+  },
+  {
+    "path": "Layer_A_CLEAN_RUNTIME_SOURCE_PACK/04_PHASE_SPECIFIC_WRITING_RULES.md",
+    "sha256": "3394989e78aeb6e74a2b2b48cab2e1b3380b6328435bde48559f92b4b2daa6db",
+    "bytes": 7529
+  },
+  {
+    "path": "Layer_A_CLEAN_RUNTIME_SOURCE_PACK/05_TERMINOLOGY_RENDERING_FIREWALL.md",
+    "sha256": "2f0174fe8f4c60c78ee8059a0ad1523029709b25f8f8a12d6a5243da09438155",
+    "bytes": 3418
+  },
+  {
+    "path": "Layer_A_CLEAN_RUNTIME_SOURCE_PACK/06_CONTENT_AND_NARRATIVE_GUARDS.md",
+    "sha256": "ae54d09b6ca589341331d97e990da97cee042cff352f97adaf52c41a7b3c402e",
+    "bytes": 4630
+  },
+  {
+    "path": "Layer_A_CLEAN_RUNTIME_SOURCE_PACK/07_FORMAL_RENDERING_RULES.md",
+    "sha256": "5eb8d84818b122e82b86b44abe0a0ac748c94ab7803eb05efa0a8fad6b23513e",
+    "bytes": 3951
+  },
+  {
+    "path": "Layer_A_CLEAN_RUNTIME_SOURCE_PACK/08_EDITORIAL_QA_CHECKLIST.md",
+    "sha256": "1520c751c5ac38d444e7b7204968b2a5a07335a0b467c47226da8b637806d1f6",
+    "bytes": 4579
+  },
+  {
+    "path": "Layer_A_CLEAN_RUNTIME_SOURCE_PACK/09_SYNTHETIC_FEWSHOT_SPECIFICATION.md",
+    "sha256": "a5323c5ea65145e397de556ab3df78ab4eca480778722c1d764ea0347a863b03",
+    "bytes": 8191
+  },
+  {
+    "path": "Layer_A_CLEAN_RUNTIME_SOURCE_PACK/10_SKILL_ASSEMBLY_SPEC.md",
+    "sha256": "169f79255447f24d696f70d97f79dc2c224d3e1061665e0706e6df0012d8fb0e",
+    "bytes": 4503
+  },
+  {
+    "path": "Layer_B_AUDIT_ONLY_PROVENANCE_LEDGER/B-01_RUNTIME_RULE_PROVENANCE_LEDGER.csv",
+    "sha256": "176b32a60332521bd5fbb0b1b0833d682131569b83144a7301d7a003b52eded2",
+    "bytes": 11388
+  },
+  {
+    "path": "Layer_B_AUDIT_ONLY_PROVENANCE_LEDGER/B-01_RUNTIME_RULE_PROVENANCE_LEDGER.md",
+    "sha256": "bca834a3c110226639e3a1214501de3697f886749d16b34690cb2289f4a9235c",
+    "bytes": 12599
+  },
+  {
+    "path": "Layer_B_AUDIT_ONLY_PROVENANCE_LEDGER/B-02_PATTERN_PROVENANCE_LEDGER.md",
+    "sha256": "7521f4114e7f353922e0489e97aeb5b8ab8344fd580741c1d06f5f4f40300036",
+    "bytes": 2785
+  },
+  {
+    "path": "Layer_B_AUDIT_ONLY_PROVENANCE_LEDGER/B-03_FEWSHOT_PROVENANCE_LEDGER.md",
+    "sha256": "2c94dbcf3e51c404e2222dc2f0712ae01b964483409b0b0d6d768dec89f119a7",
+    "bytes": 2664
+  },
+  {
+    "path": "Layer_C_HUMAN_REVIEW_SUPPORT_PACK/C-01_REVIEW_EXECUTIVE_SUMMARY.md",
+    "sha256": "e237a897cf0371948c3ae25925e0ce68604cf3ceb69458e709238b9a77339985",
+    "bytes": 5149
+  },
+  {
+    "path": "Layer_C_HUMAN_REVIEW_SUPPORT_PACK/C-02_WHAT_WILL_THE_FUTURE_WRITER_ACTUALLY_DO.md",
+    "sha256": "d118d63cf3f146b21a528d4ba099d884296380ef3f72cff7092a1347669169ac",
+    "bytes": 1872
+  },
+  {
+    "path": "Layer_C_HUMAN_REVIEW_SUPPORT_PACK/C-03_RULE_DECISION_DIGEST.md",
+    "sha256": "c221647f9fb5e057151b042eaf3c884efc8707e85721454dedb3c80e1f0001e8",
+    "bytes": 5715
+  },
+  {
+    "path": "Layer_C_HUMAN_REVIEW_SUPPORT_PACK/C-04_CHANGE_FROM_THE_FROZEN_DISTILLATION_REPORT.md",
+    "sha256": "ceece9fd23e4aaea9d1aec360afcd6ce2b8b5029e9c6c59a51b890cd2021d973",
+    "bytes": 2246
+  },
+  {
+    "path": "Layer_C_HUMAN_REVIEW_SUPPORT_PACK/C-05_WHAT_WAS_DELIBERATELY_EXCLUDED.md",
+    "sha256": "8239f98347686a56e293eeac2a5641e6089a623b62c863327e6074ca2f0695af",
+    "bytes": 1314
+  },
+  {
+    "path": "Layer_C_HUMAN_REVIEW_SUPPORT_PACK/C-06_BEFORE_AFTER_EXAMPLES.md",
+    "sha256": "41f33199112f56ddc755a8e3aca3469c347a136c23f509835c87f6cdf98fa052",
+    "bytes": 3076
+  },
+  {
+    "path": "Layer_C_HUMAN_REVIEW_SUPPORT_PACK/C-07_CONDITIONAL_RULE_MAP.md",
+    "sha256": "17804da4dafadc3793f0b9ecfb9cc4a2c163fcf673aeb733771cd45ea42efba0",
+    "bytes": 2107
+  },
+  {
+    "path": "Layer_C_HUMAN_REVIEW_SUPPORT_PACK/C-08_HUMAN_DECISION_TABLE.md",
+    "sha256": "66390ed7778352bfd2911f96deca888cf7f798bd94c7e0800b406c0b1717536b",
+    "bytes": 914
+  },
+  {
+    "path": "Layer_C_HUMAN_REVIEW_SUPPORT_PACK/C-09_HUMAN_DECISIONS_RESOLVED.md",
+    "sha256": "134f462c248fd4abffc9b2fb3056fcc2e62e1c936bc1c7bb65c5089ac252aebc",
+    "bytes": 2229
+  },
+  {
+    "path": "Layer_C_HUMAN_REVIEW_SUPPORT_PACK/C-10_FINAL_HUMAN_REVIEW_BRIEF.md",
+    "sha256": "3357943715392116e934f387cee8d421a7ca0830acf56b2f05634904aaf80ce6",
+    "bytes": 1386
+  },
+  {
+    "path": "Layer_C_HUMAN_REVIEW_SUPPORT_PACK/MISCO_HUMAN_REVIEW_SUPPORT_PACK.docx",
+    "sha256": "e0c1800c7cefbc78a13b9f904384184ff05e91674c29215842cf40d7f83fd7eb",
+    "bytes": 45567
+  },
+  {
+    "path": "README_APPROVED_FIRST.md",
+    "sha256": "029224ac901ab6902fcf1d28df66c55ead576f27a7ea5d17b68443e9159b32a0",
+    "bytes": 1339
+  },
+  {
+    "path": "Validation/FINAL_STATUS.txt",
+    "sha256": "73e100317affd63a9ccb904f8a8cd1f50e70fd66aa827ce6f2da41863f137ad3",
+    "bytes": 127
+  },
+  {
+    "path": "Validation/VALIDATION_REPORT.md",
+    "sha256": "562c0c8075cfacc1c7eb56f07c44ede762fcfab65636ecf698413569975ba74e",
+    "bytes": 2951
+  }
+]

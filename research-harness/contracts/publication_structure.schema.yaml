@@ -1,0 +1,61 @@
+schema_version: "0.2"
+title: PublicationStructure
+description: >-
+  A provisional reader-facing chapter/section projection generated from the
+  current publication-eligible Research State and Attention Map. It is not
+  Research Evidence and has no authority over questions, methods, or answers.
+type: object
+required:
+  - schema_version
+  - structure_id
+  - source_research_state_id
+  - authority
+  - revision
+  - nodes
+  - changes
+properties:
+  schema_version:
+    const: "0.2"
+  structure_id:
+    type: string
+  source_research_state_id:
+    type: string
+  source_attention_map_id:
+    type: [string, "null"]
+  authority:
+    const: PROVISIONAL_READER_ORIENTED
+  revision:
+    type: integer
+    minimum: 0
+  nodes:
+    type: array
+    items:
+      $ref: "#/definitions/node"
+  changes:
+    type: array
+    items:
+      $ref: "#/definitions/change"
+definitions:
+  node:
+    type: object
+    required: [schema_version, node_id, kind, title, position, attention_refs]
+    properties:
+      schema_version: {const: "0.1"}
+      node_id: {type: string}
+      kind: {enum: [CHAPTER, SECTION]}
+      title: {type: string, minLength: 1}
+      parent_id: {type: [string, "null"]}
+      position: {type: integer, minimum: 0}
+      attention_refs: {type: array, items: {type: string}}
+  change:
+    type: object
+    required: [schema_version, action, node_ids, new_nodes]
+    properties:
+      schema_version: {const: "0.1"}
+      action: {enum: [ADD, REMOVE, MERGE, SPLIT, MOVE, RENAME]}
+      node_ids: {type: array, items: {type: string}}
+      node: {$ref: "#/definitions/node"}
+      new_nodes: {type: array, items: {$ref: "#/definitions/node"}}
+      target_node_id: {type: [string, "null"]}
+      new_title: {type: [string, "null"]}
+      new_parent_id: {type: [string, "null"]}

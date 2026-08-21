@@ -1,0 +1,85 @@
+version: "0.2"
+status: "ACTIVE_CONTRACT_CANDIDATE_NOT_CANONICAL"
+principles:
+  question_candidate_is_authority: false
+  supporting_only_is_sufficient: false
+  material_claim_requires_source_and_locator: true
+  source_type_limits_support_scope: true
+  source_quality_order: [HIGH, MEDIUM, LOW_CONFIDENCE, LOW_TRUST]
+  low_trust_materials_are_exploratory_only: true
+  low_trust_may_be_sole_material_finding_support: false
+  low_trust_may_resolve_evidence_gap: false
+  company_primary_default_support_scope: COMPANY_CLAIM
+  independent_effectiveness_requires_independent_support: true
+  low_confidence_sources_are_contextual_only: true
+  low_confidence_may_resolve_evidence_gap: false
+  publication_draft_is_research_input: false
+  archive_provenance_runtime_access: DENY
+source_types:
+  PEER_REVIEWED_RESEARCH:
+    may_support: [DESCRIPTIVE_CONTEXT, INDEPENDENT_EFFECTIVENESS, CAUSAL_EFFECT]
+    caution: "Causal support still depends on the reported design and limitations."
+  GOVERNMENT_PRIMARY:
+    may_support: [DESCRIPTIVE_CONTEXT, INDEPENDENT_EFFECTIVENESS]
+    caution: "Authority and method determine support; official status alone is insufficient."
+  STANDARDS_BODY:
+    may_support: [DESCRIPTIVE_CONTEXT]
+  COMPANY_PRIMARY:
+    may_support: [COMPANY_CLAIM, DESCRIPTIVE_CONTEXT]
+    caution: "Company blogs and press releases remain COMPANY_CLAIM evidence; independent support must be captured separately."
+  INDEPENDENT_ANALYSIS:
+    may_support: [DESCRIPTIVE_CONTEXT, INDEPENDENT_EFFECTIVENESS]
+  NEWS_REPORTING:
+    may_support: [DESCRIPTIVE_CONTEXT]
+  WORKING_PAPER:
+    quality: LOW_CONFIDENCE
+    may_support: [DESCRIPTIVE_CONTEXT, LEAD_ONLY]
+    may_resolve_evidence_gap: false
+    caution: "Context or lead evidence only; do not establish an effect alone."
+  PREPRINT:
+    quality: LOW_CONFIDENCE
+    may_support: [DESCRIPTIVE_CONTEXT, LEAD_ONLY]
+    may_resolve_evidence_gap: false
+    caution: "Context or lead evidence only; do not establish an effect alone."
+  INDUSTRY_REPORT:
+    quality: LOW_CONFIDENCE
+    may_support: [DESCRIPTIVE_CONTEXT, LEAD_ONLY]
+    may_resolve_evidence_gap: false
+    caution: "Context or lead evidence only; do not establish an effect alone."
+  CORPORATE_PUBLICATION:
+    quality: LOW_CONFIDENCE
+    may_support: [DESCRIPTIVE_CONTEXT, LEAD_ONLY]
+    may_resolve_evidence_gap: false
+    caution: "Context or lead evidence only; use COMPANY_PRIMARY for company blogs and press releases."
+  SOCIAL_MEDIA:
+    quality: LOW_TRUST
+    may_support: [DESCRIPTIVE_CONTEXT, LEAD_ONLY]
+    may_be_sole_material_finding_support: false
+    may_resolve_evidence_gap: false
+    caution: "Use as a lead or descriptive context only; preserve the snapshot and acquisition time."
+  ONLINE_FORUM:
+    quality: LOW_TRUST
+    may_support: [DESCRIPTIVE_CONTEXT, LEAD_ONLY]
+    may_be_sole_material_finding_support: false
+    may_resolve_evidence_gap: false
+    caution: "Use as a lead or descriptive context only; preserve the snapshot and acquisition time."
+  OTHER:
+    quality: "MUST_BE_DECLARED_PER_EVIDENCE"
+    may_support: [DESCRIPTIVE_CONTEXT, LEAD_ONLY]
+    may_be_sole_material_finding_support: "DEPENDS_ON_SOURCE_QUALITY"
+    may_resolve_evidence_gap: "DEPENDS_ON_SOURCE_QUALITY"
+    caution: "If the material is low trust, flag it LOW_TRUST and apply the low-trust restrictions."
+required_capture_fields:
+  - evidence_id
+  - source_id
+  - source_type
+  - source_quality
+  - locator
+  - captured_statement
+  - acquired_at
+  - text_snapshot
+  - snapshot_path
+  - snapshot_sha256
+  - excerpt_locator_pairs
+  - evidence_kind
+  - support_scope

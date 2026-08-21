@@ -1,0 +1,14 @@
+schema_model: DesktopResearchHandoff
+schema_version: "0.3"
+required:
+  - source_captures
+  - evidence_citations
+  - findings
+  - evidence_gaps
+  - research_brief
+constraints:
+  - "SourceCapture is acquired once and may be referenced by multiple EvidenceCitations."
+  - "Capture-only material is retained but cannot support a Finding."
+  - "LEAD_ONLY is restricted to the confirmed abstract/summary scope."
+  - "AGGREGATE_SYNTHESIS preserves included sources, overlap, conflicts, and limitations."
+  - "Publication Context excludes original files, full text, and internal excerpts."

@@ -1,0 +1,66 @@
+schema_model: SourceCapture + EvidenceCitation
+schema_version: "0.3"
+legacy_schema_version: "0.2"
+legacy_required:
+  - evidence_id
+  - source_id
+  - source_type
+  - source_quality
+  - locator
+  - captured_statement
+  - acquired_at
+  - text_snapshot
+  - snapshot_path
+  - snapshot_sha256
+  - excerpt_locator_pairs
+  - evidence_kind
+  - support_scope
+capture_required:
+  - capture_id
+  - source_id
+  - canonical_locator
+  - acquired_at
+  - original_path
+  - original_sha256
+  - text_snapshot_path
+  - text_snapshot_sha256
+citation_required:
+  - evidence_id
+  - capture_id
+  - captured_statement
+  - excerpt
+  - excerpt_locator
+  - evidence_status
+  - writer_use_mode
+  - verbatim_use_status
+required:
+  - capture_required
+  - citation_required
+evidence_kind:
+  - SUPPORTING
+  - COUNTEREVIDENCE
+  - CONFLICT
+  - NULL
+  - LIMITATION
+  - UNKNOWN
+source_quality:
+  - HIGH
+  - MEDIUM
+  - LOW_CONFIDENCE
+  - LOW_TRUST
+constraints:
+  - "v0.3 SourceCapture identity is canonical_locator + original_sha256"
+  - "v0.3 captures preserve original bytes and a UTF-8 text rendition; both SHA-256 values are verified"
+  - "v0.3 Citation excerpts must be contained in the referenced Capture text"
+  - "locator must be non-empty for every captured material claim"
+  - "acquired_at must be timezone-aware UTC acquisition time, not a publication date"
+  - "text_snapshot must equal the UTF-8 contents of snapshot_path"
+  - "snapshot_sha256 must equal the SHA-256 of the snapshot file bytes"
+  - "SOCIAL_MEDIA and ONLINE_FORUM sources must be flagged LOW_TRUST"
+  - "WORKING_PAPER, PREPRINT, INDUSTRY_REPORT, and CORPORATE_PUBLICATION sources must be flagged LOW_CONFIDENCE"
+  - "LOW_CONFIDENCE evidence may not support INDEPENDENT_EFFECTIVENESS or CAUSAL_EFFECT"
+  - "LOW_TRUST evidence may support only DESCRIPTIVE_CONTEXT or LEAD_ONLY"
+  - "snapshot_path must be <run-exchange>/evidence_snapshots/<evidence-id>.txt at submission and an immutable run snapshot after collection"
+  - "every excerpt_locator_pairs.excerpt must occur in text_snapshot and have a non-empty locator"
+  - "the primary locator must be represented in excerpt_locator_pairs"
+  - "COMPANY_PRIMARY cannot support INDEPENDENT_EFFECTIVENESS or CAUSAL_EFFECT; independent support must be captured separately"

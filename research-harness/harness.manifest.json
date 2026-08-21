@@ -1,0 +1,11 @@
+{
+  "kind": "HARNESS",
+  "managed_paths": [
+    "src",
+    "contracts",
+    "pyproject.toml",
+    "uv.lock",
+    "WORK_RESEARCH_COORDINATOR.md"
+  ],
+  "schema_version": "1"
+}

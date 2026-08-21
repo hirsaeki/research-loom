@@ -1,0 +1,350 @@
+version: "0.1"
+status: "ACTIVE_CONTRACT_CANDIDATE_NOT_CANONICAL"
+purpose: >-
+  Eliminate ambiguous reference-material access. Every artifact must have an explicit
+  role, authority, lane, runtime policy, and evidence eligibility. File existence does
+  not grant runtime access.
+
+defaults:
+  unknown_role: DENY
+  unregistered_artifact: DENY
+  generic_reference_role_allowed: false
+  infer_access_from_directory_name: false
+  infer_access_from_filename: false
+
+lanes:
+  - CONTROL_PLANE
+  - RESEARCH
+  - PUBLICATION
+  - HUMAN_REVIEW
+  - IMPLEMENTATION
+
+runtime_events:
+  - QUESTION_FORMATION
+  - SEED_COMPARISON
+  - RESEARCH_PLANNING
+  - RESEARCH_RUN
+  - DESKTOP_RESEARCH
+  - PUBLICATION_DRAFT
+  - PUBLICATION_FINALIZATION
+  - CONTRACT_MIGRATION_REVIEW
+  - EVIDENCE_MODEL_MIGRATION
+  - PROVENANCE_AUDIT
+  - ATTENTION_DISTILLATION
+
+policy_values:
+  - INCLUDE
+  - RETRIEVE
+  - DENY
+  - HUMAN_ONLY
+  - EXPLICIT_INCLUDE
+
+roles:
+  ACTIVE_CONTRACT:
+    authority: HUMAN_APPROVED_CONTRACT
+    evidence_eligible: false
+    may_shape_questions: true
+    may_determine_method: false
+    may_determine_answer: false
+    default_runtime_policy: INCLUDE
+
+  DESKTOP_RESEARCH_CONTRACT:
+    authority: HUMAN_APPROVED_CONTRACT
+    evidence_eligible: false
+    may_shape_questions: true
+    may_determine_method: false
+    may_determine_answer: false
+    runtime_policy:
+      DESKTOP_RESEARCH: INCLUDE
+      CONTRACT_MIGRATION_REVIEW: INCLUDE
+      PROVENANCE_AUDIT: INCLUDE
+
+  DESKTOP_RESEARCH_SOURCE_POLICY:
+    authority: HUMAN_APPROVED_SOURCE_POLICY
+    evidence_eligible: false
+    may_shape_questions: false
+    may_determine_method: false
+    may_determine_answer: false
+    runtime_policy:
+      DESKTOP_RESEARCH: INCLUDE
+      CONTRACT_MIGRATION_REVIEW: INCLUDE
+      PROVENANCE_AUDIT: INCLUDE
+
+  INTAKE_SOURCE:
+    authority: HUMAN_SUPPLIED_REQUIREMENT_INPUT
+    evidence_eligible: false
+    may_shape_questions: true
+    may_determine_method: false
+    may_determine_answer: false
+    runtime_policy:
+      QUESTION_FORMATION: INCLUDE
+      SEED_COMPARISON: INCLUDE
+      RESEARCH_PLANNING: INCLUDE
+      RESEARCH_RUN: RETRIEVE
+      DESKTOP_RESEARCH: RETRIEVE
+      PUBLICATION_DRAFT: RETRIEVE
+      PUBLICATION_FINALIZATION: RETRIEVE
+      CONTRACT_MIGRATION_REVIEW: RETRIEVE
+      PROVENANCE_AUDIT: RETRIEVE
+
+  ATTENTION_PUBLICATION_MAP:
+    authority: HUMAN_APPROVED_GUIDANCE
+    evidence_eligible: false
+    may_shape_questions: true
+    may_determine_method: false
+    may_determine_answer: false
+    mutable: false
+    runtime_policy:
+      QUESTION_FORMATION: INCLUDE
+      SEED_COMPARISON: INCLUDE
+      RESEARCH_PLANNING: INCLUDE
+      RESEARCH_RUN: RETRIEVE
+      DESKTOP_RESEARCH: RETRIEVE
+      PUBLICATION_DRAFT: INCLUDE
+      PUBLICATION_FINALIZATION: INCLUDE
+      CONTRACT_MIGRATION_REVIEW: INCLUDE
+      PROVENANCE_AUDIT: RETRIEVE
+      ATTENTION_DISTILLATION: RETRIEVE
+
+  ATTENTION_INTAKE_DROP:
+    authority: HUMAN_SUPPLIED_UNTRIAGED_INTAKE
+    evidence_eligible: false
+    may_shape_questions: false
+    may_determine_method: false
+    may_determine_answer: false
+    mutable: false
+    runtime_policy:
+      ATTENTION_DISTILLATION: INCLUDE
+      CONTRACT_MIGRATION_REVIEW: RETRIEVE
+
+  ATTENTION_MAP_CANDIDATE:
+    authority: WORK_DISTILLED_CANDIDATE
+    evidence_eligible: false
+    may_shape_questions: false
+    may_determine_method: false
+    may_determine_answer: false
+    mutable: false
+    runtime_policy:
+      ATTENTION_DISTILLATION: INCLUDE
+      CONTRACT_MIGRATION_REVIEW: RETRIEVE
+
+  FORMAL_PUBLICATION_SPEC:
+    authority: HUMAN_APPROVED_FORMAL_SPEC
+    evidence_eligible: false
+    may_shape_questions: false
+    may_determine_method: false
+    may_determine_answer: false
+    runtime_policy:
+      QUESTION_FORMATION: DENY
+      SEED_COMPARISON: DENY
+      RESEARCH_PLANNING: DENY
+      RESEARCH_RUN: DENY
+      DESKTOP_RESEARCH: DENY
+      PUBLICATION_DRAFT: INCLUDE
+      PUBLICATION_FINALIZATION: INCLUDE
+      CONTRACT_MIGRATION_REVIEW: RETRIEVE
+      PROVENANCE_AUDIT: RETRIEVE
+
+  CLEAN_PUBLICATION_SOURCE:
+    authority: HUMAN_APPROVED_PUBLICATION_STYLE_AUTHORITY
+    evidence_eligible: false
+    may_shape_questions: false
+    may_determine_method: false
+    may_determine_answer: false
+    runtime_policy:
+      QUESTION_FORMATION: DENY
+      SEED_COMPARISON: DENY
+      RESEARCH_PLANNING: DENY
+      RESEARCH_RUN: DENY
+      DESKTOP_RESEARCH: DENY
+      PUBLICATION_DRAFT: INCLUDE
+      PUBLICATION_FINALIZATION: INCLUDE
+      CONTRACT_MIGRATION_REVIEW: RETRIEVE
+      PROVENANCE_AUDIT: RETRIEVE
+
+  PUBLICATION_DRAFT:
+    authority: GENERATED_PUBLICATION_PROSE
+    evidence_eligible: false
+    may_shape_questions: false
+    may_determine_method: false
+    may_determine_answer: false
+    runtime_policy:
+      QUESTION_FORMATION: DENY
+      SEED_COMPARISON: DENY
+      RESEARCH_PLANNING: DENY
+      RESEARCH_RUN: DENY
+      DESKTOP_RESEARCH: DENY
+      PUBLICATION_DRAFT: RETRIEVE
+      PUBLICATION_FINALIZATION: INCLUDE
+      CONTRACT_MIGRATION_REVIEW: DENY
+      PROVENANCE_AUDIT: RETRIEVE
+
+  PUBLICATION_FEEDBACK:
+    authority: GENERATED_PUBLICATION_FEEDBACK
+    evidence_eligible: false
+    may_shape_questions: false
+    may_determine_method: false
+    may_determine_answer: false
+    runtime_policy:
+      QUESTION_FORMATION: DENY
+      SEED_COMPARISON: DENY
+      RESEARCH_PLANNING: DENY
+      RESEARCH_RUN: DENY
+      DESKTOP_RESEARCH: DENY
+      PUBLICATION_DRAFT: INCLUDE
+      PUBLICATION_FINALIZATION: INCLUDE
+      CONTRACT_MIGRATION_REVIEW: DENY
+      PROVENANCE_AUDIT: RETRIEVE
+
+  MODE_BRIDGE_CONTRACT:
+    authority: HUMAN_APPROVED_CONTRACT
+    evidence_eligible: false
+    may_shape_questions: false
+    may_determine_method: true
+    may_determine_answer: false
+    default_runtime_policy: EXPLICIT_INCLUDE
+
+  PRIOR_SEED:
+    authority: QUARANTINED_PRIOR
+    evidence_eligible: false
+    may_shape_questions: false
+    may_determine_method: false
+    may_determine_answer: false
+    runtime_policy:
+      QUESTION_FORMATION: DENY
+      SEED_COMPARISON: INCLUDE
+      RESEARCH_PLANNING: DENY
+      RESEARCH_RUN: DENY
+      DESKTOP_RESEARCH: DENY
+      PUBLICATION_DRAFT: DENY
+      PUBLICATION_FINALIZATION: DENY
+      CONTRACT_MIGRATION_REVIEW: RETRIEVE
+      PROVENANCE_AUDIT: RETRIEVE
+
+  SOURCE_EVIDENCE:
+    authority: RESEARCH_SOURCE_OR_ACCEPTED_EVIDENCE
+    evidence_eligible: true
+    may_shape_questions: true
+    may_determine_method: false
+    may_determine_answer: false
+    runtime_policy:
+      QUESTION_FORMATION: RETRIEVE
+      SEED_COMPARISON: RETRIEVE
+      RESEARCH_PLANNING: RETRIEVE
+      RESEARCH_RUN: RETRIEVE
+      DESKTOP_RESEARCH: RETRIEVE
+      PUBLICATION_DRAFT: RETRIEVE
+      PUBLICATION_FINALIZATION: RETRIEVE
+      CONTRACT_MIGRATION_REVIEW: DENY
+      PROVENANCE_AUDIT: RETRIEVE
+
+  RESEARCH_STATE:
+    authority: CONTROLLED_STATE
+    evidence_eligible: false
+    runtime_policy:
+      QUESTION_FORMATION: INCLUDE
+      SEED_COMPARISON: INCLUDE
+      RESEARCH_PLANNING: INCLUDE
+      RESEARCH_RUN: INCLUDE
+      DESKTOP_RESEARCH: INCLUDE
+      PUBLICATION_DRAFT: EXPLICIT_INCLUDE
+      PUBLICATION_FINALIZATION: EXPLICIT_INCLUDE
+      CONTRACT_MIGRATION_REVIEW: RETRIEVE
+      PROVENANCE_AUDIT: INCLUDE
+
+  PUBLICATION_STATE:
+    authority: CONTROLLED_STATE
+    evidence_eligible: false
+    runtime_policy:
+      QUESTION_FORMATION: DENY
+      SEED_COMPARISON: DENY
+      RESEARCH_PLANNING: DENY
+      RESEARCH_RUN: DENY
+      DESKTOP_RESEARCH: DENY
+      PUBLICATION_DRAFT: INCLUDE
+      PUBLICATION_FINALIZATION: INCLUDE
+      CONTRACT_MIGRATION_REVIEW: RETRIEVE
+      PROVENANCE_AUDIT: INCLUDE
+
+  DECISION_RECORD:
+    authority: HUMAN_DECISION
+    evidence_eligible: false
+    runtime_policy:
+      QUESTION_FORMATION: INCLUDE
+      SEED_COMPARISON: INCLUDE
+      RESEARCH_PLANNING: INCLUDE
+      RESEARCH_RUN: INCLUDE
+      DESKTOP_RESEARCH: INCLUDE
+      PUBLICATION_DRAFT: INCLUDE
+      PUBLICATION_FINALIZATION: INCLUDE
+      CONTRACT_MIGRATION_REVIEW: INCLUDE
+      PROVENANCE_AUDIT: INCLUDE
+
+  SUPERSEDED_CANONICAL_PROVENANCE:
+    authority: PROVENANCE_ONLY
+    evidence_eligible: false
+    may_shape_questions: false
+    may_determine_method: false
+    may_determine_answer: false
+    runtime_policy:
+      QUESTION_FORMATION: DENY
+      SEED_COMPARISON: DENY
+      RESEARCH_PLANNING: DENY
+      RESEARCH_RUN: DENY
+      DESKTOP_RESEARCH: DENY
+      PUBLICATION_DRAFT: DENY
+      PUBLICATION_FINALIZATION: DENY
+      CONTRACT_MIGRATION_REVIEW: EXPLICIT_INCLUDE
+      PROVENANCE_AUDIT: EXPLICIT_INCLUDE
+
+  HISTORICAL_CALIBRATION_SOURCE:
+    authority: PROVENANCE_ONLY
+    evidence_eligible: false
+    may_shape_questions: false
+    may_determine_method: false
+    may_determine_answer: false
+    runtime_policy:
+      QUESTION_FORMATION: DENY
+      SEED_COMPARISON: DENY
+      RESEARCH_PLANNING: DENY
+      RESEARCH_RUN: DENY
+      DESKTOP_RESEARCH: DENY
+      PUBLICATION_DRAFT: DENY
+      PUBLICATION_FINALIZATION: DENY
+      CONTRACT_MIGRATION_REVIEW: EXPLICIT_INCLUDE
+      PROVENANCE_AUDIT: EXPLICIT_INCLUDE
+
+  SIMULATION_PROVENANCE:
+    authority: PROVENANCE_ONLY
+    evidence_eligible: false
+    may_shape_questions: false
+    may_determine_method: false
+    may_determine_answer: false
+    runtime_policy:
+      QUESTION_FORMATION: DENY
+      SEED_COMPARISON: DENY
+      RESEARCH_PLANNING: DENY
+      RESEARCH_RUN: DENY
+      DESKTOP_RESEARCH: DENY
+      PUBLICATION_DRAFT: DENY
+      PUBLICATION_FINALIZATION: DENY
+      CONTRACT_MIGRATION_REVIEW: EXPLICIT_INCLUDE
+      PROVENANCE_AUDIT: EXPLICIT_INCLUDE
+
+examples:
+  - artifact: "2025年度G1研究会.pdf"
+    role: HISTORICAL_CALIBRATION_SOURCE
+    runtime_comment: "Style lessons must be distilled into CLEAN_PUBLICATION_SOURCE; original is runtime DENY."
+
+  - artifact: "MISCO_01_研究設計正本_v0.8.docx"
+    role: SUPERSEDED_CANONICAL_PROVENANCE
+    applies_after: "new design formally adopted"
+    runtime_comment: "May be opened only for explicit migration/provenance events."
+
+  - artifact: "Provisional_RQ_Seed.md"
+    role: PRIOR_SEED
+    runtime_comment: "Excluded from independent question formation; included only in seed comparison."
+
+  - artifact: "MISCO_Research_Attention_and_Initial_Publication_Map_v0.1.md"
+    role: ATTENTION_PUBLICATION_MAP
+    runtime_comment: "May guide attention/routing but cannot support a research claim or force a method."
