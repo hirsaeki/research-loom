@@ -26,6 +26,7 @@ Machine-readable expectations for the core cases are in `contract-cases.json`.
 - `invalid/incompatible-core.profile.json` → `PROFILE-CORE-COMPAT-001`.
 - `invalid/effective-profile-set-duplicate-profile-key.json` → `PROFILE-EFFECTIVE-IDENTITY-001`.
 - `invalid/effective-profile-set-duplicate-constraint-path.json` → `PROFILE-EFFECTIVE-IDENTITY-001`.
+- `invalid/effective-profile-set-missing-requested.json` → `PROFILE-EFFECTIVE-REQUEST-001`; a direct request is omitted from the selected Effective Profile Set.
 - `invalid/effective-profile-set-bad-provenance.json` → `PROFILE-EFFECTIVE-PROVENANCE-001`; a dependency edge points at the right Profile identity/version but the wrong immutable manifest pin.
 - `invalid/ambiguous-cross-category-conflict/` → exactly `PROFILE-COMP-REPLACE-001`.
 - `invalid/unverifiable-core-strengthening.profile.json` → `PROFILE-CORE-STRENGTHENING-001`; its declared validator binding exists, but the referenced constraint does not match the approved form.
@@ -36,4 +37,4 @@ Machine-readable expectations for the core cases are in `contract-cases.json`.
 
 `semantic/version-resolution/conflict-case.json` adds a direct target range incompatible with the transitive range and must fail exactly `PROFILE-VERSION-001`.
 
-`tests/contracts/test_profile_contracts.py`, `test_version_conflict.py`, and `test_provenance_failure.py` execute these fixtures. Their exhaustive solver is intentionally tiny and test-only; it is an oracle for the canonical semantics, not a general runtime resolver.
+`tests/contracts/test_profile_contracts.py`, `test_version_conflict.py`, `test_provenance_failure.py`, and `test_requested_presence.py` execute these fixtures. Their exhaustive solver is intentionally tiny and test-only; it is an oracle for the canonical semantics, not a general runtime resolver.

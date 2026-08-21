@@ -102,7 +102,8 @@ conflict_errors:
   PROFILE-MANIFEST-IDENTITY-001: a manifest repeats a constraint/resource/dependency identity ambiguously
   PROFILE-MANIFEST-REF-001: a manifest reference does not resolve
   PROFILE-EFFECTIVE-IDENTITY-001: a normalized Effective Profile Set repeats an identity that must be unique
-  PROFILE-EFFECTIVE-PROVENANCE-001: effective provenance does not resolve to its pinned selected manifest
+  PROFILE-EFFECTIVE-REQUEST-001: a direct requested Profile key/range is missing from the selected Effective Profile Set or lacks matching requested provenance
+  PROFILE-EFFECTIVE-PROVENANCE-001: effective provenance does not resolve to its pinned selected manifest or declared dependency edge
   PROFILE-CORE-INVARIANT-001: a profile attempts to disable, weaken, reinterpret, substitute, or replace a Core invariant
   PROFILE-CORE-STRENGTHENING-001: a strengthening claim has no authoritative binding or fails/inconclusively satisfies its registered validator/form
 
@@ -133,6 +134,8 @@ effective_profile_set:
     - requested_profiles contains at most one direct requirement per [profile_type, profile_id]
     - effective_profiles contains exactly one version/content pin per [profile_type, profile_id]
     - each effective Profile is a member of candidate_universe
+    - every requested_profiles requirement resolves to exactly one effective Profile with the same Profile key and a selected version satisfying the requested range
+    - that requested effective Profile contains a relation=requested selection_provenance entry carrying exactly the direct requested range
     - effective_constraints contains exactly one entry per semantic path
     - core_invariants contains exactly one entry per active Core invariant ID
   selection_provenance:
@@ -143,6 +146,9 @@ effective_profile_set:
     - every constraint source repeats the selected manifest_sha256 for its Profile
     - every invariant strengthening source repeats the selected manifest_sha256 and validator_binding
     - every provenance source must resolve to exactly one effective Profile with the same type/id/version/hash
+    - every extends/requires selection_provenance introduced_by pin resolves to exactly one effective Profile
+    - the introducing pinned manifest declares an edge with the recorded relation, target Profile key, and exact required_version range
+    - the selected target Profile version satisfies the recorded required_version range
 
 canonical_serialization:
   normative_for_reproducibility_only: true
