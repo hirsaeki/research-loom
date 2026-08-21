@@ -12,18 +12,21 @@
       "id": "FIX-BAD-INV-001",
       "path": "evidence.capture.display_label",
       "merge_strategy": "must_equal",
-      "value": "source optional",
-      "rationale": "An unrelated display label does not establish a stricter traceability predicate."
+      "value": "exact",
+      "rationale": "The path is unrelated to the registered exact-locator form."
     }
   ],
   "core_invariant_strengthenings": [
     {
       "invariant_id": "CORE-TRACE-001",
       "effect": "strengthen",
-      "constraint_ids": [
-        "FIX-BAD-INV-001"
-      ],
-      "rationale": "This declaration is intentionally unverifiable and must fail closed."
+      "constraint_ids": ["FIX-BAD-INV-001"],
+      "validator_binding": {
+        "validator_id": "core.trace.evidence-source",
+        "validator_version": "0.1.0",
+        "form_id": "exact-locator"
+      },
+      "rationale": "Binding exists, but the referenced constraint does not match the approved form."
     }
   ]
 }
