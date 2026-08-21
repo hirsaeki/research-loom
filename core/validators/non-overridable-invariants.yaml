@@ -1,0 +1,123 @@
+contract_version: 0.1.0
+override_policy: deny
+purpose: >-
+  Core research invariants that profiles, project configuration, plugins,
+  skills, CLI flags, or storage implementations may strengthen but must not
+  disable, weaken, or reinterpret.
+
+invariants:
+  - id: CORE-TRACE-001
+    name: evidence_requires_source
+    scope: evidence
+    rule: >-
+      Every Evidence must reference exactly one Source by source_id, carry a
+      non-empty locator within that source, and both references must resolve.
+    rationale: Source and Evidence are distinct; evidence must remain traceable to source material.
+
+  - id: CORE-TRACE-002
+    name: finding_requires_research_question
+    scope: finding
+    rule: >-
+      Every Finding must reference at least one ResearchQuestion and every
+      referenced question must resolve.
+    rationale: A finding is research state only in relation to a question it addresses.
+
+  - id: CORE-TRACE-003
+    name: argument_requires_support
+    scope: argument
+    rule: >-
+      Every Argument must reference at least one Finding or Evidence item, and
+      every referenced support object must resolve.
+    rationale: An argument may organize research meaning but may not become an unsupported source of research facts.
+
+  - id: CORE-TRACE-004
+    name: recommendation_requires_finding
+    scope: recommendation
+    rule: >-
+      Every Recommendation must reference at least one Finding and every
+      referenced finding must resolve.
+    rationale: Recommendations must remain downstream of research findings.
+
+  - id: CORE-PROV-001
+    name: generated_artifact_requires_snapshot
+    aliases: [published_artifact_requires_snapshot]
+    scope: artifact
+    rule: >-
+      Every generated or published Artifact must reference an immutable
+      Research Snapshot by source_snapshot_id, and that snapshot must resolve.
+    rationale: Generated outputs must be reproducible to a pinned research state.
+
+  - id: CORE-PROV-002
+    name: research_snapshot_is_immutable
+    scope: snapshot
+    rule: >-
+      A persisted Research Snapshot must never be mutated in place. Any change
+      creates a new snapshot and may point to the previous snapshot by prior_snapshot_id.
+    rationale: Research provenance requires stable historical states.
+
+  - id: CORE-PROV-003
+    name: audit_log_is_append_only
+    scope: audit_event
+    rule: >-
+      Persisted AuditEvent records must be append-only. Corrections are new
+      events that reference or supersede prior events; prior event payloads are not rewritten or deleted.
+    rationale: Audit history must preserve what occurred, including later corrections.
+
+  - id: CORE-PROV-004
+    name: snapshot_member_identity_is_unique
+    scope: snapshot
+    rule: >-
+      A Research Snapshot must contain at most one member for each
+      (kind, id, revision) tuple. When a member carries a digest, that digest
+      must identify the content of that exact object revision.
+    rationale: A snapshot must bind each object revision to one unambiguous state.
+
+  - id: CORE-REF-001
+    name: referenced_objects_must_resolve
+    aliases: [citation_must_resolve]
+    scope: graph
+    rule: >-
+      Every identifier used as a research-object reference must resolve within
+      the applicable project/snapshot context. A missing reference is a hard
+      contract violation, not an ignorable warning.
+    rationale: Traceability cannot depend on dangling IDs. Citation rendering is out of scope; reference resolution is not.
+
+  - id: CORE-AUTH-001
+    name: authoritative_research_change_requires_human_decision
+    scope: research_state
+    rule: >-
+      A transition that qualifies Evidence as authoritative, or that adopts,
+      rejects, closes, or materially revises a ResearchQuestion, Method,
+      Finding, or Recommendation, must carry a resolving Decision whose
+      actor_type is human. Automated components may propose these transitions
+      but may not self-authorize them.
+    rationale: Research judgment remains human-owned even when orchestration is automated.
+
+  - id: CORE-FW-001
+    name: publication_artifacts_are_not_research_evidence
+    scope: artifact
+    rule: >-
+      An Artifact in the publication lane must have evidence_eligible=false and
+      must not be used as Evidence or as a substitute for research-state objects.
+      Writing feedback may identify gaps but cannot directly mutate authoritative research state.
+    rationale: Reader-facing prose must not recursively become its own research evidence.
+
+  - id: CORE-EPI-001
+    name: synthetic_evidence_cannot_be_promoted_to_empirical
+    scope: evidence
+    rule: >-
+      Evidence with evidence_mode=synthetic must remain synthetic in every
+      derived research state. It may inform process design, testing, or gap
+      discovery, but it cannot be relabeled or counted as empirical evidence.
+    rationale: Simulation and virtual-run outputs must not silently acquire empirical authority.
+
+  - id: CORE-EPI-002
+    name: epistemic_state_cannot_be_silently_strengthened
+    scope: research_state
+    rule: >-
+      A transformation must not silently strengthen Evidence verification or
+      empirical status, convert counter/conflict/null/unknown evidence into
+      supporting evidence, or erase recorded limitations. Any authoritative
+      reclassification must be represented as a new revision with preserved
+      prior provenance and the required human Decision.
+    rationale: Research transformations may reorganize state but must not manufacture stronger evidence.
