@@ -1,0 +1,430 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:research-loom:core:research-object:0.1.0",
+  "title": "research-loom canonical research object",
+  "description": "Storage- and profile-agnostic data contract for canonical research objects. Cross-object non-overridable invariants are defined separately under core/validators/.",
+  "oneOf": [
+    {"$ref": "#/$defs/project"},
+    {"$ref": "#/$defs/research_question"},
+    {"$ref": "#/$defs/claim"},
+    {"$ref": "#/$defs/method"},
+    {"$ref": "#/$defs/source"},
+    {"$ref": "#/$defs/evidence"},
+    {"$ref": "#/$defs/analysis"},
+    {"$ref": "#/$defs/finding"},
+    {"$ref": "#/$defs/counter_review"},
+    {"$ref": "#/$defs/argument"},
+    {"$ref": "#/$defs/contribution"},
+    {"$ref": "#/$defs/recommendation"},
+    {"$ref": "#/$defs/next_action"},
+    {"$ref": "#/$defs/decision"},
+    {"$ref": "#/$defs/artifact"},
+    {"$ref": "#/$defs/snapshot"},
+    {"$ref": "#/$defs/audit_event"}
+  ],
+  "$defs": {
+    "identifier": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"},
+    "ids": {"type": "array", "items": {"$ref": "#/$defs/identifier"}, "uniqueItems": true},
+    "non_empty_ids": {"type": "array", "items": {"$ref": "#/$defs/identifier"}, "minItems": 1, "uniqueItems": true},
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "object_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": {"type": "string", "minLength": 1},
+        "id": {"$ref": "#/$defs/identifier"}
+      }
+    },
+    "snapshot_member": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id", "revision"],
+      "properties": {
+        "kind": {"type": "string", "minLength": 1},
+        "id": {"$ref": "#/$defs/identifier"},
+        "revision": {"type": "integer", "minimum": 0},
+        "digest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "base": {
+      "type": "object",
+      "required": ["schema_version", "id", "kind", "revision"],
+      "properties": {
+        "schema_version": {"const": "0.1.0"},
+        "id": {"$ref": "#/$defs/identifier"},
+        "kind": {"type": "string"},
+        "revision": {"type": "integer", "minimum": 0},
+        "decision_ids": {"$ref": "#/$defs/ids"}
+      }
+    },
+    "project": {
+      "allOf": [
+        {"$ref": "#/$defs/base"},
+        {
+          "type": "object",
+          "required": ["title"],
+          "properties": {
+            "kind": {"const": "project"},
+            "title": {"type": "string", "minLength": 1},
+            "objective": {"type": "string"},
+            "scope": {"type": "array", "items": {"type": "string"}},
+            "out_of_scope": {"type": "array", "items": {"type": "string"}}
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "research_question": {
+      "allOf": [
+        {"$ref": "#/$defs/base"},
+        {
+          "type": "object",
+          "required": ["project_id", "text", "adoption_state"],
+          "properties": {
+            "kind": {"const": "research_question"},
+            "project_id": {"$ref": "#/$defs/identifier"},
+            "parent_question_id": {"$ref": "#/$defs/identifier"},
+            "text": {"type": "string", "minLength": 1},
+            "rationale": {"type": "string"},
+            "acceptance_criteria": {"type": "array", "items": {"type": "string"}},
+            "scope_limits": {"type": "array", "items": {"type": "string"}},
+            "adoption_state": {"enum": ["candidate", "proposed", "approved", "revised", "rejected", "closed", "out_of_scope"]}
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "claim": {
+      "allOf": [
+        {"$ref": "#/$defs/base"},
+        {
+          "type": "object",
+          "required": ["project_id", "question_id", "statement"],
+          "properties": {
+            "kind": {"const": "claim"},
+            "project_id": {"$ref": "#/$defs/identifier"},
+            "question_id": {"$ref": "#/$defs/identifier"},
+            "statement": {"type": "string", "minLength": 1},
+            "claim_type": {"type": "string", "minLength": 1},
+            "assessment": {"enum": ["proposed", "under_review", "supported", "mixed", "rejected", "insufficient"]},
+            "supporting_evidence_ids": {"$ref": "#/$defs/ids"},
+            "challenging_evidence_ids": {"$ref": "#/$defs/ids"}
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "method": {
+      "allOf": [
+        {"$ref": "#/$defs/base"},
+        {
+          "type": "object",
+          "required": ["project_id", "question_ids", "name", "adoption_state"],
+          "properties": {
+            "kind": {"const": "method"},
+            "project_id": {"$ref": "#/$defs/identifier"},
+            "question_ids": {"$ref": "#/$defs/non_empty_ids"},
+            "name": {"type": "string", "minLength": 1},
+            "protocol_ref": {"type": "string", "minLength": 1},
+            "adoption_state": {"enum": ["candidate", "approved", "rejected"]},
+            "limitations": {"type": "array", "items": {"type": "string"}}
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "source": {
+      "allOf": [
+        {"$ref": "#/$defs/base"},
+        {
+          "type": "object",
+          "required": ["project_id", "source_type", "canonical_locator"],
+          "properties": {
+            "kind": {"const": "source"},
+            "project_id": {"$ref": "#/$defs/identifier"},
+            "source_type": {"type": "string", "minLength": 1},
+            "canonical_locator": {"type": "string", "minLength": 1},
+            "acquired_at": {"type": "string", "format": "date-time"},
+            "content_digest": {"$ref": "#/$defs/digest"},
+            "media_type": {"type": "string", "minLength": 1},
+            "title": {"type": "string"},
+            "publisher_or_author": {"type": "string"},
+            "publication_or_update_date": {"type": "string"},
+            "version_or_revision": {"type": "string"}
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "evidence": {
+      "allOf": [
+        {"$ref": "#/$defs/base"},
+        {
+          "type": "object",
+          "required": ["project_id", "source_id", "locator", "statement", "evidence_kind", "verification_status", "evidence_mode"],
+          "properties": {
+            "kind": {"const": "evidence"},
+            "project_id": {"$ref": "#/$defs/identifier"},
+            "source_id": {"$ref": "#/$defs/identifier"},
+            "locator": {"type": "string", "minLength": 1},
+            "statement": {"type": "string", "minLength": 1},
+            "excerpt": {"type": "string"},
+            "capture_digest": {"$ref": "#/$defs/digest"},
+            "evidence_kind": {"enum": ["supporting", "counterevidence", "conflict", "null", "limitation", "unknown"]},
+            "verification_status": {"enum": ["verified", "lead_only", "unverified", "claim_not_supported", "capture_unavailable"]},
+            "evidence_mode": {"enum": ["empirical", "synthetic"]},
+            "limitations": {"type": "array", "items": {"type": "string"}},
+            "independence_group": {"type": "string"}
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "analysis": {
+      "allOf": [
+        {"$ref": "#/$defs/base"},
+        {
+          "type": "object",
+          "required": ["project_id", "question_ids", "evidence_ids", "summary"],
+          "properties": {
+            "kind": {"const": "analysis"},
+            "project_id": {"$ref": "#/$defs/identifier"},
+            "question_ids": {"$ref": "#/$defs/non_empty_ids"},
+            "method_id": {"$ref": "#/$defs/identifier"},
+            "evidence_ids": {"$ref": "#/$defs/non_empty_ids"},
+            "summary": {"type": "string", "minLength": 1},
+            "assumptions": {"type": "array", "items": {"type": "string"}},
+            "limitations": {"type": "array", "items": {"type": "string"}}
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "finding": {
+      "allOf": [
+        {"$ref": "#/$defs/base"},
+        {
+          "type": "object",
+          "required": ["project_id", "question_ids", "statement", "adoption_state"],
+          "properties": {
+            "kind": {"const": "finding"},
+            "project_id": {"$ref": "#/$defs/identifier"},
+            "question_ids": {"$ref": "#/$defs/non_empty_ids"},
+            "statement": {"type": "string", "minLength": 1},
+            "evidence_ids": {"$ref": "#/$defs/ids"},
+            "analysis_ids": {"$ref": "#/$defs/ids"},
+            "counter_evidence_ids": {"$ref": "#/$defs/ids"},
+            "boundary_conditions": {"type": "array", "items": {"type": "string"}},
+            "limitations": {"type": "array", "items": {"type": "string"}},
+            "confidence": {"enum": ["low", "moderate", "high"]},
+            "adoption_state": {"enum": ["candidate", "provisional", "approved", "rejected", "needs_revision"]}
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "counter_review": {
+      "allOf": [
+        {"$ref": "#/$defs/base"},
+        {
+          "type": "object",
+          "required": ["project_id", "target", "issue", "severity", "disposition"],
+          "properties": {
+            "kind": {"const": "counter_review"},
+            "project_id": {"$ref": "#/$defs/identifier"},
+            "target": {"$ref": "#/$defs/object_ref"},
+            "review_lens": {"type": "string", "minLength": 1},
+            "issue": {"type": "string", "minLength": 1},
+            "severity": {"enum": ["minor", "major", "critical"]},
+            "evidence_ids": {"$ref": "#/$defs/ids"},
+            "proposed_resolution": {"type": "string"},
+            "disposition": {"enum": ["open", "accepted", "partially_accepted", "rejected_with_reason", "resolved"]}
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "argument": {
+      "allOf": [
+        {"$ref": "#/$defs/base"},
+        {
+          "type": "object",
+          "required": ["project_id", "conclusion", "warrant", "finding_ids", "evidence_ids"],
+          "properties": {
+            "kind": {"const": "argument"},
+            "project_id": {"$ref": "#/$defs/identifier"},
+            "question_ids": {"$ref": "#/$defs/ids"},
+            "conclusion": {"type": "string", "minLength": 1},
+            "conclusion_claim_id": {"$ref": "#/$defs/identifier"},
+            "premise_claim_ids": {"$ref": "#/$defs/ids"},
+            "finding_ids": {"$ref": "#/$defs/ids"},
+            "evidence_ids": {"$ref": "#/$defs/ids"},
+            "warrant": {"type": "string", "minLength": 1},
+            "qualifier": {"type": "string"},
+            "counter_review_ids": {"$ref": "#/$defs/ids"},
+            "implications": {"type": "array", "items": {"type": "string"}}
+          },
+          "anyOf": [
+            {"properties": {"finding_ids": {"minItems": 1}}},
+            {"properties": {"evidence_ids": {"minItems": 1}}}
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "contribution": {
+      "allOf": [
+        {"$ref": "#/$defs/base"},
+        {
+          "type": "object",
+          "required": ["project_id", "statement"],
+          "properties": {
+            "kind": {"const": "contribution"},
+            "project_id": {"$ref": "#/$defs/identifier"},
+            "statement": {"type": "string", "minLength": 1},
+            "contribution_type": {"type": "string", "minLength": 1},
+            "finding_ids": {"$ref": "#/$defs/ids"},
+            "novelty_basis": {"type": "string"},
+            "target_audience": {"type": "array", "items": {"type": "string"}}
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "recommendation": {
+      "allOf": [
+        {"$ref": "#/$defs/base"},
+        {
+          "type": "object",
+          "required": ["project_id", "statement", "finding_ids", "adoption_state"],
+          "properties": {
+            "kind": {"const": "recommendation"},
+            "project_id": {"$ref": "#/$defs/identifier"},
+            "statement": {"type": "string", "minLength": 1},
+            "finding_ids": {"$ref": "#/$defs/non_empty_ids"},
+            "conditions": {"type": "array", "items": {"type": "string"}},
+            "scope": {"type": "array", "items": {"type": "string"}},
+            "adoption_state": {"enum": ["candidate", "provisional", "approved", "rejected"]}
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "next_action": {
+      "allOf": [
+        {"$ref": "#/$defs/base"},
+        {
+          "type": "object",
+          "required": ["project_id", "action_type", "target", "instruction", "reason", "priority", "status"],
+          "properties": {
+            "kind": {"const": "next_action"},
+            "project_id": {"$ref": "#/$defs/identifier"},
+            "action_type": {"type": "string", "minLength": 1},
+            "target": {"$ref": "#/$defs/object_ref"},
+            "instruction": {"type": "string", "minLength": 1},
+            "reason": {"type": "string", "minLength": 1},
+            "priority": {"enum": ["low", "medium", "high", "critical"]},
+            "blocked_by": {"$ref": "#/$defs/ids"},
+            "status": {"enum": ["open", "doing", "done", "cancelled"]}
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "decision": {
+      "allOf": [
+        {"$ref": "#/$defs/base"},
+        {
+          "type": "object",
+          "required": ["project_id", "decision_kind", "subjects", "choice", "actor_type", "decided_by", "decided_at"],
+          "properties": {
+            "kind": {"const": "decision"},
+            "project_id": {"$ref": "#/$defs/identifier"},
+            "decision_kind": {"type": "string", "minLength": 1},
+            "subjects": {"type": "array", "items": {"$ref": "#/$defs/object_ref"}, "minItems": 1},
+            "choice": {"type": "string", "minLength": 1},
+            "conditions": {"type": "array", "items": {"type": "string"}},
+            "rationale": {"type": "string"},
+            "actor_type": {"enum": ["human", "system"]},
+            "decided_by": {"type": "string", "minLength": 1},
+            "decided_at": {"type": "string", "format": "date-time"}
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "artifact": {
+      "allOf": [
+        {"$ref": "#/$defs/base"},
+        {
+          "type": "object",
+          "required": ["project_id", "role", "lane", "artifact_class", "locator", "evidence_eligible"],
+          "properties": {
+            "kind": {"const": "artifact"},
+            "project_id": {"$ref": "#/$defs/identifier"},
+            "role": {"type": "string", "minLength": 1},
+            "lane": {"enum": ["research", "publication", "control", "human_review", "implementation"]},
+            "artifact_class": {"enum": ["input", "process", "generated", "published"]},
+            "locator": {"type": "string", "minLength": 1},
+            "content_digest": {"$ref": "#/$defs/digest"},
+            "source_snapshot_id": {"$ref": "#/$defs/identifier"},
+            "evidence_eligible": {"type": "boolean"}
+          },
+          "allOf": [
+            {
+              "if": {"properties": {"artifact_class": {"enum": ["generated", "published"]}}},
+              "then": {"required": ["source_snapshot_id"]}
+            },
+            {
+              "if": {"properties": {"lane": {"const": "publication"}}},
+              "then": {"properties": {"evidence_eligible": {"const": false}}}
+            }
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "snapshot": {
+      "allOf": [
+        {"$ref": "#/$defs/base"},
+        {
+          "type": "object",
+          "required": ["project_id", "snapshot_type", "created_at", "mode", "members"],
+          "properties": {
+            "kind": {"const": "snapshot"},
+            "project_id": {"$ref": "#/$defs/identifier"},
+            "snapshot_type": {"const": "research"},
+            "created_at": {"type": "string", "format": "date-time"},
+            "mode": {"enum": ["real", "virtual"]},
+            "prior_snapshot_id": {"$ref": "#/$defs/identifier"},
+            "members": {"type": "array", "items": {"$ref": "#/$defs/snapshot_member"}, "uniqueItems": true},
+            "content_digest": {"$ref": "#/$defs/digest"}
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "audit_event": {
+      "allOf": [
+        {"$ref": "#/$defs/base"},
+        {
+          "type": "object",
+          "required": ["project_id", "occurred_at", "actor_type", "actor_id", "action", "subjects"],
+          "properties": {
+            "kind": {"const": "audit_event"},
+            "project_id": {"$ref": "#/$defs/identifier"},
+            "occurred_at": {"type": "string", "format": "date-time"},
+            "actor_type": {"enum": ["human", "system"]},
+            "actor_id": {"type": "string", "minLength": 1},
+            "action": {"type": "string", "minLength": 1},
+            "subjects": {"type": "array", "items": {"$ref": "#/$defs/object_ref"}, "minItems": 1},
+            "previous_event_id": {"$ref": "#/$defs/identifier"},
+            "payload_digest": {"$ref": "#/$defs/digest"}
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    }
+  }
+}
