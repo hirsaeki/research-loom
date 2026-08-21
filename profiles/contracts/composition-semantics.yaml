@@ -59,12 +59,14 @@ dependency_rules:
 
 manifest_semantics:
   profile_key: [profile_type, profile_id]
+  reserved_constraint_namespaces: [core]
   requirements:
     - constraint IDs must be unique within a Profile manifest
     - resource paths must be unique within a Profile manifest
     - extends and requires may not repeat one profile key with contradictory version requirements
     - core_invariant_strengthenings.constraint_ids must resolve to constraints in the same manifest
     - every named Core invariant must exist in the active invariant catalog
+    - Profile constraint paths must not use the reserved core.* namespace
   violations: error
 
 composition:
@@ -87,8 +89,13 @@ composition:
     - max applies only to comparable numeric values and chooses the greatest lower-bound requirement.
     - min applies only to comparable numeric values and chooses the least upper-bound requirement.
     - For different replace values, replacement is permitted only when every competing declaration is comparable through same-type extends ancestry and one declaration is the unique descendant of all others.
-    - Different replace values across profile categories, or between unrelated same-type profiles, are an ambiguous conflict and must fail.
+    - Different replace values across profile categories, or between unrelated same-type profiles, have no replacement winner and must fail.
     - requires never establishes replacement precedence.
+  conflict_classification:
+    - If declarations at one path use different merge strategies, report PROFILE-COMP-STRATEGY-001.
+    - If the shared strategy is replace and differing values have no unique same-type descendant winner, report PROFILE-COMP-REPLACE-001.
+    - Otherwise, if the shared strategy cannot deterministically merge the values, report PROFILE-COMP-CONFLICT-001.
+    - The classifications above are evaluated in order and exactly one composition conflict code is reported for one path.
 
 conflict_errors:
   PROFILE-EXTENDS-TYPE-001: extends targets a different profile_type
@@ -96,35 +103,64 @@ conflict_errors:
   PROFILE-VERSION-001: requested or required profile version cannot be satisfied
   PROFILE-CORE-COMPAT-001: a selected profile excludes the active Core contract version
   PROFILE-COMP-STRATEGY-001: one constraint path declares incompatible merge strategies
-  PROFILE-COMP-CONFLICT-001: constraint values cannot be merged deterministically
-  PROFILE-COMP-REPLACE-001: replace has no unique same-type descendant winner
+  PROFILE-COMP-CONFLICT-001: same-strategy constraint values cannot be merged deterministically and no more specific conflict code applies
+  PROFILE-COMP-REPLACE-001: replace has no unique same-type descendant winner, including cross-category replace collisions
   PROFILE-MANIFEST-IDENTITY-001: a manifest repeats a constraint/resource/dependency identity ambiguously
   PROFILE-MANIFEST-REF-001: a strengthening references a missing constraint or unknown Core invariant
+  PROFILE-EFFECTIVE-IDENTITY-001: a normalized Effective Profile Set repeats a Profile key, semantic constraint path, or Core invariant identity ambiguously
   PROFILE-CORE-INVARIANT-001: a profile attempts to disable, weaken, reinterpret, or replace a Core non-overridable invariant
+  PROFILE-CORE-STRENGTHENING-001: a declared Core invariant strengthening cannot be positively validated as a strict conjunctive strengthening
 
 core_invariant_floor:
   override_policy: deny
   allowed_profile_effects: [preserve, strengthen]
   forbidden_profile_effects: [disable, weaken, reinterpret, replace]
   strengthening_contract:
-    - A strengthening must name an existing Core invariant ID.
-    - It must point to one or more profile constraint IDs that implement the stricter condition.
-    - It must preserve the full original Core rule; the stricter rule is conjunctive, not substitutive.
-    - Composition must retain provenance for both the Core invariant and every strengthening profile.
+    declaration_is_claim_only: true
+    validation_required_before_effective_status: strengthened
+    validation_mode: fail_closed
+    validation_inputs:
+      - the immutable Core invariant rule identified by invariant_id
+      - the fully resolved Profile constraints named by constraint_ids
+    acceptance_criteria:
+      - The Core invariant is evaluated unchanged as predicate C; Profile constraints never substitute for C.
+      - The named Profile constraints are evaluated as additional predicates S and composition enforces C AND S.
+      - An invariant-specific validator must establish that C AND S is satisfiable.
+      - An invariant-specific validator must establish that S excludes at least one state otherwise admitted by C, or match an invariant-specific approved strengthening form with equivalent proof obligations.
+      - Validation must bind the actual resolved constraint paths and values, not only effect=strengthen, rationale text, or constraint IDs.
+    rejection:
+      unavailable_validator: PROFILE-CORE-STRENGTHENING-001
+      inconclusive_validation: PROFILE-CORE-STRENGTHENING-001
+      unsatisfiable_with_core: PROFILE-CORE-STRENGTHENING-001
+      does_not_strictly_strengthen: PROFILE-CORE-STRENGTHENING-001
+      attempts_core_substitution: PROFILE-CORE-INVARIANT-001
+    effective_output:
+      - A strengthening declaration alone never authorizes status=strengthened.
+      - Only positively validated strengthenings may contribute strengthening provenance.
+      - If a declared strengthening is rejected or cannot be validated, composition fails; it is not silently downgraded to preserved.
+    implementation_note: This contract defines required validation behavior but does not prescribe or implement a runtime resolver or theorem prover.
   precedence: Core invariants are evaluated as the semantic floor before and after Profile composition; no profile ordering can bypass them.
 
 effective_profile_set:
+  identity_rules:
+    - requested_profiles contains at most one entry per [profile_type, profile_id] key.
+    - effective_profiles contains exactly one resolved version per [profile_type, profile_id] key.
+    - If a Profile key appears in both requested_profiles and effective_profiles, profile_version must match.
+    - effective_constraints contains exactly one entry per semantic path.
+    - core_invariants contains exactly one entry per active Core invariant ID.
   required_output:
     - active Core research/invariant contract versions
     - requested profile refs
     - dependency-closed effective profile refs and selection provenance
     - effective_constraints with one entry per semantic path, per-constraint provenance, and resolution mode
     - exactly one resolved version per Profile key with all selection reasons/provenance
-    - every active Core invariant with status preserved or strengthened
+    - every active Core invariant with status preserved or positively validated as strengthened
   forbidden_output:
     - silent conflict resolution
     - an effective constraint without source profile provenance
+    - duplicate resolved Profile keys or effective constraint paths
     - a weakened/disabled Core invariant
+    - status=strengthened without at least one positively validated strengthening source
 
 non_goals:
   - runtime resolver implementation

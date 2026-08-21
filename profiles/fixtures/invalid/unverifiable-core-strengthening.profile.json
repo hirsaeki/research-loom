@@ -1,0 +1,29 @@
+{
+  "schema_version": "0.1.0",
+  "profile_id": "fixture.unverifiable-strengthening",
+  "profile_type": "research",
+  "profile_version": "1.0.0",
+  "core_compatibility": {
+    "research_contract": ">=0.1.0 <0.2.0",
+    "invariant_contract": ">=0.1.0 <0.2.0"
+  },
+  "constraints": [
+    {
+      "id": "FIX-BAD-INV-001",
+      "path": "evidence.capture.display_label",
+      "merge_strategy": "must_equal",
+      "value": "source optional",
+      "rationale": "An unrelated display label does not establish a stricter traceability predicate."
+    }
+  ],
+  "core_invariant_strengthenings": [
+    {
+      "invariant_id": "CORE-TRACE-001",
+      "effect": "strengthen",
+      "constraint_ids": [
+        "FIX-BAD-INV-001"
+      ],
+      "rationale": "This declaration is intentionally unverifiable and must fail closed."
+    }
+  ]
+}

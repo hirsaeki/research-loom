@@ -31,7 +31,7 @@ Both dependency forms are versioned. Dependency cycles, unsatisfied versions, or
 
 ## Constraint composition
 
-Profiles emit declarative constraints identified by stable semantic `path`. A collision is resolved by its explicit `merge_strategy`:
+Profiles emit declarative constraints identified by stable semantic `path`. The `core.*` namespace is reserved to Core and cannot be used by Profile constraints. A collision is resolved by its explicit `merge_strategy`:
 
 - `must_equal`
 - `union`
@@ -40,13 +40,17 @@ Profiles emit declarative constraints identified by stable semantic `path`. A co
 - `min`
 - `replace`
 
-There is no cross-category or input-order last-write-wins rule. `replace` is legal only when same-type `extends` ancestry yields one unique descendant. Otherwise the collision is an error. All successful effective constraints retain source Profile and constraint-ID provenance.
+`union` and `intersection` require set-like arrays. `max` and `min` require numeric values. The Effective Profile Set schema also constrains `resolution` to modes compatible with the declared merge strategy.
+
+There is no cross-category or input-order last-write-wins rule. `replace` is legal only when same-type `extends` ancestry yields one unique descendant. Otherwise the collision is `PROFILE-COMP-REPLACE-001`; the generic `PROFILE-COMP-CONFLICT-001` is reserved for same-strategy conflicts without a more specific code. All successful effective constraints retain source Profile and constraint-ID provenance.
 
 ## Core invariants are a floor
 
 The Core invariant catalog is not another Profile layer. Profiles may only preserve it or add a conjunctive strengthening. The manifest therefore exposes `core_invariant_strengthenings` with `effect: strengthen`; there is no valid disable/weaken/replace operation.
 
-A strengthening names the Core invariant and the Profile constraints that make it stricter. The resolved effective set records the Core invariant as `preserved` or `strengthened` and retains Profile provenance. A Profile that attempts to weaken a Core invariant is invalid even if some ordering scheme would otherwise select it later.
+A strengthening declaration is a **claim**, not proof. A conforming composition implementation must evaluate the original Core invariant unchanged and validate the referenced, fully resolved Profile constraints as additional predicates. The result may be reported as `strengthened` only after invariant-specific validation establishes a satisfiable, strict conjunctive strengthening. Missing, inconclusive, unrelated, or substitutive validation fails closed with `PROFILE-CORE-STRENGTHENING-001` (or `PROFILE-CORE-INVARIANT-001` for an attempted Core substitution).
+
+This defines the validation boundary without prescribing a resolver implementation or theorem prover.
 
 ## Effective Profile Set
 
@@ -57,6 +61,8 @@ Downstream components should consume the resolved effective contract rather than
 - selection provenance (`requested`, `extends`, `requires`), retaining all applicable reasons;
 - normalized `effective_constraints` and merge provenance;
 - Core invariant status and strengthening provenance.
+
+The normalized output has exactly one resolved version per Profile key, one effective constraint per semantic path, and one entry per active Core invariant. `strengthened` requires non-empty strengthening provenance; `preserved` requires empty strengthening provenance. These identity rules include semantic validation beyond what JSON Schema `uniqueItems` can express.
 
 The schema does not require a particular resolver implementation, storage engine, package layout, or Writer/Publication runtime.
 

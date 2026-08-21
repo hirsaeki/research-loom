@@ -45,8 +45,8 @@ It also calls for inheritance/composition and an `effective_constraints` view. P
 | Merge semantics | Explicit commutative strategies plus constrained `replace` | Avoids input-order behavior and supports deterministic effective constraints. |
 | Cross-category replacement | Error | No implicit cross-category last-write-wins. |
 | Same-type replacement | Only unique descendant over ancestor | Makes inheritance refinement deterministic while rejecting sibling ambiguity. |
-| Effective Profile Set | Canonical output schema | Downstream consumers get resolved constraints plus provenance rather than reimplementing precedence. |
-| Core invariant modification | Preserve/strengthen only | PR 3 invariants are a semantic floor, never a Profile setting. |
+| Effective Profile Set | Canonical output schema plus semantic identity rules | Downstream consumers get one unambiguous resolved value per identity with provenance. |
+| Core invariant modification | Preserve or positively validated strengthening only | PR 3 invariants are a semantic floor; a manifest claim cannot self-authorize `strengthened`. |
 | Resources | Optional manifest-declared static resources | Retains the useful static-pack concept without canonicalizing legacy copy targets/runtime. |
 
 ## Why the inventory's global precedence ladder is not canonicalized
@@ -61,15 +61,19 @@ Project Config and CLI temporary overrides are intentionally deferred, so this P
 
 Composition is semantic-order independent. A canonical serialization order exists only to make outputs reproducible; it does not choose winners.
 
-Every effective constraint records all contributing Profile refs and constraint IDs. Every effective Profile records whether it was directly requested or introduced by `extends`/`requires`. The effective output also pins the active Core contract versions and reports each Core invariant as preserved or strengthened.
+Every effective constraint records all contributing Profile refs and constraint IDs. Every effective Profile records whether it was directly requested or introduced by `extends`/`requires`. Normalized output rejects duplicate Profile keys, duplicate semantic constraint paths, and duplicate Core invariant identities.
+
+Conflict classification is deterministic as well: merge-strategy disagreement is `PROFILE-COMP-STRATEGY-001`; a `replace` collision without one unique same-type descendant winner is `PROFILE-COMP-REPLACE-001`; other same-strategy unmergeable values use the generic `PROFILE-COMP-CONFLICT-001`.
 
 This keeps `effective_constraints` suitable as a later package/interface boundary without forcing a resolver architecture now.
 
-## Core invariant fixture
+## Core invariant validation boundary
 
-The invalid fixture `profiles/fixtures/invalid/core-invariant-weakening.profile.json` deliberately tries to declare `effect: weaken` for `CORE-TRACE-001`. It fails the manifest schema because the only permitted effect is `strengthen`.
+The schema-invalid fixture `profiles/fixtures/invalid/core-invariant-weakening.profile.json` deliberately tries to declare `effect: weaken` for `CORE-TRACE-001`; only `strengthen` is representable.
 
-The composition contract adds the semantic rule as well: unknown ways of disabling, weakening, reinterpreting, or replacing any invariant in `core/validators/non-overridable-invariants.yaml` are `PROFILE-CORE-INVARIANT-001`, regardless of Profile category or ordering.
+A schema-valid `effect: strengthen` declaration is still only a claim. A conforming composition implementation must keep the original Core invariant predicate unchanged, resolve the referenced Profile constraints as additional predicates, and positively validate a satisfiable strict strengthening before emitting `status: strengthened`. Validation must bind the actual resolved paths and values. Missing or inconclusive validation fails `PROFILE-CORE-STRENGTHENING-001`; an attempted substitution or weakening of the Core rule fails `PROFILE-CORE-INVARIANT-001`.
+
+The semantic-invalid fixture `profiles/fixtures/invalid/unverifiable-core-strengthening.profile.json` covers the case where an unrelated Profile constraint is falsely labeled as a strengthening. This specifies the required boundary without adding a runtime resolver or theorem prover to PR 4.
 
 ## Explicit non-goals
 

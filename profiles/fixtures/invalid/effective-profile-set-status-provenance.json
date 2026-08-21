@@ -1,0 +1,111 @@
+{
+  "schema_version": "0.1.0",
+  "core_contracts": {
+    "research_contract": "0.1.0",
+    "invariant_contract": "0.1.0"
+  },
+  "requested_profiles": [
+    {
+      "profile_id": "fixture.research-base",
+      "profile_type": "research",
+      "profile_version": "1.0.0"
+    }
+  ],
+  "effective_profiles": [
+    {
+      "profile_id": "fixture.research-base",
+      "profile_type": "research",
+      "profile_version": "1.0.0",
+      "selection_reasons": [
+        "requested"
+      ],
+      "introduced_by": []
+    }
+  ],
+  "effective_constraints": [
+    {
+      "path": "evidence.capture.required_fields",
+      "merge_strategy": "union",
+      "value": [
+        "locator",
+        "source_id"
+      ],
+      "resolution": "single",
+      "provenance": [
+        {
+          "profile_id": "fixture.research-base",
+          "profile_type": "research",
+          "profile_version": "1.0.0",
+          "constraint_id": "FIX-RES-001"
+        }
+      ]
+    }
+  ],
+  "core_invariants": [
+    {
+      "invariant_id": "CORE-TRACE-001",
+      "status": "strengthened",
+      "provenance": []
+    },
+    {
+      "invariant_id": "CORE-TRACE-002",
+      "status": "preserved",
+      "provenance": []
+    },
+    {
+      "invariant_id": "CORE-TRACE-003",
+      "status": "preserved",
+      "provenance": []
+    },
+    {
+      "invariant_id": "CORE-TRACE-004",
+      "status": "preserved",
+      "provenance": []
+    },
+    {
+      "invariant_id": "CORE-PROV-001",
+      "status": "preserved",
+      "provenance": []
+    },
+    {
+      "invariant_id": "CORE-PROV-002",
+      "status": "preserved",
+      "provenance": []
+    },
+    {
+      "invariant_id": "CORE-PROV-003",
+      "status": "preserved",
+      "provenance": []
+    },
+    {
+      "invariant_id": "CORE-PROV-004",
+      "status": "preserved",
+      "provenance": []
+    },
+    {
+      "invariant_id": "CORE-REF-001",
+      "status": "preserved",
+      "provenance": []
+    },
+    {
+      "invariant_id": "CORE-AUTH-001",
+      "status": "preserved",
+      "provenance": []
+    },
+    {
+      "invariant_id": "CORE-FW-001",
+      "status": "preserved",
+      "provenance": []
+    },
+    {
+      "invariant_id": "CORE-EPI-001",
+      "status": "preserved",
+      "provenance": []
+    },
+    {
+      "invariant_id": "CORE-EPI-002",
+      "status": "preserved",
+      "provenance": []
+    }
+  ]
+}
