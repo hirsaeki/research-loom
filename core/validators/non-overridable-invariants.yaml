@@ -63,6 +63,15 @@ invariants:
       events that reference or supersede prior events; prior event payloads are not rewritten or deleted.
     rationale: Audit history must preserve what occurred, including later corrections.
 
+  - id: CORE-PROV-004
+    name: snapshot_member_identity_is_unique
+    scope: snapshot
+    rule: >-
+      A Research Snapshot must contain at most one member for each
+      (kind, id, revision) tuple. When a member carries a digest, that digest
+      must identify the content of that exact object revision.
+    rationale: A snapshot must bind each object revision to one unambiguous state.
+
   - id: CORE-REF-001
     name: referenced_objects_must_resolve
     aliases: [citation_must_resolve]
