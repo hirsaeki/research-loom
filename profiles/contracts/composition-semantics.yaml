@@ -102,8 +102,8 @@ conflict_errors:
   PROFILE-MANIFEST-IDENTITY-001: a manifest repeats a constraint/resource/dependency identity ambiguously
   PROFILE-MANIFEST-REF-001: a manifest reference does not resolve
   PROFILE-EFFECTIVE-IDENTITY-001: a normalized Effective Profile Set repeats an identity that must be unique
-  PROFILE-EFFECTIVE-REQUEST-001: a direct requested Profile key/range is missing from the selected Effective Profile Set or lacks matching requested provenance
-  PROFILE-EFFECTIVE-PROVENANCE-001: effective provenance does not resolve to its pinned selected manifest or declared dependency edge
+  PROFILE-EFFECTIVE-REQUEST-001: direct request provenance is missing, fabricated, duplicated, or does not exactly match its requested Profile key/range
+  PROFILE-EFFECTIVE-PROVENANCE-001: effective provenance is missing, fabricated, duplicated, or does not resolve to its pinned selected manifest and declared dependency edge/range
   PROFILE-CORE-INVARIANT-001: a profile attempts to disable, weaken, reinterpret, substitute, or replace a Core invariant
   PROFILE-CORE-STRENGTHENING-001: a strengthening claim has no authoritative binding or fails/inconclusively satisfies its registered validator/form
 
@@ -135,13 +135,17 @@ effective_profile_set:
     - effective_profiles contains exactly one version/content pin per [profile_type, profile_id]
     - each effective Profile is a member of candidate_universe
     - every requested_profiles requirement resolves to exactly one effective Profile with the same Profile key and a selected version satisfying the requested range
-    - that requested effective Profile contains a relation=requested selection_provenance entry carrying exactly the direct requested range
     - effective_constraints contains exactly one entry per semantic path
     - core_invariants contains exactly one entry per active Core invariant ID
   selection_provenance:
     requested: records relation=requested and the direct required_version range
     dependency: records relation=extends|requires, the pinned introducing Profile, and the exact required_version range from that edge
     lossless: true
+    bidirectional_completeness:
+      - every direct request is represented exactly once by relation=requested provenance on its selected Profile with the same exact required_version range
+      - every relation=requested provenance entry maps to exactly one direct request for the same target Profile key and exact required_version range
+      - every active extends/requires edge from a selected introducing manifest to a selected target is represented exactly once by dependency provenance
+      - every dependency provenance entry maps to exactly one declared active edge with the same relation, introducing manifest pin, target Profile key, and exact required_version range
   provenance_rules:
     - every constraint source repeats the selected manifest_sha256 for its Profile
     - every invariant strengthening source repeats the selected manifest_sha256 and validator_binding

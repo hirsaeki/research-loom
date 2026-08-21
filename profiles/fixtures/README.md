@@ -31,10 +31,13 @@ Machine-readable expectations for the core cases are in `contract-cases.json`.
 - `invalid/ambiguous-cross-category-conflict/` → exactly `PROFILE-COMP-REPLACE-001`.
 - `invalid/unverifiable-core-strengthening.profile.json` → `PROFILE-CORE-STRENGTHENING-001`; its declared validator binding exists, but the referenced constraint does not match the approved form.
 
-## Semantic resolution fixtures
+## Semantic regression fixtures
 
-`semantic/version-resolution/case.json` supplies a finite candidate universe with four versions of one Research Profile. A requested Publication Profile contributes one range and its transitive Organization dependency contributes another. Both ranges admit multiple versions; the deterministic rule selects `fixture.version-target@2.4.0`. The expected dependency-edge provenance is also asserted.
+- `semantic/version-resolution/case.json` supplies a finite candidate universe with four versions of one Research Profile. A requested Publication Profile contributes one range and its transitive Organization dependency contributes another. Both ranges admit multiple versions; the deterministic rule selects `fixture.version-target@2.4.0`. The expected dependency-edge provenance is also asserted.
+- `semantic/version-resolution/conflict-case.json` adds a direct target range incompatible with the transitive range and must fail exactly `PROFILE-VERSION-001`.
+- `semantic/provenance/forged-dependency-relation.json` mutates a valid dependency edge to the wrong relation and must fail `PROFILE-EFFECTIVE-PROVENANCE-001`.
+- `semantic/provenance/forged-dependency-range.json` mutates a valid dependency edge to an undeclared/unsatisfied exact range and must fail `PROFILE-EFFECTIVE-PROVENANCE-001`.
+- `semantic/provenance/fabricated-request.json` adds a `relation=requested` provenance entry with no corresponding direct request and must fail `PROFILE-EFFECTIVE-REQUEST-001`.
+- `semantic/canonical-serialization.json` covers RFC 8785 set-member ordering and de-duplication for numeric aliases, object key order, composed Unicode, and decomposed Unicode.
 
-`semantic/version-resolution/conflict-case.json` adds a direct target range incompatible with the transitive range and must fail exactly `PROFILE-VERSION-001`.
-
-`tests/contracts/test_profile_contracts.py`, `test_version_conflict.py`, `test_provenance_failure.py`, and `test_requested_presence.py` execute these fixtures. Their exhaustive solver is intentionally tiny and test-only; it is an oracle for the canonical semantics, not a general runtime resolver.
+`tests/contracts/semantic_oracle.py` is the shared test-only oracle. `test_profile_contracts.py`, `test_version_conflict.py`, `test_provenance_failure.py`, and `test_requested_presence.py` execute these fixtures. The exhaustive version solver remains intentionally tiny and test-only; it is an oracle for canonical semantics, not a general runtime resolver.
