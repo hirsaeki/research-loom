@@ -1,0 +1,14 @@
+schema_model: CoverageStoppingAssessment
+schema_version: "0.1"
+required:
+  - dimensions
+  - saturation
+  - unresolved_material_evidence_gap_ids
+  - remaining_information_value
+  - stop_recommended
+  - stopping_rationale
+  - stopping_basis
+constraints:
+  - "fixed source count is not a sufficient stopping basis"
+  - "stop_recommended must be false while material Evidence Gaps remain"
+  - "stop_recommended must be false while remaining information value is HIGH"

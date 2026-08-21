@@ -1,0 +1,21 @@
+schema_version: "0.1"
+input_classes: [QUERY, PROPOSAL, COMMITTABLE_ACTION, CONFIRMATION, CANCEL]
+actions:
+  - SHOW_STATUS
+  - SHOW_DECISION
+  - PROPOSE_DECISION
+  - RECORD_DECISION
+  - SUBMIT_WORK_RESULT
+  - STOP_AT_BOUNDARY
+  - ABORT_PENDING_RUN
+  - REQUEST_RECOVERY
+  - CONFIRM_RECOVERY
+  - CANCEL_PENDING_ACTION
+  - REGISTER_ATTENTION_DROP
+  - ARCHIVE_RESEARCH
+rules:
+  chat_text_is_evidence: false
+  natural_language_direct_mutation: false
+  state_changing_actions_require_confirmation: true
+  confirmation_single_use: true
+  confirmation_state_bound: true

@@ -1,0 +1,30 @@
+schema_model: DesktopResearchHandoff
+schema_version: "0.3"
+legacy_schema_version: "0.2"
+required:
+  - run_id
+  - question_impact
+  - findings
+  - evidence
+  - counterevidence
+  - counterevidence_search_summary
+  - unknowns
+  - evidence_gaps
+  - candidate_next_method_options
+  - coverage
+  - back_references
+  - publication_eligibility
+v03_required:
+  - source_captures
+  - evidence_citations
+  - research_brief
+constraints:
+  - "every Finding evidence_id resolves to an Evidence Capture with source_id and locator"
+  - "a material Finding must have at least one non-LOW_TRUST Evidence Capture"
+  - "LOW_TRUST Evidence Capture cannot resolve an Evidence Gap"
+  - "LOW_CONFIDENCE Evidence Capture cannot resolve an Evidence Gap"
+  - "resolved_by_evidence_ids must resolve to Evidence Captures in the same Handoff"
+  - "every Evidence Capture resolves its exact text_snapshot, snapshot_path, snapshot_sha256, and excerpt_locator_pairs before reduction"
+  - "candidate next methods are options only and selected must remain false"
+  - "State Reducer must preserve counterevidence, unknowns, and Evidence Gaps"
+  - "Publication Eligibility uses the existing Human-approved snapshot semantics"

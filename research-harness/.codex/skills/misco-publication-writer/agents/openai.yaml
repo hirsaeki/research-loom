@@ -1,0 +1,4 @@
+interface:
+  display_name: "MISCO Publication Writer"
+  short_description: "Draft approved MISCO research into publication prose"
+  default_prompt: "Use $misco-publication-writer to turn this Publication-eligible approved Research State snapshot into reader-facing prose while preserving status and uncertainty."
