@@ -1,0 +1,37 @@
+{
+  "semantic_invalid": [
+    {
+      "id": "incompatible-core",
+      "kind": "profile_core_compatibility",
+      "fixtures": ["profiles/fixtures/invalid/incompatible-core.profile.json"],
+      "expected_error": "PROFILE-CORE-COMPAT-001"
+    },
+    {
+      "id": "duplicate-effective-profile-key",
+      "kind": "effective_identity",
+      "fixtures": ["profiles/fixtures/invalid/effective-profile-set-duplicate-profile-key.json"],
+      "expected_error": "PROFILE-EFFECTIVE-IDENTITY-001"
+    },
+    {
+      "id": "duplicate-effective-constraint-path",
+      "kind": "effective_identity",
+      "fixtures": ["profiles/fixtures/invalid/effective-profile-set-duplicate-constraint-path.json"],
+      "expected_error": "PROFILE-EFFECTIVE-IDENTITY-001"
+    },
+    {
+      "id": "ambiguous-replace",
+      "kind": "constraint_composition",
+      "fixtures": [
+        "profiles/fixtures/invalid/ambiguous-cross-category-conflict/research.profile.json",
+        "profiles/fixtures/invalid/ambiguous-cross-category-conflict/organization.profile.json"
+      ],
+      "expected_error": "PROFILE-COMP-REPLACE-001"
+    },
+    {
+      "id": "unverifiable-strengthening",
+      "kind": "strengthening",
+      "fixtures": ["profiles/fixtures/invalid/unverifiable-core-strengthening.profile.json"],
+      "expected_error": "PROFILE-CORE-STRENGTHENING-001"
+    }
+  ]
+}
