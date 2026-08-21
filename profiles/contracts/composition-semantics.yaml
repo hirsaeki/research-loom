@@ -4,112 +4,107 @@ semantic_floor:
   research_contract: 0.1.0
   invariant_contract: 0.1.0
   invariant_catalog: ../../core/validators/non-overridable-invariants.yaml
+  strengthening_registry: invariant-strengthening-validators.yaml
 
 profile_types:
   research:
-    owns:
-      - methodology and research-quality policy
-      - method-independent or method-family research gates
-      - source/evidence quality policy that is not a universal Core invariant
-    does_not_own:
-      - organization-specific terminology or disclosure policy
-      - narrative/section ordering
-      - citation/rendering/release formatting
+    owns: [methodology and research-quality policy, method-independent or method-family research gates, source/evidence quality policy that is not a universal Core invariant]
   organization:
-    owns:
-      - organization or domain-specific semantic requirements
-      - terminology, disclosure/confidentiality policy, organization gates
-    does_not_own:
-      - generic methodology rules
-      - narrative/section ordering
-      - publication rendering mechanics
+    owns: [organization or domain-specific semantic requirements, terminology and disclosure policy, organization gates]
   narrative:
-    owns:
-      - argument/narrative stages and semantic ordering
-      - section-purpose semantics consumed by a later Writer boundary
-    does_not_own:
-      - authoritative research findings or evidence qualification
-      - document rendering or release mechanics
+    owns: [argument/narrative stages and semantic ordering, section-purpose semantics]
   publication:
-    owns:
-      - output/citation/template/rendering/release constraints
-      - reader-facing formal document requirements
-    does_not_own:
-      - authoritative research state or research-quality decisions
-      - narrative claims not already supported by research state
+    owns: [output/citation/template/rendering/release constraints, reader-facing formal document requirements]
 
 dependency_rules:
   extends:
     meaning: inheritance/refinement within one profile category
     same_profile_type_required: true
     cross_profile_type: error
-    cycles: error
     grants_replace_precedence: descendant_over_ancestor_only
   requires:
     meaning: dependency/composition requirement; it does not create override precedence
     cross_profile_type_allowed: true
-    cycles: error
     grants_replace_precedence: false
-  version_resolution:
-    range_grammar: exact SemVer or a whitespace-separated conjunction of simple comparators
-    prerelease_or_or_ranges_in_v0_1: unsupported
-    one_selected_version_per_profile_key: true
-    unsatisfied_requirement: error
-    incompatible_core_contract: error
+  cycles: error
+
+version_resolution:
+  candidate_universe:
+    definition: >-
+      The complete finite set of Profile manifest byte sequences supplied to one
+      composition invocation. Each candidate is identified by
+      [profile_type, profile_id, profile_version] and pinned by SHA-256 of the exact
+      manifest bytes supplied.
+    duplicate_key_version_same_content: coalesce
+    duplicate_key_version_different_content: PROFILE-CANDIDATE-IDENTITY-001
+    incomplete_universe_behavior: out_of_contract
+  constraints:
+    - Every direct request contributes its declared version range to its Profile key.
+    - Every extends/requires edge from a selected candidate contributes its declared version range to the target Profile key.
+    - A selected version must satisfy the intersection of every active range targeting that Profile key.
+    - Only dependency edges from selected candidates are active; transitive dependencies are recursively included until closure.
+    - Every selected candidate must be compatible with the active Core research and invariant contract versions.
+  valid_assignment: >-
+    A dependency-closed assignment selecting exactly one candidate for every
+    reachable Profile key and satisfying every direct-request range, every active
+    transitive dependency range, same-type extends, Core compatibility, and cycle rules.
+  selection_rule:
+    no_valid_assignment: PROFILE-VERSION-001
+    deterministic_winner: >-
+      Enumerate the set of valid assignments conceptually. Order all Profile keys
+      present in the candidate universe by canonical_profile_key_order. Represent
+      each assignment as a version vector over those keys, using ABSENT below every
+      SemVer. Select the lexicographically greatest vector by SemVer comparison.
+      This is a semantic definition only; implementations may use any equivalent
+      solver and need not enumerate assignments.
+    canonical_profile_key_order: [profile_type_rank, profile_id]
+    profile_type_rank: [research, organization, narrative, publication]
+    semantic_note: >-
+      This tie-break determines dependency version selection only. It grants no
+      cross-category constraint precedence and does not introduce last-write-wins.
 
 manifest_semantics:
   profile_key: [profile_type, profile_id]
-  reserved_constraint_namespaces: [core]
   requirements:
-    - constraint IDs must be unique within a Profile manifest
-    - resource paths must be unique within a Profile manifest
-    - extends and requires may not repeat one profile key with contradictory version requirements
-    - core_invariant_strengthenings.constraint_ids must resolve to constraints in the same manifest
-    - every named Core invariant must exist in the active invariant catalog
-    - Profile constraint paths must not use the reserved core.* namespace
-  violations: error
+    - constraint IDs are unique within a manifest
+    - resource paths are unique within a manifest
+    - Profile constraint paths do not use the reserved core.* namespace
+    - strengthening constraint_ids resolve within the same manifest
+    - strengthening invariant_id exists in the active Core catalog
+    - strengthening validator_binding resolves in the active authoritative strengthening registry
 
 composition:
   properties:
     deterministic: true
     order_independent_semantics: true
     last_write_wins: forbidden
-  canonical_serialization_order:
-    profile_type_rank: [research, organization, narrative, publication]
-    then: [profile_id, profile_version]
-    note: Serialization order is for reproducibility only and never grants semantic precedence.
   constraint_identity: semantic path
   rules:
-    - If only one declaration exists at a path, keep it with full provenance.
-    - Identical declarations may coalesce before replacement precedence is considered; no winner is chosen and provenance must retain every source.
-    - Declarations at one path must use the same merge_strategy or composition fails.
+    - One declaration at a path is retained with full provenance.
+    - Identical declarations coalesce with all provenance.
+    - Different merge strategies at one path fail PROFILE-COMP-STRATEGY-001.
     - must_equal succeeds only when all values are equal.
-    - union applies only to set-like array values; output is de-duplicated and canonically sorted.
-    - intersection applies only to set-like array values; an empty intersection is a conflict unless the declared semantics explicitly permit an empty set in a later contract revision.
-    - max applies only to comparable numeric values and chooses the greatest lower-bound requirement.
-    - min applies only to comparable numeric values and chooses the least upper-bound requirement.
-    - For different replace values, replacement is permitted only when every competing declaration is comparable through same-type extends ancestry and one declaration is the unique descendant of all others.
-    - Different replace values across profile categories, or between unrelated same-type profiles, have no replacement winner and must fail.
+    - union and intersection operate on set-like arrays.
+    - max and min operate on numeric values.
+    - replace with differing values succeeds only when one declaration is the unique same-type extends descendant of every competitor.
+    - Cross-category or unrelated replace collisions fail PROFILE-COMP-REPLACE-001.
     - requires never establishes replacement precedence.
-  conflict_classification:
-    - If declarations at one path use different merge strategies, report PROFILE-COMP-STRATEGY-001.
-    - If the shared strategy is replace and differing values have no unique same-type descendant winner, report PROFILE-COMP-REPLACE-001.
-    - Otherwise, if the shared strategy cannot deterministically merge the values, report PROFILE-COMP-CONFLICT-001.
-    - The classifications above are evaluated in order and exactly one composition conflict code is reported for one path.
 
 conflict_errors:
   PROFILE-EXTENDS-TYPE-001: extends targets a different profile_type
-  PROFILE-DEP-CYCLE-001: extends/requires dependency graph contains a cycle
-  PROFILE-VERSION-001: requested or required profile version cannot be satisfied
-  PROFILE-CORE-COMPAT-001: a selected profile excludes the active Core contract version
+  PROFILE-DEP-CYCLE-001: dependency graph contains a cycle
+  PROFILE-CANDIDATE-IDENTITY-001: one Profile key/version maps to different manifest content in the candidate universe
+  PROFILE-VERSION-001: no valid dependency-closed version assignment exists
+  PROFILE-CORE-COMPAT-001: a selected profile excludes an active Core contract version
   PROFILE-COMP-STRATEGY-001: one constraint path declares incompatible merge strategies
-  PROFILE-COMP-CONFLICT-001: same-strategy constraint values cannot be merged deterministically and no more specific conflict code applies
-  PROFILE-COMP-REPLACE-001: replace has no unique same-type descendant winner, including cross-category replace collisions
+  PROFILE-COMP-REPLACE-001: replace has no unique same-type descendant winner
+  PROFILE-COMP-CONFLICT-001: same-strategy values cannot be merged deterministically and no more specific code applies
   PROFILE-MANIFEST-IDENTITY-001: a manifest repeats a constraint/resource/dependency identity ambiguously
-  PROFILE-MANIFEST-REF-001: a strengthening references a missing constraint or unknown Core invariant
-  PROFILE-EFFECTIVE-IDENTITY-001: a normalized Effective Profile Set repeats a Profile key, semantic constraint path, or Core invariant identity ambiguously
-  PROFILE-CORE-INVARIANT-001: a profile attempts to disable, weaken, reinterpret, or replace a Core non-overridable invariant
-  PROFILE-CORE-STRENGTHENING-001: a declared Core invariant strengthening cannot be positively validated as a strict conjunctive strengthening
+  PROFILE-MANIFEST-REF-001: a manifest reference does not resolve
+  PROFILE-EFFECTIVE-IDENTITY-001: a normalized Effective Profile Set repeats an identity that must be unique
+  PROFILE-EFFECTIVE-PROVENANCE-001: effective provenance does not resolve to its pinned selected manifest
+  PROFILE-CORE-INVARIANT-001: a profile attempts to disable, weaken, reinterpret, substitute, or replace a Core invariant
+  PROFILE-CORE-STRENGTHENING-001: a strengthening claim has no authoritative binding or fails/inconclusively satisfies its registered validator/form
 
 core_invariant_floor:
   override_policy: deny
@@ -117,55 +112,62 @@ core_invariant_floor:
   forbidden_profile_effects: [disable, weaken, reinterpret, replace]
   strengthening_contract:
     declaration_is_claim_only: true
-    validation_required_before_effective_status: strengthened
+    authoritative_binding: invariant-strengthening-validators.yaml
     validation_mode: fail_closed
-    validation_inputs:
-      - the immutable Core invariant rule identified by invariant_id
-      - the fully resolved Profile constraints named by constraint_ids
-    acceptance_criteria:
-      - The Core invariant is evaluated unchanged as predicate C; Profile constraints never substitute for C.
-      - The named Profile constraints are evaluated as additional predicates S and composition enforces C AND S.
-      - An invariant-specific validator must establish that C AND S is satisfiable.
-      - An invariant-specific validator must establish that S excludes at least one state otherwise admitted by C, or match an invariant-specific approved strengthening form with equivalent proof obligations.
-      - Validation must bind the actual resolved constraint paths and values, not only effect=strengthen, rationale text, or constraint IDs.
-    rejection:
-      unavailable_validator: PROFILE-CORE-STRENGTHENING-001
-      inconclusive_validation: PROFILE-CORE-STRENGTHENING-001
-      unsatisfiable_with_core: PROFILE-CORE-STRENGTHENING-001
-      does_not_strictly_strengthen: PROFILE-CORE-STRENGTHENING-001
-      attempts_core_substitution: PROFILE-CORE-INVARIANT-001
-    effective_output:
-      - A strengthening declaration alone never authorizes status=strengthened.
-      - Only positively validated strengthenings may contribute strengthening provenance.
-      - If a declared strengthening is rejected or cannot be validated, composition fails; it is not silently downgraded to preserved.
-    implementation_note: This contract defines required validation behavior but does not prescribe or implement a runtime resolver or theorem prover.
-  precedence: Core invariants are evaluated as the semantic floor before and after Profile composition; no profile ordering can bypass them.
+    required_steps:
+      - resolve [invariant_id, validator_id, validator_version, form_id] in the registry
+      - bind the actual resolved Profile constraints named by constraint_ids
+      - verify the constraints satisfy the registry form
+      - obtain a positive result from the bound invariant-specific validator
+      - preserve the original Core predicate C and enforce strengthening only as C AND S
+    failure: PROFILE-CORE-STRENGTHENING-001
+    implementation_note: The contract defines the binding and proof obligations, not a runtime resolver or theorem prover.
 
 effective_profile_set:
+  content_identity:
+    hash_algorithm: sha256
+    hash_input: exact UTF-8 manifest bytes supplied in the candidate universe
+    selected_manifest_pin_required: true
   identity_rules:
-    - requested_profiles contains at most one entry per [profile_type, profile_id] key.
-    - effective_profiles contains exactly one resolved version per [profile_type, profile_id] key.
-    - If a Profile key appears in both requested_profiles and effective_profiles, profile_version must match.
-    - effective_constraints contains exactly one entry per semantic path.
-    - core_invariants contains exactly one entry per active Core invariant ID.
-  required_output:
-    - active Core research/invariant contract versions
-    - requested profile refs
-    - dependency-closed effective profile refs and selection provenance
-    - effective_constraints with one entry per semantic path, per-constraint provenance, and resolution mode
-    - exactly one resolved version per Profile key with all selection reasons/provenance
-    - every active Core invariant with status preserved or positively validated as strengthened
-  forbidden_output:
-    - silent conflict resolution
-    - an effective constraint without source profile provenance
-    - duplicate resolved Profile keys or effective constraint paths
-    - a weakened/disabled Core invariant
-    - status=strengthened without at least one positively validated strengthening source
+    - candidate_universe contains at most one content pin per [profile_type, profile_id, profile_version]
+    - requested_profiles contains at most one direct requirement per [profile_type, profile_id]
+    - effective_profiles contains exactly one version/content pin per [profile_type, profile_id]
+    - each effective Profile is a member of candidate_universe
+    - effective_constraints contains exactly one entry per semantic path
+    - core_invariants contains exactly one entry per active Core invariant ID
+  selection_provenance:
+    requested: records relation=requested and the direct required_version range
+    dependency: records relation=extends|requires, the pinned introducing Profile, and the exact required_version range from that edge
+    lossless: true
+  provenance_rules:
+    - every constraint source repeats the selected manifest_sha256 for its Profile
+    - every invariant strengthening source repeats the selected manifest_sha256 and validator_binding
+    - every provenance source must resolve to exactly one effective Profile with the same type/id/version/hash
+
+canonical_serialization:
+  normative_for_reproducibility_only: true
+  profile_type_rank: [research, organization, narrative, publication]
+  requested_profiles: [profile_type_rank, profile_id, version]
+  candidate_universe: [profile_type_rank, profile_id, profile_version, manifest_sha256]
+  effective_profiles: [profile_type_rank, profile_id, profile_version, manifest_sha256]
+  selection_provenance:
+    relation_rank: [requested, extends, requires]
+    then: [introduced_by.profile_type, introduced_by.profile_id, introduced_by.profile_version, introduced_by.manifest_sha256, required_version]
+    note: introduced_by fields are absent for requested entries and sort before populated dependency fields
+  effective_constraints: [path]
+  constraint_provenance: [profile_type_rank, profile_id, profile_version, manifest_sha256, constraint_id]
+  core_invariants: invariant catalog declaration order
+  invariant_provenance: [profile_type_rank, profile_id, profile_version, manifest_sha256, validator_binding.validator_id, validator_binding.validator_version, validator_binding.form_id]
+  set_like_values: >-
+    De-duplicate by JSON value equality, serialize each member with RFC 8785 JSON
+    Canonicalization Scheme, then sort by ascending UTF-8 byte sequence of that
+    canonical serialization. This ordering never grants semantic precedence.
 
 non_goals:
-  - runtime resolver implementation
+  - general runtime resolver implementation
   - Project Config or CLI override precedence
   - concrete MISCO profile content
   - concrete research-quality/source-quality matrices
   - Writer or Publication implementation
   - SQLite, export, publish, or storage behavior
+  - Research Package, Manuscript Package, or Release Manifest wire formats

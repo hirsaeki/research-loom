@@ -1,0 +1,38 @@
+{
+  "core_contracts": {
+    "research_contract": "0.1.0",
+    "invariant_contract": "0.1.0"
+  },
+  "requested_profiles": [
+    {
+      "profile_id": "fixture.version-root",
+      "profile_type": "publication",
+      "version": "1.0.0"
+    }
+  ],
+  "candidate_files": [
+    "target-1.5.0.profile.json",
+    "target-2.1.0.profile.json",
+    "target-2.4.0.profile.json",
+    "target-2.6.0.profile.json",
+    "organization.profile.json",
+    "publication.profile.json"
+  ],
+  "expected_selected": [
+    {
+      "profile_type": "research",
+      "profile_id": "fixture.version-target",
+      "profile_version": "2.4.0"
+    },
+    {
+      "profile_type": "organization",
+      "profile_id": "fixture.version-org",
+      "profile_version": "1.0.0"
+    },
+    {
+      "profile_type": "publication",
+      "profile_id": "fixture.version-root",
+      "profile_version": "1.0.0"
+    }
+  ]
+}

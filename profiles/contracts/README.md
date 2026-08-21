@@ -1,14 +1,15 @@
 # Canonical Profile contracts
 
-PR 4 establishes the Profile-system contract above the Core semantic floor defined by PR 3. It defines **what a Profile is and how Profiles compose**, without selecting concrete organization policy or implementing a runtime resolver.
+PR 4 establishes the Profile-system contract above the Core semantic floor defined by PR 3. It defines **what a Profile is, how Profile versions are selected, and how selected Profiles compose** without introducing concrete organization policy or a general runtime resolver.
 
-## Contracts
+## Contract files
 
-- [`profile-manifest.schema.json`](profile-manifest.schema.json) — common declarative envelope for all Profile categories.
-- [`composition-semantics.yaml`](composition-semantics.yaml) — normative dependency, composition, conflict, and Core-invariant-floor semantics.
-- [`effective-profile-set.schema.json`](effective-profile-set.schema.json) — resolved contract presented to downstream consumers, including `effective_constraints` and provenance.
+- `profile-manifest.schema.json` — common declarative envelope for Research, Organization, Narrative, and Publication Profiles.
+- `composition-semantics.yaml` — normative dependency, deterministic version resolution, composition, provenance, serialization, conflict, and Core-invariant-floor semantics.
+- `effective-profile-set.schema.json` — canonical resolved boundary, including the pinned candidate universe, lossless dependency provenance, effective constraints, and Core invariant status.
+- `invariant-strengthening-validators.yaml` — authoritative binding between Core invariant IDs and versioned Profile-strengthening validators/forms.
 
-The Profile contract version is `0.1.0`. A Profile uses SemVer for `profile_version` and separately declares compatibility ranges for the Core research-object and invariant contracts. PR 4 targets Core `0.1.0` as its semantic floor.
+The Profile contract version is `0.1.0`. Profiles use SemVer independently from Core and declare compatibility ranges for both Core research and invariant contracts.
 
 ## Profile categories
 
@@ -19,51 +20,46 @@ The Profile contract version is `0.1.0`. A Profile uses SemVer for `profile_vers
 | `narrative` | argument/narrative stages, semantic ordering, section-purpose semantics | authoritative research decisions, rendering/release |
 | `publication` | output, citation, template, rendering, formal document and release constraints | authoritative research state or new research claims |
 
-The category is determined by **why a rule varies**, not merely by which research object it refers to. For example, an organization may impose an organization-specific research requirement; that does not turn it into a generic Research Profile rule.
+`extends` is same-type inheritance/refinement. `requires` may cross types and expresses dependency only; it never grants override precedence. Cross-category last-write-wins remains forbidden.
 
-## `extends` and `requires`
+## Deterministic version resolution
 
-`extends` is inheritance/refinement and is same-type only. It may establish descendant-over-ancestor precedence for an explicit `replace` constraint. Multiple inheritance is allowed, but ambiguous sibling replacement is an error.
+One composition invocation receives a **complete finite candidate universe** of manifest byte sequences. Candidate identity is `(profile_type, profile_id, profile_version)` plus SHA-256 of the exact manifest bytes. Supplying different content for the same key/version is `PROFILE-CANDIDATE-IDENTITY-001`.
 
-`requires` is dependency/composition. It may target any Profile type, including another category, but it never grants override precedence. Cross-type relationships that are dependencies therefore use `requires`, not `extends`.
+Direct requests and every active transitive `extends` / `requires` edge contribute version ranges. A valid assignment selects exactly one candidate for every reachable Profile key and satisfies all ranges, Core compatibility, type, closure, and cycle rules.
 
-Both dependency forms are versioned. Dependency cycles, unsatisfied versions, or selection of a Profile incompatible with the active Core contracts are hard errors.
+If several valid assignments exist, the contract chooses one deterministically: build a version vector over all candidate Profile keys in canonical Profile-key order, use `ABSENT` below any SemVer, and select the lexicographically greatest vector. This is only a semantic definition; implementations may use any equivalent solver. It does **not** create layer precedence or LWW behavior.
 
-## Constraint composition
+## Lossless and immutable provenance
 
-Profiles emit declarative constraints identified by stable semantic `path`. The `core.*` namespace is reserved to Core and cannot be used by Profile constraints. A collision is resolved by its explicit `merge_strategy`:
+The Effective Profile Set retains:
 
-- `must_equal`
-- `union`
-- `intersection`
-- `max`
-- `min`
-- `replace`
+- direct requests as `relation: requested` plus the requested version range;
+- each dependency edge as `relation: extends|requires`, the pinned introducing Profile, and the edge's required version range;
+- every selected Profile with mandatory `manifest_sha256`;
+- the complete candidate universe as pinned Profile refs;
+- every constraint/invariant provenance source with the same selected manifest hash.
 
-`union` and `intersection` require set-like arrays. `max` and `min` require numeric values. The Effective Profile Set schema also constrains `resolution` to modes compatible with the declared merge strategy.
+Therefore a provenance source cannot silently drift to different manifest content while keeping the same Profile ID/version.
 
-There is no cross-category or input-order last-write-wins rule. `replace` is legal only when same-type `extends` ancestry yields one unique descendant. Otherwise the collision is `PROFILE-COMP-REPLACE-001`; the generic `PROFILE-COMP-CONFLICT-001` is reserved for same-strategy conflicts without a more specific code. All successful effective constraints retain source Profile and constraint-ID provenance.
+## Constraint composition and serialization
 
-## Core invariants are a floor
+`must_equal`, `union`, `intersection`, `max`, `min`, and constrained `replace` retain the PR 4 composition rules. `replace` can choose a winner only through one unique same-type `extends` descendant. Cross-category replacement conflicts are `PROFILE-COMP-REPLACE-001`.
 
-The Core invariant catalog is not another Profile layer. Profiles may only preserve it or add a conjunctive strengthening. The manifest therefore exposes `core_invariant_strengthenings` with `effect: strengthen`; there is no valid disable/weaken/replace operation.
+Canonical serialization is defined for reproducibility, not precedence: Profiles use type-rank/id/version order, effective constraints use semantic path, provenance arrays have deterministic tuple orders, Core invariants retain catalog order, and set-like values are de-duplicated and sorted by RFC 8785 canonical JSON bytes.
 
-A strengthening declaration is a **claim**, not proof. A conforming composition implementation must evaluate the original Core invariant unchanged and validate the referenced, fully resolved Profile constraints as additional predicates. The result may be reported as `strengthened` only after invariant-specific validation establishes a satisfiable, strict conjunctive strengthening. Missing, inconclusive, unrelated, or substitutive validation fails closed with `PROFILE-CORE-STRENGTHENING-001` (or `PROFILE-CORE-INVARIANT-001` for an attempted Core substitution).
+## Core invariant strengthening
 
-This defines the validation boundary without prescribing a resolver implementation or theorem prover.
+`effect: strengthen` is a **claim**, never proof. Each claim must carry a `validator_binding` with validator ID, validator version, and form ID. That four-part binding with `invariant_id` must resolve in `invariant-strengthening-validators.yaml`.
 
-## Effective Profile Set
+The registry is authoritative for which validators/forms exist. It currently registers one synthetic contract fixture form for `CORE-TRACE-001`; every other Core invariant explicitly has `no_registered_forms` and therefore fails closed for Profile strengthening in contract `0.1.0`.
 
-Downstream components should consume the resolved effective contract rather than infer precedence from raw Profile files. `effective-profile-set.schema.json` carries:
+A conforming implementation must bind the actual resolved constraints, satisfy the registered form, preserve the original Core predicate unchanged, and obtain a positive result from the bound invariant-specific validator before emitting `status: strengthened`. Missing, mismatched, unavailable, or inconclusive validation is `PROFILE-CORE-STRENGTHENING-001`. The registry defines the connection point and proof obligations without prescribing a resolver implementation or theorem prover.
 
-- active Core contract versions;
-- requested and dependency-closed Profile refs;
-- selection provenance (`requested`, `extends`, `requires`), retaining all applicable reasons;
-- normalized `effective_constraints` and merge provenance;
-- Core invariant status and strengthening provenance.
+## Executable contract tests
 
-The normalized output has exactly one resolved version per Profile key, one effective constraint per semantic path, and one entry per active Core invariant. `strengthened` requires non-empty strengthening provenance; `preserved` requires empty strengthening provenance. These identity rules include semantic validation beyond what JSON Schema `uniqueItems` can express.
+`tests/contracts/test_profile_contracts.py` is a thin contract oracle for fixtures, not production resolution code. It exercises schema validity and semantic cases including Core compatibility, transitive version resolution, duplicate identities, replacement conflicts, strengthening bindings, lossless provenance, deterministic composition, content pins, and canonical ordering.
 
-The schema does not require a particular resolver implementation, storage engine, package layout, or Writer/Publication runtime.
+`.github/workflows/contracts.yml` runs these checks as the `contract-checks` GitHub Actions workflow.
 
-See [`../fixtures/`](../fixtures/) for synthetic contract fixtures. They are not concrete MISCO or research-quality Profiles.
+Concrete MISCO Profiles, concrete research/source-quality matrices, Project Config/CLI override precedence, Writer/Publication runtime behavior, persistence/export/publish behavior, general runtime resolution, and research/manuscript/release package wire formats remain out of scope.
