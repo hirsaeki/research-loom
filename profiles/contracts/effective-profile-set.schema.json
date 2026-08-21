@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:research-loom:profiles:effective-profile-set:0.1.0",
+  "title": "research-loom effective profile set",
+  "description": "Resolved, deterministic profile composition result intended for downstream consumers. It records semantic constraints and their provenance, not resolver internals.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "core_contracts", "requested_profiles", "effective_profiles", "effective_constraints", "core_invariants"],
+  "properties": {
+    "schema_version": {"const": "0.1.0"},
+    "core_contracts": {"type": "object", "additionalProperties": false, "required": ["research_contract", "invariant_contract"], "properties": {"research_contract": {"$ref": "#/$defs/semver"}, "invariant_contract": {"$ref": "#/$defs/semver"}}},
+    "requested_profiles": {"type": "array", "items": {"$ref": "#/$defs/resolved_profile_ref"}, "uniqueItems": true},
+    "effective_profiles": {"type": "array", "items": {"$ref": "#/$defs/effective_profile"}, "minItems": 1},
+    "effective_constraints": {"type": "array", "items": {"$ref": "#/$defs/effective_constraint"}},
+    "core_invariants": {"type": "array", "items": {"$ref": "#/$defs/effective_invariant"}}
+  },
+  "$defs": {
+    "semver": {"type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"},
+    "profile_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,127}$"},
+    "profile_type": {"enum": ["research", "organization", "narrative", "publication"]},
+    "resolved_profile_ref": {"type": "object", "additionalProperties": false, "required": ["profile_id", "profile_type", "profile_version"], "properties": {"profile_id": {"$ref": "#/$defs/profile_id"}, "profile_type": {"$ref": "#/$defs/profile_type"}, "profile_version": {"$ref": "#/$defs/semver"}}},
+    "effective_profile": {"type": "object", "additionalProperties": false, "required": ["profile_id", "profile_type", "profile_version", "selection_reasons", "introduced_by"], "properties": {"profile_id": {"$ref": "#/$defs/profile_id"}, "profile_type": {"$ref": "#/$defs/profile_type"}, "profile_version": {"$ref": "#/$defs/semver"}, "selection_reasons": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["requested", "extends", "requires"]}}, "introduced_by": {"type": "array", "items": {"$ref": "#/$defs/resolved_profile_ref"}}, "manifest_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}},
+    "constraint_source": {"type": "object", "additionalProperties": false, "required": ["profile_id", "profile_type", "profile_version", "constraint_id"], "properties": {"profile_id": {"$ref": "#/$defs/profile_id"}, "profile_type": {"$ref": "#/$defs/profile_type"}, "profile_version": {"$ref": "#/$defs/semver"}, "constraint_id": {"type": "string", "minLength": 1}}},
+    "effective_constraint": {"type": "object", "additionalProperties": false, "required": ["path", "merge_strategy", "value", "resolution", "provenance"], "properties": {"path": {"type": "string", "pattern": "^[a-z][a-z0-9_]*(?:\\.[a-z][a-z0-9_]*)+$"}, "merge_strategy": {"enum": ["must_equal", "union", "intersection", "max", "min", "replace"]}, "value": {}, "resolution": {"enum": ["single", "identical", "union", "intersection", "max", "min", "descendant_replace"]}, "provenance": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/constraint_source"}}}},
+    "invariant_source": {"type": "object", "additionalProperties": false, "required": ["profile_id", "profile_type", "profile_version", "constraint_ids"], "properties": {"profile_id": {"$ref": "#/$defs/profile_id"}, "profile_type": {"$ref": "#/$defs/profile_type"}, "profile_version": {"$ref": "#/$defs/semver"}, "constraint_ids": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}}},
+    "effective_invariant": {"type": "object", "additionalProperties": false, "required": ["invariant_id", "status", "provenance"], "properties": {"invariant_id": {"type": "string", "pattern": "^CORE-[A-Z]+-[0-9]{3}$"}, "status": {"enum": ["preserved", "strengthened"]}, "provenance": {"type": "array", "items": {"$ref": "#/$defs/invariant_source"}}}}
+  }
+}

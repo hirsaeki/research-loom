@@ -1,0 +1,8 @@
+{
+  "schema_version": "0.1.0",
+  "profile_id": "fixture.conflict-organization",
+  "profile_type": "organization",
+  "profile_version": "1.0.0",
+  "core_compatibility": {"research_contract": ">=0.1.0 <0.2.0", "invariant_contract": ">=0.1.0 <0.2.0"},
+  "constraints": [{"id": "FIX-CONFLICT-ORG", "path": "shared.review.mode", "merge_strategy": "replace", "value": "organization-value"}]
+}

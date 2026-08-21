@@ -1,0 +1,9 @@
+{
+  "schema_version": "0.1.0",
+  "profile_id": "fixture.invalid-core-weakening",
+  "profile_type": "research",
+  "profile_version": "1.0.0",
+  "core_compatibility": {"research_contract": ">=0.1.0 <0.2.0", "invariant_contract": ">=0.1.0 <0.2.0"},
+  "constraints": [{"id": "FIX-BAD-001", "path": "evidence.source.required", "merge_strategy": "replace", "value": false, "rationale": "Invalid fixture: attempts to weaken the Core source-traceability invariant."}],
+  "core_invariant_strengthenings": [{"invariant_id": "CORE-TRACE-001", "effect": "weaken", "constraint_ids": ["FIX-BAD-001"], "rationale": "Invalid by contract: Core invariants may not be weakened."}]
+}

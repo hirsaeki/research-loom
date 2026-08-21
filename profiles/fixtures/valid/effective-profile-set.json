@@ -1,0 +1,37 @@
+{
+  "schema_version": "0.1.0",
+  "core_contracts": {"research_contract": "0.1.0", "invariant_contract": "0.1.0"},
+  "requested_profiles": [
+    {"profile_id": "fixture.narrative", "profile_type": "narrative", "profile_version": "1.0.0"},
+    {"profile_id": "fixture.publication", "profile_type": "publication", "profile_version": "1.0.0"}
+  ],
+  "effective_profiles": [
+    {"profile_id": "fixture.research-base", "profile_type": "research", "profile_version": "1.0.0", "selection_reasons": ["extends"], "introduced_by": [{"profile_id": "fixture.research-strict", "profile_type": "research", "profile_version": "1.1.0"}]},
+    {"profile_id": "fixture.research-strict", "profile_type": "research", "profile_version": "1.1.0", "selection_reasons": ["requires"], "introduced_by": [{"profile_id": "fixture.organization", "profile_type": "organization", "profile_version": "2.0.0"}]},
+    {"profile_id": "fixture.organization", "profile_type": "organization", "profile_version": "2.0.0", "selection_reasons": ["requires"], "introduced_by": [{"profile_id": "fixture.publication", "profile_type": "publication", "profile_version": "1.0.0"}]},
+    {"profile_id": "fixture.narrative", "profile_type": "narrative", "profile_version": "1.0.0", "selection_reasons": ["requested"], "introduced_by": []},
+    {"profile_id": "fixture.publication", "profile_type": "publication", "profile_version": "1.0.0", "selection_reasons": ["requested"], "introduced_by": []}
+  ],
+  "effective_constraints": [
+    {"path": "evidence.capture.locator_precision", "merge_strategy": "must_equal", "value": "exact", "resolution": "single", "provenance": [{"profile_id": "fixture.research-strict", "profile_type": "research", "profile_version": "1.1.0", "constraint_id": "FIX-RES-003"}]},
+    {"path": "evidence.capture.required_fields", "merge_strategy": "union", "value": ["captured_hash", "locator", "source_id"], "resolution": "union", "provenance": [{"profile_id": "fixture.research-base", "profile_type": "research", "profile_version": "1.0.0", "constraint_id": "FIX-RES-001"}, {"profile_id": "fixture.research-strict", "profile_type": "research", "profile_version": "1.1.0", "constraint_id": "FIX-RES-002"}]},
+    {"path": "narrative.semantic_stages", "merge_strategy": "must_equal", "value": ["framing", "synthesis"], "resolution": "single", "provenance": [{"profile_id": "fixture.narrative", "profile_type": "narrative", "profile_version": "1.0.0", "constraint_id": "FIX-NAR-001"}]},
+    {"path": "organization.review.roles", "merge_strategy": "union", "value": ["human-reviewer"], "resolution": "single", "provenance": [{"profile_id": "fixture.organization", "profile_type": "organization", "profile_version": "2.0.0", "constraint_id": "FIX-ORG-001"}]},
+    {"path": "publication.outputs.formats", "merge_strategy": "union", "value": ["fixture-format"], "resolution": "single", "provenance": [{"profile_id": "fixture.publication", "profile_type": "publication", "profile_version": "1.0.0", "constraint_id": "FIX-PUB-001"}]}
+  ],
+  "core_invariants": [
+    {"invariant_id": "CORE-TRACE-001", "status": "strengthened", "provenance": [{"profile_id": "fixture.research-strict", "profile_type": "research", "profile_version": "1.1.0", "constraint_ids": ["FIX-RES-003"]}]},
+    {"invariant_id": "CORE-TRACE-002", "status": "preserved", "provenance": []},
+    {"invariant_id": "CORE-TRACE-003", "status": "preserved", "provenance": []},
+    {"invariant_id": "CORE-TRACE-004", "status": "preserved", "provenance": []},
+    {"invariant_id": "CORE-PROV-001", "status": "preserved", "provenance": []},
+    {"invariant_id": "CORE-PROV-002", "status": "preserved", "provenance": []},
+    {"invariant_id": "CORE-PROV-003", "status": "preserved", "provenance": []},
+    {"invariant_id": "CORE-PROV-004", "status": "preserved", "provenance": []},
+    {"invariant_id": "CORE-REF-001", "status": "preserved", "provenance": []},
+    {"invariant_id": "CORE-AUTH-001", "status": "preserved", "provenance": []},
+    {"invariant_id": "CORE-FW-001", "status": "preserved", "provenance": []},
+    {"invariant_id": "CORE-EPI-001", "status": "preserved", "provenance": []},
+    {"invariant_id": "CORE-EPI-002", "status": "preserved", "provenance": []}
+  ]
+}

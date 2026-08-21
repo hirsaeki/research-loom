@@ -1,0 +1,135 @@
+contract_version: 0.1.0
+status: CANONICAL
+semantic_floor:
+  research_contract: 0.1.0
+  invariant_contract: 0.1.0
+  invariant_catalog: ../../core/validators/non-overridable-invariants.yaml
+
+profile_types:
+  research:
+    owns:
+      - methodology and research-quality policy
+      - method-independent or method-family research gates
+      - source/evidence quality policy that is not a universal Core invariant
+    does_not_own:
+      - organization-specific terminology or disclosure policy
+      - narrative/section ordering
+      - citation/rendering/release formatting
+  organization:
+    owns:
+      - organization or domain-specific semantic requirements
+      - terminology, disclosure/confidentiality policy, organization gates
+    does_not_own:
+      - generic methodology rules
+      - narrative/section ordering
+      - publication rendering mechanics
+  narrative:
+    owns:
+      - argument/narrative stages and semantic ordering
+      - section-purpose semantics consumed by a later Writer boundary
+    does_not_own:
+      - authoritative research findings or evidence qualification
+      - document rendering or release mechanics
+  publication:
+    owns:
+      - output/citation/template/rendering/release constraints
+      - reader-facing formal document requirements
+    does_not_own:
+      - authoritative research state or research-quality decisions
+      - narrative claims not already supported by research state
+
+dependency_rules:
+  extends:
+    meaning: inheritance/refinement within one profile category
+    same_profile_type_required: true
+    cross_profile_type: error
+    cycles: error
+    grants_replace_precedence: descendant_over_ancestor_only
+  requires:
+    meaning: dependency/composition requirement; it does not create override precedence
+    cross_profile_type_allowed: true
+    cycles: error
+    grants_replace_precedence: false
+  version_resolution:
+    range_grammar: exact SemVer or a whitespace-separated conjunction of simple comparators
+    prerelease_or_or_ranges_in_v0_1: unsupported
+    one_selected_version_per_profile_key: true
+    unsatisfied_requirement: error
+    incompatible_core_contract: error
+
+manifest_semantics:
+  profile_key: [profile_type, profile_id]
+  requirements:
+    - constraint IDs must be unique within a Profile manifest
+    - resource paths must be unique within a Profile manifest
+    - extends and requires may not repeat one profile key with contradictory version requirements
+    - core_invariant_strengthenings.constraint_ids must resolve to constraints in the same manifest
+    - every named Core invariant must exist in the active invariant catalog
+  violations: error
+
+composition:
+  properties:
+    deterministic: true
+    order_independent_semantics: true
+    last_write_wins: forbidden
+  canonical_serialization_order:
+    profile_type_rank: [research, organization, narrative, publication]
+    then: [profile_id, profile_version]
+    note: Serialization order is for reproducibility only and never grants semantic precedence.
+  constraint_identity: semantic path
+  rules:
+    - If only one declaration exists at a path, keep it with full provenance.
+    - Identical declarations may coalesce before replacement precedence is considered; no winner is chosen and provenance must retain every source.
+    - Declarations at one path must use the same merge_strategy or composition fails.
+    - must_equal succeeds only when all values are equal.
+    - union applies only to set-like array values; output is de-duplicated and canonically sorted.
+    - intersection applies only to set-like array values; an empty intersection is a conflict unless the declared semantics explicitly permit an empty set in a later contract revision.
+    - max applies only to comparable numeric values and chooses the greatest lower-bound requirement.
+    - min applies only to comparable numeric values and chooses the least upper-bound requirement.
+    - For different replace values, replacement is permitted only when every competing declaration is comparable through same-type extends ancestry and one declaration is the unique descendant of all others.
+    - Different replace values across profile categories, or between unrelated same-type profiles, are an ambiguous conflict and must fail.
+    - requires never establishes replacement precedence.
+
+conflict_errors:
+  PROFILE-EXTENDS-TYPE-001: extends targets a different profile_type
+  PROFILE-DEP-CYCLE-001: extends/requires dependency graph contains a cycle
+  PROFILE-VERSION-001: requested or required profile version cannot be satisfied
+  PROFILE-CORE-COMPAT-001: a selected profile excludes the active Core contract version
+  PROFILE-COMP-STRATEGY-001: one constraint path declares incompatible merge strategies
+  PROFILE-COMP-CONFLICT-001: constraint values cannot be merged deterministically
+  PROFILE-COMP-REPLACE-001: replace has no unique same-type descendant winner
+  PROFILE-MANIFEST-IDENTITY-001: a manifest repeats a constraint/resource/dependency identity ambiguously
+  PROFILE-MANIFEST-REF-001: a strengthening references a missing constraint or unknown Core invariant
+  PROFILE-CORE-INVARIANT-001: a profile attempts to disable, weaken, reinterpret, or replace a Core non-overridable invariant
+
+core_invariant_floor:
+  override_policy: deny
+  allowed_profile_effects: [preserve, strengthen]
+  forbidden_profile_effects: [disable, weaken, reinterpret, replace]
+  strengthening_contract:
+    - A strengthening must name an existing Core invariant ID.
+    - It must point to one or more profile constraint IDs that implement the stricter condition.
+    - It must preserve the full original Core rule; the stricter rule is conjunctive, not substitutive.
+    - Composition must retain provenance for both the Core invariant and every strengthening profile.
+  precedence: Core invariants are evaluated as the semantic floor before and after Profile composition; no profile ordering can bypass them.
+
+effective_profile_set:
+  required_output:
+    - active Core research/invariant contract versions
+    - requested profile refs
+    - dependency-closed effective profile refs and selection provenance
+    - effective_constraints with one entry per semantic path, per-constraint provenance, and resolution mode
+    - exactly one resolved version per Profile key with all selection reasons/provenance
+    - every active Core invariant with status preserved or strengthened
+  forbidden_output:
+    - silent conflict resolution
+    - an effective constraint without source profile provenance
+    - a weakened/disabled Core invariant
+
+non_goals:
+  - runtime resolver implementation
+  - Project Config or CLI override precedence
+  - concrete MISCO profile content
+  - concrete research-quality/source-quality matrices
+  - Writer or Publication implementation
+  - SQLite, export, publish, or storage behavior
