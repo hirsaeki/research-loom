@@ -85,6 +85,16 @@
       ]
     },
     {
+      "id":"snapshot-revision-bump-still-mutates-identity",
+      "expected_invariants":["CORE-PROV-002"],
+      "prior_objects":[
+        {"schema_version":"0.1.0","id":"SNP-REV","kind":"snapshot","revision":0,"project_id":"PRJ-1","snapshot_type":"research","created_at":"2026-01-01T00:00:00Z","mode":"real","members":[]}
+      ],
+      "objects":[
+        {"schema_version":"0.1.0","id":"SNP-REV","kind":"snapshot","revision":1,"project_id":"PRJ-1","snapshot_type":"research","created_at":"2026-01-01T00:00:00Z","mode":"real","members":[{"kind":"finding","id":"FND-1","revision":0}]}
+      ]
+    },
+    {
       "id":"snapshot-deleted",
       "expected_invariants":["CORE-PROV-002"],
       "prior_objects":[
@@ -114,6 +124,34 @@
         {"schema_version":"0.1.0","id":"RQ-1","kind":"research_question","revision":0,"project_id":"PRJ-1","text":"Q","adoption_state":"candidate"},
         {"schema_version":"0.1.0","id":"FND-1","kind":"finding","revision":1,"project_id":"PRJ-1","question_ids":["RQ-1"],"statement":"F","adoption_state":"approved","decision_ids":["DEC-SYS"]},
         {"schema_version":"0.1.0","id":"DEC-SYS","kind":"decision","revision":0,"project_id":"PRJ-1","decision_kind":"research_adoption","subjects":[{"kind":"finding","id":"FND-1"}],"choice":"approve","actor_type":"system","decided_by":"fixture-system","decided_at":"2026-01-02T00:00:00Z"}
+      ]
+    },
+    {
+      "id":"approved-finding-material-revision-without-human-decision",
+      "expected_invariants":["CORE-AUTH-001"],
+      "prior_objects":[
+        {"schema_version":"0.1.0","id":"PRJ-1","kind":"project","revision":0,"title":"P"},
+        {"schema_version":"0.1.0","id":"RQ-1","kind":"research_question","revision":0,"project_id":"PRJ-1","text":"Q","adoption_state":"approved"},
+        {"schema_version":"0.1.0","id":"FND-MAT","kind":"finding","revision":0,"project_id":"PRJ-1","question_ids":["RQ-1"],"statement":"Original finding","adoption_state":"approved"}
+      ],
+      "objects":[
+        {"schema_version":"0.1.0","id":"PRJ-1","kind":"project","revision":0,"title":"P"},
+        {"schema_version":"0.1.0","id":"RQ-1","kind":"research_question","revision":0,"project_id":"PRJ-1","text":"Q","adoption_state":"approved"},
+        {"schema_version":"0.1.0","id":"FND-MAT","kind":"finding","revision":1,"project_id":"PRJ-1","question_ids":["RQ-1"],"statement":"Materially revised finding","adoption_state":"approved"}
+      ]
+    },
+    {
+      "id":"approved-finding-revision-metadata-only",
+      "expected_invariants":[],
+      "prior_objects":[
+        {"schema_version":"0.1.0","id":"PRJ-1","kind":"project","revision":0,"title":"P"},
+        {"schema_version":"0.1.0","id":"RQ-1","kind":"research_question","revision":0,"project_id":"PRJ-1","text":"Q","adoption_state":"approved"},
+        {"schema_version":"0.1.0","id":"FND-META","kind":"finding","revision":0,"project_id":"PRJ-1","question_ids":["RQ-1"],"statement":"Stable finding","adoption_state":"approved"}
+      ],
+      "objects":[
+        {"schema_version":"0.1.0","id":"PRJ-1","kind":"project","revision":0,"title":"P"},
+        {"schema_version":"0.1.0","id":"RQ-1","kind":"research_question","revision":0,"project_id":"PRJ-1","text":"Q","adoption_state":"approved"},
+        {"schema_version":"0.1.0","id":"FND-META","kind":"finding","revision":1,"project_id":"PRJ-1","question_ids":["RQ-1"],"statement":"Stable finding","adoption_state":"approved"}
       ]
     },
     {
