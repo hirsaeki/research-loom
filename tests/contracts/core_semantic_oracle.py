@@ -19,11 +19,6 @@ def _by_kind_id(objects: Iterable[dict]) -> dict[tuple[str, str], dict]:
     return {(obj["kind"], obj["id"]): obj for obj in objects}
 
 
-def _same_object_revision(left: dict, right: dict) -> bool:
-    """Return whether two fixture objects identify the same canonical revision."""
-    return left.get("kind") == right.get("kind") and left.get("id") == right.get("id") and left.get("revision") == right.get("revision")
-
-
 def _human_decision_for(obj: dict, objects: list[dict]) -> bool:
     """Check whether an object revision is backed by a referenced human Decision."""
     decision_ids = set(obj.get("decision_ids", []))
@@ -110,13 +105,13 @@ def _history_violations(prior_objects: list[dict], objects: list[dict]) -> set[s
     violations: set[str] = set()
 
     # Persisted Research Snapshots are immutable and cannot disappear in place.
+    # Reusing a snapshot identity with any changed payload, including a revision
+    # bump, is mutation in place; changed snapshot content requires a new id.
     for key, before in prior.items():
         if before.get("kind") != "snapshot":
             continue
         after = current.get(key)
-        if after is None:
-            violations.add("CORE-PROV-002")
-        elif _same_object_revision(before, after) and canonical_object_bytes(before) != canonical_object_bytes(after):
+        if after is None or canonical_object_bytes(before) != canonical_object_bytes(after):
             violations.add("CORE-PROV-002")
 
     # Audit history is append-only: every prior event must still exist byte-for-byte.
