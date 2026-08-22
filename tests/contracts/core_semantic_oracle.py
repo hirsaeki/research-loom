@@ -109,12 +109,15 @@ def _history_violations(prior_objects: list[dict], objects: list[dict]) -> set[s
     current = _by_kind_id(objects)
     violations: set[str] = set()
 
-    # Persisted Research Snapshots are immutable at one object revision.
+    # Persisted Research Snapshots are immutable and cannot disappear in place.
     for key, before in prior.items():
+        if before.get("kind") != "snapshot":
+            continue
         after = current.get(key)
-        if before.get("kind") == "snapshot" and after is not None:
-            if _same_object_revision(before, after) and canonical_object_bytes(before) != canonical_object_bytes(after):
-                violations.add("CORE-PROV-002")
+        if after is None:
+            violations.add("CORE-PROV-002")
+        elif _same_object_revision(before, after) and canonical_object_bytes(before) != canonical_object_bytes(after):
+            violations.add("CORE-PROV-002")
 
     # Audit history is append-only: every prior event must still exist byte-for-byte.
     for key, before in prior.items():
@@ -160,9 +163,10 @@ def evaluate_core_invariants(objects: list[dict], prior_objects: list[dict] | No
     This module is a test oracle. It deliberately does not expose a runtime
     validator API and does not attempt to define persistence behavior.
     """
+    violations = _graph_violations(objects)
     if prior_objects is not None:
-        return _history_violations(prior_objects, objects)
-    return _graph_violations(objects)
+        violations |= _history_violations(prior_objects, objects)
+    return violations
 
 
 def canonical_object_bytes(obj: dict) -> bytes:
