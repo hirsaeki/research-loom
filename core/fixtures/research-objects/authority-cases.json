@@ -1,6 +1,6 @@
 {
   "fixture_version": "0.1.0",
-  "description": "Schema-valid history fixtures for first-persisted authoritative research state and Evidence qualification.",
+  "description": "Schema-valid history fixtures for first-persisted authoritative research state and Evidence qualification. Decision kind/choice values are synthetic contract-fixture sentinels, not production vocabulary.",
   "cases": [
     {
       "id":"initial-approved-finding-without-human-decision",
@@ -30,6 +30,34 @@
       ]
     },
     {
+      "id":"initial-approved-finding-with-reject-choice",
+      "expected_invariants":["CORE-AUTH-001"],
+      "prior_objects":[
+        {"schema_version":"0.1.0","id":"PRJ-1","kind":"project","revision":0,"title":"P"},
+        {"schema_version":"0.1.0","id":"RQ-1","kind":"research_question","revision":0,"project_id":"PRJ-1","text":"Q","adoption_state":"candidate"}
+      ],
+      "objects":[
+        {"schema_version":"0.1.0","id":"PRJ-1","kind":"project","revision":0,"title":"P"},
+        {"schema_version":"0.1.0","id":"RQ-1","kind":"research_question","revision":0,"project_id":"PRJ-1","text":"Q","adoption_state":"candidate"},
+        {"schema_version":"0.1.0","id":"FND-NEW","kind":"finding","revision":0,"project_id":"PRJ-1","question_ids":["RQ-1"],"statement":"Initially approved finding","adoption_state":"approved","decision_ids":["DEC-WRONG"]},
+        {"schema_version":"0.1.0","id":"DEC-WRONG","kind":"decision","revision":0,"project_id":"PRJ-1","decision_kind":"research_adoption","subjects":[{"kind":"finding","id":"FND-NEW"}],"choice":"reject","actor_type":"human","decided_by":"fixture-human","decided_at":"2026-01-02T00:00:00Z"}
+      ]
+    },
+    {
+      "id":"initial-approved-finding-with-wrong-decision-kind",
+      "expected_invariants":["CORE-AUTH-001"],
+      "prior_objects":[
+        {"schema_version":"0.1.0","id":"PRJ-1","kind":"project","revision":0,"title":"P"},
+        {"schema_version":"0.1.0","id":"RQ-1","kind":"research_question","revision":0,"project_id":"PRJ-1","text":"Q","adoption_state":"candidate"}
+      ],
+      "objects":[
+        {"schema_version":"0.1.0","id":"PRJ-1","kind":"project","revision":0,"title":"P"},
+        {"schema_version":"0.1.0","id":"RQ-1","kind":"research_question","revision":0,"project_id":"PRJ-1","text":"Q","adoption_state":"candidate"},
+        {"schema_version":"0.1.0","id":"FND-NEW","kind":"finding","revision":0,"project_id":"PRJ-1","question_ids":["RQ-1"],"statement":"Initially approved finding","adoption_state":"approved","decision_ids":["DEC-WRONG"]},
+        {"schema_version":"0.1.0","id":"DEC-WRONG","kind":"decision","revision":0,"project_id":"PRJ-1","decision_kind":"evidence_qualification","subjects":[{"kind":"finding","id":"FND-NEW"}],"choice":"approve","actor_type":"human","decided_by":"fixture-human","decided_at":"2026-01-02T00:00:00Z"}
+      ]
+    },
+    {
       "id":"initial-verified-evidence-without-human-decision",
       "expected_invariants":["CORE-AUTH-001"],
       "prior_objects":[
@@ -54,6 +82,34 @@
         {"schema_version":"0.1.0","id":"SRC-1","kind":"source","revision":0,"project_id":"PRJ-1","source_type":"report","canonical_locator":"fixture://source/1"},
         {"schema_version":"0.1.0","id":"EVD-NEW","kind":"evidence","revision":0,"project_id":"PRJ-1","source_id":"SRC-1","locator":"p.1","statement":"Verified evidence","evidence_kind":"supporting","verification_status":"verified","evidence_mode":"empirical","decision_ids":["DEC-EVD"]},
         {"schema_version":"0.1.0","id":"DEC-EVD","kind":"decision","revision":0,"project_id":"PRJ-1","decision_kind":"evidence_qualification","subjects":[{"kind":"evidence","id":"EVD-NEW"}],"choice":"verify","actor_type":"human","decided_by":"fixture-human","decided_at":"2026-01-02T00:00:00Z"}
+      ]
+    },
+    {
+      "id":"initial-verified-evidence-with-wrong-choice",
+      "expected_invariants":["CORE-AUTH-001"],
+      "prior_objects":[
+        {"schema_version":"0.1.0","id":"PRJ-1","kind":"project","revision":0,"title":"P"},
+        {"schema_version":"0.1.0","id":"SRC-1","kind":"source","revision":0,"project_id":"PRJ-1","source_type":"report","canonical_locator":"fixture://source/1"}
+      ],
+      "objects":[
+        {"schema_version":"0.1.0","id":"PRJ-1","kind":"project","revision":0,"title":"P"},
+        {"schema_version":"0.1.0","id":"SRC-1","kind":"source","revision":0,"project_id":"PRJ-1","source_type":"report","canonical_locator":"fixture://source/1"},
+        {"schema_version":"0.1.0","id":"EVD-NEW","kind":"evidence","revision":0,"project_id":"PRJ-1","source_id":"SRC-1","locator":"p.1","statement":"Verified evidence","evidence_kind":"supporting","verification_status":"verified","evidence_mode":"empirical","decision_ids":["DEC-EVD"]},
+        {"schema_version":"0.1.0","id":"DEC-EVD","kind":"decision","revision":0,"project_id":"PRJ-1","decision_kind":"evidence_qualification","subjects":[{"kind":"evidence","id":"EVD-NEW"}],"choice":"reject","actor_type":"human","decided_by":"fixture-human","decided_at":"2026-01-02T00:00:00Z"}
+      ]
+    },
+    {
+      "id":"initial-verified-evidence-with-wrong-decision-kind",
+      "expected_invariants":["CORE-AUTH-001"],
+      "prior_objects":[
+        {"schema_version":"0.1.0","id":"PRJ-1","kind":"project","revision":0,"title":"P"},
+        {"schema_version":"0.1.0","id":"SRC-1","kind":"source","revision":0,"project_id":"PRJ-1","source_type":"report","canonical_locator":"fixture://source/1"}
+      ],
+      "objects":[
+        {"schema_version":"0.1.0","id":"PRJ-1","kind":"project","revision":0,"title":"P"},
+        {"schema_version":"0.1.0","id":"SRC-1","kind":"source","revision":0,"project_id":"PRJ-1","source_type":"report","canonical_locator":"fixture://source/1"},
+        {"schema_version":"0.1.0","id":"EVD-NEW","kind":"evidence","revision":0,"project_id":"PRJ-1","source_id":"SRC-1","locator":"p.1","statement":"Verified evidence","evidence_kind":"supporting","verification_status":"verified","evidence_mode":"empirical","decision_ids":["DEC-EVD"]},
+        {"schema_version":"0.1.0","id":"DEC-EVD","kind":"decision","revision":0,"project_id":"PRJ-1","decision_kind":"research_adoption","subjects":[{"kind":"evidence","id":"EVD-NEW"}],"choice":"verify","actor_type":"human","decided_by":"fixture-human","decided_at":"2026-01-02T00:00:00Z"}
       ]
     }
   ]
