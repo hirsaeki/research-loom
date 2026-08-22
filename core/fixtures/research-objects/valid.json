@@ -1,0 +1,23 @@
+{
+  "fixture_version": "0.1.0",
+  "description": "Minimal schema-valid examples for every canonical Core research-object kind.",
+  "objects": [
+    {"schema_version":"0.1.0","id":"PRJ-1","kind":"project","revision":0,"title":"Fixture project"},
+    {"schema_version":"0.1.0","id":"RQ-1","kind":"research_question","revision":0,"project_id":"PRJ-1","text":"What does the fixture establish?","adoption_state":"approved","decision_ids":["DEC-1"]},
+    {"schema_version":"0.1.0","id":"CLM-1","kind":"claim","revision":0,"project_id":"PRJ-1","question_id":"RQ-1","statement":"The fixture is traceable.","assessment":"supported"},
+    {"schema_version":"0.1.0","id":"MTH-1","kind":"method","revision":0,"project_id":"PRJ-1","question_ids":["RQ-1"],"name":"Fixture method","adoption_state":"approved","decision_ids":["DEC-1"]},
+    {"schema_version":"0.1.0","id":"SRC-1","kind":"source","revision":0,"project_id":"PRJ-1","source_type":"report","canonical_locator":"fixture://source/1"},
+    {"schema_version":"0.1.0","id":"EVD-1","kind":"evidence","revision":0,"project_id":"PRJ-1","source_id":"SRC-1","locator":"p.1","statement":"Fixture evidence.","evidence_kind":"supporting","verification_status":"verified","evidence_mode":"empirical","decision_ids":["DEC-1"],"limitations":["fixture scope only"]},
+    {"schema_version":"0.1.0","id":"ANL-1","kind":"analysis","revision":0,"project_id":"PRJ-1","question_ids":["RQ-1"],"method_id":"MTH-1","evidence_ids":["EVD-1"],"summary":"Fixture analysis."},
+    {"schema_version":"0.1.0","id":"FND-1","kind":"finding","revision":0,"project_id":"PRJ-1","question_ids":["RQ-1"],"statement":"Traceability is represented.","evidence_ids":["EVD-1"],"analysis_ids":["ANL-1"],"limitations":["fixture scope only"],"confidence":"moderate","adoption_state":"approved","decision_ids":["DEC-1"]},
+    {"schema_version":"0.1.0","id":"CR-1","kind":"counter_review","revision":0,"project_id":"PRJ-1","target":{"kind":"finding","id":"FND-1"},"issue":"Fixture counterpoint.","severity":"minor","disposition":"resolved"},
+    {"schema_version":"0.1.0","id":"ARG-1","kind":"argument","revision":0,"project_id":"PRJ-1","question_ids":["RQ-1"],"conclusion":"The fixture has support.","finding_ids":["FND-1"],"evidence_ids":[],"warrant":"The finding is explicitly linked."},
+    {"schema_version":"0.1.0","id":"CTR-1","kind":"contribution","revision":0,"project_id":"PRJ-1","statement":"Fixture contribution.","finding_ids":["FND-1"]},
+    {"schema_version":"0.1.0","id":"REC-1","kind":"recommendation","revision":0,"project_id":"PRJ-1","statement":"Preserve traceability.","finding_ids":["FND-1"],"adoption_state":"approved","decision_ids":["DEC-1"]},
+    {"schema_version":"0.1.0","id":"ACT-1","kind":"next_action","revision":0,"project_id":"PRJ-1","action_type":"verify","target":{"kind":"evidence","id":"EVD-1"},"instruction":"Retain the fixture.","reason":"Regression coverage","priority":"low","status":"done"},
+    {"schema_version":"0.1.0","id":"DEC-1","kind":"decision","revision":0,"project_id":"PRJ-1","decision_kind":"research_adoption","subjects":[{"kind":"research_question","id":"RQ-1"},{"kind":"method","id":"MTH-1"},{"kind":"evidence","id":"EVD-1"},{"kind":"finding","id":"FND-1"},{"kind":"recommendation","id":"REC-1"}],"choice":"approve fixture state","actor_type":"human","decided_by":"fixture-human","decided_at":"2026-01-01T00:00:00Z"},
+    {"schema_version":"0.1.0","id":"ART-1","kind":"artifact","revision":0,"project_id":"PRJ-1","role":"fixture report","lane":"publication","artifact_class":"generated","locator":"fixture://artifact/1","source_snapshot_id":"SNP-1","evidence_eligible":false},
+    {"schema_version":"0.1.0","id":"SNP-1","kind":"snapshot","revision":0,"project_id":"PRJ-1","snapshot_type":"research","created_at":"2026-01-01T00:00:00Z","mode":"real","members":[{"kind":"finding","id":"FND-1","revision":0}]},
+    {"schema_version":"0.1.0","id":"AUD-1","kind":"audit_event","revision":0,"project_id":"PRJ-1","occurred_at":"2026-01-01T00:00:00Z","actor_type":"human","actor_id":"fixture-human","action":"fixture-created","subjects":[{"kind":"project","id":"PRJ-1"}]}
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "fixture_version": "0.1.0",
+  "description": "Schema-invalid canonical Core research-object fixtures. Each case declares the specific Draft 2020-12 failure it is intended to exercise.",
+  "cases": [
+    {"id":"missing-required-project-title","expected_error":{"validator":"required","path":[],"message_contains":"'title' is a required property"},"object":{"schema_version":"0.1.0","id":"PRJ-X","kind":"project","revision":0}},
+    {"id":"empty-evidence-locator","expected_error":{"validator":"minLength","path":["locator"]},"object":{"schema_version":"0.1.0","id":"EVD-X","kind":"evidence","revision":0,"project_id":"PRJ-1","source_id":"SRC-1","locator":"","statement":"x","evidence_kind":"supporting","verification_status":"verified","evidence_mode":"empirical"}},
+    {"id":"finding-without-question","expected_error":{"validator":"minItems","path":["question_ids"]},"object":{"schema_version":"0.1.0","id":"FND-X","kind":"finding","revision":0,"project_id":"PRJ-1","question_ids":[],"statement":"x","adoption_state":"candidate"}},
+    {"id":"argument-without-support","expected_error":{"validator":"anyOf","path":[]},"object":{"schema_version":"0.1.0","id":"ARG-X","kind":"argument","revision":0,"project_id":"PRJ-1","conclusion":"x","warrant":"x","finding_ids":[],"evidence_ids":[]}},
+    {"id":"recommendation-without-finding","expected_error":{"validator":"minItems","path":["finding_ids"]},"object":{"schema_version":"0.1.0","id":"REC-X","kind":"recommendation","revision":0,"project_id":"PRJ-1","statement":"x","finding_ids":[],"adoption_state":"candidate"}},
+    {"id":"generated-artifact-without-snapshot","expected_error":{"validator":"required","path":[],"message_contains":"'source_snapshot_id' is a required property"},"object":{"schema_version":"0.1.0","id":"ART-X","kind":"artifact","revision":0,"project_id":"PRJ-1","role":"x","lane":"publication","artifact_class":"generated","locator":"fixture://artifact/x","evidence_eligible":false}},
+    {"id":"publication-artifact-evidence-eligible","expected_error":{"validator":"const","path":["evidence_eligible"]},"object":{"schema_version":"0.1.0","id":"ART-Y","kind":"artifact","revision":0,"project_id":"PRJ-1","role":"x","lane":"publication","artifact_class":"input","locator":"fixture://artifact/y","evidence_eligible":true}},
+    {"id":"invalid-digest","expected_error":{"validator":"pattern","path":["content_digest"]},"object":{"schema_version":"0.1.0","id":"SRC-X","kind":"source","revision":0,"project_id":"PRJ-1","source_type":"report","canonical_locator":"fixture://source/x","content_digest":"sha256:not-a-digest"}},
+    {"id":"unknown-property","expected_error":{"validator":"unevaluatedProperties","path":[],"message_contains":"runtime_only"},"object":{"schema_version":"0.1.0","id":"PRJ-Y","kind":"project","revision":0,"title":"x","runtime_only":true}}
+  ]
+}
