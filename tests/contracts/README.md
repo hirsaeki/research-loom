@@ -25,6 +25,10 @@ A conforming implementation may use different Decision vocabulary, serialization
 
 `reference-cases.json` contains one schema-valid complete research graph and one schema-valid mutation for every reference-bearing field in the Core JSON Schema. The test suite derives the reference-field inventory independently from the schema and requires exact equality with both the oracle mapping and fixture mutation inventory. This prevents a newly added Core reference from silently escaping `CORE-REF-001` regression coverage.
 
+### P2 regression audit
+
+The contract suite retains explicit regressions for every P2-level gap found during PR 5 review: snapshot-member digest binding, complete Core reference resolution, snapshot identity reuse across revision bumps, material revisions with unchanged adoption state, first-persisted authoritative state, and resolving Human Decision semantics. Adjacent checks also require a new Evidence revision for authoritative epistemic reclassification and preserve the distinction between fixture-only proof vocabulary and canonical runtime contracts.
+
 ## Stable CI check
 
 The workflow file is `.github/workflows/contracts.yml`. Both the workflow and job are named `contract-checks` deliberately so the resulting check can later be configured as a required status check without renaming it.
