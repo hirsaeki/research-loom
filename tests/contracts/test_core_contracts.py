@@ -3,12 +3,20 @@ from __future__ import annotations
 import json
 import random
 import unittest
+from copy import deepcopy
 from pathlib import Path
 
 import yaml
 from jsonschema import Draft202012Validator
 
-from core_semantic_oracle import canonical_state_bytes, evaluate_core_invariants
+from core_semantic_oracle import (
+    canonical_state_bytes,
+    core_reference_rule_names,
+    core_reference_violations,
+    evaluate_core_invariants,
+    fixture_object_digest,
+    snapshot_member_digest_violations,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 SCHEMA_PATH = ROOT / "core/models/research-object.schema.json"
@@ -17,9 +25,31 @@ VALID_FIXTURE_PATH = ROOT / "core/fixtures/research-objects/valid.json"
 INVALID_FIXTURE_PATH = ROOT / "core/fixtures/research-objects/invalid.json"
 SEMANTIC_FIXTURE_PATH = ROOT / "core/fixtures/research-objects/semantic-cases.json"
 AUTHORITY_FIXTURE_PATH = ROOT / "core/fixtures/research-objects/authority-cases.json"
+EPISTEMIC_FIXTURE_PATH = ROOT / "core/fixtures/research-objects/epistemic-cases.json"
+REFERENCE_FIXTURE_PATH = ROOT / "core/fixtures/research-objects/reference-cases.json"
 REGISTRY_PATH = ROOT / "profiles/contracts/invariant-strengthening-validators.yaml"
 PROFILE_SEMANTICS_PATH = ROOT / "profiles/contracts/composition-semantics.yaml"
 PROFILE_FIXTURES = ROOT / "profiles/fixtures"
+
+REFERENCE_DEFS = {
+    "#/$defs/identifier",
+    "#/$defs/ids",
+    "#/$defs/non_empty_ids",
+    "#/$defs/object_ref",
+}
+REFERENCE_ITEM_DEFS = {
+    "#/$defs/object_ref",
+    "#/$defs/snapshot_member",
+}
+UTILITY_DEFS = {
+    "identifier",
+    "ids",
+    "non_empty_ids",
+    "digest",
+    "object_ref",
+    "snapshot_member",
+    "base",
+}
 
 
 def load_json(path: Path) -> dict:
@@ -32,6 +62,28 @@ def flatten_validation_errors(errors):
     for error in errors:
         yield error
         yield from flatten_validation_errors(error.context)
+
+
+def schema_reference_rule_names(schema: dict) -> set[str]:
+    """Derive the reference-bearing Core fields directly from the JSON Schema."""
+    rules = {"base.decision_ids"}
+    for definition_name, definition in schema["$defs"].items():
+        if definition_name in UTILITY_DEFS:
+            continue
+        properties: dict = {}
+        for part in definition.get("allOf", []):
+            properties.update(part.get("properties", {}))
+        for field, field_schema in properties.items():
+            if field == "id":
+                continue
+            if field == "project_id":
+                rules.add("base.project_id")
+                continue
+            direct_ref = field_schema.get("$ref")
+            item_ref = field_schema.get("items", {}).get("$ref")
+            if direct_ref in REFERENCE_DEFS or item_ref in REFERENCE_ITEM_DEFS:
+                rules.add(f"{definition_name}.{field}")
+    return rules
 
 
 class CoreContractTests(unittest.TestCase):
@@ -49,7 +101,13 @@ class CoreContractTests(unittest.TestCase):
         cls.invalid_fixture = load_json(INVALID_FIXTURE_PATH)
         cls.semantic_fixture = load_json(SEMANTIC_FIXTURE_PATH)
         cls.authority_fixture = load_json(AUTHORITY_FIXTURE_PATH)
-        cls.semantic_cases = cls.semantic_fixture["cases"] + cls.authority_fixture["cases"]
+        cls.epistemic_fixture = load_json(EPISTEMIC_FIXTURE_PATH)
+        cls.reference_fixture = load_json(REFERENCE_FIXTURE_PATH)
+        cls.semantic_cases = (
+            cls.semantic_fixture["cases"]
+            + cls.authority_fixture["cases"]
+            + cls.epistemic_fixture["cases"]
+        )
 
     def test_research_object_schema_is_valid_draft_2020_12(self):
         """Require the canonical research-object schema itself to be valid Draft 2020-12."""
@@ -91,6 +149,7 @@ class CoreContractTests(unittest.TestCase):
     def test_semantic_fixtures_remain_schema_valid(self):
         """Keep semantic-invalid fixtures structurally valid so layers remain distinct."""
         self.assertTrue(self.authority_fixture["cases"], "authority fixture must not be empty")
+        self.assertTrue(self.epistemic_fixture["cases"], "epistemic fixture must not be empty")
         for case in self.semantic_cases:
             for lane in ("prior_objects", "objects"):
                 for obj in case.get(lane, []):
@@ -103,6 +162,17 @@ class CoreContractTests(unittest.TestCase):
             prior = case.get("prior_objects")
             actual = evaluate_core_invariants(case["objects"], prior)
             self.assertEqual(set(case["expected_invariants"]), actual, case["id"])
+
+    def test_authority_fixtures_cover_resolving_decision_mismatches(self):
+        """Keep wrong decision choice and wrong decision kind as explicit AUTH regressions."""
+        case_ids = {case["id"] for case in self.authority_fixture["cases"]}
+        required = {
+            "initial-approved-finding-with-reject-choice",
+            "initial-approved-finding-with-wrong-decision-kind",
+            "initial-verified-evidence-with-wrong-choice",
+            "initial-verified-evidence-with-wrong-decision-kind",
+        }
+        self.assertTrue(required.issubset(case_ids))
 
     def test_snapshot_revision_bump_is_still_snapshot_mutation(self):
         """Require a reused snapshot id with a revision bump to violate immutability."""
@@ -131,6 +201,51 @@ class CoreContractTests(unittest.TestCase):
         self.assertFalse(list(self.validator.iter_errors(prior)))
         self.assertFalse(list(self.validator.iter_errors(current)))
         self.assertEqual({"CORE-PROV-002"}, evaluate_core_invariants([current], [prior]))
+
+    def test_reference_inventory_matches_schema_and_mutation_fixture(self):
+        """Require schema, oracle mapping, and negative reference fixtures to stay in lockstep."""
+        schema_rules = schema_reference_rule_names(self.schema)
+        oracle_rules = core_reference_rule_names()
+        fixture_rules = {case["rule"] for case in self.reference_fixture["mutations"]}
+        self.assertEqual(schema_rules, oracle_rules)
+        self.assertEqual(schema_rules, fixture_rules)
+        self.assertEqual(len(fixture_rules), len(self.reference_fixture["mutations"]))
+
+    def test_complete_reference_graph_is_schema_valid_and_resolves(self):
+        """Require one complete graph to resolve every schema-defined reference form."""
+        graph = self.reference_fixture["valid_graph"]
+        self.assertTrue(graph, "reference graph must not be empty")
+        for obj in graph:
+            errors = list(self.validator.iter_errors(obj))
+            self.assertFalse(errors, f"reference graph {obj['kind']}:{obj['id']}: {errors}")
+        self.assertEqual(set(), core_reference_violations(graph))
+        self.assertEqual(set(), evaluate_core_invariants(graph))
+
+    def test_every_reference_form_fails_when_its_target_is_missing(self):
+        """Require each schema reference form to produce CORE-REF-001 independently."""
+        base_graph = self.reference_fixture["valid_graph"]
+        for mutation in self.reference_fixture["mutations"]:
+            graph = deepcopy(base_graph)
+            target = next(obj for obj in graph if obj["id"] == mutation["object_id"])
+            target[mutation["field"]] = deepcopy(mutation["value"])
+            errors = list(self.validator.iter_errors(target))
+            self.assertFalse(errors, f"{mutation['rule']}: mutation must remain schema-valid: {errors}")
+            self.assertEqual(
+                {"CORE-REF-001"},
+                core_reference_violations(graph),
+                mutation["rule"],
+            )
+
+    def test_snapshot_member_digest_binds_exact_fixture_revision(self):
+        """Require an optional snapshot-member digest to identify the exact fixture revision."""
+        graph = deepcopy(self.reference_fixture["valid_graph"])
+        target = next(obj for obj in graph if obj["id"] == "FND-A")
+        snapshot = next(obj for obj in graph if obj["id"] == "SNP-A")
+        snapshot["members"][0]["digest"] = fixture_object_digest(target)
+        self.assertEqual(set(), snapshot_member_digest_violations(graph))
+
+        snapshot["members"][0]["digest"] = "sha256:" + "0" * 64
+        self.assertEqual({"CORE-PROV-004"}, snapshot_member_digest_violations(graph))
 
     def test_every_core_invariant_has_executable_semantic_fixture_coverage(self):
         """Require executable semantic fixture coverage for every cataloged Core invariant."""
