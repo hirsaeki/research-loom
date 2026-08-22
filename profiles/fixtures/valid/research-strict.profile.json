@@ -1,0 +1,20 @@
+{
+  "schema_version": "0.1.0",
+  "profile_id": "fixture.research-strict",
+  "profile_type": "research",
+  "profile_version": "1.1.0",
+  "description": "Synthetic same-type inheritance fixture.",
+  "core_compatibility": {"research_contract": ">=0.1.0 <0.2.0", "invariant_contract": ">=0.1.0 <0.2.0"},
+  "extends": [{"profile_id": "fixture.research-base", "profile_type": "research", "version": ">=1.0.0 <2.0.0"}],
+  "constraints": [
+    {"id": "FIX-RES-002", "path": "evidence.capture.required_fields", "merge_strategy": "union", "value": ["captured_hash"], "rationale": "Adds one synthetic capture field without replacement."},
+    {"id": "FIX-RES-003", "path": "evidence.capture.locator_precision", "merge_strategy": "must_equal", "value": "exact", "rationale": "Synthetic strengthening tied to Core traceability for fixture coverage."}
+  ],
+  "core_invariant_strengthenings": [{
+    "invariant_id": "CORE-TRACE-001",
+    "effect": "strengthen",
+    "constraint_ids": ["FIX-RES-003"],
+    "validator_binding": {"validator_id": "core.trace.evidence-source", "validator_version": "0.1.0", "form_id": "exact-locator"},
+    "rationale": "The fixture preserves source+locator traceability and adds the registered exact-locator strengthening form."
+  }]
+}

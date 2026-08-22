@@ -1,0 +1,10 @@
+{
+  "schema_version": "0.1.0",
+  "profile_id": "fixture.organization",
+  "profile_type": "organization",
+  "profile_version": "2.0.0",
+  "description": "Synthetic organization fixture demonstrating cross-type requires.",
+  "core_compatibility": {"research_contract": ">=0.1.0 <0.2.0", "invariant_contract": ">=0.1.0 <0.2.0"},
+  "requires": [{"profile_id": "fixture.research-strict", "profile_type": "research", "version": ">=1.1.0 <2.0.0"}],
+  "constraints": [{"id": "FIX-ORG-001", "path": "organization.review.roles", "merge_strategy": "union", "value": ["human-reviewer"], "rationale": "Synthetic organization-only constraint."}]
+}

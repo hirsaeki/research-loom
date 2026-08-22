@@ -1,0 +1,7 @@
+{
+  "schema_version": "0.1.0",
+  "profile_id": "fixture.invalid-core-version",
+  "profile_type": "research",
+  "profile_version": "1.0.0",
+  "core_compatibility": {"research_contract": ">=0.2.0 <0.3.0", "invariant_contract": ">=0.2.0 <0.3.0"}
+}

@@ -1,0 +1,9 @@
+{
+  "schema_version": "0.1.0",
+  "profile_id": "fixture.research-base",
+  "profile_type": "research",
+  "profile_version": "1.0.0",
+  "description": "Synthetic fixture only; not a canonical research-quality profile.",
+  "core_compatibility": {"research_contract": ">=0.1.0 <0.2.0", "invariant_contract": ">=0.1.0 <0.2.0"},
+  "constraints": [{"id": "FIX-RES-001", "path": "evidence.capture.required_fields", "merge_strategy": "union", "value": ["source_id", "locator"], "rationale": "Synthetic set-valued constraint used to exercise deterministic union."}]
+}

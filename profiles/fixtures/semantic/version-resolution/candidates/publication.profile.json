@@ -1,0 +1,22 @@
+{
+  "schema_version": "0.1.0",
+  "profile_id": "fixture.version-root",
+  "profile_type": "publication",
+  "profile_version": "1.0.0",
+  "core_compatibility": {
+    "research_contract": ">=0.1.0 <0.2.0",
+    "invariant_contract": ">=0.1.0 <0.2.0"
+  },
+  "requires": [
+    {
+      "profile_id": "fixture.version-org",
+      "profile_type": "organization",
+      "version": "1.0.0"
+    },
+    {
+      "profile_id": "fixture.version-target",
+      "profile_type": "research",
+      "version": ">=2.0.0 <2.5.0"
+    }
+  ]
+}

@@ -1,0 +1,63 @@
+registry_version: 0.1.0
+status: CANONICAL
+authoritative_for_invariant_contract: 0.1.0
+purpose: >-
+  Bind Profile strengthening claims to invariant-specific, versioned validators
+  and approved forms. A manifest declaration is never self-authenticating.
+semantics:
+  binding_key: [invariant_id, validator_id, validator_version, form_id]
+  unknown_binding: PROFILE-CORE-STRENGTHENING-001
+  form_mismatch: PROFILE-CORE-STRENGTHENING-001
+  validator_result_required: true
+  validator_result_fail_closed: true
+  fixture_only_bindings_are_not_profile_policy: true
+  note: >-
+    The registry defines the authoritative semantic connection point. It does not
+    prescribe validator implementation language, resolver architecture, a
+    theorem prover, or concrete research/source-quality policy.
+invariants:
+  CORE-TRACE-001:
+    strengthening_policy: registered_forms
+    validators:
+      - validator_id: core.trace.evidence-source
+        validator_version: 0.1.0
+        scope: contract_fixture_only
+        applicability:
+          profile_id_prefix: fixture.
+        approved_forms:
+          - form_id: exact-locator
+            scope: contract_fixture_only
+            required_constraints:
+              - path: evidence.capture.locator_precision
+                merge_strategy: must_equal
+                value_schema:
+                  const: exact
+            proof_obligations:
+              - original Core predicate remains unchanged
+              - registered constraints are conjunctive with the Core predicate
+              - combined predicate is satisfiable
+              - registered constraints exclude at least one state admitted by the Core predicate
+  CORE-TRACE-002:
+    strengthening_policy: no_registered_forms
+  CORE-TRACE-003:
+    strengthening_policy: no_registered_forms
+  CORE-TRACE-004:
+    strengthening_policy: no_registered_forms
+  CORE-PROV-001:
+    strengthening_policy: no_registered_forms
+  CORE-PROV-002:
+    strengthening_policy: no_registered_forms
+  CORE-PROV-003:
+    strengthening_policy: no_registered_forms
+  CORE-PROV-004:
+    strengthening_policy: no_registered_forms
+  CORE-REF-001:
+    strengthening_policy: no_registered_forms
+  CORE-AUTH-001:
+    strengthening_policy: no_registered_forms
+  CORE-FW-001:
+    strengthening_policy: no_registered_forms
+  CORE-EPI-001:
+    strengthening_policy: no_registered_forms
+  CORE-EPI-002:
+    strengthening_policy: no_registered_forms

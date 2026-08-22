@@ -1,0 +1,18 @@
+{
+  "schema_version": "0.1.0",
+  "profile_id": "fixture.invalid-merge-type",
+  "profile_type": "research",
+  "profile_version": "1.0.0",
+  "core_compatibility": {
+    "research_contract": ">=0.1.0 <0.2.0",
+    "invariant_contract": ">=0.1.0 <0.2.0"
+  },
+  "constraints": [
+    {
+      "id": "FIX-BAD-MERGE-001",
+      "path": "evidence.capture.required_fields",
+      "merge_strategy": "union",
+      "value": "source_id"
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "base": "profiles/fixtures/valid/effective-profile-set.json",
+  "target_profile": {"profile_type": "research", "profile_id": "fixture.research-strict"},
+  "selection_index": 0,
+  "set": {"relation": "extends"},
+  "expected_error": "PROFILE-EFFECTIVE-PROVENANCE-001"
+}

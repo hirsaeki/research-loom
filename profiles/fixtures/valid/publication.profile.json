@@ -1,0 +1,10 @@
+{
+  "schema_version": "0.1.0",
+  "profile_id": "fixture.publication",
+  "profile_type": "publication",
+  "profile_version": "1.0.0",
+  "description": "Synthetic publication fixture.",
+  "core_compatibility": {"research_contract": ">=0.1.0 <0.2.0", "invariant_contract": ">=0.1.0 <0.2.0"},
+  "requires": [{"profile_id": "fixture.organization", "profile_type": "organization", "version": "2.0.0"}],
+  "constraints": [{"id": "FIX-PUB-001", "path": "publication.outputs.formats", "merge_strategy": "union", "value": ["fixture-format"], "rationale": "Synthetic output value; not a canonical publication rule."}]
+}

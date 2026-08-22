@@ -1,0 +1,6 @@
+{
+  "base": "profiles/fixtures/valid/effective-profile-set.json",
+  "target_profile": {"profile_type": "research", "profile_id": "fixture.research-base"},
+  "append_selection_provenance": {"relation": "requested", "required_version": ">=1.0.0 <2.0.0"},
+  "expected_error": "PROFILE-EFFECTIVE-REQUEST-001"
+}

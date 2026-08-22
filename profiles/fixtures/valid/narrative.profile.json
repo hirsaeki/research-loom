@@ -1,0 +1,9 @@
+{
+  "schema_version": "0.1.0",
+  "profile_id": "fixture.narrative",
+  "profile_type": "narrative",
+  "profile_version": "1.0.0",
+  "description": "Synthetic narrative fixture.",
+  "core_compatibility": {"research_contract": ">=0.1.0 <0.2.0", "invariant_contract": ">=0.1.0 <0.2.0"},
+  "constraints": [{"id": "FIX-NAR-001", "path": "narrative.semantic_stages", "merge_strategy": "must_equal", "value": ["framing", "synthesis"], "rationale": "Synthetic ordering payload; no concrete Writer behavior is implied."}]
+}
