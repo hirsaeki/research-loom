@@ -100,6 +100,34 @@ class CoreContractTests(unittest.TestCase):
             actual = evaluate_core_invariants(case["objects"], prior)
             self.assertEqual(set(case["expected_invariants"]), actual, case["id"])
 
+    def test_snapshot_revision_bump_is_still_snapshot_mutation(self):
+        """Require a reused snapshot id with a revision bump to violate immutability."""
+        prior = {
+            "schema_version": "0.1.0",
+            "id": "SNP-REV",
+            "kind": "snapshot",
+            "revision": 0,
+            "project_id": "PRJ-1",
+            "snapshot_type": "research",
+            "created_at": "2026-01-01T00:00:00Z",
+            "mode": "real",
+            "members": [],
+        }
+        current = {
+            "schema_version": "0.1.0",
+            "id": "SNP-REV",
+            "kind": "snapshot",
+            "revision": 1,
+            "project_id": "PRJ-1",
+            "snapshot_type": "research",
+            "created_at": "2026-01-01T00:00:00Z",
+            "mode": "real",
+            "members": [{"kind": "finding", "id": "FND-1", "revision": 0}],
+        }
+        self.assertFalse(list(self.validator.iter_errors(prior)))
+        self.assertFalse(list(self.validator.iter_errors(current)))
+        self.assertEqual({"CORE-PROV-002"}, evaluate_core_invariants([current], [prior]))
+
     def test_every_core_invariant_has_executable_semantic_fixture_coverage(self):
         """Require executable semantic fixture coverage for every cataloged Core invariant."""
         catalog_ids = {entry["id"] for entry in self.catalog["invariants"]}
