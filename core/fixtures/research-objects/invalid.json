@@ -1,0 +1,15 @@
+{
+  "fixture_version": "0.1.0",
+  "description": "Schema-invalid canonical Core research-object fixtures. Each object must fail Draft 2020-12 validation independently.",
+  "cases": [
+    {"id":"missing-required-project-title","object":{"schema_version":"0.1.0","id":"PRJ-X","kind":"project","revision":0}},
+    {"id":"empty-evidence-locator","object":{"schema_version":"0.1.0","id":"EVD-X","kind":"evidence","revision":0,"project_id":"PRJ-1","source_id":"SRC-1","locator":"","statement":"x","evidence_kind":"supporting","verification_status":"verified","evidence_mode":"empirical"}},
+    {"id":"finding-without-question","object":{"schema_version":"0.1.0","id":"FND-X","kind":"finding","revision":0,"project_id":"PRJ-1","question_ids":[],"statement":"x","adoption_state":"candidate"}},
+    {"id":"argument-without-support","object":{"schema_version":"0.1.0","id":"ARG-X","kind":"argument","revision":0,"project_id":"PRJ-1","conclusion":"x","warrant":"x","finding_ids":[],"evidence_ids":[]}},
+    {"id":"recommendation-without-finding","object":{"schema_version":"0.1.0","id":"REC-X","kind":"recommendation","revision":0,"project_id":"PRJ-1","statement":"x","finding_ids":[],"adoption_state":"candidate"}},
+    {"id":"generated-artifact-without-snapshot","object":{"schema_version":"0.1.0","id":"ART-X","kind":"artifact","revision":0,"project_id":"PRJ-1","role":"x","lane":"publication","artifact_class":"generated","locator":"fixture://artifact/x","evidence_eligible":false}},
+    {"id":"publication-artifact-evidence-eligible","object":{"schema_version":"0.1.0","id":"ART-Y","kind":"artifact","revision":0,"project_id":"PRJ-1","role":"x","lane":"publication","artifact_class":"input","locator":"fixture://artifact/y","evidence_eligible":true}},
+    {"id":"invalid-digest","object":{"schema_version":"0.1.0","id":"SRC-X","kind":"source","revision":0,"project_id":"PRJ-1","source_type":"report","canonical_locator":"fixture://source/x","content_digest":"sha256:not-a-digest"}},
+    {"id":"unknown-property","object":{"schema_version":"0.1.0","id":"PRJ-Y","kind":"project","revision":0,"title":"x","runtime_only":true}}
+  ]
+}
