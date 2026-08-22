@@ -140,10 +140,21 @@ def _history_violations(prior_objects: list[dict], objects: list[dict]) -> set[s
 
     for key, after in current.items():
         before = prior.get(key)
+        kind = after.get("kind")
+
         if before is None:
+            initially_authoritative = (
+                kind in AUTHORITATIVE_STATES
+                and after.get("adoption_state") in AUTHORITATIVE_STATES[kind]
+            )
+            initially_verified_evidence = (
+                kind == "evidence"
+                and after.get("verification_status") == "verified"
+            )
+            if (initially_authoritative or initially_verified_evidence) and not _human_decision_for(after, objects):
+                violations.add("CORE-AUTH-001")
             continue
 
-        kind = after.get("kind")
         if kind == "evidence":
             became_verified = before.get("verification_status") != "verified" and after.get("verification_status") == "verified"
             promoted_mode = before.get("evidence_mode") == "synthetic" and after.get("evidence_mode") == "empirical"
