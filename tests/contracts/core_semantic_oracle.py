@@ -187,14 +187,17 @@ def core_reference_violations(
                 require_object_ref(ref)
 
         if kind == "snapshot" and include_snapshot_members:
-            seen: set[tuple[str, str, int]] = set()
-            for member in obj.get("members", []):
+            members = obj.get("members", [])
+            counts: dict[tuple[str, str, int], int] = {}
+            for member in members:
                 key = (member["kind"], member["id"], member["revision"])
-                # CORE-PROV-004 owns duplicate identity. Avoid adding a secondary
-                # dangling-reference result for duplicate entries in that fixture.
-                if key in seen:
+                counts[key] = counts.get(key, 0) + 1
+            for member in members:
+                key = (member["kind"], member["id"], member["revision"])
+                # Duplicate member identity is already a CORE-PROV-004 failure;
+                # do not add a secondary dangling-reference result for it.
+                if counts[key] > 1:
                     continue
-                seen.add(key)
                 if key not in revision_index:
                     unresolved = True
 
@@ -282,11 +285,12 @@ def _graph_violations(objects: list[dict]) -> set[str]:
 
     violations |= snapshot_member_digest_violations(objects)
 
-    # Full project-shaped fixture states get the complete generic reference
-    # audit. History fixtures that intentionally model only a partial persisted
-    # lane remain focused; exhaustive reference coverage is tested separately.
+    # Project-shaped states are complete fixture contexts and therefore receive
+    # the exhaustive generic reference audit in addition to specialized rules.
+    # Some focused history fixtures omit Project intentionally; their reference
+    # forms are covered independently by reference-cases.json.
     if any(obj.get("kind") == "project" for obj in objects):
-        violations |= core_reference_violations(objects, include_snapshot_members=False)
+        violations |= core_reference_violations(objects)
 
     if dangling:
         violations.add("CORE-REF-001")
