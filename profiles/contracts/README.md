@@ -1,6 +1,6 @@
 # Canonical Profile contracts
 
-PR 4 establishes the Profile-system contract above the Core semantic floor defined by PR 3. It defines **what a Profile is, how Profile versions are selected, and how selected Profiles compose** without introducing concrete organization policy or a general runtime resolver.
+PR 4 establishes the Profile-system contract above the Core semantic floor defined by PR 3. It defines **what a Profile is, how Profile versions are selected, and how selected Profiles compose** without introducing concrete organization policy or a general runtime resolver. PR 6 adds the canonical reusable Research Profile quality-policy vocabulary on top of those composition semantics.
 
 ## Contract files
 
@@ -8,8 +8,10 @@ PR 4 establishes the Profile-system contract above the Core semantic floor defin
 - `composition-semantics.yaml` — normative dependency, deterministic version resolution, composition, provenance, serialization, conflict, and Core-invariant-floor semantics.
 - `effective-profile-set.schema.json` — canonical resolved boundary, including the pinned candidate universe, lossless dependency provenance, effective constraints, and Core invariant status.
 - `invariant-strengthening-validators.yaml` — authoritative binding between Core invariant IDs and versioned Profile-strengthening validators/forms.
+- `research-quality-policy.schema.json` — structural contract for the canonical Research quality-policy catalog.
+- `research-quality-policy.yaml` — Research-owned quality vocabulary, typed constraint paths, monotone merge semantics, quality-gate meanings, and stable error codes.
 
-The Profile contract version is `0.1.0`. Profiles use SemVer independently from Core and declare compatibility ranges for both Core research and invariant contracts.
+The Profile contract version is `0.1.0`. Profiles use SemVer independently from Core and declare compatibility ranges for both Core research and invariant contracts. The Research quality-policy catalog introduced by PR 6 is also versioned independently at `0.1.0`.
 
 ## Profile categories
 
@@ -48,6 +50,19 @@ Therefore a provenance source cannot silently drift to different manifest conten
 
 Canonical serialization is defined for reproducibility, not precedence: Profiles use type-rank/id/version order, effective constraints use semantic path, provenance arrays have deterministic tuple orders, Core invariants retain catalog order, and set-like values are de-duplicated and sorted by RFC 8785 canonical JSON bytes.
 
+## Research quality-policy namespace
+
+`research_quality.*` is a canonical **Research Profile-only** constraint namespace. The catalog closes this namespace: each path has one value shape, one merge strategy, and a documented strengthening meaning. Organization, Narrative, and Publication Profiles cannot declare these paths.
+
+The contract deliberately separates semantic rules from numeric thresholds:
+
+- semantic requirements use `union` to add requirements/prohibitions or `intersection` to narrow allowed sets;
+- numeric thresholds live only under `research_quality.thresholds.*` and use `max` or `min`.
+
+The catalog defines Profile-level assessment vocabulary such as source quality tier, Evidence directness/support scope, Claim family, method family, and quality gates without adding those as new Core fields. Core invariants remain unchanged. A future runtime may derive the assessment labels, but PR 6 does not define that runtime representation.
+
+The generic fixture under `profiles/fixtures/research-quality/` demonstrates source/evidence admissibility, verification, independence, causal support, Finding limitations/boundary conditions, Counter Review, evidence sufficiency, method-family requirements, and quality gates. It is synthetic and contains no MISCO, organization, narrative, publication, or Project Config rules.
+
 ## Core invariant strengthening
 
 `effect: strengthen` is a **claim**, never proof. Each claim must carry a `validator_binding` with validator ID, validator version, and form ID. That four-part binding with `invariant_id` must resolve in `invariant-strengthening-validators.yaml`.
@@ -58,8 +73,8 @@ A conforming implementation must bind the actual resolved constraints, satisfy t
 
 ## Executable contract tests
 
-`tests/contracts/test_profile_contracts.py` is a thin contract oracle for fixtures, not production resolution code. It exercises schema validity and semantic cases including Core compatibility, transitive version resolution, duplicate identities, replacement conflicts, strengthening bindings, lossless provenance, deterministic composition, content pins, and canonical ordering.
+`tests/contracts/test_profile_contracts.py` remains the PR 4 Profile-system oracle. `tests/contracts/test_research_quality_policy.py` and `research_quality_oracle.py` add fixture-only executable semantics for the PR 6 Research quality-policy catalog. None of these are production resolvers or research validators.
 
-`.github/workflows/contracts.yml` runs these checks as the `contract-checks` GitHub Actions workflow.
+`.github/workflows/contracts.yml` runs all of these checks as the stable `contract-checks` GitHub Actions workflow.
 
-Concrete MISCO Profiles, concrete research/source-quality matrices, Project Config/CLI override precedence, Writer/Publication runtime behavior, persistence/export/publish behavior, general runtime resolution, and research/manuscript/release package wire formats remain out of scope.
+Concrete MISCO Profiles, organization-specific source-quality defaults/matrices, Project Config/CLI override precedence, Writer/Publication runtime behavior, persistence/export/publish behavior, general runtime resolution, and research/manuscript/release package wire formats remain out of scope.

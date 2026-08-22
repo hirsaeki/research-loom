@@ -1,0 +1,202 @@
+contract_version: 0.1.0
+status: CANONICAL
+profile_type: research
+ownership:
+  owns:
+    - reusable methodology and research-quality policy
+    - source/evidence admissibility and support-scope policy above the Core floor
+    - claim-support, finding-sufficiency, counter-review, and method-family quality gates
+  excludes:
+    - universal Core invariants
+    - organization/domain-specific requirements
+    - narrative/chapter structure
+    - citation, quotation, rendering, and release presentation
+    - project-specific research questions or methods
+principles:
+  core_floor_unchanged: true
+  derived_quality_assessment: true
+  numeric_thresholds_separate: true
+  monotone_strengthening: true
+  no_fixed_source_count_stopping: true
+
+# These labels are evaluation vocabulary owned by Research Profile policy. They do
+# not add fields to the Core research-object schema. A future validator may derive
+# them from Core objects plus method/source metadata, but that representation is
+# deliberately out of contract here.
+vocabularies:
+  source_quality_tier: [high, medium, low_confidence, low_trust, unassessed]
+  source_role: [peer_reviewed_research, government_primary, standards_body, company_primary, independent_analysis, news_reporting, working_paper, preprint, industry_report, corporate_publication, social_media, online_forum, other]
+  evidence_verification_status: [verified, lead_only, unverified, claim_not_supported, capture_unavailable]
+  evidence_directness: [direct, indirect, lead_only, non_supporting]
+  support_scope: [source_attributed_claim, descriptive_context, association, independent_effect, causal_effect, lead_only]
+  independence_requirement: [distinct_independence_group, synthesis_overlap_accounted, same_evidence_not_self_validate]
+  indirect_support_requirement: [explicit_qualification]
+  claim_family: [definitional, descriptive, prevalence, association, independent_effect, causal, governance, legal_policy, future_scenario, other]
+  causal_inference_basis: [association_only, self_report_only, small_case_only, indirect_only, narrative_review_only, scoping_review_only, guideline_or_consensus_only]
+  finding_qualifier_field: [limitations, boundary_conditions]
+  counter_review_lens: [contradictory_evidence, alternative_explanation, methodological_weakness, scope_violation, causal_overreach, selection_bias, measurement_validity, practical_feasibility]
+  counter_review_severity: [minor, major, critical]
+  evidence_sufficiency_check: [counterevidence_considered, material_gaps_resolved, source_overlap_accounted, remaining_information_value_not_high]
+  method_family: [primary_empirical, evidence_synthesis, observational, experimental, survey, qualitative, case_study, consensus, technical_evaluation, design_science, mixed_methods, other]
+  quality_gate: [evidence_admissibility, claim_support, finding_sufficiency, counter_review, research_freeze]
+
+quality_gates:
+  evidence_admissibility:
+    meaning: Evidence may count toward a research-quality judgment only after applicable source-tier, verification, directness, and support-scope constraints pass.
+  claim_support:
+    meaning: The evidence admitted for a Claim must match the Claim family, must not exceed its support scope, and must satisfy independence/causal-support requirements when those apply.
+  finding_sufficiency:
+    meaning: A Finding may be quality-sufficient only when configured evidence thresholds and semantic sufficiency checks pass and required limitations/boundary conditions remain explicit.
+  counter_review:
+    meaning: Required counter-review lenses must be represented and configured blocking severities must not remain unresolved.
+  research_freeze:
+    meaning: A Research Profile may require an aggregate freeze gate only after every earlier gate required by the same effective Research Profile passes; this is not a Publication release gate.
+
+constraint_paths:
+  - path: research_quality.source.forbidden_as_sole_material_support_tiers
+    class: semantic
+    value_shape: enum_set
+    vocabulary: source_quality_tier
+    merge_strategy: union
+    semantics: Adding a tier strengthens policy by forbidding a material Finding from relying only on Evidence whose Sources are assessed in those tiers.
+  - path: research_quality.source.cannot_resolve_material_gap_tiers
+    class: semantic
+    value_shape: enum_set
+    vocabulary: source_quality_tier
+    merge_strategy: union
+    semantics: Adding a tier strengthens policy by preventing Evidence from that tier from being the basis for declaring a material Evidence Gap resolved.
+  - path: research_quality.source.low_confidence.allowed_support_scopes
+    class: semantic
+    value_shape: enum_set
+    vocabulary: support_scope
+    merge_strategy: intersection
+    semantics: Intersection narrows what a low-confidence Source may support; it does not change the Source's Core identity or provenance.
+  - path: research_quality.source.low_trust.allowed_support_scopes
+    class: semantic
+    value_shape: enum_set
+    vocabulary: support_scope
+    merge_strategy: intersection
+    semantics: Intersection narrows low-trust material to the support scopes explicitly retained by every composing Research Profile.
+  - path: research_quality.source.company_primary.allowed_support_scopes
+    class: semantic
+    value_shape: enum_set
+    vocabulary: support_scope
+    merge_strategy: intersection
+    semantics: Company-primary material remains attributable to the company and cannot become independent-effect or causal support unless another Profile-level assessment admits independent evidence separately.
+  - path: research_quality.evidence.material_support.required_verification_statuses
+    class: semantic
+    value_shape: enum_set
+    vocabulary: evidence_verification_status
+    merge_strategy: intersection
+    semantics: Intersection narrows the Core verification statuses that may count as material Finding support; Core still owns the status and Human Decision rules.
+  - path: research_quality.evidence.claim_support.allowed_directness
+    class: semantic
+    value_shape: enum_set
+    vocabulary: evidence_directness
+    merge_strategy: intersection
+    semantics: Intersection narrows directness classes admitted as Claim support; directness is a derived quality assessment rather than a Core field.
+  - path: research_quality.evidence.indirect_support.requirements
+    class: semantic
+    value_shape: enum_set
+    vocabulary: indirect_support_requirement
+    merge_strategy: union
+    semantics: Adding requirements strengthens the conditions under which indirect but otherwise admissible Evidence may support a Claim.
+  - path: research_quality.evidence.independence.required_claim_families
+    class: semantic
+    value_shape: enum_set
+    vocabulary: claim_family
+    merge_strategy: union
+    semantics: Adding a Claim family strengthens policy by requiring independent-support checks for that family.
+  - path: research_quality.evidence.independence.requirements
+    class: semantic
+    value_shape: enum_set
+    vocabulary: independence_requirement
+    merge_strategy: union
+    semantics: Independence is provenance independence, not file or citation count; reviews that include the same primary studies may overlap and must not be double-counted as independent support.
+  - path: research_quality.claim.independent_effect.allowed_support_scopes
+    class: semantic
+    value_shape: enum_set
+    vocabulary: support_scope
+    merge_strategy: intersection
+    semantics: Independent-effect Claims may only be supported by scopes retained in the effective set and remain subject to independence requirements.
+  - path: research_quality.claim.causal.allowed_support_scopes
+    class: semantic
+    value_shape: enum_set
+    vocabulary: support_scope
+    merge_strategy: intersection
+    semantics: Causal Claims require Evidence assessed as causal-supporting under the Research Profile; correlation or source authority alone cannot upgrade scope.
+  - path: research_quality.claim.causal.prohibited_inference_bases
+    class: semantic
+    value_shape: enum_set
+    vocabulary: causal_inference_basis
+    merge_strategy: union
+    semantics: Adding an inference basis strengthens policy by making that basis insufficient on its own for a causal Claim.
+  - path: research_quality.finding.required_qualifier_fields
+    class: semantic
+    value_shape: enum_set
+    vocabulary: finding_qualifier_field
+    merge_strategy: union
+    semantics: Adding a field strengthens quality policy by requiring the canonical Finding to preserve that qualifier explicitly when the Finding is judged sufficient.
+  - path: research_quality.counter_review.required_lenses
+    class: semantic
+    value_shape: enum_set
+    vocabulary: counter_review_lens
+    merge_strategy: union
+    semantics: Adding a lens strengthens the minimum counter-review coverage required before the counter-review gate may pass.
+  - path: research_quality.counter_review.blocking_severities
+    class: semantic
+    value_shape: enum_set
+    vocabulary: counter_review_severity
+    merge_strategy: union
+    semantics: Adding a severity strengthens policy by making unresolved CounterReviews at that severity block the counter-review gate.
+  - path: research_quality.evidence_sufficiency.required_checks
+    class: semantic
+    value_shape: enum_set
+    vocabulary: evidence_sufficiency_check
+    merge_strategy: union
+    semantics: Sufficiency is coverage- and uncertainty-aware; fixed Source counts never by themselves satisfy these semantic checks.
+  - path: research_quality.methods.protocol_required_for_families
+    class: semantic
+    value_shape: enum_set
+    vocabulary: method_family
+    merge_strategy: union
+    semantics: Adding a method family strengthens policy by requiring an explicit protocol reference before that Method may pass its quality gate.
+  - path: research_quality.methods.limitations_required_for_families
+    class: semantic
+    value_shape: enum_set
+    vocabulary: method_family
+    merge_strategy: union
+    semantics: Adding a method family strengthens policy by requiring method limitations to remain explicit.
+  - path: research_quality.gates.required
+    class: semantic
+    value_shape: enum_set
+    vocabulary: quality_gate
+    merge_strategy: union
+    semantics: Adding a gate strengthens the effective Research Profile; Research gates do not define Narrative order or Publication release mechanics.
+  - path: research_quality.thresholds.material_finding.min_supporting_evidence_count
+    class: threshold
+    value_shape: integer
+    merge_strategy: max
+    minimum: 0
+    semantics: A higher numeric minimum is stricter. This threshold is insufficient by itself to establish evidence sufficiency.
+  - path: research_quality.thresholds.material_finding.min_independent_evidence_groups
+    class: threshold
+    value_shape: integer
+    merge_strategy: max
+    minimum: 0
+    semantics: A higher minimum distinct independence-group count is stricter; shared-origin or overlapping synthesis Evidence must not be counted as distinct merely because it has multiple citations.
+
+error_codes:
+  PROFILE-RESEARCH-QUALITY-OWNER-001: research_quality.* constraints are owned by Research Profiles only.
+  PROFILE-RESEARCH-QUALITY-PATH-001: a research_quality.* path is not declared in the active canonical Research quality-policy catalog.
+  PROFILE-RESEARCH-QUALITY-MERGE-001: a research_quality.* constraint uses a merge strategy other than the one declared for that path.
+  PROFILE-RESEARCH-QUALITY-VALUE-001: a research_quality.* value does not match its cataloged shape, vocabulary, or numeric bounds.
+  RESEARCH-QUALITY-EVIDENCE-ADMISSIBILITY-001: Source/Evidence tier, verification, directness, or indirect-support requirements make material support inadmissible.
+  RESEARCH-QUALITY-INDEPENDENCE-001: required independent support is absent, overlapping, or self-validating.
+  RESEARCH-QUALITY-CLAIM-SUPPORT-001: Claim family and Evidence support-scope semantics are incompatible.
+  RESEARCH-QUALITY-CAUSAL-SUPPORT-001: a causal Claim relies on a prohibited inference basis.
+  RESEARCH-QUALITY-FINDING-QUALIFICATION-001: a Finding lacks a qualifier field required by the effective Research Profile.
+  RESEARCH-QUALITY-COUNTER-REVIEW-001: required counter-review coverage is absent or a blocking severity remains unresolved.
+  RESEARCH-QUALITY-SUFFICIENCY-001: configured evidence thresholds or semantic evidence-sufficiency checks fail.
+  RESEARCH-QUALITY-METHOD-001: a method-family quality requirement is not satisfied.
+  RESEARCH-QUALITY-GATE-001: a Research quality gate required by the effective Research Profile has not passed.

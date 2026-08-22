@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:research-loom:profiles:research-quality-policy:0.1.0",
+  "title": "research-loom canonical Research Profile quality policy catalog",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "status",
+    "profile_type",
+    "ownership",
+    "principles",
+    "vocabularies",
+    "quality_gates",
+    "constraint_paths",
+    "error_codes"
+  ],
+  "properties": {
+    "contract_version": {"const": "0.1.0"},
+    "status": {"const": "CANONICAL"},
+    "profile_type": {"const": "research"},
+    "ownership": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["owns", "excludes"],
+      "properties": {
+        "owns": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+        "excludes": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true}
+      }
+    },
+    "principles": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "core_floor_unchanged",
+        "derived_quality_assessment",
+        "numeric_thresholds_separate",
+        "monotone_strengthening",
+        "no_fixed_source_count_stopping"
+      ],
+      "properties": {
+        "core_floor_unchanged": {"const": true},
+        "derived_quality_assessment": {"const": true},
+        "numeric_thresholds_separate": {"const": true},
+        "monotone_strengthening": {"const": true},
+        "no_fixed_source_count_stopping": {"const": true}
+      }
+    },
+    "vocabularies": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "array",
+        "minItems": 1,
+        "uniqueItems": true,
+        "items": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"}
+      }
+    },
+    "quality_gates": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["meaning"],
+        "properties": {"meaning": {"type": "string", "minLength": 1}}
+      }
+    },
+    "constraint_paths": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/constraint_path"}
+    },
+    "error_codes": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {"type": "string", "minLength": 1}
+    }
+  },
+  "$defs": {
+    "constraint_path": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "class", "value_shape", "merge_strategy", "semantics"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "pattern": "^research_quality\\.[a-z][a-z0-9_]*(?:\\.[a-z][a-z0-9_]*)+$"
+        },
+        "class": {"enum": ["semantic", "threshold"]},
+        "value_shape": {"enum": ["enum_set", "integer"]},
+        "vocabulary": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+        "merge_strategy": {"enum": ["union", "intersection", "max", "min"]},
+        "minimum": {"type": "integer"},
+        "maximum": {"type": "integer"},
+        "semantics": {"type": "string", "minLength": 1}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"value_shape": {"const": "enum_set"}}, "required": ["value_shape"]},
+          "then": {
+            "required": ["vocabulary"],
+            "properties": {"merge_strategy": {"enum": ["union", "intersection"]}},
+            "not": {"anyOf": [{"required": ["minimum"]}, {"required": ["maximum"]}]}
+          }
+        },
+        {
+          "if": {"properties": {"value_shape": {"const": "integer"}}, "required": ["value_shape"]},
+          "then": {
+            "properties": {"merge_strategy": {"enum": ["max", "min"]}},
+            "not": {"required": ["vocabulary"]}
+          }
+        },
+        {
+          "if": {"properties": {"class": {"const": "threshold"}}, "required": ["class"]},
+          "then": {
+            "properties": {
+              "path": {"pattern": "^research_quality\\.thresholds\\."},
+              "value_shape": {"const": "integer"}
+            }
+          }
+        },
+        {
+          "if": {"properties": {"class": {"const": "semantic"}}, "required": ["class"]},
+          "then": {
+            "properties": {"path": {"not": {"pattern": "^research_quality\\.thresholds\\."}}}
+          }
+        }
+      ]
+    }
+  }
+}
