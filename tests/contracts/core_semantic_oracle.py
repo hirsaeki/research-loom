@@ -15,14 +15,17 @@ AUTHORITATIVE_STATES = {
 
 
 def _by_kind_id(objects: Iterable[dict]) -> dict[tuple[str, str], dict]:
+    """Index fixture objects by canonical `(kind, id)` identity."""
     return {(obj["kind"], obj["id"]): obj for obj in objects}
 
 
 def _same_object_revision(left: dict, right: dict) -> bool:
+    """Return whether two fixture objects identify the same canonical revision."""
     return left.get("kind") == right.get("kind") and left.get("id") == right.get("id") and left.get("revision") == right.get("revision")
 
 
 def _human_decision_for(obj: dict, objects: list[dict]) -> bool:
+    """Check whether an object revision is backed by a referenced human Decision."""
     decision_ids = set(obj.get("decision_ids", []))
     for decision in objects:
         if decision.get("kind") != "decision" or decision.get("id") not in decision_ids:
@@ -35,6 +38,7 @@ def _human_decision_for(obj: dict, objects: list[dict]) -> bool:
 
 
 def _graph_violations(objects: list[dict]) -> set[str]:
+    """Evaluate graph-local Core invariant violations for one synthetic state."""
     index = _by_kind_id(objects)
     violations: set[str] = set()
     dangling = False
@@ -100,6 +104,7 @@ def _graph_violations(objects: list[dict]) -> set[str]:
 
 
 def _history_violations(prior_objects: list[dict], objects: list[dict]) -> set[str]:
+    """Evaluate history-sensitive Core invariant violations across two states."""
     prior = _by_kind_id(prior_objects)
     current = _by_kind_id(objects)
     violations: set[str] = set()
@@ -161,9 +166,11 @@ def evaluate_core_invariants(objects: list[dict], prior_objects: list[dict] | No
 
 
 def canonical_object_bytes(obj: dict) -> bytes:
+    """Serialize one fixture object using RFC 8785 canonical JSON bytes."""
     return rfc8785.dumps(deepcopy(obj))
 
 
 def canonical_state_bytes(objects: list[dict]) -> bytes:
+    """Serialize a fixture state deterministically independent of object order."""
     ordered = sorted(deepcopy(objects), key=lambda obj: (obj["kind"], obj["id"], obj["revision"]))
     return rfc8785.dumps(ordered)
