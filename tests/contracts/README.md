@@ -19,7 +19,7 @@ Some Core invariants are intentionally implementation-neutral and therefore do n
 - `Decision.decision_kind` / `Decision.choice` sentinel pairs such as `research_adoption` + `approve`, `research_revision` + `revise`, and `evidence_qualification` + `verify` represent a Decision that resolves the fixture transition being tested. PR 3 leaves both fields as non-empty strings; these sentinel values are **not** a production enum or required runtime vocabulary.
 - When a snapshot-member digest must be checked, the fixture oracle uses SHA-256 over RFC 8785 canonical JSON bytes of the exact fixture object revision. This is a deterministic test convention for proving that the member digest identifies its target revision; it does **not** establish a runtime object-serialization or package-wire digest format.
 
-A conforming implementation may use different Decision vocabulary, serialization, storage, or validation machinery as long as its behavior is equivalent to the canonical invariant.
+A conforming implementation may use different Decision vocabulary, serialization, storage, or validation machinery as long as its behavior is equivalent to the canonical invariant. The sentinel bindings are assertions about the synthetic fixtures only; production transition vocabulary remains deliberately uncanonicalized in PR 5.
 
 ### Reference completeness
 
