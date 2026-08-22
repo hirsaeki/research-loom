@@ -13,6 +13,13 @@ AUTHORITATIVE_STATES = {
     "recommendation": {"approved", "rejected"},
 }
 
+MATERIAL_REVISION_METADATA_FIELDS = {
+    "schema_version",
+    "revision",
+    "decision_ids",
+    "adoption_state",
+}
+
 
 def _by_kind_id(objects: Iterable[dict]) -> dict[tuple[str, str], dict]:
     """Index fixture objects by canonical `(kind, id)` identity."""
@@ -30,6 +37,15 @@ def _human_decision_for(obj: dict, objects: list[dict]) -> bool:
         if any(subject.get("kind") == obj.get("kind") and subject.get("id") == obj.get("id") for subject in decision.get("subjects", [])):
             return True
     return False
+
+
+def _material_research_payload(obj: dict) -> dict:
+    """Return research-semantic fields used to detect a material object revision."""
+    return {
+        key: deepcopy(value)
+        for key, value in obj.items()
+        if key not in MATERIAL_REVISION_METADATA_FIELDS
+    }
 
 
 def _graph_violations(objects: list[dict]) -> set[str]:
@@ -145,9 +161,16 @@ def _history_violations(prior_objects: list[dict], objects: list[dict]) -> set[s
         if kind in AUTHORITATIVE_STATES:
             before_state = before.get("adoption_state")
             after_state = after.get("adoption_state")
-            if before_state != after_state and after_state in AUTHORITATIVE_STATES[kind]:
-                if not _human_decision_for(after, objects):
-                    violations.add("CORE-AUTH-001")
+            authoritative_transition = (
+                before_state != after_state
+                and after_state in AUTHORITATIVE_STATES[kind]
+            )
+            materially_revised = (
+                _material_research_payload(before)
+                != _material_research_payload(after)
+            )
+            if (authoritative_transition or materially_revised) and not _human_decision_for(after, objects):
+                violations.add("CORE-AUTH-001")
 
     return violations
 
