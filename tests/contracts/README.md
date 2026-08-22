@@ -16,7 +16,9 @@ It is intentionally test-only. `core_semantic_oracle.py` and `semantic_oracle.py
 
 Some Core invariants are intentionally implementation-neutral and therefore do not prescribe a runtime wire representation for the proof they require. The contract tests use deterministic **fixture-only sentinels** to make those requirements executable without expanding the canonical runtime contract:
 
-- `Decision.decision_kind` / `Decision.choice` sentinel pairs such as `research_adoption` + `approve`, `research_revision` + `revise`, and `evidence_qualification` + `verify` represent a Decision that resolves the fixture transition being tested. PR 3 leaves both fields as non-empty strings; these sentinel values are **not** a production enum or required runtime vocabulary.
+- `Decision.decision_kind` / `Decision.choice` sentinel pairs such as `research_adoption` + `approve`, `research_revision` + `revise`, `evidence_qualification` + `verify`, and `evidence_reclassification` + `reclassify` represent Decisions that resolve fixture actions being tested. PR 3 leaves both fields as non-empty strings; these sentinel values are **not** a production enum or required runtime vocabulary.
+- When one fixture revision performs multiple independently authoritative actions, the fixture oracle requires every applicable sentinel action to be resolved. For example, Evidence that becomes both `verified` and reclassified from `counterevidence` to `supporting` carries both qualification and reclassification fixture Decisions. A conforming production implementation may instead encode the same human resolution in one explicit combined Decision if it preserves equivalent semantics and provenance.
+- The same rule applies to research objects: a fixture revision that both changes substantive research payload and moves into an authoritative adoption state must resolve both the revision and state-transition actions. This is executable-fixture bookkeeping, not a required production Decision count.
 - When a snapshot-member digest must be checked, the fixture oracle uses SHA-256 over RFC 8785 canonical JSON bytes of the exact fixture object revision. This is a deterministic test convention for proving that the member digest identifies its target revision; it does **not** establish a runtime object-serialization or package-wire digest format.
 
 A conforming implementation may use different Decision vocabulary, serialization, storage, or validation machinery as long as its behavior is equivalent to the canonical invariant. The sentinel bindings are assertions about the synthetic fixtures only; production transition vocabulary remains deliberately uncanonicalized in PR 5.
@@ -27,7 +29,7 @@ A conforming implementation may use different Decision vocabulary, serialization
 
 ### P2 regression audit
 
-The contract suite retains explicit regressions for every P2-level gap found during PR 5 review: snapshot-member digest binding, complete Core reference resolution, snapshot identity reuse across revision bumps, material revisions with unchanged adoption state, first-persisted authoritative state, and resolving Human Decision semantics. Adjacent checks also require a new Evidence revision for authoritative epistemic reclassification and preserve the distinction between fixture-only proof vocabulary and canonical runtime contracts.
+The contract suite retains explicit regressions for every P2-level gap found during PR 5 review: snapshot-member digest binding, complete Core reference resolution, snapshot identity reuse across revision bumps, material revisions with unchanged adoption state, first-persisted authoritative state, resolving Human Decision semantics, and combined authoritative actions in one revision. Adjacent checks also require a new Evidence revision for authoritative epistemic reclassification and preserve the distinction between fixture-only proof vocabulary and canonical runtime contracts.
 
 ## Stable CI check
 
