@@ -1,0 +1,51 @@
+{
+  "fixture_version": "0.1.0",
+  "description": "Schema-valid history fixtures for Core epistemic reclassification. Decision kind/choice values are synthetic contract-fixture sentinels, not production vocabulary.",
+  "cases": [
+    {
+      "id":"evidence-qualification-without-new-revision",
+      "expected_invariants":["CORE-EPI-002"],
+      "prior_objects":[
+        {"schema_version":"0.1.0","id":"PRJ-EPI","kind":"project","revision":0,"title":"P"},
+        {"schema_version":"0.1.0","id":"SRC-EPI","kind":"source","revision":0,"project_id":"PRJ-EPI","source_type":"report","canonical_locator":"fixture://source/epi"},
+        {"schema_version":"0.1.0","id":"EVD-EPI","kind":"evidence","revision":0,"project_id":"PRJ-EPI","source_id":"SRC-EPI","locator":"p.1","statement":"E","evidence_kind":"supporting","verification_status":"unverified","evidence_mode":"empirical"}
+      ],
+      "objects":[
+        {"schema_version":"0.1.0","id":"PRJ-EPI","kind":"project","revision":0,"title":"P"},
+        {"schema_version":"0.1.0","id":"SRC-EPI","kind":"source","revision":0,"project_id":"PRJ-EPI","source_type":"report","canonical_locator":"fixture://source/epi"},
+        {"schema_version":"0.1.0","id":"EVD-EPI","kind":"evidence","revision":0,"project_id":"PRJ-EPI","source_id":"SRC-EPI","locator":"p.1","statement":"E","evidence_kind":"supporting","verification_status":"verified","evidence_mode":"empirical","decision_ids":["DEC-EPI"]},
+        {"schema_version":"0.1.0","id":"DEC-EPI","kind":"decision","revision":0,"project_id":"PRJ-EPI","decision_kind":"evidence_qualification","subjects":[{"kind":"evidence","id":"EVD-EPI"}],"choice":"verify","actor_type":"human","decided_by":"fixture-human","decided_at":"2026-01-02T00:00:00Z"}
+      ]
+    },
+    {
+      "id":"counterevidence-reclassified-with-new-revision-and-human-decision",
+      "expected_invariants":[],
+      "prior_objects":[
+        {"schema_version":"0.1.0","id":"PRJ-EPI","kind":"project","revision":0,"title":"P"},
+        {"schema_version":"0.1.0","id":"SRC-EPI","kind":"source","revision":0,"project_id":"PRJ-EPI","source_type":"report","canonical_locator":"fixture://source/epi"},
+        {"schema_version":"0.1.0","id":"EVD-EPI","kind":"evidence","revision":0,"project_id":"PRJ-EPI","source_id":"SRC-EPI","locator":"p.1","statement":"E","evidence_kind":"counterevidence","verification_status":"unverified","evidence_mode":"empirical","limitations":["fixture limitation"]}
+      ],
+      "objects":[
+        {"schema_version":"0.1.0","id":"PRJ-EPI","kind":"project","revision":0,"title":"P"},
+        {"schema_version":"0.1.0","id":"SRC-EPI","kind":"source","revision":0,"project_id":"PRJ-EPI","source_type":"report","canonical_locator":"fixture://source/epi"},
+        {"schema_version":"0.1.0","id":"EVD-EPI","kind":"evidence","revision":1,"project_id":"PRJ-EPI","source_id":"SRC-EPI","locator":"p.1","statement":"E","evidence_kind":"supporting","verification_status":"unverified","evidence_mode":"empirical","limitations":["fixture limitation"],"decision_ids":["DEC-EPI"]},
+        {"schema_version":"0.1.0","id":"DEC-EPI","kind":"decision","revision":0,"project_id":"PRJ-EPI","decision_kind":"evidence_reclassification","subjects":[{"kind":"evidence","id":"EVD-EPI"}],"choice":"reclassify","actor_type":"human","decided_by":"fixture-human","decided_at":"2026-01-02T00:00:00Z"}
+      ]
+    },
+    {
+      "id":"counterevidence-reclassified-with-wrong-human-decision",
+      "expected_invariants":["CORE-EPI-002"],
+      "prior_objects":[
+        {"schema_version":"0.1.0","id":"PRJ-EPI","kind":"project","revision":0,"title":"P"},
+        {"schema_version":"0.1.0","id":"SRC-EPI","kind":"source","revision":0,"project_id":"PRJ-EPI","source_type":"report","canonical_locator":"fixture://source/epi"},
+        {"schema_version":"0.1.0","id":"EVD-EPI","kind":"evidence","revision":0,"project_id":"PRJ-EPI","source_id":"SRC-EPI","locator":"p.1","statement":"E","evidence_kind":"counterevidence","verification_status":"unverified","evidence_mode":"empirical"}
+      ],
+      "objects":[
+        {"schema_version":"0.1.0","id":"PRJ-EPI","kind":"project","revision":0,"title":"P"},
+        {"schema_version":"0.1.0","id":"SRC-EPI","kind":"source","revision":0,"project_id":"PRJ-EPI","source_type":"report","canonical_locator":"fixture://source/epi"},
+        {"schema_version":"0.1.0","id":"EVD-EPI","kind":"evidence","revision":1,"project_id":"PRJ-EPI","source_id":"SRC-EPI","locator":"p.1","statement":"E","evidence_kind":"supporting","verification_status":"unverified","evidence_mode":"empirical","decision_ids":["DEC-EPI"]},
+        {"schema_version":"0.1.0","id":"DEC-EPI","kind":"decision","revision":0,"project_id":"PRJ-EPI","decision_kind":"research_adoption","subjects":[{"kind":"evidence","id":"EVD-EPI"}],"choice":"reclassify","actor_type":"human","decided_by":"fixture-human","decided_at":"2026-01-02T00:00:00Z"}
+      ]
+    }
+  ]
+}
