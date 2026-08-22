@@ -24,7 +24,8 @@ MATERIAL_REVISION_METADATA_FIELDS = {
 # Synthetic contract-fixture vocabulary only. These sentinel bindings make the
 # Core phrase "resolving Decision" executable without defining a production
 # Decision enum or runtime API. Implementations may use different vocabulary if
-# they preserve equivalent transition/qualification semantics.
+# they preserve equivalent transition/qualification semantics, including one
+# explicit combined Decision for multiple actions represented separately here.
 FIXTURE_RESEARCH_STATE_DECISIONS = {
     "approved": ("research_adoption", "approve"),
     "rejected": ("research_adoption", "reject"),
@@ -129,6 +130,18 @@ def _human_decision_for(
                 continue
         return True
     return False
+
+
+def _human_decisions_cover(
+    obj: dict,
+    objects: list[dict],
+    expected_bindings: Iterable[tuple[str, str]],
+) -> bool:
+    """Require every distinct fixture action to have a resolving human Decision."""
+    return all(
+        _human_decision_for(obj, objects, binding)
+        for binding in set(expected_bindings)
+    )
 
 
 def _material_research_payload(obj: dict) -> dict:
@@ -344,24 +357,50 @@ def _history_violations(prior_objects: list[dict], objects: list[dict]) -> set[s
             continue
 
         if kind == "evidence":
-            became_verified = before.get("verification_status") != "verified" and after.get("verification_status") == "verified"
-            promoted_mode = before.get("evidence_mode") == "synthetic" and after.get("evidence_mode") == "empirical"
-            strengthened_kind = before.get("evidence_kind") in {"counterevidence", "conflict", "null", "unknown", "limitation"} and after.get("evidence_kind") == "supporting"
-            removed_limitations = not set(before.get("limitations", [])).issubset(set(after.get("limitations", [])))
-            epistemic_change = promoted_mode or strengthened_kind or removed_limitations or became_verified
+            became_verified = (
+                before.get("verification_status") != "verified"
+                and after.get("verification_status") == "verified"
+            )
+            promoted_mode = (
+                before.get("evidence_mode") == "synthetic"
+                and after.get("evidence_mode") == "empirical"
+            )
+            strengthened_kind = (
+                before.get("evidence_kind")
+                in {"counterevidence", "conflict", "null", "unknown", "limitation"}
+                and after.get("evidence_kind") == "supporting"
+            )
+            removed_limitations = not set(before.get("limitations", [])).issubset(
+                set(after.get("limitations", []))
+            )
+            epistemic_change = (
+                promoted_mode
+                or strengthened_kind
+                or removed_limitations
+                or became_verified
+            )
 
             if promoted_mode:
                 violations.add("CORE-EPI-001")
+
             if epistemic_change:
-                binding = (
-                    FIXTURE_EVIDENCE_QUALIFICATION_DECISION
-                    if became_verified
-                    else FIXTURE_EVIDENCE_RECLASSIFICATION_DECISION
-                )
+                required_bindings: set[tuple[str, str]] = set()
+                if became_verified:
+                    required_bindings.add(FIXTURE_EVIDENCE_QUALIFICATION_DECISION)
+                if promoted_mode or strengthened_kind or removed_limitations:
+                    required_bindings.add(FIXTURE_EVIDENCE_RECLASSIFICATION_DECISION)
                 revision_advanced = after.get("revision", -1) > before.get("revision", -1)
-                if not revision_advanced or not _human_decision_for(after, objects, binding):
+                if (
+                    not revision_advanced
+                    or not _human_decisions_cover(after, objects, required_bindings)
+                ):
                     violations.add("CORE-EPI-002")
-            if became_verified and not _human_decision_for(after, objects, FIXTURE_EVIDENCE_QUALIFICATION_DECISION):
+
+            if became_verified and not _human_decision_for(
+                after,
+                objects,
+                FIXTURE_EVIDENCE_QUALIFICATION_DECISION,
+            ):
                 violations.add("CORE-AUTH-001")
 
         if kind in AUTHORITATIVE_STATES:
@@ -375,13 +414,18 @@ def _history_violations(prior_objects: list[dict], objects: list[dict]) -> set[s
                 _material_research_payload(before)
                 != _material_research_payload(after)
             )
+
+            required_bindings: set[tuple[str, str]] = set()
             if authoritative_transition:
-                binding = FIXTURE_RESEARCH_STATE_DECISIONS[after_state]
-                if not _human_decision_for(after, objects, binding):
-                    violations.add("CORE-AUTH-001")
-            elif materially_revised:
-                if not _human_decision_for(after, objects, FIXTURE_RESEARCH_REVISION_DECISION):
-                    violations.add("CORE-AUTH-001")
+                required_bindings.add(FIXTURE_RESEARCH_STATE_DECISIONS[after_state])
+            if materially_revised:
+                required_bindings.add(FIXTURE_RESEARCH_REVISION_DECISION)
+            if required_bindings and not _human_decisions_cover(
+                after,
+                objects,
+                required_bindings,
+            ):
+                violations.add("CORE-AUTH-001")
 
     return violations
 
@@ -405,5 +449,8 @@ def canonical_object_bytes(obj: dict) -> bytes:
 
 def canonical_state_bytes(objects: list[dict]) -> bytes:
     """Serialize a fixture state deterministically independent of object order."""
-    ordered = sorted(deepcopy(objects), key=lambda obj: (obj["kind"], obj["id"], obj["revision"]))
+    ordered = sorted(
+        deepcopy(objects),
+        key=lambda obj: (obj["kind"], obj["id"], obj["revision"]),
+    )
     return rfc8785.dumps(ordered)
