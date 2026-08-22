@@ -16,6 +16,7 @@ CATALOG_PATH = ROOT / "core/validators/non-overridable-invariants.yaml"
 VALID_FIXTURE_PATH = ROOT / "core/fixtures/research-objects/valid.json"
 INVALID_FIXTURE_PATH = ROOT / "core/fixtures/research-objects/invalid.json"
 SEMANTIC_FIXTURE_PATH = ROOT / "core/fixtures/research-objects/semantic-cases.json"
+AUTHORITY_FIXTURE_PATH = ROOT / "core/fixtures/research-objects/authority-cases.json"
 REGISTRY_PATH = ROOT / "profiles/contracts/invariant-strengthening-validators.yaml"
 PROFILE_SEMANTICS_PATH = ROOT / "profiles/contracts/composition-semantics.yaml"
 PROFILE_FIXTURES = ROOT / "profiles/fixtures"
@@ -47,6 +48,8 @@ class CoreContractTests(unittest.TestCase):
         cls.valid_fixture = load_json(VALID_FIXTURE_PATH)
         cls.invalid_fixture = load_json(INVALID_FIXTURE_PATH)
         cls.semantic_fixture = load_json(SEMANTIC_FIXTURE_PATH)
+        cls.authority_fixture = load_json(AUTHORITY_FIXTURE_PATH)
+        cls.semantic_cases = cls.semantic_fixture["cases"] + cls.authority_fixture["cases"]
 
     def test_research_object_schema_is_valid_draft_2020_12(self):
         """Require the canonical research-object schema itself to be valid Draft 2020-12."""
@@ -87,7 +90,8 @@ class CoreContractTests(unittest.TestCase):
 
     def test_semantic_fixtures_remain_schema_valid(self):
         """Keep semantic-invalid fixtures structurally valid so layers remain distinct."""
-        for case in self.semantic_fixture["cases"]:
+        self.assertTrue(self.authority_fixture["cases"], "authority fixture must not be empty")
+        for case in self.semantic_cases:
             for lane in ("prior_objects", "objects"):
                 for obj in case.get(lane, []):
                     errors = list(self.validator.iter_errors(obj))
@@ -95,7 +99,7 @@ class CoreContractTests(unittest.TestCase):
 
     def test_semantic_fixtures_exercise_exact_invariant_outcomes(self):
         """Require every semantic fixture to produce exactly its declared invariant set."""
-        for case in self.semantic_fixture["cases"]:
+        for case in self.semantic_cases:
             prior = case.get("prior_objects")
             actual = evaluate_core_invariants(case["objects"], prior)
             self.assertEqual(set(case["expected_invariants"]), actual, case["id"])
@@ -133,14 +137,14 @@ class CoreContractTests(unittest.TestCase):
         catalog_ids = {entry["id"] for entry in self.catalog["invariants"]}
         covered = {
             invariant_id
-            for case in self.semantic_fixture["cases"]
+            for case in self.semantic_cases
             for invariant_id in case["expected_invariants"]
         }
         self.assertEqual(catalog_ids, covered)
 
     def test_semantic_results_and_state_serialization_are_input_order_independent(self):
         """Require shuffled object order to preserve outcomes and canonical serialization."""
-        for case in self.semantic_fixture["cases"]:
+        for case in self.semantic_cases:
             expected_invariants = set(case["expected_invariants"])
             baseline_bytes = canonical_state_bytes(case["objects"])
             for seed in range(20):
