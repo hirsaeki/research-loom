@@ -26,6 +26,13 @@ def load_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def flatten_validation_errors(errors):
+    """Yield validation errors recursively, including nested oneOf/anyOf contexts."""
+    for error in errors:
+        yield error
+        yield from flatten_validation_errors(error.context)
+
+
 class CoreContractTests(unittest.TestCase):
     """Executable specification for canonical Core and Core/Profile contracts."""
 
@@ -59,11 +66,24 @@ class CoreContractTests(unittest.TestCase):
             errors = list(self.validator.iter_errors(obj))
             self.assertFalse(errors, f"{obj['kind']}:{obj['id']}: {errors}")
 
-    def test_schema_invalid_fixtures_each_fail_independently(self):
-        """Require every structural invalid fixture to fail schema validation on its own."""
+    def test_schema_invalid_fixtures_each_fail_for_declared_reason(self):
+        """Require every structural invalid fixture to fail for its declared schema reason."""
         for case in self.invalid_fixture["cases"]:
-            errors = list(self.validator.iter_errors(case["object"]))
+            errors = list(flatten_validation_errors(self.validator.iter_errors(case["object"])))
             self.assertTrue(errors, case["id"])
+            expected = case["expected_error"]
+            matches = [
+                error
+                for error in errors
+                if error.validator == expected["validator"]
+                and list(error.path) == expected["path"]
+                and expected.get("message_contains", "") in error.message
+            ]
+            self.assertTrue(
+                matches,
+                f"{case['id']}: expected {expected}, got "
+                f"{[(error.validator, list(error.path), error.message) for error in errors]}",
+            )
 
     def test_semantic_fixtures_remain_schema_valid(self):
         """Keep semantic-invalid fixtures structurally valid so layers remain distinct."""
