@@ -257,10 +257,11 @@ def narrative_projection_error(state: dict[str, Any], profile: dict[str, Any]) -
     ):
         return "NARRATIVE-PRESERVATION-001"
 
-    authoritative = set(state["authoritative_connections"])
-    represented = set(projection.get("represented_connections", []))
-    if represented != authoritative:
-        return "NARRATIVE-CONNECTION-001"
+    if constraints.get("narrative.connections.preserve"):
+        authoritative = set(state["authoritative_connections"])
+        represented = set(projection.get("represented_connections", []))
+        if represented != authoritative:
+            return "NARRATIVE-CONNECTION-001"
 
     non_normative_hints = set(constraints.get("narrative.projection.non_normative_hints", []))
     for hint in projection.get("hints", []):
