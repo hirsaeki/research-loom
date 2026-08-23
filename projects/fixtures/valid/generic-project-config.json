@@ -1,0 +1,159 @@
+{
+  "schema_version": "0.1.0",
+  "config_version": "0.1.0",
+  "project": {
+    "project_id": "PRJ-1",
+    "title": "Fixture project",
+    "objective": "Exercise project-local configuration boundaries without encoding a real organization, publication, or research method."
+  },
+  "scope": {
+    "in_scope": [
+      "synthetic contract behavior",
+      "project-local configuration boundaries"
+    ],
+    "out_of_scope": [
+      "real organization policy",
+      "runtime execution behavior"
+    ]
+  },
+  "research_questions": {
+    "references": [
+      {
+        "question_id": "RQ-1"
+      }
+    ],
+    "seeds": [
+      {
+        "seed_id": "RQ-SEED-001",
+        "text": "Which project-local factors require investigation before the research question is considered complete?",
+        "rationale": "A synthetic question candidate; it is not an adopted Research Question or an answer."
+      }
+    ]
+  },
+  "profile_requests": {
+    "research": [],
+    "organization": [],
+    "narrative": [
+      {
+        "profile_id": "fixture.narrative",
+        "profile_type": "narrative",
+        "version": "1.0.0"
+      }
+    ],
+    "publication": [
+      {
+        "profile_id": "fixture.publication",
+        "profile_type": "publication",
+        "version": "1.0.0"
+      }
+    ]
+  },
+  "communication_brief": {
+    "audience": [
+      "fixture reviewers"
+    ],
+    "purpose": "Exercise the canonical Project Config contract.",
+    "core_message": "Report only what supplied authoritative research state can support.",
+    "must_include": [
+      "scope limits",
+      "unresolved questions"
+    ],
+    "tone": "neutral"
+  },
+  "research_attention": [
+    {
+      "attention_id": "ATT-FIXTURE-001",
+      "statement": "Preserve the distinction between observed findings and proposed explanations.",
+      "rationale": "The issue should remain visible while question candidates and coverage evolve.",
+      "source_reference_ids": [
+        "REF-INPUT-001"
+      ],
+      "related_question_ids": [
+        "RQ-1"
+      ],
+      "related_question_seed_ids": [
+        "RQ-SEED-001"
+      ],
+      "disposition": "active",
+      "projection_hints": [
+        {
+          "hint_type": "publication_location",
+          "value": "provisional explanatory location",
+          "normative": false
+        }
+      ]
+    },
+    {
+      "attention_id": "ATT-FIXTURE-002",
+      "statement": "A separate synthetic topic is intentionally excluded from this project.",
+      "disposition": "out_of_scope",
+      "disposition_reason": "It does not contribute to the synthetic fixture objective."
+    }
+  ],
+  "project_constraints": {
+    "requirements": [
+      {
+        "guard_id": "GUARD-REQ-001",
+        "statement": "Keep unresolved project uncertainties visible in project-facing outputs."
+      }
+    ],
+    "prohibitions": [
+      {
+        "guard_id": "GUARD-PRO-001",
+        "statement": "Do not treat a configured resource reference as Evidence merely because it is listed."
+      }
+    ],
+    "must_not_claim": [
+      {
+        "guard_id": "GUARD-CLAIM-001",
+        "statement": "Do not claim a real-world causal effect from this synthetic fixture."
+      }
+    ]
+  },
+  "resource_references": [
+    {
+      "reference_id": "REF-INPUT-001",
+      "reference_type": "input",
+      "locator": "inputs/synthetic-brief.md",
+      "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "purpose": "Synthetic project intake input."
+    },
+    {
+      "reference_id": "REF-SOURCE-001",
+      "reference_type": "source",
+      "object_id": "SRC-1",
+      "purpose": "Reference to an already-materialized synthetic Core Source."
+    },
+    {
+      "reference_id": "REF-ARTIFACT-001",
+      "reference_type": "artifact",
+      "object_id": "ART-1",
+      "locator": "artifacts/synthetic-context.json",
+      "purpose": "Synthetic artifact reference; listing it grants no runtime access."
+    }
+  ],
+  "capability_hints": [
+    {
+      "capability_id": "fixture-capability-a",
+      "availability_hint": "available",
+      "permission_hint": "no_project_objection",
+      "rationale": "Availability and project posture do not select a Research Method or grant runtime authorization."
+    },
+    {
+      "capability_id": "fixture-capability-b",
+      "availability_hint": "conditional",
+      "permission_hint": "human_approval_required",
+      "rationale": "The project records a hint only; runtime enforcement is outside this contract."
+    }
+  ],
+  "provenance": {
+    "source_reference_ids": [
+      "REF-INPUT-001"
+    ],
+    "derived_from_configuration_digests": [],
+    "notes": [
+      "Synthetic fixture only; no concrete organization or project policy is implied."
+    ]
+  },
+  "configuration_digest": "sha256:9fa677cbca9f50f54055021d8c1f0febfe636795a96931174f2aef6052fb13fb"
+}
