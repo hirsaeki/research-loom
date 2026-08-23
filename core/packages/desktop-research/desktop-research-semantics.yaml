@@ -1,0 +1,69 @@
+schema_version: "0.1.0"
+capability:
+  descriptor_id: desktop-research
+  function: investigate
+  generic_input_contract: capability-context-pack@0.1.0
+  generic_output_contract: capability-handoff@0.1.0
+  implementation_neutral: true
+context:
+  extension_contract: desktop-research-context-extension@0.1.0
+  exact_pr9_context_binding_required: true
+  question_candidate_is_authoritative: false
+  source_categories_encode_quality: false
+  all_pr9_resources_require_desktop_role_binding: true
+  forbidden_resource_roles_are_fail_closed: true
+  bounded_resource_and_artifact_budget_required: true
+capture:
+  discovery_is_evidence_adoption: false
+  capture_is_verified_evidence: false
+  exact_locator_required: true
+  acquisition_timestamp_must_be_utc: true
+  original_capture_digest_required: true
+  utf8_text_rendition_digest_required: true
+  excerpt_containment_required: true
+  citation_back_reference_required: true
+search_trace:
+  preserve_unsuccessful_coverage: true
+  engine_or_browser_specific_contract: false
+coverage_and_stopping:
+  all_declared_dimensions_assessed: true
+  saturation_required: true
+  remaining_information_value_required: true
+  fixed_source_count_is_sufficient: false
+  material_gap_blocks_stop_recommendation: true
+  high_remaining_information_value_blocks_stop_recommendation: true
+  stopping_is_research_completion: false
+  stopping_is_human_decision: false
+handoff:
+  canonical_wire_format: capability-handoff@0.1.0
+  second_desktop_research_handoff_forbidden: true
+  result_extension_contract: desktop-research-result-extension@0.1.0
+  result_extension_requires_exact_handoff_binding: true
+  preserve_counterevidence_conflicts_nulls_unknowns_gaps: true
+  next_method_is_candidate_only: true
+  research_state_mutation_performed: false
+quality_boundary:
+  source_quality_owned_by: research_profile
+  causal_support_owned_by: research_profile
+  source_type_to_quality_tier_matrix_canonicalized: false
+  writer_publication_material_is_research_evidence: false
+  execution_mode_epistemic_boundary_owned_by: capability-handoff@0.1.0
+errors:
+  - {id: DR-CONTEXT-DIGEST-001, meaning: "Desktop Research Context extension digest does not match canonical content."}
+  - {id: DR-CONTEXT-BINDING-001, meaning: "Context extension does not bind the exact PR9 Context Pack/project/target."}
+  - {id: DR-CONTEXT-IDENTITY-001, meaning: "Desktop Research Context extension has duplicate coverage or resource-role identities."}
+  - {id: DR-CONTEXT-RESOURCE-ROLE-001, meaning: "A PR9 resource lacks a Desktop role binding or uses a forbidden Desktop runtime role."}
+  - {id: DR-CONTEXT-BUDGET-001, meaning: "PR9 Context resources exceed the Desktop Research bounded resource/artifact budget."}
+  - {id: DR-RESULT-DIGEST-001, meaning: "Desktop Research result extension digest does not match canonical content."}
+  - {id: DR-RESULT-BINDING-001, meaning: "Result extension does not bind the exact PR9 Capability Handoff and Context Pack."}
+  - {id: DR-CAPTURE-PROVENANCE-001, meaning: "Source capture detail does not preserve exact locator/acquisition/original/text-rendition provenance."}
+  - {id: DR-CAPTURE-BUDGET-001, meaning: "Acquired captures, search trace, or text rendition bytes exceed the Context extension budget."}
+  - {id: DR-CITATION-001, meaning: "A captured evidence/counterevidence candidate lacks a valid excerpt containment and back-reference."}
+  - {id: DR-SEARCH-TRACE-001, meaning: "Search trace references are invalid or unsuccessful coverage is not preserved exactly."}
+  - {id: DR-NULL-001, meaning: "A null result is not projected to a preserved PR9 observation or unknown."}
+  - {id: DR-EVIDENCE-GAP-001, meaning: "PR9 Evidence Gap assessment is missing, duplicated, or bound to unknown coverage dimensions."}
+  - {id: DR-COVERAGE-001, meaning: "Coverage does not assess exactly the declared dimensions or references invalid search trace entries."}
+  - {id: DR-STOP-BASIS-001, meaning: "Fixed source count is used as the sole stopping basis."}
+  - {id: DR-STOP-GAP-001, meaning: "Stopping is recommended while a material Evidence Gap remains."}
+  - {id: DR-STOP-RIV-001, meaning: "Stopping is recommended while remaining information value is high."}
+  - {id: DR-NEXT-METHOD-001, meaning: "Result extension drops or invents a PR9 candidate next-method proposal."}
