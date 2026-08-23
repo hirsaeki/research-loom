@@ -1,0 +1,26 @@
+{
+  "schema_version": "0.1.0",
+  "capability_id": "fixture.research-support",
+  "capability_version": "1.0.0",
+  "capability_kind": "research_support",
+  "implementation_boundary": "plugin",
+  "declared_functions": [
+    {
+      "function_id": "investigate",
+      "description": "Return structured research candidates from an explicitly bounded Context Pack.",
+      "supported_execution_modes": ["real", "virtual", "synthetic_test"],
+      "input_contract": "capability-context-pack@0.1.0",
+      "output_contract": "capability-handoff@0.1.0"
+    }
+  ],
+  "availability": {
+    "declaration": "available",
+    "rationale": "Synthetic fixture declaration only; runtime authorization remains separate."
+  },
+  "compatibility": {
+    "core_research_contract": "0.1.0",
+    "project_config_contract": "0.1.0",
+    "effective_profile_set_contract": "0.1.0"
+  },
+  "descriptor_digest": "sha256:7c490b81baad229a38ce3f1588721ccc496f37733fd082f86c278c387f445487"
+}
