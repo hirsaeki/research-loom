@@ -98,7 +98,30 @@ class ResearchMethodContracts(unittest.TestCase):
 
         source_handoff = deepcopy(self.gap_handoff)
         source_handoff["input_pins"]["context_pack_digest"] = "sha256:" + "0" * 64
+        # Do not refresh handoff_digest: this verifies RFC 8785 Handoff tamper
+        # detection, not equality with the current Context Pack digest.
         self.assertEqual(self._context_error(self.context_extension, handoff=source_handoff), "RM-CONTEXT-BINDING-001")
+
+    def test_schema_enforces_function_specific_inputs(self):
+        validator = Draft202012Validator(self.context_schema)
+
+        execute = deepcopy(self.context_extension)
+        execute["run_spec"] = None
+        refresh(execute)
+        self.assertTrue(list(validator.iter_errors(execute)))
+
+        method_design = deepcopy(self.context_extension)
+        method_design["function_id"] = "method_design"
+        method_design["run_spec"] = None
+        method_design["prior_run_result_refs"] = [{"id":"RRES-OLD","version":"1.0.0","content_digest":"sha256:"+"c"*64}]
+        refresh(method_design)
+        self.assertTrue(list(validator.iter_errors(method_design)))
+
+        analyze = deepcopy(self.context_extension)
+        analyze["function_id"] = "analyze"
+        analyze["prior_run_result_refs"] = []
+        refresh(analyze)
+        self.assertTrue(list(validator.iter_errors(analyze)))
 
     def test_real_execute_requires_adopted_method_and_human_decisions(self):
         case = deepcopy(self.context_extension)

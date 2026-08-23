@@ -24,6 +24,18 @@
     {
       "if": {"properties":{"function_id":{"const":"instrument_design"}},"required":["function_id"]},
       "then": {"properties":{"method_basis":{"not":{"type":"null"}},"protocol_basis":{"not":{"type":"null"}}}}
+    },
+    {
+      "if": {"properties":{"function_id":{"const":"execute"}},"required":["function_id"]},
+      "then": {"properties":{"method_basis":{"not":{"type":"null"}},"protocol_basis":{"not":{"type":"null"}},"run_spec":{"not":{"type":"null"}}}}
+    },
+    {
+      "if": {"properties":{"function_id":{"const":"method_design"}},"required":["function_id"]},
+      "then": {"properties":{"run_spec":{"type":"null"},"prior_run_result_refs":{"maxItems":0}}}
+    },
+    {
+      "if": {"properties":{"function_id":{"const":"analyze"}},"required":["function_id"]},
+      "then": {"properties":{"prior_run_result_refs":{"minItems":1}}}
     }
   ],
   "$defs": {
