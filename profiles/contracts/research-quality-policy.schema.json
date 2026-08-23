@@ -123,7 +123,10 @@
         {
           "if": {"properties": {"class": {"const": "semantic"}}, "required": ["class"]},
           "then": {
-            "properties": {"path": {"not": {"pattern": "^research_quality\\.thresholds\\."}}}
+            "properties": {
+              "path": {"not": {"pattern": "^research_quality\\.thresholds\\."}},
+              "value_shape": {"const": "enum_set"}
+            }
           }
         }
       ]
