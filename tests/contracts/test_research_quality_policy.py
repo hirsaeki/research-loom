@@ -9,6 +9,7 @@ from jsonschema import Draft202012Validator
 
 from research_quality_oracle import (
     apply_mutations,
+    catalog_cross_reference_errors,
     catalog_index,
     research_quality_constraint_error,
     research_quality_state_error,
@@ -42,6 +43,7 @@ class ResearchQualityPolicyContractTests(unittest.TestCase):
         """Require the catalog to conform and semantic entries to remain set-valued."""
         Draft202012Validator.check_schema(self.quality_schema)
         self.assertFalse(list(self.quality_validator.iter_errors(self.catalog)))
+        self.assertEqual([], catalog_cross_reference_errors(self.catalog))
         paths = [entry["path"] for entry in self.catalog["constraint_paths"]]
         self.assertEqual(len(paths), len(set(paths)))
         index = catalog_index(self.catalog)
@@ -62,6 +64,30 @@ class ResearchQualityPolicyContractTests(unittest.TestCase):
         semantic_entry["merge_strategy"] = "max"
         semantic_entry.pop("vocabulary", None)
         self.assertTrue(list(self.quality_validator.iter_errors(invalid_catalog)))
+
+    def test_quality_catalog_cross_references_fail_closed(self):
+        """Reject missing constraint vocabularies and quality-gate definition drift."""
+        missing_vocabulary = json.loads(json.dumps(self.catalog))
+        enum_entry = next(entry for entry in missing_vocabulary["constraint_paths"] if entry["value_shape"] == "enum_set")
+        enum_entry["vocabulary"] = "missing_vocabulary"
+        errors = catalog_cross_reference_errors(missing_vocabulary)
+        self.assertEqual(1, len(errors))
+        self.assertIn("missing vocabulary", errors[0])
+        with self.assertRaisesRegex(AssertionError, "invalid Research quality catalog"):
+            research_quality_constraint_error(self.generic, missing_vocabulary)
+
+        missing_gate_definition = json.loads(json.dumps(self.catalog))
+        gate_to_remove = missing_gate_definition["vocabularies"]["quality_gate"][0]
+        missing_gate_definition["quality_gates"].pop(gate_to_remove)
+        errors = catalog_cross_reference_errors(missing_gate_definition)
+        self.assertEqual(1, len(errors))
+        self.assertIn("quality_gate vocabulary/definition mismatch", errors[0])
+
+        extra_gate_definition = json.loads(json.dumps(self.catalog))
+        extra_gate_definition["quality_gates"]["fixture_extra_gate"] = {"meaning": "Synthetic invalid gate definition."}
+        errors = catalog_cross_reference_errors(extra_gate_definition)
+        self.assertEqual(1, len(errors))
+        self.assertIn("quality_gate vocabulary/definition mismatch", errors[0])
 
     def test_generic_and_strict_research_quality_fixtures_are_valid_manifests(self):
         """Validate the synthetic generic and stricter Research Profile manifests."""
