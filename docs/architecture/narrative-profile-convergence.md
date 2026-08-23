@@ -59,7 +59,7 @@ No chapter number or heading participates in canonical dependency identity.
 
 If selected research material carries counter-findings/counterevidence effects, qualifiers, or limitations, the Narrative projection must retain their constraining effect where the affected reasoning remains understandable. Merely moving adverse material to a detached limitations section is not preservation when doing so makes the Argument or Recommendation read stronger than the authoritative Research State.
 
-Likewise, authoritative links such as Argument→support, Finding→counterevidence/qualifiers, Contribution→Finding, and Recommendation→Finding are preserved when both endpoints are projected. Missing links are reported as gaps; Narrative does not invent them.
+Likewise, supplied structure such as Argument→support, `Argument.qualifier`, `Finding.counter_evidence_ids`, `Finding.limitations`, Contribution→Finding, and Recommendation→Finding is preserved when the affected content is projected. Missing links or attachments are reported as gaps; Narrative does not invent them.
 
 Narrative is read-only with respect to authoritative Research State. Method choice, RQ answering, object creation/adoption, epistemic strengthening, and research-state mutation remain outside this layer.
 
