@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 from copy import deepcopy
 import hashlib
 import json
@@ -25,6 +26,7 @@ from capability_oracle import (
 )
 
 ROOT = Path(__file__).resolve().parents[2]
+ORACLE_PATH = ROOT / "tests/contracts/capability_oracle.py"
 PATHS = {
     "descriptor": ROOT / "core/packages/capability-descriptor.schema.json",
     "context": ROOT / "core/packages/capability-context-pack.schema.json",
@@ -71,10 +73,20 @@ class CapabilityContracts(unittest.TestCase):
         )
 
     def assert_valid(self, key, document):
-        self.assertFalse(list(self.validators[key].iter_errors(document)))
+        errors = list(self.validators[key].iter_errors(document))
+        self.assertFalse(
+            errors,
+            "\n".join(
+                f"{list(error.path)}: {error.message}" for error in errors
+            ),
+        )
 
     def assert_invalid(self, key, document):
-        self.assertTrue(list(self.validators[key].iter_errors(document)))
+        errors = list(self.validators[key].iter_errors(document))
+        self.assertTrue(
+            errors,
+            f"expected {key} schema validation to fail, but document was valid",
+        )
 
     def test_valid_chain_and_digests(self):
         for schema in self.schemas.values():
@@ -124,6 +136,19 @@ class CapabilityContracts(unittest.TestCase):
             context["pins"]["effective_profile_set"]["content_digest"],
             expected_effective_digest,
         )
+
+    def test_oracle_error_codes_match_semantics_catalog(self):
+        tree = ast.parse(ORACLE_PATH.read_text())
+        oracle_codes = {
+            node.value.value
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Return)
+            and isinstance(node.value, ast.Constant)
+            and isinstance(node.value.value, str)
+            and node.value.value.startswith("CAP-")
+        }
+        catalog_codes = {item["id"] for item in self.semantics["errors"]}
+        self.assertEqual(catalog_codes, oracle_codes)
 
     def test_context_pins_and_preserves_governance(self):
         context = self.fixtures["context"]
@@ -397,6 +422,14 @@ class CapabilityContracts(unittest.TestCase):
 
         bad = deepcopy(handoff)
         bad["provenance"]["input_content_digests"] = ["sha256:" + "f" * 64]
+        refresh_digest("handoff", bad)
+        self.assertEqual(
+            "CAP-HANDOFF-PROVENANCE-001",
+            handoff_semantic_error(bad, invocation, context),
+        )
+
+        bad = deepcopy(handoff)
+        bad["provenance"]["input_content_digests"].append("sha256:" + "e" * 64)
         refresh_digest("handoff", bad)
         self.assertEqual(
             "CAP-HANDOFF-PROVENANCE-001",
