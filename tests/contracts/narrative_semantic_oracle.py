@@ -230,18 +230,31 @@ def narrative_projection_error(state: dict[str, Any], profile: dict[str, Any]) -
     constraints = {item["path"]: item["value"] for item in profile.get("constraints", [])}
     projection = state["projection"]
 
-    prohibited = set(constraints["narrative.authority.prohibited_actions"])
+    prohibited = set(constraints.get("narrative.authority.prohibited_actions", []))
     if state["research_state_digest_before"] != state["research_state_digest_after"]:
         return "NARRATIVE-AUTHORITY-001"
     if prohibited.intersection(projection.get("authority_actions", [])):
         return "NARRATIVE-AUTHORITY-001"
 
-    required_preservation = set(constraints["narrative.preservation.required_content"])
+    required_preservation = set(constraints.get("narrative.preservation.required_content", []))
+    expected_preservation = {
+        (item.get("content"), item.get("affected_id"))
+        for item in state.get("authoritative_preservation_requirements", [])
+        if item.get("content") in required_preservation
+    }
     preservation = projection.get("required_preservation", [])
-    represented_types = {item.get("content") for item in preservation if item.get("effect_preserved") is True}
-    if not required_preservation.issubset(represented_types):
+    preserved = {
+        (item.get("content"), item.get("affected_id"))
+        for item in preservation
+        if item.get("content") in required_preservation and item.get("effect_preserved") is True
+    }
+    if not expected_preservation.issubset(preserved):
         return "NARRATIVE-PRESERVATION-001"
-    if any(item.get("content") in required_preservation and not item.get("effect_preserved") for item in preservation):
+    if any(
+        (item.get("content"), item.get("affected_id")) in expected_preservation
+        and item.get("effect_preserved") is not True
+        for item in preservation
+    ):
         return "NARRATIVE-PRESERVATION-001"
 
     authoritative = set(state["authoritative_connections"])
@@ -249,7 +262,7 @@ def narrative_projection_error(state: dict[str, Any], profile: dict[str, Any]) -
     if represented != authoritative:
         return "NARRATIVE-CONNECTION-001"
 
-    non_normative_hints = set(constraints["narrative.projection.non_normative_hints"])
+    non_normative_hints = set(constraints.get("narrative.projection.non_normative_hints", []))
     for hint in projection.get("hints", []):
         if hint.get("kind") in non_normative_hints and hint.get("treatment") != "projection_hint":
             return "NARRATIVE-PROJECTION-HINT-001"
