@@ -1,0 +1,52 @@
+{
+  "schema_version": "0.1.0",
+  "profile_id": "fixture.generic-narrative",
+  "profile_type": "narrative",
+  "profile_version": "1.0.0",
+  "description": "Synthetic generic Narrative Profile fixture demonstrating semantic stages and partial-order composition without literal chapters, project attention, publication formatting, or Writer runtime behavior.",
+  "core_compatibility": {
+    "research_contract": "0.1.0",
+    "invariant_contract": "0.1.0"
+  },
+  "constraints": [
+    {
+      "id": "narrative-stages",
+      "path": "narrative.stages.definitions",
+      "merge_strategy": "union",
+      "value": [
+        {"id":"framing","semantic_role":"framing","consumes":["research_question","argument","finding"],"requires":["research_question"],"produces":["context_frame"]},
+        {"id":"formation","semantic_role":"formation","consumes":["claim","finding","argument"],"requires":["argument"],"produces":["argument_exposition"]},
+        {"id":"validation","semantic_role":"validation","consumes":["finding","counter_review","argument"],"requires":["finding","argument"],"produces":["qualified_finding_exposition","validation_exposition"]},
+        {"id":"synthesis","semantic_role":"synthesis","consumes":["finding","counter_review","argument","contribution"],"requires":["finding","argument"],"produces":["contribution_synthesis"]},
+        {"id":"implication","semantic_role":"implication","consumes":["finding","recommendation"],"requires":["recommendation"],"produces":["recommendation_rationale"]}
+      ]
+    },
+    {
+      "id": "narrative-dependencies",
+      "path": "narrative.dependencies.required",
+      "merge_strategy": "union",
+      "value": [
+        {"from_stage":"framing","to_stage":"formation","relation":"semantic_precondition"},
+        {"from_stage":"formation","to_stage":"validation","relation":"output_dependency"},
+        {"from_stage":"validation","to_stage":"synthesis","relation":"semantic_precondition"},
+        {"from_stage":"validation","to_stage":"implication","relation":"semantic_precondition"}
+      ]
+    },
+    {
+      "id": "narrative-section-purposes",
+      "path": "narrative.section_purposes.definitions",
+      "merge_strategy": "union",
+      "value": [
+        {"id":"frame_problem","purpose_role":"establish_context","stage_ids":["framing"]},
+        {"id":"expose_argument","purpose_role":"expose_argument","stage_ids":["formation"]},
+        {"id":"test_and_qualify","purpose_role":"validate","stage_ids":["validation"]},
+        {"id":"integrate_contributions","purpose_role":"synthesize","stage_ids":["synthesis"]},
+        {"id":"present_implications","purpose_role":"present_recommendation","stage_ids":["implication"]}
+      ]
+    },
+    {"id":"narrative-preservation","path":"narrative.preservation.required_content","merge_strategy":"union","value":["counter_findings","qualifiers","limitations"]},
+    {"id":"narrative-connections","path":"narrative.connections.preserve","merge_strategy":"union","value":["argument_to_support","finding_to_counterevidence","finding_to_qualifiers","contribution_to_findings","recommendation_to_findings"]},
+    {"id":"narrative-authority","path":"narrative.authority.prohibited_actions","merge_strategy":"union","value":["choose_research_method","answer_research_question","mutate_authoritative_research_state","create_authoritative_research_object","change_research_adoption_state","strengthen_epistemic_status"]},
+    {"id":"narrative-hints","path":"narrative.projection.non_normative_hints","merge_strategy":"union","value":["provisional_outline","publication_location","primary_exposition_location","literal_heading","chapter_number"]}
+  ]
+}
