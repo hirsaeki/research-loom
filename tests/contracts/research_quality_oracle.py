@@ -5,10 +5,12 @@ from typing import Any
 
 
 def catalog_index(catalog: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """Index canonical Research quality constraint specifications by path."""
     return {entry["path"]: entry for entry in catalog["constraint_paths"]}
 
 
 def research_quality_constraint_error(profile: dict[str, Any], catalog: dict[str, Any]) -> str | None:
+    """Return the first fixture-level Research quality declaration error, if any."""
     index = catalog_index(catalog)
     vocabularies = catalog["vocabularies"]
     for constraint in profile.get("constraints", []):
@@ -42,6 +44,7 @@ def research_quality_constraint_error(profile: dict[str, Any], catalog: dict[str
 
 
 def apply_mutations(base: dict[str, Any], mutations: list[dict[str, Any]]) -> dict[str, Any]:
+    """Apply deterministic fixture mutations to a deep copy of the base state."""
     state = deepcopy(base)
     for mutation in mutations:
         parts = mutation["path"].split(".")
@@ -58,10 +61,12 @@ def apply_mutations(base: dict[str, Any], mutations: list[dict[str, Any]]) -> di
 
 
 def _constraints(profile: dict[str, Any]) -> dict[str, Any]:
+    """Project a fixture profile's constraint declarations into path/value pairs."""
     return {constraint["path"]: constraint["value"] for constraint in profile.get("constraints", [])}
 
 
 def research_quality_state_error(state: dict[str, Any], profile: dict[str, Any]) -> str | None:
+    """Evaluate only the canonical Research quality semantics exercised by fixtures."""
     c = _constraints(profile)
     objects = state["objects"]
     assessments = state["assessments"]
@@ -112,7 +117,10 @@ def research_quality_state_error(state: dict[str, Any], profile: dict[str, Any])
     if "same_evidence_not_self_validate" in independence_requirements:
         formation = set(claim_assessment.get("formation_evidence_ids", []))
         supporting = set(claim.get("supporting_evidence_ids", []))
-        if formation and formation == supporting:
+        if formation and supporting and supporting.issubset(formation):
+            return "RESEARCH-QUALITY-INDEPENDENCE-001"
+    if "synthesis_overlap_accounted" in independence_requirements:
+        if any(not assessments["evidence"][eid].get("synthesis_overlap_accounted", False) for eid in evidence_ids):
             return "RESEARCH-QUALITY-INDEPENDENCE-001"
     if claim_family in set(c["research_quality.evidence.independence.required_claim_families"]):
         groups = {objects[eid].get("independence_group") for eid in evidence_ids}
