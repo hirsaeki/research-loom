@@ -1,0 +1,21 @@
+{
+  "schema_version": "0.1.0",
+  "profile_id": "fixture.strict-research-quality",
+  "profile_type": "research",
+  "profile_version": "1.0.0",
+  "description": "Synthetic stricter Research Profile fixture used only to prove monotone quality-policy composition.",
+  "core_compatibility": {
+    "research_contract": "0.1.0",
+    "invariant_contract": "0.1.0"
+  },
+  "extends": [
+    {"profile_id":"fixture.generic-research-quality","profile_type":"research","version":"1.0.0"}
+  ],
+  "constraints": [
+    {"id":"strict-low-confidence-scope","path":"research_quality.source.low_confidence.allowed_support_scopes","merge_strategy":"intersection","value":["descriptive_context"]},
+    {"id":"strict-counter-lenses","path":"research_quality.counter_review.required_lenses","merge_strategy":"union","value":["methodological_weakness"]},
+    {"id":"strict-gates","path":"research_quality.gates.required","merge_strategy":"union","value":["research_freeze"]},
+    {"id":"strict-min-support","path":"research_quality.thresholds.material_finding.min_supporting_evidence_count","merge_strategy":"max","value":3},
+    {"id":"strict-min-independent","path":"research_quality.thresholds.material_finding.min_independent_evidence_groups","merge_strategy":"max","value":3}
+  ]
+}

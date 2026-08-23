@@ -1,8 +1,8 @@
 # Canonical contract checks
 
-This directory is the executable specification for the canonical contracts established by PR 3 (Core) and PR 4 (Profiles).
+This directory is the executable specification for the canonical contracts established by PR 3 (Core), PR 4 (Profiles), PR 5 (hardened canonical CI), and PR 6 (Research Profile quality policy).
 
-It is intentionally test-only. `core_semantic_oracle.py` and `semantic_oracle.py` model only the semantics needed to distinguish the canonical fixtures; they are not runtime validators, resolvers, storage services, or public APIs.
+It is intentionally test-only. `core_semantic_oracle.py`, `semantic_oracle.py`, and `research_quality_oracle.py` model only the semantics needed to distinguish the canonical fixtures; they are not runtime validators, resolvers, storage services, or public APIs.
 
 ## Covered contracts
 
@@ -11,6 +11,13 @@ It is intentionally test-only. `core_semantic_oracle.py` and `semantic_oracle.py
 - Profile manifest / Effective Profile Set schema and semantic fixtures.
 - Core invariant catalog ↔ Profile strengthening-registry consistency.
 - Deterministic version selection, composition, provenance, invariant evaluation, and canonical serialization under shuffled input order.
+- Research Profile quality-policy catalog structure, `research_quality.*` ownership/path/type/merge semantics, monotone composition, and synthetic semantic regressions for source/evidence admissibility, verification, independence, causal support, Finding qualification, Counter Review, sufficiency, method families, and quality gates.
+
+### Research quality fixture boundary
+
+PR 6 adds **generic synthetic Research Profile policy**, not a production quality engine and not a concrete MISCO quality matrix. The fixture oracle uses Profile-level derived assessment labels (for example source quality tier, directness, support scope, Claim family, and method family) only to make the canonical semantic rules executable. Those labels do not add fields to the Core research-object schema.
+
+Numeric thresholds and semantic sufficiency are tested separately. In particular, a configured minimum Evidence count may be necessary for a fixture but is never sufficient by itself to satisfy coverage/stopping semantics.
 
 ### Fixture-only sentinels
 
@@ -43,9 +50,9 @@ Direct test dependencies are pinned and the CI environment fixes Python 3.12, `P
 
 These tests must not grow into:
 
-- a production research-object validator;
+- a production research-object validator or Research quality evaluator;
 - a Profile runtime resolver;
 - legacy implementation compatibility tests;
 - SQLite/export/publish behavior;
 - Writer/Publication implementation tests;
-- concrete MISCO or source-quality policy.
+- concrete MISCO, organization-specific, or project-specific research-quality policy.

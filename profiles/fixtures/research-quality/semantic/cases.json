@@ -1,0 +1,46 @@
+{
+  "base_state": {
+    "objects": {
+      "PRJ-1": {"schema_version":"0.1.0","id":"PRJ-1","kind":"project","revision":0,"title":"Synthetic quality fixture"},
+      "RQ-1": {"schema_version":"0.1.0","id":"RQ-1","kind":"research_question","revision":0,"project_id":"PRJ-1","text":"What does the bounded evidence support?","adoption_state":"approved"},
+      "SRC-1": {"schema_version":"0.1.0","id":"SRC-1","kind":"source","revision":0,"project_id":"PRJ-1","source_type":"peer_reviewed_research","canonical_locator":"fixture://source/1"},
+      "SRC-2": {"schema_version":"0.1.0","id":"SRC-2","kind":"source","revision":0,"project_id":"PRJ-1","source_type":"government_primary","canonical_locator":"fixture://source/2"},
+      "EVD-1": {"schema_version":"0.1.0","id":"EVD-1","kind":"evidence","revision":0,"project_id":"PRJ-1","source_id":"SRC-1","locator":"p.1","statement":"Synthetic observation one","evidence_kind":"supporting","verification_status":"verified","evidence_mode":"empirical","limitations":["bounded synthetic fixture"],"independence_group":"origin-a"},
+      "EVD-2": {"schema_version":"0.1.0","id":"EVD-2","kind":"evidence","revision":0,"project_id":"PRJ-1","source_id":"SRC-2","locator":"p.2","statement":"Synthetic observation two","evidence_kind":"supporting","verification_status":"verified","evidence_mode":"empirical","limitations":["bounded synthetic fixture"],"independence_group":"origin-b"},
+      "CLM-1": {"schema_version":"0.1.0","id":"CLM-1","kind":"claim","revision":0,"project_id":"PRJ-1","question_id":"RQ-1","statement":"The bounded descriptive pattern is supported","claim_type":"descriptive","assessment":"supported","supporting_evidence_ids":["EVD-1","EVD-2"],"challenging_evidence_ids":[]},
+      "MTH-1": {"schema_version":"0.1.0","id":"MTH-1","kind":"method","revision":0,"project_id":"PRJ-1","question_ids":["RQ-1"],"name":"Synthetic primary method","protocol_ref":"fixture://protocol/1","adoption_state":"approved","limitations":["synthetic fixture only"]},
+      "FND-1": {"schema_version":"0.1.0","id":"FND-1","kind":"finding","revision":0,"project_id":"PRJ-1","question_ids":["RQ-1"],"statement":"A bounded descriptive finding","evidence_ids":["EVD-1","EVD-2"],"counter_evidence_ids":[],"boundary_conditions":["fixture context only"],"limitations":["not generalizable"],"confidence":"moderate","adoption_state":"approved"},
+      "CR-1": {"schema_version":"0.1.0","id":"CR-1","kind":"counter_review","revision":0,"project_id":"PRJ-1","target":{"kind":"finding","id":"FND-1"},"review_lens":"contradictory_evidence","issue":"No contradictory fixture evidence found","severity":"minor","disposition":"resolved"},
+      "CR-2": {"schema_version":"0.1.0","id":"CR-2","kind":"counter_review","revision":0,"project_id":"PRJ-1","target":{"kind":"finding","id":"FND-1"},"review_lens":"alternative_explanation","issue":"Alternative explanation considered","severity":"major","disposition":"resolved"}
+    },
+    "assessments": {
+      "sources": {"SRC-1":{"quality_tier":"high","source_role":"peer_reviewed_research"},"SRC-2":{"quality_tier":"medium","source_role":"government_primary"}},
+      "evidence": {"EVD-1":{"directness":"direct","support_scope":"descriptive_context","inference_bases":[],"explicit_qualification":true,"synthesis_overlap_accounted":true},"EVD-2":{"directness":"direct","support_scope":"descriptive_context","inference_bases":[],"explicit_qualification":true,"synthesis_overlap_accounted":true}},
+      "claims": {"CLM-1":{"claim_family":"descriptive","formation_evidence_ids":[]}},
+      "methods": {"MTH-1":{"method_family":"primary_empirical"}}
+    },
+    "sufficiency": {"material_gap_ids":[],"counterevidence_considered":true,"source_overlap_accounted":true,"remaining_information_value":"low","gap_resolution_evidence_ids":[]},
+    "quality_gate_results": {"evidence_admissibility":true,"claim_support":true,"finding_sufficiency":true,"counter_review":true,"research_freeze":true}
+  },
+  "valid": [{"id":"generic-baseline","mutations":[],"expected_error":null}],
+  "semantic_invalid": [
+    {"id":"low-trust-sole-material-support","mutations":[{"op":"set","path":"assessments.sources.SRC-1.quality_tier","value":"low_trust"},{"op":"set","path":"assessments.sources.SRC-2.quality_tier","value":"low_trust"}],"expected_error":"RESEARCH-QUALITY-EVIDENCE-ADMISSIBILITY-001"},
+    {"id":"unverified-material-support","mutations":[{"op":"set","path":"objects.EVD-2.verification_status","value":"unverified"}],"expected_error":"RESEARCH-QUALITY-EVIDENCE-ADMISSIBILITY-001"},
+    {"id":"indirect-support-without-qualification","mutations":[{"op":"set","path":"assessments.evidence.EVD-2.directness","value":"indirect"},{"op":"set","path":"assessments.evidence.EVD-2.explicit_qualification","value":false}],"expected_error":"RESEARCH-QUALITY-EVIDENCE-ADMISSIBILITY-001"},
+    {"id":"low-confidence-effect-scope","mutations":[{"op":"set","path":"assessments.sources.SRC-1.quality_tier","value":"low_confidence"},{"op":"set","path":"assessments.evidence.EVD-1.support_scope","value":"independent_effect"}],"expected_error":"RESEARCH-QUALITY-EVIDENCE-ADMISSIBILITY-001"},
+    {"id":"company-primary-effect-scope","mutations":[{"op":"set","path":"assessments.sources.SRC-1.source_role","value":"company_primary"},{"op":"set","path":"assessments.evidence.EVD-1.support_scope","value":"independent_effect"}],"expected_error":"RESEARCH-QUALITY-EVIDENCE-ADMISSIBILITY-001"},
+    {"id":"independent-effect-with-overlapping-origin","mutations":[{"op":"set","path":"assessments.claims.CLM-1.claim_family","value":"independent_effect"},{"op":"set","path":"assessments.evidence.EVD-1.support_scope","value":"independent_effect"},{"op":"set","path":"assessments.evidence.EVD-2.support_scope","value":"independent_effect"},{"op":"set","path":"objects.EVD-2.independence_group","value":"origin-a"}],"expected_error":"RESEARCH-QUALITY-INDEPENDENCE-001"},
+    {"id":"self-validation-subset","mutations":[{"op":"set","path":"objects.CLM-1.supporting_evidence_ids","value":["EVD-1"]},{"op":"set","path":"assessments.claims.CLM-1.formation_evidence_ids","value":["EVD-1","EVD-2"]}],"expected_error":"RESEARCH-QUALITY-INDEPENDENCE-001"},
+    {"id":"synthesis-overlap-unaccounted","mutations":[{"op":"set","path":"assessments.evidence.EVD-2.synthesis_overlap_accounted","value":false}],"expected_error":"RESEARCH-QUALITY-INDEPENDENCE-001"},
+    {"id":"causal-claim-with-descriptive-scope","mutations":[{"op":"set","path":"assessments.claims.CLM-1.claim_family","value":"causal"}],"expected_error":"RESEARCH-QUALITY-CLAIM-SUPPORT-001"},
+    {"id":"causal-claim-from-self-report-only","mutations":[{"op":"set","path":"assessments.claims.CLM-1.claim_family","value":"causal"},{"op":"set","path":"assessments.evidence.EVD-1.support_scope","value":"causal_effect"},{"op":"set","path":"assessments.evidence.EVD-2.support_scope","value":"causal_effect"},{"op":"set","path":"assessments.evidence.EVD-1.inference_bases","value":["self_report_only"]}],"expected_error":"RESEARCH-QUALITY-CAUSAL-SUPPORT-001"},
+    {"id":"finding-missing-limitations","mutations":[{"op":"set","path":"objects.FND-1.limitations","value":[]}],"expected_error":"RESEARCH-QUALITY-FINDING-QUALIFICATION-001"},
+    {"id":"required-counter-lens-missing","mutations":[{"op":"set","path":"objects.CR-2.review_lens","value":"selection_bias"}],"expected_error":"RESEARCH-QUALITY-COUNTER-REVIEW-001"},
+    {"id":"unresolved-major-counter-review","mutations":[{"op":"set","path":"objects.CR-2.disposition","value":"open"}],"expected_error":"RESEARCH-QUALITY-COUNTER-REVIEW-001"},
+    {"id":"low-confidence-evidence-cannot-resolve-gap","mutations":[{"op":"set","path":"assessments.sources.SRC-1.quality_tier","value":"low_confidence"},{"op":"set","path":"sufficiency.gap_resolution_evidence_ids","value":["EVD-1"]}],"expected_error":"RESEARCH-QUALITY-SUFFICIENCY-001"},
+    {"id":"material-gap-remains","mutations":[{"op":"set","path":"sufficiency.material_gap_ids","value":["GAP-1"]}],"expected_error":"RESEARCH-QUALITY-SUFFICIENCY-001"},
+    {"id":"support-count-below-threshold","mutations":[{"op":"set","path":"objects.FND-1.evidence_ids","value":["EVD-1"]}],"expected_error":"RESEARCH-QUALITY-SUFFICIENCY-001"},
+    {"id":"method-protocol-missing","mutations":[{"op":"remove","path":"objects.MTH-1.protocol_ref"}],"expected_error":"RESEARCH-QUALITY-METHOD-001"},
+    {"id":"required-quality-gate-fails","mutations":[{"op":"set","path":"quality_gate_results.counter_review","value":false}],"expected_error":"RESEARCH-QUALITY-GATE-001"}
+  ]
+}

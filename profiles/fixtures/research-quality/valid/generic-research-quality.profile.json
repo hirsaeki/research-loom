@@ -1,0 +1,35 @@
+{
+  "schema_version": "0.1.0",
+  "profile_id": "fixture.generic-research-quality",
+  "profile_type": "research",
+  "profile_version": "1.0.0",
+  "description": "Synthetic generic Research Profile fixture exercising canonical research-quality policy without organization, narrative, publication, or project rules.",
+  "core_compatibility": {
+    "research_contract": "0.1.0",
+    "invariant_contract": "0.1.0"
+  },
+  "constraints": [
+    {"id":"rq-source-sole","path":"research_quality.source.forbidden_as_sole_material_support_tiers","merge_strategy":"union","value":["low_trust"]},
+    {"id":"rq-source-gap","path":"research_quality.source.cannot_resolve_material_gap_tiers","merge_strategy":"union","value":["low_confidence","low_trust"]},
+    {"id":"rq-low-confidence-scope","path":"research_quality.source.low_confidence.allowed_support_scopes","merge_strategy":"intersection","value":["descriptive_context","lead_only"]},
+    {"id":"rq-low-trust-scope","path":"research_quality.source.low_trust.allowed_support_scopes","merge_strategy":"intersection","value":["descriptive_context","lead_only"]},
+    {"id":"rq-company-scope","path":"research_quality.source.company_primary.allowed_support_scopes","merge_strategy":"intersection","value":["source_attributed_claim","descriptive_context"]},
+    {"id":"rq-verification","path":"research_quality.evidence.material_support.required_verification_statuses","merge_strategy":"intersection","value":["verified"]},
+    {"id":"rq-directness","path":"research_quality.evidence.claim_support.allowed_directness","merge_strategy":"intersection","value":["direct","indirect"]},
+    {"id":"rq-indirect","path":"research_quality.evidence.indirect_support.requirements","merge_strategy":"union","value":["explicit_qualification"]},
+    {"id":"rq-independence-families","path":"research_quality.evidence.independence.required_claim_families","merge_strategy":"union","value":["independent_effect","causal"]},
+    {"id":"rq-independence","path":"research_quality.evidence.independence.requirements","merge_strategy":"union","value":["distinct_independence_group","synthesis_overlap_accounted","same_evidence_not_self_validate"]},
+    {"id":"rq-independent-scope","path":"research_quality.claim.independent_effect.allowed_support_scopes","merge_strategy":"intersection","value":["independent_effect","causal_effect"]},
+    {"id":"rq-causal-scope","path":"research_quality.claim.causal.allowed_support_scopes","merge_strategy":"intersection","value":["causal_effect"]},
+    {"id":"rq-causal-bases","path":"research_quality.claim.causal.prohibited_inference_bases","merge_strategy":"union","value":["association_only","self_report_only","small_case_only","narrative_review_only","scoping_review_only","guideline_or_consensus_only"]},
+    {"id":"rq-finding-qualifiers","path":"research_quality.finding.required_qualifier_fields","merge_strategy":"union","value":["limitations","boundary_conditions"]},
+    {"id":"rq-counter-lenses","path":"research_quality.counter_review.required_lenses","merge_strategy":"union","value":["contradictory_evidence","alternative_explanation"]},
+    {"id":"rq-counter-blocking","path":"research_quality.counter_review.blocking_severities","merge_strategy":"union","value":["major","critical"]},
+    {"id":"rq-sufficiency","path":"research_quality.evidence_sufficiency.required_checks","merge_strategy":"union","value":["counterevidence_considered","material_gaps_resolved","source_overlap_accounted","remaining_information_value_not_high"]},
+    {"id":"rq-method-protocol","path":"research_quality.methods.protocol_required_for_families","merge_strategy":"union","value":["primary_empirical","evidence_synthesis"]},
+    {"id":"rq-method-limitations","path":"research_quality.methods.limitations_required_for_families","merge_strategy":"union","value":["primary_empirical","evidence_synthesis"]},
+    {"id":"rq-gates","path":"research_quality.gates.required","merge_strategy":"union","value":["evidence_admissibility","claim_support","finding_sufficiency","counter_review"]},
+    {"id":"rq-min-support","path":"research_quality.thresholds.material_finding.min_supporting_evidence_count","merge_strategy":"max","value":2},
+    {"id":"rq-min-independent","path":"research_quality.thresholds.material_finding.min_independent_evidence_groups","merge_strategy":"max","value":2}
+  ]
+}
