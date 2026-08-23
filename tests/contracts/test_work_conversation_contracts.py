@@ -11,6 +11,7 @@ from jsonschema import Draft202012Validator
 
 from conversation_oracle import (
     apply_semantic_case,
+    binding,
     conversation_semantic_error,
     document_digest,
     payload_digest,
@@ -33,8 +34,14 @@ class WorkConversationContracts(unittest.TestCase):
     def setUpClass(cls):
         cls.contract = json.loads(CONTRACT_PATH.read_text())
         cls.semantics_schema = json.loads(SEMANTICS_SCHEMA_PATH.read_text())
-        cls.validator = Draft202012Validator(cls.contract)
-        cls.semantics_validator = Draft202012Validator(cls.semantics_schema)
+        cls.validator = Draft202012Validator(
+            cls.contract,
+            format_checker=Draft202012Validator.FORMAT_CHECKER,
+        )
+        cls.semantics_validator = Draft202012Validator(
+            cls.semantics_schema,
+            format_checker=Draft202012Validator.FORMAT_CHECKER,
+        )
         cls.semantics = yaml.safe_load(SEMANTICS_PATH.read_text())
         cls.flow = json.loads(FLOW_PATH.read_text())
         cls.cases = json.loads(CASES_PATH.read_text())["cases"]
@@ -43,7 +50,12 @@ class WorkConversationContracts(unittest.TestCase):
 
     def assert_valid_document(self, document):
         errors = list(self.validator.iter_errors(document))
-        self.assertFalse(errors, "\n".join(f"{list(error.path)}: {error.message}" for error in errors))
+        self.assertFalse(
+            errors,
+            "\n".join(
+                f"{list(error.path)}: {error.message}" for error in errors
+            ),
+        )
 
     def assert_invalid_document(self, document):
         self.assertTrue(list(self.validator.iter_errors(document)))
@@ -57,7 +69,12 @@ class WorkConversationContracts(unittest.TestCase):
             "action_receipt": "action_receipt_id",
             "candidate_presentation": "presentation_id",
         }[message_type]
-        return next(document for document in self.flow["documents"] if document["message_type"] == message_type and document[id_field] == identifier)
+        return next(
+            document
+            for document in self.flow["documents"]
+            if document["message_type"] == message_type
+            and document[id_field] == identifier
+        )
 
     def test_schemas_semantics_and_generic_flow_are_valid(self):
         Draft202012Validator.check_schema(self.contract)
@@ -75,12 +92,47 @@ class WorkConversationContracts(unittest.TestCase):
             }[document["message_type"]]
             self.assertEqual(document[digest_field], document_digest(document))
             if document["message_type"] == "action_proposal":
-                self.assertEqual(document["action"]["payload_digest"], payload_digest(document))
-        self.assertIsNone(conversation_semantic_error(self.flow, self.invocation, self.handoff))
+                self.assertEqual(
+                    document["action"]["payload_digest"],
+                    payload_digest(document),
+                )
+        self.assertIsNone(
+            conversation_semantic_error(
+                self.flow,
+                self.invocation,
+                self.handoff,
+            )
+        )
+
+    def test_semantics_section_keys_are_contractual(self):
+        for section, key in (
+            ("routing", "capability_invocation"),
+            ("confirmation", "fail_closed"),
+            ("cancellation", "pending_only"),
+            ("handoff_candidates", "proposal_only"),
+            ("receipts", "immutable_audit"),
+        ):
+            mutated = deepcopy(self.semantics)
+            mutated[section].pop(key)
+            self.assertTrue(
+                list(self.semantics_validator.iter_errors(mutated)),
+                f"{section}.{key} must be required by the semantic catalog schema",
+            )
+
+    def test_date_time_formats_are_enforced(self):
+        bad = deepcopy(self.by_id("conversation_input", "IN-Q"))
+        bad["received_at"] = "not-a-date-time"
+        refresh_document_digest(bad)
+        self.assert_invalid_document(bad)
 
     def test_closed_input_classification_and_explicit_targets(self):
-        enum = self.contract["$defs"]["conversation_input"]["properties"]["classification"]["enum"]
-        self.assertEqual(enum, ["QUERY", "PROPOSAL", "COMMITTABLE_ACTION", "CONFIRMATION", "CANCEL"])
+        enum = self.contract["$defs"]["conversation_input"]["properties"][
+            "classification"
+        ]["enum"]
+        self.assertEqual(
+            enum,
+            ["QUERY", "PROPOSAL", "COMMITTABLE_ACTION", "CONFIRMATION", "CANCEL"],
+        )
         confirmation = deepcopy(self.by_id("conversation_input", "IN-CONFIRM"))
         confirmation.pop("target")
         refresh_document_digest(confirmation)
@@ -95,7 +147,9 @@ class WorkConversationContracts(unittest.TestCase):
         self.assert_invalid_document(query)
 
     def test_action_vocabulary_is_open_but_typed_and_legacy_enum_is_not_canonicalized(self):
-        action_schema = self.contract["$defs"]["action_proposal"]["properties"]["action"]["properties"]
+        action_schema = self.contract["$defs"]["action_proposal"]["properties"][
+            "action"
+        ]["properties"]
         self.assertNotIn("enum", action_schema["action_type"])
         self.assertIn("payload_contract", action_schema)
         self.assertIn("payload_digest", action_schema)
@@ -113,7 +167,10 @@ class WorkConversationContracts(unittest.TestCase):
         bad["research_state_patch"] = {"anything": "forbidden"}
         refresh_document_digest(bad)
         self.assert_invalid_document(bad)
-        self.assertIn("proposal_binding", self.contract["$defs"]["action_receipt"]["required"])
+        self.assertIn(
+            "proposal_binding",
+            self.contract["$defs"]["action_receipt"]["required"],
+        )
 
     def test_read_only_query_has_no_confirmation_and_does_not_change_state(self):
         proposal = self.by_id("action_proposal", "P-Q")
@@ -129,11 +186,81 @@ class WorkConversationContracts(unittest.TestCase):
         cancel = self.by_id("conversation_input", "IN-CANCEL")
         receipt = self.by_id("action_receipt", "AR-CANCEL")
         self.assertEqual(proposal["commitment_mode"], "proposal_only")
-        self.assertEqual(cancel["target"], {"target_type": "proposal", "target_id": "P-PENDING"})
+        self.assertEqual(
+            cancel["target"],
+            {"target_type": "proposal", "target_id": "P-PENDING"},
+        )
         self.assertEqual(receipt["status"], "cancelled")
         self.assertEqual(receipt["execution"]["execution_type"], "none")
         self.assertEqual(receipt["state_before"], receipt["state_after"])
         self.assertNotIn("run_id", cancel)
+
+    def test_pending_confirmation_request_can_be_cancelled_without_execution(self):
+        flow = deepcopy(self.flow)
+        flow["documents"] = [
+            document
+            for document in flow["documents"]
+            if not (
+                document["message_type"] == "conversation_input"
+                and document["input_id"] == "IN-CONFIRM"
+            )
+            and document["message_type"] != "confirmation_receipt"
+            and not (
+                document["message_type"] == "action_receipt"
+                and document["action_receipt_id"] == "AR-CAP"
+            )
+        ]
+        proposal = self.by_id("action_proposal", "P-CAP")
+        request = self.by_id("confirmation_request", "CR-CAP")
+        cancel = {
+            "schema_version": "0.1.0",
+            "message_type": "conversation_input",
+            "input_id": "IN-CANCEL-CR",
+            "conversation_id": "CONV-001",
+            "project_id": "PRJ-1",
+            "actor": {"actor_id": "HUMAN-1", "actor_type": "human"},
+            "classification": "CANCEL",
+            "text": "Cancel the pending confirmation request.",
+            "received_at": "2026-01-01T00:02:30Z",
+            "target": {
+                "target_type": "confirmation_request",
+                "target_id": "CR-CAP",
+            },
+            "input_digest": "",
+        }
+        refresh_document_digest(cancel)
+        receipt = {
+            "schema_version": "0.1.0",
+            "message_type": "action_receipt",
+            "action_receipt_id": "AR-CANCEL-CR",
+            "conversation_id": "CONV-001",
+            "project_id": "PRJ-1",
+            "source_input_id": "IN-CANCEL-CR",
+            "proposal_binding": binding(proposal),
+            "actor": {"actor_id": "HUMAN-1", "actor_type": "human"},
+            "action_binding": request["action_binding"],
+            "effect": "state_changing",
+            "status": "cancelled",
+            "state_before": request["state_binding"],
+            "state_after": request["state_binding"],
+            "research_context_binding": request["research_context_binding"],
+            "research_state_mutation_performed": False,
+            "execution": {
+                "execution_type": "none",
+                "reason": "Pending confirmation request cancelled before confirmation.",
+            },
+            "trace_id": "TRACE-CANCEL-CR",
+            "completed_at": "2026-01-01T00:02:31Z",
+            "immutable": True,
+            "receipt_digest": "",
+        }
+        refresh_document_digest(receipt)
+        flow["documents"].extend([cancel, receipt])
+        self.assert_valid_document(cancel)
+        self.assert_valid_document(receipt)
+        self.assertIsNone(
+            conversation_semantic_error(flow, self.invocation, self.handoff)
+        )
 
     def test_state_changing_capability_action_uses_bound_single_use_confirmation(self):
         proposal = self.by_id("action_proposal", "P-CAP")
@@ -146,26 +273,45 @@ class WorkConversationContracts(unittest.TestCase):
         self.assertEqual(request["actor_binding"], confirmation["actor"])
         self.assertEqual(request["action_binding"], confirmation["action_binding"])
         self.assertEqual(request["state_binding"], confirmation["observed_state"])
-        self.assertEqual(request["research_context_binding"], confirmation["research_context_binding"])
-        self.assertFalse(proposal["human_decision_boundary"]["confirmation_is_human_decision"])
-        self.assertEqual(receipt["confirmation_receipt_binding"]["confirmation_receipt_id"], "CF-CAP")
+        self.assertEqual(
+            request["research_context_binding"],
+            confirmation["research_context_binding"],
+        )
+        self.assertFalse(
+            proposal["human_decision_boundary"]["confirmation_is_human_decision"]
+        )
+        self.assertEqual(
+            receipt["confirmation_receipt_binding"]["confirmation_receipt_id"],
+            "CF-CAP",
+        )
 
     def test_capability_route_is_pr9_invocation_and_authorization_is_not_in_conversation(self):
         proposal = self.by_id("action_proposal", "P-CAP")
         receipt = self.by_id("action_receipt", "AR-CAP")
         route = proposal["route"]
         self.assertEqual(route["route_type"], "capability_invocation")
-        self.assertEqual(route["invocation_contract"], "capability-invocation@0.1.0")
+        self.assertEqual(
+            route["invocation_contract"],
+            "capability-invocation@0.1.0",
+        )
         self.assertEqual(route["capability"], self.invocation["capability"])
         self.assertEqual(route["execution_mode"], self.invocation["execution_mode"])
         self.assertEqual(route["context_pack"], self.invocation["context_pack"])
         self.assertNotIn("runtime_authorization_evidence", route)
         self.assertIn("runtime_authorization_evidence", self.invocation)
-        self.assertEqual(receipt["execution"]["invocation_id"], self.invocation["invocation_id"])
-        self.assertEqual(receipt["execution"]["invocation_digest"], self.invocation["invocation_digest"])
+        self.assertEqual(
+            receipt["execution"]["invocation_id"],
+            self.invocation["invocation_id"],
+        )
+        self.assertEqual(
+            receipt["execution"]["invocation_digest"],
+            self.invocation["invocation_digest"],
+        )
         self.assertFalse(receipt["research_state_mutation_performed"])
         bad = deepcopy(proposal)
-        bad["route"]["runtime_authorization_evidence"] = {"authorization_id": "FAKE"}
+        bad["route"]["runtime_authorization_evidence"] = {
+            "authorization_id": "FAKE"
+        }
         refresh_document_digest(bad)
         self.assert_invalid_document(bad)
 
@@ -174,8 +320,14 @@ class WorkConversationContracts(unittest.TestCase):
         next_method = self.by_id("candidate_presentation", "PRES-NM")
         action_proposal = self.by_id("action_proposal", "P-NA")
         method_proposal = self.by_id("action_proposal", "P-NM")
-        self.assertEqual(next_action["handoff_binding"]["handoff_digest"], self.handoff["handoff_digest"])
-        self.assertEqual(next_method["handoff_binding"]["handoff_digest"], self.handoff["handoff_digest"])
+        self.assertEqual(
+            next_action["handoff_binding"]["handoff_digest"],
+            self.handoff["handoff_digest"],
+        )
+        self.assertEqual(
+            next_method["handoff_binding"]["handoff_digest"],
+            self.handoff["handoff_digest"],
+        )
         self.assertFalse(next_action["auto_adopted"])
         self.assertFalse(next_method["auto_adopted"])
         self.assertTrue(next_action["structured_source_only"])
@@ -184,9 +336,17 @@ class WorkConversationContracts(unittest.TestCase):
         self.assertEqual(method_proposal["commitment_mode"], "proposal_only")
         self.assertEqual(method_proposal["route"]["route_type"], "unresolved")
         self.assertTrue(method_proposal["human_decision_boundary"]["required"])
-        self.assertFalse(method_proposal["human_decision_boundary"]["confirmation_is_human_decision"])
-        handoff_method_ids = {item["proposal_id"] for item in self.handoff["outputs"]["candidate_next_methods"]}
-        self.assertIn(next_method["candidate"]["candidate_proposal_id"], handoff_method_ids)
+        self.assertFalse(
+            method_proposal["human_decision_boundary"]["confirmation_is_human_decision"]
+        )
+        handoff_method_ids = {
+            item["proposal_id"]
+            for item in self.handoff["outputs"]["candidate_next_methods"]
+        }
+        self.assertIn(
+            next_method["candidate"]["candidate_proposal_id"],
+            handoff_method_ids,
+        )
 
     def test_semantic_mutations_fail_with_stable_error_codes(self):
         for case in self.cases:
@@ -194,11 +354,24 @@ class WorkConversationContracts(unittest.TestCase):
                 mutated = apply_semantic_case(self.flow, case)
                 for document in mutated["documents"]:
                     self.assert_valid_document(document)
-                self.assertEqual(case["expected_error"], conversation_semantic_error(mutated, self.invocation, self.handoff))
+                self.assertEqual(
+                    case["expected_error"],
+                    conversation_semantic_error(
+                        mutated,
+                        self.invocation,
+                        self.handoff,
+                    ),
+                )
 
     def test_oracle_error_codes_match_semantics_catalog(self):
         tree = ast.parse(ORACLE_PATH.read_text())
-        oracle_codes = {node.value for node in ast.walk(tree) if isinstance(node, ast.Constant) and isinstance(node.value, str) and node.value.startswith("CONV-")}
+        oracle_codes = {
+            node.value
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Constant)
+            and isinstance(node.value, str)
+            and node.value.startswith("CONV-")
+        }
         catalog_codes = {item["id"] for item in self.semantics["errors"]}
         self.assertEqual(catalog_codes, oracle_codes)
 
