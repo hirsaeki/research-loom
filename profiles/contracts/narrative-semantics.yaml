@@ -1,0 +1,137 @@
+contract_version: 0.1.0
+status: CANONICAL
+profile_type: narrative
+ownership:
+  owns:
+    - reusable argument and narrative stage semantics
+    - minimal semantic dependencies between narrative stages
+    - section-purpose semantics independent of literal headings or chapter numbers
+    - read-only projection rules connecting authoritative Argument, Finding, Contribution, and Recommendation objects
+    - preservation rules for counter-findings, qualifiers, limitations, and supplied research-state links
+  excludes:
+    - Research Method selection or research-design choice
+    - deciding or changing the answer to a Research Question
+    - mutation, adoption, rejection, qualification, or revision of authoritative Research State
+    - concrete chapter numbers, literal headings, or a mandatory chapter tree
+    - project-specific Research Attention, topic emphasis, or communication brief
+    - citation, template, formatting, rendering, and Publication release policy
+principles:
+  core_floor_unchanged: true
+  partial_order_only: true
+  research_state_read_only: true
+  literal_outline_is_projection: true
+  hints_are_non_normative: true
+  preserve_adverse_and_qualifying_content: true
+
+# These are Narrative Profile vocabulary, not new Core research-object fields.
+# A Writer/Project projection may map literal sections to these semantics later.
+vocabularies:
+  semantic_role: [framing, formation, validation, synthesis, implication]
+  research_input_kind: [research_question, claim, method, evidence, analysis, finding, counter_review, argument, contribution, recommendation]
+  narrative_product: [context_frame, argument_exposition, qualified_finding_exposition, validation_exposition, contribution_synthesis, recommendation_rationale, transition]
+  dependency_relation: [semantic_precondition, output_dependency]
+  section_purpose_role: [orient, establish_context, expose_argument, present_finding, qualify, validate, synthesize, present_contribution, present_recommendation, bridge]
+  preservation_content: [counter_findings, qualifiers, limitations]
+  preserved_connection: [argument_to_support, argument_to_qualifier, finding_to_counterevidence, finding_to_limitations, contribution_to_findings, recommendation_to_findings]
+  authority_action: [choose_research_method, answer_research_question, mutate_authoritative_research_state, create_authoritative_research_object, change_research_adoption_state, strengthen_epistemic_status]
+  projection_hint: [provisional_outline, publication_location, primary_exposition_location, literal_heading, chapter_number]
+
+value_shapes:
+  stage_set:
+    identity: stage.id
+    semantics: >-
+      Each member has id, semantic_role, consumes, requires, and produces. consumes
+      names authoritative research input kinds a stage may draw on; requires names
+      inputs that must exist before that stage can be instantiated; produces names
+      reader-facing narrative products only and never creates or revises Core
+      research objects. Equal stage IDs must have identical definitions after
+      canonical set normalization; divergent definitions are an ambiguous conflict.
+  dependency_set:
+    identity: [from_stage, to_stage]
+    semantics: >-
+      Each member declares from_stage, to_stage, and relation. Edges define only the
+      minimum partial order/dependency required by the narrative semantics. They do
+      not impose an order on unrelated stages, must resolve to declared stage IDs,
+      and the resulting graph must be acyclic. Divergent relations for one endpoint
+      pair are an ambiguous conflict.
+  section_purpose_set:
+    identity: purpose.id
+    semantics: >-
+      Each member has id, purpose_role, and stage_ids. A purpose describes what a
+      projected section must accomplish and which semantic stages it realizes. It
+      never supplies a literal heading, chapter number, publication location, or
+      authoritative research conclusion. Equal IDs with divergent definitions are
+      an ambiguous conflict.
+
+constraint_paths:
+  - path: narrative.stages.definitions
+    value_shape: stage_set
+    merge_strategy: union
+    semantics: >-
+      Union adds reusable semantic stages. Stage IDs are semantic identities, not
+      chapter labels. A Narrative Profile may omit formation/model stages entirely;
+      their existence is never inferred from this catalog.
+  - path: narrative.dependencies.required
+    value_shape: dependency_set
+    merge_strategy: union
+    semantics: >-
+      Union adds minimum semantic prerequisites. The effective dependency graph is a
+      partial order only; a linear Writer outline may choose any topological order
+      consistent with these edges and project multiple stages into one section or one
+      stage across several sections.
+  - path: narrative.section_purposes.definitions
+    value_shape: section_purpose_set
+    merge_strategy: union
+    semantics: >-
+      Union adds semantic section purposes. Purpose IDs are reusable functions, not
+      literal section names, and may be mapped to a provisional outline by a later
+      Writer/Project projection.
+  - path: narrative.preservation.required_content
+    value_shape: enum_set
+    vocabulary: preservation_content
+    merge_strategy: union
+    semantics: >-
+      When selected research content carries an applicable counter-finding,
+      qualifier, or limitation, adding a value requires its constraining effect to
+      remain visible in the narrative. Moving adverse material to a generic
+      limitations location is insufficient when that would hide how it modifies the
+      affected Argument, Finding, Contribution, or Recommendation.
+  - path: narrative.connections.preserve
+    value_shape: enum_set
+    vocabulary: preserved_connection
+    merge_strategy: union
+    semantics: >-
+      Adding a connection requires an already-authoritative research-state link or
+      qualifier/limitation attachment to remain traceable when its affected object is
+      projected. Narrative may expose or bridge supplied structure but may not create
+      a missing research relationship.
+  - path: narrative.authority.prohibited_actions
+    value_shape: enum_set
+    vocabulary: authority_action
+    merge_strategy: union
+    semantics: >-
+      Adding an action strengthens the read-only Narrative boundary. Narrative may
+      report a gap when required input is absent but cannot resolve the gap by making
+      a research decision or mutating authoritative Research State.
+  - path: narrative.projection.non_normative_hints
+    value_shape: enum_set
+    vocabulary: projection_hint
+    merge_strategy: union
+    semantics: >-
+      These values may guide a provisional Writer/Project projection but never become
+      canonical Narrative dependencies, Research State ownership, or mandatory
+      chapter/headline structure. Primary exposition means first sufficient reader
+      explanation, not ownership of a Finding by a chapter.
+
+error_codes:
+  PROFILE-NARRATIVE-OWNER-001: narrative.* constraints are owned by Narrative Profiles only.
+  PROFILE-NARRATIVE-PATH-001: a narrative.* path is not declared in the active canonical Narrative semantics catalog.
+  PROFILE-NARRATIVE-MERGE-001: a narrative.* constraint uses a merge strategy other than the cataloged strategy.
+  PROFILE-NARRATIVE-VALUE-001: a narrative.* value does not match its cataloged shape or vocabulary.
+  PROFILE-NARRATIVE-IDENTITY-001: composed structured Narrative values reuse one semantic identity with divergent definitions.
+  PROFILE-NARRATIVE-REF-001: a Narrative dependency or section-purpose reference does not resolve to a declared stage.
+  NARRATIVE-DEPENDENCY-CYCLE-001: the effective Narrative stage dependency graph contains a cycle.
+  NARRATIVE-PRESERVATION-001: projected Narrative content drops, decontextualizes, or neutralizes required counter-findings, qualifiers, or limitations.
+  NARRATIVE-CONNECTION-001: a required authoritative connection is lost or a missing research-state connection is invented by Narrative.
+  NARRATIVE-AUTHORITY-001: Narrative chooses a method, answers an RQ, creates or mutates authoritative research content, changes adoption state, or strengthens epistemic status.
+  NARRATIVE-PROJECTION-HINT-001: a provisional outline or publication-location hint is treated as normative Narrative semantics or authoritative Research State.

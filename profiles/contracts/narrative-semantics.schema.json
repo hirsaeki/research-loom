@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:research-loom:profiles:narrative-semantics:0.1.0",
+  "title": "research-loom canonical Narrative Profile semantics catalog",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract_version", "status", "profile_type", "ownership", "principles", "vocabularies", "value_shapes", "constraint_paths", "error_codes"],
+  "properties": {
+    "contract_version": {"const": "0.1.0"},
+    "status": {"const": "CANONICAL"},
+    "profile_type": {"const": "narrative"},
+    "ownership": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["owns", "excludes"],
+      "properties": {
+        "owns": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+        "excludes": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true}
+      }
+    },
+    "principles": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["core_floor_unchanged", "partial_order_only", "research_state_read_only", "literal_outline_is_projection", "hints_are_non_normative", "preserve_adverse_and_qualifying_content"],
+      "properties": {
+        "core_floor_unchanged": {"const": true},
+        "partial_order_only": {"const": true},
+        "research_state_read_only": {"const": true},
+        "literal_outline_is_projection": {"const": true},
+        "hints_are_non_normative": {"const": true},
+        "preserve_adverse_and_qualifying_content": {"const": true}
+      }
+    },
+    "vocabularies": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "array",
+        "minItems": 1,
+        "uniqueItems": true,
+        "items": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"}
+      }
+    },
+    "value_shapes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stage_set", "dependency_set", "section_purpose_set"],
+      "properties": {
+        "stage_set": {"$ref": "#/$defs/shape_description"},
+        "dependency_set": {"$ref": "#/$defs/shape_description"},
+        "section_purpose_set": {"$ref": "#/$defs/shape_description"}
+      }
+    },
+    "constraint_paths": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/constraint_path"}
+    },
+    "error_codes": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {"type": "string", "minLength": 1}
+    }
+  },
+  "$defs": {
+    "shape_description": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["identity", "semantics"],
+      "properties": {
+        "identity": {"oneOf": [{"type": "string", "minLength": 1}, {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}, "uniqueItems": true}]},
+        "semantics": {"type": "string", "minLength": 1}
+      }
+    },
+    "constraint_path": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "value_shape", "merge_strategy", "semantics"],
+      "properties": {
+        "path": {"type": "string", "pattern": "^narrative\\.[a-z][a-z0-9_]*(?:\\.[a-z][a-z0-9_]*)+$"},
+        "value_shape": {"enum": ["enum_set", "stage_set", "dependency_set", "section_purpose_set"]},
+        "vocabulary": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+        "merge_strategy": {"const": "union"},
+        "semantics": {"type": "string", "minLength": 1}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"value_shape": {"const": "enum_set"}}, "required": ["value_shape"]},
+          "then": {"required": ["vocabulary"]}
+        },
+        {
+          "if": {"properties": {"value_shape": {"enum": ["stage_set", "dependency_set", "section_purpose_set"]}}, "required": ["value_shape"]},
+          "then": {"not": {"required": ["vocabulary"]}}
+        }
+      ]
+    }
+  }
+}
