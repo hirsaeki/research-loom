@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:research-loom:core:research-method-context-extension:0.1.0",
+  "title": "research-loom Research Method Capability Context extension",
+  "description": "Common Research Method Capability inputs bound to one exact PR9 Capability Context Pack. This extension does not replace the PR9 envelope and carries only method-independent method-design, instrument-design, execute, and analyze semantics.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version","extension_type","context_binding","function_id","targets","method_basis","protocol_basis","instrument_refs","run_spec","prior_run_result_refs","human_decision_bindings","extension_digest"],
+  "properties": {
+    "schema_version": {"const": "0.1.0"},
+    "extension_type": {"const": "research_method_context"},
+    "context_binding": {"$ref": "#/$defs/context_binding"},
+    "function_id": {"enum": ["method_design","instrument_design","execute","analyze"]},
+    "targets": {"$ref": "#/$defs/targets"},
+    "method_basis": {"oneOf": [{"type":"null"},{"$ref":"#/$defs/method_basis"}]},
+    "protocol_basis": {"oneOf": [{"type":"null"},{"$ref":"#/$defs/protocol_ref"}]},
+    "instrument_refs": {"type":"array","uniqueItems":true,"items":{"$ref":"#/$defs/instrument_ref"}},
+    "run_spec": {"oneOf": [{"type":"null"},{"$ref":"#/$defs/run_spec"}]},
+    "prior_run_result_refs": {"type":"array","uniqueItems":true,"items":{"$ref":"#/$defs/versioned_ref"}},
+    "human_decision_bindings": {"$ref":"#/$defs/decision_bindings"},
+    "extension_digest": {"$ref":"#/$defs/digest"}
+  },
+  "$defs": {
+    "identifier": {"type":"string","pattern":"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"},
+    "token": {"type":"string","pattern":"^[a-z][a-z0-9._-]{0,127}$"},
+    "digest": {"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+    "semver": {"type":"string","pattern":"^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"},
+    "context_binding": {
+      "type":"object","additionalProperties":false,
+      "required":["context_pack_id","context_pack_digest","project_id"],
+      "properties":{"context_pack_id":{"$ref":"#/$defs/identifier"},"context_pack_digest":{"$ref":"#/$defs/digest"},"project_id":{"$ref":"#/$defs/identifier"}}
+    },
+    "targets": {
+      "type":"object","additionalProperties":false,
+      "required":["question_ids","evidence_gap_ids"],
+      "properties": {
+        "question_ids":{"type":"array","minItems":1,"uniqueItems":true,"items":{"$ref":"#/$defs/identifier"}},
+        "evidence_gap_ids":{"type":"array","uniqueItems":true,"items":{"$ref":"#/$defs/identifier"}}
+      }
+    },
+    "method_design_ref": {
+      "type":"object","additionalProperties":false,
+      "required":["method_design_id","version","content_digest","authoritative_method"],
+      "properties":{"method_design_id":{"$ref":"#/$defs/identifier"},"version":{"$ref":"#/$defs/semver"},"content_digest":{"$ref":"#/$defs/digest"},"authoritative_method":{"const":false}}
+    },
+    "core_method_ref": {
+      "type":"object","additionalProperties":false,
+      "required":["method_id","revision","adoption_state"],
+      "properties":{"method_id":{"$ref":"#/$defs/identifier"},"revision":{"type":"integer","minimum":0},"adoption_state":{"enum":["candidate","approved","rejected"]}}
+    },
+    "method_basis": {
+      "type":"object","additionalProperties":false,
+      "properties":{"method_design_ref":{"$ref":"#/$defs/method_design_ref"},"core_method_ref":{"$ref":"#/$defs/core_method_ref"}},
+      "oneOf":[{"required":["method_design_ref"]},{"required":["core_method_ref"]}]
+    },
+    "protocol_ref": {
+      "type":"object","additionalProperties":false,
+      "required":["protocol_id","version","content_digest","approval_status","material_revision"],
+      "properties": {
+        "protocol_id":{"$ref":"#/$defs/identifier"},"version":{"$ref":"#/$defs/semver"},"content_digest":{"$ref":"#/$defs/digest"},
+        "approval_status":{"enum":["candidate","approved","rejected"]},"material_revision":{"type":"boolean"},"supersedes_version":{"$ref":"#/$defs/semver"}
+      }
+    },
+    "instrument_ref": {
+      "type":"object","additionalProperties":false,
+      "required":["instrument_id","version","content_digest","approval_status"],
+      "properties":{"instrument_id":{"$ref":"#/$defs/identifier"},"version":{"$ref":"#/$defs/semver"},"content_digest":{"$ref":"#/$defs/digest"},"approval_status":{"enum":["candidate","approved","rejected"]}}
+    },
+    "versioned_ref": {
+      "type":"object","additionalProperties":false,
+      "required":["id","version","content_digest"],
+      "properties":{"id":{"$ref":"#/$defs/identifier"},"version":{"$ref":"#/$defs/semver"},"content_digest":{"$ref":"#/$defs/digest"}}
+    },
+    "run_spec": {
+      "type":"object","additionalProperties":false,
+      "required":["run_spec_id","version","content_digest","input_digest","data_roles","coverage_dimensions"],
+      "properties": {
+        "run_spec_id":{"$ref":"#/$defs/identifier"},"version":{"$ref":"#/$defs/semver"},"content_digest":{"$ref":"#/$defs/digest"},"input_digest":{"$ref":"#/$defs/digest"},
+        "data_roles":{"type":"array","minItems":1,"uniqueItems":true,"items":{"$ref":"#/$defs/token"}},
+        "coverage_dimensions":{"type":"array","uniqueItems":true,"items":{"$ref":"#/$defs/identifier"}}
+      }
+    },
+    "decision_bindings": {
+      "type":"object","additionalProperties":false,
+      "required":["method_adoption_decision_ids","material_protocol_revision_decision_ids"],
+      "properties": {
+        "method_adoption_decision_ids":{"type":"array","uniqueItems":true,"items":{"$ref":"#/$defs/identifier"}},
+        "material_protocol_revision_decision_ids":{"type":"array","uniqueItems":true,"items":{"$ref":"#/$defs/identifier"}}
+      }
+    }
+  }
+}
