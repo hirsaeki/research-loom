@@ -46,12 +46,15 @@ def context_error(context, extension, execution_mode, evidence_gap_handoffs=()):
     }
     seen_gap_refs = set()
     for gap_ref in gap_refs:
+        source_digest = gap_ref.get("source_handoff_digest")
         resource = resources.get(gap_ref.get("source_resource_reference_id"))
-        if not resource or resource.get("reference_type") != "artifact" or resource.get("evidentiary_use") != "context_only":
+        if not resource or resource.get("reference_type") != "artifact" or resource.get("evidentiary_use") != "context_only" or resource.get("digest") != source_digest:
             return "RM-CONTEXT-BINDING-001"
-        source_key = (gap_ref.get("source_handoff_id"), gap_ref.get("source_handoff_digest"))
+        source_key = (gap_ref.get("source_handoff_id"), source_digest)
         source_handoff = source_handoffs.get(source_key)
         if not source_handoff or source_handoff.get("project_id") != context.get("project_id"):
+            return "RM-CONTEXT-BINDING-001"
+        if source_handoff.get("handoff_digest") != canonical_digest(source_handoff, "handoff_digest"):
             return "RM-CONTEXT-BINDING-001"
         gap_key = (source_handoff.get("handoff_id"), gap_ref.get("gap_id"))
         if gap_key in seen_gap_refs:

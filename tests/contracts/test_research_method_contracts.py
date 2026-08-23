@@ -29,18 +29,24 @@ class ResearchMethodContracts(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.descriptor_schema = load(PKG / "capability-descriptor.schema.json")
+        cls.context_pack_schema = load(PKG / "capability-context-pack.schema.json")
         cls.context_schema = load(RM / "research-method-context-extension.schema.json")
         cls.result_schema = load(RM / "research-method-result-extension.schema.json")
         cls.conversation_schema = load(PKG / "work-conversation.schema.json")
         cls.descriptor = load(FIX / "generic-research-method-capability-descriptor.json")
-        cls.context = load(FIX / "generic-capability-context-pack.json")
+        cls.context = load(FIX / "generic-research-method-context-pack.json")
         cls.gap_handoff = load(FIX / "generic-capability-handoff.json")
         cls.context_extension = load(FIX / "generic-research-method-context-extension.json")
         cls.result_extension = load(FIX / "generic-research-method-result-extension.json")
         cls.routing = load(CONV / "research-method-routing.json")
 
-    def _context_error(self, extension, mode="real"):
-        return context_error(self.context, extension, mode, [self.gap_handoff])
+    def _context_error(self, extension, mode="real", handoff=None, context=None):
+        return context_error(
+            self.context if context is None else context,
+            extension,
+            mode,
+            [self.gap_handoff if handoff is None else handoff],
+        )
 
     def test_schemas_and_semantics_catalog(self):
         Draft202012Validator.check_schema(self.context_schema)
@@ -58,6 +64,9 @@ class ResearchMethodContracts(unittest.TestCase):
         self.assertEqual(self.descriptor["descriptor_digest"], canonical_digest(self.descriptor, "descriptor_digest"))
 
     def test_valid_real_execute_context(self):
+        pack_errors = list(Draft202012Validator(self.context_pack_schema, format_checker=FormatChecker()).iter_errors(self.context))
+        self.assertEqual(pack_errors, [])
+        self.assertEqual(self.context["context_pack_digest"], canonical_digest(self.context, "context_pack_digest"))
         errors = list(Draft202012Validator(self.context_schema).iter_errors(self.context_extension))
         self.assertEqual(errors, [])
         self.assertEqual(self._context_error(self.context_extension), None)
@@ -78,6 +87,18 @@ class ResearchMethodContracts(unittest.TestCase):
         case["targets"]["evidence_gap_refs"][0]["source_handoff_digest"] = "sha256:" + "0" * 64
         refresh(case)
         self.assertEqual(self._context_error(case), "RM-CONTEXT-BINDING-001")
+
+        context = deepcopy(self.context)
+        context["resources"][0]["digest"] = "sha256:" + "0" * 64
+        context["context_pack_digest"] = canonical_digest(context, "context_pack_digest")
+        case = deepcopy(self.context_extension)
+        case["context_binding"]["context_pack_digest"] = context["context_pack_digest"]
+        refresh(case)
+        self.assertEqual(self._context_error(case, context=context), "RM-CONTEXT-BINDING-001")
+
+        source_handoff = deepcopy(self.gap_handoff)
+        source_handoff["input_pins"]["context_pack_digest"] = "sha256:" + "0" * 64
+        self.assertEqual(self._context_error(self.context_extension, handoff=source_handoff), "RM-CONTEXT-BINDING-001")
 
     def test_real_execute_requires_adopted_method_and_human_decisions(self):
         case = deepcopy(self.context_extension)
@@ -196,6 +217,8 @@ class ResearchMethodContracts(unittest.TestCase):
         self.assertTrue(proposal["human_decision_boundary"]["required"])
         self.assertFalse(proposal["human_decision_boundary"]["confirmation_is_human_decision"])
         self.assertEqual(set(proposal["human_decision_boundary"]["decision_reference_ids"]), {"DEC-METHOD-1","DEC-PROTOCOL-1"})
+        self.assertEqual(proposal["route"]["context_pack"]["context_pack_id"], self.context["context_pack_id"])
+        self.assertEqual(proposal["route"]["context_pack"]["context_pack_digest"], self.context["context_pack_digest"])
         self.assertEqual(proposal["action"]["payload"]["context_extension_digest"], self.context_extension["extension_digest"])
 
 
