@@ -4,12 +4,12 @@
   "action_proposal":{
     "schema_version":"0.1.0","message_type":"action_proposal","proposal_id":"P-RM-ROUTE-001","conversation_id":"CONV-RM-001","project_id":"PRJ-1",
     "source":{"source_type":"human_input","input_id":"IN-RM-001"},"initiating_actor":{"actor_id":"HUMAN-1","actor_type":"human"},
-    "action":{"action_type":"research.method.fixture.execute","effect":"state_changing","payload_contract":"research-method-context-extension@0.1.0","payload":{"context_extension_digest":"sha256:577fc6fc05b8ccc8712730d79c33337d7c48e3791e914c9419bbbfbea77a7aca"},"payload_digest":"sha256:a1216c66dd89325bd04364983e4b3f8e28b98c34a00ebe1f4552379dac2ad45b"},
+    "action":{"action_type":"research.method.fixture.execute","effect":"state_changing","payload_contract":"research-method-context-extension@0.1.0","payload":{"context_extension_digest":"sha256:93ee89ddb9f30ce16cfc2cad192444e104578da5cc1287f755bb3d0edafa8a22"},"payload_digest":"sha256:ab4c4e2bff18e83c69b5ecfba9651b1dc96e936661ae2d919bf37fd1ec2602db"},
     "commitment_mode":"proposal_only","confirmation_policy":{"required_on_commit":true,"human_confirmation_only":true},
     "human_decision_boundary":{"required":true,"confirmation_is_human_decision":false,"decision_reference_ids":["DEC-METHOD-1","DEC-PROTOCOL-1"]},
     "bindings":{"current_state":{"state_id":"STATE-RM-001","revision":0,"content_digest":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"research_context":{"project_config_digest":"sha256:9fa677cbca9f50f54055021d8c1f0febfe636795a96931174f2aef6052fb13fb","effective_profile_set_digest":"sha256:ab4631d96e1d81f6f8cb3fda8d62dc5fbf5c7500895001cb91f16f803d336e17","research_snapshot":{"snapshot_id":"SNP-1","revision":0,"content_digest":"sha256:eb0b25b360df904b109f94bf5cdb3d4a7e3d59fca40fc48a1f95ffca26657391"}}},
     "route":{"route_type":"capability_invocation","invocation_contract":"capability-invocation@0.1.0","capability":{"capability_id":"fixture.research-method","capability_version":"0.1.0","descriptor_digest":"sha256:3082d290a0de6b72dbb9b312f247226708ac112af7a970e5c7ba698c85898c43","function_id":"execute"},"execution_mode":"real","context_pack":{"context_pack_id":"CTX-001","context_pack_digest":"sha256:d6a91b9a6127f2ad396255ffdf95ea2d79a79a0339421c0936e36f7cba197bd8"}},
-    "created_at":"2026-08-24T00:00:00Z","proposal_digest":"sha256:5ea47f541b062f6bf94661a51f3c7e65d927e3dbf5025367610994607015ab72"
+    "created_at":"2026-08-24T00:00:00Z","proposal_digest":"sha256:d0c33684ce3ab3992226cbf0627d9651a87eb7589b0be2e159215d01f4efa0c4"
   },
-  "expected_context_extension_digest":"sha256:577fc6fc05b8ccc8712730d79c33337d7c48e3791e914c9419bbbfbea77a7aca"
+  "expected_context_extension_digest":"sha256:93ee89ddb9f30ce16cfc2cad192444e104578da5cc1287f755bb3d0edafa8a22"
 }

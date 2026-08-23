@@ -24,15 +24,49 @@ def descriptor_error(descriptor):
     return None
 
 
-def context_error(context, extension, execution_mode):
+def context_error(context, extension, execution_mode, evidence_gap_handoffs=()):
     if extension.get("extension_digest") != canonical_digest(extension, "extension_digest"):
         return "RM-CONTEXT-DIGEST-001"
     binding = extension.get("context_binding", {})
     if binding.get("context_pack_id") != context.get("context_pack_id") or binding.get("context_pack_digest") != context.get("context_pack_digest") or binding.get("project_id") != context.get("project_id"):
         return "RM-CONTEXT-BINDING-001"
-    target_questions = set(extension.get("targets", {}).get("question_ids", []))
+
+    targets = extension.get("targets", {})
+    target_questions = set(targets.get("question_ids", []))
     if not target_questions or not target_questions.issubset(set(context.get("question_ids", []))):
         return "RM-CONTEXT-BINDING-001"
+
+    gap_refs = targets.get("evidence_gap_refs", [])
+    if not gap_refs:
+        return "RM-CONTEXT-BINDING-001"
+    resources = {item.get("reference_id"): item for item in context.get("resources", [])}
+    source_handoffs = {
+        (item.get("handoff_id"), item.get("handoff_digest")): item
+        for item in evidence_gap_handoffs
+    }
+    seen_gap_refs = set()
+    for gap_ref in gap_refs:
+        resource = resources.get(gap_ref.get("source_resource_reference_id"))
+        if not resource or resource.get("reference_type") != "artifact" or resource.get("evidentiary_use") != "context_only":
+            return "RM-CONTEXT-BINDING-001"
+        source_key = (gap_ref.get("source_handoff_id"), gap_ref.get("source_handoff_digest"))
+        source_handoff = source_handoffs.get(source_key)
+        if not source_handoff or source_handoff.get("project_id") != context.get("project_id"):
+            return "RM-CONTEXT-BINDING-001"
+        gap_key = (source_handoff.get("handoff_id"), gap_ref.get("gap_id"))
+        if gap_key in seen_gap_refs:
+            return "RM-CONTEXT-BINDING-001"
+        seen_gap_refs.add(gap_key)
+        source_gap = next(
+            (
+                item
+                for item in source_handoff.get("outputs", {}).get("evidence_gaps", [])
+                if item.get("gap_id") == gap_ref.get("gap_id")
+            ),
+            None,
+        )
+        if source_gap is None:
+            return "RM-CONTEXT-BINDING-001"
 
     fn = extension.get("function_id")
     method_basis = extension.get("method_basis")
@@ -45,7 +79,7 @@ def context_error(context, extension, execution_mode):
         if run_spec is not None or prior:
             return "RM-FUNCTION-001"
     elif fn == "instrument_design":
-        if method_basis is None:
+        if method_basis is None or protocol is None:
             return "RM-FUNCTION-001"
     elif fn == "execute":
         if method_basis is None or protocol is None or run_spec is None:
@@ -83,15 +117,37 @@ def result_error(extension, handoff, context, context_extension):
     if any(b.get(k) != v for k, v in expected.items()):
         return "RM-RESULT-BINDING-001"
 
+    context_function = context_extension.get("function_id")
+    handoff_function = handoff.get("capability", {}).get("function_id")
+    if context_function != handoff_function or b.get("function_id") != context_function:
+        return "RM-RESULT-BINDING-001"
+
     mode = handoff.get("execution_mode")
     run_ids = set()
+    run_spec = context_extension.get("run_spec")
+    protocol = context_extension.get("protocol_basis")
+    if extension.get("run_results") and (not isinstance(run_spec, dict) or not isinstance(protocol, dict)):
+        return "RM-PROTOCOL-001"
+    expected_run_ref = None if not isinstance(run_spec, dict) else {
+        "id": run_spec.get("run_spec_id"),
+        "version": run_spec.get("version"),
+        "content_digest": run_spec.get("content_digest"),
+    }
+    expected_protocol_ref = None if not isinstance(protocol, dict) else {
+        "id": protocol.get("protocol_id"),
+        "version": protocol.get("version"),
+        "content_digest": protocol.get("content_digest"),
+    }
+
     for run in extension.get("run_results", []):
         run_ids.add(run.get("run_result_id"))
-        if run.get("input_digest") != context_extension.get("run_spec", {}).get("input_digest"):
+        if run.get("input_digest") != run_spec.get("input_digest"):
             return "RM-PROTOCOL-001"
-        if run.get("run_spec_ref", {}).get("content_digest") != context_extension.get("run_spec", {}).get("content_digest"):
+        run_ref = run.get("run_spec_ref", {})
+        protocol_ref = run.get("protocol_ref", {})
+        if any(run_ref.get(k) != v for k, v in expected_run_ref.items()):
             return "RM-PROTOCOL-001"
-        if run.get("protocol_ref", {}).get("content_digest") != context_extension.get("protocol_basis", {}).get("content_digest"):
+        if any(protocol_ref.get(k) != v for k, v in expected_protocol_ref.items()):
             return "RM-PROTOCOL-001"
         for raw in run.get("raw_data_refs", []):
             if raw.get("evidence_adoption_performed") is not False:

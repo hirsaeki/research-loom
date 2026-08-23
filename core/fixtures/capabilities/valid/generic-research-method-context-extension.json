@@ -1,12 +1,21 @@
 {
   "schema_version":"0.1.0","extension_type":"research_method_context",
   "context_binding":{"context_pack_id":"CTX-001","context_pack_digest":"sha256:d6a91b9a6127f2ad396255ffdf95ea2d79a79a0339421c0936e36f7cba197bd8","project_id":"PRJ-1"},
-  "function_id":"execute","targets":{"question_ids":["RQ-1"],"evidence_gap_ids":["GAP-001"]},
+  "function_id":"execute",
+  "targets":{
+    "question_ids":["RQ-1"],
+    "evidence_gap_refs":[{
+      "gap_id":"GAP-001",
+      "source_handoff_id":"HND-001",
+      "source_handoff_digest":"sha256:f97ab79d19681df782b3c0fd1775c8a4b6f7832f201271bd20f83b7c5e54c265",
+      "source_resource_reference_id":"REF-ARTIFACT-001"
+    }]
+  },
   "method_basis":{"core_method_ref":{"method_id":"MTH-1","revision":1,"adoption_state":"approved"}},
   "protocol_basis":{"protocol_id":"PROT-1","version":"1.1.0","content_digest":"sha256:4444444444444444444444444444444444444444444444444444444444444444","approval_status":"approved","material_revision":true,"supersedes_version":"1.0.0"},
   "instrument_refs":[{"instrument_id":"INST-1","version":"1.0.0","content_digest":"sha256:5555555555555555555555555555555555555555555555555555555555555555","approval_status":"approved"}],
   "run_spec":{"run_spec_id":"RSPEC-1","version":"1.0.0","content_digest":"sha256:6666666666666666666666666666666666666666666666666666666666666666","input_digest":"sha256:7777777777777777777777777777777777777777777777777777777777777777","data_roles":["observation","measurement"],"coverage_dimensions":["COV-1"]},
   "prior_run_result_refs":[],
   "human_decision_bindings":{"method_adoption_decision_ids":["DEC-METHOD-1"],"material_protocol_revision_decision_ids":["DEC-PROTOCOL-1"]},
-  "extension_digest":"sha256:577fc6fc05b8ccc8712730d79c33337d7c48e3791e914c9419bbbfbea77a7aca"
+  "extension_digest":"sha256:93ee89ddb9f30ce16cfc2cad192444e104578da5cc1287f755bb3d0edafa8a22"
 }

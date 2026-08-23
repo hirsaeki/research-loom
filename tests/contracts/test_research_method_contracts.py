@@ -34,9 +34,13 @@ class ResearchMethodContracts(unittest.TestCase):
         cls.conversation_schema = load(PKG / "work-conversation.schema.json")
         cls.descriptor = load(FIX / "generic-research-method-capability-descriptor.json")
         cls.context = load(FIX / "generic-capability-context-pack.json")
+        cls.gap_handoff = load(FIX / "generic-capability-handoff.json")
         cls.context_extension = load(FIX / "generic-research-method-context-extension.json")
         cls.result_extension = load(FIX / "generic-research-method-result-extension.json")
         cls.routing = load(CONV / "research-method-routing.json")
+
+    def _context_error(self, extension, mode="real"):
+        return context_error(self.context, extension, mode, [self.gap_handoff])
 
     def test_schemas_and_semantics_catalog(self):
         Draft202012Validator.check_schema(self.context_schema)
@@ -56,23 +60,40 @@ class ResearchMethodContracts(unittest.TestCase):
     def test_valid_real_execute_context(self):
         errors = list(Draft202012Validator(self.context_schema).iter_errors(self.context_extension))
         self.assertEqual(errors, [])
-        self.assertEqual(context_error(self.context, self.context_extension, "real"), None)
+        self.assertEqual(self._context_error(self.context_extension), None)
+
+    def test_evidence_gap_target_is_required_and_source_bound(self):
+        case = deepcopy(self.context_extension)
+        case["targets"]["evidence_gap_refs"] = []
+        refresh(case)
+        errors = list(Draft202012Validator(self.context_schema).iter_errors(case))
+        self.assertTrue(errors)
+
+        case = deepcopy(self.context_extension)
+        case["targets"]["evidence_gap_refs"][0]["gap_id"] = "GAP-NOT-THERE"
+        refresh(case)
+        self.assertEqual(self._context_error(case), "RM-CONTEXT-BINDING-001")
+
+        case = deepcopy(self.context_extension)
+        case["targets"]["evidence_gap_refs"][0]["source_handoff_digest"] = "sha256:" + "0" * 64
+        refresh(case)
+        self.assertEqual(self._context_error(case), "RM-CONTEXT-BINDING-001")
 
     def test_real_execute_requires_adopted_method_and_human_decisions(self):
         case = deepcopy(self.context_extension)
         case["method_basis"]["core_method_ref"]["adoption_state"] = "candidate"
         refresh(case)
-        self.assertEqual(context_error(self.context, case, "real"), "RM-REAL-EXECUTION-001")
+        self.assertEqual(self._context_error(case), "RM-REAL-EXECUTION-001")
 
         case = deepcopy(self.context_extension)
         case["human_decision_bindings"]["method_adoption_decision_ids"] = []
         refresh(case)
-        self.assertEqual(context_error(self.context, case, "real"), "RM-METHOD-DECISION-001")
+        self.assertEqual(self._context_error(case), "RM-METHOD-DECISION-001")
 
         case = deepcopy(self.context_extension)
         case["human_decision_bindings"]["material_protocol_revision_decision_ids"] = []
         refresh(case)
-        self.assertEqual(context_error(self.context, case, "real"), "RM-PROTOCOL-DECISION-001")
+        self.assertEqual(self._context_error(case), "RM-PROTOCOL-DECISION-001")
 
     def test_virtual_execute_may_test_candidate_design(self):
         case = deepcopy(self.context_extension)
@@ -80,21 +101,31 @@ class ResearchMethodContracts(unittest.TestCase):
         case["protocol_basis"]["approval_status"] = "candidate"
         case["human_decision_bindings"] = {"method_adoption_decision_ids":[],"material_protocol_revision_decision_ids":[]}
         refresh(case)
-        self.assertEqual(context_error(self.context, case, "virtual"), None)
+        self.assertEqual(self._context_error(case, "virtual"), None)
+
+    def test_instrument_design_requires_method_and_protocol(self):
+        case = deepcopy(self.context_extension)
+        case["function_id"] = "instrument_design"
+        case["run_spec"] = None
+        case["protocol_basis"] = None
+        refresh(case)
+        errors = list(Draft202012Validator(self.context_schema).iter_errors(case))
+        self.assertTrue(errors)
+        self.assertEqual(self._context_error(case), "RM-FUNCTION-001")
 
     def test_function_specific_inputs(self):
         case = deepcopy(self.context_extension)
         case["function_id"] = "analyze"
         refresh(case)
-        self.assertEqual(context_error(self.context, case, "real"), "RM-FUNCTION-001")
+        self.assertEqual(self._context_error(case), "RM-FUNCTION-001")
         case["prior_run_result_refs"] = [{"id":"RRES-OLD","version":"1.0.0","content_digest":"sha256:"+"c"*64}]
         refresh(case)
-        self.assertEqual(context_error(self.context, case, "real"), None)
+        self.assertEqual(self._context_error(case), None)
 
-    def _handoff(self, mode="real"):
+    def _handoff(self, mode="real", function_id="execute"):
         return {
             "handoff_id":"HND-RM-001","handoff_digest":"sha256:"+"8"*64,"invocation_id":"INV-RM-001","run_id":"RUN-RM-001",
-            "capability":{"capability_id":"fixture.research-method","function_id":"execute"},"execution_mode":mode,
+            "capability":{"capability_id":"fixture.research-method","function_id":function_id},"execution_mode":mode,
             "outputs":{"candidate_findings":[{"candidate_finding_id":"CFND-RM-1"}],"candidate_next_actions":[{"proposal_id":"NA-RM-1"}],"candidate_next_methods":[{"proposal_id":"NM-RM-1"}]}
         }
 
@@ -102,6 +133,25 @@ class ResearchMethodContracts(unittest.TestCase):
         validator = Draft202012Validator(self.result_schema, format_checker=FormatChecker())
         self.assertEqual(list(validator.iter_errors(self.result_extension)), [])
         self.assertEqual(result_error(self.result_extension, self._handoff(), self.context, self.context_extension), None)
+
+    def test_result_function_mismatch_is_stable_binding_error(self):
+        case = deepcopy(self.context_extension)
+        case["function_id"] = "method_design"
+        case["protocol_basis"] = None
+        case["run_spec"] = None
+        refresh(case)
+        self.assertEqual(result_error(self.result_extension, self._handoff(), self.context, case), "RM-RESULT-BINDING-001")
+
+    def test_result_requires_exact_runspec_and_protocol_identity(self):
+        case = deepcopy(self.result_extension)
+        case["run_results"][0]["run_spec_ref"]["id"] = "RSPEC-OTHER"
+        refresh(case)
+        self.assertEqual(result_error(case, self._handoff(), self.context, self.context_extension), "RM-PROTOCOL-001")
+
+        case = deepcopy(self.result_extension)
+        case["run_results"][0]["protocol_ref"]["version"] = "9.9.9"
+        refresh(case)
+        self.assertEqual(result_error(case, self._handoff(), self.context, self.context_extension), "RM-PROTOCOL-001")
 
     def test_virtual_or_synthetic_cannot_be_empirical(self):
         self.assertEqual(result_error(self.result_extension, self._handoff("virtual"), self.context, self.context_extension), "RM-EPISTEMIC-MODE-001")
@@ -121,7 +171,6 @@ class ResearchMethodContracts(unittest.TestCase):
     def test_raw_data_and_analysis_never_auto_adopt(self):
         case = deepcopy(self.result_extension)
         case["run_results"][0]["raw_data_refs"][0]["evidence_adoption_performed"] = True
-        # schema rejects this; oracle also expresses the semantic error on an unvalidated projection.
         self.assertEqual(result_error(case, self._handoff(), self.context, self.context_extension), "RM-RESULT-DIGEST-001")
         refresh(case)
         self.assertEqual(result_error(case, self._handoff(), self.context, self.context_extension), "RM-RAW-EVIDENCE-001")
