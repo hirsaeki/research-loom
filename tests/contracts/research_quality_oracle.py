@@ -9,8 +9,36 @@ def catalog_index(catalog: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return {entry["path"]: entry for entry in catalog["constraint_paths"]}
 
 
+def catalog_cross_reference_errors(catalog: dict[str, Any]) -> list[str]:
+    """Return fixture-level errors for unresolved catalog cross-references."""
+    errors: list[str] = []
+    vocabularies = catalog.get("vocabularies", {})
+    vocabulary_names = set(vocabularies)
+
+    for entry in catalog.get("constraint_paths", []):
+        if entry.get("value_shape") != "enum_set":
+            continue
+        vocabulary = entry.get("vocabulary")
+        if vocabulary not in vocabulary_names:
+            errors.append(f"missing vocabulary for {entry.get('path')}: {vocabulary}")
+
+    quality_gate_values = set(vocabularies.get("quality_gate", []))
+    quality_gate_definitions = set(catalog.get("quality_gates", {}))
+    if quality_gate_values != quality_gate_definitions:
+        errors.append(
+            "quality_gate vocabulary/definition mismatch: "
+            f"vocabulary_only={sorted(quality_gate_values - quality_gate_definitions)}, "
+            f"definition_only={sorted(quality_gate_definitions - quality_gate_values)}"
+        )
+    return errors
+
+
 def research_quality_constraint_error(profile: dict[str, Any], catalog: dict[str, Any]) -> str | None:
     """Return the first fixture-level Research quality declaration error, if any."""
+    catalog_errors = catalog_cross_reference_errors(catalog)
+    if catalog_errors:
+        raise AssertionError("invalid Research quality catalog: " + "; ".join(catalog_errors))
+
     index = catalog_index(catalog)
     vocabularies = catalog["vocabularies"]
     for constraint in profile.get("constraints", []):
