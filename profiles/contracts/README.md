@@ -1,6 +1,6 @@
 # Canonical Profile contracts
 
-PR 4 establishes the Profile-system contract above the Core semantic floor defined by PR 3. It defines **what a Profile is, how Profile versions are selected, and how selected Profiles compose** without introducing concrete organization policy or a general runtime resolver. PR 6 adds the canonical reusable Research Profile quality-policy vocabulary on top of those composition semantics.
+PR 4 establishes the Profile-system contract above the Core semantic floor defined by PR 3. It defines **what a Profile is, how Profile versions are selected, and how selected Profiles compose** without introducing concrete organization policy or a general runtime resolver. PR 6 adds the canonical reusable Research Profile quality-policy vocabulary on top of those composition semantics. PR 7 adds the canonical reusable Narrative Profile semantics for argument stages, minimum semantic dependencies, section purposes, preservation, and read-only projection boundaries.
 
 ## Contract files
 
@@ -10,8 +10,10 @@ PR 4 establishes the Profile-system contract above the Core semantic floor defin
 - `invariant-strengthening-validators.yaml` — authoritative binding between Core invariant IDs and versioned Profile-strengthening validators/forms.
 - `research-quality-policy.schema.json` — structural contract for the canonical Research quality-policy catalog.
 - `research-quality-policy.yaml` — Research-owned quality vocabulary, typed constraint paths, monotone merge semantics, quality-gate meanings, and stable error codes.
+- `narrative-semantics.schema.json` — structural contract for the canonical Narrative semantics catalog.
+- `narrative-semantics.yaml` — Narrative-owned semantic stages, partial-order dependencies, section purposes, preservation/connection rules, non-normative hints, and stable error codes.
 
-The Profile contract version is `0.1.0`. Profiles use SemVer independently from Core and declare compatibility ranges for both Core research and invariant contracts. The Research quality-policy catalog introduced by PR 6 is also versioned independently at `0.1.0`.
+The Profile contract version is `0.1.0`. Profiles use SemVer independently from Core and declare compatibility ranges for both Core research and invariant contracts. The Research quality-policy and Narrative-semantics catalogs are independently versioned at `0.1.0`.
 
 ## Profile categories
 
@@ -19,7 +21,7 @@ The Profile contract version is `0.1.0`. Profiles use SemVer independently from 
 | --- | --- | --- |
 | `research` | methodology and research-quality policy, method-family gates, non-universal evidence/source policy | organization terminology, narrative ordering, rendering |
 | `organization` | organization/domain semantic requirements, terminology, disclosure/confidentiality, organization gates | generic methodology, Writer structure, rendering mechanics |
-| `narrative` | argument/narrative stages, semantic ordering, section-purpose semantics | authoritative research decisions, rendering/release |
+| `narrative` | argument/narrative stages, minimum semantic dependencies, section-purpose and preservation semantics | authoritative research decisions, Project Research Attention, literal chapter tree, rendering/release |
 | `publication` | output, citation, template, rendering, formal document and release constraints | authoritative research state or new research claims |
 
 `extends` is same-type inheritance/refinement. `requires` may cross types and expresses dependency only; it never grants override precedence. Cross-category last-write-wins remains forbidden.
@@ -63,6 +65,23 @@ The catalog defines Profile-level assessment vocabulary such as source quality t
 
 The generic fixture under `profiles/fixtures/research-quality/` demonstrates source/evidence admissibility, verification, independence, causal support, Finding limitations/boundary conditions, Counter Review, evidence sufficiency, method-family requirements, and quality gates. It is synthetic and contains no MISCO, organization, narrative, publication, or Project Config rules.
 
+## Narrative semantics namespace
+
+`narrative.*` is a canonical **Narrative Profile-only** namespace. It describes a read-only semantic projection over authoritative Research State rather than a new research state or a literal document structure.
+
+The catalog distinguishes:
+
+- semantic stage definitions from literal chapters;
+- `consumes` / `requires` authoritative research inputs from `produces` reader-facing Narrative products;
+- minimum acyclic partial-order dependencies from fixed total ordering;
+- semantic section purposes from literal headings or chapter numbers;
+- preservation of counter-findings, `Argument.qualifier`, `Finding.limitations`, counterevidence effects, and traceable Contribution/Recommendation support from creating new research links;
+- provisional outline / publication-location / Primary Exposition hints from normative Narrative semantics.
+
+Structured Narrative identities fail closed on divergent definitions, dangling stage references fail, and dependency cycles fail. A Writer/Project projection may later linearize the graph, but PR 7 does not define a Writer runtime or Outline/Manuscript wire format. Project-specific Research Attention remains deferred to Project Config.
+
+The synthetic generic fixture under `profiles/fixtures/narrative/` branches after validation into unordered synthesis and implication stages, demonstrating that the contract preserves only minimum semantic dependencies rather than a mandatory chapter order.
+
 ## Core invariant strengthening
 
 `effect: strengthen` is a **claim**, never proof. Each claim must carry a `validator_binding` with validator ID, validator version, and form ID. That four-part binding with `invariant_id` must resolve in `invariant-strengthening-validators.yaml`.
@@ -73,8 +92,8 @@ A conforming implementation must bind the actual resolved constraints, satisfy t
 
 ## Executable contract tests
 
-`tests/contracts/test_profile_contracts.py` remains the PR 4 Profile-system oracle. `tests/contracts/test_research_quality_policy.py` and `research_quality_oracle.py` add fixture-only executable semantics for the PR 6 Research quality-policy catalog. None of these are production resolvers or research validators.
+`tests/contracts/test_profile_contracts.py` remains the PR 4 Profile-system oracle. `tests/contracts/test_research_quality_policy.py` / `research_quality_oracle.py` add fixture-only executable semantics for PR 6. `tests/contracts/test_narrative_semantics.py` / `narrative_semantic_oracle.py` add fixture-only executable semantics for PR 7, including structured identity/ref/cycle checks and projection regressions for preservation, authority, connections, and non-normative hints. None of these are production resolvers or research/Writer validators.
 
 `.github/workflows/contracts.yml` runs all of these checks as the stable `contract-checks` GitHub Actions workflow.
 
-Concrete MISCO Profiles, organization-specific source-quality defaults/matrices, Project Config/CLI override precedence, Writer/Publication runtime behavior, persistence/export/publish behavior, general runtime resolution, and research/manuscript/release package wire formats remain out of scope.
+Concrete MISCO Profiles, organization-specific source-quality defaults/matrices, Project Config/Research Attention, Writer/Outline/Manuscript runtime behavior, Publication rendering/citation/template behavior, persistence/export/publish behavior, general runtime resolution, and research/manuscript/release package wire formats remain out of scope.
