@@ -32,7 +32,7 @@ vocabularies:
   dependency_relation: [semantic_precondition, output_dependency]
   section_purpose_role: [orient, establish_context, expose_argument, present_finding, qualify, validate, synthesize, present_contribution, present_recommendation, bridge]
   preservation_content: [counter_findings, qualifiers, limitations]
-  preserved_connection: [argument_to_support, finding_to_counterevidence, finding_to_qualifiers, contribution_to_findings, recommendation_to_findings]
+  preserved_connection: [argument_to_support, argument_to_qualifier, finding_to_counterevidence, finding_to_limitations, contribution_to_findings, recommendation_to_findings]
   authority_action: [choose_research_method, answer_research_question, mutate_authoritative_research_state, create_authoritative_research_object, change_research_adoption_state, strengthen_epistemic_status]
   projection_hint: [provisional_outline, publication_location, primary_exposition_location, literal_heading, chapter_number]
 
@@ -101,9 +101,10 @@ constraint_paths:
     vocabulary: preserved_connection
     merge_strategy: union
     semantics: >-
-      Adding a connection requires an already-authoritative research-state link to
-      remain traceable when both endpoints are projected. Narrative may expose or
-      bridge a supplied link but may not create a missing research relationship.
+      Adding a connection requires an already-authoritative research-state link or
+      qualifier/limitation attachment to remain traceable when its affected object is
+      projected. Narrative may expose or bridge supplied structure but may not create
+      a missing research relationship.
   - path: narrative.authority.prohibited_actions
     value_shape: enum_set
     vocabulary: authority_action
