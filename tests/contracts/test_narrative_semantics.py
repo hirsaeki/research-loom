@@ -116,6 +116,23 @@ class NarrativeSemanticsContractTests(unittest.TestCase):
             state = apply_mutations(cases["base_state"], case["mutations"])
             self.assertEqual(case["expected_error"], narrative_projection_error(state, self.generic), case["id"])
 
+    def test_partial_narrative_profile_omits_unconfigured_projection_checks(self):
+        cases = json.loads((FIXTURES / "semantic/cases.json").read_text(encoding="utf-8"))
+        profile = deepcopy(self.generic)
+        profile["profile_id"] = "fixture.partial-narrative"
+        profile["constraints"] = [
+            next(c for c in profile["constraints"] if c["path"] == "narrative.stages.definitions")
+        ]
+        state = deepcopy(cases["base_state"])
+        state["projection"]["required_preservation"] = []
+        state["projection"]["represented_connections"] = []
+        state["projection"]["authority_actions"] = ["answer_research_question"]
+        state["projection"]["hints"][0]["treatment"] = "normative_dependency"
+        self.assertIsNone(narrative_projection_error(state, profile))
+
+        state["research_state_digest_after"] = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        self.assertEqual("NARRATIVE-AUTHORITY-001", narrative_projection_error(state, profile))
+
     def test_stage_outputs_are_narrative_products_not_core_research_objects(self):
         stages = next(c["value"] for c in self.generic["constraints"] if c["path"] == "narrative.stages.definitions")
         research_kinds = set(self.catalog["vocabularies"]["research_input_kind"])
