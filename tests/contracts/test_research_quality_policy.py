@@ -24,8 +24,11 @@ FIXTURES = ROOT / "profiles/fixtures/research-quality"
 
 
 class ResearchQualityPolicyContractTests(unittest.TestCase):
+    """Executable specification for the canonical Research quality policy."""
+
     @classmethod
     def setUpClass(cls):
+        """Load canonical schemas, catalog, validators, and the generic fixture."""
         cls.profile_schema = json.loads(PROFILE_SCHEMA.read_text(encoding="utf-8"))
         cls.core_schema = json.loads(CORE_SCHEMA.read_text(encoding="utf-8"))
         cls.quality_schema = json.loads(QUALITY_SCHEMA.read_text(encoding="utf-8"))
@@ -36,6 +39,7 @@ class ResearchQualityPolicyContractTests(unittest.TestCase):
         cls.generic = json.loads((FIXTURES / "valid/generic-research-quality.profile.json").read_text(encoding="utf-8"))
 
     def test_quality_catalog_schema_is_valid_and_catalog_conforms(self):
+        """Require the catalog to conform and semantic entries to remain set-valued."""
         Draft202012Validator.check_schema(self.quality_schema)
         self.assertFalse(list(self.quality_validator.iter_errors(self.catalog)))
         paths = [entry["path"] for entry in self.catalog["constraint_paths"]]
@@ -52,13 +56,22 @@ class ResearchQualityPolicyContractTests(unittest.TestCase):
                 self.assertEqual("enum_set", entry["value_shape"])
                 self.assertIn(entry["merge_strategy"], {"union", "intersection"})
 
+        invalid_catalog = json.loads(json.dumps(self.catalog))
+        semantic_entry = next(entry for entry in invalid_catalog["constraint_paths"] if entry["class"] == "semantic")
+        semantic_entry["value_shape"] = "integer"
+        semantic_entry["merge_strategy"] = "max"
+        semantic_entry.pop("vocabulary", None)
+        self.assertTrue(list(self.quality_validator.iter_errors(invalid_catalog)))
+
     def test_generic_and_strict_research_quality_fixtures_are_valid_manifests(self):
+        """Validate the synthetic generic and stricter Research Profile manifests."""
         for path in sorted((FIXTURES / "valid").glob("*.profile.json")):
             manifest = json.loads(path.read_text(encoding="utf-8"))
             self.assertFalse(list(self.profile_validator.iter_errors(manifest)), str(path))
             self.assertIsNone(research_quality_constraint_error(manifest, self.catalog), str(path))
 
     def test_quality_namespace_rejects_wrong_owner_path_merge_and_values(self):
+        """Reject invalid Research quality ownership, paths, merge rules, and values."""
         cases = [
             ("PROFILE-RESEARCH-QUALITY-OWNER-001", {"profile_type": "organization"}),
             ("PROFILE-RESEARCH-QUALITY-PATH-001", {"constraint": {"path": "research_quality.evidence.magic_score", "merge_strategy": "max", "value": 5}}),
@@ -78,6 +91,7 @@ class ResearchQualityPolicyContractTests(unittest.TestCase):
             self.assertEqual(code, research_quality_constraint_error(manifest, self.catalog), str(index))
 
     def test_quality_composition_is_monotone_and_reuses_profile_merge_semantics(self):
+        """Prove stricter quality constraints compose monotonically via PR 4 rules."""
         generic = load_candidate(FIXTURES / "valid/generic-research-quality.profile.json")
         strict = load_candidate(FIXTURES / "valid/strict-research-quality.profile.json")
         composed = {item["path"]: item["value"] for item in canonical_compose_constraints([strict, generic])}
@@ -91,6 +105,7 @@ class ResearchQualityPolicyContractTests(unittest.TestCase):
         self.assertIn("research_freeze", composed["research_quality.gates.required"])
 
     def test_semantic_quality_fixtures_use_schema_valid_core_objects_and_expected_outcomes(self):
+        """Require each semantic quality case to use valid Core objects and its expected outcome."""
         cases = json.loads((FIXTURES / "semantic/cases.json").read_text(encoding="utf-8"))
         base = cases["base_state"]
         for case in cases["valid"] + cases["semantic_invalid"]:
@@ -101,6 +116,7 @@ class ResearchQualityPolicyContractTests(unittest.TestCase):
             self.assertEqual(case["expected_error"], research_quality_state_error(state, self.generic), case["id"])
 
     def test_policy_keeps_numeric_thresholds_distinct_from_semantic_sufficiency(self):
+        """Keep numeric evidence floors distinct from semantic sufficiency checks."""
         paths = catalog_index(self.catalog)
         count_path = paths["research_quality.thresholds.material_finding.min_supporting_evidence_count"]
         sufficiency_path = paths["research_quality.evidence_sufficiency.required_checks"]
