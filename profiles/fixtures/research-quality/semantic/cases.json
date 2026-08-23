@@ -15,7 +15,7 @@
     },
     "assessments": {
       "sources": {"SRC-1":{"quality_tier":"high","source_role":"peer_reviewed_research"},"SRC-2":{"quality_tier":"medium","source_role":"government_primary"}},
-      "evidence": {"EVD-1":{"directness":"direct","support_scope":"descriptive_context","inference_bases":[],"explicit_qualification":true},"EVD-2":{"directness":"direct","support_scope":"descriptive_context","inference_bases":[],"explicit_qualification":true}},
+      "evidence": {"EVD-1":{"directness":"direct","support_scope":"descriptive_context","inference_bases":[],"explicit_qualification":true,"synthesis_overlap_accounted":true},"EVD-2":{"directness":"direct","support_scope":"descriptive_context","inference_bases":[],"explicit_qualification":true,"synthesis_overlap_accounted":true}},
       "claims": {"CLM-1":{"claim_family":"descriptive","formation_evidence_ids":[]}},
       "methods": {"MTH-1":{"method_family":"primary_empirical"}}
     },
@@ -30,7 +30,8 @@
     {"id":"low-confidence-effect-scope","mutations":[{"op":"set","path":"assessments.sources.SRC-1.quality_tier","value":"low_confidence"},{"op":"set","path":"assessments.evidence.EVD-1.support_scope","value":"independent_effect"}],"expected_error":"RESEARCH-QUALITY-EVIDENCE-ADMISSIBILITY-001"},
     {"id":"company-primary-effect-scope","mutations":[{"op":"set","path":"assessments.sources.SRC-1.source_role","value":"company_primary"},{"op":"set","path":"assessments.evidence.EVD-1.support_scope","value":"independent_effect"}],"expected_error":"RESEARCH-QUALITY-EVIDENCE-ADMISSIBILITY-001"},
     {"id":"independent-effect-with-overlapping-origin","mutations":[{"op":"set","path":"assessments.claims.CLM-1.claim_family","value":"independent_effect"},{"op":"set","path":"assessments.evidence.EVD-1.support_scope","value":"independent_effect"},{"op":"set","path":"assessments.evidence.EVD-2.support_scope","value":"independent_effect"},{"op":"set","path":"objects.EVD-2.independence_group","value":"origin-a"}],"expected_error":"RESEARCH-QUALITY-INDEPENDENCE-001"},
-    {"id":"self-validating-claim","mutations":[{"op":"set","path":"assessments.claims.CLM-1.formation_evidence_ids","value":["EVD-1","EVD-2"]}],"expected_error":"RESEARCH-QUALITY-INDEPENDENCE-001"},
+    {"id":"self-validation-subset","mutations":[{"op":"set","path":"objects.CLM-1.supporting_evidence_ids","value":["EVD-1"]},{"op":"set","path":"assessments.claims.CLM-1.formation_evidence_ids","value":["EVD-1","EVD-2"]}],"expected_error":"RESEARCH-QUALITY-INDEPENDENCE-001"},
+    {"id":"synthesis-overlap-unaccounted","mutations":[{"op":"set","path":"assessments.evidence.EVD-2.synthesis_overlap_accounted","value":false}],"expected_error":"RESEARCH-QUALITY-INDEPENDENCE-001"},
     {"id":"causal-claim-with-descriptive-scope","mutations":[{"op":"set","path":"assessments.claims.CLM-1.claim_family","value":"causal"}],"expected_error":"RESEARCH-QUALITY-CLAIM-SUPPORT-001"},
     {"id":"causal-claim-from-self-report-only","mutations":[{"op":"set","path":"assessments.claims.CLM-1.claim_family","value":"causal"},{"op":"set","path":"assessments.evidence.EVD-1.support_scope","value":"causal_effect"},{"op":"set","path":"assessments.evidence.EVD-2.support_scope","value":"causal_effect"},{"op":"set","path":"assessments.evidence.EVD-1.inference_bases","value":["self_report_only"]}],"expected_error":"RESEARCH-QUALITY-CAUSAL-SUPPORT-001"},
     {"id":"finding-missing-limitations","mutations":[{"op":"set","path":"objects.FND-1.limitations","value":[]}],"expected_error":"RESEARCH-QUALITY-FINDING-QUALIFICATION-001"},
