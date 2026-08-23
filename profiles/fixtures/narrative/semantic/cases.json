@@ -9,6 +9,12 @@
       "CTR-1->FND-1",
       "REC-1->FND-1"
     ],
+    "authoritative_preservation_requirements": [
+      {"content":"counter_findings","affected_id":"FND-1"},
+      {"content":"qualifiers","affected_id":"ARG-1"},
+      {"content":"limitations","affected_id":"FND-1"},
+      {"content":"limitations","affected_id":"REC-1"}
+    ],
     "projection": {
       "represented_connections": [
         "ARG-1->FND-1",
@@ -19,7 +25,8 @@
       "required_preservation": [
         {"content":"counter_findings","affected_id":"FND-1","effect_preserved":true},
         {"content":"qualifiers","affected_id":"ARG-1","effect_preserved":true},
-        {"content":"limitations","affected_id":"FND-1","effect_preserved":true}
+        {"content":"limitations","affected_id":"FND-1","effect_preserved":true},
+        {"content":"limitations","affected_id":"REC-1","effect_preserved":true}
       ],
       "authority_actions": [],
       "hints": [
@@ -34,6 +41,7 @@
   "semantic_invalid": [
     {"id":"NAR-PRESERVE-001","mutations":[{"op":"set","path":"projection.required_preservation.0.effect_preserved","value":false}],"expected_error":"NARRATIVE-PRESERVATION-001"},
     {"id":"NAR-PRESERVE-002","mutations":[{"op":"remove","path":"projection.required_preservation.2"}],"expected_error":"NARRATIVE-PRESERVATION-001"},
+    {"id":"NAR-PRESERVE-003","mutations":[{"op":"remove","path":"projection.required_preservation.3"}],"expected_error":"NARRATIVE-PRESERVATION-001"},
     {"id":"NAR-CONNECTION-001","mutations":[{"op":"remove","path":"projection.represented_connections.0"}],"expected_error":"NARRATIVE-CONNECTION-001"},
     {"id":"NAR-CONNECTION-002","mutations":[{"op":"set","path":"projection.represented_connections.0","value":"ARG-1->FND-NEW"}],"expected_error":"NARRATIVE-CONNECTION-001"},
     {"id":"NAR-AUTHORITY-001","mutations":[{"op":"set","path":"projection.authority_actions","value":["answer_research_question"]}],"expected_error":"NARRATIVE-AUTHORITY-001"},
