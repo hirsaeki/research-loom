@@ -1,0 +1,75 @@
+contract_version: 0.1.0
+status: CANONICAL
+ownership:
+  owns:
+    - concrete project identity, title, objective, scope, and out-of-scope declarations
+    - references to adopted Research Questions and project-local Research Question seeds
+    - direct requests for Research, Organization, Narrative, and Publication Profiles
+    - project Communication Brief and project-local communication intent
+    - Research Attention that preserves issues and question candidates from silent loss
+    - project-specific requirements, prohibitions, and must-not-claim guards
+    - references to project inputs, Core Source objects, and Core Artifact objects
+    - capability availability and project-level permission hints
+    - configuration provenance and deterministic configuration digest
+  excludes:
+    - authoritative Research State revisions, adoption state, findings, answers, or human decisions
+    - reusable research-quality semantics or evidence sufficiency policy
+    - reusable Organization Profile rules
+    - reusable Narrative ordering, dependency, or section-purpose semantics
+    - reusable Publication formatting, citation, template, rendering, or release semantics
+    - Research Method selection, method adoption, or evidence-gap resolution
+    - Profile dependency expansion, version selection, composition, or Effective Profile Set ownership
+    - runtime storage, database state, capability execution, or permission enforcement
+    - CLI temporary override precedence
+principles:
+  core_floor_unchanged: true
+  project_config_is_not_research_state: true
+  profile_requests_are_direct_only: true
+  project_constraints_are_not_profile_constraints: true
+  project_constraints_cannot_weaken_core_or_profiles: true
+  cli_override_precedence_defined: false
+  attention_may_shape_questions: true
+  attention_may_determine_answer: false
+  attention_may_select_method: false
+  attention_disposition_requires_reason: true
+  projection_hints_are_non_normative: true
+  capability_hints_may_select_method: false
+  capability_permission_hint_is_authorization: false
+  resource_reference_is_evidence: false
+  resource_reference_grants_runtime_access: false
+  project_facts_flow_to_reusable_profiles: false
+research_attention:
+  dispositions: [active, dropped, out_of_scope]
+  drop_requires_reason: true
+  out_of_scope_requires_reason: true
+  may_shape_question_candidates: true
+  may_answer_research_question: false
+  may_choose_research_method: false
+  projection_hint_normative: false
+profile_request_bridge:
+  source_path: profile_requests
+  target_contract: urn:research-loom:profiles:effective-profile-set:0.1.0
+  target_field: requested_profiles
+  category_order: [research, organization, narrative, publication]
+  category_mapping:
+    research: research
+    organization: organization
+    narrative: narrative
+    publication: publication
+  direct_requests_only: true
+  transitive_profiles_written_back: false
+  effective_profiles_owned_by_project_config: false
+  project_constraints_join_effective_constraints: false
+configuration_digest:
+  algorithm: SHA-256
+  canonicalization: RFC8785-JCS
+  excluded_fields: [configuration_digest]
+  wire_prefix: "sha256:"
+error_codes:
+  PROJECT-CONFIG-DIGEST-001: configuration_digest does not identify the RFC 8785 canonical Project Config payload with the digest field omitted.
+  PROJECT-CONFIG-IDENTITY-001: a Project Config local semantic identity is duplicated within its identity domain.
+  PROJECT-CONFIG-SCOPE-001: the same scope statement is declared both in-scope and out-of-scope.
+  PROJECT-CONFIG-REF-001: a Project Config local reference does not resolve to the corresponding configured item.
+  PROJECT-CORE-BINDING-001: a Project, Research Question, Source, or Artifact reference that claims a Core target does not resolve to the expected Core kind in the same project.
+  PROJECT-PROFILE-REQUEST-IDENTITY-001: more than one direct Profile request is supplied for the same Profile type and id.
+  PROJECT-PROFILE-BINDING-001: Project Config direct Profile requests and Effective Profile Set requested_profiles are not losslessly identical.

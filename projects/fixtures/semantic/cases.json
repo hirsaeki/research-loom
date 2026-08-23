@@ -1,0 +1,39 @@
+{
+  "fixture": "../valid/generic-project-config.json",
+  "cases": [
+    {
+      "id": "valid-generic-project-config",
+      "mutation": "none",
+      "expected_error": null
+    },
+    {
+      "id": "configuration-digest-mismatch",
+      "mutation": "change-title-without-rehash",
+      "expected_error": "PROJECT-CONFIG-DIGEST-001"
+    },
+    {
+      "id": "duplicate-direct-profile-key",
+      "mutation": "duplicate-narrative-request",
+      "rehash": true,
+      "expected_error": "PROJECT-PROFILE-REQUEST-IDENTITY-001"
+    },
+    {
+      "id": "scope-overlap",
+      "mutation": "copy-in-scope-to-out-of-scope",
+      "rehash": true,
+      "expected_error": "PROJECT-CONFIG-SCOPE-001"
+    },
+    {
+      "id": "unresolved-attention-resource-reference",
+      "mutation": "replace-attention-source-reference-with-missing-id",
+      "rehash": true,
+      "expected_error": "PROJECT-CONFIG-REF-001"
+    },
+    {
+      "id": "duplicate-attention-identity",
+      "mutation": "duplicate-attention-item",
+      "rehash": true,
+      "expected_error": "PROJECT-CONFIG-IDENTITY-001"
+    }
+  ]
+}

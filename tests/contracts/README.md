@@ -1,8 +1,8 @@
 # Canonical contract checks
 
-This directory is the executable specification for the canonical contracts established by PR 3 (Core), PR 4 (Profiles), PR 5 (hardened canonical CI), and PR 6 (Research Profile quality policy).
+This directory is the executable specification for the canonical contracts established by PR 3 (Core), PR 4 (Profiles), PR 5 (hardened canonical CI), PR 6 (Research Profile quality policy), PR 7 (Narrative Profile semantics), and PR 8 (Project Config).
 
-It is intentionally test-only. `core_semantic_oracle.py`, `semantic_oracle.py`, and `research_quality_oracle.py` model only the semantics needed to distinguish the canonical fixtures; they are not runtime validators, resolvers, storage services, or public APIs.
+It is intentionally test-only. `core_semantic_oracle.py`, `semantic_oracle.py`, `research_quality_oracle.py`, `narrative_semantic_oracle.py`, and `project_config_oracle.py` model only the semantics needed to distinguish the canonical fixtures; they are not runtime validators, resolvers, storage services, or public APIs.
 
 ## Covered contracts
 
@@ -12,12 +12,26 @@ It is intentionally test-only. `core_semantic_oracle.py`, `semantic_oracle.py`, 
 - Core invariant catalog ↔ Profile strengthening-registry consistency.
 - Deterministic version selection, composition, provenance, invariant evaluation, and canonical serialization under shuffled input order.
 - Research Profile quality-policy catalog structure, `research_quality.*` ownership/path/type/merge semantics, monotone composition, and synthetic semantic regressions for source/evidence admissibility, verification, independence, causal support, Finding qualification, Counter Review, sufficiency, method families, and quality gates.
+- Narrative Profile semantic-stage/dependency/section-purpose catalogs, partial-order semantics, read-only research-state projection, preservation of adverse/qualifying content, authoritative-connection preservation, and non-normative outline/publication-location hints.
+- Project Config envelope, digest, local references/identities/scope, Research Attention boundaries, project-local guard separation, resource/capability hint boundaries, and lossless direct request binding to `Effective Profile Set.requested_profiles`.
 
 ### Research quality fixture boundary
 
 PR 6 adds **generic synthetic Research Profile policy**, not a production quality engine and not a concrete MISCO quality matrix. The fixture oracle uses Profile-level derived assessment labels (for example source quality tier, directness, support scope, Claim family, and method family) only to make the canonical semantic rules executable. Those labels do not add fields to the Core research-object schema.
 
 Numeric thresholds and semantic sufficiency are tested separately. In particular, a configured minimum Evidence count may be necessary for a fixture but is never sufficient by itself to satisfy coverage/stopping semantics.
+
+### Narrative fixture boundary
+
+PR 7 adds generic Narrative semantics only. Literal headings, chapter numbers, primary exposition locations, and provisional outlines remain projection hints rather than normative Narrative ordering. The fixture oracle is read-only with respect to authoritative Research State and cannot choose methods, answer Research Questions, or manufacture missing Finding/Argument/Contribution/Recommendation connections.
+
+### Project Config fixture boundary
+
+PR 8 adds one generic synthetic Project Config plus semantic mutations. It contains no concrete MISCO configuration or chapter map.
+
+Project Config `profile_requests` are direct requests only. The generic fixture deliberately leaves Research and Organization request lists empty while its bound PR 4 Effective Profile Set contains those Profile types transitively through `requires` / `extends`. This prevents resolver output from being written back as project intent.
+
+Research Question seeds and Research Attention remain guidance/candidate material, not authoritative Research State. Project guards do not become Profile `effective_constraints`; resource references do not become Evidence; capability/permission hints do not grant runtime authorization or select Research Method. CLI temporary override precedence remains uncanonicalized.
 
 ### Fixture-only sentinels
 
@@ -52,6 +66,7 @@ These tests must not grow into:
 
 - a production research-object validator or Research quality evaluator;
 - a Profile runtime resolver;
+- a Project Config runtime loader/state store or permission engine;
 - legacy implementation compatibility tests;
 - SQLite/export/publish behavior;
 - Writer/Publication implementation tests;
