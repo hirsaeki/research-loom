@@ -1,0 +1,26 @@
+{
+  "schema_version": "0.1.0",
+  "capability_id": "desktop-research",
+  "capability_version": "0.1.0",
+  "capability_kind": "desktop_research",
+  "implementation_boundary": "plugin",
+  "declared_functions": [
+    {
+      "function_id": "investigate",
+      "description": "Discover and capture bounded external research sources, preserve unsuccessful coverage, and return candidate-only research outputs through the canonical Capability Handoff.",
+      "supported_execution_modes": ["real", "virtual", "synthetic_test"],
+      "input_contract": "capability-context-pack@0.1.0",
+      "output_contract": "capability-handoff@0.1.0"
+    }
+  ],
+  "availability": {
+    "declaration": "conditional",
+    "rationale": "The canonical capability contract is available; any interactive or adapter runtime remains separately discoverable and authorized."
+  },
+  "compatibility": {
+    "core_research_contract": "0.1.0",
+    "project_config_contract": "0.1.0",
+    "effective_profile_set_contract": "0.1.0"
+  },
+  "descriptor_digest": "sha256:efdc9291325e1d4ab71d6cd1f7a048d6689f064a378ba1f6f8e5c99ac61863c9"
+}
