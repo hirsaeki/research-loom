@@ -1,0 +1,80 @@
+schema_version: "0.1.0"
+
+ownership:
+  common_contracts: core/packages
+  imperative_implementations: plugins
+  project_config: configures_not_owns
+  profiles: constrain_not_implement
+
+principles:
+  availability_is_authorization: false
+  project_permission_hint_is_authorization: false
+  capability_may_mutate_research_state: false
+  handoff_output_is_evidence_or_finding: false
+  capability_may_select_next_method: false
+  human_decision_core_transition_may_be_bypassed: false
+  virtual_output_may_be_empirical: false
+  publication_or_writer_artifact_may_be_research_evidence: false
+  conversational_prose_is_handoff_source_of_truth: false
+  governance_context_may_be_dropped_for_budget: false
+
+execution_modes:
+  real:
+    meaning: >
+      Execution against authorized real resources or participants. Real mode does not
+      make an output authoritative Evidence or Finding; adoption and epistemic
+      qualification remain separate Core operations.
+    empirical_candidate_possible: true
+  virtual:
+    meaning: >
+      Simulated or synthetic execution used to explore candidate observations,
+      findings, gaps, and next-method options. Every evidentiary output remains
+      synthetic and cannot be promoted to empirical.
+    empirical_candidate_possible: false
+  synthetic_test:
+    meaning: >
+      Deterministic fixture/test execution. Outputs are synthetic test material only
+      and cannot be promoted to empirical research content.
+    empirical_candidate_possible: false
+
+handoff_validation:
+  valid: Structurally and semantically acceptable for adoption review; not adopted.
+  partial: Usable candidate material exists, but explicit issues or missing coverage remain.
+  rejected: The handoff is not eligible for adoption review; provenance and rejection issues remain auditable.
+
+adoption_boundary:
+  candidate_outputs_require_adoption: true
+  authoritative_transition_owner: Core Human Decision semantics
+  research_state_patch_allowed: false
+
+errors:
+  - id: CAP-DESCRIPTOR-DIGEST-001
+    meaning: Descriptor digest does not bind the descriptor content.
+  - id: CAP-CONTEXT-DIGEST-001
+    meaning: Context Pack digest does not bind the Context Pack content.
+  - id: CAP-INVOCATION-DIGEST-001
+    meaning: Invocation digest does not bind the invocation content.
+  - id: CAP-HANDOFF-DIGEST-001
+    meaning: Handoff digest does not bind the handoff content.
+  - id: CAP-DESCRIPTOR-BINDING-001
+    meaning: Invocation capability/function/mode does not match the pinned descriptor.
+  - id: CAP-PIN-001
+    meaning: Project Config, Effective Profile Set, Research Snapshot, or Context Pack pin is inconsistent.
+  - id: CAP-AUTH-001
+    meaning: Opaque runtime authorization evidence does not cover the invocation or one of its resource references.
+  - id: CAP-CONTEXT-BOUND-001
+    meaning: A bounded Context Pack exceeds one of its declared maximums.
+  - id: CAP-CONTEXT-BINDING-001
+    meaning: Context Pack governance or resource material is not a faithful projection of its pinned inputs.
+  - id: CAP-RESOURCE-001
+    meaning: A capability treats a non-Source resource, including Writer/Publication artifacts, as an evidence basis.
+  - id: CAP-MODE-001
+    meaning: Virtual or synthetic-test execution returned non-synthetic evidentiary output.
+  - id: CAP-HANDOFF-PRESERVE-001
+    meaning: Handoff failed to preserve Research Attention, project guards, or Effective Profile constraints from the Context Pack.
+  - id: CAP-HANDOFF-VALIDATION-001
+    meaning: valid/partial/rejected handoff status is inconsistent with its issue/output semantics.
+  - id: CAP-HANDOFF-IDENTITY-001
+    meaning: Structured Handoff output identifiers are not unique.
+  - id: CAP-HANDOFF-REF-001
+    meaning: A structured Handoff reference does not resolve within the pinned Context Pack or Handoff outputs.
