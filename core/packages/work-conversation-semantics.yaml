@@ -1,0 +1,138 @@
+schema_version: "0.1.0"
+
+ownership:
+  common_contracts: core/packages
+  runtime_coordinator: implementation_defined
+  research_state_authority: Harness/Core
+  human_decision_authority: Human
+
+principles:
+  chat_prose_is_research_evidence: false
+  natural_language_directly_mutates_research_state: false
+  conversation_is_planner_or_decision_engine: false
+  capability_bypass_of_pr9_invocation_allowed: false
+  availability_or_permission_hint_is_runtime_authorization: false
+  candidate_next_method_auto_adopted: false
+  human_decision_may_be_bypassed: false
+  conversation_summary_replaces_structured_handoff: false
+
+input_classes:
+  QUERY: >
+    Requests observation or status only. A resolved QUERY may route to a read-only
+    Harness service, never requires confirmation, and must leave the bound state unchanged.
+  PROPOSAL: >
+    Requests that a typed Action Proposal be formed for discussion. It remains
+    proposal-only and cannot execute, request confirmation, or satisfy a Human Decision.
+  COMMITTABLE_ACTION: >
+    Requests commitment of one explicit typed proposal. Read-only actions may execute
+    directly; state-changing actions must first issue a state-bound Confirmation Request.
+  CONFIRMATION: >
+    Confirms one explicit Confirmation Request. It is not itself a Core Human Decision and
+    succeeds only when actor, proposal, action payload, state, research pins, expiry, and
+    single-use constraints still match.
+  CANCEL: >
+    Cancels only an identified still-pending conversational proposal or Confirmation Request.
+    It never rewinds Research State or acts as an implicit abort of an already active Run.
+
+routing:
+  harness_service: >
+    Read-only or state-changing Harness operations route through an explicitly typed Harness
+    service boundary; the conversation layer does not implement the operation itself.
+  capability_invocation: >
+    Research Capability execution must materialize and execute the PR9
+    capability-invocation@0.1.0 contract. No conversation-only capability route is valid.
+  unresolved: >
+    Proposal-only candidate material may deliberately leave the execution route unresolved.
+    The conversation layer must not choose a Capability or Research Method to make it executable.
+  runtime_authorization: >
+    Capability availability and Project permission hints are descriptive only. The actual PR9
+    Invocation must carry separate runtime authorization evidence before execution.
+
+confirmation:
+  exact_binding: >
+    A Confirmation Request binds one proposal digest, actor, action type, action payload digest,
+    current state identity/revision/digest, and applicable Project Config / Effective Profile Set /
+    Research Snapshot pins.
+  fail_closed: >
+    Missing, stale, mismatched, ambiguous, duplicate, expired, replayed, or unknown confirmation
+    attempts fail closed and cannot execute the action.
+  single_use: >
+    A successful Confirmation Receipt consumes one request exactly once.
+  human_decision_separation: >
+    Confirmation authorizes an already typed action attempt; it never substitutes for Human
+    Decision semantics required for RQ answers, Evidence qualification/reclassification,
+    Finding adoption, Research Method selection, or other Human-owned authoritative transitions.
+
+cancellation:
+  pending_only: >
+    CANCEL targets a still-pending Action Proposal or Confirmation Request and produces an
+    immutable cancellation Action Receipt with unchanged state.
+  active_run_abort: >
+    Aborting an already active Run is a distinct typed state-changing Harness action. If exposed
+    conversationally, it follows the ordinary proposal/confirmation/receipt path; lifecycle-
+    specific abort semantics are deferred from this contract.
+  no_rewind: >
+    Cancellation never deletes or rewinds prior Runs, Decisions, Research Snapshots, or receipts.
+
+handoff_candidates:
+  structured_source: >
+    Candidate next-action and next-method presentations bind directly to a structured PR9
+    Capability Handoff and candidate proposal identifier; display prose is non-authoritative.
+  proposal_only: >
+    A Handoff candidate is converted only into a proposal-only Action Proposal. It is not
+    automatically committed, routed, adopted, or used as a Human Decision.
+  next_method: >
+    A candidate next-method remains non-binding and must retain the Human Decision boundary;
+    the conversation layer may not select the method or a Capability on the Human's behalf.
+
+receipts:
+  immutable_audit: >
+    Every executed, rejected, failed, or cancelled state-changing attempt has an immutable,
+    digest-bound Action Receipt recording actor, exact action binding, before/after state,
+    confirmation where applicable, execution route, and trace identity.
+  read_only: >
+    Successful read-only Action Receipts require no confirmation, perform no Research State
+    mutation, and preserve identical before/after state binding.
+  capability: >
+    Capability execution receipts reference the actual PR9 Invocation and, when available, the
+    structured Handoff. A conversational summary is never accepted in place of that Handoff.
+
+errors:
+  - id: CONV-INPUT-DIGEST-001
+    meaning: Conversation Input digest does not bind the input content.
+  - id: CONV-PROPOSAL-DIGEST-001
+    meaning: Action Proposal or typed payload digest does not bind its content.
+  - id: CONV-CONFIRMATION-REQUEST-DIGEST-001
+    meaning: Confirmation Request digest does not bind the request content.
+  - id: CONV-CONFIRMATION-RECEIPT-DIGEST-001
+    meaning: Confirmation Receipt digest does not bind the receipt content.
+  - id: CONV-ACTION-RECEIPT-DIGEST-001
+    meaning: Action Receipt digest does not bind the receipt content.
+  - id: CONV-PRESENTATION-DIGEST-001
+    meaning: Candidate presentation digest does not bind the presentation content.
+  - id: CONV-CLASSIFICATION-001
+    meaning: An input classification is resolved with semantics belonging to a different input class.
+  - id: CONV-NATURAL-LANGUAGE-AUTHORITY-001
+    meaning: Conversational prose is treated as an authoritative action, Evidence, Research State patch, or structured Handoff.
+  - id: CONV-READONLY-001
+    meaning: A read-only action requires confirmation, changes bound state, or performs Research State mutation.
+  - id: CONV-PROPOSAL-ONLY-001
+    meaning: Proposal-only material is executed, routed as committed work, or used to satisfy Human Decision authority.
+  - id: CONV-ROUTE-001
+    meaning: Capability execution bypasses PR9 Invocation or a committed proposal uses an unresolved route.
+  - id: CONV-PIN-001
+    meaning: Project Config, Effective Profile Set, Research Snapshot, Context Pack, or PR9 Invocation binding is inconsistent.
+  - id: CONV-CONFIRMATION-BINDING-001
+    meaning: Confirmation actor, proposal, action payload, state, or applicable research-context binding does not match the bound request.
+  - id: CONV-CONFIRMATION-EXPIRED-001
+    meaning: Confirmation occurs at or after the request expiry.
+  - id: CONV-CONFIRMATION-REPLAY-001
+    meaning: One Confirmation Request is successfully consumed more than once.
+  - id: CONV-CANCEL-001
+    meaning: Cancellation targets a finalized/unknown item, changes state, rewinds history, or is used as an implicit active-Run abort.
+  - id: CONV-HANDOFF-PRESENTATION-001
+    meaning: A presented next-action/next-method candidate does not resolve to the bound structured PR9 Handoff or is auto-adopted.
+  - id: CONV-HUMAN-DECISION-001
+    meaning: Confirmation or conversational proposal is used to bypass a required Human Decision or auto-select a candidate Research Method.
+  - id: CONV-AUDIT-001
+    meaning: A state-changing attempt lacks an immutable Action Receipt or its recorded route/state/confirmation provenance is inconsistent.
