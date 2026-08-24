@@ -1,0 +1,66 @@
+schema_version: "0.1.0"
+capability:
+  capability_kind: research_method.delphi
+  research_method_contract: research-method@0.1.0
+  canonical_function_ids: [method_design, instrument_design, execute, analyze]
+  pr9_context_or_handoff_redefined: false
+  pr12_method_envelopes_redefined: false
+method_design:
+  owns: [delphi_purpose, target_question, panel_population, panel_selection, inclusion_exclusion, expertise_stakeholder_coverage, participation_targets, anonymity_pseudonymity, facilitator_researcher_boundary, affiliation_conflict_capture, planned_rounds, stopping_criteria, consensus_goal, stability_goal, representativeness]
+  generated_design_is_candidate_only: true
+  self_adopts_core_method: false
+  panel_target_is_research_sufficiency: false
+instrument:
+  stable_item_identity_across_rounds: true
+  item_types: [statement, forecast, scenario, ranking]
+  response_modes: [rating, ranking, probability, confidence, free_text_rationale]
+  construct_rq_gap_traceability_required: true
+  controlled_feedback_explicit: true
+  item_revision_lineage_required: true
+  lifecycle: [new, revised, retired]
+  generation_is_approval: false
+  material_revision_requires_human_decision: true
+execution:
+  pr12_run_identity_redefined: false
+  round_identity_sequence_explicit: true
+  protocol_instrument_runspec_pinned: true
+  participation_by_round_preserved: true
+  partial_nonresponse_dropout_preserved: true
+  late_join_replacement_policy_explicit: true
+  anonymity_preserving_linkage_supported: true
+  feedback_traceable_to_prior_rounds: true
+  prior_round_results_immutable: true
+  missing_data_preserved: true
+  minority_dissent_preserved: true
+  panel_opinion_is_verified_evidence: false
+analysis:
+  item_denominators_explicit: true
+  distribution_ranking_central_tendency_candidate_only: true
+  dispersion_disagreement_supported: true
+  consensus_indicator_candidate_only: true
+  stability_change_supported: true
+  uncertainty_supported: true
+  subgroup_and_coding_provenance_required_where_used: true
+  minority_dissent_preserved: true
+  configured_thresholds_explicit_and_provenance_bound: true
+  universal_numeric_threshold_defined_here: false
+  consensus_threshold_satisfaction_is_finding: false
+  majority_median_consensus_is_truth: false
+  lack_of_consensus_is_valid_result: true
+stopping:
+  bases: [configured_consensus_goal, round_to_round_stability, diminishing_information_gain, attrition_feasibility, maximum_approved_rounds]
+  recommendation_is_research_completion: false
+  recommendation_is_human_decision: false
+epistemic_boundary:
+  modes: [real, virtual, synthetic_test]
+  synthetic_expert_persona_generation_defined_here: false
+  synthetic_panel_is_empirical_consensus: false
+  synthetic_panel_may_be_promoted_to_empirical_evidence: false
+routing:
+  delphi_selects_next_method: false
+  research_profile_quality_redefined_here: false
+  misco_panel_or_items_canonicalized_here: false
+  virtual_runner_defined_here: false
+conversation_boundary:
+  pr10_route_supported: true
+  confirmation_is_human_decision: false
