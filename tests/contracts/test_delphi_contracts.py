@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 import json
 import unittest
 from pathlib import Path
@@ -7,6 +8,7 @@ from pathlib import Path
 import yaml
 from jsonschema import Draft202012Validator, FormatChecker
 
+from delphi_oracle import design_error
 from research_method_oracle import canonical_digest
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -47,11 +49,19 @@ class DelphiContracts(unittest.TestCase):
         self.assertFalse(semantics["routing"]["delphi_selects_next_method"])
 
     def test_design_instrument_and_multi_round_fixtures(self):
-        self.assertEqual(list(Draft202012Validator(self.design_schema).iter_errors(self.fixtures["design"])), [])
+        design = self.fixtures["design"]
+        self.assertEqual(list(Draft202012Validator(self.design_schema).iter_errors(design)), [])
+        self.assertEqual(design_error(design), None)
         validator = Draft202012Validator(self.schema, format_checker=FormatChecker())
         for name in ("round1_instrument", "round2_revised_instrument", "real_multi_round", "no_consensus"):
             self.assertEqual(list(validator.iter_errors(self.fixtures[name])), [])
-        design = self.fixtures["design"]
+        self.assertEqual(design["content_digest"], canonical_digest(design, "content_digest"))
+        for name in ("round1_instrument", "round2_revised_instrument"):
+            instrument = self.fixtures[name]
+            self.assertEqual(instrument["content_digest"], canonical_digest(instrument, "content_digest"))
+        for name in ("real_multi_round", "no_consensus"):
+            result = self.fixtures[name]
+            self.assertEqual(result["extension_digest"], canonical_digest(result, "extension_digest"))
         self.assertTrue(design["candidate_only"])
         self.assertFalse(design["participation_targets"]["target_is_research_sufficiency"])
         self.assertTrue(design["stopping"]["no_universal_numeric_threshold"])
@@ -69,6 +79,31 @@ class DelphiContracts(unittest.TestCase):
         self.assertTrue(no_consensus["item_analyses"][0]["minority_dissent_refs"])
         self.assertFalse(no_consensus["consensus_is_truth"])
         self.assertFalse(no_consensus["analysis_is_finding"])
+
+    def test_instrument_human_decision_evidence_is_required(self):
+        validator = Draft202012Validator(self.schema)
+        approved_without_decision = deepcopy(self.fixtures["round1_instrument"])
+        approved_without_decision.pop("approval_decision_id")
+        self.assertTrue(list(validator.iter_errors(approved_without_decision)))
+
+        material_without_decision = deepcopy(self.fixtures["round2_revised_instrument"])
+        material_without_decision.pop("material_revision_decision_id")
+        self.assertTrue(list(validator.iter_errors(material_without_decision)))
+
+    def test_planned_rounds_are_executable(self):
+        validator = Draft202012Validator(self.design_schema)
+        null_plan = deepcopy(self.fixtures["design"])
+        null_plan["planned_rounds"]["round_plan"] = None
+        self.assertTrue(list(validator.iter_errors(null_plan)))
+
+        invalid_minimum = deepcopy(self.fixtures["design"])
+        invalid_minimum["planned_rounds"]["minimum_rounds"] = 0
+        self.assertTrue(list(validator.iter_errors(invalid_minimum)))
+
+        inverted = deepcopy(self.fixtures["design"])
+        inverted["planned_rounds"]["minimum_rounds"] = 4
+        inverted["planned_rounds"]["maximum_approved_rounds"] = 3
+        self.assertEqual(design_error(inverted), "DLP-DESIGN-ROUNDS-001")
 
     def test_pr10_routing_preserves_pr9_and_human_decision_boundary(self):
         proposal = self.routing["action_proposal"]
