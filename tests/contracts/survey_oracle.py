@@ -3,6 +3,11 @@ from __future__ import annotations
 from research_method_oracle import canonical_digest
 
 CANONICAL_FUNCTIONS = {"method_design", "instrument_design", "execute", "analyze"}
+EPISTEMIC_MODE_BY_EXECUTION = {
+    "real": "empirical",
+    "virtual": "virtual",
+    "synthetic_test": "synthetic",
+}
 
 
 def descriptor_error(descriptor):
@@ -38,19 +43,30 @@ def questionnaire_error(questionnaire):
     return None
 
 
-def context_error(extension, questionnaire, execution_mode):
+def context_error(extension, design, questionnaire, execution_mode):
     if extension.get("extension_digest") != canonical_digest(extension, "extension_digest"):
         return "SV-CONTEXT-DIGEST-001"
     if extension.get("function_id") == "execute":
+        dref = extension.get("survey_design_ref")
+        if not isinstance(dref, dict):
+            return "SV-FUNCTION-001"
+        expected_design = {
+            "id": design.get("survey_design_id"),
+            "version": design.get("version"),
+            "content_digest": design.get("content_digest"),
+        }
+        if any(dref.get(key) != value for key, value in expected_design.items()):
+            return "SV-CONTEXT-BINDING-001"
+
         qref = extension.get("questionnaire_ref")
         if not isinstance(qref, dict):
             return "SV-FUNCTION-001"
-        expected = {
+        expected_questionnaire = {
             "id": questionnaire.get("questionnaire_id"),
             "version": questionnaire.get("version"),
             "content_digest": questionnaire.get("content_digest"),
         }
-        if any(qref.get(key) != value for key, value in expected.items()):
+        if any(qref.get(key) != value for key, value in expected_questionnaire.items()):
             return "SV-CONTEXT-BINDING-001"
         if execution_mode == "real":
             if questionnaire.get("approval_status") != "approved":
@@ -69,10 +85,11 @@ def context_error(extension, questionnaire, execution_mode):
 def result_error(result, execution_mode):
     if result.get("extension_digest") != canonical_digest(result, "extension_digest"):
         return "SV-RESULT-DIGEST-001"
+    expected_epistemic_mode = EPISTEMIC_MODE_BY_EXECUTION.get(execution_mode)
     for response in result.get("responses", []):
         if response.get("verified_evidence_claimed") is not False:
             return "SV-RESPONSE-EVIDENCE-001"
-        if execution_mode in {"virtual", "synthetic_test"} and response.get("epistemic_mode") == "empirical":
+        if expected_epistemic_mode is not None and response.get("epistemic_mode") != expected_epistemic_mode:
             return "SV-EPISTEMIC-MODE-001"
         if response.get("eligibility_status") == "excluded" and not response.get("exclusion_reason"):
             return "SV-DISPOSITION-001"
