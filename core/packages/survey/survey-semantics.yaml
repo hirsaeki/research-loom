@@ -33,6 +33,7 @@ execution:
   missing_data_preserved: true
   privacy_sensitive_respondent_identity_is_core_research_object: false
   response_is_verified_evidence: false
+  target_sample_achievement_bound_to_design: true
   target_sample_achieved_is_research_sufficiency: false
 analysis:
   response_and_eligible_counts_explicit: true
@@ -80,6 +81,7 @@ errors:
   - {id: SV-DISPOSITION-001, meaning: "Sample/response disposition is internally inconsistent or excluded responses lack reasons."}
   - {id: SV-MISSINGNESS-001, meaning: "Missingness, nonresponse, dropout, or partial response is hidden or discarded."}
   - {id: SV-DUPLICATE-001, meaning: "Duplicate-response handling is inconsistent with the declared execution policy or disposition."}
+  - {id: SV-TARGET-SAMPLE-001, meaning: "target_sample_achieved is inconsistent with the pinned SurveyDesign target and completed-response count."}
   - {id: SV-ANALYSIS-DENOMINATOR-001, meaning: "Item-level denominator, missingness, or exclusion accounting is inconsistent."}
   - {id: SV-ANALYSIS-AUTHORITY-001, meaning: "Survey aggregate/statistic/coding output is treated as authoritative Core Analysis or Finding."}
   - {id: SV-SUBGROUP-PROVENANCE-001, meaning: "Subgroup or free-text coding output lacks reproducible definition/provenance."}
