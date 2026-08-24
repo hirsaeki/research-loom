@@ -90,11 +90,18 @@ class SurveyContracts(unittest.TestCase):
         stale["questions"][0]["text"] = "Changed without digest update."
         self.assertEqual(questionnaire_error(stale), "SV-QUESTIONNAIRE-DIGEST-001")
 
-    def test_real_execute_requires_exact_approved_questionnaire_and_human_decision(self):
+    def test_real_execute_requires_exact_design_questionnaire_and_human_decision(self):
+        design = self.fixtures["design"]
         questionnaire = self.fixtures["questionnaire"]
         context = self.fixtures["context"]
         self.assertEqual(list(self._validator().iter_errors(context)), [])
-        self.assertEqual(context_error(context, questionnaire, "real"), None)
+        self.assertEqual(context_error(context, design, questionnaire, "real"), None)
+
+        changed_design = deepcopy(design)
+        changed_design["target_population"]["definition"] = "Changed design after context pinning."
+        refresh(changed_design, "content_digest")
+        self.assertEqual(context_error(context, changed_design, questionnaire, "real"), "SV-CONTEXT-BINDING-001")
+
         candidate = deepcopy(questionnaire)
         candidate["approval_status"] = "candidate"
         candidate.pop("approval_decision_id", None)
@@ -103,14 +110,14 @@ class SurveyContracts(unittest.TestCase):
         candidate_context["questionnaire_ref"]["content_digest"] = candidate["content_digest"]
         candidate_context["questionnaire_decision_ids"] = []
         refresh(candidate_context, "extension_digest")
-        self.assertEqual(context_error(candidate_context, candidate, "real"), "SV-REAL-EXECUTION-001")
+        self.assertEqual(context_error(candidate_context, design, candidate, "real"), "SV-REAL-EXECUTION-001")
         missing_decision = deepcopy(context)
         missing_decision["questionnaire_decision_ids"] = []
         refresh(missing_decision, "extension_digest")
-        self.assertEqual(context_error(missing_decision, questionnaire, "real"), "SV-REAL-EXECUTION-001")
+        self.assertEqual(context_error(missing_decision, design, questionnaire, "real"), "SV-REAL-EXECUTION-001")
         stale = deepcopy(context)
         stale["duplicate_response_policy"] = "manual_review"
-        self.assertEqual(context_error(stale, questionnaire, "real"), "SV-CONTEXT-DIGEST-001")
+        self.assertEqual(context_error(stale, design, questionnaire, "real"), "SV-CONTEXT-DIGEST-001")
 
     def test_real_execution_keeps_nonresponse_sufficiency_and_datetime_boundary(self):
         result = self.fixtures["real"]
@@ -118,15 +125,17 @@ class SurveyContracts(unittest.TestCase):
         self.assertEqual(result_error(result, "real"), None)
         self.assertEqual(result["extension_digest"], canonical_digest(result, "extension_digest"))
         self.assertEqual(result["sample_disposition"]["nonresponse_count"], 1)
-        self.assertTrue(result["target_sample_achieved"])
+        self.assertFalse(result["target_sample_achieved"])
         self.assertFalse(result["research_sufficiency_claimed"])
         self.assertTrue(all(not r["verified_evidence_claimed"] for r in result["responses"]))
         invalid_time = deepcopy(result)
         invalid_time["responses"][0]["response_timestamp"] = "not-a-date-time"
         refresh(invalid_time, "extension_digest")
         errors = list(self._validator().iter_errors(invalid_time))
+
         def contains_format(error):
             return error.validator == "format" or any(contains_format(child) for child in error.context)
+
         self.assertTrue(any(contains_format(error) for error in errors), errors)
         stale = deepcopy(result)
         stale["limitations"].append("Changed without digest update.")
@@ -142,6 +151,31 @@ class SurveyContracts(unittest.TestCase):
         self.assertGreater(disposition["duplicate_flagged_count"], 0)
         self.assertTrue(result["missing_data_preserved"])
         self.assertTrue(any(r["duplicate_disposition"] == "excluded" for r in result["responses"]))
+
+    def test_execution_mode_requires_matching_epistemic_mode(self):
+        real = self.fixtures["real"]
+        self.assertEqual(result_error(real, "real"), None)
+        wrong_real = deepcopy(real)
+        wrong_real["responses"][0]["epistemic_mode"] = "synthetic"
+        refresh(wrong_real, "extension_digest")
+        self.assertEqual(result_error(wrong_real, "real"), "SV-EPISTEMIC-MODE-001")
+
+        synthetic = self.fixtures["synthetic_test"]
+        self.assertEqual(result_error(synthetic, "synthetic_test"), None)
+        wrong_synthetic = deepcopy(synthetic)
+        wrong_synthetic["responses"][0]["epistemic_mode"] = "empirical"
+        refresh(wrong_synthetic, "extension_digest")
+        self.assertEqual(result_error(wrong_synthetic, "synthetic_test"), "SV-EPISTEMIC-MODE-001")
+
+        virtual = deepcopy(synthetic)
+        virtual["responses"][0]["epistemic_mode"] = "virtual"
+        refresh(virtual, "extension_digest")
+        self.assertEqual(list(self._validator().iter_errors(virtual)), [])
+        self.assertEqual(result_error(virtual, "virtual"), None)
+        wrong_virtual = deepcopy(virtual)
+        wrong_virtual["responses"][0]["epistemic_mode"] = "synthetic"
+        refresh(wrong_virtual, "extension_digest")
+        self.assertEqual(result_error(wrong_virtual, "virtual"), "SV-EPISTEMIC-MODE-001")
 
     def test_synthetic_test_cannot_claim_empirical_or_finding_authority(self):
         result = self.fixtures["synthetic_test"]
