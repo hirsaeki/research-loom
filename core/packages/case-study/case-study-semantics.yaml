@@ -1,0 +1,118 @@
+schema_version: 0.1.0
+capability:
+  capability_kind: research_method.case_study
+  research_method_contract: research-method@0.1.0
+  canonical_function_ids: [method_design, instrument_design, execute, analyze]
+  pr9_context_or_handoff_redefined: false
+  pr12_method_envelopes_redefined: false
+  harness_is_only_authoritative_write_boundary: true
+method_design:
+  owns: [case_study_purpose, target_research_question, target_evidence_gap, unit_of_analysis, case_boundary, selection_strategy, inclusion_exclusion, case_universe, selected_case_rationale, number_of_cases_rationale, within_cross_case_intent, embedded_units, transferability_assumptions, validity_threats, access_constraints, additional_case_criteria]
+  selection_strategies: [typical, critical, extreme_deviant, maximum_variation, theoretical_purposive, comparative, convenience]
+  selected_case_is_representative_population_sample: false
+  case_count_alone_is_research_sufficiency: false
+  convenience_may_be_mislabeled_purposive_or_theoretical: false
+  generated_design_is_candidate_only: true
+  self_adopts_core_method: false
+instrument:
+  instrument_design_means_questionnaire_generation: false
+  specialization: [case_protocol, extraction_template, coding_frame, observation_guide]
+  stable_variable_construct_observation_field_identity: true
+  rq_gap_construct_traceability_required: true
+  source_roles: [interview, document, event, metric, artifact, direct_observation]
+  within_case_coding_supported: true
+  cross_case_common_coding_supported: true
+  triangulation_plan_required: true
+  chronology_process_tracing_supported: true
+  negative_rival_capture_required: true
+  material_revision_requires_human_decision: true
+  generation_is_approval: false
+execution:
+  pr12_run_identity_redefined: false
+  protocol_instrument_runspec_pinned: true
+  case_identity_and_boundary_pinned: true
+  source_observation_measurement_artifact_refs_preserved: true
+  temporal_ordering_preserved_where_applicable: true
+  access_failure_missingness_dropout_unusable_case_preserved: true
+  protocol_deviation_and_exclusion_rationale_preserved: true
+  negative_contradictory_observations_preserved: true
+  researcher_llm_coding_provenance_required: true
+raw_observation_boundary:
+  raw_observation_is_verified_evidence: false
+  coding_label_is_finding: false
+  researcher_interpretation_is_observed_fact: false
+  direct_observation_source_extraction_interpretation_are_distinct: true
+  original_source_locator_artifact_back_reference_required: true
+within_case_analysis:
+  outputs_candidate_only: true
+  chronology_sequence_reconstruction: true
+  pattern_candidate: true
+  mechanism_candidate: true
+  rival_explanation: true
+  expected_vs_observed: true
+  negative_contradictory_preserved: true
+  boundary_conditions_and_validity_threats: true
+cross_case_analysis:
+  comparison_set_identity_required: true
+  common_variable_construct_identity_required: true
+  case_value_provenance_required: true
+  negative_deviant_cases_preserved: true
+  subgroup_cluster_definition_provenance_required: true
+  missing_incomparable_dimensions_preserved: true
+  candidate_only: true
+analysis_boundary:
+  recurring_pattern_is_causal_mechanism: false
+  sequence_consistency_is_causal_proof: false
+  cross_case_similarity_is_generalizability: false
+  exceptional_case_may_be_silently_dropped_as_noise: false
+  mechanism_causal_candidates_subject_to_research_profile_causal_policy: true
+  transferability_generalization_requires_explicit_boundary: true
+triangulation:
+  same_primary_source_observations_are_independent_evidence: false
+  source_role_differences_preserved: true
+  conflicting_evidence_may_appear_resolved_without_resolution: false
+  unavailable_inaccessible_material_explicit: true
+  public_information_may_fill_unknown_internal_state_by_inference: false
+epistemic_boundary:
+  modes: [real, virtual, synthetic_test]
+  real_requires_real_case_observation_or_material: true
+  virtual_purpose: [protocol_form_validation, coding_frame_validation, analysis_flow_validation, missingness_ambiguity_handling_validation]
+  virtual_content_may_be_promoted_to_real_observation: false
+  virtual_findings_may_be_empirical_evidence_or_finding: false
+  synthetic_test_has_empirical_semantics: false
+stopping:
+  fixed_case_count_alone: false
+  remaining_information_value_if: [test_important_rival_explanation, fill_material_evidence_gap, falsify_current_pattern, add_coverage_dimension]
+  saturation_diminishing_gain_candidate_assessment: true
+  recommendation_is_research_completion: false
+  recommendation_is_human_decision: false
+routing:
+  case_study_handoff_wire_format_defined: false
+  case_specific_info_is_pr12_extension_only: true
+  next_case_proposal_only: true
+  next_method_proposal_only: true
+  confirmation_is_method_adoption_or_material_protocol_revision_decision: false
+  research_profile_quality_or_causal_policy_redefined_here: false
+guardrails:
+  fail_closed_on: [required_input_missing, authorization_missing, human_decision_missing, case_boundary_invalid_or_missing, rq_or_evidence_gap_binding_missing, incompatible_protocol_pin]
+  capability_may_fill_missing_input: false
+  return_as: [evidence_gap, ambiguity, blocked_reason]
+errors:
+  CASE-DESCRIPTOR-001: Descriptor kind/functions/wire contracts or digest are invalid.
+  CASE-DESIGN-BINDING-001: Case design lacks bounded RQ/Evidence Gap binding.
+  CASE-BOUNDARY-001: Case boundary is missing, stale, mutated, or not pinned exactly.
+  CASE-SELECTION-001: Case selection strategy/rationale is inconsistent, including convenience mislabeled as purposive/theoretical.
+  CASE-REPRESENTATIVENESS-001: Case selection or count is being treated as population representativeness or research sufficiency.
+  CASE-ANALYSIS-INTENT-001: Within-case/cross-case intent is inconsistent with the selected comparison set.
+  CASE-PROTOCOL-001: Case Protocol digest, approval/material revision, stable field identity, or pin is invalid.
+  CASE-PROTOCOL-TRACE-001: Protocol field lacks RQ/Evidence Gap/construct traceability.
+  CASE-BLOCKED-001: Required input, authorization, Human Decision, boundary, RQ/gap binding, or protocol pin is unavailable; execution must fail closed.
+  CASE-OBSERVATION-PROVENANCE-001: Observation fact/interpretation role or original-source provenance is invalid.
+  CASE-MISSINGNESS-001: Incomplete/access-failed/unusable case does not preserve missingness, unavailability, deviation, exclusion, or ambiguity.
+  CASE-NEGATIVE-DEVIANT-001: Negative, contradictory, or deviant observations/cases were dropped from analysis.
+  CASE-CROSS-CASE-001: Cross-case comparison set, common construct, case-value provenance, or incomparable-dimension accounting is invalid.
+  CASE-TRIANGULATION-001: Observations from one primary source were inflated as independent evidence or conflicts were erased.
+  CASE-CAUSAL-BOUNDARY-001: Pattern/sequence/similarity was promoted to mechanism, causal proof, or generalizability.
+  CASE-EPISTEMIC-MODE-001: Virtual/synthetic content crossed into empirical semantics or execution-mode labeling is inconsistent.
+  CASE-STOPPING-001: Stopping relies on fixed case count, hides remaining information value, or claims Research completion/Human Decision.
+  CASE-AUTHORITY-001: Case output adopted Evidence/Finding/next case/next method or directly changed authoritative state.
