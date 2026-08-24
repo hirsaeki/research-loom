@@ -1,216 +1,68 @@
 {
-  "questionnaire": {
+  "design": {
     "schema_version": "0.1.0",
-    "object_type": "survey_questionnaire",
-    "questionnaire_id": "QNR-1",
+    "survey_design_id": "SV-DES-1",
     "version": "1.0.0",
-    "approval_status": "approved",
-    "approval_decision_id": "DEC-QNR-1",
-    "material_revision": false,
-    "retired_question_ids": [],
-    "revision_changes": [],
-    "questions": [
-      {
-        "question_id": "Q1",
-        "item_revision": 1,
-        "text": "Role?",
-        "question_type": "single_choice",
-        "required": true,
-        "response_options": [
-          {"option_id": "M", "label": "Manager"},
-          {"option_id": "C", "label": "Contributor"}
-        ],
-        "scale": null,
-        "numeric_constraints": null,
-        "branching": [],
-        "randomization_group_id": null,
-        "traceability": {
-          "construct_ids": ["ROLE"],
-          "research_question_ids": ["RQ-1"],
-          "evidence_gap_ids": ["GAP-1"]
-        }
-      },
-      {
-        "question_id": "Q2",
-        "item_revision": 1,
-        "text": "Usefulness?",
-        "question_type": "scale",
-        "required": true,
-        "response_options": [],
-        "scale": {"minimum": 1, "maximum": 5},
-        "numeric_constraints": null,
-        "branching": [],
-        "randomization_group_id": null,
-        "traceability": {
-          "construct_ids": ["VALUE"],
-          "research_question_ids": ["RQ-1"],
-          "evidence_gap_ids": ["GAP-1"]
-        }
-      },
-      {
-        "question_id": "Q3",
-        "item_revision": 1,
-        "text": "Count?",
-        "question_type": "numeric",
-        "required": false,
-        "response_options": [],
-        "scale": null,
-        "numeric_constraints": {"minimum": 0},
-        "branching": [],
-        "randomization_group_id": null,
-        "traceability": {
-          "construct_ids": ["ASIS"],
-          "research_question_ids": ["RQ-1"],
-          "evidence_gap_ids": []
-        }
-      },
-      {
-        "question_id": "Q4",
-        "item_revision": 1,
-        "text": "Notes?",
-        "question_type": "free_text",
-        "required": false,
-        "response_options": [],
-        "scale": null,
-        "numeric_constraints": null,
-        "branching": [],
-        "randomization_group_id": null,
-        "traceability": {
-          "construct_ids": ["EXCEPTION"],
-          "research_question_ids": ["RQ-1"],
-          "evidence_gap_ids": []
-        }
-      }
+    "method_design_ref": {"method_design_id":"MD-SV-1","version":"1.0.0","content_digest":"sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","authoritative_method":false},
+    "target_population": {"definition":"Eligible members of the bounded fixture population.","unit_of_analysis":"respondent"},
+    "sampling_frame": {"resource_reference_id":null,"frame_description":"Synthetic fixture frame.","coverage_statement":"Fixture coverage is intentionally bounded."},
+    "sampling_strategy": {"strategy_family":"non_probability","description":"Fixture purposive sampling strategy."},
+    "eligibility": {"inclusion_criteria":["Meets fixture eligibility."],"exclusion_criteria":[]},
+    "recruitment": {"constraints":["Fixture-only recruitment."],"contact_constraints":["No real contact distribution."]},
+    "target_sample": {"target_count":3,"stopping_rule":"Stop after the fixture target or bounded run termination.","target_count_is_research_sufficiency":false},
+    "representativeness": {"assumptions":["No population representativeness is inferred."],"limitations":["Synthetic fixture only."]},
+    "candidate_only": true,
+    "content_digest": "sha256:f851f29363ac0d0af1f023540d03024d81c2596d3b0b206e6fbe23a7840766d7"
+  },
+  "questionnaire": {
+    "schema_version":"0.1.0","object_type":"survey_questionnaire","questionnaire_id":"QNR-1","version":"1.0.0","approval_status":"approved","approval_decision_id":"DEC-QNR-1","material_revision":false,"retired_question_ids":[],"revision_changes":[],
+    "questions":[
+      {"question_id":"Q1","item_revision":1,"text":"Role?","question_type":"single_choice","required":true,"response_options":[{"option_id":"M","label":"Manager"},{"option_id":"C","label":"Contributor"}],"scale":null,"numeric_constraints":null,"branching":[],"randomization_group_id":null,"traceability":{"construct_ids":["ROLE"],"research_question_ids":["RQ-1"],"evidence_gap_ids":["GAP-1"]}},
+      {"question_id":"Q2","item_revision":1,"text":"Usefulness?","question_type":"scale","required":true,"response_options":[],"scale":{"minimum":1,"maximum":5},"numeric_constraints":null,"branching":[],"randomization_group_id":null,"traceability":{"construct_ids":["VALUE"],"research_question_ids":["RQ-1"],"evidence_gap_ids":["GAP-1"]}},
+      {"question_id":"Q3","item_revision":1,"text":"Count?","question_type":"numeric","required":false,"response_options":[],"scale":null,"numeric_constraints":{"minimum":0},"branching":[],"randomization_group_id":null,"traceability":{"construct_ids":["ASIS"],"research_question_ids":["RQ-1"],"evidence_gap_ids":[]}},
+      {"question_id":"Q4","item_revision":1,"text":"Notes?","question_type":"free_text","required":false,"response_options":[],"scale":null,"numeric_constraints":null,"branching":[],"randomization_group_id":null,"traceability":{"construct_ids":["EXCEPTION"],"research_question_ids":["RQ-1"],"evidence_gap_ids":[]}}
     ],
-    "content_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+    "content_digest":"sha256:c9d44d8909a1d7646e1ec4a9d1e977bb7bab3026d3816d693fe4bc23c4203e80"
+  },
+  "context": {
+    "schema_version":"0.1.0","object_type":"survey_context_extension","research_method_context_digest":"sha256:5555555555555555555555555555555555555555555555555555555555555555","function_id":"execute",
+    "survey_design_ref":{"id":"SV-DES-1","version":"1.0.0","content_digest":"sha256:f851f29363ac0d0af1f023540d03024d81c2596d3b0b206e6fbe23a7840766d7"},
+    "questionnaire_ref":{"id":"QNR-1","version":"1.0.0","content_digest":"sha256:c9d44d8909a1d7646e1ec4a9d1e977bb7bab3026d3816d693fe4bc23c4203e80"},
+    "duplicate_response_policy":"exclude_all","missing_data_policy":"preserve","questionnaire_decision_ids":["DEC-QNR-1"],
+    "extension_digest":"sha256:0802ecc6561a385d4164ce51ce89ca1cf045044bbdc5268bf52feae144a4cffd"
   },
   "real": {
-    "schema_version": "0.1.0",
-    "object_type": "survey_result_extension",
-    "research_method_result_digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
-    "responses": [
-      {"response_id":"R1","raw_data_ref_id":"DATA-1","response_status":"complete","eligibility_status":"eligible","epistemic_mode":"empirical","duplicate_disposition":"not_duplicate","verified_evidence_claimed":false},
-      {"response_id":"R2","raw_data_ref_id":"DATA-2","response_status":"complete","eligibility_status":"eligible","epistemic_mode":"empirical","duplicate_disposition":"not_duplicate","verified_evidence_claimed":false}
+    "schema_version":"0.1.0","object_type":"survey_result_extension","research_method_result_digest":"sha256:3333333333333333333333333333333333333333333333333333333333333333",
+    "responses":[
+      {"response_id":"R1","raw_data_ref_id":"DATA-1","response_status":"complete","eligibility_status":"eligible","response_timestamp":"2026-08-24T01:00:00Z","epistemic_mode":"empirical","duplicate_disposition":"not_duplicate","verified_evidence_claimed":false},
+      {"response_id":"R2","raw_data_ref_id":"DATA-2","response_status":"complete","eligibility_status":"eligible","response_timestamp":"2026-08-24T01:01:00Z","epistemic_mode":"empirical","duplicate_disposition":"not_duplicate","verified_evidence_claimed":false}
     ],
-    "sample_disposition": {
-      "eligible_count": 3,
-      "response_count": 2,
-      "completed_count": 2,
-      "partial_count": 0,
-      "nonresponse_count": 1,
-      "dropout_count": 0,
-      "excluded_response_count": 0,
-      "duplicate_flagged_count": 0
-    },
-    "item_summaries": [],
-    "aggregation_provenance_ref": "fixture://real",
-    "subgroup_provenance_refs": [],
-    "free_text_coding_refs": [],
-    "limitations": ["Nonresponse preserved."],
-    "response_bias_candidate": {"status": "candidate"},
-    "missing_data_preserved": true,
-    "target_sample_achieved": true,
-    "research_sufficiency_claimed": false,
-    "aggregate_is_finding": false,
-    "finding_adoption_performed": false,
-    "synthetic_responses_may_be_empirical": false,
-    "extension_digest": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+    "sample_disposition":{"eligible_count":3,"response_count":2,"completed_count":2,"partial_count":0,"nonresponse_count":1,"dropout_count":0,"excluded_response_count":0,"duplicate_flagged_count":0},
+    "item_summaries":[],"aggregation_provenance_ref":"fixture://survey/aggregation","subgroup_provenance_refs":[],"free_text_coding_refs":[],"limitations":["Nonresponse preserved."],"response_bias_candidate":{"status":"candidate"},"missing_data_preserved":true,"target_sample_achieved":true,"research_sufficiency_claimed":false,"aggregate_is_finding":false,"finding_adoption_performed":false,"synthetic_responses_may_be_empirical":false,
+    "extension_digest":"sha256:e0b0110cf7a1a34ce7a0b1dfb30466de5a16b29f9e0420c1d03754fd937f0d57"
   },
   "partial_nonresponse": {
-    "schema_version": "0.1.0",
-    "object_type": "survey_result_extension",
-    "research_method_result_digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
-    "responses": [
+    "schema_version":"0.1.0","object_type":"survey_result_extension","research_method_result_digest":"sha256:3333333333333333333333333333333333333333333333333333333333333333",
+    "responses":[
       {"response_id":"R3","raw_data_ref_id":"DATA-3","response_status":"partial","eligibility_status":"eligible","epistemic_mode":"empirical","duplicate_disposition":"kept","verified_evidence_claimed":false},
-      {"response_id":"R4","raw_data_ref_id":"DATA-4","response_status":"partial","eligibility_status":"excluded","epistemic_mode":"empirical","duplicate_disposition":"excluded","exclusion_reason":"Duplicate response excluded by pinned policy.","verified_evidence_claimed":false}
+      {"response_id":"R4","raw_data_ref_id":"DATA-4","response_status":"complete","eligibility_status":"excluded","epistemic_mode":"empirical","duplicate_disposition":"excluded","exclusion_reason":"Duplicate response excluded under declared policy.","verified_evidence_claimed":false}
     ],
-    "sample_disposition": {
-      "eligible_count": 4,
-      "response_count": 2,
-      "completed_count": 0,
-      "partial_count": 2,
-      "nonresponse_count": 1,
-      "dropout_count": 1,
-      "excluded_response_count": 1,
-      "duplicate_flagged_count": 1
-    },
-    "item_summaries": [],
-    "aggregation_provenance_ref": "fixture://partial",
-    "subgroup_provenance_refs": [],
-    "free_text_coding_refs": [],
-    "limitations": ["Partial responses, dropout, nonresponse, and duplicate exclusion are preserved."],
-    "response_bias_candidate": {"status": "candidate"},
-    "missing_data_preserved": true,
-    "target_sample_achieved": false,
-    "research_sufficiency_claimed": false,
-    "aggregate_is_finding": false,
-    "finding_adoption_performed": false,
-    "synthetic_responses_may_be_empirical": false,
-    "extension_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+    "sample_disposition":{"eligible_count":4,"response_count":2,"completed_count":1,"partial_count":1,"nonresponse_count":1,"dropout_count":1,"excluded_response_count":1,"duplicate_flagged_count":2},
+    "item_summaries":[],"aggregation_provenance_ref":"fixture://survey/aggregation","subgroup_provenance_refs":[],"free_text_coding_refs":[],"limitations":["Partial response, dropout, nonresponse, and duplicate exclusion preserved."],"response_bias_candidate":{"status":"candidate"},"missing_data_preserved":true,"target_sample_achieved":false,"research_sufficiency_claimed":false,"aggregate_is_finding":false,"finding_adoption_performed":false,"synthetic_responses_may_be_empirical":false,
+    "extension_digest":"sha256:996e3bdfe59c204557c944ecc5a74262f66300d68faf372f7736a94d54985f4e"
   },
   "synthetic_test": {
-    "schema_version": "0.1.0",
-    "object_type": "survey_result_extension",
-    "research_method_result_digest": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
-    "responses": [
-      {"response_id":"SR1","raw_data_ref_id":"SDATA-1","response_status":"complete","eligibility_status":"eligible","epistemic_mode":"synthetic","duplicate_disposition":"not_duplicate","verified_evidence_claimed":false},
-      {"response_id":"SR2","raw_data_ref_id":"SDATA-2","response_status":"complete","eligibility_status":"eligible","epistemic_mode":"synthetic","duplicate_disposition":"not_duplicate","verified_evidence_claimed":false}
-    ],
-    "sample_disposition": {
-      "eligible_count": 2,
-      "response_count": 2,
-      "completed_count": 2,
-      "partial_count": 0,
-      "nonresponse_count": 0,
-      "dropout_count": 0,
-      "excluded_response_count": 0,
-      "duplicate_flagged_count": 0
-    },
-    "item_summaries": [],
-    "aggregation_provenance_ref": "fixture://synthetic-test",
-    "subgroup_provenance_refs": [],
-    "free_text_coding_refs": [],
-    "limitations": ["Synthetic test responses are not empirical responses."],
-    "response_bias_candidate": {"status": "not_assessed"},
-    "missing_data_preserved": true,
-    "target_sample_achieved": true,
-    "research_sufficiency_claimed": false,
-    "aggregate_is_finding": false,
-    "finding_adoption_performed": false,
-    "synthetic_responses_may_be_empirical": false,
-    "extension_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777"
+    "schema_version":"0.1.0","object_type":"survey_result_extension","research_method_result_digest":"sha256:3333333333333333333333333333333333333333333333333333333333333333",
+    "responses":[{"response_id":"RS1","raw_data_ref_id":"DATA-S1","response_status":"complete","eligibility_status":"eligible","epistemic_mode":"synthetic","duplicate_disposition":"not_duplicate","verified_evidence_claimed":false}],
+    "sample_disposition":{"eligible_count":1,"response_count":1,"completed_count":1,"partial_count":0,"nonresponse_count":0,"dropout_count":0,"excluded_response_count":0,"duplicate_flagged_count":0},
+    "item_summaries":[],"aggregation_provenance_ref":"fixture://survey/aggregation","subgroup_provenance_refs":[],"free_text_coding_refs":[],"limitations":["Synthetic-test output is not empirical."],"response_bias_candidate":{"status":"candidate"},"missing_data_preserved":true,"target_sample_achieved":false,"research_sufficiency_claimed":false,"aggregate_is_finding":false,"finding_adoption_performed":false,"synthetic_responses_may_be_empirical":false,
+    "extension_digest":"sha256:34d336b26701bae213f4df272595213afc82b03508860335d8ec74dbbe56ee9d"
   },
   "analysis": {
-    "schema_version": "0.1.0",
-    "object_type": "survey_result_extension",
-    "research_method_result_digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
-    "responses": [],
-    "sample_disposition": {
-      "eligible_count": 10,
-      "response_count": 8,
-      "completed_count": 7,
-      "partial_count": 1,
-      "nonresponse_count": 2,
-      "dropout_count": 1,
-      "excluded_response_count": 0,
-      "duplicate_flagged_count": 0
-    },
-    "item_summaries": [
-      {"question_id":"Q1","denominator_count":8,"answered_count":8,"missing_count":0,"excluded_count":0},
-      {"question_id":"Q2","denominator_count":8,"answered_count":7,"missing_count":1,"excluded_count":0},
-      {"question_id":"Q4","denominator_count":8,"answered_count":5,"missing_count":3,"excluded_count":0}
-    ],
-    "aggregation_provenance_ref": "analysis://aggregate/A1",
-    "subgroup_provenance_refs": ["analysis://subgroup/role"],
-    "free_text_coding_refs": ["analysis://coding/Q4-v1"],
-    "limitations": ["Candidate descriptive analysis only; nonresponse and missingness remain material limitations."],
-    "response_bias_candidate": {"status":"candidate","assessment":"Nonrespondents may differ from respondents."},
-    "missing_data_preserved": true,
-    "target_sample_achieved": false,
-    "research_sufficiency_claimed": false,
-    "aggregate_is_finding": false,
-    "finding_adoption_performed": false,
-    "synthetic_responses_may_be_empirical": false,
-    "extension_digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999"
+    "schema_version":"0.1.0","object_type":"survey_result_extension","research_method_result_digest":"sha256:3333333333333333333333333333333333333333333333333333333333333333","responses":[],
+    "sample_disposition":{"eligible_count":3,"response_count":2,"completed_count":2,"partial_count":0,"nonresponse_count":1,"dropout_count":0,"excluded_response_count":0,"duplicate_flagged_count":0},
+    "item_summaries":[{"question_id":"Q1","denominator_count":3,"answered_count":2,"missing_count":1,"excluded_count":0},{"question_id":"Q4","denominator_count":3,"answered_count":1,"missing_count":1,"excluded_count":1}],
+    "aggregation_provenance_ref":"fixture://survey/aggregation","subgroup_provenance_refs":["fixture://survey/subgroup/role"],"free_text_coding_refs":["fixture://survey/coding/q4"],"limitations":["Descriptive candidate analysis only."],"response_bias_candidate":{"status":"candidate"},"missing_data_preserved":true,"target_sample_achieved":false,"research_sufficiency_claimed":false,"aggregate_is_finding":false,"finding_adoption_performed":false,"synthetic_responses_may_be_empirical":false,
+    "extension_digest":"sha256:0338a9e6b72a5ae5d3c81719d27e353e1e54e693b579dfb8a0fa618217aec7f3"
   }
 }
