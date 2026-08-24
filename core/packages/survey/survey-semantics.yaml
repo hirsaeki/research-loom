@@ -1,0 +1,88 @@
+schema_version: "0.1.0"
+capability:
+  capability_kind: research_method.survey
+  research_method_contract: research-method@0.1.0
+  canonical_function_ids: [method_design, instrument_design, execute, analyze]
+  pr9_context_or_handoff_redefined: false
+  pr12_method_envelopes_redefined: false
+method_design:
+  survey_design_contract: survey-design@0.1.0
+  owns: [target_population, unit_of_analysis, sampling_frame, sampling_strategy, inclusion_exclusion, recruitment_constraints, contact_constraints, target_sample, stopping_rule, representativeness_assumptions]
+  generated_design_is_candidate_only: true
+  survey_capability_self_adopts_core_method: false
+  target_sample_is_research_sufficiency: false
+instrument:
+  questionnaire_contract: questionnaire@0.1.0
+  questionnaire_is_core_method: false
+  question_identity_stable_across_versions: true
+  supported_question_types: [single_choice, multiple_choice, scale, numeric, free_text]
+  branching_and_skip_logic_explicit: true
+  randomized_order_explicit_where_used: true
+  construct_rq_gap_traceability_required: true
+  generation_is_instrument_approval: false
+  wording_or_scale_change_is_material_revision: true
+  material_questionnaire_revision_requires_human_decision: true
+execution:
+  run_identity_owned_by: capability-invocation@0.1.0
+  pinned_protocol_and_runspec_owned_by: research-method-context-extension@0.1.0
+  approved_questionnaire_required_for_real: true
+  recruitment_and_sample_disposition_preserved: true
+  partial_response_preserved: true
+  nonresponse_dropout_exclusion_preserved: true
+  duplicate_response_handling_explicit: true
+  missing_data_preserved: true
+  privacy_sensitive_respondent_identity_is_core_research_object: false
+  response_is_verified_evidence: false
+  target_sample_achieved_is_research_sufficiency: false
+analysis:
+  response_and_eligible_counts_explicit: true
+  completion_information_explicit: true
+  item_level_denominators_explicit: true
+  missingness_and_exclusions_explicit: true
+  aggregation_provenance_required: true
+  subgroup_definition_provenance_required: true
+  descriptive_statistics_are_candidate_analysis: true
+  free_text_coding_result_refs_supported: true
+  limitations_coverage_and_response_bias_assessment_preserved: true
+  aggregate_or_statistic_is_finding: false
+  survey_analysis_self_adopts_finding: false
+epistemic_boundary:
+  modes: [real, virtual, synthetic_test]
+  synthetic_respondent_or_persona_generation_defined_here: false
+  synthetic_response_is_empirical_response: false
+  synthetic_response_may_be_promoted_to_empirical_evidence: false
+  response_and_analysis_outputs_are_candidate_material: true
+routing:
+  survey_selects_next_method: false
+  candidate_next_methods_only: true
+  research_profile_quality_requirements_redefined_here: false
+  misco_questionnaire_or_excel_format_canonicalized_here: false
+conversation_boundary:
+  pr10_route_supported: true
+  confirmation_is_human_decision: false
+  questionnaire_approval_or_material_revision_cannot_be_replaced_by_confirmation: true
+errors:
+  - {id: SV-DESCRIPTOR-001, meaning: "Survey descriptor does not bind the PR12 Research Method family and canonical functions."}
+  - {id: SV-DESIGN-DIGEST-001, meaning: "SurveyDesign digest does not match canonical content."}
+  - {id: SV-DESIGN-AUTHORITY-001, meaning: "SurveyDesign is treated as an authoritative Core Method or target sample as research sufficiency."}
+  - {id: SV-DESIGN-BINDING-001, meaning: "SurveyDesign resource or sampling-frame reference is not exactly bound to the PR9 Context Pack."}
+  - {id: SV-QUESTIONNAIRE-DIGEST-001, meaning: "Questionnaire digest does not match canonical content."}
+  - {id: SV-QUESTIONNAIRE-IDENTITY-001, meaning: "Question identity, branching, randomization, or traceability is invalid or silently lost across versions."}
+  - {id: SV-QUESTIONNAIRE-REVISION-001, meaning: "A wording/scale material change is not represented as a material questionnaire revision."}
+  - {id: SV-QUESTIONNAIRE-APPROVAL-001, meaning: "Questionnaire approval or material revision lacks Human Decision authority."}
+  - {id: SV-CONTEXT-DIGEST-001, meaning: "Survey Context extension digest does not match canonical content."}
+  - {id: SV-CONTEXT-BINDING-001, meaning: "Survey Context extension does not exactly bind its PR12 Research Method Context or resources."}
+  - {id: SV-FUNCTION-001, meaning: "Function-specific Survey inputs are missing or contradictory."}
+  - {id: SV-REAL-EXECUTION-001, meaning: "Real Survey execute lacks an approved pinned Questionnaire or its approval decisions."}
+  - {id: SV-RESULT-DIGEST-001, meaning: "Survey result extension digest does not match canonical content."}
+  - {id: SV-RESULT-BINDING-001, meaning: "Survey result extension does not exactly bind its PR12 Research Method result and PR9 Handoff."}
+  - {id: SV-RESPONSE-EVIDENCE-001, meaning: "A raw Survey response is treated as verified/adopted Evidence."}
+  - {id: SV-DISPOSITION-001, meaning: "Sample/response disposition is internally inconsistent or excluded responses lack reasons."}
+  - {id: SV-MISSINGNESS-001, meaning: "Missingness, nonresponse, dropout, or partial response is hidden or discarded."}
+  - {id: SV-DUPLICATE-001, meaning: "Duplicate-response handling is inconsistent with the declared execution policy or disposition."}
+  - {id: SV-ANALYSIS-DENOMINATOR-001, meaning: "Item-level denominator, missingness, or exclusion accounting is inconsistent."}
+  - {id: SV-ANALYSIS-AUTHORITY-001, meaning: "Survey aggregate/statistic/coding output is treated as authoritative Core Analysis or Finding."}
+  - {id: SV-SUBGROUP-PROVENANCE-001, meaning: "Subgroup or free-text coding output lacks reproducible definition/provenance."}
+  - {id: SV-EPISTEMIC-MODE-001, meaning: "Virtual/synthetic Survey output is marked or promoted as empirical."}
+  - {id: SV-SUFFICIENCY-001, meaning: "Target-sample achievement is equated with research sufficiency."}
+  - {id: SV-CONVERSATION-DECISION-001, meaning: "Conversational confirmation substitutes for Questionnaire approval/material-revision Human Decision."}
