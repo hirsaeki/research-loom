@@ -1,0 +1,16 @@
+{
+  "utterance": "このSurveyを仮想実行して問題を洗って",
+  "action_proposal": {
+    "schema_version":"0.1.0","message_type":"action_proposal","proposal_id":"PROP-VR-1","conversation_id":"CONV-1","project_id":"PROJ-1",
+    "source":{"source_type":"human_input","input_id":"INPUT-VR-1"},
+    "initiating_actor":{"actor_id":"HUMAN-1","actor_type":"human"},
+    "action":{"action_type":"virtual_runner.execute","effect":"state_changing","payload_contract":"virtual-runner-contract@0.1.0","payload":{"scenario_class":"STANDARD","method_family":"survey","context_extension_digest":"sha256:2222222222222222222222222222222222222222222222222222222222222222"},"payload_digest":"sha256:1111111111111111111111111111111111111111111111111111111111111111"},
+    "commitment_mode":"proposal_only","confirmation_policy":{"required_on_commit":true,"human_confirmation_only":true},
+    "human_decision_boundary":{"required":false,"confirmation_is_human_decision":false,"decision_reference_ids":[]},
+    "bindings":{"current_state":{"state_id":"STATE-1","revision":3,"content_digest":"sha256:3333333333333333333333333333333333333333333333333333333333333333"},"research_context":{"project_config_digest":"sha256:7777777777777777777777777777777777777777777777777777777777777777","effective_profile_set_digest":"sha256:8888888888888888888888888888888888888888888888888888888888888888","research_snapshot":{"snapshot_id":"SNAP-1","revision":4,"content_digest":"sha256:9999999999999999999999999999999999999999999999999999999999999999"}}},
+    "route":{"route_type":"capability_invocation","invocation_contract":"capability-invocation@0.1.0","capability":{"capability_id":"fixture.virtual-runner","capability_version":"0.1.0","descriptor_digest":"sha256:a84af5e7b5a3abbb5a10c9ed0c1ce71ccadeb65a966619437c6d5a22e59a7aab","function_id":"execute"},"execution_mode":"virtual","context_pack":{"context_pack_id":"CTX-VR-1","context_pack_digest":"sha256:1111111111111111111111111111111111111111111111111111111111111111"}},
+    "created_at":"2026-08-25T00:00:00Z","proposal_digest":"sha256:4444444444444444444444444444444444444444444444444444444444444444"
+  },
+  "candidate_only_actions": ["add_standard_run","add_stress_run","revise_protocol","cutover_real"],
+  "auto_adopted": false
+}

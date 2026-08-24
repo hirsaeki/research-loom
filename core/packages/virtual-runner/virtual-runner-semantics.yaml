@@ -1,0 +1,112 @@
+schema_version: "0.1.0"
+capability:
+  capability_kind: execution_backend.virtual_runner
+  research_method_family: false
+  canonical_function_id: execute
+  execution_mode: virtual
+  scenario_classes: [STANDARD, STRESS]
+  pr9_input_contract: capability-context-pack@0.1.0
+  pr9_output_contract: capability-handoff@0.1.0
+  pr12_binding: research-method-context-extension@0.1.0
+  method_selection_performed: false
+  method_adoption_performed: false
+  protocol_generation_performed: false
+  protocol_approval_performed: false
+  instrument_generation_performed: false
+  instrument_approval_performed: false
+supported_method_binding:
+  canonical_fixtures: [survey, delphi]
+  method_family_neutral_extension: true
+  method_specific_semantics_are_referenced_not_redefined: true
+virtual_input:
+  adopted_core_method_required: true
+  approved_protocol_required: true
+  approved_instrument_required_where_applicable: true
+  runspec_pin_required: true
+  pr9_project_profile_snapshot_pins_required: true
+  runtime_authorization_required: true
+synthetic_population:
+  real_person_claimed: false
+  empirical_distribution_claimed: false
+  target_population_representation_claimed: false
+  real_identity_mapping_permitted: false
+  synthetic_real_identity_namespace_collision_permitted: false
+generation_provenance:
+  provenance_complete_required: true
+  replay_attempt_capable_required: true
+  byte_identical_rerun_assumed: false
+  seed_is_proof_of_determinism: false
+scenario_semantics:
+  STANDARD: normal completion, approved branching, expected ranges, standard missingness, and normal analysis-pipeline paths
+  STRESS: incomplete, dropout, nonresponse, contradiction, extremes, branching edges, malformed or unavailable input, duplicates, attrition, no-consensus, and method-bounded limit paths
+  scenario_class_is_execution_mode: false
+epistemic_firewall:
+  virtual_evidence_status: SYNTHETIC_TEST_ONLY
+  virtual_response_is_empirical_response: false
+  virtual_observation_is_empirical_observation: false
+  virtual_evidence_candidate_is_empirical_evidence: false
+  virtual_analysis_candidate_is_core_analysis: false
+  virtual_finding_candidate_is_authoritative_finding: false
+  synthetic_consensus_is_expert_consensus: false
+  synthetic_case_pattern_is_empirical_case_pattern: false
+  virtual_run_may_authoritatively_answer_rq: false
+  virtual_preview_may_be_candidate_snapshot_or_package: true
+  virtual_preview_is_authoritative_research_freeze: false
+  virtual_preview_may_promote_to_real_manuscript: false
+defects:
+  taxonomy: [DESIGN_DEFECT, INSTRUMENT_DEFECT, SCHEMA_DEFECT, EXECUTION_DEFECT, ANALYSIS_PIPELINE_DEFECT, GATE_DEFECT, IMPLEMENTATION_DEFECT, UNKNOWN]
+  correction_is_candidate_change_request: true
+  runner_applies_authoritative_correction: false
+iteration:
+  past_runs_are_immutable: true
+  revised_artifact_requires_new_version_and_digest: true
+  revision_requires_new_virtual_run: true
+cutover:
+  explicit_boundary_required: true
+  execution_mode_flip_is_cutover: false
+  readiness_is_candidate_assessment: true
+  threshold_and_required_run_count_owned_by: [project, profile, protocol]
+  universal_core_threshold_forbidden: true
+  freeze_package_approves_virtual_results: false
+  freeze_package_pins_real_design_and_implementation: true
+  real_execution_started_by_virtual_runner: false
+  real_start_requires_separate_authorized_invocation: true
+real_isolation:
+  new_run_root_required: true
+  new_run_id_required: true
+  execution_mode: real
+  new_runtime_authorization_required: true
+  access_zone_owner_permission_context_required: true
+  isolated_raw_data_namespace_required: true
+  synthetic_content_transfer_forbidden: true
+  reusable_material: [approved_method_design, approved_protocol, approved_instrument, schema, prompt_template, executable_code_pin, gate_definition, defect_history, resolved_change_history, validation_result, cutover_manifest, design_rationale]
+cross_run_comparison:
+  allowed_purposes: [protocol_behavior, implementation_behavior, expected_edge_case_coverage, execution_divergence]
+  virtual_prediction_matching_real_strengthens_evidence: false
+human_gate:
+  conversation_confirmation_is_cutover_approval: false
+  core_human_decision_may_be_required: true
+  decision_and_frozen_digests_recorded_in_cutover_manifest: true
+harness_boundary:
+  authoritative_write_boundary: harness
+  runner_research_state_mutation_performed: false
+  candidate_next_actions_only: true
+  candidate_readiness_only: true
+errors:
+  - {id: VR-DESCRIPTOR-001, meaning: "Virtual Runner descriptor violates execution-backend, function, mode, or PR9-envelope conventions."}
+  - {id: VR-CONTEXT-DIGEST-001, meaning: "Virtual Runner Context digest does not match canonical content."}
+  - {id: VR-CONTEXT-BINDING-001, meaning: "Virtual Runner Context does not bind the exact PR9 Context Pack/project/pins/runtime authorization."}
+  - {id: VR-METHOD-BINDING-001, meaning: "Virtual Runner does not bind an approved PR12 execute Method/Protocol/Instrument/RunSpec without redefining method semantics."}
+  - {id: VR-SYNTHETIC-PROVENANCE-001, meaning: "Synthetic generation provenance is incomplete or claims deterministic reproducibility unsupported by the contract."}
+  - {id: VR-IDENTITY-COLLISION-001, meaning: "Synthetic identity namespace collides with or maps into a REAL participant identity namespace."}
+  - {id: VR-RESULT-DIGEST-001, meaning: "Virtual Runner result digest does not match canonical content."}
+  - {id: VR-RESULT-BINDING-001, meaning: "Virtual Runner result does not bind the exact VIRTUAL invocation/context/scenario."}
+  - {id: VR-EPISTEMIC-FIREWALL-001, meaning: "Synthetic output is marked, adopted, or promoted as empirical/authoritative research content."}
+  - {id: VR-DEFECT-AUTHORITY-001, meaning: "Virtual Runner applies an authoritative correction instead of returning a defect/change proposal."}
+  - {id: VR-READINESS-001, meaning: "Cutover readiness contradicts required runs, unresolved blockers, or defect state."}
+  - {id: VR-FREEZE-STALE-001, meaning: "REAL freeze package has a missing or stale content pin."}
+  - {id: VR-HUMAN-DECISION-001, meaning: "Required Core Human Decision is absent or replaced by conversational confirmation."}
+  - {id: VR-REAL-ISOLATION-001, meaning: "REAL execution does not start with a new isolated root/run/authorization/access/raw-data namespace."}
+  - {id: VR-VIRTUAL-COPY-001, meaning: "Synthetic VIRTUAL research content or participant identity is copied or promoted into REAL."}
+  - {id: VR-RUNTIME-AUTH-001, meaning: "Required runtime authorization binding is absent or inconsistent."}
+  - {id: VR-CONVERSATION-DECISION-001, meaning: "Research Coordinator auto-adopts a virtual rerun, revision, or REAL cutover proposal."}
