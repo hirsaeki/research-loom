@@ -97,31 +97,53 @@ class ResearchMethodContracts(unittest.TestCase):
         self.assertEqual(self._context_error(case, context=context), "RM-CONTEXT-BINDING-001")
 
         source_handoff = deepcopy(self.gap_handoff)
-        source_handoff["input_pins"]["context_pack_digest"] = "sha256:" + "0" * 64
-        # Do not refresh handoff_digest: this verifies RFC 8785 Handoff tamper
-        # detection, not equality with the current Context Pack digest.
+        source_handoff["outputs"]["evidence_gaps"][0]["statement"] = "Tampered after the Handoff digest was computed."
+        # Keep all Context Pack bindings valid and do not refresh handoff_digest:
+        # only RFC 8785 Handoff digest recomputation should detect this mutation.
         self.assertEqual(self._context_error(self.context_extension, handoff=source_handoff), "RM-CONTEXT-BINDING-001")
 
     def test_schema_enforces_function_specific_inputs(self):
         validator = Draft202012Validator(self.context_schema)
 
+        def assert_rule(document, validator_name, path):
+            errors = list(validator.iter_errors(document))
+            self.assertTrue(
+                any(error.validator == validator_name and list(error.absolute_path) == path for error in errors),
+                [f"{error.validator}:{list(error.absolute_path)}:{error.message}" for error in errors],
+            )
+
         execute = deepcopy(self.context_extension)
         execute["run_spec"] = None
         refresh(execute)
-        self.assertTrue(list(validator.iter_errors(execute)))
+        assert_rule(execute, "not", ["run_spec"])
+
+        instrument_control = deepcopy(execute)
+        instrument_control["function_id"] = "instrument_design"
+        refresh(instrument_control)
+        self.assertEqual(list(validator.iter_errors(instrument_control)), [])
 
         method_design = deepcopy(self.context_extension)
         method_design["function_id"] = "method_design"
         method_design["run_spec"] = None
         method_design["prior_run_result_refs"] = [{"id":"RRES-OLD","version":"1.0.0","content_digest":"sha256:"+"c"*64}]
         refresh(method_design)
-        self.assertTrue(list(validator.iter_errors(method_design)))
+        assert_rule(method_design, "maxItems", ["prior_run_result_refs"])
+
+        analyze_control = deepcopy(method_design)
+        analyze_control["function_id"] = "analyze"
+        refresh(analyze_control)
+        self.assertEqual(list(validator.iter_errors(analyze_control)), [])
 
         analyze = deepcopy(self.context_extension)
         analyze["function_id"] = "analyze"
         analyze["prior_run_result_refs"] = []
         refresh(analyze)
-        self.assertTrue(list(validator.iter_errors(analyze)))
+        assert_rule(analyze, "minItems", ["prior_run_result_refs"])
+
+        execute_control = deepcopy(analyze)
+        execute_control["function_id"] = "execute"
+        refresh(execute_control)
+        self.assertEqual(list(validator.iter_errors(execute_control)), [])
 
     def test_real_execute_requires_adopted_method_and_human_decisions(self):
         case = deepcopy(self.context_extension)
@@ -148,14 +170,27 @@ class ResearchMethodContracts(unittest.TestCase):
         self.assertEqual(self._context_error(case, "virtual"), None)
 
     def test_instrument_design_requires_method_and_protocol(self):
-        case = deepcopy(self.context_extension)
-        case["function_id"] = "instrument_design"
-        case["run_spec"] = None
-        case["protocol_basis"] = None
-        refresh(case)
-        errors = list(Draft202012Validator(self.context_schema).iter_errors(case))
-        self.assertTrue(errors)
-        self.assertEqual(self._context_error(case), "RM-FUNCTION-001")
+        validator = Draft202012Validator(self.context_schema)
+        instrument = deepcopy(self.context_extension)
+        instrument["function_id"] = "instrument_design"
+        instrument["run_spec"] = None
+        refresh(instrument)
+        self.assertEqual(list(validator.iter_errors(instrument)), [])
+        self.assertEqual(self._context_error(instrument), None)
+
+        missing_method = deepcopy(instrument)
+        missing_method["method_basis"] = None
+        refresh(missing_method)
+        method_errors = list(validator.iter_errors(missing_method))
+        self.assertTrue(any(error.validator == "not" and list(error.absolute_path) == ["method_basis"] for error in method_errors), method_errors)
+        self.assertEqual(self._context_error(missing_method), "RM-FUNCTION-001")
+
+        missing_protocol = deepcopy(instrument)
+        missing_protocol["protocol_basis"] = None
+        refresh(missing_protocol)
+        protocol_errors = list(validator.iter_errors(missing_protocol))
+        self.assertTrue(any(error.validator == "not" and list(error.absolute_path) == ["protocol_basis"] for error in protocol_errors), protocol_errors)
+        self.assertEqual(self._context_error(missing_protocol), "RM-FUNCTION-001")
 
     def test_function_specific_inputs(self):
         case = deepcopy(self.context_extension)
