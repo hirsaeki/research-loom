@@ -38,8 +38,8 @@
       {"response_id":"R2","raw_data_ref_id":"DATA-2","response_status":"complete","eligibility_status":"eligible","response_timestamp":"2026-08-24T01:01:00Z","epistemic_mode":"empirical","duplicate_disposition":"not_duplicate","verified_evidence_claimed":false}
     ],
     "sample_disposition":{"eligible_count":3,"response_count":2,"completed_count":2,"partial_count":0,"nonresponse_count":1,"dropout_count":0,"excluded_response_count":0,"duplicate_flagged_count":0},
-    "item_summaries":[],"aggregation_provenance_ref":"fixture://survey/aggregation","subgroup_provenance_refs":[],"free_text_coding_refs":[],"limitations":["Nonresponse preserved."],"response_bias_candidate":{"status":"candidate"},"missing_data_preserved":true,"target_sample_achieved":true,"research_sufficiency_claimed":false,"aggregate_is_finding":false,"finding_adoption_performed":false,"synthetic_responses_may_be_empirical":false,
-    "extension_digest":"sha256:e0b0110cf7a1a34ce7a0b1dfb30466de5a16b29f9e0420c1d03754fd937f0d57"
+    "item_summaries":[],"aggregation_provenance_ref":"fixture://survey/aggregation","subgroup_provenance_refs":[],"free_text_coding_refs":[],"limitations":["Nonresponse preserved."],"response_bias_candidate":{"status":"candidate"},"missing_data_preserved":true,"target_sample_achieved":false,"research_sufficiency_claimed":false,"aggregate_is_finding":false,"finding_adoption_performed":false,"synthetic_responses_may_be_empirical":false,
+    "extension_digest":"sha256:f5ad3c33ad6f34d8d296ebdc35debcf15eeeac0ea1110f42becdf0fea2310d4f"
   },
   "partial_nonresponse": {
     "schema_version":"0.1.0","object_type":"survey_result_extension","research_method_result_digest":"sha256:3333333333333333333333333333333333333333333333333333333333333333",
