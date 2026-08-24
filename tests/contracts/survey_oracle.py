@@ -82,7 +82,7 @@ def context_error(extension, design, questionnaire, execution_mode):
     return None
 
 
-def result_error(result, execution_mode):
+def result_error(result, execution_mode, design):
     if result.get("extension_digest") != canonical_digest(result, "extension_digest"):
         return "SV-RESULT-DIGEST-001"
     expected_epistemic_mode = EPISTEMIC_MODE_BY_EXECUTION.get(execution_mode)
@@ -99,6 +99,13 @@ def result_error(result, execution_mode):
     if disposition.get("partial_count", 0) or disposition.get("nonresponse_count", 0) or disposition.get("dropout_count", 0):
         if result.get("missing_data_preserved") is not True:
             return "SV-MISSINGNESS-001"
+
+    target_count = design.get("target_sample", {}).get("target_count")
+    if isinstance(target_count, int):
+        expected_target_achieved = disposition.get("completed_count", 0) >= target_count
+        if result.get("target_sample_achieved") is not expected_target_achieved:
+            return "SV-TARGET-SAMPLE-001"
+
     for item in result.get("item_summaries", []):
         if item.get("denominator_count") != item.get("answered_count", 0) + item.get("missing_count", 0) + item.get("excluded_count", 0):
             return "SV-ANALYSIS-DENOMINATOR-001"
