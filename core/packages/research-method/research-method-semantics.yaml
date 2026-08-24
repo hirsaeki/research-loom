@@ -1,0 +1,84 @@
+schema_version: "0.1.0"
+capability_family:
+  kind_prefix: research_method.
+  generic_input_contract: capability-context-pack@0.1.0
+  generic_output_contract: capability-handoff@0.1.0
+  implementation_boundary: plugin
+  canonical_function_ids: [method_design, instrument_design, execute, analyze]
+  function_meanings:
+    method_design: propose a method design for bounded Research Questions and Evidence Gaps without adopting a Core Method
+    instrument_design: propose a versioned instrument bound to method/protocol context without making it authoritative
+    execute: execute one pinned RunSpec under one pinned Protocol and preserve raw data, missingness, validity threats, and completion status
+    analyze: analyze one or more pinned Run results and return candidate Analysis/Finding material through PR9 Handoff
+context:
+  extension_contract: research-method-context-extension@0.1.0
+  exact_pr9_context_binding_required: true
+  question_and_gap_targeting_required: true
+  project_config_profile_snapshot_binding_owned_by: capability-context-pack@0.1.0
+  availability_or_permission_hint_is_runtime_authorization: false
+method_authority:
+  generated_method_design_is_core_method: false
+  capability_self_adopts_method: false
+  adopted_method_is_core_method_with_approved_adoption_state: true
+  method_adoption_requires_human_decision: true
+protocol_and_instrument:
+  protocol_is_versioned_and_content_pinned: true
+  instrument_is_versioned_and_content_pinned: true
+  generated_protocol_is_candidate_only: true
+  generated_instrument_is_candidate_only: true
+  material_protocol_revision_requires_human_decision: true
+  repeated_run_under_approved_pinned_protocol_requires_new_research_decision: false
+execution:
+  modes: [real, virtual, synthetic_test]
+  real_execute_requires_adopted_core_method: true
+  real_execute_requires_approved_protocol: true
+  run_spec_is_versioned_and_content_pinned: true
+  run_identity_owned_by: capability-invocation@0.1.0
+  runtime_authorization_owned_by: capability-invocation@0.1.0
+  virtual_or_synthetic_may_use_candidate_design: true
+raw_data:
+  raw_observation_response_or_measurement_is_verified_evidence: false
+  evidence_adoption_performed: false
+  preserve_missingness_dropout_unavailable_data: true
+  preserve_partial_incomplete_failed_runs: true
+  preserve_validity_threats_limitations_and_coverage: true
+analysis:
+  candidate_analysis_is_core_analysis: false
+  analysis_output_is_adopted_finding: false
+  candidate_findings_must_reference_pr9_handoff_candidates: true
+handoff:
+  canonical_wire_format: capability-handoff@0.1.0
+  second_method_handoff_forbidden: true
+  result_extension_contract: research-method-result-extension@0.1.0
+  exact_handoff_binding_required: true
+  research_state_mutation_performed: false
+  candidate_next_actions_only: true
+epistemic_boundary:
+  real_raw_data_may_be_empirical_candidate_material: true
+  virtual_and_synthetic_raw_data_must_not_be_empirical: true
+  virtual_or_synthetic_output_may_not_be_promoted_to_empirical_evidence: true
+quality_boundary:
+  method_family_requirements_owned_by: research_profile
+  research_quality_requirements_owned_by: research_profile
+  method_specific_terminology_canonicalized_here: false
+conversation_boundary:
+  confirmation_is_human_decision: false
+  adoption_or_material_revision_decision_cannot_be_replaced_by_confirmation: true
+errors:
+  - {id: RM-DESCRIPTOR-001, meaning: "Research Method descriptor does not follow canonical family/function conventions."}
+  - {id: RM-CONTEXT-DIGEST-001, meaning: "Research Method Context extension digest does not match canonical content."}
+  - {id: RM-CONTEXT-BINDING-001, meaning: "Research Method Context extension does not bind the exact PR9 Context Pack/project/questions."}
+  - {id: RM-FUNCTION-001, meaning: "Function-specific Research Method inputs are missing or contradictory."}
+  - {id: RM-METHOD-AUTHORITY-001, meaning: "A capability attempts to self-adopt a Method or treat a generated MethodDesign as authoritative."}
+  - {id: RM-METHOD-DECISION-001, meaning: "Real execution lacks the Human Decision that adopted the referenced Core Method."}
+  - {id: RM-PROTOCOL-001, meaning: "Protocol/RunSpec/Instrument version or content pin is missing or inconsistent."}
+  - {id: RM-PROTOCOL-DECISION-001, meaning: "A material Protocol revision lacks a Human Decision binding."}
+  - {id: RM-REAL-EXECUTION-001, meaning: "Real execute is attempted without an approved Core Method and approved pinned Protocol."}
+  - {id: RM-RESULT-DIGEST-001, meaning: "Research Method result extension digest does not match canonical content."}
+  - {id: RM-RESULT-BINDING-001, meaning: "Result extension does not bind the exact PR9 Handoff/Invocation/Run/Context."}
+  - {id: RM-RAW-EVIDENCE-001, meaning: "Raw method data is treated as adopted or verified Evidence."}
+  - {id: RM-EPISTEMIC-MODE-001, meaning: "Virtual or synthetic method output is marked or promoted as empirical."}
+  - {id: RM-COMPLETION-001, meaning: "Partial/incomplete/failed run state or associated missingness/limitations is lost."}
+  - {id: RM-ANALYSIS-001, meaning: "Candidate Analysis is treated as authoritative Core Analysis or adopted Finding."}
+  - {id: RM-HANDOFF-CANDIDATE-001, meaning: "Result extension drops or invents PR9 candidate Finding/next-action/next-method references."}
+  - {id: RM-CONVERSATION-DECISION-001, meaning: "Conversational confirmation is used as a substitute for required Human Decision authority."}

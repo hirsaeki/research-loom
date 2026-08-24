@@ -1,0 +1,16 @@
+{
+  "schema_version": "0.1.0",
+  "capability_id": "fixture.research-method",
+  "capability_version": "0.1.0",
+  "capability_kind": "research_method.fixture",
+  "implementation_boundary": "plugin",
+  "declared_functions": [
+    {"function_id":"method_design","description":"Propose bounded method design material without adopting a Core Method.","supported_execution_modes":["real","virtual","synthetic_test"],"input_contract":"capability-context-pack@0.1.0","output_contract":"capability-handoff@0.1.0"},
+    {"function_id":"instrument_design","description":"Propose a versioned instrument bound to method and protocol context.","supported_execution_modes":["real","virtual","synthetic_test"],"input_contract":"capability-context-pack@0.1.0","output_contract":"capability-handoff@0.1.0"},
+    {"function_id":"execute","description":"Execute one pinned RunSpec under one pinned Protocol and preserve raw data and run quality metadata.","supported_execution_modes":["real","virtual","synthetic_test"],"input_contract":"capability-context-pack@0.1.0","output_contract":"capability-handoff@0.1.0"},
+    {"function_id":"analyze","description":"Analyze pinned Run results and return candidate-only research outputs through the PR9 Handoff.","supported_execution_modes":["real","virtual","synthetic_test"],"input_contract":"capability-context-pack@0.1.0","output_contract":"capability-handoff@0.1.0"}
+  ],
+  "availability":{"declaration":"conditional","rationale":"The canonical contract exists; concrete method runtimes and authorization remain separate."},
+  "compatibility":{"core_research_contract":"0.1.0","project_config_contract":"0.1.0","effective_profile_set_contract":"0.1.0"},
+  "descriptor_digest":"sha256:3082d290a0de6b72dbb9b312f247226708ac112af7a970e5c7ba698c85898c43"
+}

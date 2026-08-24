@@ -1,0 +1,15 @@
+{
+  "fixture_version":"0.1.0",
+  "description":"PR10 Conversation route into a real Research Method execute invocation. Confirmation commits the proposal but is not the Human Decision that adopted the method or material protocol revision.",
+  "action_proposal":{
+    "schema_version":"0.1.0","message_type":"action_proposal","proposal_id":"P-RM-ROUTE-001","conversation_id":"CONV-RM-001","project_id":"PRJ-1",
+    "source":{"source_type":"human_input","input_id":"IN-RM-001"},"initiating_actor":{"actor_id":"HUMAN-1","actor_type":"human"},
+    "action":{"action_type":"research.method.fixture.execute","effect":"state_changing","payload_contract":"research-method-context-extension@0.1.0","payload":{"context_extension_digest":"sha256:7a7036f1f26be1a355ff8b981a2c98613a3b3c60ef01c394fbb3a78bdcbd6216"},"payload_digest":"sha256:75d29cb2e4940913804bac8fdb050cbb8fd2616447bcea85c5ddd9c6182b5115"},
+    "commitment_mode":"proposal_only","confirmation_policy":{"required_on_commit":true,"human_confirmation_only":true},
+    "human_decision_boundary":{"required":true,"confirmation_is_human_decision":false,"decision_reference_ids":["DEC-METHOD-1","DEC-PROTOCOL-1"]},
+    "bindings":{"current_state":{"state_id":"STATE-RM-001","revision":0,"content_digest":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"research_context":{"project_config_digest":"sha256:9fa677cbca9f50f54055021d8c1f0febfe636795a96931174f2aef6052fb13fb","effective_profile_set_digest":"sha256:ab4631d96e1d81f6f8cb3fda8d62dc5fbf5c7500895001cb91f16f803d336e17","research_snapshot":{"snapshot_id":"SNP-1","revision":0,"content_digest":"sha256:eb0b25b360df904b109f94bf5cdb3d4a7e3d59fca40fc48a1f95ffca26657391"}}},
+    "route":{"route_type":"capability_invocation","invocation_contract":"capability-invocation@0.1.0","capability":{"capability_id":"fixture.research-method","capability_version":"0.1.0","descriptor_digest":"sha256:3082d290a0de6b72dbb9b312f247226708ac112af7a970e5c7ba698c85898c43","function_id":"execute"},"execution_mode":"real","context_pack":{"context_pack_id":"CTX-RM-001","context_pack_digest":"sha256:383d0f44f14771eec2a8a868a10a3fcf1794656850bb81d819181b643b4dda81"}},
+    "created_at":"2026-08-24T00:00:00Z","proposal_digest":"sha256:7228a3a21871b53847a05860ebd7bda3b4dbc115686951606410f2d936c256a8"
+  },
+  "expected_context_extension_digest":"sha256:7a7036f1f26be1a355ff8b981a2c98613a3b3c60ef01c394fbb3a78bdcbd6216"
+}
