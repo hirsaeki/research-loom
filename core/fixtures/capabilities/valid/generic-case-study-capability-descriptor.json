@@ -1,0 +1,47 @@
+{
+  "schema_version": "0.1.0",
+  "capability_id": "fixture.case-study",
+  "capability_version": "0.1.0",
+  "capability_kind": "research_method.case_study",
+  "implementation_boundary": "plugin",
+  "declared_functions": [
+    {
+      "function_id": "method_design",
+      "description": "Propose bounded Case Study method-design candidate material without adopting a Core Method.",
+      "supported_execution_modes": ["real", "virtual", "synthetic_test"],
+      "input_contract": "capability-context-pack@0.1.0",
+      "output_contract": "capability-handoff@0.1.0"
+    },
+    {
+      "function_id": "instrument_design",
+      "description": "Propose a versioned Case Protocol, extraction template, coding frame, and observation guide without approving them.",
+      "supported_execution_modes": ["real", "virtual", "synthetic_test"],
+      "input_contract": "capability-context-pack@0.1.0",
+      "output_contract": "capability-handoff@0.1.0"
+    },
+    {
+      "function_id": "execute",
+      "description": "Execute pinned Case Study runs while preserving case boundaries, observation provenance, missingness, contradictions, and negative evidence.",
+      "supported_execution_modes": ["real", "virtual", "synthetic_test"],
+      "input_contract": "capability-context-pack@0.1.0",
+      "output_contract": "capability-handoff@0.1.0"
+    },
+    {
+      "function_id": "analyze",
+      "description": "Produce candidate within-case and cross-case analyses, rival explanations, validity threats, and stopping recommendations without adopting Findings.",
+      "supported_execution_modes": ["real", "virtual", "synthetic_test"],
+      "input_contract": "capability-context-pack@0.1.0",
+      "output_contract": "capability-handoff@0.1.0"
+    }
+  ],
+  "availability": {
+    "declaration": "conditional",
+    "rationale": "Contract only; runtime and authorization are separate."
+  },
+  "compatibility": {
+    "core_research_contract": "0.1.0",
+    "project_config_contract": "0.1.0",
+    "effective_profile_set_contract": "0.1.0"
+  },
+  "descriptor_digest": "sha256:8b42b48601e4fbed835b36d018b9232143ab20be3597696756ec76fee3bc9d86"
+}
