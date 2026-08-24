@@ -120,14 +120,21 @@ class SurveyContracts(unittest.TestCase):
         self.assertEqual(context_error(stale, design, questionnaire, "real"), "SV-CONTEXT-DIGEST-001")
 
     def test_real_execution_keeps_nonresponse_sufficiency_and_datetime_boundary(self):
+        design = self.fixtures["design"]
         result = self.fixtures["real"]
         self.assertEqual(list(self._validator().iter_errors(result)), [])
-        self.assertEqual(result_error(result, "real"), None)
+        self.assertEqual(result_error(result, "real", design), None)
         self.assertEqual(result["extension_digest"], canonical_digest(result, "extension_digest"))
         self.assertEqual(result["sample_disposition"]["nonresponse_count"], 1)
         self.assertFalse(result["target_sample_achieved"])
         self.assertFalse(result["research_sufficiency_claimed"])
         self.assertTrue(all(not r["verified_evidence_claimed"] for r in result["responses"]))
+
+        false_achievement = deepcopy(result)
+        false_achievement["target_sample_achieved"] = True
+        refresh(false_achievement, "extension_digest")
+        self.assertEqual(result_error(false_achievement, "real", design), "SV-TARGET-SAMPLE-001")
+
         invalid_time = deepcopy(result)
         invalid_time["responses"][0]["response_timestamp"] = "not-a-date-time"
         refresh(invalid_time, "extension_digest")
@@ -139,12 +146,13 @@ class SurveyContracts(unittest.TestCase):
         self.assertTrue(any(contains_format(error) for error in errors), errors)
         stale = deepcopy(result)
         stale["limitations"].append("Changed without digest update.")
-        self.assertEqual(result_error(stale, "real"), "SV-RESULT-DIGEST-001")
+        self.assertEqual(result_error(stale, "real", design), "SV-RESULT-DIGEST-001")
 
     def test_partial_nonresponse_preserves_missingness_and_duplicate_disposition(self):
+        design = self.fixtures["design"]
         result = self.fixtures["partial_nonresponse"]
         self.assertEqual(list(self._validator().iter_errors(result)), [])
-        self.assertEqual(result_error(result, "real"), None)
+        self.assertEqual(result_error(result, "real", design), None)
         disposition = result["sample_disposition"]
         self.assertGreater(disposition["partial_count"], 0)
         self.assertGreater(disposition["dropout_count"], 0)
@@ -153,44 +161,47 @@ class SurveyContracts(unittest.TestCase):
         self.assertTrue(any(r["duplicate_disposition"] == "excluded" for r in result["responses"]))
 
     def test_execution_mode_requires_matching_epistemic_mode(self):
+        design = self.fixtures["design"]
         real = self.fixtures["real"]
-        self.assertEqual(result_error(real, "real"), None)
+        self.assertEqual(result_error(real, "real", design), None)
         wrong_real = deepcopy(real)
         wrong_real["responses"][0]["epistemic_mode"] = "synthetic"
         refresh(wrong_real, "extension_digest")
-        self.assertEqual(result_error(wrong_real, "real"), "SV-EPISTEMIC-MODE-001")
+        self.assertEqual(result_error(wrong_real, "real", design), "SV-EPISTEMIC-MODE-001")
 
         synthetic = self.fixtures["synthetic_test"]
-        self.assertEqual(result_error(synthetic, "synthetic_test"), None)
+        self.assertEqual(result_error(synthetic, "synthetic_test", design), None)
         wrong_synthetic = deepcopy(synthetic)
         wrong_synthetic["responses"][0]["epistemic_mode"] = "empirical"
         refresh(wrong_synthetic, "extension_digest")
-        self.assertEqual(result_error(wrong_synthetic, "synthetic_test"), "SV-EPISTEMIC-MODE-001")
+        self.assertEqual(result_error(wrong_synthetic, "synthetic_test", design), "SV-EPISTEMIC-MODE-001")
 
         virtual = deepcopy(synthetic)
         virtual["responses"][0]["epistemic_mode"] = "virtual"
         refresh(virtual, "extension_digest")
         self.assertEqual(list(self._validator().iter_errors(virtual)), [])
-        self.assertEqual(result_error(virtual, "virtual"), None)
+        self.assertEqual(result_error(virtual, "virtual", design), None)
         wrong_virtual = deepcopy(virtual)
         wrong_virtual["responses"][0]["epistemic_mode"] = "synthetic"
         refresh(wrong_virtual, "extension_digest")
-        self.assertEqual(result_error(wrong_virtual, "virtual"), "SV-EPISTEMIC-MODE-001")
+        self.assertEqual(result_error(wrong_virtual, "virtual", design), "SV-EPISTEMIC-MODE-001")
 
     def test_synthetic_test_cannot_claim_empirical_or_finding_authority(self):
+        design = self.fixtures["design"]
         result = self.fixtures["synthetic_test"]
         self.assertEqual(list(self._validator().iter_errors(result)), [])
-        self.assertEqual(result_error(result, "synthetic_test"), None)
+        self.assertEqual(result_error(result, "synthetic_test", design), None)
         self.assertTrue(all(r["epistemic_mode"] == "synthetic" for r in result["responses"]))
         empirical = deepcopy(result)
         empirical["responses"][0]["epistemic_mode"] = "empirical"
         refresh(empirical, "extension_digest")
-        self.assertEqual(result_error(empirical, "synthetic_test"), "SV-EPISTEMIC-MODE-001")
+        self.assertEqual(result_error(empirical, "synthetic_test", design), "SV-EPISTEMIC-MODE-001")
 
     def test_analysis_fixture_has_item_denominators_provenance_and_candidate_authority(self):
+        design = self.fixtures["design"]
         result = self.fixtures["analysis"]
         self.assertEqual(list(self._validator().iter_errors(result)), [])
-        self.assertEqual(result_error(result, "real"), None)
+        self.assertEqual(result_error(result, "real", design), None)
         self.assertTrue(result["item_summaries"])
         for item in result["item_summaries"]:
             self.assertEqual(item["denominator_count"], item["answered_count"] + item["missing_count"] + item["excluded_count"])
@@ -201,7 +212,7 @@ class SurveyContracts(unittest.TestCase):
         bad_denominator = deepcopy(result)
         bad_denominator["item_summaries"][0]["denominator_count"] += 1
         refresh(bad_denominator, "extension_digest")
-        self.assertEqual(result_error(bad_denominator, "real"), "SV-ANALYSIS-DENOMINATOR-001")
+        self.assertEqual(result_error(bad_denominator, "real", design), "SV-ANALYSIS-DENOMINATOR-001")
 
     def test_pr10_routing_keeps_pr9_invocation_and_human_decision_boundary(self):
         proposal = self.routing["action_proposal"]
