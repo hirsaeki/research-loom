@@ -1,0 +1,281 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:research-loom:core:survey-design:0.1.0",
+  "title": "research-loom canonical Survey method design",
+  "description": "Survey-specific MethodDesign candidate material. It defines population, sampling, recruitment, stopping, and representativeness assumptions without becoming an authoritative Core Method.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "survey_design_id",
+    "version",
+    "method_design_ref",
+    "target_population",
+    "sampling_frame",
+    "sampling_strategy",
+    "eligibility",
+    "recruitment",
+    "target_sample",
+    "representativeness",
+    "candidate_only",
+    "content_digest"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "survey_design_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+    },
+    "method_design_ref": {
+      "$ref": "#/$defs/method_design_ref"
+    },
+    "target_population": {
+      "$ref": "#/$defs/target_population"
+    },
+    "sampling_frame": {
+      "$ref": "#/$defs/sampling_frame"
+    },
+    "sampling_strategy": {
+      "$ref": "#/$defs/sampling_strategy"
+    },
+    "eligibility": {
+      "$ref": "#/$defs/eligibility"
+    },
+    "recruitment": {
+      "$ref": "#/$defs/recruitment"
+    },
+    "target_sample": {
+      "$ref": "#/$defs/target_sample"
+    },
+    "representativeness": {
+      "$ref": "#/$defs/representativeness"
+    },
+    "candidate_only": {
+      "const": true
+    },
+    "content_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+    },
+    "token": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9._-]{0,127}$"
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "semver": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+    },
+    "method_design_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "method_design_id",
+        "version",
+        "content_digest",
+        "authoritative_method"
+      ],
+      "properties": {
+        "method_design_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "version": {
+          "$ref": "#/$defs/semver"
+        },
+        "content_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "authoritative_method": {
+          "const": false
+        }
+      }
+    },
+    "target_population": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "definition",
+        "unit_of_analysis"
+      ],
+      "properties": {
+        "definition": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unit_of_analysis": {
+          "$ref": "#/$defs/token"
+        }
+      }
+    },
+    "sampling_frame": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "resource_reference_id",
+        "frame_description",
+        "coverage_statement"
+      ],
+      "properties": {
+        "resource_reference_id": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "frame_description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "coverage_statement": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "sampling_strategy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "strategy_family",
+        "description"
+      ],
+      "properties": {
+        "strategy_family": {
+          "enum": [
+            "census",
+            "probability",
+            "non_probability",
+            "mixed",
+            "other"
+          ]
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "eligibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "inclusion_criteria",
+        "exclusion_criteria"
+      ],
+      "properties": {
+        "inclusion_criteria": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "exclusion_criteria": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "recruitment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "constraints",
+        "contact_constraints"
+      ],
+      "properties": {
+        "constraints": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "contact_constraints": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "target_sample": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target_count",
+        "stopping_rule",
+        "target_count_is_research_sufficiency"
+      ],
+      "properties": {
+        "target_count": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "stopping_rule": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_count_is_research_sufficiency": {
+          "const": false
+        }
+      }
+    },
+    "representativeness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "assumptions",
+        "limitations"
+      ],
+      "properties": {
+        "assumptions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}

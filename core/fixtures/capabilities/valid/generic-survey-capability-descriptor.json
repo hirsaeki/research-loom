@@ -1,0 +1,16 @@
+{
+  "schema_version": "0.1.0",
+  "capability_id": "fixture.survey",
+  "capability_version": "0.1.0",
+  "capability_kind": "research_method.survey",
+  "implementation_boundary": "plugin",
+  "declared_functions": [
+    {"function_id":"method_design","description":"Propose Survey design candidate material.","supported_execution_modes":["real","virtual","synthetic_test"],"input_contract":"capability-context-pack@0.1.0","output_contract":"capability-handoff@0.1.0"},
+    {"function_id":"instrument_design","description":"Propose a versioned Questionnaire without approving it.","supported_execution_modes":["real","virtual","synthetic_test"],"input_contract":"capability-context-pack@0.1.0","output_contract":"capability-handoff@0.1.0"},
+    {"function_id":"execute","description":"Execute pinned Survey inputs while preserving response disposition and missingness.","supported_execution_modes":["real","virtual","synthetic_test"],"input_contract":"capability-context-pack@0.1.0","output_contract":"capability-handoff@0.1.0"},
+    {"function_id":"analyze","description":"Produce candidate descriptive Survey analysis.","supported_execution_modes":["real","virtual","synthetic_test"],"input_contract":"capability-context-pack@0.1.0","output_contract":"capability-handoff@0.1.0"}
+  ],
+  "availability":{"declaration":"conditional","rationale":"Contract only; runtime and authorization are separate."},
+  "compatibility":{"core_research_contract":"0.1.0","project_config_contract":"0.1.0","effective_profile_set_contract":"0.1.0"},
+  "descriptor_digest":"sha256:eb73efbfd31147d44f62910b76625833d3c00ebcde3dba3250a067825edfa4e2"
+}

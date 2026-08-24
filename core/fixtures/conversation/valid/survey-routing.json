@@ -1,0 +1,36 @@
+{
+  "fixture_version": "0.1.0",
+  "description": "PR10 route into PR13 Survey execute; conversational confirmation is not Method/Questionnaire Human Decision authority.",
+  "action_proposal": {
+    "schema_version": "0.1.0",
+    "message_type": "action_proposal",
+    "proposal_id": "P-SV-001",
+    "conversation_id": "CONV-SV-001",
+    "project_id": "PRJ-1",
+    "source": {"source_type":"human_input","input_id":"IN-SV-001"},
+    "initiating_actor": {"actor_id":"HUMAN-1","actor_type":"human"},
+    "action": {
+      "action_type": "research.method.survey.execute",
+      "effect": "state_changing",
+      "payload_contract": "survey-context-extension@0.1.0",
+      "payload": {
+        "research_method_context_extension_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+        "survey_context_extension_digest": "sha256:0802ecc6561a385d4164ce51ce89ca1cf045044bbdc5268bf52feae144a4cffd"
+      },
+      "payload_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777"
+    },
+    "commitment_mode": "proposal_only",
+    "confirmation_policy": {"required_on_commit":true,"human_confirmation_only":true},
+    "human_decision_boundary": {"required":true,"confirmation_is_human_decision":false,"decision_reference_ids":["DEC-METHOD-1","DEC-QNR-1"]},
+    "bindings": {"current_state":{"state_id":"STATE-SV-1","revision":0,"content_digest":"sha256:8888888888888888888888888888888888888888888888888888888888888888"}},
+    "route": {
+      "route_type": "capability_invocation",
+      "invocation_contract": "capability-invocation@0.1.0",
+      "capability": {"capability_id":"fixture.survey","capability_version":"0.1.0","descriptor_digest":"sha256:eb73efbfd31147d44f62910b76625833d3c00ebcde3dba3250a067825edfa4e2","function_id":"execute"},
+      "execution_mode": "real",
+      "context_pack": {"context_pack_id":"CTX-SV-1","context_pack_digest":"sha256:9999999999999999999999999999999999999999999999999999999999999999"}
+    },
+    "created_at": "2026-08-24T01:00:00Z",
+    "proposal_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  }
+}
