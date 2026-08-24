@@ -105,6 +105,24 @@ class DelphiContracts(unittest.TestCase):
         inverted["planned_rounds"]["maximum_approved_rounds"] = 3
         self.assertEqual(design_error(inverted), "DLP-DESIGN-ROUNDS-001")
 
+        below_minimum = deepcopy(self.fixtures["design"])
+        below_minimum["planned_rounds"]["minimum_rounds"] = 3
+        below_minimum["planned_rounds"]["maximum_approved_rounds"] = 3
+        below_minimum["planned_rounds"]["round_plan"] = [{"sequence": 1}, {"sequence": 2}]
+        self.assertEqual(design_error(below_minimum), "DLP-DESIGN-ROUNDS-001")
+
+        above_maximum = deepcopy(self.fixtures["design"])
+        above_maximum["planned_rounds"]["minimum_rounds"] = 2
+        above_maximum["planned_rounds"]["maximum_approved_rounds"] = 2
+        above_maximum["planned_rounds"]["round_plan"] = [{"sequence": 1}, {"sequence": 2}, {"sequence": 3}]
+        self.assertEqual(design_error(above_maximum), "DLP-DESIGN-ROUNDS-001")
+
+        exact_bounds = deepcopy(self.fixtures["design"])
+        exact_bounds["planned_rounds"]["minimum_rounds"] = 2
+        exact_bounds["planned_rounds"]["maximum_approved_rounds"] = 2
+        exact_bounds["planned_rounds"]["round_plan"] = [{"sequence": 1}, {"sequence": 2}]
+        self.assertEqual(design_error(exact_bounds), None)
+
     def test_pr10_routing_preserves_pr9_and_human_decision_boundary(self):
         proposal = self.routing["action_proposal"]
         validator = Draft202012Validator(self.conversation_schema, format_checker=FormatChecker())
