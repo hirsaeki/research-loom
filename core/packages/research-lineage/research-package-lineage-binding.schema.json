@@ -1,0 +1,15 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"urn:research-loom:core:research-lineage:downstream-binding:0.1.0",
+  "title":"Canonical lineage binding for PR18 downstream packages",
+  "type":"object","additionalProperties":false,
+  "required":["schema_version","object_type","research_package_id","research_package_digest","source_lineage_ref","source_lineage_digest","source_snapshot_ref","source_snapshot_digest","status_against_active_lineage"],
+  "properties":{
+    "schema_version":{"const":"0.1.0"},"object_type":{"const":"research_package_lineage_binding"},
+    "research_package_id":{"$ref":"#/$defs/id"},"research_package_digest":{"$ref":"#/$defs/digest"},
+    "source_lineage_ref":{"$ref":"#/$defs/id"},"source_lineage_digest":{"$ref":"#/$defs/digest"},
+    "source_snapshot_ref":{"$ref":"#/$defs/id"},"source_snapshot_digest":{"$ref":"#/$defs/digest"},
+    "status_against_active_lineage":{"enum":["current","stale","non_current","rebuild_required"]}
+  },
+  "$defs":{"id":{"type":"string","pattern":"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},"digest":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"}}
+}
