@@ -33,6 +33,24 @@ class _ParitySQLiteRepository(SQLiteResearchStateRepository):
         )
 
 
+class _RaceSQLiteRepository(SQLiteResearchStateRepository):
+    """Inject one competing commit after StateView load but before own CAS."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.before_commit = None
+
+    def commit(self, bundle, *, expected_head_snapshot_digest):
+        callback = self.before_commit
+        self.before_commit = None
+        if callback is not None:
+            callback()
+        return super().commit(
+            bundle,
+            expected_head_snapshot_digest=expected_head_snapshot_digest,
+        )
+
+
 class SQLiteStateTransitionRuntimeParityTests(
     runtime_suite.StateTransitionRuntimeTests
 ):
@@ -240,10 +258,9 @@ class SQLiteRepositorySpecificTests(unittest.TestCase):
     def test_two_connections_reject_second_stale_head(self):
         seed = seed_state(objects=[project(), rq()])
         first = self.repo(seed)
-        second = SQLiteResearchStateRepository(self.db_path)
+        second = _RaceSQLiteRepository(self.db_path)
         self.repositories.append(second)
 
-        stale_state = second.load_state_view("PRJ-1", "LIN-1")
         request_a = make_request(
             seed,
             [
@@ -257,7 +274,7 @@ class SQLiteRepositorySpecificTests(unittest.TestCase):
             new_snapshot_id="SNP-A",
         )
         request_b = make_request(
-            stale_state,
+            seed,
             [
                 TransitionAction(
                     TransitionKind.CREATE_OBJECT,
@@ -268,10 +285,12 @@ class SQLiteRepositorySpecificTests(unittest.TestCase):
             key="IDEMP-B",
             new_snapshot_id="SNP-B",
         )
-        self.assertIsInstance(
-            self.service(first).apply(request_a),
-            CommitReceipt,
-        )
+
+        def competing_commit():
+            result = self.service(first).apply(request_a)
+            self.assertIsInstance(result, CommitReceipt)
+
+        second.before_commit = competing_commit
         rejected = self.service(second).apply(request_b)
         self.assertNotIsInstance(rejected, CommitReceipt)
         self.assertIn(
