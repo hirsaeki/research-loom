@@ -1,0 +1,33 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"urn:research-loom:core:writer-publication:manuscript-package:0.1.0",
+  "title":"Canonical Writer to Publication Manuscript Package",
+  "type":"object","additionalProperties":false,
+  "required":["schema_version","object_type","manuscript_id","manuscript_mode","source_epistemic_status","preview_only","draft_only","non_authoritative","release_eligible","source","writer","effective_profile_set","narrative_profile_pins","publication_profile_pin","outline_ref","ordered_section_refs","content_refs","citations","exhibit_refs","bibliography_input_refs","preserved_refs","writer_audit_summary","unresolved_writing_issue_refs","lineage","content_digest","provenance"],
+  "properties":{
+    "schema_version":{"const":"0.1.0"},"object_type":{"const":"manuscript_package"},"manuscript_id":{"$ref":"#/$defs/id"},"manuscript_mode":{"enum":["preview","real_draft"]},"source_epistemic_status":{"enum":["SYNTHETIC_TEST_ONLY","EMPIRICAL_RESEARCH_STATE"]},"preview_only":{"type":"boolean"},"draft_only":{"const":true},"non_authoritative":{"const":true},"release_eligible":{"const":false},
+    "source":{"$ref":"#/$defs/source_binding"},
+    "writer":{"type":"object","additionalProperties":false,"required":["writer_id","writer_version","rule_digest","prompt_template_digest"],"properties":{"writer_id":{"$ref":"#/$defs/id"},"writer_version":{"$ref":"#/$defs/semver"},"rule_digest":{"$ref":"#/$defs/digest"},"prompt_template_digest":{"$ref":"#/$defs/digest"}}},
+    "effective_profile_set":{"type":"object","additionalProperties":false,"required":["effective_profile_set_ref","content_digest"],"properties":{"effective_profile_set_ref":{"$ref":"#/$defs/id"},"content_digest":{"$ref":"#/$defs/digest"}}},
+    "narrative_profile_pins":{"type":"array","minItems":1,"items":{"$ref":"#/$defs/profile_pin"}},"publication_profile_pin":{"$ref":"#/$defs/profile_pin"},
+    "outline_ref":{"type":"object","additionalProperties":false,"required":["outline_id","outline_version","outline_digest"],"properties":{"outline_id":{"$ref":"#/$defs/id"},"outline_version":{"$ref":"#/$defs/semver"},"outline_digest":{"$ref":"#/$defs/digest"}}},
+    "ordered_section_refs":{"$ref":"#/$defs/ids"},
+    "content_refs":{"type":"array","minItems":1,"items":{"type":"object","additionalProperties":false,"required":["content_id","section_ref","kind","content_digest"],"properties":{"content_id":{"$ref":"#/$defs/id"},"section_ref":{"$ref":"#/$defs/id"},"kind":{"enum":["diagnostic_fixture","draft_prose","exhibit_caption"]},"content_digest":{"$ref":"#/$defs/digest"}}}},
+    "citations":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["citation_key","source_ref","locator_ref","namespace"],"properties":{"citation_key":{"$ref":"#/$defs/id"},"source_ref":{"$ref":"#/$defs/id"},"locator_ref":{"$ref":"#/$defs/id"},"namespace":{"enum":["supplied_source","preview_placeholder"]}}}},
+    "exhibit_refs":{"$ref":"#/$defs/ids"},"bibliography_input_refs":{"$ref":"#/$defs/ids"},"preserved_refs":{"$ref":"#/$defs/ids"},
+    "writer_audit_summary":{"type":"object","additionalProperties":false,"required":["traceability","logic","qualifier_limitation_preservation","communication_brief_alignment"],"properties":{"traceability":{"enum":["passed","warning","failed"]},"logic":{"enum":["passed","warning","failed"]},"qualifier_limitation_preservation":{"enum":["passed","warning","failed"]},"communication_brief_alignment":{"enum":["passed","warning","failed"]}}},
+    "unresolved_writing_issue_refs":{"$ref":"#/$defs/ids"},
+    "lineage":{"type":"object","additionalProperties":false,"required":["newly_generated_from_research_package"],"properties":{"newly_generated_from_research_package":{"type":"boolean"},"promoted_from_virtual_manuscript_ref":{"$ref":"#/$defs/id"}}},
+    "content_digest":{"$ref":"#/$defs/digest"},"provenance":{"$ref":"#/$defs/provenance"}
+  },
+  "allOf":[
+    {"if":{"properties":{"source_epistemic_status":{"const":"SYNTHETIC_TEST_ONLY"}}},"then":{"properties":{"manuscript_mode":{"const":"preview"},"preview_only":{"const":true},"lineage":{"properties":{"newly_generated_from_research_package":{"const":true}},"not":{"required":["promoted_from_virtual_manuscript_ref"]}}}}},
+    {"if":{"properties":{"manuscript_mode":{"const":"real_draft"}}},"then":{"properties":{"source_epistemic_status":{"const":"EMPIRICAL_RESEARCH_STATE"},"preview_only":{"const":false},"lineage":{"properties":{"newly_generated_from_research_package":{"const":true}},"not":{"required":["promoted_from_virtual_manuscript_ref"]}}}}}
+  ],
+  "$defs":{
+    "id":{"type":"string","pattern":"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},"digest":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},"semver":{"type":"string","pattern":"^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"},"ids":{"type":"array","uniqueItems":true,"items":{"$ref":"#/$defs/id"}},
+    "source_binding":{"type":"object","additionalProperties":false,"required":["research_package_id","research_package_digest","research_snapshot_id","research_snapshot_digest"],"properties":{"research_package_id":{"$ref":"#/$defs/id"},"research_package_digest":{"$ref":"#/$defs/digest"},"research_snapshot_id":{"$ref":"#/$defs/id"},"research_snapshot_digest":{"$ref":"#/$defs/digest"}}},
+    "profile_pin":{"type":"object","additionalProperties":false,"required":["profile_id","profile_version","content_digest"],"properties":{"profile_id":{"$ref":"#/$defs/id"},"profile_version":{"$ref":"#/$defs/semver"},"content_digest":{"$ref":"#/$defs/digest"}}},
+    "provenance":{"type":"object","additionalProperties":false,"required":["generated_at","tool_id","tool_version","input_digests","prompt_template_digest"],"properties":{"generated_at":{"type":"string","format":"date-time"},"tool_id":{"$ref":"#/$defs/id"},"tool_version":{"$ref":"#/$defs/semver"},"input_digests":{"type":"array","minItems":1,"items":{"$ref":"#/$defs/digest"}},"prompt_template_digest":{"$ref":"#/$defs/digest"}}}
+  }
+}
