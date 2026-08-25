@@ -1,0 +1,184 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:research-loom:core:writer-publication:research-package:0.1.0",
+  "title": "Canonical Harness to Writer Research Package",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "object_type", "package_id", "package_mode",
+    "source_epistemic_status", "preview_only", "authoritative_research_freeze",
+    "release_eligible", "project", "project_config_digest", "effective_profile_set",
+    "source_research_snapshot", "communication_brief", "content",
+    "narrative_constraints", "project_constraints", "publication_requirements",
+    "provenance", "package_digest"
+  ],
+  "properties": {
+    "schema_version": {"const": "0.1.0"},
+    "object_type": {"const": "research_package"},
+    "package_id": {"$ref": "#/$defs/id"},
+    "package_mode": {"enum": ["preview", "real"]},
+    "source_epistemic_status": {"enum": ["SYNTHETIC_TEST_ONLY", "EMPIRICAL_RESEARCH_STATE"]},
+    "preview_only": {"type": "boolean"},
+    "authoritative_research_freeze": {"type": "boolean"},
+    "release_eligible": {"type": "boolean"},
+    "project": {
+      "type": "object", "additionalProperties": false,
+      "required": ["project_id"],
+      "properties": {"project_id": {"$ref": "#/$defs/id"}, "title": {"type": "string", "minLength": 1}}
+    },
+    "project_config_digest": {"$ref": "#/$defs/digest"},
+    "effective_profile_set": {
+      "type": "object", "additionalProperties": false,
+      "required": ["effective_profile_set_ref", "content_digest", "profile_pins"],
+      "properties": {
+        "effective_profile_set_ref": {"$ref": "#/$defs/id"},
+        "content_digest": {"$ref": "#/$defs/digest"},
+        "profile_pins": {
+          "type": "array", "minItems": 1,
+          "items": {"$ref": "#/$defs/profile_pin"}
+        }
+      }
+    },
+    "source_research_snapshot": {"$ref": "#/$defs/snapshot"},
+    "communication_brief": {
+      "type": "object", "additionalProperties": false,
+      "required": ["audience", "core_message", "must_include", "must_not_claim"],
+      "properties": {
+        "audience": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "core_message": {"type": "string", "minLength": 1},
+        "must_include": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "must_not_claim": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}}
+      }
+    },
+    "content": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "research_question_refs", "finding_refs", "argument_refs", "contribution_refs",
+        "evidence_refs", "source_refs", "counter_review_refs", "qualifier_refs",
+        "limitations", "unresolved_evidence_gap_refs", "research_attention_refs"
+      ],
+      "properties": {
+        "research_question_refs": {"$ref": "#/$defs/id_array"},
+        "finding_refs": {"$ref": "#/$defs/id_array"},
+        "argument_refs": {"$ref": "#/$defs/id_array"},
+        "contribution_refs": {"$ref": "#/$defs/id_array"},
+        "evidence_refs": {"$ref": "#/$defs/id_array"},
+        "source_refs": {"type": "array", "items": {"$ref": "#/$defs/source_ref"}},
+        "counter_review_refs": {"$ref": "#/$defs/id_array"},
+        "qualifier_refs": {"$ref": "#/$defs/id_array"},
+        "limitations": {
+          "type": "array", "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["limitation_id", "statement"],
+            "properties": {"limitation_id": {"$ref": "#/$defs/id"}, "statement": {"type": "string", "minLength": 1}}
+          }
+        },
+        "unresolved_evidence_gap_refs": {"$ref": "#/$defs/id_array"},
+        "research_attention_refs": {"$ref": "#/$defs/id_array"}
+      }
+    },
+    "narrative_constraints": {
+      "type": "object", "additionalProperties": false,
+      "required": ["stage_refs", "section_purpose_refs", "required_preservation_refs", "partial_order_edges"],
+      "properties": {
+        "stage_refs": {"$ref": "#/$defs/id_array"},
+        "section_purpose_refs": {"$ref": "#/$defs/id_array"},
+        "required_preservation_refs": {"$ref": "#/$defs/id_array"},
+        "partial_order_edges": {
+          "type": "array", "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["from_stage", "to_stage", "relation"],
+            "properties": {
+              "from_stage": {"$ref": "#/$defs/id"},
+              "to_stage": {"$ref": "#/$defs/id"},
+              "relation": {"enum": ["semantic_precondition", "output_dependency"]}
+            }
+          }
+        }
+      }
+    },
+    "project_constraints": {
+      "type": "object", "additionalProperties": false,
+      "required": ["must_not_claim"],
+      "properties": {"must_not_claim": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}}}
+    },
+    "publication_requirements": {
+      "type": "object", "additionalProperties": false,
+      "required": ["requirement_refs"],
+      "properties": {"requirement_refs": {"$ref": "#/$defs/id_array"}}
+    },
+    "provenance": {"$ref": "#/$defs/provenance"},
+    "package_digest": {"$ref": "#/$defs/digest"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"source_epistemic_status": {"const": "SYNTHETIC_TEST_ONLY"}}, "required": ["source_epistemic_status"]},
+      "then": {
+        "properties": {
+          "package_mode": {"const": "preview"},
+          "preview_only": {"const": true},
+          "authoritative_research_freeze": {"const": false},
+          "release_eligible": {"const": false},
+          "source_research_snapshot": {"properties": {"execution_mode": {"const": "virtual"}}, "required": ["execution_mode"]}
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "semver": {"type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"},
+    "id_array": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+    "profile_pin": {
+      "type": "object", "additionalProperties": false,
+      "required": ["profile_type", "profile_id", "profile_version", "content_digest"],
+      "properties": {
+        "profile_type": {"enum": ["research", "organization", "narrative", "publication"]},
+        "profile_id": {"$ref": "#/$defs/id"},
+        "profile_version": {"$ref": "#/$defs/semver"},
+        "content_digest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "snapshot": {
+      "type": "object", "additionalProperties": false,
+      "required": ["snapshot_id", "revision", "content_digest", "execution_mode"],
+      "properties": {
+        "snapshot_id": {"$ref": "#/$defs/id"},
+        "revision": {"type": "integer", "minimum": 0},
+        "content_digest": {"$ref": "#/$defs/digest"},
+        "execution_mode": {"enum": ["virtual", "real"]}
+      }
+    },
+    "source_ref": {
+      "type": "object", "additionalProperties": false,
+      "required": ["source_id", "citation_capable", "citation_namespace", "locator_refs", "metadata_origin"],
+      "properties": {
+        "source_id": {"$ref": "#/$defs/id"},
+        "citation_capable": {"type": "boolean"},
+        "citation_namespace": {"enum": ["supplied_source", "preview_placeholder"]},
+        "locator_refs": {"$ref": "#/$defs/id_array"},
+        "metadata_origin": {"const": "supplied"}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"citation_namespace": {"const": "preview_placeholder"}}, "required": ["citation_namespace"]},
+          "then": {"properties": {"source_id": {"pattern": "^preview:[A-Za-z0-9._:-]+$"}, "citation_capable": {"const": false}}}
+        },
+        {
+          "if": {"properties": {"source_id": {"pattern": "^preview:"}}, "required": ["source_id"]},
+          "then": {"properties": {"citation_namespace": {"const": "preview_placeholder"}, "citation_capable": {"const": false}}}
+        }
+      ]
+    },
+    "provenance": {
+      "type": "object", "additionalProperties": false,
+      "required": ["generated_at", "generator_id", "tool_version", "input_digests"],
+      "properties": {
+        "generated_at": {"type": "string", "format": "date-time"},
+        "generator_id": {"$ref": "#/$defs/id"},
+        "tool_version": {"$ref": "#/$defs/semver"},
+        "input_digests": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/digest"}}
+      }
+    }
+  }
+}

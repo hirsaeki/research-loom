@@ -1,0 +1,86 @@
+schema_version: 0.1.0
+contract_id: writer-publication-preview@0.1.0
+
+boundary:
+  writer_publication_are_research_capabilities: false
+  reuse_pr9_capability_handoff: false
+  harness_to_writer_boundary: research_package
+  writer_to_publication_boundary: manuscript_package
+  writer_reads_runtime_database_directly: false
+  writer_resolves_profile_files_independently: false
+  harness_remains_authoritative_research_write_boundary: true
+
+writer_authority:
+  may_project: [argument_ordering, section_planning, section_purpose, headings, paragraph_planning, citation_placement, exhibit_placement, transitions, draft_prose, redundancy_reduction, communication_adaptation]
+  may_not: [adopt_or_revise_rq_answer, adopt_or_revise_finding, qualify_evidence, strengthen_confidence, decide_causal_support, select_research_method, mutate_research_state]
+
+publication_authority:
+  may_project: [publication_profile, document_template, citation_formatting, bibliography_rendering, figure_table_numbering, heading_numbering, table_of_contents, cross_reference_resolution, page_layout, docx_pdf_render, output_filename, render_validation]
+  may_not: [change_finding_meaning, add_evidence, recalculate_research_numbers, change_causal_or_generalization_scope, delete_limitations_or_counterevidence, independently_rewrite_argument_structure, fabricate_citation_metadata]
+
+preview:
+  virtual_research_package:
+    source_epistemic_status: SYNTHETIC_TEST_ONLY
+    preview_only: true
+    authoritative_research_freeze: false
+    release_eligible: false
+  writer_preview:
+    draft_only: true
+    non_authoritative: true
+    release_eligible: false
+    virtual_prose_is_real_manuscript_seed: false
+  publication_preview:
+    preview_only: true
+    release_eligible: false
+    published_artifact: false
+    release_manifest: false
+
+virtual_real_firewall:
+  transferable_after_human_review: [narrative_profile_revision, publication_profile_revision, writer_rule_rubric_prompt_template_revision, publication_template_style_map_revision, section_contract_schema, validation_rules, defect_history, preview_test_history]
+  forbidden_transfer: [virtual_manuscript_prose, synthetic_fact_statement, virtual_research_citation, virtual_analytical_conclusion, synthetic_respondent_quotation, virtual_finding_prose, preview_bibliography_entry_derived_only_from_synthetic_content]
+  real_writer_requires: [real_research_snapshot, new_research_package, new_outline, new_draft]
+  virtual_draft_to_real_draft_promotion: forbidden
+
+citation_semantics:
+  allowed_keys: supplied_source_or_evidence_references_only
+  preview_placeholder_namespace: "preview:"
+  fabricate_doi_url_bibliography_metadata: forbidden
+  publication_may_auto_resolve_unknown_citation: false
+  unknown_citation_outcome: defect_candidate
+
+profile_revision_semantics:
+  ambiguous_conflict_resolution: human_review_required
+  last_write_wins_for_ambiguous_conflicts: false
+  core_invariant_weakening_proposal_allowed: false
+
+traceability_chain: [virtual_research_snapshot, research_package, outline_package, manuscript_package, preview_artifact_manifest, profile_defect_candidate, preview_iteration]
+
+conversation:
+  route_type: harness_service
+  service_id: writer-publication.preview
+  proposal_only: true
+  preview_execution_is_research_freeze: false
+  preview_execution_is_manuscript_freeze: false
+  preview_execution_is_publication_release: false
+  confirmation_is_final_release_approval: false
+
+errors:
+  WP-RP-DIGEST-001: Research Package digest must bind canonical package content.
+  WP-RP-SNAPSHOT-BINDING-001: Research Package must be content-bound to its immutable Research Snapshot.
+  WP-RP-PROFILE-BINDING-001: Research Package must carry resolved Narrative and Publication profile pins.
+  WP-EPISTEMIC-FIREWALL-001: SYNTHETIC_TEST_ONLY status and preview restrictions must be preserved downstream.
+  WP-OUTLINE-DIGEST-001: Outline digest must bind canonical outline content.
+  WP-OUTLINE-BINDING-001: Outline must bind exactly to its Research Package and Research Snapshot.
+  WP-SECTION-TRACEABILITY-001: Section references must resolve only to content supplied by the Research Package.
+  WP-PRESERVATION-001: Required counterreview, qualifier, and limitation references may not disappear in Writer projection.
+  WP-FEEDBACK-DIGEST-001: Writing Feedback digest must bind canonical feedback content.
+  WP-RESEARCH-STATE-AUTHORITY-001: Writer or Publication feedback may not mutate authoritative Research State.
+  WP-MANUSCRIPT-DIGEST-001: Manuscript Package digest must bind canonical manuscript content.
+  WP-MANUSCRIPT-BINDING-001: Manuscript must bind exactly to its source Research Package, Snapshot, and Outline.
+  WP-CITATION-SOURCE-001: Citations must resolve to supplied source/locator references and may not fabricate sources.
+  WP-VIRTUAL-REAL-PROMOTION-001: Virtual manuscript content may not be promoted into a REAL draft lineage.
+  WP-PREVIEW-MANIFEST-DIGEST-001: Preview Artifact Manifest digest must bind canonical manifest content.
+  WP-PUBLICATION-PIN-001: Publication preview must use the pinned Publication Profile, template, and style map digests.
+  WP-PROFILE-DEFECT-AUTHORITY-001: Profile defect candidates are proposals and may not mutate Profile or weaken Core contracts directly.
+  WP-PREVIEW-ITERATION-001: Revised previews require new pins and identities and may not overwrite prior preview artifacts.
+  WP-CONVERSATION-ROUTING-001: PR10 preview requests must route to the non-Capability harness service and remain proposal-only.
