@@ -1,0 +1,67 @@
+schema_version: "0.1.0"
+contract: research-lineage@0.1.0
+principles:
+  fork_is_rollback: false
+  fork_is_git_branch: false
+  snapshots_immutable: true
+  lineage_head_is_snapshot_pointer: true
+  append_only_history: true
+  harness_authoritative_write_boundary: true
+  capability_or_llm_auto_commit_permitted: false
+inheritance:
+  treatments: [PRESERVE, RECONFIRM, INVALIDATE]
+  implicit_copy_permitted: false
+  invalidation_deletes_history: false
+  reconfirm_auto_approved: false
+identity:
+  same_kind_id_revision_different_digest_permitted: false
+  core_schema_lineage_id_required: false
+  lineage_mapping_preferred: true
+recovery:
+  specialization_of_corrective_fork: true
+  old_run_id_reuse_permitted: false
+  old_context_pack_mutable_reuse_permitted: false
+  old_handoff_copy_as_new_result_permitted: false
+impact:
+  statuses: [unaffected, inherited, requires_reconfirmation, stale, invalidated, blocked, unknown]
+  completeness_may_be_unknown: true
+replay:
+  immutable_approved_plan_required: true
+  context_pack_rebuilt_from_target_lineage: true
+  new_run_ids_required: true
+  capability_order_is_proposal: true
+active_selection:
+  fork_creation_is_selection: false
+  explicit_selection_required: true
+  conversation_confirmation_is_human_decision: false
+merge:
+  automatic_merge_permitted: false
+  compare_and_propose_only: true
+virtual_real_firewall:
+  permitted_forks: [virtual_to_virtual, real_to_real]
+  virtual_to_real_fork_promotion_permitted: false
+  pr17_cutover_is_only_virtual_real_boundary: true
+downstream:
+  research_package_binds_exact_lineage_and_snapshot: true
+  historical_packages_deleted_on_switch: false
+  stale_non_current_rebuild_required_expressible: true
+  old_manuscript_auto_promoted: false
+errors:
+  - {id: RL-DIGEST-001, meaning: "A canonical lineage object digest does not match canonical content."}
+  - {id: RL-PARENT-001, meaning: "Fork/recovery parent lineage or baseline ancestry is unresolved or inconsistent."}
+  - {id: RL-BASELINE-STALE-001, meaning: "Baseline Snapshot digest is stale or does not resolve exactly."}
+  - {id: RL-PROJECT-MISMATCH-001, meaning: "Lineage/Fork objects cross project identity boundaries."}
+  - {id: RL-TREATMENT-001, meaning: "Inheritance treatment is invalid, incomplete, or inconsistent with effective child state."}
+  - {id: RL-HUMAN-DECISION-001, meaning: "A required Human Decision is missing or replaced by conversational confirmation."}
+  - {id: RL-OBJECT-IDENTITY-001, meaning: "The same Core object identity/revision maps to conflicting content."}
+  - {id: RL-INVALIDATED-LEAK-001, meaning: "An invalidated object remains effective in the child lineage."}
+  - {id: RL-REPLAY-RUN-ID-001, meaning: "Replay reuses a prior Run ID."}
+  - {id: RL-REPLAY-CONTEXT-001, meaning: "Replay reuses old mutable Context Pack state instead of rebuilding from target lineage."}
+  - {id: RL-REPLAY-HANDOFF-001, meaning: "Replay copies an old Handoff as a new run result."}
+  - {id: RL-ACTIVE-SELECTION-001, meaning: "Active-lineage selection lacks exact target Snapshot, authority, or required decision."}
+  - {id: RL-AUTO-MERGE-001, meaning: "Lineage contents or Human Decisions are automatically merged/adopted."}
+  - {id: RL-VIRTUAL-REAL-001, meaning: "A Fork promotes virtual/synthetic research content into a REAL lineage."}
+  - {id: RL-CONFIG-PROFILE-PIN-001, meaning: "Project Config or Effective Profile Set pins are stale or changed without new digest."}
+  - {id: RL-DOWNSTREAM-STALE-001, meaning: "A downstream package is treated as current after its source lineage was switched/superseded."}
+  - {id: RL-COMPARISON-READONLY-001, meaning: "Lineage comparison mutates Research State or auto-adopts a side."}
+  - {id: RL-CONVERSATION-DECISION-001, meaning: "Work Conversation prose/confirmation is treated as Fork/Recovery Human Decision."}
