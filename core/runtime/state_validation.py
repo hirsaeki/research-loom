@@ -16,6 +16,8 @@ def _validate_reference_integrity(current_state: StateView, reduction: Reduction
             if expected_kind == "*":
                 if not any(key[1] == object_id for key in effective):
                     issues.append(_issue("RT-REF-001", ValidationStage.REFERENCE_INTEGRITY, "Referenced object ID does not resolve.", (object_id,)))
+            elif expected_kind == "project" and object_id == current_state.project_ref:
+                continue
             elif (expected_kind, object_id) not in effective:
                 issues.append(_issue(
                     "RT-REF-001",
@@ -71,7 +73,7 @@ def _validate_profile_strengthening(current_state: StateView, reduction: Reducti
         for obj in reduction.object_revisions:
             fields = required_fields.get(obj.get("kind"), ())
             if isinstance(fields, Sequence) and not isinstance(fields, (str, bytes)):
-                missing = [field for field in fields if not obj.get(field)]
+                missing = [field for field in fields if field not in obj]
                 if missing:
                     issues.append(_issue(
                         "RT-PROFILE-002",

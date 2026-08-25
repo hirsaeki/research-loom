@@ -85,15 +85,7 @@ def _validate_human_decisions(current_state: StateView, request: StateTransition
             matched = False
             for decision_ref in action.decision_refs:
                 decision = decisions.get(decision_ref)
-                if decision is None:
-                    continue
-                if decision_ref in current_state.used_decision_ids:
-                    issues.append(_issue(
-                        "RT-DECISION-005",
-                        ValidationStage.HUMAN_DECISION,
-                        "A Human Decision may not be replayed for a second authoritative transition.",
-                        (decision_ref,),
-                    ))
+                if decision is None or decision_ref in current_state.used_decision_ids:
                     continue
                 if decision.get("actor_type") != "human":
                     continue
@@ -121,6 +113,13 @@ def _validate_human_decisions(current_state: StateView, request: StateTransition
             if decision is None:
                 issues.append(_issue("RT-DECISION-002", ValidationStage.HUMAN_DECISION, "Referenced Decision does not resolve.", (decision_ref,)))
                 continue
+            if decision_ref in current_state.used_decision_ids:
+                issues.append(_issue(
+                    "RT-DECISION-005",
+                    ValidationStage.HUMAN_DECISION,
+                    "A Human Decision may not be replayed for a second authoritative transition.",
+                    (decision_ref,),
+                ))
             if decision.get("actor_type") != "human":
                 issues.append(_issue("RT-DECISION-003", ValidationStage.HUMAN_DECISION, "Resolving authoritative Decision must be human-owned.", (decision_ref,)))
             if target is not None and not _decision_subject_matches(decision, target.kind, target.id):
@@ -152,15 +151,22 @@ def _validate_lineage_preconditions(current_state: StateView, request: StateTran
             if not isinstance(treatments, Sequence) or isinstance(treatments, (str, bytes)):
                 issues.append(_issue("RT-LINEAGE-006", ValidationStage.LINEAGE, "Lineage treatments must be an explicit sequence."))
             else:
-                source_refs = {str(item.get("source_ref")) for item in treatments if isinstance(item, Mapping)}
-                baseline_refs = {str(member.get("id")) for member in current_state.snapshot_members()}
+                source_refs = {
+                    (str(item.get("object_kind", "")), str(item.get("source_ref", "")))
+                    for item in treatments
+                    if isinstance(item, Mapping)
+                }
+                baseline_refs = {
+                    (str(member.get("kind", "")), str(member.get("id", "")))
+                    for member in current_state.snapshot_members()
+                }
                 missing_treatment = sorted(baseline_refs - source_refs)
                 if missing_treatment:
                     issues.append(_issue(
                         "RT-LINEAGE-007",
                         ValidationStage.LINEAGE,
                         "Every inherited baseline member requires explicit PRESERVE/RECONFIRM/INVALIDATE treatment.",
-                        tuple(missing_treatment),
+                        tuple(f"{kind}:{object_id}" for kind, object_id in missing_treatment),
                     ))
                 for item in treatments:
                     if not isinstance(item, Mapping) or item.get("treatment") not in {"PRESERVE", "RECONFIRM", "INVALIDATE"}:
@@ -176,7 +182,25 @@ def _validate_lineage_preconditions(current_state: StateView, request: StateTran
                                 "RECONFIRM requires a derived Core object and explicit Human Decision binding.",
                                 (str(item.get("source_ref", "")),),
                             ))
-                        elif decision_ref not in set(action.decision_refs) or decision_ref not in set(derived.get("decision_ids", ()) or ()):
+                            continue
+                        derived_id = str(derived.get("id", ""))
+                        source_ref = str(item.get("source_ref", ""))
+                        derived_ref = str(item.get("derived_ref", ""))
+                        if derived_id != source_ref and derived_ref != derived_id:
+                            issues.append(_issue(
+                                "RT-LINEAGE-015",
+                                ValidationStage.LINEAGE,
+                                "RECONFIRM identity changes require explicit derived_ref matching the derived Core object.",
+                                (source_ref, derived_id),
+                            ))
+                        elif derived_ref and derived_ref != derived_id:
+                            issues.append(_issue(
+                                "RT-LINEAGE-015",
+                                ValidationStage.LINEAGE,
+                                "RECONFIRM derived_ref must match the derived Core object identity.",
+                                (derived_ref, derived_id),
+                            ))
+                        if decision_ref not in set(action.decision_refs) or decision_ref not in set(derived.get("decision_ids", ()) or ()):
                             issues.append(_issue(
                                 "RT-LINEAGE-014",
                                 ValidationStage.LINEAGE,

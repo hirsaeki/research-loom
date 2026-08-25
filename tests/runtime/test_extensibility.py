@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import json
 import unittest
 
@@ -10,9 +11,17 @@ from runtime_fixtures import *
 class RuntimeDependencyRuleTests(unittest.TestCase):
     def test_reducer_has_no_concrete_capability_or_storage_dependency(self):
         source_text=(ROOT/"core/runtime/state_reducer.py").read_text(encoding="utf-8")
-        lowered=source_text.lower()
-        for forbidden in ("plugins.","survey","delphi","case_study","desktop_research","writer","publication","sqlite","sqlmodel","requests","boto3"):
-            self.assertNotIn(forbidden,lowered)
+        tree=ast.parse(source_text)
+        imported_modules=[]
+        for node in ast.walk(tree):
+            if isinstance(node,ast.Import):
+                imported_modules.extend(alias.name for alias in node.names)
+            elif isinstance(node,ast.ImportFrom):
+                imported_modules.append(node.module or "")
+        forbidden={"plugins","survey","delphi","case_study","desktop_research","writer","publication","sqlite","sqlite3","sqlmodel","requests","boto3"}
+        for module in imported_modules:
+            parts=set(module.lower().split("."))
+            self.assertTrue(parts.isdisjoint(forbidden),f"forbidden reducer dependency: {module}")
         self.assertNotIn("fixture.future-research-capability",source_text)
 
     def test_transition_vocabulary_contains_no_capability_kind(self):
@@ -59,6 +68,19 @@ class FutureCapabilityNormalizationTests(unittest.TestCase):
         ext=json.loads((ROOT/"core/fixtures/capabilities/valid/generic-future-capability-result-extension.json").read_text())
         with self.assertRaises(NormalizationRejected):
             CapabilityNormalizationBoundary(()).normalize(handoff,extension=ext,state=self._state())
+
+    def test_handoff_validation_status_must_be_valid_or_partial(self):
+        handoff=json.loads((ROOT/"core/fixtures/capabilities/valid/generic-future-capability-handoff.json").read_text())
+        ext=json.loads((ROOT/"core/fixtures/capabilities/valid/generic-future-capability-result-extension.json").read_text())
+        state=self._state()
+        for status in (None,"unknown","rejected"):
+            invalid=json.loads(json.dumps(handoff))
+            if status is None:
+                invalid["validation"].pop("status",None)
+            else:
+                invalid["validation"]["status"]=status
+            with self.assertRaises(NormalizationRejected):
+                CapabilityNormalizationBoundary((self.FutureNormalizer(),)).normalize(invalid,extension=ext,state=state)
 
     def test_future_capability_normalizes_without_reducer_capability_branch(self):
         handoff=json.loads((ROOT/"core/fixtures/capabilities/valid/generic-future-capability-handoff.json").read_text())

@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 import unittest
 
-from core.runtime import StateTransitionRejected, TransitionAction, TransitionKind, reduce_state
+from core.runtime import ReductionError, StateTransitionRejected, TransitionAction, TransitionKind, reduce_state
 from core.runtime.transition_models import CommitReceipt
 from runtime_fixtures import *
 
@@ -58,6 +58,19 @@ class StateTransitionRuntimeTests(unittest.TestCase):
         rejected = svc.apply(second)
         self.assertIn("RT-DECISION-005", codes(rejected))
 
+    def test_decision_replay_is_rejected_even_without_authority_requirement(self):
+        dec = decision("DEC-USED","research_adoption","approve","project","PRJ-1")
+        base = seed_state(objects=[project()],decisions=(dec,))
+        base = replace(base,used_decision_ids=("DEC-USED",))
+        action = TransitionAction(
+            TransitionKind.RECORD_RUN_RESULT_ADOPTION,
+            {"adoption_refs":["RUN-1"]},
+            decision_refs=("DEC-USED",),
+        )
+        _,svc=service(base)
+        rejected=svc.apply(make_request(base,[action]))
+        self.assertIn("RT-DECISION-005",codes(rejected))
+
     def test_active_lineage_switch_is_authorized_and_does_not_create_snapshot(self):
         base = seed_state(objects=[project(),rq()])
         second_line = replace(base.lineages[0], lineage_id="LIN-2")
@@ -79,10 +92,11 @@ class StateTransitionRuntimeTests(unittest.TestCase):
         self.assertIn("RT-DECISION-001", codes(rejected))
 
         dec = decision("DEC-REV","research_revision","revise","finding","FND-1")
-        revised["decision_ids"]=["DEC-REV"]
+        revised_with_decision = dict(revised)
+        revised_with_decision["decision_ids"]=["DEC-REV"]
         req = make_request(base,[
             TransitionAction(TransitionKind.RECORD_DECISION,{"object":dec}),
-            TransitionAction(TransitionKind.REVISE_OBJECT,{"object":revised},decision_refs=("DEC-REV",)),
+            TransitionAction(TransitionKind.REVISE_OBJECT,{"object":revised_with_decision},decision_refs=("DEC-REV",)),
         ],suffix="2")
         repo, svc = service(base)
         self.assertIsInstance(svc.apply(req), CommitReceipt)
@@ -102,15 +116,34 @@ class StateTransitionRuntimeTests(unittest.TestCase):
         self.assertIn("RT-DECISION-001", codes(rejected))
 
         reclass = decision("DEC-RECLASS","evidence_reclassification","reclassify","evidence","EVD-1")
-        changed["decision_ids"]=["DEC-VERIFY","DEC-RECLASS"]
+        changed_with_both = evidence(
+            revision=1,
+            evidence_kind="supporting",
+            verification="verified",
+            decision_ids=("DEC-VERIFY","DEC-RECLASS"),
+        )
         req = make_request(base,[
             TransitionAction(TransitionKind.RECORD_DECISION,{"object":verify}),
             TransitionAction(TransitionKind.RECORD_DECISION,{"object":reclass}),
-            TransitionAction(TransitionKind.VERIFY_EVIDENCE,{"object":changed},decision_refs=("DEC-VERIFY","DEC-RECLASS")),
+            TransitionAction(TransitionKind.VERIFY_EVIDENCE,{"object":changed_with_both},decision_refs=("DEC-VERIFY","DEC-RECLASS")),
         ],suffix="2")
         repo, svc = service(base)
         self.assertIsInstance(svc.apply(req), CommitReceipt)
         self.assertEqual(repo.load_object_revision("evidence","EVD-1",1)["evidence_kind"],"supporting")
+
+    def test_project_ref_resolves_without_project_snapshot_member(self):
+        base=seed_state(objects=[rq()])
+        claim={"schema_version":"0.1.0","id":"CLM-PROJ","kind":"claim","revision":0,"project_id":"PRJ-1","question_id":"RQ-1","statement":"Project-ref resolution","assessment":"proposed"}
+        _,svc=service(base)
+        receipt=svc.apply(make_request(base,[TransitionAction(TransitionKind.CREATE_OBJECT,{"object":claim})]))
+        self.assertIsInstance(receipt,CommitReceipt)
+
+    def test_profile_required_field_checks_presence_not_truthiness(self):
+        base=seed_state(objects=[],constraints={"required_fields_by_kind":{"artifact":["evidence_eligible"]}})
+        artifact={"schema_version":"0.1.0","id":"ART-1","kind":"artifact","revision":0,"project_id":"PRJ-1","role":"input","lane":"publication","artifact_class":"input","locator":"fixture://artifact/1","evidence_eligible":False}
+        _,svc=service(base)
+        receipt=svc.apply(make_request(base,[TransitionAction(TransitionKind.CREATE_OBJECT,{"object":artifact})]))
+        self.assertIsInstance(receipt,CommitReceipt)
 
     def test_dangling_reference_is_rejected(self):
         base = seed_state(objects=[project()])
@@ -206,6 +239,67 @@ class StateTransitionRuntimeTests(unittest.TestCase):
         self.assertEqual(parent.current_snapshot["id"],base.current_snapshot["id"])
         self.assertNotEqual(child.current_snapshot["id"],parent.current_snapshot["id"])
         self.assertEqual(repo.debug_state()["active"],"LIN-1")
+
+    def test_lineage_treatment_identity_is_kind_and_id(self):
+        p=project("SAME")
+        q={"schema_version":"0.1.0","id":"SAME","kind":"research_question","revision":0,"project_id":"SAME","text":"Same ID across kinds","adoption_state":"candidate"}
+        dec=decision("DEC-FORK","lineage_plan","apply","lineage_plan","PLAN-1",project_id="SAME")
+        base=seed_state(objects=[p,q],decisions=(dec,),project_id="SAME")
+        action=TransitionAction(TransitionKind.APPLY_LINEAGE_PLAN,{
+            "plan_ref":"PLAN-1","target_lineage_id":"LIN-CHILD","lineage_kind":"exploratory_fork",
+            "baseline_snapshot_ref":base.current_snapshot["id"],"baseline_snapshot_digest":base.current_snapshot["content_digest"],
+            "treatments":[{"object_kind":"project","source_ref":"SAME","treatment":"PRESERVE"}],
+        },decision_refs=("DEC-FORK",))
+        _,svc=service(base)
+        rejected=svc.apply(make_request(base,[action]))
+        self.assertIn("RT-LINEAGE-007",codes(rejected))
+        issue=next(item for item in rejected.issues if item.error_code=="RT-LINEAGE-007")
+        self.assertIn("research_question:SAME",issue.affected_refs)
+
+    def test_lineage_kind_missing_reduces_to_stable_error(self):
+        objs=[project(),rq()]
+        dec=decision("DEC-FORK","lineage_plan","apply","lineage_plan","PLAN-1")
+        base=seed_state(objects=objs,decisions=(dec,))
+        action=TransitionAction(TransitionKind.APPLY_LINEAGE_PLAN,{
+            "plan_ref":"PLAN-1","target_lineage_id":"LIN-CHILD",
+            "baseline_snapshot_ref":base.current_snapshot["id"],"baseline_snapshot_digest":base.current_snapshot["content_digest"],
+            "treatments":[{"object_kind":item["kind"],"source_ref":item["id"],"treatment":"PRESERVE"} for item in objs],
+        },decision_refs=("DEC-FORK",))
+        request=make_request(base,[action])
+        with self.assertRaisesRegex(ReductionError,"lineage plan requires lineage_kind"):
+            reduce_state(base,request)
+
+    def test_reconfirm_identity_change_requires_explicit_derived_ref(self):
+        objs=[project(),rq(),finding()]
+        plan=decision("DEC-FORK","lineage_plan","apply","lineage_plan","PLAN-MAP")
+        reconfirm=decision("DEC-RECONF","lineage_reconfirmation","reconfirm","finding","FND-2")
+        base=seed_state(objects=objs,decisions=(plan,reconfirm))
+        derived=finding(revision=0,statement="Mapped finding",decision_ids=("DEC-RECONF",))
+        derived["id"]="FND-2"
+        base_payload={
+            "plan_ref":"PLAN-MAP","target_lineage_id":"LIN-MAP","lineage_kind":"exploratory_fork",
+            "baseline_snapshot_ref":base.current_snapshot["id"],"baseline_snapshot_digest":base.current_snapshot["content_digest"],
+            "treatments":[
+                {"object_kind":"project","source_ref":"PRJ-1","treatment":"PRESERVE"},
+                {"object_kind":"research_question","source_ref":"RQ-1","treatment":"PRESERVE"},
+                {"object_kind":"finding","source_ref":"FND-1","treatment":"RECONFIRM","derived_object":derived,"human_decision_ref":"DEC-RECONF"},
+            ],
+        }
+        _,svc=service(base)
+        rejected=svc.apply(make_request(base,[TransitionAction(TransitionKind.APPLY_LINEAGE_PLAN,base_payload,decision_refs=("DEC-FORK","DEC-RECONF"))]))
+        self.assertIn("RT-LINEAGE-015",codes(rejected))
+
+        explicit=dict(base_payload)
+        explicit["treatments"]=[dict(item) for item in base_payload["treatments"]]
+        explicit["treatments"][2]["derived_ref"]="FND-2"
+        repo,svc=service(base)
+        receipt=svc.apply(make_request(base,[TransitionAction(TransitionKind.APPLY_LINEAGE_PLAN,explicit,decision_refs=("DEC-FORK","DEC-RECONF"))],suffix="2"))
+        self.assertIsInstance(receipt,CommitReceipt)
+        mapped=repo.load_state_view("PRJ-1","LIN-MAP")
+        effective={(str(obj["kind"]),str(obj["id"])) for obj in mapped.effective_objects()}
+        self.assertNotIn(("finding","FND-1"),effective)
+        self.assertIn(("finding","FND-2"),effective)
+        self.assertEqual(mapped.latest_object("finding","FND-2")["revision"],0)
 
     def test_recovery_applies_explicit_treatments_and_registers_replay_plan(self):
         objs=[project(),rq(),finding()]

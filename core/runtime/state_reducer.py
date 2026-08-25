@@ -116,6 +116,9 @@ def _reduce_lineage_plan(current_state: StateView, request: StateTransitionReque
     target_lineage_id = str(payload.get("target_lineage_id", ""))
     if not target_lineage_id:
         raise ReductionError("lineage plan requires target_lineage_id")
+    lineage_kind = str(payload.get("lineage_kind", ""))
+    if not lineage_kind:
+        raise ReductionError("lineage plan requires lineage_kind")
 
     by_ref: dict[tuple[str, str], Mapping[str, Any]] = {}
     for treatment in payload.get("treatments", ()):
@@ -152,14 +155,24 @@ def _reduce_lineage_plan(current_state: StateView, request: StateTransitionReque
             derived = dict(derived)
             if derived.get("kind") != key[0]:
                 raise ReductionError("reconfirmed object kind must match its source treatment")
+            derived_id = str(derived.get("id", ""))
+            declared_derived_ref = str(treatment.get("derived_ref", ""))
+            if not derived_id:
+                raise ReductionError("reconfirmed object must carry an id")
+            if derived_id != key[1] and declared_derived_ref != derived_id:
+                raise ReductionError(
+                    "reconfirmed object identity change requires derived_ref matching derived_object id"
+                )
+            if declared_derived_ref and declared_derived_ref != derived_id:
+                raise ReductionError("lineage treatment derived_ref must match derived_object id")
             if int(derived.get("revision", -1)) < 0:
                 raise ReductionError("reconfirmed object must carry a non-negative revision")
-            existing = current_state.latest_object(str(derived.get("kind", "")), str(derived.get("id", "")))
+            existing = current_state.latest_object(str(derived.get("kind", "")), derived_id)
             if existing is not None and int(derived["revision"]) != int(existing["revision"]) + 1:
                 raise ReductionError("reconfirmed existing object requires the next monotonic revision")
             if existing is None and int(derived["revision"]) != 0:
                 raise ReductionError("new reconfirmed object identity starts at revision 0")
-            child_members[(str(derived["kind"]), str(derived["id"]))] = derived
+            child_members[(str(derived["kind"]), derived_id)] = derived
             new_revisions.append(derived)
         else:
             raise ReductionError(f"unsupported lineage treatment {treatment_kind!r}")
@@ -178,7 +191,7 @@ def _reduce_lineage_plan(current_state: StateView, request: StateTransitionReque
     if parent is None:
         raise ReductionError(f"parent lineage {request.lineage_ref!r} does not resolve")
     child = LineageView(
-        lineage_id=target_lineage_id, lineage_kind=str(payload["lineage_kind"]),
+        lineage_id=target_lineage_id, lineage_kind=lineage_kind,
         head_snapshot_ref=str(snapshot["id"]), head_snapshot_digest=str(snapshot["content_digest"]),
         head_snapshot_revision=int(snapshot["revision"]), execution_mode=execution_mode, status="active",
         parent_lineage_ref=parent.lineage_id, baseline_snapshot_ref=str(current_state.current_snapshot["id"]),

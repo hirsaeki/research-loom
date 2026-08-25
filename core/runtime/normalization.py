@@ -68,7 +68,7 @@ def _validate_outer_handoff(handoff: Mapping[str, Any], state: StateView) -> Non
     if handoff.get("project_id") != state.project_ref:
         raise NormalizationRejected("Capability Handoff project does not match current Research State")
     validation = handoff.get("validation")
-    if not isinstance(validation, Mapping) or validation.get("status") == "rejected":
+    if not isinstance(validation, Mapping) or validation.get("status") not in {"valid", "partial"}:
         raise NormalizationRejected("rejected/invalid Capability Handoff cannot enter normalization")
     boundary = handoff.get("adoption_boundary")
     expected = {

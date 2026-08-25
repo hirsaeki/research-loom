@@ -55,7 +55,7 @@ class StateTransitionService:
                 ),
             )
 
-        schema_issues = self._schema_validator.validate_request(request)
+        schema_issues = _ordered_issues(self._schema_validator.validate_request(request))
         if schema_issues:
             return StateTransitionRejected(transition_id=request.transition_id, issues=schema_issues)
 
@@ -151,6 +151,13 @@ class StateTransitionService:
             )
 
 
+def _ordered_issues(issues: Iterable[ValidationIssue]) -> tuple[ValidationIssue, ...]:
+    return tuple(sorted(
+        issues,
+        key=lambda item: (item.stage.value, item.error_code, item.message, item.affected_refs),
+    ))
+
+
 def _reject(request: StateTransitionRequest, issue: ValidationIssue) -> StateTransitionRejected:
     return StateTransitionRejected(transition_id=request.transition_id, issues=(issue,))
 
@@ -160,7 +167,7 @@ def _rejected_with_head(
     current_state,
     issues,
 ) -> StateTransitionRejected:
-    ordered = tuple(sorted(issues, key=lambda item: (item.stage.value, item.error_code, item.message)))
+    ordered = _ordered_issues(issues)
     return StateTransitionRejected(
         transition_id=request.transition_id,
         issues=ordered,

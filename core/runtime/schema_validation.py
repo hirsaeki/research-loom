@@ -54,7 +54,11 @@ class CanonicalResearchObjectSchemaValidator:
         for obj in objects:
             errors = sorted(
                 self._validator.iter_errors(obj),
-                key=lambda error: tuple(str(item) for item in error.absolute_path),
+                key=lambda error: (
+                    tuple(str(item) for item in error.absolute_path),
+                    error.validator or "",
+                    error.message,
+                ),
             )
             for error in errors:
                 path = ".".join(str(item) for item in error.absolute_path) or "$"

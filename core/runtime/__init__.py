@@ -23,8 +23,8 @@ from .transition_models import (
 
 __all__ = [
     "Actor",
-    "CapabilityNormalizationBoundary",
     "CanonicalResearchObjectSchemaValidator",
+    "CapabilityNormalizationBoundary",
     "CommitBundle",
     "CommitReceipt",
     "LineageView",
