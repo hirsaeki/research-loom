@@ -86,6 +86,18 @@ class SQLiteResearchStateRepository(
                     "SQLite foreign_keys pragma is not enabled"
                 )
             self._migrate()
+        except RepositoryError:
+            connection = getattr(self, "_connection", None)
+            if connection is not None:
+                connection.close()
+            raise
+        except sqlite3.Error as exc:
+            connection = getattr(self, "_connection", None)
+            if connection is not None:
+                connection.close()
+            raise RepositoryError(
+                "failed to initialize SQLite Research State repository"
+            ) from exc
         except Exception:
             connection = getattr(self, "_connection", None)
             if connection is not None:
