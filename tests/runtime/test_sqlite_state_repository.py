@@ -437,7 +437,7 @@ class SQLiteRepositorySpecificTests(unittest.TestCase):
                     """
                     INSERT INTO used_decisions(
                         decision_ref, consuming_transition_id, consuming_commit_id
-                    ) VALUES ('DEC-RQ', 'TR-RACE', 'COM-RACE')
+                    ) VALUES ('DEC-RQ', 'TR-RACE', NULL)
                     """
                 )
 
