@@ -131,6 +131,7 @@ class SQLiteResearchStateRepository(
     def _migrate(self) -> None:
         migrations = load_migrations(MIGRATION_DIR)
         latest = migrations[-1][0] if migrations else 0
+        known_versions = [version for version, _name, _sql in migrations]
         try:
             self._connection.execute("BEGIN IMMEDIATE")
             self._connection.execute(
@@ -155,6 +156,13 @@ class SQLiteResearchStateRepository(
                 raise RepositoryError(
                     f"SQLite schema version {max(applied)} is newer "
                     f"than supported version {latest}"
+                )
+            applied_versions = sorted(applied)
+            expected_prefix = known_versions[: len(applied_versions)]
+            if applied_versions != expected_prefix:
+                raise RepositoryError(
+                    "SQLite applied migration history must be the contiguous "
+                    "known prefix beginning at 0001"
                 )
             for version, name, _sql in migrations:
                 existing_name = applied.get(version)

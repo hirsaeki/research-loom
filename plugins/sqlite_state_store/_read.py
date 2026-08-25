@@ -203,8 +203,7 @@ class ReadMixin:
         verify_embedded_content_digest(payload)
         return payload
 
-    @repository_read
-    def load_object_revision(
+    def _load_object_revision_unchecked(
         self: "SQLiteResearchStateRepository",
         kind: str,
         object_id: str,
@@ -221,29 +220,76 @@ class ReadMixin:
         return decode_payload_row(row) if row is not None else None
 
     @repository_read
+    def load_object_revision(
+        self: "SQLiteResearchStateRepository",
+        kind: str,
+        object_id: str,
+        revision: int,
+    ) -> Mapping[str, Any] | None:
+        return self._load_object_revision_unchecked(kind, object_id, revision)
+
+    @repository_read
     def resolve_refs(
         self: "SQLiteResearchStateRepository",
         refs: Sequence[tuple[str, str]],
     ) -> Mapping[tuple[str, str], bool]:
-        known = {
-            (str(row["kind"]), str(row["object_id"]))
-            for row in self._connection.execute(
-                "SELECT DISTINCT kind, object_id FROM object_revisions"
-            )
-        }
-        known.update(
-            ("snapshot", str(row["snapshot_ref"]))
-            for row in self._connection.execute(
-                "SELECT snapshot_ref FROM snapshots"
-            )
+        requested = tuple(
+            (str(ref[0]), str(ref[1]))
+            for ref in refs
         )
-        known.update(
-            ("research_lineage", str(row["lineage_id"]))
-            for row in self._connection.execute(
-                "SELECT lineage_id FROM lineages"
+        if not requested:
+            return {}
+
+        by_kind: dict[str, set[str]] = {}
+        for kind, object_id in requested:
+            by_kind.setdefault(kind, set()).add(object_id)
+
+        known: set[tuple[str, str]] = set()
+        for kind, object_ids in sorted(by_kind.items()):
+            ordered_ids = sorted(object_ids)
+            placeholders = ",".join("?" for _ in ordered_ids)
+            rows = self._connection.execute(
+                f"""
+                SELECT DISTINCT kind, object_id
+                FROM object_revisions
+                WHERE kind = ? AND object_id IN ({placeholders})
+                """,
+                (kind, *ordered_ids),
             )
-        )
-        return {tuple(ref): tuple(ref) in known for ref in refs}
+            known.update(
+                (str(row["kind"]), str(row["object_id"]))
+                for row in rows
+            )
+
+        snapshot_ids = sorted(by_kind.get("snapshot", ()))
+        if snapshot_ids:
+            placeholders = ",".join("?" for _ in snapshot_ids)
+            known.update(
+                ("snapshot", str(row["snapshot_ref"]))
+                for row in self._connection.execute(
+                    f"""
+                    SELECT snapshot_ref FROM snapshots
+                    WHERE snapshot_ref IN ({placeholders})
+                    """,
+                    tuple(snapshot_ids),
+                )
+            )
+
+        lineage_ids = sorted(by_kind.get("research_lineage", ()))
+        if lineage_ids:
+            placeholders = ",".join("?" for _ in lineage_ids)
+            known.update(
+                ("research_lineage", str(row["lineage_id"]))
+                for row in self._connection.execute(
+                    f"""
+                    SELECT lineage_id FROM lineages
+                    WHERE lineage_id IN ({placeholders})
+                    """,
+                    tuple(lineage_ids),
+                )
+            )
+
+        return {ref: ref in known for ref in requested}
 
     @repository_read
     def find_commit_by_idempotency_key(

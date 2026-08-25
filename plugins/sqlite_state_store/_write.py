@@ -90,7 +90,13 @@ class WriteMixin:
                     )
                 for decision in bundle.decision_records:
                     key = object_key(decision)
-                    if self.load_object_revision(*key) is None:
+                    try:
+                        stored_decision = self._load_object_revision_unchecked(*key)
+                    except RepositoryError as exc:
+                        raise AtomicCommitError(
+                            "failed to validate Decision canonical object revision"
+                        ) from exc
+                    if stored_decision is None:
                         raise AtomicCommitError(
                             f"Decision {decision['id']!r} is missing its "
                             "canonical object revision"
@@ -157,7 +163,7 @@ class WriteMixin:
                         raise AtomicCommitError(
                             "active lineage target does not resolve"
                         )
-                    self._connection.execute(
+                    updated = self._connection.execute(
                         """
                         UPDATE project_active_lineage
                         SET active_lineage_ref = ?, updated_commit_id = ?
@@ -169,21 +175,32 @@ class WriteMixin:
                             bundle.project_ref,
                         ),
                     )
+                    if updated.rowcount != 1:
+                        raise AtomicCommitError(
+                            "project active lineage pointer is missing: "
+                            f"{bundle.project_ref}"
+                        )
 
                 for decision_ref in bundle.used_decision_refs:
-                    self._connection.execute(
-                        """
-                        INSERT INTO used_decisions(
-                            decision_ref, consuming_transition_id,
-                            consuming_commit_id
-                        ) VALUES (?, ?, ?)
-                        """,
-                        (
-                            decision_ref,
-                            bundle.transition_id,
-                            bundle.commit_id,
-                        ),
-                    )
+                    try:
+                        self._connection.execute(
+                            """
+                            INSERT INTO used_decisions(
+                                decision_ref, consuming_transition_id,
+                                consuming_commit_id
+                            ) VALUES (?, ?, ?)
+                            """,
+                            (
+                                decision_ref,
+                                bundle.transition_id,
+                                bundle.commit_id,
+                            ),
+                        )
+                    except sqlite3.IntegrityError as exc:
+                        raise AtomicCommitError(
+                            "Decision reference cannot be consumed twice: "
+                            f"{decision_ref}"
+                        ) from exc
 
                 for adoption_ref in bundle.adoption_refs:
                     self._connection.execute(
@@ -270,13 +287,9 @@ class WriteMixin:
             raise AtomicCommitError(
                 "SQLite integrity constraint rejected atomic commit"
             ) from exc
-        except sqlite3.OperationalError as exc:
+        except sqlite3.Error as exc:
             raise AtomicCommitError(
                 "SQLite persistence operation failed"
-            ) from exc
-        except sqlite3.Error as exc:
-            raise RepositoryError(
-                "SQLite repository operation failed"
             ) from exc
 
     def _insert_immutable_object(

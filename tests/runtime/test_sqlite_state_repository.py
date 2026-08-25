@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from contextlib import closing
+from dataclasses import replace
 from pathlib import Path
 import shutil
 import sqlite3
@@ -13,7 +15,14 @@ from core.runtime.transition_models import CommitReceipt
 from plugins.sqlite_state_store import SQLiteResearchStateRepository
 from plugins.sqlite_state_store import adapter as sqlite_adapter
 from plugins.sqlite_state_store import _support as sqlite_support
-from runtime_fixtures import SCHEMA_VALIDATOR, make_request, project, rq, seed_state
+from runtime_fixtures import (
+    SCHEMA_VALIDATOR,
+    decision,
+    make_request,
+    project,
+    rq,
+    seed_state,
+)
 
 
 class _ParitySQLiteRepository(SQLiteResearchStateRepository):
@@ -49,6 +58,13 @@ class _RaceSQLiteRepository(SQLiteResearchStateRepository):
             bundle,
             expected_head_snapshot_digest=expected_head_snapshot_digest,
         )
+
+
+class _DecisionReadFailureSQLiteRepository(SQLiteResearchStateRepository):
+    """Inject a physical/read-integrity failure inside commit validation."""
+
+    def _load_object_revision_unchecked(self, kind, object_id, revision):
+        raise RepositoryError("simulated Decision revision read failure")
 
 
 class SQLiteStateTransitionRuntimeParityTests(
@@ -136,7 +152,7 @@ class SQLiteRepositorySpecificTests(unittest.TestCase):
 
     def test_generic_schema_has_no_capability_specific_tables(self):
         self.repo(seed_state(objects=[project()]))
-        with sqlite3.connect(self.db_path) as connection:
+        with closing(sqlite3.connect(self.db_path)) as connection:
             tables = {
                 row[0]
                 for row in connection.execute(
@@ -162,7 +178,7 @@ class SQLiteRepositorySpecificTests(unittest.TestCase):
         repository = self.repo()
         repository.close()
         self.repositories.remove(repository)
-        with sqlite3.connect(self.db_path) as connection:
+        with closing(sqlite3.connect(self.db_path)) as connection, connection:
             connection.execute(
                 """
                 INSERT INTO schema_migrations(version, name)
@@ -171,6 +187,53 @@ class SQLiteRepositorySpecificTests(unittest.TestCase):
             )
         with self.assertRaises(RepositoryError):
             SQLiteResearchStateRepository(self.db_path)
+
+    def test_unknown_version_zero_schema_history_fails_closed(self):
+        repository = self.repo()
+        repository.close()
+        self.repositories.remove(repository)
+        with closing(sqlite3.connect(self.db_path)) as connection, connection:
+            connection.execute(
+                """
+                INSERT INTO schema_migrations(version, name)
+                VALUES (0, 'unknown_zero')
+                """
+            )
+        with self.assertRaisesRegex(RepositoryError, "contiguous known prefix"):
+            SQLiteResearchStateRepository(self.db_path)
+
+    def test_non_contiguous_applied_migration_history_fails_closed(self):
+        migration_dir = Path(self.tempdir.name) / "gap-migrations"
+        migration_dir.mkdir()
+        shutil.copyfile(
+            sqlite_support.MIGRATION_DIR / "0001_research_state.sql",
+            migration_dir / "0001_research_state.sql",
+        )
+        (migration_dir / "0002_noop.sql").write_text(
+            "CREATE TABLE migration_two(id INTEGER PRIMARY KEY);\n",
+            encoding="utf-8",
+        )
+        gap_db = Path(self.tempdir.name) / "gap.sqlite3"
+        with closing(sqlite3.connect(gap_db)) as connection, connection:
+            connection.execute(
+                """
+                CREATE TABLE schema_migrations(
+                    version INTEGER PRIMARY KEY,
+                    name TEXT NOT NULL UNIQUE,
+                    applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+            connection.execute(
+                "INSERT INTO schema_migrations(version, name) VALUES (2, 'noop')"
+            )
+        prior = sqlite_adapter.MIGRATION_DIR
+        sqlite_adapter.MIGRATION_DIR = migration_dir
+        try:
+            with self.assertRaisesRegex(RepositoryError, "contiguous known prefix"):
+                SQLiteResearchStateRepository(gap_db)
+        finally:
+            sqlite_adapter.MIGRATION_DIR = prior
 
     def test_pending_migration_failure_rolls_back_transaction(self):
         migration_dir = Path(self.tempdir.name) / "migrations"
@@ -192,7 +255,7 @@ class SQLiteRepositorySpecificTests(unittest.TestCase):
                 SQLiteResearchStateRepository(broken)
         finally:
             sqlite_adapter.MIGRATION_DIR = prior
-        with sqlite3.connect(broken) as connection:
+        with closing(sqlite3.connect(broken)) as connection:
             tables = {
                 row[0]
                 for row in connection.execute(
@@ -301,11 +364,154 @@ class SQLiteRepositorySpecificTests(unittest.TestCase):
             second.load_object_revision("claim", "CLM-B", 0)
         )
 
+    def test_missing_active_lineage_pointer_cannot_commit_switch(self):
+        base = seed_state(objects=[project(), rq()])
+        second_lineage = replace(base.lineages[0], lineage_id="LIN-2")
+        switch_decision = decision(
+            "DEC-SWITCH",
+            "active_lineage_selection",
+            "switch",
+            "research_lineage",
+            "LIN-2",
+        )
+        base = replace(
+            base,
+            lineages=(*base.lineages, second_lineage),
+            decisions=(switch_decision,),
+            objects=(*base.objects, switch_decision),
+        )
+        repository = _RaceSQLiteRepository(self.db_path)
+        repository.initialize_from_validated_state_view(base)
+        self.repositories.append(repository)
+
+        def remove_active_pointer():
+            with closing(sqlite3.connect(self.db_path)) as connection, connection:
+                connection.execute(
+                    "DELETE FROM project_active_lineage WHERE project_ref = 'PRJ-1'"
+                )
+
+        repository.before_commit = remove_active_pointer
+        request = make_request(
+            base,
+            [
+                TransitionAction(
+                    TransitionKind.SWITCH_ACTIVE_LINEAGE,
+                    {"target_lineage_ref": "LIN-2"},
+                    decision_refs=("DEC-SWITCH",),
+                )
+            ],
+            suffix="33",
+            key="IDEMP-SWITCH-MISSING",
+        )
+        rejected = self.service(repository).apply(request)
+        self.assertNotIsInstance(rejected, CommitReceipt)
+        self.assertIn(
+            "RT-PERSIST-001",
+            {issue.error_code for issue in rejected.issues},
+        )
+        self.assertIn("active lineage pointer is missing", rejected.issues[0].message)
+        self.assertIsNone(
+            repository.find_commit_by_idempotency_key("IDEMP-SWITCH-MISSING")
+        )
+
+    def test_used_decision_uniqueness_defends_against_commit_time_replay(self):
+        adopted_decision = decision(
+            "DEC-RQ",
+            "research_adoption",
+            "approve",
+            "research_question",
+            "RQ-1",
+        )
+        base = seed_state(
+            objects=[project(), rq()],
+            decisions=(adopted_decision,),
+        )
+        repository = _RaceSQLiteRepository(self.db_path)
+        repository.initialize_from_validated_state_view(base)
+        self.repositories.append(repository)
+
+        def consume_decision_first():
+            with closing(sqlite3.connect(self.db_path)) as connection, connection:
+                connection.execute("PRAGMA foreign_keys = ON")
+                connection.execute(
+                    """
+                    INSERT INTO used_decisions(
+                        decision_ref, consuming_transition_id, consuming_commit_id
+                    ) VALUES ('DEC-RQ', 'TR-RACE', 'COM-RACE')
+                    """
+                )
+
+        repository.before_commit = consume_decision_first
+        adopted = rq(
+            revision=1,
+            state="approved",
+            decision_ids=("DEC-RQ",),
+        )
+        request = make_request(
+            base,
+            [
+                TransitionAction(
+                    TransitionKind.ADOPT_OBJECT,
+                    {"object": adopted},
+                    decision_refs=("DEC-RQ",),
+                )
+            ],
+            suffix="34",
+            key="IDEMP-DECISION-RACE",
+            new_snapshot_id="SNP-DECISION-RACE",
+        )
+        rejected = self.service(repository).apply(request)
+        self.assertNotIsInstance(rejected, CommitReceipt)
+        self.assertIn(
+            "RT-PERSIST-001",
+            {issue.error_code for issue in rejected.issues},
+        )
+        self.assertIn("cannot be consumed twice", rejected.issues[0].message)
+        self.assertIsNone(repository.load_snapshot("SNP-DECISION-RACE"))
+        self.assertIsNone(
+            repository.find_commit_by_idempotency_key("IDEMP-DECISION-RACE")
+        )
+
+    def test_decision_revision_read_failure_is_atomic_commit_error(self):
+        base = seed_state(objects=[project(), rq()])
+        repository = _DecisionReadFailureSQLiteRepository(self.db_path)
+        repository.initialize_from_validated_state_view(base)
+        self.repositories.append(repository)
+        recorded = decision(
+            "DEC-NEW",
+            "research_adoption",
+            "approve",
+            "research_question",
+            "RQ-1",
+        )
+        request = make_request(
+            base,
+            [
+                TransitionAction(
+                    TransitionKind.RECORD_DECISION,
+                    {"object": recorded},
+                )
+            ],
+            suffix="35",
+            key="IDEMP-DECISION-READ",
+            new_snapshot_id="SNP-DECISION-READ",
+        )
+        rejected = self.service(repository).apply(request)
+        self.assertNotIsInstance(rejected, CommitReceipt)
+        self.assertIn(
+            "RT-PERSIST-001",
+            {issue.error_code for issue in rejected.issues},
+        )
+        self.assertIn("failed to validate Decision", rejected.issues[0].message)
+        self.assertIsNone(
+            repository.find_commit_by_idempotency_key("IDEMP-DECISION-READ")
+        )
+
     def test_mid_transaction_fault_rolls_back_all_research_state(self):
         seed = seed_state(objects=[project(), rq()])
         repository = self.repo(seed)
         before = repository.debug_state()
-        with sqlite3.connect(self.db_path) as connection:
+        with closing(sqlite3.connect(self.db_path)) as connection, connection:
             connection.execute(
                 """
                 CREATE TRIGGER fail_audit
@@ -346,7 +552,7 @@ class SQLiteRepositorySpecificTests(unittest.TestCase):
         repository = self.repo(seed)
         repository.close()
         self.repositories.remove(repository)
-        with sqlite3.connect(self.db_path) as connection:
+        with closing(sqlite3.connect(self.db_path)) as connection, connection:
             connection.execute("PRAGMA foreign_keys = OFF")
             connection.execute(
                 """
