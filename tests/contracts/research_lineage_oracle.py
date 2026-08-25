@@ -58,13 +58,21 @@ def lineage_error(lineage: dict, known_parent: dict | None = None) -> str | None
     """Validate lineage ancestry, project identity, and execution mode."""
     if error := digest_error(lineage):
         return error
+    mode = lineage["execution_mode"]
+    if (
+        lineage["baseline_snapshot"]["execution_mode"] != mode
+        or lineage["current_snapshot"]["execution_mode"] != mode
+    ):
+        return "RL-VIRTUAL-REAL-001"
     if lineage["lineage_kind"] == "primary":
         return None
     if not lineage.get("parent_lineage_ref") or known_parent is None:
         return "RL-PARENT-001"
+    if lineage["parent_lineage_ref"] != known_parent["lineage_id"]:
+        return "RL-PARENT-001"
     if lineage["project_ref"] != known_parent["project_ref"]:
         return "RL-PROJECT-MISMATCH-001"
-    if lineage["baseline_snapshot"]["execution_mode"] != lineage["execution_mode"]:
+    if known_parent["execution_mode"] != mode:
         return "RL-VIRTUAL-REAL-001"
     return None
 
@@ -72,27 +80,59 @@ def lineage_error(lineage: dict, known_parent: dict | None = None) -> str | None
 def fork_plan_error(
     plan: dict, proposal: dict, parent: dict, effective_refs: set[str]
 ) -> str | None:
-    """Validate baseline, project, treatment decisions, and invalidation."""
+    """Validate baseline, exact pins, treatments, decisions, and invalidation."""
     if error := digest_error(plan):
         return error
     if plan["project_ref"] != parent["project_ref"]:
         return "RL-PROJECT-MISMATCH-001"
     if proposal["project_ref"] != parent["project_ref"]:
         return "RL-PROJECT-MISMATCH-001"
+    if (
+        plan["parent_lineage_ref"] != parent["lineage_id"]
+        or proposal["requested_baseline_lineage"] != parent["lineage_id"]
+    ):
+        return "RL-PARENT-001"
     if plan["approved_baseline"] != proposal["baseline_snapshot"]:
         return "RL-BASELINE-STALE-001"
+
+    expected_pins = {
+        (parent["project_config"]["ref"], parent["project_config"]["content_digest"]),
+        (
+            parent["effective_profile_set"]["ref"],
+            parent["effective_profile_set"]["content_digest"],
+        ),
+    }
+    actual_pins = {(pin["ref"], pin["content_digest"]) for pin in plan["exact_input_pins"]}
+    if len(plan["exact_input_pins"]) != len(actual_pins) or actual_pins != expected_pins:
+        return "RL-CONFIG-PROFILE-PIN-001"
+
+    allowed_treatments = {"PRESERVE", "RECONFIRM", "INVALIDATE"}
+    proposal_refs = set(proposal["affected_refs"])
+    treatment_refs = [treatment["source_ref"] for treatment in plan["treatments"]]
+    if (
+        any(treatment["treatment"] not in allowed_treatments for treatment in plan["treatments"])
+        or len(treatment_refs) != len(set(treatment_refs))
+        or set(treatment_refs) != proposal_refs
+    ):
+        return "RL-TREATMENT-001"
+
     required = set(plan["required_human_decision_refs"])
+    used: set[str] = set()
     for treatment in plan["treatments"]:
         decision = treatment.get("human_decision_ref")
         if treatment["treatment"] in {"RECONFIRM", "INVALIDATE"} and not decision:
             return "RL-HUMAN-DECISION-001"
         if decision and decision not in required:
             return "RL-HUMAN-DECISION-001"
+        if decision:
+            used.add(decision)
         if (
             treatment["treatment"] == "INVALIDATE"
             and treatment["source_ref"] in effective_refs
         ):
             return "RL-INVALIDATED-LEAK-001"
+    if required != used:
+        return "RL-HUMAN-DECISION-001"
     return None
 
 
@@ -107,10 +147,28 @@ def revision_collision_error(records: list[dict]) -> str | None:
     return None
 
 
-def replay_error(plan: dict, execution: dict) -> str | None:
-    """Validate append-only replay IDs, rebuilt Context Packs, and Handoffs."""
+def replay_error(
+    plan: dict, execution: dict, source_lineage: dict, target_lineage: dict
+) -> str | None:
+    """Validate replay project, lineage, mode, new IDs, Context Packs, and Handoffs."""
     if error := digest_error(plan):
         return error
+    if (
+        plan["project_ref"] != source_lineage["project_ref"]
+        or plan["project_ref"] != target_lineage["project_ref"]
+    ):
+        return "RL-PROJECT-MISMATCH-001"
+    if (
+        plan["source_lineage_ref"] != source_lineage["lineage_id"]
+        or plan["target_lineage_ref"] != target_lineage["lineage_id"]
+    ):
+        return "RL-PARENT-001"
+    if (
+        source_lineage["execution_mode"] != target_lineage["execution_mode"]
+        or plan["baseline_snapshot"]["execution_mode"]
+        != source_lineage["execution_mode"]
+    ):
+        return "RL-VIRTUAL-REAL-001"
     if set(execution["source_old_run_ids"]) & set(execution["target_new_run_ids"]):
         return "RL-REPLAY-RUN-ID-001"
     if execution["context_pack_policy"] != "rebuild_from_target_lineage":
@@ -134,10 +192,12 @@ def selection_error(selection: dict) -> str | None:
 
 
 def comparison_error(comparison: dict) -> str | None:
-    """Ensure lineage comparison is read-only and performs no adoption."""
+    """Ensure lineage comparison stays read-only and never auto-adopts either side."""
     if error := digest_error(comparison):
         return error
-    if not comparison["read_only"] or comparison["automatic_adoption_performed"]:
+    if comparison["automatic_adoption_performed"]:
+        return "RL-AUTO-MERGE-001"
+    if not comparison["read_only"]:
         return "RL-COMPARISON-READONLY-001"
     return None
 

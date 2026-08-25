@@ -13,6 +13,7 @@ from research_lineage_oracle import (
     canonical_digest,
     comparison_error,
     conversation_error,
+    digest_error,
     downstream_error,
     fork_plan_error,
     lineage_error,
@@ -91,6 +92,44 @@ class ResearchLineageContractsTest(unittest.TestCase):
         """Keep semantic error catalog and executable oracle exact."""
         self.assertEqual({item["id"] for item in self.sem["errors"]}, ERROR_IDS)
 
+    def test_all_digest_bearing_fixtures_and_tamper_detection(self) -> None:
+        """Validate every canonical fixture digest and reject stale content digests."""
+        keys = (
+            "primary_lineage",
+            "exploratory_lineage",
+            "recovery_lineage",
+            "fork_proposal",
+            "fork_plan",
+            "impact_assessment",
+            "recovery_request",
+            "replay_plan",
+            "interrupted_replay_plan",
+            "active_lineage_selection",
+            "lineage_comparison",
+        )
+        for key in keys:
+            with self.subTest(key=key):
+                document = self.f[key]
+                self.assertIsNone(digest_error(document))
+                tampered = deepcopy(document)
+                if "rationale" in tampered:
+                    tampered["rationale"] += " tampered"
+                elif "reason" in tampered:
+                    tampered["reason"] += " tampered"
+                elif "replay_actions" in tampered:
+                    tampered["replay_actions"].append("tampered")
+                elif "items" in tampered:
+                    tampered["items"][0]["object_ref"] = "TAMPERED"
+                elif "uncertainty" in tampered:
+                    tampered["uncertainty"] += " tampered"
+                elif "replay_start_boundary" in tampered:
+                    tampered["replay_start_boundary"] = "TAMPERED"
+                elif "impact_summary_ref" in tampered:
+                    tampered["impact_summary_ref"] = "TAMPERED"
+                else:
+                    tampered["changes"][0]["object_ref"] = "TAMPERED"
+                self.assertEqual(digest_error(tampered), "RL-DIGEST-001")
+
     def test_parent_and_child_continue_independently(self) -> None:
         """A historical fork must not move the parent lineage head."""
         parent = self.f["primary_lineage"]
@@ -98,6 +137,18 @@ class ResearchLineageContractsTest(unittest.TestCase):
         self.assertIsNone(lineage_error(parent))
         self.assertIsNone(lineage_error(child, parent))
         self.assertNotEqual(parent["current_snapshot"], child["current_snapshot"])
+
+    def test_lineage_parent_execution_mode_is_part_of_firewall(self) -> None:
+        """Reject a REAL child when its known parent lineage is VIRTUAL."""
+        parent = deepcopy(self.f["primary_lineage"])
+        parent["execution_mode"] = "virtual"
+        parent["baseline_snapshot"]["execution_mode"] = "virtual"
+        parent["current_snapshot"]["execution_mode"] = "virtual"
+        refresh(parent, "lineage_digest")
+        self.assertEqual(
+            lineage_error(self.f["exploratory_lineage"], parent),
+            "RL-VIRTUAL-REAL-001",
+        )
 
     def test_treatments_and_invalidated_leak(self) -> None:
         """Require explicit treatments and prevent invalidated state from leaking."""
@@ -110,6 +161,7 @@ class ResearchLineageContractsTest(unittest.TestCase):
                 {"RQ-1", "METHOD-2"},
             )
         )
+
         missing_decision = deepcopy(fixture["fork_plan"])
         missing_decision["treatments"][1].pop("human_decision_ref")
         refresh(missing_decision, "plan_digest")
@@ -122,6 +174,59 @@ class ResearchLineageContractsTest(unittest.TestCase):
             ),
             "RL-HUMAN-DECISION-001",
         )
+
+        unused_decision = deepcopy(fixture["fork_plan"])
+        unused_decision["required_human_decision_refs"].append("HD-UNUSED")
+        refresh(unused_decision, "plan_digest")
+        self.assertEqual(
+            fork_plan_error(
+                unused_decision,
+                fixture["fork_proposal"],
+                fixture["primary_lineage"],
+                set(),
+            ),
+            "RL-HUMAN-DECISION-001",
+        )
+
+        incomplete = deepcopy(fixture["fork_plan"])
+        incomplete["treatments"].pop()
+        refresh(incomplete, "plan_digest")
+        self.assertEqual(
+            fork_plan_error(
+                incomplete,
+                fixture["fork_proposal"],
+                fixture["primary_lineage"],
+                set(),
+            ),
+            "RL-TREATMENT-001",
+        )
+
+        wrong_parent = deepcopy(fixture["fork_plan"])
+        wrong_parent["parent_lineage_ref"] = "LIN-OTHER"
+        refresh(wrong_parent, "plan_digest")
+        self.assertEqual(
+            fork_plan_error(
+                wrong_parent,
+                fixture["fork_proposal"],
+                fixture["primary_lineage"],
+                set(),
+            ),
+            "RL-PARENT-001",
+        )
+
+        stale_pin = deepcopy(fixture["fork_plan"])
+        stale_pin["exact_input_pins"][0]["content_digest"] = "sha256:" + "9" * 64
+        refresh(stale_pin, "plan_digest")
+        self.assertEqual(
+            fork_plan_error(
+                stale_pin,
+                fixture["fork_proposal"],
+                fixture["primary_lineage"],
+                set(),
+            ),
+            "RL-CONFIG-PROFILE-PIN-001",
+        )
+
         self.assertEqual(
             fork_plan_error(
                 fixture["fork_plan"],
@@ -168,31 +273,41 @@ class ResearchLineageContractsTest(unittest.TestCase):
         )
 
     def test_replay_uses_new_runs_contexts_and_handoffs(self) -> None:
-        """Replay must allocate new Runs and rebuild Context Packs and Handoffs."""
+        """Replay must stay in-project and allocate new Runs, Context Packs, and Handoffs."""
         fixture = self.f
+        source = fixture["primary_lineage"]
+        target = fixture["recovery_lineage"]
         self.assertIsNone(
-            replay_error(fixture["replay_plan"], fixture["replay_execution"])
+            replay_error(fixture["replay_plan"], fixture["replay_execution"], source, target)
         )
 
         execution = deepcopy(fixture["replay_execution"])
         execution["target_new_run_ids"] = ["RUN-014"]
         self.assertEqual(
-            replay_error(fixture["replay_plan"], execution),
+            replay_error(fixture["replay_plan"], execution, source, target),
             "RL-REPLAY-RUN-ID-001",
         )
 
         execution = deepcopy(fixture["replay_execution"])
         execution["target_handoff_refs"] = ["HANDOFF-014"]
         self.assertEqual(
-            replay_error(fixture["replay_plan"], execution),
+            replay_error(fixture["replay_plan"], execution, source, target),
             "RL-REPLAY-HANDOFF-001",
         )
 
         execution = deepcopy(fixture["replay_execution"])
         execution["context_pack_policy"] = "reuse_old"
         self.assertEqual(
-            replay_error(fixture["replay_plan"], execution),
+            replay_error(fixture["replay_plan"], execution, source, target),
             "RL-REPLAY-CONTEXT-001",
+        )
+
+        cross_project = deepcopy(fixture["replay_plan"])
+        cross_project["project_ref"] = "PROJ-OTHER"
+        refresh(cross_project, "plan_digest")
+        self.assertEqual(
+            replay_error(cross_project, fixture["replay_execution"], source, target),
+            "RL-PROJECT-MISMATCH-001",
         )
 
     def test_active_selection_and_read_only_comparison(self) -> None:
@@ -207,6 +322,11 @@ class ResearchLineageContractsTest(unittest.TestCase):
         comparison = deepcopy(self.f["lineage_comparison"])
         comparison["automatic_adoption_performed"] = True
         refresh(comparison, "comparison_digest")
+        self.assertEqual(comparison_error(comparison), "RL-AUTO-MERGE-001")
+
+        comparison = deepcopy(self.f["lineage_comparison"])
+        comparison["read_only"] = False
+        refresh(comparison, "comparison_digest")
         self.assertEqual(
             comparison_error(comparison), "RL-COMPARISON-READONLY-001"
         )
@@ -216,14 +336,14 @@ class ResearchLineageContractsTest(unittest.TestCase):
         fixture = self.f
         self.assertIsNone(
             downstream_error(
-                fixture["downstream_binding"],
+                self.binding,
                 fixture["exploratory_lineage"],
                 fixture["exploratory_lineage"]["current_snapshot"],
             )
         )
         self.assertEqual(
             downstream_error(
-                fixture["downstream_binding"],
+                self.binding,
                 fixture["primary_lineage"],
                 fixture["primary_lineage"]["current_snapshot"],
             ),
@@ -234,8 +354,15 @@ class ResearchLineageContractsTest(unittest.TestCase):
         """Preserve PR17 by refusing VIRTUAL-to-REAL through lineage fork semantics."""
         parent = deepcopy(self.f["primary_lineage"])
         parent["execution_mode"] = "virtual"
+        parent["baseline_snapshot"]["execution_mode"] = "virtual"
+        parent["current_snapshot"]["execution_mode"] = "virtual"
+        refresh(parent, "lineage_digest")
         self.assertEqual(
             virtual_real_error(parent, self.f["exploratory_lineage"]),
+            "RL-VIRTUAL-REAL-001",
+        )
+        self.assertEqual(
+            lineage_error(self.f["exploratory_lineage"], parent),
             "RL-VIRTUAL-REAL-001",
         )
 
@@ -248,7 +375,12 @@ class ResearchLineageContractsTest(unittest.TestCase):
         )
 
     def test_fail_closed_replay_schema(self) -> None:
-        """Reject a Replay Plan that permits old Handoff reuse."""
+        """Reject Replay Plans that omit project identity or permit old Handoff reuse."""
+        replay = deepcopy(self.f["replay_plan"])
+        replay.pop("project_ref")
+        with self.assertRaises(ValidationError):
+            self.validate(replay)
+
         replay = deepcopy(self.f["replay_plan"])
         replay["handoff_copy_allowed"] = True
         with self.assertRaises(ValidationError):
