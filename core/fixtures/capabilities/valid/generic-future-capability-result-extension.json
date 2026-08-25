@@ -1,0 +1,14 @@
+{
+  "schema_version": "0.1.0",
+  "extension_type": "fixture_future_evaluate_result",
+  "handoff_binding": {
+    "handoff_id": "HND-FUTURE-001",
+    "handoff_digest": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+  },
+  "candidate_claim": {
+    "id": "CLM-FUTURE-001",
+    "question_id": "RQ-FUTURE",
+    "statement": "Future capability produced a generic candidate claim."
+  },
+  "extension_digest": "sha256:6bd81f54b1b435aab0fd136bfa9c2f0ad2f556373fdf233020fa2d5d53bae428"
+}
