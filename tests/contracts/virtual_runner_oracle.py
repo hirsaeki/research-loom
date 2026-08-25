@@ -160,12 +160,19 @@ def cutover_error(manifest, *, current_pins=None):
     return None
 
 
-def real_start_error(real_start, virtual_run_ids=()):
+def real_start_error(real_start, virtual_run_roots):
     if real_start.get("execution_mode") != "real" or not real_start.get("run_root_id") or not real_start.get("run_id") or not real_start.get("runtime_authorization_id"):
         return "VR-REAL-ISOLATION-001"
     if not real_start.get("raw_data_namespace", "").startswith("real:"):
         return "VR-REAL-ISOLATION-001"
-    if real_start.get("run_id") in set(virtual_run_ids) or real_start.get("copied_virtual_content_ids") or real_start.get("virtual_identity_mapping_refs"):
+
+    source_virtual_run_id = real_start.get("source_virtual_run_id")
+    if source_virtual_run_id not in virtual_run_roots:
+        return "VR-REAL-ISOLATION-001"
+    if real_start.get("run_root_id") in set(virtual_run_roots.values()):
+        return "VR-REAL-ISOLATION-001"
+
+    if real_start.get("run_id") in set(virtual_run_roots) or real_start.get("copied_virtual_content_ids") or real_start.get("virtual_identity_mapping_refs"):
         return "VR-VIRTUAL-COPY-001"
     for key in ("access_zone", "owner", "permission_context"):
         if not real_start.get(key):

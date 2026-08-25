@@ -441,6 +441,10 @@ class VirtualRunnerContracts(unittest.TestCase):
         self.assertNotEqual(old["extension_digest"], revised["extension_digest"])
         self.assertNotEqual(old_result["handoff_binding"]["run_id"], new_result["handoff_binding"]["run_id"])
 
+        virtual_run_roots = {
+            "VR-RUN-1": "VR-ROOT-1",
+            "VR-RUN-2": "VR-ROOT-2",
+        }
         real = {
             "run_root_id": "REAL-ROOT-1",
             "run_id": "REAL-RUN-1",
@@ -455,10 +459,35 @@ class VirtualRunnerContracts(unittest.TestCase):
             "virtual_identity_mapping_refs": [],
         }
         self.assertEqual(list(Draft202012Validator(self.schema).iter_errors(real)), [])
-        self.assertEqual(real_start_error(real, ["VR-RUN-1", "VR-RUN-2"]), None)
+        self.assertEqual(real_start_error(real, virtual_run_roots), None)
 
-        real["copied_virtual_content_ids"] = ["SYN-RESP-1"]
-        self.assertEqual(real_start_error(real, ["VR-RUN-1"]), "VR-VIRTUAL-COPY-001")
+        unknown_source = deepcopy(real)
+        unknown_source["source_virtual_run_id"] = "VR-RUN-MISSING"
+        self.assertEqual(
+            real_start_error(unknown_source, virtual_run_roots),
+            "VR-REAL-ISOLATION-001",
+        )
+
+        reused_root = deepcopy(real)
+        reused_root["run_root_id"] = "VR-ROOT-1"
+        self.assertEqual(
+            real_start_error(reused_root, virtual_run_roots),
+            "VR-REAL-ISOLATION-001",
+        )
+
+        reused_run_id = deepcopy(real)
+        reused_run_id["run_id"] = "VR-RUN-2"
+        self.assertEqual(
+            real_start_error(reused_run_id, virtual_run_roots),
+            "VR-VIRTUAL-COPY-001",
+        )
+
+        copied_content = deepcopy(real)
+        copied_content["copied_virtual_content_ids"] = ["SYN-RESP-1"]
+        self.assertEqual(
+            real_start_error(copied_content, virtual_run_roots),
+            "VR-VIRTUAL-COPY-001",
+        )
 
     def test_pr10_conversational_routing_is_proposal_only(self):
         proposal = self.routing["action_proposal"]
