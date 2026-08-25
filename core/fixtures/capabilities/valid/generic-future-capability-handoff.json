@@ -1,0 +1,61 @@
+{
+  "schema_version": "0.1.0",
+  "handoff_id": "HND-FUTURE-001",
+  "invocation_id": "INV-FUTURE-001",
+  "run_id": "RUN-FUTURE-001",
+  "project_id": "PRJ-FUTURE",
+  "capability": {
+    "capability_id": "fixture.future-research-capability",
+    "capability_version": "1.0.0",
+    "descriptor_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "function_id": "evaluate"
+  },
+  "execution_mode": "real",
+  "input_pins": {
+    "invocation_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "context_pack_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "project_config_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+    "research_snapshot": {
+      "snapshot_id": "SNP-FUTURE",
+      "revision": 0,
+      "content_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    "effective_profile_set_digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+  },
+  "preserved_context": {
+    "research_attention_ids": [],
+    "project_guard_ids": [],
+    "effective_constraint_paths": []
+  },
+  "validation": {
+    "status": "valid",
+    "issues": []
+  },
+  "outputs": {
+    "observations": [],
+    "source_captures": [],
+    "evidence_candidates": [],
+    "candidate_findings": [],
+    "counterevidence": [],
+    "conflicts": [],
+    "unknowns": [],
+    "evidence_gaps": [],
+    "candidate_next_actions": [],
+    "candidate_next_methods": []
+  },
+  "provenance": {
+    "trace_id": "TRACE-FUTURE-001",
+    "produced_at": "2026-08-26T00:00:00Z",
+    "implementation_id": "plugin.fixture.future",
+    "implementation_version": "1.0.0",
+    "input_content_digests": [
+      "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    ]
+  },
+  "adoption_boundary": {
+    "research_state_mutation_performed": false,
+    "outputs_are_candidates": true,
+    "human_decision_required_for_authoritative_transition": true
+  },
+  "handoff_digest": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+}
