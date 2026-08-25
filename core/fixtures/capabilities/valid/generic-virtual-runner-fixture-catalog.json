@@ -1,0 +1,22 @@
+{
+  "fixture_catalog_version": "0.1.0",
+  "contract": "virtual-runner-contract@0.1.0",
+  "cases": [
+    {"id":"survey-standard-valid","method_family":"survey","scenario_class":"STANDARD","expected":"valid","covers":["approved method/protocol/instrument pins","normal branching","SYNTHETIC_TEST_ONLY"]},
+    {"id":"survey-stress-valid","method_family":"survey","scenario_class":"STRESS","expected":"valid","covers":["missingness","dropout","invalid response preservation"]},
+    {"id":"delphi-standard-valid","method_family":"delphi","scenario_class":"STANDARD","expected":"valid","covers":["approved panel protocol","normal round flow"]},
+    {"id":"delphi-no-consensus-dropout-stress","method_family":"delphi","scenario_class":"STRESS","expected":"valid","covers":["no consensus","panel attrition","dropout preservation"]},
+    {"id":"synthetic-population-provenance-valid","expected":"valid","covers":["synthetic namespace","model/provider/version","prompt/schema/code pins","replay-attempt-capable provenance"]},
+    {"id":"unresolved-critical-defect","expected_error":"VR-READINESS-001"},
+    {"id":"revised-instrument-rerun","expected":"valid","covers":["new instrument version/digest","new immutable virtual run"]},
+    {"id":"cutover-ready","expected":"valid"},
+    {"id":"cutover-blocked","expected_error":"VR-READINESS-001"},
+    {"id":"real-new-root-new-run","expected":"valid"},
+    {"id":"forbidden-virtual-response-copy","expected_error":"VR-VIRTUAL-COPY-001"},
+    {"id":"forbidden-synthetic-empirical-promotion","expected_error":"VR-EPISTEMIC-FIREWALL-001"},
+    {"id":"stale-freeze-digest","expected_error":"VR-FREEZE-STALE-001"},
+    {"id":"missing-human-decision","expected_error":"VR-HUMAN-DECISION-001"},
+    {"id":"virtual-real-identity-collision","expected_error":"VR-IDENTITY-COLLISION-001"},
+    {"id":"missing-runtime-authorization","expected_error":"VR-RUNTIME-AUTH-001"}
+  ]
+}
