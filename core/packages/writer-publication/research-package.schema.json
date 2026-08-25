@@ -163,6 +163,10 @@
         {
           "if": {"properties": {"citation_namespace": {"const": "preview_placeholder"}}, "required": ["citation_namespace"]},
           "then": {"properties": {"source_id": {"pattern": "^preview:[A-Za-z0-9._:-]+$"}, "citation_capable": {"const": false}}}
+        },
+        {
+          "if": {"properties": {"source_id": {"pattern": "^preview:"}}, "required": ["source_id"]},
+          "then": {"properties": {"citation_namespace": {"const": "preview_placeholder"}, "citation_capable": {"const": false}}}
         }
       ]
     },

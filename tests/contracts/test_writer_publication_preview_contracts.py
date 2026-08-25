@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 import yaml
-from jsonschema import Draft202012Validator, FormatChecker
+from jsonschema import Draft202012Validator, FormatChecker, ValidationError
 
 from writer_publication_preview_oracle import (
     ERROR_IDS, canonical_digest, conversation_routing_error, feedback_error,
@@ -51,6 +51,11 @@ class WriterPublicationPreviewContractsTest(unittest.TestCase):
         b=deepcopy(p); b["release_eligible"]=True; refresh(b,"package_digest"); self.assertEqual(research_package_error(b),"WP-EPISTEMIC-FIREWALL-001")
         b=deepcopy(p); b["provenance"]["input_digests"].remove(p["source_research_snapshot"]["content_digest"]); refresh(b,"package_digest"); self.assertEqual(research_package_error(b),"WP-RP-SNAPSHOT-BINDING-001")
 
+    def test_preview_source_namespace_is_bidirectional(self):
+        p=deepcopy(self.f["research_package"]); source=p["content"]["source_refs"][1]
+        source["citation_namespace"]="supplied_source"; source["citation_capable"]=True; refresh(p,"package_digest")
+        with self.assertRaises(ValidationError): self.validate("research-package.schema.json",p)
+
     def test_outline_traceability_and_preservation(self):
         p,o=self.f["research_package"],self.f["outline_package"]; self.assertIsNone(outline_error(o,p))
         b=deepcopy(o); b["sections"][1]["limitation_refs"]=[]; refresh(b,"outline_digest"); self.assertEqual(outline_error(b,p),"WP-PRESERVATION-001")
@@ -68,6 +73,10 @@ class WriterPublicationPreviewContractsTest(unittest.TestCase):
         self.assertTrue({"UNRESOLVED_CITATION","MISSING_EXHIBIT","CROSS_REFERENCE","PROFILE_RULE_CONFLICT","NARRATIVE_CONSTRAINT_CONFLICT"}.issubset({d["defect_kind"] for d in f["profile_defect_candidates"]}))
         for d in f["profile_defect_candidates"]: self.assertIsNone(profile_defect_error(d))
 
+    def test_profile_defect_requires_preview_ref(self):
+        d=deepcopy(self.f["profile_defect_candidates"][0]); d["source_preview_refs"]=[]; refresh(d,"content_digest")
+        with self.assertRaises(ValidationError): self.validate("publication-preview.schema.json",d)
+
     def test_profile_revision_rerun(self):
         i=self.f["preview_iteration"]; self.assertIsNone(preview_iteration_error(i)); b=deepcopy(i); b["new_preview"]=deepcopy(b["previous_preview"]); refresh(b,"content_digest"); self.assertEqual(preview_iteration_error(b),"WP-PREVIEW-ITERATION-001")
 
@@ -81,6 +90,40 @@ class WriterPublicationPreviewContractsTest(unittest.TestCase):
 
     def test_fabricated_citation_forbidden(self):
         f=self.f; b=deepcopy(f["manuscript_package"]); b["citations"][0]["source_ref"]="SRC-FAKE"; refresh(b,"content_digest"); self.assertEqual(manuscript_error(b,f["research_package"],f["outline_package"]),"WP-CITATION-SOURCE-001")
+
+    def test_preview_placeholder_not_citation_capable(self):
+        f=self.f; b=deepcopy(f["manuscript_package"])
+        b["citations"][0].update(citation_key="preview:SRC-SYN-1",source_ref="preview:SRC-SYN-1",locator_ref="preview:LOC-1",namespace="preview_placeholder")
+        refresh(b,"content_digest"); self.assertEqual(manuscript_error(b,f["research_package"],f["outline_package"]),"WP-CITATION-SOURCE-001")
+
+    def test_composite_binding_identity_fields(self):
+        f=self.f; p,o=f["research_package"],f["outline_package"]
+        feedback_mutations=(
+            ("source","research_package_id","RP-OTHER"),("source","research_package_digest",fill("e")),
+            ("source","research_snapshot_id","SNAP-OTHER"),("source","research_snapshot_digest",fill("e")),
+            ("source_outline_ref","outline_id","OUT-OTHER"),("source_outline_ref","outline_digest",fill("e")),
+        )
+        for container,field,value in feedback_mutations:
+            with self.subTest(kind="feedback",field=field):
+                b=deepcopy(f["writing_feedback_package"]); b[container][field]=value; refresh(b,"feedback_digest")
+                self.assertEqual(feedback_error(b,p,o),"WP-OUTLINE-BINDING-001")
+        manuscript_mutations=(
+            ("source","research_package_id","RP-OTHER"),("source","research_package_digest",fill("e")),
+            ("source","research_snapshot_id","SNAP-OTHER"),("source","research_snapshot_digest",fill("e")),
+            ("outline_ref","outline_id","OUT-OTHER"),("outline_ref","outline_version","2.0.0"),("outline_ref","outline_digest",fill("e")),
+            ("effective_profile_set","effective_profile_set_ref","EPS-OTHER"),("effective_profile_set","content_digest",fill("e")),
+        )
+        for container,field,value in manuscript_mutations:
+            with self.subTest(kind="manuscript",field=field):
+                b=deepcopy(f["manuscript_package"]); b[container][field]=value; refresh(b,"content_digest")
+                self.assertEqual(manuscript_error(b,p,o),"WP-MANUSCRIPT-BINDING-001")
+        for pin_name in ("narrative_profile_pins","publication_profile_pin"):
+            for field,value in (("profile_id","fixture.other"),("profile_version","2.0.0"),("content_digest",fill("e"))):
+                with self.subTest(kind=pin_name,field=field):
+                    b=deepcopy(f["manuscript_package"]); pin=b[pin_name][0] if isinstance(b[pin_name],list) else b[pin_name]; pin[field]=value; refresh(b,"content_digest")
+                    self.assertEqual(manuscript_error(b,p,o),"WP-MANUSCRIPT-BINDING-001")
+        b=deepcopy(f["preview_artifact_manifest"]); b["source_manuscript"]["manuscript_id"]="MS-OTHER"; refresh(b,"content_digest")
+        self.assertEqual(preview_manifest_error(b,f["manuscript_package"]),"WP-MANUSCRIPT-BINDING-001")
 
     def test_stale_profile_template_pin_forbidden(self):
         f=self.f; b=deepcopy(f["preview_artifact_manifest"]); b["publication_profile"]["content_digest"]=fill("e"); refresh(b,"content_digest"); self.assertEqual(preview_manifest_error(b,f["manuscript_package"]),"WP-PUBLICATION-PIN-001")

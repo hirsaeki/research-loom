@@ -19,6 +19,30 @@ def canonical_digest(document, digest_field):
     return "sha256:" + hashlib.sha256(rfc8785.dumps(body)).hexdigest()
 
 
+def _source_binding_tuple(binding):
+    return (
+        binding["research_package_id"], binding["research_package_digest"],
+        binding["research_snapshot_id"], binding["research_snapshot_digest"],
+    )
+
+
+def _expected_source_binding_tuple(p):
+    snap = p["source_research_snapshot"]
+    return p["package_id"], p["package_digest"], snap["snapshot_id"], snap["content_digest"]
+
+
+def _profile_pin_tuple(pin):
+    return pin["profile_id"], pin["profile_version"], pin["content_digest"]
+
+
+def _package_profile_pin_tuples(p, profile_type):
+    return {
+        (pin["profile_id"], pin["profile_version"], pin["content_digest"])
+        for pin in p["effective_profile_set"]["profile_pins"]
+        if pin["profile_type"] == profile_type
+    }
+
+
 def research_package_error(p):
     if p["package_digest"] != canonical_digest(p, "package_digest"):
         return "WP-RP-DIGEST-001"
@@ -77,7 +101,9 @@ def outline_error(o, p):
 def feedback_error(f, p, o):
     if f["feedback_digest"] != canonical_digest(f, "feedback_digest"):
         return "WP-FEEDBACK-DIGEST-001"
-    if f["source"]["research_package_digest"] != p["package_digest"] or f["source_outline_ref"]["outline_digest"] != o["outline_digest"]:
+    if _source_binding_tuple(f["source"]) != _expected_source_binding_tuple(p):
+        return "WP-OUTLINE-BINDING-001"
+    if (f["source_outline_ref"]["outline_id"], f["source_outline_ref"]["outline_digest"]) != (o["outline_id"], o["outline_digest"]):
         return "WP-OUTLINE-BINDING-001"
     if f["is_research_evidence"] or f["research_state_mutation_performed"]:
         return "WP-RESEARCH-STATE-AUTHORITY-001"
@@ -87,7 +113,19 @@ def feedback_error(f, p, o):
 def manuscript_error(m, p, o):
     if m["content_digest"] != canonical_digest(m, "content_digest"):
         return "WP-MANUSCRIPT-DIGEST-001"
-    if m["source"]["research_package_digest"] != p["package_digest"] or m["outline_ref"]["outline_digest"] != o["outline_digest"]:
+    if _source_binding_tuple(m["source"]) != _expected_source_binding_tuple(p):
+        return "WP-MANUSCRIPT-BINDING-001"
+    if (m["outline_ref"]["outline_id"], m["outline_ref"]["outline_version"], m["outline_ref"]["outline_digest"]) != (o["outline_id"], o["outline_version"], o["outline_digest"]):
+        return "WP-MANUSCRIPT-BINDING-001"
+    eps = m["effective_profile_set"]
+    if (eps["effective_profile_set_ref"], eps["content_digest"]) != (
+        p["effective_profile_set"]["effective_profile_set_ref"], p["effective_profile_set"]["content_digest"]
+    ):
+        return "WP-MANUSCRIPT-BINDING-001"
+    if {_profile_pin_tuple(pin) for pin in m["narrative_profile_pins"]} != _package_profile_pin_tuples(p, "narrative"):
+        return "WP-MANUSCRIPT-BINDING-001"
+    publication_pins = _package_profile_pin_tuples(p, "publication")
+    if len(publication_pins) != 1 or _profile_pin_tuple(m["publication_profile_pin"]) not in publication_pins:
         return "WP-MANUSCRIPT-BINDING-001"
     if m["source_epistemic_status"] != p["source_epistemic_status"]:
         return "WP-EPISTEMIC-FIREWALL-001"
@@ -102,7 +140,7 @@ def manuscript_error(m, p, o):
         sid = cite["source_ref"]
         if sid not in src or cite["locator_ref"] not in src[sid]["locator_refs"] or cite["namespace"] != src[sid]["citation_namespace"]:
             return "WP-CITATION-SOURCE-001"
-        if src[sid]["citation_namespace"] == "supplied_source" and not src[sid]["citation_capable"]:
+        if not src[sid]["citation_capable"]:
             return "WP-CITATION-SOURCE-001"
     return None
 
@@ -110,7 +148,7 @@ def manuscript_error(m, p, o):
 def preview_manifest_error(a, m):
     if a["content_digest"] != canonical_digest(a, "content_digest"):
         return "WP-PREVIEW-MANIFEST-DIGEST-001"
-    if a["source_manuscript"]["manuscript_digest"] != m["content_digest"] or a["source_epistemic_status"] != m["source_epistemic_status"]:
+    if (a["source_manuscript"]["manuscript_id"], a["source_manuscript"]["manuscript_digest"]) != (m["manuscript_id"], m["content_digest"]) or a["source_epistemic_status"] != m["source_epistemic_status"]:
         return "WP-MANUSCRIPT-BINDING-001"
     if not (a["preview_only"] and not a["release_eligible"] and not a["published_artifact"] and not a["release_manifest"]):
         return "WP-EPISTEMIC-FIREWALL-001"
