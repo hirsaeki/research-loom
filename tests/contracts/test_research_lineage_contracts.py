@@ -130,6 +130,65 @@ class ResearchLineageContractsTest(unittest.TestCase):
                     tampered["changes"][0]["object_ref"] = "TAMPERED"
                 self.assertEqual(digest_error(tampered), "RL-DIGEST-001")
 
+    def test_reference_contract_digests_fail_closed(self) -> None:
+        """Reject stale auxiliary lineage/proposal inputs before relation checks."""
+        fixture = self.f
+
+        parent = deepcopy(fixture["primary_lineage"])
+        parent["rationale"] += " tampered"
+        self.assertEqual(
+            lineage_error(fixture["exploratory_lineage"], parent),
+            "RL-DIGEST-001",
+        )
+
+        proposal = deepcopy(fixture["fork_proposal"])
+        proposal["reason"] += " tampered"
+        self.assertEqual(
+            fork_plan_error(
+                fixture["fork_plan"],
+                proposal,
+                fixture["primary_lineage"],
+                set(),
+            ),
+            "RL-DIGEST-001",
+        )
+
+        parent = deepcopy(fixture["primary_lineage"])
+        parent["rationale"] += " tampered"
+        self.assertEqual(
+            fork_plan_error(
+                fixture["fork_plan"],
+                fixture["fork_proposal"],
+                parent,
+                set(),
+            ),
+            "RL-DIGEST-001",
+        )
+
+        source = deepcopy(fixture["primary_lineage"])
+        source["rationale"] += " tampered"
+        self.assertEqual(
+            replay_error(
+                fixture["replay_plan"],
+                fixture["replay_execution"],
+                source,
+                fixture["recovery_lineage"],
+            ),
+            "RL-DIGEST-001",
+        )
+
+        target = deepcopy(fixture["recovery_lineage"])
+        target["rationale"] += " tampered"
+        self.assertEqual(
+            replay_error(
+                fixture["replay_plan"],
+                fixture["replay_execution"],
+                fixture["primary_lineage"],
+                target,
+            ),
+            "RL-DIGEST-001",
+        )
+
     def test_parent_and_child_continue_independently(self) -> None:
         """A historical fork must not move the parent lineage head."""
         parent = self.f["primary_lineage"]

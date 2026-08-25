@@ -68,6 +68,8 @@ def lineage_error(lineage: dict, known_parent: dict | None = None) -> str | None
         return None
     if not lineage.get("parent_lineage_ref") or known_parent is None:
         return "RL-PARENT-001"
+    if error := digest_error(known_parent):
+        return error
     if lineage["parent_lineage_ref"] != known_parent["lineage_id"]:
         return "RL-PARENT-001"
     if lineage["project_ref"] != known_parent["project_ref"]:
@@ -82,6 +84,10 @@ def fork_plan_error(
 ) -> str | None:
     """Validate baseline, exact pins, treatments, decisions, and invalidation."""
     if error := digest_error(plan):
+        return error
+    if error := digest_error(proposal):
+        return error
+    if error := digest_error(parent):
         return error
     if plan["project_ref"] != parent["project_ref"]:
         return "RL-PROJECT-MISMATCH-001"
@@ -152,6 +158,10 @@ def replay_error(
 ) -> str | None:
     """Validate replay project, lineage, mode, new IDs, Context Packs, and Handoffs."""
     if error := digest_error(plan):
+        return error
+    if error := digest_error(source_lineage):
+        return error
+    if error := digest_error(target_lineage):
         return error
     if (
         plan["project_ref"] != source_lineage["project_ref"]
