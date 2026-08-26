@@ -94,6 +94,36 @@ class LocalExecutionStoreConcurrencySecurityTests(unittest.TestCase):
                 first.close()
                 second.close()
 
+    @unittest.skipIf(os.name == "nt", "symlink-parent regression is POSIX-specific")
+    def test_file_intake_accepts_allowed_root_through_symlinked_parent(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            physical_parent = root / "physical"
+            physical_parent.mkdir()
+            physical_intake = physical_parent / "intake"
+            physical_intake.mkdir()
+            source = physical_intake / "input.bin"
+            source.write_bytes(b"through-parent-link")
+            linked_parent = root / "linked"
+            linked_parent.symlink_to(physical_parent, target_is_directory=True)
+            linked_source = linked_parent / "intake" / source.name
+            store = LocalExecutionStore(
+                root / "execution-store",
+                allowed_import_roots=(linked_parent / "intake",),
+            )
+            try:
+                resource = store.register_input_file("REF-LINKED-PARENT", linked_source)
+                loaded = store.load(
+                    {
+                        "reference_id": resource.reference_id,
+                        "locator": resource.storage_locator,
+                        "digest": resource.digest,
+                    }
+                )
+                self.assertEqual(loaded.content, b"through-parent-link")
+            finally:
+                store.close()
+
     @unittest.skipUnless(
         os.name != "nt"
         and hasattr(os, "O_NOFOLLOW")

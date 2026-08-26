@@ -1432,6 +1432,14 @@ class LocalExecutionStore:
         candidate = Path(os.path.abspath(raw))
         root = self._matching_import_root(candidate)
         if root is None:
+            try:
+                anchored = Path(os.path.realpath(candidate.parent)) / candidate.name
+            except OSError:
+                anchored = candidate
+            if anchored != candidate:
+                candidate = anchored
+                root = self._matching_import_root(candidate)
+        if root is None:
             raise PermissionError(
                 "file is outside configured artifact/resource intake roots"
             )
