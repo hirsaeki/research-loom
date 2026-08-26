@@ -3,6 +3,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
+import errno
 import hashlib
 import json
 import os
@@ -532,6 +533,13 @@ class LocalExecutionStore:
         self,
         artifact: ExecutionArtifactMetadata,
     ) -> None:
+        with self._write_transaction():
+            self._register_output_artifact_in_transaction(artifact)
+
+    def _register_output_artifact_in_transaction(
+        self,
+        artifact: ExecutionArtifactMetadata,
+    ) -> None:
         payload = (
             artifact.artifact_id,
             artifact.run_id,
@@ -543,29 +551,28 @@ class LocalExecutionStore:
             artifact.execution_mode,
             _canonical_json(dict(artifact.provenance)),
         )
-        with self._write_transaction():
-            prior = self._connection.execute(
-                """
-                SELECT artifact_id, run_id, role, media_type, size, digest,
-                       storage_locator, execution_mode, provenance_json
-                FROM execution_artifacts WHERE artifact_id = ?
-                """,
-                (artifact.artifact_id,),
-            ).fetchone()
-            if prior is not None:
-                prior_tuple = tuple(prior[key] for key in prior.keys())
-                if prior_tuple != payload:
-                    raise ValueError("immutable artifact identity collision")
-                return
-            self._connection.execute(
-                """
-                INSERT INTO execution_artifacts(
-                    artifact_id, run_id, role, media_type, size, digest,
-                    storage_locator, execution_mode, provenance_json
-                ) VALUES (?,?,?,?,?,?,?,?,?)
-                """,
-                payload,
-            )
+        prior = self._connection.execute(
+            """
+            SELECT artifact_id, run_id, role, media_type, size, digest,
+                   storage_locator, execution_mode, provenance_json
+            FROM execution_artifacts WHERE artifact_id = ?
+            """,
+            (artifact.artifact_id,),
+        ).fetchone()
+        if prior is not None:
+            prior_tuple = tuple(prior[key] for key in prior.keys())
+            if prior_tuple != payload:
+                raise ValueError("immutable artifact identity collision")
+            return
+        self._connection.execute(
+            """
+            INSERT INTO execution_artifacts(
+                artifact_id, run_id, role, media_type, size, digest,
+                storage_locator, execution_mode, provenance_json
+            ) VALUES (?,?,?,?,?,?,?,?,?)
+            """,
+            payload,
+        )
 
     def load_invocation(
         self,
@@ -637,21 +644,7 @@ class LocalExecutionStore:
             raise LocalExecutionStoreIntegrityError(
                 "artifact Run binding does not match persisted Run"
             )
-        with self._lock:
-            row = self._connection.execute(
-                """
-                SELECT COALESCE(SUM(size), 0) AS total
-                FROM execution_artifacts WHERE run_id = ?
-                """,
-                (run.run_id,),
-            ).fetchone()
-            current_total = int(row["total"])
-        if current_total + len(content) > self.config.max_run_output_bytes:
-            raise LocalExecutionStoreError(
-                "Run output exceeds configured max_run_output_bytes"
-            )
 
-        digest, locator = self._store_blob(content, scheme="artifact")
         trusted_provenance = dict(provenance or {})
         trusted_provenance.update(
             {
@@ -662,19 +655,34 @@ class LocalExecutionStore:
                 "parent_artifact_refs": list(parent_artifact_refs),
             }
         )
-        metadata = ExecutionArtifactMetadata(
-            artifact_id
-            or f"ART-{uuid.uuid4().hex}",
-            run.run_id,
-            str(role),
-            str(media_type),
-            len(content),
-            digest,
-            locator,
-            run.execution_mode,
-            trusted_provenance,
-        )
-        self.register_output_artifact(metadata)
+        artifact_identity = artifact_id or f"ART-{uuid.uuid4().hex}"
+        with self._write_transaction():
+            row = self._connection.execute(
+                """
+                SELECT COALESCE(SUM(size), 0) AS total
+                FROM execution_artifacts WHERE run_id = ?
+                """,
+                (run.run_id,),
+            ).fetchone()
+            current_total = int(row["total"])
+            if current_total + len(content) > self.config.max_run_output_bytes:
+                raise LocalExecutionStoreError(
+                    "Run output exceeds configured max_run_output_bytes"
+                )
+
+            digest, locator = self._store_blob(content, scheme="artifact")
+            metadata = ExecutionArtifactMetadata(
+                artifact_identity,
+                run.run_id,
+                str(role),
+                str(media_type),
+                len(content),
+                digest,
+                locator,
+                run.execution_mode,
+                trusted_provenance,
+            )
+            self._register_output_artifact_in_transaction(metadata)
         return metadata
 
     def import_output_file(
@@ -1421,33 +1429,191 @@ class LocalExecutionStore:
         raw = Path(source_path)
         if ".." in raw.parts:
             raise PermissionError("path traversal is not allowed for file intake")
-        try:
-            info = raw.lstat()
-        except FileNotFoundError:
-            raise
-        if raw.is_symlink():
-            raise PermissionError("symlink intake is forbidden")
-        if not stat.S_ISREG(info.st_mode):
-            raise PermissionError("only regular files may be imported")
-        resolved = raw.resolve(strict=True)
-        if not any(
-            resolved == root or resolved.is_relative_to(root)
-            for root in self._allowed_import_roots
-        ):
+        candidate = Path(os.path.abspath(raw))
+        root = self._matching_import_root(candidate)
+        if root is None:
             raise PermissionError(
                 "file is outside configured artifact/resource intake roots"
             )
-        if info.st_size > max_bytes:
-            raise LocalExecutionStoreError(
-                "file exceeds configured intake size limit"
+        relative = candidate.relative_to(root)
+        self._reject_reparse_components(root, relative)
+
+        if (
+            os.name != "nt"
+            and hasattr(os, "O_NOFOLLOW")
+            and hasattr(os, "O_DIRECTORY")
+            and os.open in os.supports_dir_fd
+        ):
+            return self._read_controlled_file_dirfd(
+                root,
+                relative,
+                max_bytes=max_bytes,
             )
-        with resolved.open("rb") as stream:
-            data = stream.read(max_bytes + 1)
+        return self._read_controlled_file_fallback(
+            candidate,
+            root,
+            relative,
+            max_bytes=max_bytes,
+        )
+
+    def _matching_import_root(self, candidate: Path) -> Path | None:
+        matches = [
+            root
+            for root in self._allowed_import_roots
+            if candidate == root or candidate.is_relative_to(root)
+        ]
+        if not matches:
+            return None
+        return max(matches, key=lambda item: len(item.parts))
+
+    @staticmethod
+    def _reject_reparse_components(root: Path, relative: Path) -> None:
+        current = root
+        for part in relative.parts:
+            if part in {"", ".", ".."}:
+                raise PermissionError("invalid path component for file intake")
+            current = current / part
+            info = current.lstat()
+            is_junction = getattr(current, "is_junction", None)
+            if stat.S_ISLNK(info.st_mode) or (
+                callable(is_junction) and is_junction()
+            ):
+                raise PermissionError("symlink/reparse-point intake is forbidden")
+
+    def _read_controlled_file_dirfd(
+        self,
+        root: Path,
+        relative: Path,
+        *,
+        max_bytes: int,
+    ) -> bytes:
+        root_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+        root_fd = os.open(root, root_flags)
+        current_fd = root_fd
+        try:
+            parts = relative.parts
+            if not parts:
+                raise PermissionError("only regular files may be imported")
+            for index, part in enumerate(parts):
+                final = index == len(parts) - 1
+                flags = os.O_RDONLY | os.O_NOFOLLOW
+                if final:
+                    flags |= getattr(os, "O_NONBLOCK", 0)
+                else:
+                    flags |= os.O_DIRECTORY
+                try:
+                    next_fd = os.open(part, flags, dir_fd=current_fd)
+                except OSError as exc:
+                    if exc.errno in {errno.ELOOP, errno.ENOTDIR}:
+                        raise PermissionError(
+                            "symlink/reparse-point intake is forbidden"
+                        ) from exc
+                    raise
+                if current_fd != root_fd:
+                    os.close(current_fd)
+                current_fd = next_fd
+            info = os.fstat(current_fd)
+            if not stat.S_ISREG(info.st_mode):
+                raise PermissionError("only regular files may be imported")
+            if info.st_size > max_bytes:
+                raise LocalExecutionStoreError(
+                    "file exceeds configured intake size limit"
+                )
+            return self._read_fd_limited(current_fd, max_bytes)
+        finally:
+            if current_fd != root_fd:
+                os.close(current_fd)
+            os.close(root_fd)
+
+    def _read_controlled_file_fallback(
+        self,
+        candidate: Path,
+        root: Path,
+        relative: Path,
+        *,
+        max_bytes: int,
+    ) -> bytes:
+        before = candidate.lstat()
+        if not stat.S_ISREG(before.st_mode):
+            raise PermissionError("only regular files may be imported")
+        flags = os.O_RDONLY | getattr(os, "O_BINARY", 0)
+        fd = os.open(candidate, flags)
+        try:
+            opened = os.fstat(fd)
+            if not stat.S_ISREG(opened.st_mode):
+                raise PermissionError("only regular files may be imported")
+            if opened.st_size > max_bytes:
+                raise LocalExecutionStoreError(
+                    "file exceeds configured intake size limit"
+                )
+            self._reject_reparse_components(root, relative)
+            after = candidate.lstat()
+            before_identity = (before.st_dev, before.st_ino)
+            opened_identity = (opened.st_dev, opened.st_ino)
+            after_identity = (after.st_dev, after.st_ino)
+            if not (
+                before_identity == opened_identity == after_identity
+            ):
+                raise PermissionError(
+                    "file changed during controlled intake"
+                )
+            if os.name == "nt":
+                final_path = self._windows_final_path_for_fd(fd)
+                if os.path.normcase(os.path.abspath(final_path)) != os.path.normcase(
+                    os.path.abspath(candidate)
+                ):
+                    raise PermissionError(
+                        "symlink/reparse-point intake is forbidden"
+                    )
+            return self._read_fd_limited(fd, max_bytes)
+        finally:
+            os.close(fd)
+
+    @staticmethod
+    def _read_fd_limited(fd: int, max_bytes: int) -> bytes:
+        chunks: list[bytes] = []
+        total = 0
+        while total <= max_bytes:
+            chunk = os.read(fd, min(1024 * 1024, max_bytes + 1 - total))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            total += len(chunk)
+        data = b"".join(chunks)
         if len(data) > max_bytes:
             raise LocalExecutionStoreError(
                 "file exceeded configured intake size limit while reading"
             )
         return data
+
+    @staticmethod
+    def _windows_final_path_for_fd(fd: int) -> Path:
+        import ctypes
+        import msvcrt
+
+        handle = msvcrt.get_osfhandle(fd)
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        get_final_path = kernel32.GetFinalPathNameByHandleW
+        get_final_path.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_wchar_p,
+            ctypes.c_uint32,
+            ctypes.c_uint32,
+        ]
+        get_final_path.restype = ctypes.c_uint32
+        size = get_final_path(handle, None, 0, 0)
+        if size == 0:
+            raise OSError(ctypes.get_last_error(), "GetFinalPathNameByHandleW failed")
+        buffer = ctypes.create_unicode_buffer(size + 1)
+        written = get_final_path(handle, buffer, len(buffer), 0)
+        if written == 0 or written >= len(buffer):
+            raise OSError(ctypes.get_last_error(), "GetFinalPathNameByHandleW failed")
+        value = buffer.value
+        if value.startswith("\\\\?\\UNC\\"):
+            value = "\\\\" + value[8:]
+        elif value.startswith("\\\\?\\"):
+            value = value[4:]
+        return Path(value)
 
     @staticmethod
     def _fsync_directory(path: Path) -> None:
