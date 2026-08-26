@@ -133,7 +133,7 @@ class CapabilityExecutionRequest:
                 "artifacts",
                 BoundedArtifactSink(
                     self.run,
-                    getattr(self.resources, "_artifact_store", None),
+                    getattr(self.resources, "artifact_store", None),
                 ),
             )
 

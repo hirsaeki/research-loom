@@ -54,6 +54,28 @@ _DOCUMENT_DIGEST_FIELDS = {
     "context_pack": "context_pack_digest",
     "handoff": "handoff_digest",
 }
+_RUN_IMMUTABLE_FIELDS = (
+    "run_id",
+    "invocation_id",
+    "invocation_digest",
+    "capability_id",
+    "capability_version",
+    "descriptor_digest",
+    "implementation_id",
+    "implementation_version",
+    "function_id",
+    "execution_mode",
+    "context_pack_id",
+    "context_pack_digest",
+    "project_ref",
+    "lineage_ref",
+    "snapshot_ref",
+    "snapshot_digest",
+    "attempt",
+    "parent_run_id",
+    "prepared_at",
+    "provenance",
+)
 
 
 class LocalExecutionStoreError(RuntimeError):
@@ -383,7 +405,7 @@ class LocalExecutionStore:
 
         with self._write_transaction():
             current = self._connection.execute(
-                "SELECT status FROM runs WHERE run_id = ?",
+                "SELECT * FROM runs WHERE run_id = ?",
                 (updated_run.run_id,),
             ).fetchone()
             if (
@@ -391,6 +413,12 @@ class LocalExecutionStore:
                 or str(current["status"]) != expected_status.value
             ):
                 return False
+            persisted = self._decode_run(current)
+            for name in _RUN_IMMUTABLE_FIELDS:
+                if getattr(persisted, name) != getattr(updated_run, name):
+                    raise LocalExecutionStoreIntegrityError(
+                        f"immutable Run field {name} cannot change on transition"
+                    )
             row = self._connection.execute(
                 """
                 SELECT COALESCE(MAX(sequence), 0) AS sequence
@@ -406,18 +434,20 @@ class LocalExecutionStore:
             update = self._connection.execute(
                 """
                 UPDATE runs SET
-                    invocation_id=?, invocation_digest=?,
-                    capability_id=?, capability_version=?, descriptor_digest=?,
-                    implementation_id=?, implementation_version=?, function_id=?,
-                    execution_mode=?, context_pack_id=?, context_pack_digest=?,
-                    project_ref=?, lineage_ref=?, snapshot_ref=?, snapshot_digest=?,
-                    attempt=?, parent_run_id=?, status=?, prepared_at=?, started_at=?,
-                    completed_at=?, handoff_ref=?, handoff_digest=?, failure_json=?,
-                    provenance_json=?
+                    status=?, started_at=?, completed_at=?, handoff_ref=?,
+                    handoff_digest=?, failure_json=?
                 WHERE run_id=? AND status=?
                 """,
-                self._encode_run(updated_run)[1:]
-                + (updated_run.run_id, expected_status.value),
+                (
+                    updated_run.status.value,
+                    updated_run.started_at,
+                    updated_run.completed_at,
+                    updated_run.handoff_ref,
+                    updated_run.handoff_digest,
+                    _failure_json(updated_run.failure),
+                    updated_run.run_id,
+                    expected_status.value,
+                ),
             )
             if update.rowcount != 1:
                 return False
@@ -562,6 +592,12 @@ class LocalExecutionStore:
         payload: Mapping[str, Any],
     ) -> None:
         with self._write_transaction():
+            exists = self._connection.execute(
+                "SELECT 1 FROM runs WHERE run_id = ?",
+                (run_id,),
+            ).fetchone()
+            if exists is None:
+                raise ValueError(f"unknown Run {run_id}")
             self._connection.execute(
                 """
                 INSERT INTO diagnostics(run_id, kind, payload_json)
@@ -866,9 +902,36 @@ class LocalExecutionStore:
                 + (" WHERE run_id = ?" if run_id is not None else ""),
                 (run_id,) if run_id is not None else (),
             ).fetchall()
-            document_rows = self._connection.execute(
-                "SELECT * FROM execution_documents"
-            ).fetchall()
+            if run_id is None:
+                document_rows = self._connection.execute(
+                    "SELECT * FROM execution_documents"
+                ).fetchall()
+                diagnostic_rows = self._connection.execute(
+                    "SELECT run_id FROM diagnostics"
+                ).fetchall()
+            else:
+                run_row = run_rows[0]
+                clauses = ["run_id = ?"]
+                args: list[Any] = [run_id]
+                for doc_type, identity in (
+                    ("descriptor", str(run_row["descriptor_digest"])),
+                    ("invocation", str(run_row["invocation_id"])),
+                    ("context_pack", str(run_row["context_pack_id"])),
+                ):
+                    clauses.append("(document_type = ? AND identity = ?)")
+                    args.extend((doc_type, identity))
+                if run_row["handoff_ref"] is not None:
+                    clauses.append("(document_type = ? AND identity = ?)")
+                    args.extend(("handoff", str(run_row["handoff_ref"])))
+                document_rows = self._connection.execute(
+                    "SELECT * FROM execution_documents WHERE "
+                    + " OR ".join(clauses),
+                    tuple(args),
+                ).fetchall()
+                diagnostic_rows = self._connection.execute(
+                    "SELECT run_id FROM diagnostics WHERE run_id = ?",
+                    (run_id,),
+                ).fetchall()
             artifact_rows = self._connection.execute(
                 "SELECT * FROM execution_artifacts"
                 + (" WHERE run_id = ?" if run_id is not None else ""),
@@ -880,6 +943,21 @@ class LocalExecutionStore:
             for row in document_rows
         }
         for row in document_rows:
+            document_run_id = str(row["run_id"]) if row["run_id"] else None
+            if document_run_id is not None:
+                with self._lock:
+                    run_exists = self._connection.execute(
+                        "SELECT 1 FROM runs WHERE run_id = ?",
+                        (document_run_id,),
+                    ).fetchone()
+                if run_exists is None:
+                    diagnostics.append(
+                        StoreIntegrityDiagnostic(
+                            "DANGLING_DOCUMENT_RUN_REF",
+                            "execution document references a missing Run",
+                            run_id=document_run_id,
+                        )
+                    )
             try:
                 payload = json.loads(str(row["payload_json"]))
                 if _payload_sha256(payload) != str(row["payload_sha256"]):
@@ -887,7 +965,7 @@ class LocalExecutionStore:
                         StoreIntegrityDiagnostic(
                             "DOCUMENT_PAYLOAD_DIGEST_MISMATCH",
                             "immutable execution document payload hash mismatch",
-                            run_id=str(row["run_id"]) if row["run_id"] else None,
+                            run_id=document_run_id,
                         )
                     )
             except (TypeError, ValueError, json.JSONDecodeError):
@@ -895,7 +973,23 @@ class LocalExecutionStore:
                     StoreIntegrityDiagnostic(
                         "DOCUMENT_INVALID_JSON",
                         "immutable execution document is not valid canonical JSON",
-                        run_id=str(row["run_id"]) if row["run_id"] else None,
+                        run_id=document_run_id,
+                    )
+                )
+
+        for row in diagnostic_rows:
+            diagnostic_run_id = str(row["run_id"])
+            with self._lock:
+                run_exists = self._connection.execute(
+                    "SELECT 1 FROM runs WHERE run_id = ?",
+                    (diagnostic_run_id,),
+                ).fetchone()
+            if run_exists is None:
+                diagnostics.append(
+                    StoreIntegrityDiagnostic(
+                        "DANGLING_DIAGNOSTIC_RUN_REF",
+                        "diagnostic record references a missing Run",
+                        run_id=diagnostic_run_id,
                     )
                 )
 

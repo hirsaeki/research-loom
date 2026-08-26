@@ -27,10 +27,11 @@ class BoundedResourceAccess:
         self._authorized = frozenset(authorized_reference_ids)
         self._provider = provider
         self._artifact_store = artifact_store
-        if self._artifact_store is None and callable(
-            getattr(provider, "put_bytes", None)
-        ):
-            self._artifact_store = provider
+
+    @property
+    def artifact_store(self) -> ExecutionArtifactStore | None:
+        """Return the explicitly injected trusted output store, if configured."""
+        return self._artifact_store
 
     def read(self, reference_id: str) -> ResourcePayload:
         resource = self._resources.get(reference_id)

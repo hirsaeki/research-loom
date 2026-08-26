@@ -15,9 +15,11 @@ import rfc8785
 
 from core.execution import (
     BoundedResourceAccess,
+    CapabilityExecutionError,
     CapabilityExecutionOutput,
     CapabilityExecutionService,
     CapabilityRegistry,
+    ExecutionFailureCode,
     ExecutionStyle,
     RunLifecycleEvent,
     RunStatus,
@@ -291,6 +293,7 @@ def make_service(
         store,
         CapabilityNormalizationBoundary((GenericNormalizer(),)),
         StaticClock(),
+        artifact_store=store,
     )
 
 
@@ -325,6 +328,13 @@ class TraceStoreConformanceMixin:
             "2026-08-26T00:00:01Z",
             "started",
         )
+        with self.assertRaises((ValueError, LocalExecutionStoreIntegrityError)):
+            store.transition_run(
+                RunStatus.PREPARED,
+                replace(running, capability_id="fixture.mutated"),
+                event,
+            )
+        self.assertEqual(store.load_run(run.run_id), run)
         self.assertTrue(store.transition_run(RunStatus.PREPARED, running, event))
         self.assertFalse(
             store.transition_run(RunStatus.PREPARED, running, event)
@@ -641,10 +651,16 @@ class LocalExecutionStoreTests(unittest.TestCase):
             context,
             ("REF-1",),
             self.store,
+            artifact_store=self.store,
         )
+        self.assertEqual(access.artifact_store, self.store)
         self.assertEqual(access.read("REF-1").content, b"bounded")
-        with self.assertRaises(Exception):
+        with self.assertRaises(CapabilityExecutionError) as denied:
             access.read("REF-2")
+        self.assertEqual(
+            denied.exception.issue.code,
+            ExecutionFailureCode.RESOURCE_DENIED.value,
+        )
 
         bad = deepcopy(context["resources"][0])
         bad["digest"] = "sha256:" + "f" * 64
@@ -684,6 +700,52 @@ class LocalExecutionStoreTests(unittest.TestCase):
             "ARTIFACT_BLOB_MISSING",
             {item.code for item in self.store.diagnose_integrity()},
         )
+
+    def test_run_scoped_doctor_ignores_unrelated_document_corruption(self):
+        with sqlite3.connect(
+            self.root / "execution-store" / "execution.db"
+        ) as connection:
+            connection.execute(
+                """
+                INSERT INTO execution_documents(
+                    document_type, identity, payload_sha256, payload_json, run_id
+                ) VALUES ('extension', 'UNRELATED', 'sha256:bad', '{', 'RUN-B')
+                """
+            )
+        scoped = {item.code for item in self.store.diagnose_integrity("RUN-A")}
+        global_codes = {item.code for item in self.store.diagnose_integrity()}
+        self.assertNotIn("DOCUMENT_INVALID_JSON", scoped)
+        self.assertIn("DOCUMENT_INVALID_JSON", global_codes)
+
+    def test_doctor_detects_dangling_document_and_diagnostic_run_refs(self):
+        payload = {"kind": "fixture"}
+        payload_json = rfc8785.dumps(payload).decode("utf-8")
+        payload_sha = "sha256:" + hashlib.sha256(
+            rfc8785.dumps(payload)
+        ).hexdigest()
+        with sqlite3.connect(
+            self.root / "execution-store" / "execution.db"
+        ) as connection:
+            connection.execute(
+                "PRAGMA foreign_keys = OFF"
+            )
+            connection.execute(
+                """
+                INSERT INTO execution_documents(
+                    document_type, identity, payload_sha256, payload_json, run_id
+                ) VALUES ('extension', 'DANGLING', ?, ?, 'RUN-MISSING')
+                """,
+                (payload_sha, payload_json),
+            )
+            connection.execute(
+                """
+                INSERT INTO diagnostics(run_id, kind, payload_json)
+                VALUES ('RUN-MISSING', 'fixture', '{}')
+                """
+            )
+        codes = {item.code for item in self.store.diagnose_integrity()}
+        self.assertIn("DANGLING_DOCUMENT_RUN_REF", codes)
+        self.assertIn("DANGLING_DIAGNOSTIC_RUN_REF", codes)
 
     def test_lifecycle_projection_corruption_is_diagnostic_only(self):
         with sqlite3.connect(

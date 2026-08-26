@@ -21,6 +21,7 @@ from .models import (
     RunStatus,
 )
 from .ports import (
+    ExecutionArtifactStore,
     ExecutionTraceStore,
     ResourceProvider,
     RuntimeAuthorizationProvider,
@@ -69,6 +70,7 @@ class CapabilityExecutionService:
         normalization_boundary: CapabilityNormalizationBoundary,
         clock: RuntimeClock,
         *,
+        artifact_store: ExecutionArtifactStore | None = None,
         validator: CanonicalCapabilityExecutionValidator | None = None,
     ) -> None:
         self._registry = registry
@@ -76,6 +78,7 @@ class CapabilityExecutionService:
         self._states = state_provider
         self._authorization = authorization_provider
         self._resources = resource_provider
+        self._artifact_store = artifact_store
         self._normalization = normalization_boundary
         self._clock = clock
         self._validator = validator or CanonicalCapabilityExecutionValidator()
@@ -386,6 +389,7 @@ class CapabilityExecutionService:
             context_pack,
             decision.resource_reference_ids,
             self._resources,
+            artifact_store=self._artifact_store,
         )
         return run, adapter, access
 

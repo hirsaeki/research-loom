@@ -36,9 +36,11 @@ logs, generated code, and binaries stay out of Research State SQLite.
 ## Run lifecycle and immutable documents
 
 Run transition CAS is one SQLite `BEGIN IMMEDIATE` transaction: persisted
-status is checked, the current Run projection is updated, the next append-only
-lifecycle event is inserted, and only then is the transaction committed.
-Concurrent completion/abort attempts therefore cannot both succeed.
+status and immutable Run identity are checked, the mutable Run projection is
+updated, the next append-only lifecycle event is inserted, and only then is the
+transaction committed. Concurrent completion/abort attempts therefore cannot
+both succeed, and lifecycle transitions cannot rewrite invocation/capability/
+context/snapshot identity or baseline provenance.
 
 Descriptor, Invocation, Context Pack, Handoff, and result-extension documents
 are canonical JSON immutable records. Reusing an identity with different
@@ -50,14 +52,16 @@ validation, preserving rejected/invalid execution output for audit.
 `CapabilityExecutionRequest.artifacts` is a `BoundedArtifactSink`. The
 capability can provide bytes, role, media type, and optional provenance, but it
 does not receive a filesystem root and cannot choose the storage locator,
-digest, size, Run ID, or execution mode.
+digest, size, Run ID, or execution mode. The trusted Artifact Store is
+explicitly injected by the execution composition root; a read-only
+`ResourceProvider` is never implicitly promoted to a write boundary.
 
 The trusted store:
 
-1. writes into `staging/`;
-2. flushes and fsyncs;
-3. calculates SHA-256 and actual byte size;
-4. enforces configured per-artifact and per-Run limits;
+1. calculates SHA-256 and actual byte size;
+2. enforces configured per-artifact and per-Run limits;
+3. writes into `staging/`;
+4. flushes and fsyncs;
 5. hard-links the completed staging file into the content-addressed location
    without overwriting an existing blob;
 6. records immutable Run-bound metadata.
@@ -106,9 +110,11 @@ archive, repair, and publication/export are out of scope.
 - missing Handoffs referenced by completed Runs;
 - canonical document payload corruption;
 - artifact metadata with missing/corrupt blobs;
-- dangling artifact Run references.
+- dangling artifact, execution-document, or diagnostic Run references.
 
-It never repairs or silently rewrites history.
+A Run-scoped diagnosis loads and hashes only that Run's documents (plus its
+shared descriptor/context identities), rather than re-hashing unrelated trace
+history. It never repairs or silently rewrites history.
 
 ## OneDrive / shared storage
 
