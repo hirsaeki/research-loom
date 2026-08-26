@@ -2,7 +2,7 @@
 
 The production path is:
 
-```
+```text
 PR9 Invocation
   -> generic PR9 validation + current State pins
   -> registered capability Context-extension validation

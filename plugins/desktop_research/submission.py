@@ -1,21 +1,14 @@
 from __future__ import annotations
 
 from copy import deepcopy
-import hashlib
 from typing import Any, Mapping, Sequence
 
-import rfc8785
-
-
-def _digest(document: Mapping[str, Any]) -> str:
-    payload = deepcopy(dict(document))
-    payload.pop("extension_digest", None)
-    return "sha256:" + hashlib.sha256(rfc8785.dumps(payload)).hexdigest()
+from .digest import canonical_extension_digest
 
 
 def with_context_extension_digest(extension: Mapping[str, Any]) -> dict[str, Any]:
     result = deepcopy(dict(extension))
-    result["extension_digest"] = _digest(result)
+    result["extension_digest"] = canonical_extension_digest(result)
     return result
 
 
@@ -45,7 +38,9 @@ def build_result_extension(
             "capability_id": handoff["capability"]["capability_id"],
             "function_id": handoff["capability"]["function_id"],
         },
-        "source_capture_details": [deepcopy(dict(item)) for item in source_capture_details],
+        "source_capture_details": [
+            deepcopy(dict(item)) for item in source_capture_details
+        ],
         "citation_details": [deepcopy(dict(item)) for item in citation_details],
         "search_trace": deepcopy(dict(search_trace)),
         "null_results": [deepcopy(dict(item)) for item in null_results],
@@ -55,5 +50,5 @@ def build_result_extension(
         "coverage_assessment": deepcopy(dict(coverage_assessment)),
         "candidate_next_method_ids": list(candidate_next_method_ids),
     }
-    extension["extension_digest"] = _digest(extension)
+    extension["extension_digest"] = canonical_extension_digest(extension)
     return extension

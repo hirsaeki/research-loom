@@ -41,6 +41,7 @@ class DesktopResearchNormalizer:
         self._validator = DesktopResearchResultValidator(
             artifact_store,
             operational_store,
+            diagnostic_store=trace_store,
         )
 
     def supports(
