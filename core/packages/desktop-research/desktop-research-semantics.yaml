@@ -13,6 +13,7 @@ context:
   all_pr9_resources_require_desktop_role_binding: true
   forbidden_resource_roles_are_fail_closed: true
   bounded_resource_and_artifact_budget_required: true
+  production_preflight_validator_required: true
 capture:
   discovery_is_evidence_adoption: false
   capture_is_verified_evidence: false
@@ -22,9 +23,15 @@ capture:
   utf8_text_rendition_digest_required: true
   excerpt_containment_required: true
   citation_back_reference_required: true
+  trusted_metadata_comes_from_artifact_bytes: true
+  original_and_text_rendition_are_separate_artifacts: true
 search_trace:
   preserve_unsuccessful_coverage: true
   engine_or_browser_specific_contract: false
+  production_attempt_ledger_required: true
+  register_attempt_before_result: true
+  persisted_attempts_must_reconcile_exactly: true
+  acquisition_failure_is_absence_evidence: false
 coverage_and_stopping:
   all_declared_dimensions_assessed: true
   saturation_required: true
@@ -32,6 +39,8 @@ coverage_and_stopping:
   fixed_source_count_is_sufficient: false
   material_gap_blocks_stop_recommendation: true
   high_remaining_information_value_blocks_stop_recommendation: true
+  unknown_gap_or_information_value_may_remain_visible: true
+  operational_termination_is_research_stopping: false
   stopping_is_research_completion: false
   stopping_is_human_decision: false
 handoff:
@@ -64,6 +73,6 @@ errors:
   - {id: DR-EVIDENCE-GAP-001, meaning: "PR9 Evidence Gap assessment is missing, duplicated, or bound to unknown coverage dimensions."}
   - {id: DR-COVERAGE-001, meaning: "Coverage does not assess exactly the declared dimensions or references invalid search trace entries."}
   - {id: DR-STOP-BASIS-001, meaning: "Fixed source count is used as the sole stopping basis."}
-  - {id: DR-STOP-GAP-001, meaning: "Stopping is recommended while a material Evidence Gap remains."}
-  - {id: DR-STOP-RIV-001, meaning: "Stopping is recommended while remaining information value is high."}
+  - {id: DR-STOP-GAP-001, meaning: "Stopping is recommended while a material or unresolved-unknown Evidence Gap remains."}
+  - {id: DR-STOP-RIV-001, meaning: "Stopping is recommended while remaining information value is high or unknown."}
   - {id: DR-NEXT-METHOD-001, meaning: "Result extension drops or invents a PR9 candidate next-method proposal."}
