@@ -218,25 +218,26 @@ class DesktopResearchResultValidator:
                 if meta is None:
                     reasons.append(f"{key} artifact metadata is missing")
                     continue
+
+                metadata_mismatched = False
                 if meta.run_id != run_id:
                     reasons.append(f"{key} artifact is bound to another Run")
+                    metadata_mismatched = True
                 if meta.role != role:
                     reasons.append(f"{key} artifact role is incorrect")
+                    metadata_mismatched = True
                 if meta.digest != declaration["content_digest"]:
                     reasons.append(f"{key} metadata digest does not match declaration")
+                    metadata_mismatched = True
                 if meta.media_type != declaration["media_type"]:
                     reasons.append(
                         f"{key} metadata media_type does not match declaration"
                     )
+                    metadata_mismatched = True
                 if meta.size != declaration["byte_length"]:
                     reasons.append(f"{key} metadata size does not match declaration")
-                if reasons and (
-                    meta.run_id != run_id
-                    or meta.role != role
-                    or meta.digest != declaration["content_digest"]
-                    or meta.media_type != declaration["media_type"]
-                    or meta.size != declaration["byte_length"]
-                ):
+                    metadata_mismatched = True
+                if metadata_mismatched:
                     continue
 
                 try:
