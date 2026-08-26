@@ -115,6 +115,7 @@ class LocalExecutionStoreConcurrencySecurityTests(unittest.TestCase):
                 allowed_import_roots=(intake,),
             )
             real_open = os.open
+            real_supports_dir_fd = set(os.supports_dir_fd)
             swapped = False
 
             def racing_open(path, flags, *args, **kwargs):
@@ -133,9 +134,14 @@ class LocalExecutionStoreConcurrencySecurityTests(unittest.TestCase):
                 with patch(
                     "plugins.local_execution_store.store.os.open",
                     side_effect=racing_open,
-                ):
-                    with self.assertRaises(PermissionError):
-                        store.register_input_file("REF-RACE", source)
+                ) as mocked_open:
+                    with patch.object(
+                        os,
+                        "supports_dir_fd",
+                        real_supports_dir_fd | {mocked_open},
+                    ):
+                        with self.assertRaises(PermissionError):
+                            store.register_input_file("REF-RACE", source)
                 self.assertTrue(swapped)
             finally:
                 store.close()
