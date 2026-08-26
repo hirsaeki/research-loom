@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from dataclasses import replace
 import hashlib
 import json
 from pathlib import Path
@@ -95,7 +96,7 @@ class CapabilityExecutionRuntimeTests(unittest.TestCase):
         self.assertEqual(cm.exception.issue.code,"AUTHORIZATION_DENIED"); self.assertFalse(denied_traces.runs)
 
     def test_stale_snapshot_before_execution_is_blocked(self):
-        stale=state_for_context(); stale.current_snapshot=dict(stale.current_snapshot,content_digest="sha256:"+"9"*64)
+        original=state_for_context(); stale=replace(original,current_snapshot=dict(original.current_snapshot,content_digest="sha256:"+"9"*64))
         service,traces,_,_=self.make_service(Adapter(),state=stale)
         with self.assertRaises(CapabilityExecutionError) as cm: service.execute_managed(DESCRIPTOR,INVOCATION,CONTEXT,lineage_ref="LIN-1")
         self.assertEqual(cm.exception.issue.code,"STALE_STATE"); self.assertFalse(traces.runs)
