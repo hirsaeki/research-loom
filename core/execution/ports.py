@@ -58,6 +58,23 @@ class ResourceProvider(Protocol):
         ...
 
 
+class ExecutionArtifactStore(Protocol):
+    """Trusted byte store used behind a run-bound capability-facing sink."""
+
+    def put_bytes(
+        self,
+        run: CapabilityRunRecord,
+        *,
+        role: str,
+        media_type: str,
+        content: bytes,
+        artifact_id: str | None = None,
+        provenance: Mapping[str, Any] | None = None,
+        parent_artifact_refs: tuple[str, ...] = (),
+    ) -> ExecutionArtifactMetadata:
+        ...
+
+
 class RuntimeClock(Protocol):
     def now(self) -> str:
         ...

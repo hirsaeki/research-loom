@@ -27,6 +27,8 @@ class ExecutionFailureCode(str, Enum):
     IMPLEMENTATION_NOT_FOUND = "IMPLEMENTATION_NOT_FOUND"
     IMPLEMENTATION_AMBIGUOUS = "IMPLEMENTATION_AMBIGUOUS"
     RESOURCE_DENIED = "RESOURCE_DENIED"
+    RESOURCE_INTEGRITY = "RESOURCE_INTEGRITY"
+    ARTIFACT_STORE_ERROR = "ARTIFACT_STORE_ERROR"
     EXECUTION_FAILED = "EXECUTION_FAILED"
     HANDOFF_INVALID = "HANDOFF_INVALID"
     HANDOFF_REJECTED = "HANDOFF_REJECTED"
@@ -120,6 +122,20 @@ class CapabilityExecutionRequest:
     invocation: Mapping[str, Any]
     context_pack: Mapping[str, Any]
     resources: Any
+    artifacts: Any = None
+
+    def __post_init__(self) -> None:
+        if self.artifacts is None:
+            from .artifact_access import BoundedArtifactSink
+
+            object.__setattr__(
+                self,
+                "artifacts",
+                BoundedArtifactSink(
+                    self.run,
+                    getattr(self.resources, "artifact_store", None),
+                ),
+            )
 
 
 @dataclass(frozen=True)

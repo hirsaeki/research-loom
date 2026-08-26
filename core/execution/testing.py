@@ -18,6 +18,30 @@ from .models import (
 )
 
 
+_RUN_IMMUTABLE_FIELDS = (
+    "run_id",
+    "invocation_id",
+    "invocation_digest",
+    "capability_id",
+    "capability_version",
+    "descriptor_digest",
+    "implementation_id",
+    "implementation_version",
+    "function_id",
+    "execution_mode",
+    "context_pack_id",
+    "context_pack_digest",
+    "project_ref",
+    "lineage_ref",
+    "snapshot_ref",
+    "snapshot_digest",
+    "attempt",
+    "parent_run_id",
+    "prepared_at",
+    "provenance",
+)
+
+
 class InMemoryExecutionTraceStore:
     """Test-only trace store with immutable documents and atomic Run CAS."""
 
@@ -76,6 +100,11 @@ class InMemoryExecutionTraceStore:
             current = self.runs.get(updated_run.run_id)
             if current is None or current.status is not expected_status:
                 return False
+            for name in _RUN_IMMUTABLE_FIELDS:
+                if getattr(current, name) != getattr(updated_run, name):
+                    raise ValueError(
+                        f"immutable Run field {name} cannot change on transition"
+                    )
             self.runs[updated_run.run_id] = updated_run
             self.events[updated_run.run_id].append(event)
             return True

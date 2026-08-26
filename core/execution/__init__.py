@@ -1,5 +1,6 @@
-"""Canonical Research Capability execution boundary (PR22)."""
+"""Canonical Research Capability execution boundary (PR22/23)."""
 
+from .artifact_access import BoundedArtifactSink
 from .models import (
     AuthorizationDecision, CapabilityExecutionError, CapabilityExecutionOutput,
     CapabilityExecutionRequest, CapabilityRunRecord, ExecutionArtifactMetadata,
@@ -12,9 +13,11 @@ from .service import CapabilityExecutionService
 from .validation import CanonicalCapabilityExecutionValidator
 
 __all__ = [
-    "AuthorizationDecision", "BoundedResourceAccess", "CanonicalCapabilityExecutionValidator",
-    "CapabilityExecutionError", "CapabilityExecutionOutput", "CapabilityExecutionRequest",
+    "AuthorizationDecision", "BoundedArtifactSink", "BoundedResourceAccess",
+    "CanonicalCapabilityExecutionValidator", "CapabilityExecutionError",
+    "CapabilityExecutionOutput", "CapabilityExecutionRequest",
     "CapabilityExecutionService", "CapabilityRegistry", "CapabilityRunRecord",
-    "ExecutionArtifactMetadata", "ExecutionFailureCode", "ExecutionIssue", "ExecutionResult",
-    "ExecutionStyle", "PreparedExecution", "ResourcePayload", "RunLifecycleEvent", "RunStatus",
+    "ExecutionArtifactMetadata", "ExecutionFailureCode", "ExecutionIssue",
+    "ExecutionResult", "ExecutionStyle", "PreparedExecution", "ResourcePayload",
+    "RunLifecycleEvent", "RunStatus",
 ]
