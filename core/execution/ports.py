@@ -13,6 +13,7 @@ from .models import (
     ExecutionStyle,
     ResourcePayload,
     RunLifecycleEvent,
+    RunStatus,
 )
 
 
@@ -25,7 +26,10 @@ class CapabilityAdapter(Protocol):
     supported_execution_modes: tuple[str, ...]
     execution_style: ExecutionStyle
 
-    def execute(self, request: CapabilityExecutionRequest) -> CapabilityExecutionOutput:
+    def execute(
+        self,
+        request: CapabilityExecutionRequest,
+    ) -> CapabilityExecutionOutput:
         ...
 
     def cancel(self, run_id: str) -> None:
@@ -60,16 +64,24 @@ class RuntimeClock(Protocol):
 
 
 class ExecutionTraceStore(Protocol):
+    """Non-authoritative immutable execution history and atomic Run lifecycle port."""
+
     def create_run(self, run: CapabilityRunRecord) -> None:
         ...
 
     def load_run(self, run_id: str) -> CapabilityRunRecord | None:
         ...
 
-    def update_run(self, run: CapabilityRunRecord) -> None:
+    def append_run_event(self, event: RunLifecycleEvent) -> None:
         ...
 
-    def append_run_event(self, event: RunLifecycleEvent) -> None:
+    def transition_run(
+        self,
+        expected_status: RunStatus,
+        updated_run: CapabilityRunRecord,
+        event: RunLifecycleEvent,
+    ) -> bool:
+        """Atomically update Run and append event iff persisted status matches."""
         ...
 
     def store_descriptor(self, descriptor: Mapping[str, Any]) -> None:
@@ -84,20 +96,41 @@ class ExecutionTraceStore(Protocol):
     def store_handoff(self, handoff: Mapping[str, Any]) -> None:
         ...
 
-    def store_result_extension(self, run_id: str, extension: Mapping[str, Any]) -> str:
+    def store_result_extension(
+        self,
+        run_id: str,
+        extension: Mapping[str, Any],
+    ) -> str:
         ...
 
-    def register_output_artifact(self, artifact: ExecutionArtifactMetadata) -> None:
+    def register_output_artifact(
+        self,
+        artifact: ExecutionArtifactMetadata,
+    ) -> None:
         ...
 
-    def load_invocation(self, invocation_id: str) -> Mapping[str, Any] | None:
+    def load_invocation(
+        self,
+        invocation_id: str,
+    ) -> Mapping[str, Any] | None:
         ...
 
-    def load_context_pack(self, context_pack_id: str) -> Mapping[str, Any] | None:
+    def load_context_pack(
+        self,
+        context_pack_id: str,
+    ) -> Mapping[str, Any] | None:
         ...
 
-    def load_descriptor(self, descriptor_digest: str) -> Mapping[str, Any] | None:
+    def load_descriptor(
+        self,
+        descriptor_digest: str,
+    ) -> Mapping[str, Any] | None:
         ...
 
-    def store_diagnostic(self, run_id: str, kind: str, payload: Mapping[str, Any]) -> None:
+    def store_diagnostic(
+        self,
+        run_id: str,
+        kind: str,
+        payload: Mapping[str, Any],
+    ) -> None:
         ...
