@@ -49,6 +49,11 @@ _ALLOWED_TRANSITIONS = {
     RunStatus.ABORTED: set(),
     RunStatus.SUPERSEDED: set(),
 }
+_TERMINAL_STATUSES = frozenset(
+    status
+    for status, allowed_next in _ALLOWED_TRANSITIONS.items()
+    if not allowed_next
+)
 
 
 class CapabilityExecutionService:
@@ -255,8 +260,16 @@ class CapabilityExecutionService:
                 run.execution_mode,
             )
             adapter.cancel(run_id)
-        except Exception:
-            pass
+        except Exception as exc:
+            self._traces.store_diagnostic(
+                run_id,
+                "cancellation_failed",
+                {
+                    "reason": str(exc),
+                    "implementation_id": run.implementation_id,
+                    "implementation_version": run.implementation_version,
+                },
+            )
         return aborted
 
     def _prepare(
@@ -322,6 +335,11 @@ class CapabilityExecutionService:
                 raise CapabilityExecutionError(
                     ExecutionFailureCode.INVOCATION_INVALID,
                     "retry parent must preserve capability/function/execution mode",
+                )
+            if parent.status not in _TERMINAL_STATUSES:
+                raise CapabilityExecutionError(
+                    ExecutionFailureCode.INVOCATION_INVALID,
+                    "retry parent Run must be terminal before a new attempt is prepared",
                 )
             attempt = parent.attempt + 1
 
@@ -502,10 +520,26 @@ class CapabilityExecutionService:
                 ),
             )
 
-        current = self._states.load_state_view(
-            run.project_ref,
-            run.lineage_ref,
-        )
+        try:
+            current = self._states.load_state_view(
+                run.project_ref,
+                run.lineage_ref,
+            )
+        except KeyError:
+            return ExecutionResult(
+                completed,
+                handoff["handoff_id"],
+                status,
+                extension_ref,
+                None,
+                (
+                    ExecutionIssue(
+                        ExecutionFailureCode.STALE_STATE.value,
+                        "Run project/lineage no longer resolves; Handoff retained without normalization",
+                    ),
+                ),
+            )
+
         try:
             proposal = self._normalization.normalize(
                 handoff,
@@ -525,9 +559,13 @@ class CapabilityExecutionService:
                 (),
             )
         except NormalizationRejected as exc:
+            snapshot = current.current_snapshot
             code = (
                 ExecutionFailureCode.STALE_STATE.value
-                if "stale" in str(exc).lower()
+                if (
+                    snapshot.get("id") != run.snapshot_ref
+                    or snapshot.get("content_digest") != run.snapshot_digest
+                )
                 else ExecutionFailureCode.NORMALIZATION_REJECTED.value
             )
             return ExecutionResult(
