@@ -1,1 +1,98 @@
-{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"urn:research-loom:core:desktop-research-context-extension:0.1.0","title":"research-loom Desktop Research Context Pack extension","description":"Capability-specific, implementation-neutral extension bound to one exact PR9 Capability Context Pack. It does not replace or modify the canonical Context Pack envelope.","type":"object","additionalProperties":false,"required":["schema_version","extension_type","context_binding","target","retrieval_scope","allowed_source_categories","resource_role_bindings","forbidden_resource_roles","coverage_dimensions","budget","extension_digest"],"properties":{"schema_version":{"const":"0.1.0"},"extension_type":{"const":"desktop_research_context"},"context_binding":{"$ref":"#/$defs/context_binding"},"target":{"oneOf":[{"$ref":"#/$defs/question_target"},{"$ref":"#/$defs/question_candidate_target"}]},"retrieval_scope":{"$ref":"#/$defs/retrieval_scope"},"allowed_source_categories":{"type":"array","minItems":1,"uniqueItems":true,"items":{"$ref":"#/$defs/open_token"}},"resource_role_bindings":{"type":"array","items":{"$ref":"#/$defs/resource_role_binding"}},"forbidden_resource_roles":{"type":"array","minItems":1,"uniqueItems":true,"items":{"$ref":"#/$defs/resource_role"}},"coverage_dimensions":{"type":"array","minItems":1,"items":{"$ref":"#/$defs/coverage_dimension"}},"budget":{"$ref":"#/$defs/budget"},"extension_digest":{"$ref":"#/$defs/digest"}},"$defs":{"identifier":{"type":"string","pattern":"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"},"open_token":{"type":"string","pattern":"^[a-z][a-z0-9._-]{0,127}$"},"digest":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},"context_binding":{"type":"object","additionalProperties":false,"required":["context_pack_id","context_pack_digest","project_id"],"properties":{"context_pack_id":{"$ref":"#/$defs/identifier"},"context_pack_digest":{"$ref":"#/$defs/digest"},"project_id":{"$ref":"#/$defs/identifier"}}},"question_target":{"type":"object","additionalProperties":false,"required":["target_type","question_id"],"properties":{"target_type":{"const":"research_question"},"question_id":{"$ref":"#/$defs/identifier"}}},"question_candidate_target":{"type":"object","additionalProperties":false,"required":["target_type","question_candidate_id","statement","source_attention_id","authoritative_question"],"properties":{"target_type":{"const":"question_candidate"},"question_candidate_id":{"$ref":"#/$defs/identifier"},"statement":{"type":"string","minLength":1},"source_attention_id":{"$ref":"#/$defs/identifier"},"related_question_ids":{"type":"array","uniqueItems":true,"items":{"$ref":"#/$defs/identifier"}},"authoritative_question":{"const":false}}},"retrieval_scope":{"type":"object","additionalProperties":false,"required":["scope_statement","in_scope","out_of_scope"],"properties":{"scope_statement":{"type":"string","minLength":1},"in_scope":{"type":"array","minItems":1,"uniqueItems":true,"items":{"type":"string","minLength":1}},"out_of_scope":{"type":"array","uniqueItems":true,"items":{"type":"string","minLength":1}}}},"resource_role":{"enum":["research_context","candidate_source","research_artifact","writer_material","publication_material","publication_feedback","archive_provenance"]},"resource_role_binding":{"type":"object","additionalProperties":false,"required":["reference_id","role"],"properties":{"reference_id":{"$ref":"#/$defs/identifier"},"role":{"$ref":"#/$defs/resource_role"}}},"coverage_dimension":{"type":"object","additionalProperties":false,"required":["dimension_id","label","required"],"properties":{"dimension_id":{"$ref":"#/$defs/identifier"},"label":{"type":"string","minLength":1},"description":{"type":"string","minLength":1},"required":{"type":"boolean"}}},"budget":{"type":"object","additionalProperties":false,"required":["max_total_resources","max_candidate_source_resources","max_artifact_resources","max_acquired_source_captures","max_search_trace_entries","max_text_rendition_bytes"],"properties":{"max_total_resources":{"type":"integer","minimum":0},"max_candidate_source_resources":{"type":"integer","minimum":0},"max_artifact_resources":{"type":"integer","minimum":0},"max_acquired_source_captures":{"type":"integer","minimum":0},"max_search_trace_entries":{"type":"integer","minimum":0},"max_text_rendition_bytes":{"type":"integer","minimum":0}}}}}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:research-loom:core:desktop-research-context-extension:0.1.0",
+  "title": "research-loom Desktop Research Context Pack extension",
+  "description": "Capability-specific, implementation-neutral extension bound to one exact PR9 Capability Context Pack. It does not replace or modify the canonical Context Pack envelope.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "extension_type", "context_binding", "target", "retrieval_scope", "allowed_source_categories", "resource_role_bindings", "forbidden_resource_roles", "coverage_dimensions", "budget", "extension_digest"],
+  "properties": {
+    "schema_version": {"const": "0.1.0"},
+    "extension_type": {"const": "desktop_research_context"},
+    "context_binding": {"$ref": "#/$defs/context_binding"},
+    "target": {"oneOf": [{"$ref": "#/$defs/question_target"}, {"$ref": "#/$defs/question_candidate_target"}]},
+    "retrieval_scope": {"$ref": "#/$defs/retrieval_scope"},
+    "allowed_source_categories": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/open_token"}},
+    "resource_role_bindings": {"type": "array", "items": {"$ref": "#/$defs/resource_role_binding"}},
+    "forbidden_resource_roles": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/resource_role"}},
+    "coverage_dimensions": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/coverage_dimension"}},
+    "budget": {"$ref": "#/$defs/budget"},
+    "extension_digest": {"$ref": "#/$defs/digest"}
+  },
+  "$defs": {
+    "identifier": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"},
+    "open_token": {"type": "string", "pattern": "^[a-z][a-z0-9._-]{0,127}$"},
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "context_binding": {
+      "type": "object", "additionalProperties": false,
+      "required": ["context_pack_id", "context_pack_digest", "project_id"],
+      "properties": {
+        "context_pack_id": {"$ref": "#/$defs/identifier"},
+        "context_pack_digest": {"$ref": "#/$defs/digest"},
+        "project_id": {"$ref": "#/$defs/identifier"}
+      }
+    },
+    "question_target": {
+      "type": "object", "additionalProperties": false,
+      "required": ["target_type", "question_id"],
+      "properties": {
+        "target_type": {"const": "research_question"},
+        "question_id": {"$ref": "#/$defs/identifier"}
+      }
+    },
+    "question_candidate_target": {
+      "type": "object", "additionalProperties": false,
+      "required": ["target_type", "question_candidate_id", "statement", "source_attention_id", "authoritative_question"],
+      "properties": {
+        "target_type": {"const": "question_candidate"},
+        "question_candidate_id": {"$ref": "#/$defs/identifier"},
+        "statement": {"type": "string", "minLength": 1},
+        "source_attention_id": {"$ref": "#/$defs/identifier"},
+        "related_question_ids": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/identifier"}},
+        "authoritative_question": {"const": false}
+      }
+    },
+    "retrieval_scope": {
+      "type": "object", "additionalProperties": false,
+      "required": ["scope_statement", "in_scope", "out_of_scope"],
+      "properties": {
+        "scope_statement": {"type": "string", "minLength": 1},
+        "in_scope": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "out_of_scope": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}}
+      }
+    },
+    "resource_role": {"enum": ["research_context", "candidate_source", "research_artifact", "writer_material", "publication_material", "publication_feedback", "archive_provenance"]},
+    "resource_role_binding": {
+      "type": "object", "additionalProperties": false,
+      "required": ["reference_id", "role"],
+      "properties": {
+        "reference_id": {"$ref": "#/$defs/identifier"},
+        "role": {"$ref": "#/$defs/resource_role"}
+      }
+    },
+    "coverage_dimension": {
+      "type": "object", "additionalProperties": false,
+      "required": ["dimension_id", "label", "required"],
+      "properties": {
+        "dimension_id": {"$ref": "#/$defs/identifier"},
+        "label": {"type": "string", "minLength": 1},
+        "description": {"type": "string", "minLength": 1},
+        "required": {"type": "boolean"}
+      }
+    },
+    "budget": {
+      "type": "object", "additionalProperties": false,
+      "required": ["max_total_resources", "max_candidate_source_resources", "max_artifact_resources", "max_acquired_source_captures", "max_search_trace_entries", "max_text_rendition_bytes"],
+      "properties": {
+        "max_total_resources": {"type": "integer", "minimum": 0},
+        "max_candidate_source_resources": {"type": "integer", "minimum": 0},
+        "max_artifact_resources": {"type": "integer", "minimum": 0},
+        "max_acquired_source_captures": {"type": "integer", "minimum": 0},
+        "max_search_trace_entries": {"type": "integer", "minimum": 0},
+        "max_text_rendition_bytes": {"type": "integer", "minimum": 0},
+        "max_original_capture_bytes": {"type": "integer", "minimum": 0},
+        "max_capture_artifacts": {"type": "integer", "minimum": 0}
+      }
+    }
+  }
+}
