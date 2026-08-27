@@ -151,6 +151,7 @@ class LocalConversationStore:
         return self._load_document("action_proposal", proposal_id)
 
     def store_confirmation_request(self, document):
+        project_id = str(document.get("project_id") or "")
         with self._lock:
             self._db.execute("BEGIN IMMEDIATE")
             try:
@@ -163,7 +164,7 @@ class LocalConversationStore:
                         document["request_digest"],
                         document["proposal_binding"]["proposal_id"],
                         document["conversation_id"],
-                        document["project_id"],
+                        project_id,
                     ),
                 )
                 row = self._db.execute(
@@ -174,7 +175,7 @@ class LocalConversationStore:
                     str(row["request_digest"]) != str(document["request_digest"])
                     or str(row["proposal_id"]) != str(document["proposal_binding"]["proposal_id"])
                     or str(row["conversation_id"]) != str(document["conversation_id"])
-                    or str(row["project_id"]) != str(document["project_id"])
+                    or str(row["project_id"]) != project_id
                 ):
                     raise ValueError("immutable confirmation request index collision")
                 self._db.execute("COMMIT")
