@@ -47,10 +47,13 @@ class LocalConversationStore:
               request_digest TEXT NOT NULL,
               proposal_id TEXT NOT NULL,
               conversation_id TEXT NOT NULL,
+              project_id TEXT NOT NULL,
               status TEXT NOT NULL DEFAULT 'pending',
               confirmation_receipt_id TEXT,
               FOREIGN KEY(proposal_id) REFERENCES proposals(proposal_id)
             );
+            CREATE INDEX IF NOT EXISTS confirmation_requests_project_pending
+              ON confirmation_requests(project_id, status, request_id);
             CREATE TABLE IF NOT EXISTS materializations(
               proposal_id TEXT PRIMARY KEY,
               payload_json TEXT NOT NULL
@@ -153,19 +156,25 @@ class LocalConversationStore:
             try:
                 self._store_document(document)
                 self._db.execute(
-                    "INSERT INTO confirmation_requests(request_id,request_digest,proposal_id,conversation_id,status) "
-                    "VALUES(?,?,?,?,'pending') ON CONFLICT(request_id) DO NOTHING",
-                    (document["confirmation_request_id"], document["request_digest"],
-                     document["proposal_binding"]["proposal_id"], document["conversation_id"]),
+                    "INSERT INTO confirmation_requests(request_id,request_digest,proposal_id,conversation_id,project_id,status) "
+                    "VALUES(?,?,?,?,?,'pending') ON CONFLICT(request_id) DO NOTHING",
+                    (
+                        document["confirmation_request_id"],
+                        document["request_digest"],
+                        document["proposal_binding"]["proposal_id"],
+                        document["conversation_id"],
+                        document["project_id"],
+                    ),
                 )
                 row = self._db.execute(
-                    "SELECT request_digest,proposal_id,conversation_id FROM confirmation_requests WHERE request_id=?",
+                    "SELECT request_digest,proposal_id,conversation_id,project_id FROM confirmation_requests WHERE request_id=?",
                     (document["confirmation_request_id"],),
                 ).fetchone()
                 if row is None or (
                     str(row["request_digest"]) != str(document["request_digest"])
                     or str(row["proposal_id"]) != str(document["proposal_binding"]["proposal_id"])
                     or str(row["conversation_id"]) != str(document["conversation_id"])
+                    or str(row["project_id"]) != str(document["project_id"])
                 ):
                     raise ValueError("immutable confirmation request index collision")
                 self._db.execute("COMMIT")
@@ -296,14 +305,6 @@ class LocalConversationStore:
             ).fetchone()
         return dict(row) if row else None
 
-    def list_run_correlations(self):
-        """Return immutable Run/action correlations for read-only operational status."""
-        with self._lock:
-            rows = self._db.execute(
-                "SELECT run_id,proposal_id,input_id FROM run_correlations ORDER BY run_id"
-            ).fetchall()
-        return tuple(dict(row) for row in rows)
-
     def store_state_delta_proposal(self, proposal_id, payload):
         serialized = self._json(payload)
         with self._lock:
@@ -338,20 +339,23 @@ class LocalConversationStore:
         result.extend(doc for doc in (self.load_confirmation_request(item) for item in request_ids) if doc is not None)
         return tuple(result)
 
-    def list_pending_confirmation_requests(self, project_id: str):
-        """Return pending Confirmation Requests for one project in stable order."""
+    def list_pending_confirmation_requests(
+        self,
+        project_id: str,
+        *,
+        limit: int,
+    ):
+        """Return a bounded project-scoped set of pending Confirmation Requests."""
+        if limit <= 0:
+            raise ValueError("pending Confirmation query limit must be positive")
         with self._lock:
             rows = self._db.execute(
                 "SELECT d.payload_json FROM confirmation_requests c "
                 "JOIN documents d ON d.message_type='confirmation_request' AND d.document_id=c.request_id "
-                "WHERE c.status='pending' ORDER BY c.request_id"
+                "WHERE c.project_id=? AND c.status='pending' ORDER BY c.request_id LIMIT ?",
+                (str(project_id), int(limit)),
             ).fetchall()
-        result = []
-        for row in rows:
-            document = json.loads(str(row["payload_json"]))
-            if str(document.get("project_id")) == str(project_id):
-                result.append(document)
-        return tuple(result)
+        return tuple(json.loads(str(row["payload_json"])) for row in rows)
 
     def close(self):
         with self._lock:

@@ -9,6 +9,7 @@ from typing import Any, Mapping
 from core.conversation import ActionDraft, ConversationRuntimeError, CoordinatorResult
 from core.conversation.validation import with_document_digest
 from plugins.local_application.workspace import LocalWorkspace, OpenedLocalWorkspace
+from plugins.local_execution_store import pending_runs_for_project
 
 
 _INGRESS_FIELDS = {"action_type", "payload", "rationale", "actor_id", "conversation_id"}
@@ -23,6 +24,7 @@ _AUTHORITY_PAYLOAD_FIELDS = {
     "capability_implementation",
     "implementation_id",
 }
+_STATUS_ITEM_LIMIT = 100
 
 
 class LocalApplicationError(RuntimeError):
@@ -325,22 +327,22 @@ class LocalApplicationFacade:
         state = repo.load_state_view(self._project_id, lineage_id)
         pending_decisions = self._application.human_decisions.pending(self._project_id)
 
-        conversation_store = self._application.conversation_store
-        pending_confirmations = conversation_store.list_pending_confirmation_requests(
-            self._project_id
+        probe_limit = _STATUS_ITEM_LIMIT + 1
+        confirmation_probe = self._application.conversation_store.list_pending_confirmation_requests(
+            self._project_id,
+            limit=probe_limit,
         )
+        pending_confirmations = confirmation_probe[:_STATUS_ITEM_LIMIT]
+        confirmations_truncated = len(confirmation_probe) > _STATUS_ITEM_LIMIT
 
-        pending_runs = []
-        execution_store = self._application.execution_store
-        for correlation in conversation_store.list_run_correlations():
-            run = execution_store.load_run(str(correlation["run_id"]))
-            if (
-                run is None
-                or run.project_ref != self._project_id
-                or run.status.value not in {"PREPARED", "RUNNING"}
-            ):
-                continue
-            pending_runs.append({
+        run_probe = pending_runs_for_project(
+            self._application.execution_store,
+            self._project_id,
+            limit=probe_limit,
+        )
+        runs_truncated = len(run_probe) > _STATUS_ITEM_LIMIT
+        pending_runs = [
+            {
                 "run_id": run.run_id,
                 "capability_id": run.capability_id,
                 "function_id": run.function_id,
@@ -349,8 +351,9 @@ class LocalApplicationFacade:
                 "lineage_ref": run.lineage_ref,
                 "snapshot_ref": run.snapshot_ref,
                 "snapshot_digest": run.snapshot_digest,
-            })
-        pending_runs.sort(key=lambda item: str(item["run_id"]))
+            }
+            for run in run_probe[:_STATUS_ITEM_LIMIT]
+        ]
 
         snapshot = state.current_snapshot
         return {
@@ -375,6 +378,10 @@ class LocalApplicationFacade:
             "pending_confirmations": _jsonable(pending_confirmations),
             "pending_human_decisions": _jsonable(pending_decisions),
             "pending_runs": _jsonable(pending_runs),
+            "truncated": {
+                "pending_confirmations": confirmations_truncated,
+                "pending_runs": runs_truncated,
+            },
         }
 
     def doctor(self) -> Mapping[str, Any]:

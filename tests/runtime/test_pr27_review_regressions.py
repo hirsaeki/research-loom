@@ -11,8 +11,11 @@ from unittest.mock import patch
 
 import rfc8785
 
+import plugins.local_application.facade as facade_module
 import plugins.local_application.workspace as workspace_module
-from plugins.local_application import LocalWorkspace
+from plugins.local_application import LocalApplicationFacade, LocalResearchApplication, LocalWorkspace
+from plugins.local_conversation_store import LocalConversationStore
+from runtime_fixtures import project, rq, seed_state
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -20,6 +23,25 @@ PROJECT_CONFIG = ROOT / "projects/fixtures/valid/generic-project-config.json"
 EFFECTIVE_PROFILES = ROOT / "profiles/fixtures/valid/effective-profile-set.json"
 CLI = ROOT / "plugins/local_application/cli.py"
 FACADE = ROOT / "plugins/local_application/facade.py"
+
+
+class NullResolver:
+    def resolve(self, *_args, **_kwargs):
+        return None
+
+
+def profile_provider(_project_ref, expected_digest):
+    return {
+        "schema_version": "0.1.0",
+        "core_contracts": {"research_contract": "0.1.0", "invariant_contract": "0.1.0"},
+        "profile_pins": [{
+            "profile_id": "fixture.research",
+            "profile_type": "research",
+            "profile_version": "1.0.0",
+            "manifest_sha256": "1" * 64,
+        }],
+        "content_digest": expected_digest,
+    }
 
 
 def bootstrap_config(path: Path) -> Path:
@@ -58,6 +80,22 @@ class PR27ReviewRegressionTests(unittest.TestCase):
                     self.assertEqual(list(workspace.iterdir()), [])
                 else:
                     self.assertFalse(workspace.exists())
+
+    def test_partial_project_config_write_cannot_strand_workspace(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = bootstrap_config(root / "project.json")
+            workspace = root / "workspace"
+
+            def partial_copy(path, _value):
+                path.write_text("{", encoding="utf-8")
+                raise OSError("synthetic partial copy failure")
+
+            with patch.object(workspace_module, "_copy_json", side_effect=partial_copy):
+                with self.assertRaisesRegex(OSError, "synthetic partial copy failure"):
+                    LocalWorkspace.init(workspace, config, EFFECTIVE_PROFILES)
+
+            self.assertFalse(workspace.exists())
 
     def test_doctor_converts_direct_sqlite_error_to_structured_issue(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -109,7 +147,75 @@ class PR27ReviewRegressionTests(unittest.TestCase):
         self.assertIn("coordinator.process_action_draft", source)
         self.assertIn("coordinator.action_definitions", source)
         self.assertIn("list_pending_confirmation_requests", source)
-        self.assertIn("list_run_correlations", source)
+        self.assertIn("pending_runs_for_project", source)
+
+    def test_pending_confirmation_query_is_project_scoped_and_bounded(self):
+        with tempfile.TemporaryDirectory() as temp:
+            store = LocalConversationStore(Path(temp) / "conversation.db")
+            try:
+                for index, project_id in enumerate(("PRJ-A", "PRJ-B", "PRJ-A")):
+                    proposal_id = f"PROP-{index}"
+                    conversation_id = f"CONV-{index}"
+                    store.store_proposal({
+                        "message_type": "action_proposal",
+                        "proposal_id": proposal_id,
+                        "proposal_digest": f"sha256:{index:064x}",
+                        "conversation_id": conversation_id,
+                        "commitment_mode": "commit_requested",
+                    })
+                    store.store_confirmation_request({
+                        "message_type": "confirmation_request",
+                        "confirmation_request_id": f"CONF-{index}",
+                        "request_digest": f"sha256:{index + 10:064x}",
+                        "proposal_binding": {"proposal_id": proposal_id},
+                        "conversation_id": conversation_id,
+                        "project_id": project_id,
+                    })
+
+                result = store.list_pending_confirmation_requests("PRJ-A", limit=1)
+                self.assertEqual(len(result), 1)
+                self.assertEqual(result[0]["project_id"], "PRJ-A")
+            finally:
+                store.close()
+
+    def test_status_is_bounded_and_reports_truncation(self):
+        with tempfile.TemporaryDirectory() as temp:
+            app = LocalResearchApplication(
+                temp,
+                resolver=NullResolver(),
+                effective_profile_set_provider=profile_provider,
+                seed_state=seed_state(
+                    objects=[project(), rq(state="approved")],
+                    snapshot_id="SNP-STATUS-0",
+                ),
+            )
+            try:
+                facade = LocalApplicationFacade(app, "PRJ-1")
+                for index in range(3):
+                    pending = facade.submit_action({
+                        "action_type": "state.apply_candidate",
+                        "payload": {"state_delta_proposal_id": f"MISSING-{index}"},
+                    })
+                    self.assertEqual(pending["status"], "CONFIRMATION_REQUIRED")
+                    prepared = facade.submit_action({
+                        "action_type": "desktop_research.investigate",
+                        "payload": {
+                            "question_id": "RQ-1",
+                            "purpose": f"bounded status fixture {index}",
+                        },
+                    })
+                    self.assertEqual(prepared["status"], "CAPABILITY_EXECUTION_PREPARED")
+
+                with patch.object(facade_module, "_STATUS_ITEM_LIMIT", 2):
+                    status = facade.status()
+
+                self.assertEqual(len(status["pending_confirmations"]), 2)
+                self.assertEqual(len(status["pending_runs"]), 2)
+                self.assertTrue(status["truncated"]["pending_confirmations"])
+                self.assertTrue(status["truncated"]["pending_runs"])
+                self.assertTrue(all(run["status"] == "RUNNING" for run in status["pending_runs"]))
+            finally:
+                app.close()
 
 
 if __name__ == "__main__":

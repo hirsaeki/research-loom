@@ -494,10 +494,10 @@ class LocalWorkspace:
             internal.mkdir(parents=False, exist_ok=False)
             internal_created = True
             marker.write_text("initializing\n", encoding="utf-8")
-            _copy_json(config_path, config)
             config_written = True
-            _copy_json(profile_path, effective)
+            _copy_json(config_path, config)
             profile_written = True
+            _copy_json(profile_path, effective)
 
             app = LocalResearchApplication(
                 internal,
