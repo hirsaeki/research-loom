@@ -20,6 +20,25 @@ if TYPE_CHECKING:
 
 class ReadMixin:
     @repository_read
+    def load_active_lineage_ref(
+        self: "SQLiteResearchStateRepository",
+        project_ref: str,
+    ) -> str:
+        row = self._connection.execute(
+            """
+            SELECT active_lineage_ref
+            FROM project_active_lineage
+            WHERE project_ref = ?
+            """,
+            (project_ref,),
+        ).fetchone()
+        if row is None:
+            raise RepositoryError(
+                f"project {project_ref!r} has no active lineage pointer"
+            )
+        return str(row["active_lineage_ref"])
+
+    @repository_read
     def load_state_view(
         self: "SQLiteResearchStateRepository",
         project_ref: str,
