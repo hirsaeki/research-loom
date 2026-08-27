@@ -9,6 +9,16 @@ from core.conversation.validation import canonical_digest
 from .submission import with_context_extension_digest
 
 
+_DEFAULT_CONTEXT_LIMITS = {
+    "max_questions": 1,
+    "max_research_object_references": 16,
+    "max_resources": 32,
+    "max_attention_items": 64,
+    "max_project_guards": 64,
+    "max_effective_constraints": 128,
+}
+
+
 class DesktopResearchConversationMaterializer:
     """PR25 adapter from a typed Desktop action to PR9 + PR11 bounded context.
 
@@ -25,22 +35,33 @@ class DesktopResearchConversationMaterializer:
         effective_profile_set_provider,
         resource_catalog: Mapping[str, Mapping[str, Any]] | None = None,
         resource_roles: Mapping[str, str] | None = None,
+        context_limits: Mapping[str, int] | None = None,
     ) -> None:
         self._profiles = effective_profile_set_provider
         self._resources = dict(resource_catalog or {})
         self._roles = dict(resource_roles or {})
+        limits = dict(_DEFAULT_CONTEXT_LIMITS)
+        limits.update(dict(context_limits or {}))
+        self._limits = limits
 
     def materialize(self, proposal_payload, state, descriptor, *, context_pack_id):
         question_id = str(proposal_payload.get("question_id", ""))
         if not question_id:
             raise ConversationRuntimeError("CONV-PIN-001", "Desktop action requires question_id")
         rq = next(
-            (obj for obj in state.effective_objects()
-             if obj.get("kind") == "research_question" and str(obj.get("id")) == question_id),
+            (
+                obj
+                for obj in state.effective_objects()
+                if obj.get("kind") == "research_question"
+                and str(obj.get("id")) == question_id
+                and str(obj.get("adoption_state")) in {"approved", "revised"}
+            ),
             None,
         )
         if rq is None:
-            raise ConversationRuntimeError("CONV-PIN-001", "Desktop target RQ is not in current Snapshot")
+            raise ConversationRuntimeError(
+                "CONV-PIN-001", "Desktop target RQ is not an adopted current Research Question"
+            )
 
         requested = tuple(str(item) for item in proposal_payload.get("resource_reference_ids", ()))
         unknown = [item for item in requested if item not in self._resources]
@@ -49,7 +70,16 @@ class DesktopResearchConversationMaterializer:
                 "CONV-PIN-001",
                 "unregistered resource references cannot enter Context Pack: " + ", ".join(unknown),
             )
-        resources = [deepcopy(dict(self._resources[item])) for item in requested]
+        resources = []
+        for item in requested:
+            resource = deepcopy(dict(self._resources[item]))
+            if resource.get("reference_id") not in {None, item}:
+                raise ConversationRuntimeError(
+                    "CONV-PIN-001", f"resource catalog identity does not match key: {item}"
+                )
+            resource["reference_id"] = item
+            resources.append(resource)
+
         role_bindings = []
         for item in requested:
             role = self._roles.get(item)
@@ -78,6 +108,25 @@ class DesktopResearchConversationMaterializer:
             effective_constraints = [deepcopy(dict(item)) for item in raw_constraints.values() if isinstance(item, Mapping)]
         else:
             effective_constraints = [deepcopy(dict(item)) for item in raw_constraints]
+
+        counts = {
+            "max_questions": 1,
+            "max_research_object_references": 1,
+            "max_resources": len(resources),
+            "max_attention_items": len(attention),
+            "max_project_guards": sum(len(value) for value in project_constraints.values()),
+            "max_effective_constraints": len(effective_constraints),
+        }
+        exceeded = [
+            name for name, count in counts.items()
+            if count > int(self._limits[name])
+        ]
+        if exceeded:
+            raise ConversationRuntimeError(
+                "CONV-PIN-001",
+                "Desktop Context Pack bounds exceeded: " + ", ".join(sorted(exceeded)),
+            )
+
         context = {
             "schema_version": "0.1.0",
             "context_pack_id": context_pack_id,
@@ -102,14 +151,7 @@ class DesktopResearchConversationMaterializer:
             "research_attention": attention,
             "project_constraints": project_constraints,
             "effective_constraints": effective_constraints,
-        }
-        context["bounds"] = {
-            "max_questions": len(context["question_ids"]),
-            "max_research_object_references": len(context["research_object_references"]),
-            "max_resources": len(resources),
-            "max_attention_items": len(attention),
-            "max_project_guards": sum(len(value) for value in project_constraints.values()),
-            "max_effective_constraints": len(context["effective_constraints"]),
+            "bounds": {name: int(self._limits[name]) for name in _DEFAULT_CONTEXT_LIMITS},
         }
         context["context_pack_digest"] = canonical_digest(context)
 

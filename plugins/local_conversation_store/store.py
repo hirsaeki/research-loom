@@ -126,9 +126,19 @@ class LocalConversationStore:
             try:
                 self._store_document(document)
                 self._db.execute(
-                    "INSERT INTO proposals(proposal_id,conversation_id,commitment_mode,status) VALUES(?,?,?,'pending')",
+                    "INSERT INTO proposals(proposal_id,conversation_id,commitment_mode,status) "
+                    "VALUES(?,?,?,'pending') ON CONFLICT(proposal_id) DO NOTHING",
                     (document["proposal_id"], document["conversation_id"], document["commitment_mode"]),
                 )
+                row = self._db.execute(
+                    "SELECT conversation_id,commitment_mode FROM proposals WHERE proposal_id=?",
+                    (document["proposal_id"],),
+                ).fetchone()
+                if row is None or (
+                    str(row["conversation_id"]) != str(document["conversation_id"])
+                    or str(row["commitment_mode"]) != str(document["commitment_mode"])
+                ):
+                    raise ValueError("immutable proposal index collision")
                 self._db.execute("COMMIT")
             except Exception:
                 self._db.execute("ROLLBACK")
@@ -143,10 +153,21 @@ class LocalConversationStore:
             try:
                 self._store_document(document)
                 self._db.execute(
-                    "INSERT INTO confirmation_requests(request_id,request_digest,proposal_id,conversation_id,status) VALUES(?,?,?,?,'pending')",
+                    "INSERT INTO confirmation_requests(request_id,request_digest,proposal_id,conversation_id,status) "
+                    "VALUES(?,?,?,?,'pending') ON CONFLICT(request_id) DO NOTHING",
                     (document["confirmation_request_id"], document["request_digest"],
                      document["proposal_binding"]["proposal_id"], document["conversation_id"]),
                 )
+                row = self._db.execute(
+                    "SELECT request_digest,proposal_id,conversation_id FROM confirmation_requests WHERE request_id=?",
+                    (document["confirmation_request_id"],),
+                ).fetchone()
+                if row is None or (
+                    str(row["request_digest"]) != str(document["request_digest"])
+                    or str(row["proposal_id"]) != str(document["proposal_binding"]["proposal_id"])
+                    or str(row["conversation_id"]) != str(document["conversation_id"])
+                ):
+                    raise ValueError("immutable confirmation request index collision")
                 self._db.execute("COMMIT")
             except Exception:
                 self._db.execute("ROLLBACK")
@@ -194,7 +215,8 @@ class LocalConversationStore:
                         "SELECT commitment_mode,status FROM proposals WHERE proposal_id=?", (target_id,)
                     ).fetchone()
                     if row is None or row["commitment_mode"] != "proposal_only" or row["status"] != "pending":
-                        self._db.execute("ROLLBACK"); return False
+                        self._db.execute("ROLLBACK")
+                        return False
                     changed = self._db.execute(
                         "UPDATE proposals SET status='cancelled' WHERE proposal_id=? AND status='pending'", (target_id,)
                     ).rowcount
@@ -203,7 +225,8 @@ class LocalConversationStore:
                         "SELECT status,proposal_id FROM confirmation_requests WHERE request_id=?", (target_id,)
                     ).fetchone()
                     if row is None or row["status"] != "pending":
-                        self._db.execute("ROLLBACK"); return False
+                        self._db.execute("ROLLBACK")
+                        return False
                     changed = self._db.execute(
                         "UPDATE confirmation_requests SET status='cancelled' WHERE request_id=? AND status='pending'", (target_id,)
                     ).rowcount
@@ -212,7 +235,8 @@ class LocalConversationStore:
                             "UPDATE proposals SET status='cancelled' WHERE proposal_id=? AND status='pending'", (row["proposal_id"],)
                         )
                 else:
-                    self._db.execute("ROLLBACK"); return False
+                    self._db.execute("ROLLBACK")
+                    return False
                 self._db.execute("COMMIT")
                 return changed == 1
             except Exception:

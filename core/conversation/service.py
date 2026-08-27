@@ -177,7 +177,9 @@ class WorkConversationService:
             candidate = _mapping(result.state_delta_proposal)
             self._store.store_state_delta_proposal(str(candidate["proposal_id"]), candidate)
 
-        presentations = self._candidate_presentations(proposal, handoff)
+        presentations = ()
+        if not result.issues and result.handoff_ref is not None:
+            presentations = self._candidate_presentations(proposal, handoff)
         return CoordinatorResult(
             "CAPABILITY_RESULT_COLLECTED",
             input_document,

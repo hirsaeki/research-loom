@@ -20,6 +20,25 @@ if TYPE_CHECKING:
 
 class ReadMixin:
     @repository_read
+    def load_active_lineage_ref(
+        self: "SQLiteResearchStateRepository",
+        project_ref: str,
+    ) -> str:
+        row = self._connection.execute(
+            """
+            SELECT active_lineage_ref
+            FROM project_active_lineage
+            WHERE project_ref = ?
+            """,
+            (project_ref,),
+        ).fetchone()
+        if row is None:
+            raise RepositoryError(
+                f"project {project_ref!r} has no active lineage pointer"
+            )
+        return str(row["active_lineage_ref"])
+
+    @repository_read
     def load_state_view(
         self: "SQLiteResearchStateRepository",
         project_ref: str,
@@ -94,20 +113,9 @@ class ReadMixin:
             )
         )
 
-        active = self._connection.execute(
-            """
-            SELECT active_lineage_ref
-            FROM project_active_lineage
-            WHERE project_ref = ?
-            """,
-            (project_ref,),
-        ).fetchone()
-        if active is None:
-            raise RepositoryError(
-                f"project {project_ref!r} has no active lineage pointer"
-            )
+        active_lineage_ref = self.load_active_lineage_ref(project_ref)
         if not any(
-            lineage.lineage_id == str(active["active_lineage_ref"])
+            lineage.lineage_id == active_lineage_ref
             for lineage in lineages
         ):
             raise RepositoryError("project active lineage pointer is dangling")
@@ -164,7 +172,7 @@ class ReadMixin:
             decisions=decisions,
             used_decision_ids=used,
             lineages=lineages,
-            active_lineage_ref=str(active["active_lineage_ref"]),
+            active_lineage_ref=active_lineage_ref,
             project_config_ref=str(project["project_config_ref"]),
             project_config_digest=str(project["project_config_digest"]),
             effective_profile_set_ref=str(project["effective_profile_set_ref"]),
@@ -233,63 +241,17 @@ class ReadMixin:
         self: "SQLiteResearchStateRepository",
         refs: Sequence[tuple[str, str]],
     ) -> Mapping[tuple[str, str], bool]:
-        requested = tuple(
-            (str(ref[0]), str(ref[1]))
-            for ref in refs
-        )
-        if not requested:
-            return {}
-
-        by_kind: dict[str, set[str]] = {}
-        for kind, object_id in requested:
-            by_kind.setdefault(kind, set()).add(object_id)
-
-        known: set[tuple[str, str]] = set()
-        for kind, object_ids in sorted(by_kind.items()):
-            ordered_ids = sorted(object_ids)
-            placeholders = ",".join("?" for _ in ordered_ids)
-            rows = self._connection.execute(
-                f"""
-                SELECT DISTINCT kind, object_id
-                FROM object_revisions
-                WHERE kind = ? AND object_id IN ({placeholders})
+        result: dict[tuple[str, str], bool] = {}
+        for kind, object_id in sorted(set(refs)):
+            row = self._connection.execute(
+                """
+                SELECT 1 FROM object_revisions
+                WHERE kind = ? AND object_id = ? LIMIT 1
                 """,
-                (kind, *ordered_ids),
-            )
-            known.update(
-                (str(row["kind"]), str(row["object_id"]))
-                for row in rows
-            )
-
-        snapshot_ids = sorted(by_kind.get("snapshot", ()))
-        if snapshot_ids:
-            placeholders = ",".join("?" for _ in snapshot_ids)
-            known.update(
-                ("snapshot", str(row["snapshot_ref"]))
-                for row in self._connection.execute(
-                    f"""
-                    SELECT snapshot_ref FROM snapshots
-                    WHERE snapshot_ref IN ({placeholders})
-                    """,
-                    tuple(snapshot_ids),
-                )
-            )
-
-        lineage_ids = sorted(by_kind.get("research_lineage", ()))
-        if lineage_ids:
-            placeholders = ",".join("?" for _ in lineage_ids)
-            known.update(
-                ("research_lineage", str(row["lineage_id"]))
-                for row in self._connection.execute(
-                    f"""
-                    SELECT lineage_id FROM lineages
-                    WHERE lineage_id IN ({placeholders})
-                    """,
-                    tuple(lineage_ids),
-                )
-            )
-
-        return {ref: ref in known for ref in requested}
+                (kind, object_id),
+            ).fetchone()
+            result[(kind, object_id)] = row is not None
+        return result
 
     @repository_read
     def find_commit_by_idempotency_key(
@@ -299,13 +261,11 @@ class ReadMixin:
         row = self._connection.execute(
             """
             SELECT request_digest, receipt_json
-            FROM commits WHERE idempotency_key = ?
+            FROM commit_receipts
+            WHERE idempotency_key = ?
             """,
             (idempotency_key,),
         ).fetchone()
         if row is None:
             return None
-        return (
-            str(row["request_digest"]),
-            receipt_from_json(str(row["receipt_json"])),
-        )
+        return str(row["request_digest"]), receipt_from_json(str(row["receipt_json"]))

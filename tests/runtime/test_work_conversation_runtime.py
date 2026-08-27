@@ -6,7 +6,14 @@ import tempfile
 import threading
 import unittest
 
-from core.conversation import ActionDraft, ConversationRuntimeError, with_document_digest
+from core.conversation import (
+    ActionDefinition,
+    ActionDraft,
+    ActionRegistry,
+    CapabilityDescriptorRegistry,
+    ConversationRuntimeError,
+    with_document_digest,
+)
 from core.conversation.testing import MappingResolver, SequenceIdProvider
 from core.execution.testing import StaticClock
 from plugins.local_application import LocalResearchApplication
@@ -57,7 +64,7 @@ def state():
 
 
 class WorkConversationProductionRuntimeTests(unittest.TestCase):
-    def make_app(self, root, mapping, ids, *, seed=True):
+    def make_app(self, root, mapping, ids, *, seed=True, **kwargs):
         return LocalResearchApplication(
             root,
             resolver=MappingResolver(mapping),
@@ -65,6 +72,40 @@ class WorkConversationProductionRuntimeTests(unittest.TestCase):
             seed_state=state() if seed else None,
             clock=StaticClock("2026-08-27T00:00:00Z"),
             id_provider=SequenceIdProvider(ids),
+            **kwargs,
+        )
+
+    def test_action_registry_rejects_incomplete_route_definitions(self):
+        registry = ActionRegistry()
+        with self.assertRaises(ConversationRuntimeError) as harness_error:
+            registry.register(ActionDefinition(
+                "broken.service", "broken@0.1.0", "state_changing", "harness_service", True,
+            ))
+        self.assertEqual(harness_error.exception.code, "CONV-ROUTE-001")
+
+        with self.assertRaises(ConversationRuntimeError) as capability_error:
+            registry.register(ActionDefinition(
+                "broken.capability", "broken@0.1.0", "read_only", "capability_invocation", False,
+                capability_id="desktop-research", capability_version="0.1.0",
+            ))
+        self.assertEqual(capability_error.exception.code, "CONV-ROUTE-001")
+
+    def test_descriptor_registry_isolated_from_external_mutation(self):
+        registry = CapabilityDescriptorRegistry()
+        descriptor = {
+            "capability_id": "fixture-capability",
+            "capability_version": "1.0.0",
+            "descriptor_digest": "sha256:" + "a" * 64,
+            "nested": {"values": ["original"]},
+        }
+        registry.register(descriptor)
+        descriptor["nested"]["values"].append("mutated-before-resolve")
+        resolved = registry.resolve("fixture-capability", "1.0.0")
+        self.assertEqual(resolved["nested"]["values"], ["original"])
+        resolved["nested"]["values"].append("mutated-after-resolve")
+        self.assertEqual(
+            registry.resolve("fixture-capability", "1.0.0")["nested"]["values"],
+            ["original"],
         )
 
     def test_proposal_only_desktop_does_not_create_run_or_confirmation(self):
@@ -81,6 +122,100 @@ class WorkConversationProductionRuntimeTests(unittest.TestCase):
                 self.assertIsNone(result.confirmation_request)
                 self.assertEqual(app.execution_store.diagnose_integrity(), ())
                 self.assertEqual(len(app.conversation_store.list_pending("CONV-25")), 1)
+            finally:
+                app.close()
+
+    def test_desktop_materialization_rejects_unadopted_rq(self):
+        with tempfile.TemporaryDirectory() as temp:
+            candidate_state = seed_state(
+                objects=[project(), rq(state="candidate")],
+                mode="real",
+                snapshot_id="SNP-CANDIDATE",
+            )
+            app = LocalResearchApplication(
+                temp,
+                resolver=MappingResolver({
+                    "consider desktop": ActionDraft(
+                        "desktop_research.investigate", {"question_id": "RQ-1"}
+                    )
+                }),
+                effective_profile_set_provider=profile_provider,
+                seed_state=candidate_state,
+                clock=StaticClock("2026-08-27T00:00:00Z"),
+                id_provider=SequenceIdProvider(["PROP-C", "CTX-C"]),
+            )
+            try:
+                with self.assertRaises(ConversationRuntimeError) as raised:
+                    app.coordinator.process_input(
+                        input_document("IN-CAND", "PROPOSAL", "consider desktop")
+                    )
+                self.assertEqual(raised.exception.code, "CONV-PIN-001")
+                self.assertIsNone(app.conversation_store.load_materialization("PROP-C"))
+            finally:
+                app.close()
+
+    def test_desktop_resource_catalog_key_becomes_reference_id(self):
+        with tempfile.TemporaryDirectory() as temp:
+            app = self.make_app(
+                temp,
+                {"consider resource": ActionDraft(
+                    "desktop_research.investigate",
+                    {"question_id": "RQ-1", "resource_reference_ids": ["SRC-R"]},
+                )},
+                ["PROP-RSRC", "CTX-RSRC"],
+                resource_catalog={
+                    "SRC-R": {
+                        "reference_type": "source",
+                        "locator": "fixture://source/r",
+                        "access_mode": "read",
+                        "evidentiary_use": "candidate_source",
+                    }
+                },
+                resource_roles={"SRC-R": "candidate_source"},
+            )
+            try:
+                result = app.coordinator.process_input(
+                    input_document("IN-RSRC", "PROPOSAL", "consider resource")
+                )
+                materialization = app.conversation_store.load_materialization(
+                    result.proposal["proposal_id"]
+                )
+                self.assertEqual(
+                    materialization["context_pack"]["resources"][0]["reference_id"],
+                    "SRC-R",
+                )
+            finally:
+                app.close()
+
+    def test_desktop_context_bounds_are_fixed_and_fail_closed(self):
+        with tempfile.TemporaryDirectory() as temp:
+            resource_ids = [f"SRC-{index:02d}" for index in range(33)]
+            catalog = {
+                item: {
+                    "reference_type": "source",
+                    "locator": f"fixture://source/{item}",
+                    "access_mode": "read",
+                    "evidentiary_use": "candidate_source",
+                }
+                for item in resource_ids
+            }
+            roles = {item: "candidate_source" for item in resource_ids}
+            app = self.make_app(
+                temp,
+                {"too many": ActionDraft(
+                    "desktop_research.investigate",
+                    {"question_id": "RQ-1", "resource_reference_ids": resource_ids},
+                )},
+                ["PROP-BOUND", "CTX-BOUND"],
+                resource_catalog=catalog,
+                resource_roles=roles,
+            )
+            try:
+                with self.assertRaises(ConversationRuntimeError) as raised:
+                    app.coordinator.process_input(
+                        input_document("IN-BOUND", "PROPOSAL", "too many")
+                    )
+                self.assertEqual(raised.exception.code, "CONV-PIN-001")
             finally:
                 app.close()
 
@@ -124,6 +259,30 @@ class WorkConversationProductionRuntimeTests(unittest.TestCase):
                 after = app.state_repository.load_state_view("PRJ-1", "LIN-1").current_snapshot["content_digest"]
                 self.assertEqual(before, after)
                 self.assertFalse(result.action_receipt["research_state_mutation_performed"])
+            finally:
+                app.close()
+
+    def test_failed_external_handoff_does_not_generate_candidate_presentations(self):
+        with tempfile.TemporaryDirectory() as temp:
+            app = self.make_app(
+                temp,
+                {"run desktop": ActionDraft("desktop_research.investigate", {"question_id": "RQ-1"})},
+                ["PROP-I", "CTX-I", "INV-I", "RUN-I", "TRACE-I", "ACTREC-I", "CONVTRACE-I"],
+            )
+            try:
+                app.coordinator.process_input(
+                    input_document("IN-I", "COMMITTABLE_ACTION", "run desktop")
+                )
+                result = app.coordinator.collect_external(
+                    "RUN-I",
+                    {
+                        "outputs": {
+                            "candidate_next_actions": [{"proposal_id": "NEXT-INVALID"}]
+                        }
+                    },
+                )
+                self.assertTrue(result.execution_result.issues)
+                self.assertEqual(result.presentations, ())
             finally:
                 app.close()
 
@@ -209,6 +368,44 @@ class WorkConversationProductionRuntimeTests(unittest.TestCase):
             finally:
                 reopened.close()
 
+    def test_conversation_store_proposal_and_confirmation_indexes_are_idempotent(self):
+        with tempfile.TemporaryDirectory() as temp:
+            store = LocalConversationStore(Path(temp) / "conversation.db")
+            try:
+                proposal = with_document_digest({
+                    "schema_version": "0.1.0",
+                    "message_type": "action_proposal",
+                    "proposal_id": "PROP-IDEMP",
+                    "conversation_id": "CONV-IDEMP",
+                    "commitment_mode": "commit_requested",
+                })
+                store.store_proposal(proposal)
+                store.store_proposal(proposal)
+                request = with_document_digest({
+                    "schema_version": "0.1.0",
+                    "message_type": "confirmation_request",
+                    "confirmation_request_id": "REQ-IDEMP",
+                    "conversation_id": "CONV-IDEMP",
+                    "proposal_binding": {"proposal_id": "PROP-IDEMP"},
+                })
+                store.store_confirmation_request(request)
+                store.store_confirmation_request(request)
+                self.assertEqual(store.load_proposal("PROP-IDEMP"), proposal)
+                self.assertEqual(store.load_confirmation_request("REQ-IDEMP"), request)
+            finally:
+                store.close()
+
+    def test_sqlite_state_repository_exposes_active_lineage_ref(self):
+        with tempfile.TemporaryDirectory() as temp:
+            app = self.make_app(temp, {}, [])
+            try:
+                self.assertEqual(
+                    app.state_repository.load_active_lineage_ref("PRJ-1"),
+                    "LIN-1",
+                )
+            finally:
+                app.close()
+
     def test_atomic_confirmation_store_race_allows_one_consumer(self):
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / "conversation.db"
@@ -256,8 +453,12 @@ class WorkConversationProductionRuntimeTests(unittest.TestCase):
                     outcomes.append(value)
                 store.close()
 
-            a = threading.Thread(target=consume, args=("A",)); b = threading.Thread(target=consume, args=("B",))
-            a.start(); b.start(); a.join(); b.join()
+            a = threading.Thread(target=consume, args=("A",))
+            b = threading.Thread(target=consume, args=("B",))
+            a.start()
+            b.start()
+            a.join()
+            b.join()
             self.assertEqual(sorted(outcomes), [False, True])
 
 

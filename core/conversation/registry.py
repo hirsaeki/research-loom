@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import OrderedDict
+from copy import deepcopy
 from typing import Any, Mapping
 
 from .models import ActionDefinition, ConversationRuntimeError
@@ -23,6 +24,18 @@ class ActionRegistry:
             raise ConversationRuntimeError("CONV-ROUTE-001", "invalid action effect")
         if definition.route_kind not in {"harness_service", "capability_invocation"}:
             raise ConversationRuntimeError("CONV-ROUTE-001", "invalid action route")
+        if definition.route_kind == "harness_service" and not definition.service_id:
+            raise ConversationRuntimeError("CONV-ROUTE-001", "missing Harness service id")
+        if definition.route_kind == "capability_invocation" and not all((
+            definition.capability_id,
+            definition.capability_version,
+            definition.function_id,
+            definition.materializer_id,
+            definition.execution_mode,
+        )):
+            raise ConversationRuntimeError(
+                "CONV-ROUTE-001", "incomplete capability action definition"
+            )
         if definition.effect == "read_only" and definition.confirmation_required:
             raise ConversationRuntimeError(
                 "CONV-READONLY-001", "read-only action cannot require confirmation"
@@ -94,11 +107,11 @@ class CapabilityDescriptorRegistry:
             raise ConversationRuntimeError(
                 "CONV-ROUTE-001", f"descriptor already registered: {key[0]}@{key[1]}"
             )
-        self._descriptors[key] = dict(descriptor)
+        self._descriptors[key] = deepcopy(dict(descriptor))
 
     def resolve(self, capability_id: str, capability_version: str) -> Mapping[str, Any]:
         try:
-            return self._descriptors[(capability_id, capability_version)]
+            return deepcopy(self._descriptors[(capability_id, capability_version)])
         except KeyError as exc:
             raise ConversationRuntimeError(
                 "CONV-ROUTE-001",

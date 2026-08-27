@@ -20,6 +20,7 @@ from core.runtime import (
     Actor, CanonicalResearchObjectSchemaValidator, CapabilityNormalizationBoundary,
     StateTransitionRequest, StateTransitionService, TransitionAction, TransitionKind,
 )
+from core.runtime.ports import RepositoryError
 from plugins.desktop_research import (
     DesktopResearchContextValidator, DesktopResearchConversationMaterializer,
     DesktopResearchExternalAdapter, DesktopResearchNormalizer,
@@ -236,7 +237,14 @@ class LocalResearchApplication:
         )
 
         self.execution_store = LocalExecutionStore(self.root / "execution")
-        catalog = {key: deepcopy(dict(value)) for key, value in (resource_catalog or {}).items()}
+        catalog = {}
+        for reference_id, value in (resource_catalog or {}).items():
+            metadata = deepcopy(dict(value))
+            existing_reference_id = metadata.get("reference_id")
+            if existing_reference_id is not None and str(existing_reference_id) != str(reference_id):
+                raise ValueError(f"resource catalog identity mismatch: {reference_id}")
+            metadata["reference_id"] = str(reference_id)
+            catalog[str(reference_id)] = metadata
         for reference_id, content in (resource_bytes or {}).items():
             if reference_id not in catalog:
                 raise ValueError(f"resource bytes require catalog metadata: {reference_id}")
@@ -314,17 +322,10 @@ class LocalResearchApplication:
         )
 
     def _active_lineage_for(self, project_ref: str) -> str:
-        # Adapter-local routing read only; the generic Coordinator never receives
-        # or imports SQLite. No Research State mutation is performed here.
-        connection = getattr(self.state_repository, "_connection", None)
-        if connection is None:
-            raise KeyError(project_ref)
-        row = connection.execute(
-            "SELECT active_lineage_ref FROM project_active_lineage WHERE project_ref=?", (project_ref,)
-        ).fetchone()
-        if row is None:
-            raise KeyError(project_ref)
-        return str(row["active_lineage_ref"])
+        try:
+            return self.state_repository.load_active_lineage_ref(project_ref)
+        except RepositoryError as exc:
+            raise KeyError(project_ref) from exc
 
     def close(self) -> None:
         self.conversation_store.close()
