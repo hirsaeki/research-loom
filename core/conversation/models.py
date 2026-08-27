@@ -28,7 +28,6 @@ class ActionDefinition:
     route_kind: str
     confirmation_required: bool
     human_decision_required: bool = False
-    human_decision_service_managed: bool = False
     service_id: str | None = None
     capability_id: str | None = None
     capability_version: str | None = None
@@ -53,7 +52,6 @@ class HarnessServiceResult:
     result_reference: str | None = None
     data: Mapping[str, Any] = field(default_factory=dict)
     state_transition_request: Any | None = None
-    decision_request: Mapping[str, Any] | None = None
     research_state_mutation_performed: bool = False
 
 

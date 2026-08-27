@@ -10,9 +10,10 @@ import uuid
 from core.conversation import (
     ActionDefinition, ActionRegistry, CapabilityActionMaterializerRegistry,
     CapabilityDescriptorRegistry, HarnessServiceRegistry, HarnessServiceResult,
-    ResearchCoordinator, canonical_digest,
+    canonical_digest,
 )
 from core.decision import HumanDecisionService
+from core.decision.conversation import DecisionAwareResearchCoordinator
 from core.execution import (
     AuthorizationDecision, CapabilityContextExtensionRegistry,
     CapabilityExecutionService, CapabilityRegistry, ExecutionIssue,
@@ -166,7 +167,6 @@ class StateDeltaApplyHandler:
                 "decision_required": True,
                 "decision_request": deepcopy(dict(request)),
             },
-            decision_request=request,
             research_state_mutation_performed=False,
         )
 
@@ -191,7 +191,10 @@ def _abort_payload(payload: Mapping[str, Any]) -> None:
 
 def _apply_payload(payload: Mapping[str, Any]) -> None:
     if set(payload) != {"state_delta_proposal_id"} or not isinstance(payload.get("state_delta_proposal_id"), str):
-        raise ValueError("state.apply_candidate accepts only state_delta_proposal_id; Decision refs are derived by the Human Decision Gate")
+        raise ValueError(
+            "state.apply_candidate accepts only state_delta_proposal_id; "
+            "Decision refs are derived by the Human Decision Gate"
+        )
 
 
 class LocalResearchApplication:
@@ -225,11 +228,17 @@ class LocalResearchApplication:
             self.state_repository,
             schema_validator=CanonicalResearchObjectSchemaValidator(research_schema),
         )
+
+        # Conversation documents provide the immutable source bindings for Decision
+        # Requests, but the Decision lifecycle remains in its own operational DB.
+        self.conversation_store = LocalConversationStore(self.root / "conversation.db")
         self.decision_store = LocalHumanDecisionStore(self.root / "decision.db")
         self.human_decisions = HumanDecisionService(
             store=self.decision_store,
+            state_provider=self.state_repository,
             state_transition_service=self.state_transition_service,
             clock=self.clock,
+            source_binding_provider=self.conversation_store,
         )
 
         self.execution_store = LocalExecutionStore(self.root / "execution")
@@ -254,19 +263,24 @@ class LocalResearchApplication:
         capability_registry = CapabilityRegistry()
         capability_registry.register(DesktopResearchExternalAdapter(), descriptor)
         normalizer = DesktopResearchNormalizer(
-            self.execution_store, self.context_extension_store,
-            self.execution_store, self.operational_store,
+            self.execution_store,
+            self.context_extension_store,
+            self.execution_store,
+            self.operational_store,
         )
         self.capability_execution_service = CapabilityExecutionService(
-            capability_registry, self.execution_store, self.state_repository,
-            self.authorization, self.execution_store,
-            CapabilityNormalizationBoundary((normalizer,)), self.clock,
+            capability_registry,
+            self.execution_store,
+            self.state_repository,
+            self.authorization,
+            self.execution_store,
+            CapabilityNormalizationBoundary((normalizer,)),
+            self.clock,
             artifact_store=self.execution_store,
             context_extension_registry=CapabilityContextExtensionRegistry((DesktopResearchContextValidator(),)),
             context_extension_store=self.context_extension_store,
         )
 
-        self.conversation_store = LocalConversationStore(self.root / "conversation.db")
         actions = ActionRegistry()
         actions.register(ActionDefinition(
             "research.status", "research-status-query@0.1.0", "read_only", "harness_service", False,
@@ -282,9 +296,8 @@ class LocalResearchApplication:
             "run.abort", "run-abort-action@0.1.0", "state_changing", "harness_service", True,
             service_id="run.abort", payload_validator=_abort_payload,
         ))
-        # Decision need is candidate-dependent and therefore cannot be truthfully
-        # represented by a static ActionDefinition boolean. The handler delegates to
-        # PR20 required_decisions_for_action() for every exact candidate action.
+        # The exact candidate may or may not require a Decision. Static Conversation
+        # metadata cannot truthfully decide that; PR20 authority validation does.
         actions.register(ActionDefinition(
             "state.apply_candidate", "state-delta-adoption-action@0.1.0", "state_changing", "harness_service", True,
             human_decision_required=False, service_id="state.apply_candidate", payload_validator=_apply_payload,
@@ -304,7 +317,7 @@ class LocalResearchApplication:
         descriptors = CapabilityDescriptorRegistry()
         descriptors.register(descriptor)
 
-        self.coordinator = ResearchCoordinator(
+        self.coordinator = DecisionAwareResearchCoordinator(
             resolver=resolver,
             store=self.conversation_store,
             state_provider=self.state_repository,
@@ -318,6 +331,7 @@ class LocalResearchApplication:
             clock=self.clock,
             id_provider=self.ids,
             lineage_resolver=self._active_lineage_for,
+            human_decisions=self.human_decisions,
         )
 
     def resolve_human_decision(self, response: Mapping[str, Any]):
