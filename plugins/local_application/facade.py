@@ -146,6 +146,38 @@ class LocalApplicationFacade:
     def open_workspace(cls, workspace: str | Path) -> "LocalApplicationFacade":
         return cls.from_opened_workspace(LocalWorkspace.open(workspace))
 
+    @classmethod
+    def initialize_workspace(
+        cls,
+        workspace: str | Path,
+        project_config_file: str | Path,
+        effective_profile_set_file: str | Path,
+    ) -> Mapping[str, Any]:
+        opened = LocalWorkspace.init(
+            workspace,
+            project_config_file,
+            effective_profile_set_file,
+        )
+        try:
+            repository = opened.application.state_repository
+            state = repository.load_state_view(
+                opened.project_id,
+                repository.load_active_lineage_ref(opened.project_id),
+            )
+            return {
+                "status": "INITIALIZED",
+                "workspace": str(opened.root),
+                "project_id": opened.project_id,
+                "active_lineage": state.active_lineage_ref,
+                "snapshot_id": str(state.current_snapshot["id"]),
+            }
+        finally:
+            opened.close()
+
+    @classmethod
+    def doctor_workspace(cls, workspace: str | Path) -> Mapping[str, Any]:
+        return LocalWorkspace.doctor(workspace)
+
     @property
     def project_id(self) -> str:
         return self._project_id
@@ -375,4 +407,4 @@ class LocalApplicationFacade:
             raise LocalApplicationError(
                 "APPLICATION-WORKSPACE-001", "doctor requires a facade opened from a local workspace"
             )
-        return LocalWorkspace.doctor(self._workspace_root)
+        return self.doctor_workspace(self._workspace_root)

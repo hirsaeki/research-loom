@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from collections import Counter
+from contextlib import suppress
 from copy import deepcopy
 from dataclasses import dataclass
 import hashlib
 import json
 import os
 from pathlib import Path
+import shutil
 import sqlite3
 from typing import Any, Mapping
 import uuid
@@ -457,16 +459,13 @@ class LocalWorkspace:
         id_provider=None,
     ) -> OpenedLocalWorkspace:
         root = _assert_safe_workspace_root(Path(workspace))
-        if root.exists() and not root.is_dir():
+        root_preexisting = root.exists()
+        if root_preexisting and not root.is_dir():
             raise LocalWorkspaceError("WORKSPACE-PATH-001", "workspace path is not a directory")
-        if root.exists() and any(root.iterdir()):
+        if root_preexisting and any(root.iterdir()):
             raise LocalWorkspaceError("WORKSPACE-INIT-EXISTS-001", "workspace directory must be absent or empty")
-        root.mkdir(parents=True, exist_ok=True)
-        internal = root / INTERNAL_DIR
-        internal.mkdir(parents=False, exist_ok=False)
-        marker = internal / INITIALIZING_MARKER
-        marker.write_text("initializing\n", encoding="utf-8")
 
+        # Validate all explicit inputs before creating any workspace-owned path.
         config = _read_json(Path(project_config_file), code="WORKSPACE-PROJECT-CONFIG-001")
         effective = _read_json(Path(effective_profile_set_file), code="WORKSPACE-PROFILE-SET-001")
         config_digest, profile_digest = _validate_inputs(config, effective)
@@ -481,11 +480,25 @@ class LocalWorkspace:
             clock=clock,
             ids=ids,
         )
-        _copy_json(root / PROJECT_CONFIG_NAME, config)
-        _copy_json(root / EFFECTIVE_PROFILE_SET_NAME, effective)
 
+        root.mkdir(parents=True, exist_ok=True)
+        internal = root / INTERNAL_DIR
+        marker = internal / INITIALIZING_MARKER
+        config_path = root / PROJECT_CONFIG_NAME
+        profile_path = root / EFFECTIVE_PROFILE_SET_NAME
+        internal_created = False
+        config_written = False
+        profile_written = False
         app: LocalResearchApplication | None = None
         try:
+            internal.mkdir(parents=False, exist_ok=False)
+            internal_created = True
+            marker.write_text("initializing\n", encoding="utf-8")
+            _copy_json(config_path, config)
+            config_written = True
+            _copy_json(profile_path, effective)
+            profile_written = True
+
             app = LocalResearchApplication(
                 internal,
                 resolver=_TypedOnlyResolver(),
@@ -502,10 +515,21 @@ class LocalWorkspace:
             return cls.open(root)
         except Exception:
             if app is not None:
-                try:
+                with suppress(Exception):
                     app.close()
-                except Exception:
-                    pass
+            if internal_created and internal.exists():
+                with suppress(OSError):
+                    shutil.rmtree(internal)
+            if config_written and config_path.exists() and config_path.is_file():
+                with suppress(OSError):
+                    config_path.unlink()
+            if profile_written and profile_path.exists() and profile_path.is_file():
+                with suppress(OSError):
+                    profile_path.unlink()
+            if not root_preexisting and root.exists():
+                with suppress(OSError):
+                    if not any(root.iterdir()):
+                        root.rmdir()
             raise
 
     @classmethod
@@ -586,21 +610,36 @@ class LocalWorkspace:
             state_path = _safe_locator(root, str(binding["storage"]["research_state"]))
             _sqlite_quick_check(state_path, code="WORKSPACE-STATE-DB-001")
             _validate_state_database(state_path, binding)
-            connection = sqlite3.connect(f"file:{state_path}?mode=ro", uri=True)
             try:
-                connection.row_factory = sqlite3.Row
-                active = connection.execute(
-                    "SELECT active_lineage_ref FROM project_active_lineage WHERE project_ref=?",
-                    (str(binding["project_id"]),),
-                ).fetchone()
-                lineage = connection.execute(
-                    "SELECT head_snapshot_ref FROM lineages WHERE lineage_id=?",
-                    (str(active["active_lineage_ref"]),),
-                ).fetchone()
-                active_lineage = str(active["active_lineage_ref"])
-                snapshot_id = str(lineage["head_snapshot_ref"])
-            finally:
-                connection.close()
+                connection = sqlite3.connect(f"file:{state_path}?mode=ro", uri=True)
+                try:
+                    connection.row_factory = sqlite3.Row
+                    active = connection.execute(
+                        "SELECT active_lineage_ref FROM project_active_lineage WHERE project_ref=?",
+                        (str(binding["project_id"]),),
+                    ).fetchone()
+                    if active is None:
+                        raise LocalWorkspaceError(
+                            "WORKSPACE-STATE-HEAD-001", "active Research Lineage is missing"
+                        )
+                    lineage = connection.execute(
+                        "SELECT head_snapshot_ref FROM lineages WHERE lineage_id=?",
+                        (str(active["active_lineage_ref"]),),
+                    ).fetchone()
+                    if lineage is None:
+                        raise LocalWorkspaceError(
+                            "WORKSPACE-STATE-HEAD-001", "active Research Lineage does not resolve"
+                        )
+                    active_lineage = str(active["active_lineage_ref"])
+                    snapshot_id = str(lineage["head_snapshot_ref"])
+                finally:
+                    connection.close()
+            except LocalWorkspaceError:
+                raise
+            except sqlite3.Error as exc:
+                raise LocalWorkspaceError(
+                    "WORKSPACE-STATE-DB-001", "Research State DB is unreadable or incompatible"
+                ) from exc
             checks.append({
                 "check": "research_state", "status": "OK",
                 "active_lineage": active_lineage, "snapshot_id": snapshot_id,

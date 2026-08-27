@@ -9,7 +9,7 @@ from typing import Any, Mapping
 from core.conversation import ConversationRuntimeError
 from core.decision import HumanDecisionError
 from plugins.local_application.facade import LocalApplicationError, LocalApplicationFacade
-from plugins.local_application.workspace import LocalWorkspace, LocalWorkspaceError
+from plugins.local_application.workspace import LocalWorkspaceError
 
 
 def _emit(value: Mapping[str, Any]) -> None:
@@ -105,28 +105,14 @@ def build_parser() -> argparse.ArgumentParser:
 
 def _run(args: argparse.Namespace) -> Mapping[str, Any]:
     if args.command == "init":
-        opened = LocalWorkspace.init(
+        return LocalApplicationFacade.initialize_workspace(
             args.workspace,
             args.project_config,
             args.effective_profile_set,
         )
-        try:
-            state = opened.application.state_repository.load_state_view(
-                opened.project_id,
-                opened.application.state_repository.load_active_lineage_ref(opened.project_id),
-            )
-            return {
-                "status": "INITIALIZED",
-                "workspace": str(opened.root),
-                "project_id": opened.project_id,
-                "active_lineage": state.active_lineage_ref,
-                "snapshot_id": str(state.current_snapshot["id"]),
-            }
-        finally:
-            opened.close()
 
     if args.command == "doctor":
-        return LocalWorkspace.doctor(args.workspace)
+        return LocalApplicationFacade.doctor_workspace(args.workspace)
 
     with LocalApplicationFacade.open_workspace(args.workspace) as facade:
         if args.command == "status":
