@@ -10,8 +10,9 @@ class DecisionAwareResearchCoordinator(WorkConversationService):
     """PR26 operational authority extension for the PR10 Coordinator.
 
     DecisionRequirements remain owned by PR20/HumanDecisionService. This class
-    only surfaces pending authority and prevents a new Research Capability from
-    running while an exact Human Decision Request is unresolved.
+    only surfaces pending authority and prevents new state-changing work or a
+    new Research Capability from running while an exact Human Decision Request
+    is unresolved.
     """
 
     def __init__(self, *args, human_decisions, **kwargs) -> None:
@@ -39,31 +40,35 @@ class DecisionAwareResearchCoordinator(WorkConversationService):
 
     def _execute(self, source_input, proposal, state, confirmation_receipt):
         route = proposal.get("route", {})
-        if route.get("route_type") == "capability_invocation":
-            pending = self._human_decisions.pending(str(proposal["project_id"]))
-            if pending:
-                receipt = self._rejection_receipt(
-                    source_input,
-                    proposal,
-                    state,
-                    "CONV-HUMAN-DECISION-PENDING-001",
-                    confirmation_receipt,
-                )
-                return CoordinatorResult(
-                    "DECISION_PENDING",
-                    source_input,
-                    proposal=proposal,
-                    action_receipt=receipt,
-                    data={
-                        "pending_human_decision_request_ids": [
-                            str(item["request_id"]) for item in pending
-                        ]
-                    },
-                    issues=({
-                        "code": "CONV-HUMAN-DECISION-PENDING-001",
-                        "message": "a Human Decision Request is pending before the next Research Capability may execute",
-                    },),
-                )
+        action = proposal.get("action", {})
+        pending = self._human_decisions.pending(str(proposal["project_id"]))
+        blocked_by_pending_decision = bool(pending) and (
+            route.get("route_type") == "capability_invocation"
+            or action.get("effect") == "state_changing"
+        )
+        if blocked_by_pending_decision:
+            receipt = self._rejection_receipt(
+                source_input,
+                proposal,
+                state,
+                "CONV-HUMAN-DECISION-PENDING-001",
+                confirmation_receipt,
+            )
+            return CoordinatorResult(
+                "DECISION_PENDING",
+                source_input,
+                proposal=proposal,
+                action_receipt=receipt,
+                data={
+                    "pending_human_decision_request_ids": [
+                        str(item["request_id"]) for item in pending
+                    ]
+                },
+                issues=({
+                    "code": "CONV-HUMAN-DECISION-PENDING-001",
+                    "message": "a Human Decision Request is pending before further state-changing work or Research Capability execution",
+                },),
+            )
 
         result = super()._execute(source_input, proposal, state, confirmation_receipt)
         decision_request = result.data.get("decision_request") if result.data else None
