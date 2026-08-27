@@ -21,7 +21,7 @@ ChatGPT Work / human / future frontend
 
 A local workspace is a filesystem/composition concern under `plugins/local_application`. It is **not** a new Core domain object and it is not a second Research State.
 
-`LocalResearchApplication` remains the production composition root. `LocalApplicationFacade` is the small operator-facing API. The CLI calls only that facade (or the workspace lifecycle for `init`/read-only `doctor`); it does not mutate SQLite repositories or operational stores directly.
+`LocalResearchApplication` remains the production composition root. `LocalApplicationFacade` is the small operator-facing API. The CLI calls only that facade; it does not mutate SQLite repositories or operational stores directly. Workspace initialization and read-only diagnosis are also exposed through facade operations rather than CLI-owned storage logic.
 
 ## Three different bindings
 
@@ -59,9 +59,9 @@ Project Config `resource_references` are references/hints only. Their presence d
 
 ## Initialization safety
 
-Initialization accepts an absent or empty workspace only. It creates a `.research-loom/.initializing` marker before storage creation and writes the final `workspace-binding.json` only after all production stores have initialized successfully. A failure therefore cannot be mistaken for a ready workspace.
+Initialization accepts an absent or empty workspace only. Explicit Config/Profile inputs are validated before workspace-owned paths are created. It then creates a `.research-loom/.initializing` marker before storage creation and writes the final `workspace-binding.json` only after all production stores have initialized successfully. A failure therefore cannot be mistaken for a ready workspace.
 
-Re-running `init` against an initialized or unrelated non-empty directory is rejected. Workspace locators are fixed by the workspace format, must remain relative to the root, and symlink/path traversal escapes are rejected. No remote listener or general sandbox framework is introduced.
+If initialization fails after filesystem creation begins, only paths created by that init attempt are cleaned up. A pre-existing empty workspace root is preserved, while a root created by the failed attempt is removed when empty. Re-running `init` against an initialized or unrelated non-empty directory is rejected. Workspace locators are fixed by the workspace format, must remain relative to the root, and symlink/path traversal escapes are rejected. No remote listener or general sandbox framework is introduced.
 
 ## Exact reopen
 
@@ -83,7 +83,7 @@ binding parse/version
 
 Project mismatch, Config/Profile digest mismatch, malformed/incompatible binding, partial initialization, missing DBs, stale pins, or an unrelated Research State fail closed. Reopen does not rebase, repair, migrate, or silently adopt changed files.
 
-`doctor` runs the corresponding filesystem and SQLite integrity checks read-only. There is intentionally no `doctor --fix`.
+`doctor` runs the corresponding filesystem and SQLite integrity checks read-only. SQLite failures are projected as structured workspace issues rather than escaping as transport-specific exceptions. There is intentionally no `doctor --fix`.
 
 ## Application facade and typed ingress
 

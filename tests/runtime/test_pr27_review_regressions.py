@@ -24,6 +24,8 @@ CLI = ROOT / "plugins/local_application/cli.py"
 def bootstrap_config(path: Path) -> Path:
     config = json.loads(PROJECT_CONFIG.read_text(encoding="utf-8"))
     config["research_questions"]["references"] = []
+    for attention in config["research_attention"]:
+        attention.pop("related_question_ids", None)
     payload = deepcopy(config)
     payload.pop("configuration_digest", None)
     config["configuration_digest"] = "sha256:" + hashlib.sha256(rfc8785.dumps(payload)).hexdigest()
