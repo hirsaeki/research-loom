@@ -77,6 +77,7 @@ def reduce_state(current_state: StateView, request: StateTransitionRequest) -> R
     effective = _effective_members(current_state)
     new_revisions: list[Mapping[str, Any]] = []
     decisions: list[Mapping[str, Any]] = []
+    seen_decision_ids: set[str] = set()
     adoption_refs: list[str] = []
     state_changed = False
 
@@ -98,6 +99,10 @@ def reduce_state(current_state: StateView, request: StateTransitionRequest) -> R
         _validate_revision_semantics(action, obj, prior)
 
         if action.kind == TransitionKind.RECORD_DECISION:
+            decision_id = str(obj.get("id", ""))
+            if decision_id in seen_decision_ids:
+                raise ReductionError("duplicate RECORD_DECISION identity in one transition")
+            seen_decision_ids.add(decision_id)
             decisions.append(obj)
         new_revisions.append(obj)
         effective[(str(obj["kind"]), str(obj["id"]))] = obj
