@@ -62,6 +62,7 @@ class CoordinatorResult:
     proposal: Mapping[str, Any] | None = None
     confirmation_request: Mapping[str, Any] | None = None
     confirmation_receipt: Mapping[str, Any] | None = None
+    decision_request: Mapping[str, Any] | None = None
     action_receipt: Mapping[str, Any] | None = None
     prepared_execution: Any | None = None
     execution_result: Any | None = None

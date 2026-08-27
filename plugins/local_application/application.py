@@ -10,15 +10,17 @@ import uuid
 from core.conversation import (
     ActionDefinition, ActionRegistry, CapabilityActionMaterializerRegistry,
     CapabilityDescriptorRegistry, HarnessServiceRegistry, HarnessServiceResult,
-    ResearchCoordinator, canonical_digest,
+    canonical_digest,
 )
+from core.decision import HumanDecisionService
+from core.decision.conversation import DecisionAwareResearchCoordinator
 from core.execution import (
     AuthorizationDecision, CapabilityContextExtensionRegistry,
     CapabilityExecutionService, CapabilityRegistry, ExecutionIssue,
 )
 from core.runtime import (
-    Actor, CanonicalResearchObjectSchemaValidator, CapabilityNormalizationBoundary,
-    StateTransitionRequest, StateTransitionService, TransitionAction, TransitionKind,
+    CanonicalResearchObjectSchemaValidator, CapabilityNormalizationBoundary,
+    StateTransitionService,
 )
 from core.runtime.ports import RepositoryError
 from plugins.desktop_research import (
@@ -26,6 +28,7 @@ from plugins.desktop_research import (
     DesktopResearchExternalAdapter, DesktopResearchNormalizer,
 )
 from plugins.local_conversation_store import LocalConversationStore
+from plugins.local_decision_store import LocalHumanDecisionStore
 from plugins.local_execution_store import (
     LocalCapabilityContextExtensionStore, LocalExecutionStore, LocalOperationalTraceStore,
 )
@@ -51,8 +54,6 @@ class LocalStaticAuthorizationProvider:
     """Local PR9 authorization boundary, deliberately independent of PR10 confirmation."""
 
     def evidence_for(self, proposal, materialization, *, invocation_id, run_id):
-        # PR9 intentionally keeps this evidence opaque and bounded: do not add
-        # Conversation confirmation or vendor-specific bearer/token fields.
         resources = [str(item["reference_id"]) for item in materialization.context_pack["resources"]]
         evidence = {
             "authorization_id": "AUTH-" + uuid.uuid4().hex,
@@ -83,11 +84,26 @@ class LocalStaticAuthorizationProvider:
 
 
 class ResearchStatusHandler:
+    def __init__(self, human_decisions) -> None:
+        self._human_decisions = human_decisions
+
     def execute(self, payload, *, state, actor, proposal):
         objects = [deepcopy(dict(item)) for item in state.effective_objects()]
         if payload.get("kinds"):
             allowed = {str(item) for item in payload["kinds"]}
             objects = [item for item in objects if str(item.get("kind")) in allowed]
+        pending = []
+        for request in self._human_decisions.pending(state.project_ref):
+            pending.append({
+                "request_id": request["request_id"],
+                "source_candidate": deepcopy(request["source_state_delta_proposal"]),
+                "subjects": [deepcopy(unit["subject"]) for unit in request["decision_units"]],
+                "decision_kinds": list(dict.fromkeys(
+                    str(unit["required_decision_kind"]) for unit in request["decision_units"]
+                )),
+                "snapshot_binding": deepcopy(request["snapshot_binding"]),
+                "status": request.get("operational_status", "PENDING"),
+            })
         return HarnessServiceResult(
             result_reference=str(state.current_snapshot["id"]),
             data={
@@ -98,6 +114,7 @@ class ResearchStatusHandler:
                     "active_lineage_ref": state.active_lineage_ref,
                 },
                 "objects": objects,
+                "pending_human_decisions": pending,
             },
         )
 
@@ -119,64 +136,38 @@ class RunAbortHandler:
 
 
 class StateDeltaApplyHandler:
-    """Translate an existing PR20 candidate into the existing transition-service input."""
+    """Gate an exact PR20 candidate through dynamic PR20 DecisionRequirements."""
 
-    def __init__(self, store, clock, ids) -> None:
+    def __init__(self, store, human_decisions) -> None:
         self._store = store
-        self._clock = clock
-        self._ids = ids
+        self._human_decisions = human_decisions
 
     def execute(self, payload, *, state, actor, proposal):
         candidate_id = str(payload["state_delta_proposal_id"])
         candidate = self._store.load_state_delta_proposal(candidate_id)
         if candidate is None:
             raise KeyError(f"unknown StateDeltaProposal: {candidate_id}")
-        if candidate.get("candidate_only") is not True:
-            raise ValueError("only candidate-only StateDeltaProposal input is accepted")
-        if (
-            candidate.get("project_ref") != state.project_ref
-            or candidate.get("lineage_ref") != state.lineage_ref
-            or candidate.get("current_snapshot_ref") != state.current_snapshot["id"]
-            or candidate.get("current_snapshot_digest") != state.current_snapshot["content_digest"]
-        ):
-            raise ValueError("StateDeltaProposal is stale or bound to a different Research State")
-
-        supplied_decisions = tuple(str(item) for item in payload.get("decision_reference_ids", ()))
-        actions = []
-        for raw in candidate.get("proposed_actions", ()):
-            actions.append(TransitionAction(
-                kind=TransitionKind(str(raw["kind"])),
-                payload=deepcopy(dict(raw.get("payload", {}))),
-                decision_refs=tuple(str(item) for item in raw.get("decision_refs", ())) or supplied_decisions,
-                source_refs=tuple(str(item) for item in raw.get("source_refs", ())),
-            ))
-        if not actions:
-            raise ValueError("StateDeltaProposal has no proposed actions")
-
-        request = StateTransitionRequest(
-            transition_id=self._ids.new("TR-"),
-            project_ref=state.project_ref,
-            lineage_ref=state.lineage_ref,
-            expected_head_snapshot_ref=str(state.current_snapshot["id"]),
-            expected_head_snapshot_digest=str(state.current_snapshot["content_digest"]),
-            actor=Actor(str(actor["actor_id"]), str(actor["actor_type"])),
-            actions=tuple(actions),
-            project_config_ref=state.project_config_ref,
-            project_config_digest=state.project_config_digest,
-            effective_profile_set_ref=state.effective_profile_set_ref,
-            effective_profile_set_digest=state.effective_profile_set_digest,
-            authorization_evidence=tuple(str(item) for item in payload.get("authorization_evidence", ())),
-            idempotency_key=str(payload.get("idempotency_key") or self._ids.new("IDEMP-")),
-            submitted_at=self._clock.now(),
-            new_snapshot_id=self._ids.new("SNP-"),
-            commit_id=self._ids.new("COM-"),
-            audit_event_id=self._ids.new("AUD-"),
-            source_refs=tuple(str(item) for item in candidate.get("source_refs", ())),
-        ).with_calculated_digest()
+        gate = self._human_decisions.gate_candidate(
+            candidate,
+            state=state,
+            actor=actor,
+            source_action_proposal=proposal,
+        )
+        if gate.status == "READY_TO_COMMIT":
+            return HarnessServiceResult(
+                result_reference=candidate_id,
+                data={"candidate_proposal_id": candidate_id, "decision_required": False},
+                state_transition_request=gate.transition_request,
+            )
+        request = gate.decision_request
         return HarnessServiceResult(
-            result_reference=candidate_id,
-            data={"candidate_proposal_id": candidate_id},
-            state_transition_request=request,
+            result_reference=str(request["request_id"]),
+            data={
+                "candidate_proposal_id": candidate_id,
+                "decision_required": True,
+                "decision_request": deepcopy(dict(request)),
+            },
+            research_state_mutation_performed=False,
         )
 
 
@@ -199,13 +190,15 @@ def _abort_payload(payload: Mapping[str, Any]) -> None:
 
 
 def _apply_payload(payload: Mapping[str, Any]) -> None:
-    allowed = {"state_delta_proposal_id", "decision_reference_ids", "authorization_evidence", "idempotency_key"}
-    if set(payload) - allowed or not isinstance(payload.get("state_delta_proposal_id"), str):
-        raise ValueError("state.apply_candidate payload is invalid")
+    if set(payload) != {"state_delta_proposal_id"} or not isinstance(payload.get("state_delta_proposal_id"), str):
+        raise ValueError(
+            "state.apply_candidate accepts only state_delta_proposal_id; "
+            "Decision refs are derived by the Human Decision Gate"
+        )
 
 
 class LocalResearchApplication:
-    """Explicit production-local composition root for PR20-25."""
+    """Explicit production-local composition root for PR20-26."""
 
     def __init__(
         self,
@@ -236,6 +229,18 @@ class LocalResearchApplication:
             schema_validator=CanonicalResearchObjectSchemaValidator(research_schema),
         )
 
+        # Conversation documents provide the immutable source bindings for Decision
+        # Requests, but the Decision lifecycle remains in its own operational DB.
+        self.conversation_store = LocalConversationStore(self.root / "conversation.db")
+        self.decision_store = LocalHumanDecisionStore(self.root / "decision.db")
+        self.human_decisions = HumanDecisionService(
+            store=self.decision_store,
+            state_provider=self.state_repository,
+            state_transition_service=self.state_transition_service,
+            clock=self.clock,
+            source_binding_provider=self.conversation_store,
+        )
+
         self.execution_store = LocalExecutionStore(self.root / "execution")
         catalog = {}
         for reference_id, value in (resource_catalog or {}).items():
@@ -258,19 +263,24 @@ class LocalResearchApplication:
         capability_registry = CapabilityRegistry()
         capability_registry.register(DesktopResearchExternalAdapter(), descriptor)
         normalizer = DesktopResearchNormalizer(
-            self.execution_store, self.context_extension_store,
-            self.execution_store, self.operational_store,
+            self.execution_store,
+            self.context_extension_store,
+            self.execution_store,
+            self.operational_store,
         )
         self.capability_execution_service = CapabilityExecutionService(
-            capability_registry, self.execution_store, self.state_repository,
-            self.authorization, self.execution_store,
-            CapabilityNormalizationBoundary((normalizer,)), self.clock,
+            capability_registry,
+            self.execution_store,
+            self.state_repository,
+            self.authorization,
+            self.execution_store,
+            CapabilityNormalizationBoundary((normalizer,)),
+            self.clock,
             artifact_store=self.execution_store,
             context_extension_registry=CapabilityContextExtensionRegistry((DesktopResearchContextValidator(),)),
             context_extension_store=self.context_extension_store,
         )
 
-        self.conversation_store = LocalConversationStore(self.root / "conversation.db")
         actions = ActionRegistry()
         actions.register(ActionDefinition(
             "research.status", "research-status-query@0.1.0", "read_only", "harness_service", False,
@@ -286,15 +296,17 @@ class LocalResearchApplication:
             "run.abort", "run-abort-action@0.1.0", "state_changing", "harness_service", True,
             service_id="run.abort", payload_validator=_abort_payload,
         ))
+        # The exact candidate may or may not require a Decision. Static Conversation
+        # metadata cannot truthfully decide that; PR20 authority validation does.
         actions.register(ActionDefinition(
             "state.apply_candidate", "state-delta-adoption-action@0.1.0", "state_changing", "harness_service", True,
-            human_decision_required=True, service_id="state.apply_candidate", payload_validator=_apply_payload,
+            human_decision_required=False, service_id="state.apply_candidate", payload_validator=_apply_payload,
         ))
 
         services = HarnessServiceRegistry()
-        services.register("research.status", ResearchStatusHandler())
+        services.register("research.status", ResearchStatusHandler(self.human_decisions))
         services.register("run.abort", RunAbortHandler(self.capability_execution_service))
-        services.register("state.apply_candidate", StateDeltaApplyHandler(self.conversation_store, self.clock, self.ids))
+        services.register("state.apply_candidate", StateDeltaApplyHandler(self.conversation_store, self.human_decisions))
 
         materializers = CapabilityActionMaterializerRegistry()
         materializers.register(DesktopResearchConversationMaterializer(
@@ -305,7 +317,7 @@ class LocalResearchApplication:
         descriptors = CapabilityDescriptorRegistry()
         descriptors.register(descriptor)
 
-        self.coordinator = ResearchCoordinator(
+        self.coordinator = DecisionAwareResearchCoordinator(
             resolver=resolver,
             store=self.conversation_store,
             state_provider=self.state_repository,
@@ -319,7 +331,12 @@ class LocalResearchApplication:
             clock=self.clock,
             id_provider=self.ids,
             lineage_resolver=self._active_lineage_for,
+            human_decisions=self.human_decisions,
         )
+
+    def resolve_human_decision(self, response: Mapping[str, Any]):
+        """Resolve only an explicit structured Human Decision response."""
+        return self.human_decisions.resolve(response)
 
     def _active_lineage_for(self, project_ref: str) -> str:
         try:
@@ -332,4 +349,5 @@ class LocalResearchApplication:
         self.operational_store.close()
         self.context_extension_store.close()
         self.execution_store.close()
+        self.decision_store.close()
         self.state_repository.close()
