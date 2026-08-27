@@ -219,14 +219,25 @@ class HumanDecisionGateTests(unittest.TestCase):
         )
         approve = make_response(request=gate.decision_request, disposition="approve_exact", actor_id="HUMAN-1", responded_at=CLOCK.now())
         decline = make_response(request=gate.decision_request, disposition="decline", actor_id="HUMAN-1", responded_at=CLOCK.now())
-        barrier = threading.Barrier(2); outcomes = []; lock = threading.Lock()
+        barrier = threading.Barrier(2)
+        outcomes = []
+        lock = threading.Lock()
+
         def resolve(response):
             barrier.wait()
-            try: outcome = service.resolve(response).status
-            except HumanDecisionError as exc: outcome = exc.code
-            with lock: outcomes.append(outcome)
-        a = threading.Thread(target=resolve, args=(approve,)); b = threading.Thread(target=resolve, args=(decline,))
-        a.start(); b.start(); a.join(); b.join()
+            try:
+                outcome = service.resolve(response).status
+            except HumanDecisionError as exc:
+                outcome = exc.code
+            with lock:
+                outcomes.append(outcome)
+
+        a = threading.Thread(target=resolve, args=(approve,))
+        b = threading.Thread(target=resolve, args=(decline,))
+        a.start()
+        b.start()
+        a.join()
+        b.join()
         self.assertEqual(sum(item in {"RESOLVED", "DECLINED"} for item in outcomes), 1)
         self.assertIn(store.get_status(gate.decision_request["request_id"]), {"RESOLVED", "DECLINED"})
 
