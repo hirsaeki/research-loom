@@ -7,23 +7,23 @@ from threading import RLock
 from typing import Any, Mapping
 
 
-_REQUIRED_TABLES = {
-    "documents",
-    "proposals",
-    "confirmation_requests",
-    "materializations",
-    "run_correlations",
-    "state_delta_proposals",
+_REQUIRED_COLUMNS = {
+    "documents": {"message_type", "document_id", "digest", "payload_json"},
+    "proposals": {"proposal_id", "conversation_id", "commitment_mode", "status"},
+    "confirmation_requests": {
+        "request_id",
+        "request_digest",
+        "proposal_id",
+        "conversation_id",
+        "project_id",
+        "status",
+        "confirmation_receipt_id",
+    },
+    "materializations": {"proposal_id", "payload_json"},
+    "run_correlations": {"run_id", "proposal_id", "input_id"},
+    "state_delta_proposals": {"proposal_id", "payload_json"},
 }
-_REQUIRED_CONFIRMATION_COLUMNS = {
-    "request_id",
-    "request_digest",
-    "proposal_id",
-    "conversation_id",
-    "project_id",
-    "status",
-    "confirmation_receipt_id",
-}
+_REQUIRED_TABLES = set(_REQUIRED_COLUMNS)
 
 
 class LocalConversationStoreError(RuntimeError):
@@ -43,16 +43,19 @@ def _schema_issue(connection: sqlite3.Connection) -> str | None:
     missing_tables = sorted(_REQUIRED_TABLES - tables)
     if missing_tables:
         return "missing conversation-store tables: " + ", ".join(missing_tables)
-    columns = {
-        str(row["name"])
-        for row in connection.execute("PRAGMA table_info(confirmation_requests)").fetchall()
-    }
-    missing_columns = sorted(_REQUIRED_CONFIRMATION_COLUMNS - columns)
-    if missing_columns:
-        return (
-            "incompatible confirmation_requests schema; missing columns: "
-            + ", ".join(missing_columns)
-        )
+    for table_name, required_columns in _REQUIRED_COLUMNS.items():
+        columns = {
+            str(row["name"])
+            for row in connection.execute(
+                f"PRAGMA table_info({table_name})"
+            ).fetchall()
+        }
+        missing_columns = sorted(required_columns - columns)
+        if missing_columns:
+            return (
+                f"incompatible {table_name} schema; missing columns: "
+                + ", ".join(missing_columns)
+            )
     return None
 
 
