@@ -28,6 +28,7 @@ class ActionDefinition:
     route_kind: str
     confirmation_required: bool
     human_decision_required: bool = False
+    human_decision_service_managed: bool = False
     service_id: str | None = None
     capability_id: str | None = None
     capability_version: str | None = None
@@ -52,6 +53,7 @@ class HarnessServiceResult:
     result_reference: str | None = None
     data: Mapping[str, Any] = field(default_factory=dict)
     state_transition_request: Any | None = None
+    decision_request: Mapping[str, Any] | None = None
     research_state_mutation_performed: bool = False
 
 
@@ -62,6 +64,7 @@ class CoordinatorResult:
     proposal: Mapping[str, Any] | None = None
     confirmation_request: Mapping[str, Any] | None = None
     confirmation_receipt: Mapping[str, Any] | None = None
+    decision_request: Mapping[str, Any] | None = None
     action_receipt: Mapping[str, Any] | None = None
     prepared_execution: Any | None = None
     execution_result: Any | None = None
