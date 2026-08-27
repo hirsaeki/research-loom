@@ -318,6 +318,27 @@ class HumanDecisionService:
                         "DECISION-FORGED-REF-001",
                         "candidate object contains Decision provenance not inherited from current state",
                     )
+            if action.kind == TransitionKind.APPLY_LINEAGE_PLAN:
+                for treatment in action.payload.get("treatments", ()):
+                    if not isinstance(treatment, Mapping):
+                        continue
+                    derived = treatment.get("derived_object")
+                    if not isinstance(derived, Mapping) or not derived.get("decision_ids"):
+                        continue
+                    source_kind = str(treatment.get("object_kind", ""))
+                    source_id = str(treatment.get("source_ref", ""))
+                    inherited = state.latest_object(source_kind, source_id)
+                    inherited_ids = (
+                        set(str(item) for item in inherited.get("decision_ids", ()) or ())
+                        if inherited is not None
+                        else set()
+                    )
+                    proposed_ids = set(str(item) for item in derived.get("decision_ids", ()) or ())
+                    if not proposed_ids.issubset(inherited_ids):
+                        raise HumanDecisionError(
+                            "DECISION-FORGED-REF-001",
+                            "candidate lineage-derived object contains Decision provenance not inherited from current state",
+                        )
             actions.append(action)
         if not actions:
             raise HumanDecisionError("DECISION-CANDIDATE-001", "StateDeltaProposal has no proposed actions")
@@ -433,6 +454,9 @@ class HumanDecisionService:
             raise HumanDecisionError("DECISION-RESPONSE-001", "structured Human Decision response is incomplete")
         if response.get("disposition") not in {"approve_exact", "decline", "request_revision"}:
             raise HumanDecisionError("DECISION-DISPOSITION-001", "unsupported Human Decision disposition")
+        actor = response.get("actor")
+        if not isinstance(actor, Mapping) or not actor.get("actor_id") or not actor.get("actor_type"):
+            raise HumanDecisionError("DECISION-RESPONSE-001", "Human Decision response actor is invalid")
         if response_digest(response) != response.get("response_digest"):
             raise HumanDecisionError("DECISION-RESPONSE-001", "Human Decision response digest is invalid")
 
