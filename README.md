@@ -4,18 +4,16 @@
 
 ## Repository status
 
-The repository is currently in a staged convergence process:
+The canonical production path has converged through PR26: Core research semantics and Profiles/Project Config, Capability ABI and Research Method contracts, Desktop Research external execution, lineage/recovery, production State transitions and SQLite persistence, execution/artifact/resource persistence, Work Conversation coordination, and the Human Decision Gate with atomic Decision-bound commits are connected end to end.
 
-1. **PR 1 — legacy baseline:** imported the two pre-existing implementations unchanged.
-2. **PR 2 — target structure:** establishes the canonical monorepo boundaries without moving or reconciling legacy content.
-3. **Later PRs — convergence:** migrate and reconcile contracts, models, profiles, skills, publication assets, and runtime behavior incrementally.
+PR27 adds the production-local operator boundary: fresh local workspace bootstrap/reopen, exact Project Config + Effective Profile Set binding, a transport-neutral application facade, and a machine-oriented JSON CLI. ChatGPT Desktop App Work is the first intended human-facing consumer, but Work/ChatGPT semantics are not part of the Harness itself.
 
-The legacy directories remain intentionally untouched during PR 2:
+The legacy directories remain reference material only:
 
 - `research-harness/` — legacy Research Harness implementation
 - `research-profile/` — legacy Research Profile implementation
 
-New work should converge toward the target areas below rather than adding new cross-cutting concepts to either legacy tree.
+New work should converge toward the canonical areas below rather than adding new cross-cutting concepts to either legacy tree.
 
 ## Target areas
 
@@ -25,4 +23,4 @@ New work should converge toward the target areas below rather than adding new cr
 - `skills/` — writer and publication workflows that consume versioned packages/contracts
 - `projects/` — project-specific configuration, inputs, and artifacts
 
-See [`docs/architecture/monorepo-structure.md`](docs/architecture/monorepo-structure.md) for ownership boundaries, dependency direction, and migration rules.
+See [`docs/architecture/monorepo-structure.md`](docs/architecture/monorepo-structure.md) for ownership boundaries and [`docs/architecture/production-local-workspace-application-cli.md`](docs/architecture/production-local-workspace-application-cli.md) for the PR27 local application boundary.

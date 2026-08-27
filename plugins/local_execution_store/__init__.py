@@ -2,6 +2,7 @@
 
 from .context_extensions import LocalCapabilityContextExtensionStore
 from .operational_trace import LocalOperationalTraceStore
+from .status import pending_runs_for_project
 from .store import (
     LocalExecutionStore,
     LocalExecutionStoreConfig,
@@ -20,4 +21,5 @@ __all__ = [
     "LocalOperationalTraceStore",
     "RegisteredResource",
     "StoreIntegrityDiagnostic",
+    "pending_runs_for_project",
 ]

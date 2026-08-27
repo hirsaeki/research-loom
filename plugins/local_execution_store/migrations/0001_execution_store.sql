@@ -27,6 +27,9 @@ CREATE TABLE runs(
     provenance_json TEXT NOT NULL
 );
 
+CREATE INDEX runs_project_pending_idx
+    ON runs(project_ref, status, prepared_at, run_id);
+
 CREATE TABLE run_events(
     run_id TEXT NOT NULL REFERENCES runs(run_id),
     sequence INTEGER NOT NULL CHECK(sequence > 0),
