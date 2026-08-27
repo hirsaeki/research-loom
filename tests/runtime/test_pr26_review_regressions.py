@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from dataclasses import replace
 import tempfile
 import unittest
 
@@ -123,6 +124,51 @@ class PR26ReviewRegressionTests(unittest.TestCase):
         with self.assertRaises(HumanDecisionError) as raised:
             service.gate_candidate(
                 _candidate(state, [action], "SDP-FORGED-LINEAGE"),
+                state=state,
+                actor=ACTOR,
+            )
+        self.assertEqual(raised.exception.code, "DECISION-FORGED-REF-001")
+
+    def test_lineage_provenance_uses_pinned_baseline_not_sibling_latest_revision(self):
+        state = seed_state(objects=[project(), rq(state="approved"), finding(state="approved")])
+        sibling_revision = finding(
+            revision=1,
+            statement="Sibling-lineage revision",
+            state="approved",
+        )
+        sibling_revision["decision_ids"] = ["DEC-SIBLING"]
+        state = replace(state, objects=(*state.objects, sibling_revision))
+        service = self._service(state)
+
+        derived = finding(
+            revision=2,
+            statement="Reconfirmed from pinned baseline",
+            state="approved",
+        )
+        derived["decision_ids"] = ["DEC-SIBLING"]
+        action = TransitionAction(TransitionKind.APPLY_LINEAGE_PLAN, {
+            "plan_ref": "PLAN-PINNED",
+            "target_lineage_id": "LIN-PINNED",
+            "lineage_kind": "exploratory_fork",
+            "baseline_snapshot_ref": state.current_snapshot["id"],
+            "baseline_snapshot_digest": state.current_snapshot["content_digest"],
+            "treatments": [
+                {"object_kind": "project", "source_ref": "PRJ-1", "treatment": "PRESERVE"},
+                {"object_kind": "research_question", "source_ref": "RQ-1", "treatment": "PRESERVE"},
+                {
+                    "object_kind": "finding",
+                    "source_ref": "FND-1",
+                    "treatment": "RECONFIRM",
+                    "derived_object": derived,
+                },
+            ],
+        })
+
+        self.assertEqual(state.latest_object("finding", "FND-1")["revision"], 1)
+        self.assertEqual(state.exact_object("finding", "FND-1", 0).get("decision_ids", []), [])
+        with self.assertRaises(HumanDecisionError) as raised:
+            service.gate_candidate(
+                _candidate(state, [action], "SDP-PINNED-LINEAGE"),
                 state=state,
                 actor=ACTOR,
             )

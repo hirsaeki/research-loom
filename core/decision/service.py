@@ -327,7 +327,20 @@ class HumanDecisionService:
                         continue
                     source_kind = str(treatment.get("object_kind", ""))
                     source_id = str(treatment.get("source_ref", ""))
-                    inherited = state.latest_object(source_kind, source_id)
+                    baseline_revision = next(
+                        (
+                            int(member["revision"])
+                            for member in state.snapshot_members()
+                            if str(member.get("kind", "")) == source_kind
+                            and str(member.get("id", "")) == source_id
+                        ),
+                        None,
+                    )
+                    inherited = (
+                        state.exact_object(source_kind, source_id, baseline_revision)
+                        if baseline_revision is not None
+                        else None
+                    )
                     inherited_ids = (
                         set(str(item) for item in inherited.get("decision_ids", ()) or ())
                         if inherited is not None
