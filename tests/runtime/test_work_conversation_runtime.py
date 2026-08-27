@@ -362,13 +362,15 @@ class WorkConversationProductionRuntimeTests(unittest.TestCase):
                     "schema_version": "0.1.0", "message_type": "action_proposal",
                     "proposal_id": "PROP-IDEMP", "conversation_id": "CONV-IDEMP", "commitment_mode": "commit_requested",
                 })
-                store.store_proposal(proposal); store.store_proposal(proposal)
+                store.store_proposal(proposal)
+                store.store_proposal(proposal)
                 request = with_document_digest({
                     "schema_version": "0.1.0", "message_type": "confirmation_request",
                     "confirmation_request_id": "REQ-IDEMP", "conversation_id": "CONV-IDEMP",
                     "proposal_binding": {"proposal_id": "PROP-IDEMP"},
                 })
-                store.store_confirmation_request(request); store.store_confirmation_request(request)
+                store.store_confirmation_request(request)
+                store.store_confirmation_request(request)
                 self.assertEqual(store.load_proposal("PROP-IDEMP"), proposal)
                 self.assertEqual(store.load_confirmation_request("REQ-IDEMP"), request)
             finally:
@@ -384,7 +386,8 @@ class WorkConversationProductionRuntimeTests(unittest.TestCase):
 
     def test_atomic_confirmation_store_race_allows_one_consumer(self):
         with tempfile.TemporaryDirectory() as temp:
-            path = Path(temp) / "conversation.db"; setup = LocalConversationStore(path)
+            path = Path(temp) / "conversation.db"
+            setup = LocalConversationStore(path)
             proposal = with_document_digest({
                 "schema_version": "0.1.0", "message_type": "action_proposal", "proposal_id": "PROP-X",
                 "conversation_id": "CONV-X", "project_id": "PRJ-1",
@@ -409,8 +412,12 @@ class WorkConversationProductionRuntimeTests(unittest.TestCase):
                 "state_binding": {"state_id": "S", "revision": 0, "content_digest": "sha256:" + "2" * 64},
                 "issued_at": "2026-08-27T00:00:00Z", "expires_at": "2026-08-27T00:15:00Z", "single_use": True,
             })
-            setup.store_confirmation_request(request); setup.close()
-            barrier = threading.Barrier(2); outcomes = []; lock = threading.Lock()
+            setup.store_confirmation_request(request)
+            setup.close()
+            barrier = threading.Barrier(2)
+            outcomes = []
+            lock = threading.Lock()
+
             def consume(suffix):
                 store = LocalConversationStore(path)
                 receipt = {
@@ -418,11 +425,18 @@ class WorkConversationProductionRuntimeTests(unittest.TestCase):
                     "confirmation_receipt_id": "REC-" + suffix,
                     "receipt_digest": "sha256:" + ("a" if suffix == "A" else "b") * 64,
                 }
-                barrier.wait(); value = store.consume_confirmation_request("REQ-X", request["request_digest"], receipt)
-                with lock: outcomes.append(value)
+                barrier.wait()
+                value = store.consume_confirmation_request("REQ-X", request["request_digest"], receipt)
+                with lock:
+                    outcomes.append(value)
                 store.close()
-            a = threading.Thread(target=consume, args=("A",)); b = threading.Thread(target=consume, args=("B",))
-            a.start(); b.start(); a.join(); b.join()
+
+            a = threading.Thread(target=consume, args=("A",))
+            b = threading.Thread(target=consume, args=("B",))
+            a.start()
+            b.start()
+            a.join()
+            b.join()
             self.assertEqual(sorted(outcomes), [False, True])
 
 
