@@ -13,8 +13,17 @@ import rfc8785
 
 import plugins.local_application.facade as facade_module
 import plugins.local_application.workspace as workspace_module
-from plugins.local_application import LocalApplicationFacade, LocalResearchApplication, LocalWorkspace
-from plugins.local_conversation_store import LocalConversationStore
+from core.conversation import ConversationRuntimeError
+from plugins.local_application import (
+    LocalApplicationFacade,
+    LocalResearchApplication,
+    LocalWorkspace,
+    LocalWorkspaceError,
+)
+from plugins.local_conversation_store import (
+    LocalConversationStore,
+    LocalConversationStoreError,
+)
 from runtime_fixtures import project, rq, seed_state
 
 
@@ -54,6 +63,51 @@ def bootstrap_config(path: Path) -> Path:
     config["configuration_digest"] = "sha256:" + hashlib.sha256(rfc8785.dumps(payload)).hexdigest()
     path.write_text(json.dumps(config), encoding="utf-8")
     return path
+
+
+def create_legacy_conversation_schema(path: Path) -> None:
+    connection = sqlite3.connect(path)
+    try:
+        connection.executescript(
+            """
+            CREATE TABLE documents(
+              message_type TEXT NOT NULL,
+              document_id TEXT NOT NULL,
+              digest TEXT NOT NULL,
+              payload_json TEXT NOT NULL,
+              PRIMARY KEY(message_type, document_id)
+            );
+            CREATE TABLE proposals(
+              proposal_id TEXT PRIMARY KEY,
+              conversation_id TEXT NOT NULL,
+              commitment_mode TEXT NOT NULL,
+              status TEXT NOT NULL DEFAULT 'pending'
+            );
+            CREATE TABLE confirmation_requests(
+              request_id TEXT PRIMARY KEY,
+              request_digest TEXT NOT NULL,
+              proposal_id TEXT NOT NULL,
+              conversation_id TEXT NOT NULL,
+              status TEXT NOT NULL DEFAULT 'pending',
+              confirmation_receipt_id TEXT
+            );
+            CREATE TABLE materializations(
+              proposal_id TEXT PRIMARY KEY,
+              payload_json TEXT NOT NULL
+            );
+            CREATE TABLE run_correlations(
+              run_id TEXT PRIMARY KEY,
+              proposal_id TEXT NOT NULL,
+              input_id TEXT NOT NULL
+            );
+            CREATE TABLE state_delta_proposals(
+              proposal_id TEXT PRIMARY KEY,
+              payload_json TEXT NOT NULL
+            );
+            """
+        )
+    finally:
+        connection.close()
 
 
 class PR27ReviewRegressionTests(unittest.TestCase):
@@ -122,6 +176,33 @@ class PR27ReviewRegressionTests(unittest.TestCase):
             self.assertEqual(result["issues"][0]["code"], "WORKSPACE-STATE-DB-001")
             self.assertIn("unreadable or incompatible", result["issues"][0]["message"])
 
+    def test_legacy_conversation_schema_fails_closed_in_open_and_doctor(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = bootstrap_config(root / "project.json")
+            workspace = root / "workspace"
+            opened = LocalWorkspace.init(workspace, config, EFFECTIVE_PROFILES)
+            opened.close()
+
+            conversation = workspace / ".research-loom/conversation.db"
+            for suffix in ("", "-wal", "-shm"):
+                candidate = Path(str(conversation) + suffix)
+                if candidate.exists():
+                    candidate.unlink()
+            create_legacy_conversation_schema(conversation)
+
+            with self.assertRaises(LocalConversationStoreError) as direct:
+                LocalConversationStore(conversation)
+            self.assertEqual(direct.exception.code, "CONVERSATION-STORE-SCHEMA-001")
+
+            with self.assertRaises(LocalWorkspaceError) as reopened:
+                LocalWorkspace.open(workspace)
+            self.assertEqual(reopened.exception.code, "WORKSPACE-CONVERSATION-DB-001")
+
+            doctor = LocalWorkspace.doctor(workspace)
+            self.assertEqual(doctor["status"], "ERROR")
+            self.assertEqual(doctor["issues"][0]["code"], "WORKSPACE-CONVERSATION-DB-001")
+
     def test_cli_routes_workspace_lifecycle_through_facade(self):
         source = CLI.read_text(encoding="utf-8")
         self.assertNotIn("LocalWorkspace.", source)
@@ -178,6 +259,39 @@ class PR27ReviewRegressionTests(unittest.TestCase):
             finally:
                 store.close()
 
+    def test_cross_project_confirmation_is_rejected_without_consumption(self):
+        with tempfile.TemporaryDirectory() as temp:
+            app = LocalResearchApplication(
+                temp,
+                resolver=NullResolver(),
+                effective_profile_set_provider=profile_provider,
+                seed_state=seed_state(
+                    objects=[project(), rq(state="approved")],
+                    snapshot_id="SNP-CONFIRM-0",
+                ),
+            )
+            try:
+                owner = LocalApplicationFacade(app, "PRJ-1")
+                pending = owner.submit_action({
+                    "action_type": "state.apply_candidate",
+                    "payload": {"state_delta_proposal_id": "MISSING-CROSS-PROJECT"},
+                    "actor_id": "HUMAN-1",
+                })
+                request_id = pending["confirmation_request"]["confirmation_request_id"]
+                wrong_project = LocalApplicationFacade(app, "PRJ-OTHER")
+                with self.assertRaises(ConversationRuntimeError) as raised:
+                    wrong_project.submit_confirmation({
+                        "confirmation_request_id": request_id,
+                        "actor_id": "HUMAN-1",
+                    })
+                self.assertEqual(raised.exception.code, "CONV-CONFIRMATION-BINDING-001")
+                remaining = app.conversation_store.list_pending_confirmation_requests(
+                    "PRJ-1", limit=10
+                )
+                self.assertEqual([item["confirmation_request_id"] for item in remaining], [request_id])
+            finally:
+                app.close()
+
     def test_status_is_bounded_and_reports_truncation(self):
         with tempfile.TemporaryDirectory() as temp:
             app = LocalResearchApplication(
@@ -216,6 +330,28 @@ class PR27ReviewRegressionTests(unittest.TestCase):
                 self.assertTrue(all(run["status"] == "RUNNING" for run in status["pending_runs"]))
             finally:
                 app.close()
+
+    def test_execution_store_has_project_pending_run_index(self):
+        with tempfile.TemporaryDirectory() as temp:
+            app = LocalResearchApplication(
+                temp,
+                resolver=NullResolver(),
+                effective_profile_set_provider=profile_provider,
+                seed_state=seed_state(
+                    objects=[project(), rq(state="approved")],
+                    snapshot_id="SNP-INDEX-0",
+                ),
+            )
+            app.close()
+            connection = sqlite3.connect(Path(temp) / "execution/execution.db")
+            try:
+                indexes = {
+                    str(row[1])
+                    for row in connection.execute("PRAGMA index_list(runs)").fetchall()
+                }
+            finally:
+                connection.close()
+            self.assertIn("runs_project_pending_idx", indexes)
 
 
 if __name__ == "__main__":

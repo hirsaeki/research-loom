@@ -26,6 +26,28 @@ class DecisionAwareResearchCoordinator(WorkConversationService):
         request_id = str(input_document["target"]["target_id"])
         request = self._store.load_confirmation_request(request_id)
         if request is not None:
+            proposal = self._store.load_proposal(
+                str(request["proposal_binding"]["proposal_id"])
+            )
+            if proposal is None:
+                raise ConversationRuntimeError(
+                    "CONV-CONFIRMATION-BINDING-001",
+                    "bound Action Proposal is missing",
+                )
+            if (
+                str(input_document.get("project_id")) != str(request.get("project_id"))
+                or str(input_document.get("conversation_id"))
+                != str(request.get("conversation_id"))
+                or str(proposal.get("project_id")) != str(request.get("project_id"))
+                or str(proposal.get("conversation_id"))
+                != str(request.get("conversation_id"))
+                or str(proposal.get("proposal_digest"))
+                != str(request["proposal_binding"].get("proposal_digest"))
+            ):
+                raise ConversationRuntimeError(
+                    "CONV-CONFIRMATION-BINDING-001",
+                    "Confirmation Request project/conversation/proposal binding mismatch",
+                )
             pending_ids = {
                 str(item.get("confirmation_request_id"))
                 for item in self._store.list_pending(str(request["conversation_id"]))

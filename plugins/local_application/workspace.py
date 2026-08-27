@@ -19,6 +19,10 @@ import rfc8785
 from core.runtime import LineageView, StateView, canonical_digest
 from core.runtime.transition_models import with_content_digest
 from plugins.local_application.application import LocalResearchApplication, SystemClock, UUIDIdProvider
+from plugins.local_conversation_store import (
+    LocalConversationStoreError,
+    validate_conversation_store_schema,
+)
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -382,6 +386,15 @@ def _sqlite_quick_check(path: Path, *, code: str) -> None:
         raise LocalWorkspaceError(code, f"SQLite database is not readable: {path}") from exc
 
 
+def _validate_conversation_database(path: Path) -> None:
+    try:
+        validate_conversation_store_schema(path)
+    except LocalConversationStoreError as exc:
+        raise LocalWorkspaceError(
+            "WORKSPACE-CONVERSATION-DB-001", exc.message
+        ) from exc
+
+
 def _validate_state_database(path: Path, binding: Mapping[str, Any]) -> None:
     project_id = str(binding["project_id"])
     try:
@@ -547,13 +560,17 @@ class LocalWorkspace:
         for key, locator in binding["storage"].items():
             path = _safe_locator(root, str(locator))
             if key != "execution_root" and not path.is_file():
-                raise LocalWorkspaceError("WORKSPACE-MISSING-001", f"required storage is missing: {locator}")
+                raise LocalWorkspaceError("WORKSPACE-MISSING-001", f"required workspace path is missing: {locator}")
             if key == "execution_root" and not path.is_dir():
                 raise LocalWorkspaceError("WORKSPACE-MISSING-001", "execution root is missing")
         state_path = _safe_locator(root, str(binding["storage"]["research_state"]))
         _sqlite_quick_check(state_path, code="WORKSPACE-STATE-DB-001")
         _validate_state_database(state_path, binding)
-        for key in ("conversation", "decision", "execution", "context_extensions", "operational_trace"):
+
+        conversation_path = _safe_locator(root, str(binding["storage"]["conversation"]))
+        _sqlite_quick_check(conversation_path, code="WORKSPACE-CONVERSATION-DB-001")
+        _validate_conversation_database(conversation_path)
+        for key in ("decision", "execution", "context_extensions", "operational_trace"):
             _sqlite_quick_check(
                 _safe_locator(root, str(binding["storage"][key])),
                 code=f"WORKSPACE-{key.upper().replace('_', '-')}-DB-001",
@@ -605,7 +622,7 @@ class LocalWorkspace:
                     if not path.is_dir():
                         raise LocalWorkspaceError("WORKSPACE-MISSING-001", "execution root is missing")
                 elif not path.is_file():
-                    raise LocalWorkspaceError("WORKSPACE-MISSING-001", f"required storage is missing: {locator}")
+                    raise LocalWorkspaceError("WORKSPACE-MISSING-001", f"required workspace path is missing: {locator}")
 
             state_path = _safe_locator(root, str(binding["storage"]["research_state"]))
             _sqlite_quick_check(state_path, code="WORKSPACE-STATE-DB-001")
@@ -645,8 +662,12 @@ class LocalWorkspace:
                 "active_lineage": active_lineage, "snapshot_id": snapshot_id,
             })
 
+            conversation_path = _safe_locator(root, str(binding["storage"]["conversation"]))
+            _sqlite_quick_check(conversation_path, code="WORKSPACE-CONVERSATION-DB-001")
+            _validate_conversation_database(conversation_path)
+            checks.append({"check": "conversation_store", "status": "OK"})
+
             for key, label in (
-                ("conversation", "conversation_store"),
                 ("decision", "decision_store"),
                 ("execution", "execution_store"),
                 ("context_extensions", "context_extension_store"),

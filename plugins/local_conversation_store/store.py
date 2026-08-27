@@ -7,6 +7,74 @@ from threading import RLock
 from typing import Any, Mapping
 
 
+_REQUIRED_TABLES = {
+    "documents",
+    "proposals",
+    "confirmation_requests",
+    "materializations",
+    "run_correlations",
+    "state_delta_proposals",
+}
+_REQUIRED_CONFIRMATION_COLUMNS = {
+    "request_id",
+    "request_digest",
+    "proposal_id",
+    "conversation_id",
+    "project_id",
+    "status",
+    "confirmation_receipt_id",
+}
+
+
+class LocalConversationStoreError(RuntimeError):
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+        self.message = message
+
+
+def _schema_issue(connection: sqlite3.Connection) -> str | None:
+    tables = {
+        str(row["name"])
+        for row in connection.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        ).fetchall()
+    }
+    missing_tables = sorted(_REQUIRED_TABLES - tables)
+    if missing_tables:
+        return "missing conversation-store tables: " + ", ".join(missing_tables)
+    columns = {
+        str(row["name"])
+        for row in connection.execute("PRAGMA table_info(confirmation_requests)").fetchall()
+    }
+    missing_columns = sorted(_REQUIRED_CONFIRMATION_COLUMNS - columns)
+    if missing_columns:
+        return (
+            "incompatible confirmation_requests schema; missing columns: "
+            + ", ".join(missing_columns)
+        )
+    return None
+
+
+def validate_conversation_store_schema(path: str | Path) -> None:
+    """Read-only compatibility check; never migrates or repairs an existing DB."""
+    database = Path(path)
+    try:
+        connection = sqlite3.connect(f"file:{database}?mode=ro", uri=True)
+        connection.row_factory = sqlite3.Row
+        try:
+            issue = _schema_issue(connection)
+        finally:
+            connection.close()
+    except sqlite3.Error as exc:
+        raise LocalConversationStoreError(
+            "CONVERSATION-STORE-SCHEMA-001",
+            "conversation store schema is unreadable or incompatible",
+        ) from exc
+    if issue is not None:
+        raise LocalConversationStoreError("CONVERSATION-STORE-SCHEMA-001", issue)
+
+
 class LocalConversationStore:
     """Separate durable operational store for PR10 conversation documents.
 
@@ -19,56 +87,79 @@ class LocalConversationStore:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = RLock()
-        self._db = sqlite3.connect(
-            str(self.path), isolation_level=None, check_same_thread=False, timeout=5.0
-        )
-        self._db.row_factory = sqlite3.Row
-        self._db.execute("PRAGMA journal_mode=WAL")
-        self._db.execute("PRAGMA synchronous=FULL")
-        self._db.execute("PRAGMA foreign_keys=ON")
-        self._db.execute("PRAGMA busy_timeout=5000")
-        self._db.executescript(
-            """
-            CREATE TABLE IF NOT EXISTS documents(
-              message_type TEXT NOT NULL,
-              document_id TEXT NOT NULL,
-              digest TEXT NOT NULL,
-              payload_json TEXT NOT NULL,
-              PRIMARY KEY(message_type, document_id)
-            );
-            CREATE TABLE IF NOT EXISTS proposals(
-              proposal_id TEXT PRIMARY KEY,
-              conversation_id TEXT NOT NULL,
-              commitment_mode TEXT NOT NULL,
-              status TEXT NOT NULL DEFAULT 'pending'
-            );
-            CREATE TABLE IF NOT EXISTS confirmation_requests(
-              request_id TEXT PRIMARY KEY,
-              request_digest TEXT NOT NULL,
-              proposal_id TEXT NOT NULL,
-              conversation_id TEXT NOT NULL,
-              project_id TEXT NOT NULL,
-              status TEXT NOT NULL DEFAULT 'pending',
-              confirmation_receipt_id TEXT,
-              FOREIGN KEY(proposal_id) REFERENCES proposals(proposal_id)
-            );
-            CREATE INDEX IF NOT EXISTS confirmation_requests_project_pending
-              ON confirmation_requests(project_id, status, request_id);
-            CREATE TABLE IF NOT EXISTS materializations(
-              proposal_id TEXT PRIMARY KEY,
-              payload_json TEXT NOT NULL
-            );
-            CREATE TABLE IF NOT EXISTS run_correlations(
-              run_id TEXT PRIMARY KEY,
-              proposal_id TEXT NOT NULL,
-              input_id TEXT NOT NULL
-            );
-            CREATE TABLE IF NOT EXISTS state_delta_proposals(
-              proposal_id TEXT PRIMARY KEY,
-              payload_json TEXT NOT NULL
-            );
-            """
-        )
+        self._db: sqlite3.Connection | None = None
+        try:
+            self._db = sqlite3.connect(
+                str(self.path), isolation_level=None, check_same_thread=False, timeout=5.0
+            )
+            self._db.row_factory = sqlite3.Row
+            self._db.execute("PRAGMA journal_mode=WAL")
+            self._db.execute("PRAGMA synchronous=FULL")
+            self._db.execute("PRAGMA foreign_keys=ON")
+            self._db.execute("PRAGMA busy_timeout=5000")
+            # CREATE TABLE IF NOT EXISTS intentionally does not act as a migration.
+            # Existing incompatible stores fail closed below before any index that
+            # depends on the newer project_id projection is created.
+            self._db.executescript(
+                """
+                CREATE TABLE IF NOT EXISTS documents(
+                  message_type TEXT NOT NULL,
+                  document_id TEXT NOT NULL,
+                  digest TEXT NOT NULL,
+                  payload_json TEXT NOT NULL,
+                  PRIMARY KEY(message_type, document_id)
+                );
+                CREATE TABLE IF NOT EXISTS proposals(
+                  proposal_id TEXT PRIMARY KEY,
+                  conversation_id TEXT NOT NULL,
+                  commitment_mode TEXT NOT NULL,
+                  status TEXT NOT NULL DEFAULT 'pending'
+                );
+                CREATE TABLE IF NOT EXISTS confirmation_requests(
+                  request_id TEXT PRIMARY KEY,
+                  request_digest TEXT NOT NULL,
+                  proposal_id TEXT NOT NULL,
+                  conversation_id TEXT NOT NULL,
+                  project_id TEXT NOT NULL,
+                  status TEXT NOT NULL DEFAULT 'pending',
+                  confirmation_receipt_id TEXT,
+                  FOREIGN KEY(proposal_id) REFERENCES proposals(proposal_id)
+                );
+                CREATE TABLE IF NOT EXISTS materializations(
+                  proposal_id TEXT PRIMARY KEY,
+                  payload_json TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS run_correlations(
+                  run_id TEXT PRIMARY KEY,
+                  proposal_id TEXT NOT NULL,
+                  input_id TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS state_delta_proposals(
+                  proposal_id TEXT PRIMARY KEY,
+                  payload_json TEXT NOT NULL
+                );
+                """
+            )
+            issue = _schema_issue(self._db)
+            if issue is not None:
+                raise LocalConversationStoreError(
+                    "CONVERSATION-STORE-SCHEMA-001", issue
+                )
+            self._db.execute(
+                "CREATE INDEX IF NOT EXISTS confirmation_requests_project_pending "
+                "ON confirmation_requests(project_id,status,request_id)"
+            )
+        except LocalConversationStoreError:
+            if self._db is not None:
+                self._db.close()
+            raise
+        except sqlite3.Error as exc:
+            if self._db is not None:
+                self._db.close()
+            raise LocalConversationStoreError(
+                "CONVERSATION-STORE-SCHEMA-001",
+                "conversation store schema is unreadable or incompatible",
+            ) from exc
 
     @staticmethod
     def _json(value: Mapping[str, Any]) -> str:
