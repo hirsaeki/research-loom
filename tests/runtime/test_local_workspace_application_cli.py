@@ -271,6 +271,8 @@ class LocalApplicationFacadeTests(unittest.TestCase):
                 run = app.execution_store.load_run(result["run_id"])
                 self.assertEqual(run.capability_id, "desktop-research")
                 self.assertEqual(run.status.value, "RUNNING")
+                status = facade.status()
+                self.assertEqual([item["run_id"] for item in status["pending_runs"]], [run.run_id])
             finally:
                 app.close()
 
@@ -451,7 +453,7 @@ class JsonCliTests(unittest.TestCase):
             finally:
                 opened.close()
 
-            _code, _raw, pending = run_cli(
+            code, _raw, pending = run_cli(
                 ["action", "submit", "--workspace", str(workspace), "--json", "-"],
                 json.dumps({
                     "action_type": "state.apply_candidate",
@@ -459,13 +461,15 @@ class JsonCliTests(unittest.TestCase):
                     "actor_id": "HUMAN-CLI",
                 }),
             )
-            _code, _raw, decision = run_cli(
+            self.assertEqual((code, pending["status"]), (0, "CONFIRMATION_REQUIRED"))
+            code, _raw, decision = run_cli(
                 ["confirmation", "submit", "--workspace", str(workspace), "--json", "-"],
                 json.dumps({
                     "confirmation_request_id": pending["confirmation_request"]["confirmation_request_id"],
                     "actor_id": "HUMAN-CLI",
                 }),
             )
+            self.assertEqual(code, 0)
             self.assertEqual(decision["status"], "HUMAN_DECISION_REQUIRED")
 
             code, _raw, status = run_cli(["status", "--workspace", str(workspace), "--json"])

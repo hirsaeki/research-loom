@@ -194,7 +194,7 @@ class LocalApplicationFacade:
         self.close()
 
     def list_actions(self) -> Mapping[str, Any]:
-        definitions = self._application.coordinator._actions.definitions()
+        definitions = self._application.coordinator.action_definitions()
         actions = []
         for definition in definitions:
             actions.append({
@@ -243,44 +243,17 @@ class LocalApplicationFacade:
         if conversation_id is not None and (not isinstance(conversation_id, str) or not conversation_id):
             raise LocalApplicationError("APPLICATION-INGRESS-001", "conversation_id must be a non-empty string")
 
-        coordinator = self._application.coordinator
-        definition = coordinator._actions.get(action_type)
-        classification = "QUERY" if definition.effect == "read_only" else "COMMITTABLE_ACTION"
-        document = _conversation_input(
-            self._application,
-            project_id=self._project_id,
-            classification=classification,
-            actor_id=actor_id,
-            conversation_id=conversation_id,
-            text=rationale or f"typed action {action_type}",
-        )
         draft = ActionDraft(action_type, deepcopy(dict(payload)), rationale)
-
-        # This is deliberately the same proposal/confirmation/execution path used
-        # after natural-language resolution in WorkConversationService. No route,
-        # effect, Capability identity, authorization, Decision ref, or transition
-        # request is accepted from the caller.
-        coordinator._validator.validate(document)
-        coordinator._store.store_input(document)
-        state = coordinator._state(self._project_id)
         try:
-            proposal = coordinator._build_proposal(document, definition, draft.payload, state)
+            result = self._application.coordinator.process_action_draft(
+                draft,
+                project_id=self._project_id,
+                actor={"actor_id": actor_id, "actor_type": "human"},
+                conversation_id=conversation_id,
+                text=rationale or f"typed action {action_type}",
+            )
         except ValueError as exc:
             raise LocalApplicationError("APPLICATION-PAYLOAD-001", str(exc)) from exc
-        coordinator._validator.validate(proposal)
-        coordinator._store.store_proposal(proposal)
-        if definition.effect == "state_changing" and definition.confirmation_required:
-            request = coordinator._build_confirmation_request(proposal, state)
-            coordinator._validator.validate(request)
-            coordinator._store.store_confirmation_request(request)
-            result = CoordinatorResult(
-                "CONFIRMATION_REQUIRED",
-                document,
-                proposal=proposal,
-                confirmation_request=request,
-            )
-        else:
-            result = coordinator._execute(document, proposal, state, confirmation_receipt=None)
         return _result_projection(result)
 
     def submit_confirmation(self, confirmation: Mapping[str, Any]) -> Mapping[str, Any]:
@@ -352,30 +325,32 @@ class LocalApplicationFacade:
         state = repo.load_state_view(self._project_id, lineage_id)
         pending_decisions = self._application.human_decisions.pending(self._project_id)
 
-        pending_confirmations = []
-        store = self._application.conversation_store
-        with store._lock:
-            rows = store._db.execute(
-                "SELECT d.payload_json FROM confirmation_requests c "
-                "JOIN documents d ON d.message_type='confirmation_request' AND d.document_id=c.request_id "
-                "WHERE c.status='pending' ORDER BY c.request_id"
-            ).fetchall()
-        for row in rows:
-            import json
-            item = json.loads(str(row["payload_json"]))
-            if str(item.get("project_id")) == self._project_id:
-                pending_confirmations.append(item)
+        conversation_store = self._application.conversation_store
+        pending_confirmations = conversation_store.list_pending_confirmation_requests(
+            self._project_id
+        )
 
         pending_runs = []
         execution_store = self._application.execution_store
-        with execution_store._lock:
-            rows = execution_store._connection.execute(
-                "SELECT run_id,capability_id,function_id,execution_mode,status,lineage_ref,snapshot_ref,snapshot_digest "
-                "FROM runs WHERE project_ref=? AND status IN ('PREPARED','RUNNING') ORDER BY run_id",
-                (self._project_id,),
-            ).fetchall()
-        for row in rows:
-            pending_runs.append({key: row[key] for key in row.keys()})
+        for correlation in conversation_store.list_run_correlations():
+            run = execution_store.load_run(str(correlation["run_id"]))
+            if (
+                run is None
+                or run.project_ref != self._project_id
+                or run.status.value not in {"PREPARED", "RUNNING"}
+            ):
+                continue
+            pending_runs.append({
+                "run_id": run.run_id,
+                "capability_id": run.capability_id,
+                "function_id": run.function_id,
+                "execution_mode": run.execution_mode,
+                "status": run.status.value,
+                "lineage_ref": run.lineage_ref,
+                "snapshot_ref": run.snapshot_ref,
+                "snapshot_digest": run.snapshot_digest,
+            })
+        pending_runs.sort(key=lambda item: str(item["run_id"]))
 
         snapshot = state.current_snapshot
         return {

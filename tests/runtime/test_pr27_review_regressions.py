@@ -19,6 +19,7 @@ ROOT = Path(__file__).resolve().parents[2]
 PROJECT_CONFIG = ROOT / "projects/fixtures/valid/generic-project-config.json"
 EFFECTIVE_PROFILES = ROOT / "profiles/fixtures/valid/effective-profile-set.json"
 CLI = ROOT / "plugins/local_application/cli.py"
+FACADE = ROOT / "plugins/local_application/facade.py"
 
 
 def bootstrap_config(path: Path) -> Path:
@@ -88,6 +89,27 @@ class PR27ReviewRegressionTests(unittest.TestCase):
         self.assertNotIn("LocalWorkspace.", source)
         self.assertIn("LocalApplicationFacade.initialize_workspace", source)
         self.assertIn("LocalApplicationFacade.doctor_workspace", source)
+
+    def test_facade_uses_public_coordinator_and_store_queries(self):
+        source = FACADE.read_text(encoding="utf-8")
+        for private_call in (
+            "coordinator._actions",
+            "coordinator._validator",
+            "coordinator._store",
+            "coordinator._state",
+            "coordinator._build_proposal",
+            "coordinator._build_confirmation_request",
+            "coordinator._execute",
+            "conversation_store._db",
+            "conversation_store._lock",
+            "execution_store._connection",
+            "execution_store._lock",
+        ):
+            self.assertNotIn(private_call, source)
+        self.assertIn("coordinator.process_action_draft", source)
+        self.assertIn("coordinator.action_definitions", source)
+        self.assertIn("list_pending_confirmation_requests", source)
+        self.assertIn("list_run_correlations", source)
 
 
 if __name__ == "__main__":

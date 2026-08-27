@@ -296,6 +296,14 @@ class LocalConversationStore:
             ).fetchone()
         return dict(row) if row else None
 
+    def list_run_correlations(self):
+        """Return immutable Run/action correlations for read-only operational status."""
+        with self._lock:
+            rows = self._db.execute(
+                "SELECT run_id,proposal_id,input_id FROM run_correlations ORDER BY run_id"
+            ).fetchall()
+        return tuple(dict(row) for row in rows)
+
     def store_state_delta_proposal(self, proposal_id, payload):
         serialized = self._json(payload)
         with self._lock:
@@ -328,6 +336,21 @@ class LocalConversationStore:
             ).fetchall()]
         result.extend(doc for doc in (self.load_proposal(item) for item in proposal_ids) if doc is not None)
         result.extend(doc for doc in (self.load_confirmation_request(item) for item in request_ids) if doc is not None)
+        return tuple(result)
+
+    def list_pending_confirmation_requests(self, project_id: str):
+        """Return pending Confirmation Requests for one project in stable order."""
+        with self._lock:
+            rows = self._db.execute(
+                "SELECT d.payload_json FROM confirmation_requests c "
+                "JOIN documents d ON d.message_type='confirmation_request' AND d.document_id=c.request_id "
+                "WHERE c.status='pending' ORDER BY c.request_id"
+            ).fetchall()
+        result = []
+        for row in rows:
+            document = json.loads(str(row["payload_json"]))
+            if str(document.get("project_id")) == str(project_id):
+                result.append(document)
         return tuple(result)
 
     def close(self):

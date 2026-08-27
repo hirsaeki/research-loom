@@ -11,6 +11,7 @@ from core.runtime import CommitReceipt, StateTransitionRejected
 
 from .models import (
     ActionDefinition,
+    ActionDraft,
     CapabilityMaterialization,
     ConversationRuntimeError,
     CoordinatorResult,
@@ -101,6 +102,38 @@ class WorkConversationService:
         self._confirmation_ttl = confirmation_ttl_seconds
         self._validator = validator or WorkConversationValidator()
 
+    def action_definitions(self) -> tuple[ActionDefinition, ...]:
+        """Return the static registry definitions without exposing the registry itself."""
+        return self._actions.definitions()
+
+    def process_action_draft(
+        self,
+        draft: ActionDraft,
+        *,
+        project_id: str,
+        actor: Mapping[str, Any],
+        conversation_id: str | None = None,
+        text: str | None = None,
+    ) -> CoordinatorResult:
+        """Process an already-typed untrusted ActionDraft through the PR10 path."""
+        definition = self._actions.get(str(draft.action_type))
+        classification = "QUERY" if definition.effect == "read_only" else "COMMITTABLE_ACTION"
+        document = with_document_digest({
+            "schema_version": "0.1.0",
+            "message_type": "conversation_input",
+            "input_id": self._ids.new("IN-"),
+            "conversation_id": conversation_id or self._ids.new("CONV-"),
+            "project_id": str(project_id),
+            "actor": deepcopy(dict(actor)),
+            "classification": classification,
+            "text": text or draft.rationale or f"typed action {draft.action_type}",
+            "received_at": self._clock.now(),
+        })
+        self._validator.validate(document)
+        self._store.store_input(document)
+        state = self._state(str(project_id))
+        return self._process_resolved_action(document, draft, state, definition)
+
     def process_input(self, conversation_input: Mapping[str, Any]) -> CoordinatorResult:
         document = deepcopy(dict(conversation_input))
         self._validator.validate(document)
@@ -113,7 +146,7 @@ class WorkConversationService:
 
         state = self._state(document["project_id"])
         summary = self._bounded_state_summary(state)
-        draft = self._resolver.resolve(document, summary, self._actions.definitions())
+        draft = self._resolver.resolve(document, summary, self.action_definitions())
         if draft is None:
             return CoordinatorResult("UNRESOLVED", document)
 
@@ -125,7 +158,17 @@ class WorkConversationService:
                 document,
                 issues=({"code": exc.code, "message": exc.message},),
             )
+        return self._process_resolved_action(document, draft, state, definition)
 
+    def _process_resolved_action(
+        self,
+        document: Mapping[str, Any],
+        draft: ActionDraft,
+        state,
+        definition: ActionDefinition,
+    ) -> CoordinatorResult:
+        """Shared proposal-through-execution path for natural and typed ingress."""
+        classification = str(document["classification"])
         proposal = self._build_proposal(document, definition, draft.payload, state)
         self._validator.validate(proposal)
         self._store.store_proposal(proposal)
