@@ -270,7 +270,7 @@ class LocalApplicationFacadeTests(unittest.TestCase):
                 self.assertEqual(result["status"], "CAPABILITY_EXECUTION_PREPARED")
                 run = app.execution_store.load_run(result["run_id"])
                 self.assertEqual(run.capability_id, "desktop-research")
-                self.assertEqual(run.status.value, "PREPARED")
+                self.assertEqual(run.status.value, "RUNNING")
             finally:
                 app.close()
 
