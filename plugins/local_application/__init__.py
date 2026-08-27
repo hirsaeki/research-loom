@@ -1,3 +1,15 @@
-"""Explicit local production composition root for research-loom."""
+"""Explicit local production composition root, workspace, facade, and CLI boundary."""
+
 from .application import LocalResearchApplication, LocalStaticAuthorizationProvider
-__all__ = ["LocalResearchApplication", "LocalStaticAuthorizationProvider"]
+from .facade import LocalApplicationError, LocalApplicationFacade
+from .workspace import LocalWorkspace, LocalWorkspaceError, OpenedLocalWorkspace
+
+__all__ = [
+    "LocalApplicationError",
+    "LocalApplicationFacade",
+    "LocalResearchApplication",
+    "LocalStaticAuthorizationProvider",
+    "LocalWorkspace",
+    "LocalWorkspaceError",
+    "OpenedLocalWorkspace",
+]
