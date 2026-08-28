@@ -8,6 +8,7 @@ from typing import Any, Mapping
 
 from core.conversation import ActionDraft, ConversationRuntimeError, CoordinatorResult
 from core.conversation.validation import with_document_digest
+from core.decision import make_response
 from plugins.local_application.workspace import LocalWorkspace, OpenedLocalWorkspace
 from plugins.local_execution_store import pending_runs_for_project
 
@@ -24,6 +25,8 @@ _AUTHORITY_PAYLOAD_FIELDS = {
     "capability_implementation",
     "implementation_id",
 }
+_MINIMAL_DECISION_FIELDS = {"request_id", "request_digest", "disposition", "actor_id"}
+_DECISION_DISPOSITIONS = {"approve_exact", "decline", "request_revision"}
 _STATUS_ITEM_LIMIT = 100
 
 
@@ -288,7 +291,58 @@ class LocalApplicationFacade:
         return _result_projection(self._application.coordinator.process_input(document))
 
     def resolve_human_decision(self, response: Mapping[str, Any]) -> Mapping[str, Any]:
-        result = self._application.resolve_human_decision(response)
+        if not isinstance(response, Mapping):
+            raise LocalApplicationError(
+                "APPLICATION-DECISION-001", "Human Decision input must be an object"
+            )
+        response_value: Mapping[str, Any] = deepcopy(dict(response))
+        if "actor_id" in response_value:
+            if set(response_value) != _MINIMAL_DECISION_FIELDS:
+                raise LocalApplicationError(
+                    "APPLICATION-DECISION-001",
+                    "minimal Human Decision intent accepts only request_id, request_digest, disposition, and actor_id",
+                )
+            request_id = response_value.get("request_id")
+            supplied_digest = response_value.get("request_digest")
+            disposition = response_value.get("disposition")
+            actor_id = response_value.get("actor_id")
+            if not isinstance(request_id, str) or not request_id:
+                raise LocalApplicationError("APPLICATION-DECISION-001", "request_id is required")
+            if not isinstance(supplied_digest, str) or not supplied_digest:
+                raise LocalApplicationError("APPLICATION-DECISION-001", "request_digest is required")
+            if disposition not in _DECISION_DISPOSITIONS:
+                raise LocalApplicationError(
+                    "APPLICATION-DECISION-001", "unsupported Human Decision disposition"
+                )
+            if not isinstance(actor_id, str) or not actor_id:
+                raise LocalApplicationError(
+                    "APPLICATION-DECISION-001", "actor_id must be a non-empty string"
+                )
+            request = self._application.decision_store.get_request(request_id)
+            if request is None:
+                raise LocalApplicationError(
+                    "APPLICATION-DECISION-BINDING-001", "Human Decision Request does not resolve"
+                )
+            if str(request.get("request_digest")) != supplied_digest:
+                raise LocalApplicationError(
+                    "APPLICATION-DECISION-BINDING-001", "Human Decision Request digest mismatch"
+                )
+            if str(request.get("project_ref")) != self._project_id:
+                raise LocalApplicationError(
+                    "APPLICATION-DECISION-BINDING-001", "Human Decision Request belongs to another project"
+                )
+            if str(request.get("human_actor_id")) != actor_id:
+                raise LocalApplicationError(
+                    "APPLICATION-DECISION-BINDING-001", "Human Decision actor does not match request"
+                )
+            response_value = make_response(
+                request=request,
+                disposition=str(disposition),
+                actor_id=actor_id,
+                responded_at=self._application.clock.now(),
+            )
+
+        result = self._application.resolve_human_decision(response_value)
         return {
             "status": str(result.status),
             "request": _jsonable(result.request),
