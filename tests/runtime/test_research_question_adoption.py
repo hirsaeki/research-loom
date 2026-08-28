@@ -261,7 +261,7 @@ class ResearchQuestionAdoptionCliTests(unittest.TestCase):
                 "action", "submit", "--workspace", str(workspace), "--json", str(apply_file),
             ])
             self.assertEqual((code, apply["status"]), (0, "CONFIRMATION_REQUIRED"))
-            self.assertFalse(apply["action_receipt"]["research_state_mutation_performed"] if "action_receipt" in apply else False)
+            self.assertNotIn("action_receipt", apply)
 
             confirmation_file = _write_json(root / "confirmation.json", {
                 "confirmation_request_id": apply["confirmation_request"]["confirmation_request_id"],
