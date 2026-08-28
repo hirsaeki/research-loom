@@ -150,12 +150,13 @@ class ResearchQuestionProposeHandler:
                     if item.get("kind") == "research_question"
                     and item.get("id") == parent_question_id
                     and item.get("project_id") == state.project_ref
+                    and item.get("adoption_state") == "approved"
                 ),
                 None,
             )
             if parent is None:
                 raise ValueError(
-                    "parent_question_id must resolve to a current authoritative Research Question"
+                    "parent_question_id must resolve to a current authoritative approved Research Question"
                 )
 
         rq_id = self._ids.new("RQ-")
@@ -316,11 +317,19 @@ def _rq_proposal_payload(payload: Mapping[str, Any]) -> None:
     text = payload.get("text")
     if not isinstance(text, str) or not text.strip():
         raise ValueError("research_question.propose requires non-empty text")
-    for field in ("rationale", "parent_question_id"):
-        if field in payload and (
-            not isinstance(payload[field], str) or not str(payload[field]).strip()
-        ):
-            raise ValueError(f"{field} must be a non-empty string")
+    if "rationale" in payload and (
+        not isinstance(payload["rationale"], str) or not payload["rationale"].strip()
+    ):
+        raise ValueError("rationale must be a non-empty string")
+    if (
+        "parent_question_id" in payload
+        and payload["parent_question_id"] is not None
+        and (
+            not isinstance(payload["parent_question_id"], str)
+            or not payload["parent_question_id"].strip()
+        )
+    ):
+        raise ValueError("parent_question_id must be null or a non-empty string")
     for field in ("acceptance_criteria", "scope_limits", "derived_from_seed_ids"):
         if field not in payload:
             continue
