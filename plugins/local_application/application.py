@@ -20,7 +20,8 @@ from core.execution import (
 )
 from core.runtime import (
     CanonicalResearchObjectSchemaValidator, CapabilityNormalizationBoundary,
-    StateTransitionService,
+    ObjectRef, StateDeltaProposal, StateTransitionService, TransitionAction,
+    TransitionKind,
 )
 from core.runtime.ports import RepositoryError
 from plugins.desktop_research import (
@@ -119,6 +120,131 @@ class ResearchStatusHandler:
         )
 
 
+class ResearchQuestionProposeHandler:
+    """Materialize an untrusted typed RQ candidate without mutating Research State."""
+
+    def __init__(self, store, id_provider) -> None:
+        self._store = store
+        self._ids = id_provider
+
+    def execute(self, payload, *, state, actor, proposal):
+        derived_seed_ids = tuple(str(item) for item in payload.get("derived_from_seed_ids", ()))
+        configured_seeds = {
+            str(item["seed_id"])
+            for item in state.project_config.get("research_questions", {}).get("seeds", ())
+            if isinstance(item, Mapping) and item.get("seed_id")
+        }
+        unknown_seeds = sorted(set(derived_seed_ids) - configured_seeds)
+        if unknown_seeds:
+            raise ValueError(
+                "derived_from_seed_ids do not resolve in current Project Config: "
+                + ", ".join(unknown_seeds)
+            )
+
+        parent_question_id = payload.get("parent_question_id")
+        if parent_question_id is not None:
+            parent = next(
+                (
+                    item
+                    for item in state.effective_objects()
+                    if item.get("kind") == "research_question"
+                    and item.get("id") == parent_question_id
+                    and item.get("project_id") == state.project_ref
+                ),
+                None,
+            )
+            if parent is None:
+                raise ValueError(
+                    "parent_question_id must resolve to a current authoritative Research Question"
+                )
+
+        rq_id = self._ids.new("RQ-")
+        rq_candidate: dict[str, Any] = {
+            "schema_version": "0.1.0",
+            "id": rq_id,
+            "kind": "research_question",
+            "revision": 0,
+            "project_id": state.project_ref,
+            "text": str(payload["text"]),
+            "acceptance_criteria": list(payload.get("acceptance_criteria", ())),
+            "scope_limits": list(payload.get("scope_limits", ())),
+            "adoption_state": "approved",
+        }
+        if "rationale" in payload:
+            rq_candidate["rationale"] = str(payload["rationale"])
+        if parent_question_id is not None:
+            rq_candidate["parent_question_id"] = str(parent_question_id)
+
+        transition_action = TransitionAction(
+            TransitionKind.CREATE_OBJECT,
+            {"object": rq_candidate},
+            decision_refs=(),
+            source_refs=(),
+        )
+        provenance: dict[str, Any] = {
+            "producer": "research_question.propose@0.1.0",
+            "source_action_proposal": {
+                "proposal_id": str(proposal["proposal_id"]),
+                "proposal_digest": str(proposal["proposal_digest"]),
+            },
+            "source_input_id": str(proposal["source"]["input_id"]),
+            "project_config": {
+                "ref": state.project_config_ref,
+                "digest": state.project_config_digest,
+            },
+        }
+        if derived_seed_ids:
+            provenance["project_config_seed_ids"] = list(derived_seed_ids)
+
+        candidate = StateDeltaProposal(
+            proposal_id=self._ids.new("SDP-"),
+            project_ref=state.project_ref,
+            lineage_ref=state.lineage_ref,
+            source_refs=(),
+            proposed_actions=(transition_action,),
+            affected_refs=(ObjectRef("research_question", rq_id),),
+            rationale=str(
+                payload.get("rationale")
+                or "Research Question candidate proposed through bounded semantic ingress."
+            ),
+            required_human_decision_kinds=(),
+            current_snapshot_ref=str(state.current_snapshot["id"]),
+            current_snapshot_digest=str(state.current_snapshot["content_digest"]),
+            provenance=provenance,
+            candidate_only=True,
+        ).with_calculated_digest()
+        candidate_wire = {
+            "proposal_id": candidate.proposal_id,
+            "project_ref": candidate.project_ref,
+            "lineage_ref": candidate.lineage_ref,
+            "source_refs": list(candidate.source_refs),
+            "proposed_actions": [{
+                "kind": transition_action.kind.value,
+                "payload": deepcopy(dict(transition_action.payload)),
+                "decision_refs": list(transition_action.decision_refs),
+                "source_refs": list(transition_action.source_refs),
+            }],
+            "affected_refs": [{"kind": "research_question", "id": rq_id}],
+            "rationale": candidate.rationale,
+            "required_human_decision_kinds": list(candidate.required_human_decision_kinds),
+            "current_snapshot_ref": candidate.current_snapshot_ref,
+            "current_snapshot_digest": candidate.current_snapshot_digest,
+            "provenance": deepcopy(dict(candidate.provenance)),
+            "candidate_only": True,
+            "proposal_digest": candidate.proposal_digest,
+        }
+        self._store.store_state_delta_proposal(candidate.proposal_id, candidate_wire)
+        return HarnessServiceResult(
+            result_reference=candidate.proposal_id,
+            data={
+                "state_delta_proposal_id": candidate.proposal_id,
+                "research_question_candidate": deepcopy(rq_candidate),
+                "state_delta_proposal": deepcopy(candidate_wire),
+            },
+            research_state_mutation_performed=False,
+        )
+
+
 class RunAbortHandler:
     def __init__(self, execution_service) -> None:
         self._execution = execution_service
@@ -176,6 +302,38 @@ def _status_payload(payload: Mapping[str, Any]) -> None:
         raise ValueError("research.status payload is invalid")
 
 
+def _rq_proposal_payload(payload: Mapping[str, Any]) -> None:
+    allowed = {
+        "text", "rationale", "acceptance_criteria", "scope_limits",
+        "parent_question_id", "derived_from_seed_ids",
+    }
+    unknown = set(payload) - allowed
+    if unknown:
+        raise ValueError(
+            "research_question.propose payload contains unknown fields: "
+            + ", ".join(sorted(str(item) for item in unknown))
+        )
+    text = payload.get("text")
+    if not isinstance(text, str) or not text.strip():
+        raise ValueError("research_question.propose requires non-empty text")
+    for field in ("rationale", "parent_question_id"):
+        if field in payload and (
+            not isinstance(payload[field], str) or not str(payload[field]).strip()
+        ):
+            raise ValueError(f"{field} must be a non-empty string")
+    for field in ("acceptance_criteria", "scope_limits", "derived_from_seed_ids"):
+        if field not in payload:
+            continue
+        value = payload[field]
+        if not isinstance(value, list) or any(
+            not isinstance(item, str) or not item.strip() for item in value
+        ):
+            raise ValueError(f"{field} must be an array of non-empty strings")
+    seed_ids = payload.get("derived_from_seed_ids", ())
+    if len(seed_ids) != len(set(seed_ids)):
+        raise ValueError("derived_from_seed_ids must not contain duplicates")
+
+
 def _desktop_payload(payload: Mapping[str, Any]) -> None:
     allowed = {"question_id", "purpose", "resource_reference_ids", "coverage_dimensions", "desktop_policy"}
     if set(payload) - allowed or not isinstance(payload.get("question_id"), str) or not payload["question_id"]:
@@ -198,7 +356,7 @@ def _apply_payload(payload: Mapping[str, Any]) -> None:
 
 
 class LocalResearchApplication:
-    """Explicit production-local composition root for PR20-26."""
+    """Explicit production-local composition root for PR20-29."""
 
     def __init__(
         self,
@@ -287,6 +445,11 @@ class LocalResearchApplication:
             service_id="research.status", payload_validator=_status_payload,
         ))
         actions.register(ActionDefinition(
+            "research_question.propose", "research-question-proposal@0.1.0", "read_only", "harness_service", False,
+            human_decision_required=False, service_id="research_question.propose",
+            payload_validator=_rq_proposal_payload,
+        ))
+        actions.register(ActionDefinition(
             "desktop_research.investigate", "desktop-research-action@0.1.0", "read_only", "capability_invocation", False,
             capability_id="desktop-research", capability_version="0.1.0", function_id="investigate",
             execution_mode="real", materializer_id="desktop_research.investigate@0.1.0",
@@ -305,6 +468,10 @@ class LocalResearchApplication:
 
         services = HarnessServiceRegistry()
         services.register("research.status", ResearchStatusHandler(self.human_decisions))
+        services.register(
+            "research_question.propose",
+            ResearchQuestionProposeHandler(self.conversation_store, self.ids),
+        )
         services.register("run.abort", RunAbortHandler(self.capability_execution_service))
         services.register("state.apply_candidate", StateDeltaApplyHandler(self.conversation_store, self.human_decisions))
 
