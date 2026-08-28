@@ -147,6 +147,10 @@ class ResearchQuestionProposalTests(unittest.TestCase):
                 self.assertNotIn("source", kinds)
                 self.assertNotIn("evidence", kinds)
 
+                null_parent = facade.submit_action(_proposal_input(parent_question_id=None))
+                self.assertEqual(null_parent["status"], "SUCCEEDED")
+                self.assertNotIn("parent_question_id", null_parent["data"]["research_question_candidate"])
+
                 forbidden_fields = {
                     "id": "RQ-CALLER",
                     "project_id": facade.project_id,
@@ -169,12 +173,20 @@ class ResearchQuestionProposalTests(unittest.TestCase):
                     {"acceptance_criteria": [""]},
                     {"scope_limits": [1]},
                     {"derived_from_seed_ids": ["RQ-SEED-001", "RQ-SEED-001"]},
-                    {"derived_from_seed_ids": ["RQ-SEED-MISSING"]},
-                    {"parent_question_id": "RQ-MISSING"},
                 ]
                 for payload in invalid_payloads:
                     with self.subTest(payload=payload), self.assertRaises(LocalApplicationError):
                         facade.submit_action(_proposal_input(**payload))
+
+                for payload in (
+                    {"derived_from_seed_ids": ["RQ-SEED-MISSING"]},
+                    {"parent_question_id": "RQ-MISSING"},
+                ):
+                    with self.subTest(payload=payload):
+                        failed = facade.submit_action(_proposal_input(**payload))
+                        self.assertEqual(failed["status"], "FAILED")
+                        self.assertFalse(failed["action_receipt"]["research_state_mutation_performed"])
+                        self.assertEqual(before, facade.status()["snapshot"])
 
     def test_valid_authoritative_parent_is_accepted_after_adoption(self):
         with tempfile.TemporaryDirectory() as temp:
