@@ -163,6 +163,15 @@ def _rq_candidate(candidate: Mapping[str, Any]) -> tuple[Mapping[str, Any], Mapp
     return question, provenance
 
 
+def _question_revision(question: Mapping[str, Any], *, error_code: str) -> int:
+    try:
+        return int(question.get("revision", 0))
+    except (TypeError, ValueError) as exc:
+        raise ConversationRuntimeError(
+            error_code, "Research Question revision is missing or malformed"
+        ) from exc
+
+
 def _question_projection(
     question: Mapping[str, Any],
     *,
@@ -174,9 +183,10 @@ def _question_projection(
         raise ConversationRuntimeError(error_code, "Research Question id is missing or malformed")
     if not isinstance(text, str) or not text.strip():
         raise ConversationRuntimeError(error_code, "Research Question text is missing or malformed")
+    revision = _question_revision(question, error_code=error_code)
     result = {
         "id": question_id,
-        "revision": int(question.get("revision", 0)),
+        "revision": revision,
         "text": text,
         "acceptance_criteria": deepcopy(list(question.get("acceptance_criteria", ()))),
         "scope_limits": deepcopy(list(question.get("scope_limits", ()))),
@@ -194,6 +204,12 @@ def _project_projection(project_config: Mapping[str, Any], project_id: str) -> d
     scope = project_config.get("scope", {})
     if not isinstance(scope, Mapping):
         raise ConversationRuntimeError("RESUME-PROJECT-001", "Project Config scope section is malformed")
+    in_scope = scope.get("in_scope")
+    out_of_scope = scope.get("out_of_scope")
+    if not isinstance(in_scope, list) or not isinstance(out_of_scope, list):
+        raise ConversationRuntimeError(
+            "RESUME-PROJECT-001", "Project Config scope lists are missing or malformed"
+        )
     configured_project_id = project.get("project_id")
     title = project.get("title")
     if (
@@ -211,8 +227,8 @@ def _project_projection(project_config: Mapping[str, Any], project_id: str) -> d
         "title": title,
         "objective": deepcopy(project.get("objective")),
         "scope": {
-            "in_scope": deepcopy(list(scope.get("in_scope", ()))),
-            "out_of_scope": deepcopy(list(scope.get("out_of_scope", ()))),
+            "in_scope": deepcopy(in_scope),
+            "out_of_scope": deepcopy(out_of_scope),
         },
     }
 
@@ -266,7 +282,12 @@ def build_resume_context(
         for item in state.effective_objects()
         if item.get("kind") == "research_question" and item.get("project_id") == project_id
     ]
-    authoritative_all.sort(key=lambda item: (str(item.get("id", "")), int(item.get("revision", 0))))
+    authoritative_all.sort(
+        key=lambda item: (
+            str(item.get("id", "")),
+            _question_revision(item, error_code="RESUME-STATE-001"),
+        )
+    )
     authoritative_limit = _limit(effective_limits, "authoritative_research_questions")
     authoritative = [
         _question_projection(item, error_code="RESUME-STATE-001")
