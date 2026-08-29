@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from copy import deepcopy
 import json
 from pathlib import Path
 import sys
@@ -8,8 +9,10 @@ from typing import Any, Mapping
 
 from core.conversation import ConversationRuntimeError
 from core.decision import HumanDecisionError
+from plugins.local_application.application import ATTENTION_STORE_NAME
 from plugins.local_application.facade import LocalApplicationError, LocalApplicationFacade
 from plugins.local_application.workspace import LocalWorkspaceError
+from plugins.local_attention_store import LocalAttentionStoreError, validate_attention_store_schema
 
 
 def _emit(value: Mapping[str, Any]) -> None:
@@ -103,6 +106,28 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _doctor_with_optional_attention(workspace: str | Path) -> Mapping[str, Any]:
+    result = deepcopy(dict(LocalApplicationFacade.doctor_workspace(workspace)))
+    if result.get("status") != "OK":
+        return result
+    attention_path = Path(workspace).expanduser().resolve(strict=False) / ".research-loom" / ATTENTION_STORE_NAME
+    if not attention_path.exists():
+        result.setdefault("checks", []).append({
+            "check": "attention_store",
+            "status": "OK",
+            "mode": "baseline_only",
+        })
+        return result
+    try:
+        validate_attention_store_schema(attention_path)
+    except LocalAttentionStoreError as exc:
+        result["status"] = "ERROR"
+        result.setdefault("issues", []).append({"code": exc.code, "message": exc.message})
+        return result
+    result.setdefault("checks", []).append({"check": "attention_store", "status": "OK"})
+    return result
+
+
 def _run(args: argparse.Namespace) -> Mapping[str, Any]:
     if args.command == "init":
         return LocalApplicationFacade.initialize_workspace(
@@ -112,7 +137,7 @@ def _run(args: argparse.Namespace) -> Mapping[str, Any]:
         )
 
     if args.command == "doctor":
-        return LocalApplicationFacade.doctor_workspace(args.workspace)
+        return _doctor_with_optional_attention(args.workspace)
 
     with LocalApplicationFacade.open_workspace(args.workspace) as facade:
         if args.command == "status":
