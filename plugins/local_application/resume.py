@@ -78,10 +78,29 @@ def _status_projection(application, project_id: str) -> Mapping[str, Any]:
     }
 
 
+def _validated_limits(limits: Mapping[str, int] | None) -> dict[str, int]:
+    effective = dict(DEFAULT_RESUME_LIMITS)
+    if limits is None:
+        return effective
+    unknown = set(limits) - set(effective)
+    if unknown:
+        raise ValueError("unknown resume context limits: " + ", ".join(sorted(unknown)))
+    for key, raw_value in limits.items():
+        value = int(raw_value)
+        maximum = DEFAULT_RESUME_LIMITS[str(key)]
+        if value <= 0 or value > maximum:
+            raise ValueError(
+                f"resume context limit must be between 1 and {maximum}: {key}"
+            )
+        effective[str(key)] = value
+    return effective
+
+
 def _limit(limits: Mapping[str, int], key: str) -> int:
     value = int(limits[key])
-    if value <= 0:
-        raise ValueError(f"resume context limit must be positive: {key}")
+    maximum = DEFAULT_RESUME_LIMITS[key]
+    if value <= 0 or value > maximum:
+        raise ValueError(f"resume context limit must be between 1 and {maximum}: {key}")
     return value
 
 
@@ -144,11 +163,21 @@ def _rq_candidate(candidate: Mapping[str, Any]) -> tuple[Mapping[str, Any], Mapp
     return question, provenance
 
 
-def _question_projection(question: Mapping[str, Any]) -> dict[str, Any]:
+def _question_projection(
+    question: Mapping[str, Any],
+    *,
+    error_code: str,
+) -> dict[str, Any]:
+    question_id = question.get("id")
+    text = question.get("text")
+    if not isinstance(question_id, str) or not question_id.strip():
+        raise ConversationRuntimeError(error_code, "Research Question id is missing or malformed")
+    if not isinstance(text, str) or not text.strip():
+        raise ConversationRuntimeError(error_code, "Research Question text is missing or malformed")
     result = {
-        "id": str(question["id"]),
+        "id": question_id,
         "revision": int(question.get("revision", 0)),
-        "text": str(question["text"]),
+        "text": text,
         "acceptance_criteria": deepcopy(list(question.get("acceptance_criteria", ()))),
         "scope_limits": deepcopy(list(question.get("scope_limits", ()))),
     }
@@ -156,6 +185,36 @@ def _question_projection(question: Mapping[str, Any]) -> dict[str, Any]:
         if key in question:
             result[key] = deepcopy(question[key])
     return result
+
+
+def _project_projection(project_config: Mapping[str, Any], project_id: str) -> dict[str, Any]:
+    project = project_config.get("project")
+    if not isinstance(project, Mapping):
+        raise ConversationRuntimeError("RESUME-PROJECT-001", "Project Config project section is malformed")
+    scope = project_config.get("scope", {})
+    if not isinstance(scope, Mapping):
+        raise ConversationRuntimeError("RESUME-PROJECT-001", "Project Config scope section is malformed")
+    configured_project_id = project.get("project_id")
+    title = project.get("title")
+    if (
+        not isinstance(configured_project_id, str)
+        or not configured_project_id.strip()
+        or configured_project_id != project_id
+    ):
+        raise ConversationRuntimeError(
+            "RESUME-PROJECT-001", "Project Config project identity does not bind the requested project"
+        )
+    if not isinstance(title, str) or not title.strip():
+        raise ConversationRuntimeError("RESUME-PROJECT-001", "Project Config project title is missing")
+    return {
+        "project_id": configured_project_id,
+        "title": title,
+        "objective": deepcopy(project.get("objective")),
+        "scope": {
+            "in_scope": deepcopy(list(scope.get("in_scope", ()))),
+            "out_of_scope": deepcopy(list(scope.get("out_of_scope", ()))),
+        },
+    }
 
 
 def _run_projection(run) -> dict[str, Any]:
@@ -183,13 +242,8 @@ def build_resume_context(
     limits: Mapping[str, int] | None = None,
 ) -> Mapping[str, Any]:
     """Build one bounded read-only projection over existing production stores."""
+    effective_limits = _validated_limits(limits)
     status_projection = _status_projection(application, project_id)
-    effective_limits = dict(DEFAULT_RESUME_LIMITS)
-    if limits is not None:
-        unknown = set(limits) - set(effective_limits)
-        if unknown:
-            raise ValueError("unknown resume context limits: " + ", ".join(sorted(unknown)))
-        effective_limits.update({str(key): int(value) for key, value in limits.items()})
 
     repo = application.state_repository
     lineage_id = repo.load_active_lineage_ref(project_id)
@@ -205,12 +259,7 @@ def build_resume_context(
         )
 
     project_config = state.project_config
-    project = project_config.get("project")
-    if not isinstance(project, Mapping):
-        raise ConversationRuntimeError("RESUME-PROJECT-001", "Project Config project section is malformed")
-    scope = project_config.get("scope", {})
-    if not isinstance(scope, Mapping):
-        raise ConversationRuntimeError("RESUME-PROJECT-001", "Project Config scope section is malformed")
+    project_projection = _project_projection(project_config, project_id)
 
     authoritative_all = [
         item
@@ -219,7 +268,10 @@ def build_resume_context(
     ]
     authoritative_all.sort(key=lambda item: (str(item.get("id", "")), int(item.get("revision", 0))))
     authoritative_limit = _limit(effective_limits, "authoritative_research_questions")
-    authoritative = [_question_projection(item) for item in authoritative_all[:authoritative_limit]]
+    authoritative = [
+        _question_projection(item, error_code="RESUME-STATE-001")
+        for item in authoritative_all[:authoritative_limit]
+    ]
     authoritative_ids = {str(item["id"]) for item in authoritative_all}
 
     candidate_limit = _limit(effective_limits, "research_question_candidates")
@@ -323,7 +375,7 @@ def build_resume_context(
         candidate_output.append({
             "state_delta_proposal_id": candidate_id,
             "proposal_digest": str(candidate["proposal_digest"]),
-            "question": _question_projection(question),
+            "question": _question_projection(question, error_code="RESUME-CANDIDATE-001"),
             "bound_snapshot": {
                 "snapshot_id": str(candidate["current_snapshot_ref"]),
                 "content_digest": str(candidate["current_snapshot_digest"]),
@@ -341,9 +393,9 @@ def build_resume_context(
             "human_decision_requests": deepcopy(decisions_by_candidate.get(candidate_id, ())),
         })
 
+    attention_limit = _limit(effective_limits, "attention_maps")
     try:
         active, effective_attention = application.effective_attention.resolve(state)
-        attention_limit = _limit(effective_limits, "attention_maps")
         map_probe = attention_maps_for_project(
             application.attention_store,
             project_id,
@@ -404,15 +456,7 @@ def build_resume_context(
 
     return {
         "status": "OK",
-        "project": {
-            "project_id": str(project["project_id"]),
-            "title": str(project["title"]),
-            "objective": deepcopy(project.get("objective")),
-            "scope": {
-                "in_scope": deepcopy(list(scope.get("in_scope", ()))),
-                "out_of_scope": deepcopy(list(scope.get("out_of_scope", ()))),
-            },
-        },
+        "project": project_projection,
         "research_state": {
             "active_lineage": str(status_projection["active_lineage"]),
             "snapshot": deepcopy(status_projection["snapshot"]),
