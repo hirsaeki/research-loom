@@ -13,6 +13,7 @@ import unittest
 import rfc8785
 
 from core.conversation import ConversationRuntimeError
+from core.execution import CapabilityRunRecord, RunLifecycleEvent, RunStatus
 from plugins.local_application import LocalApplicationFacade
 
 
@@ -269,23 +270,54 @@ class ProductionResearchResumeContextTests(unittest.TestCase):
                     "payload": {"additions": [{"statement": "Never activated guidance."}]},
                 })["data"]["attention_map"]
 
-                prepared = facade.submit_action({
-                    "action_type": "desktop_research.investigate",
-                    "payload": {"question_id": rq_id, "purpose": "resume run visibility"},
-                    "actor_id": "HUMAN-RESUME",
-                })
-                run_id = prepared["run_id"]
-                before_abort = facade.resume_context()
-                self.assertEqual(before_abort["workflow"]["pending_runs"][0]["run_id"], run_id)
-                abort = facade.submit_action({
-                    "action_type": "run.abort",
-                    "payload": {"run_id": run_id, "reason": "test terminal projection"},
-                    "actor_id": "HUMAN-RESUME",
-                })
-                facade.submit_confirmation({
-                    "confirmation_request_id": abort["confirmation_request"]["confirmation_request_id"],
-                    "actor_id": "HUMAN-RESUME",
-                })
+                state = facade._application.state_repository.load_state_view(
+                    "PRJ-1",
+                    facade._application.state_repository.load_active_lineage_ref("PRJ-1"),
+                )
+                run_id = "RUN-RESUME-1"
+                running = CapabilityRunRecord(
+                    run_id=run_id,
+                    invocation_id="INV-RESUME-1",
+                    invocation_digest="sha256:" + "1" * 64,
+                    capability_id="desktop-research",
+                    capability_version="0.1.0",
+                    descriptor_digest="sha256:" + "2" * 64,
+                    implementation_id="desktop-research.external",
+                    implementation_version="0.1.0",
+                    function_id="investigate",
+                    execution_mode="real",
+                    context_pack_id="CTX-RESUME-1",
+                    context_pack_digest="sha256:" + "3" * 64,
+                    project_ref="PRJ-1",
+                    lineage_ref=state.active_lineage_ref,
+                    snapshot_ref=str(state.current_snapshot["id"]),
+                    snapshot_digest=str(state.current_snapshot["content_digest"]),
+                    attempt=1,
+                    parent_run_id=None,
+                    status=RunStatus.RUNNING,
+                    prepared_at="2026-08-29T16:00:00Z",
+                    started_at="2026-08-29T16:00:01Z",
+                )
+                facade._application.execution_store.create_run(running)
+                before_terminal = facade.resume_context()
+                self.assertEqual(before_terminal["workflow"]["pending_runs"][0]["run_id"], run_id)
+                aborted = running.with_status(
+                    RunStatus.ABORTED,
+                    completed_at="2026-08-29T16:00:02Z",
+                )
+                transitioned = facade._application.execution_store.transition_run(
+                    RunStatus.RUNNING,
+                    aborted,
+                    RunLifecycleEvent(
+                        run_id=run_id,
+                        sequence=1,
+                        from_status=RunStatus.RUNNING,
+                        to_status=RunStatus.ABORTED,
+                        occurred_at="2026-08-29T16:00:02Z",
+                        reason="resume projection fixture",
+                    ),
+                )
+                self.assertTrue(transitioned)
                 result = facade.resume_context()
 
             self.assertEqual(result["research_attention"]["active_map"]["map_id"], map_b["map_id"])
