@@ -33,11 +33,15 @@ class DesktopResearchConversationMaterializer:
         self,
         *,
         effective_profile_set_provider,
+        effective_attention_provider=None,
         resource_catalog: Mapping[str, Mapping[str, Any]] | None = None,
         resource_roles: Mapping[str, str] | None = None,
         context_limits: Mapping[str, int] | None = None,
     ) -> None:
         self._profiles = effective_profile_set_provider
+        self._attention = effective_attention_provider or (
+            lambda state: deepcopy(list(state.project_config.get("research_attention", ())))
+        )
         self._resources = dict(resource_catalog or {})
         self._roles = dict(resource_roles or {})
         limits = dict(_DEFAULT_CONTEXT_LIMITS)
@@ -94,7 +98,10 @@ class DesktopResearchConversationMaterializer:
             raise ConversationRuntimeError("CONV-PIN-001", "Effective Profile Set provider returned wrong pin")
         snapshot = state.current_snapshot
         project = state.project_config
-        attention = deepcopy(list(project.get("research_attention", ())))
+        attention = deepcopy(list(self._attention(state)))
+        attention_ids = [str(item.get("attention_id")) for item in attention if isinstance(item, Mapping)]
+        if len(attention_ids) != len(attention) or len(attention_ids) != len(set(attention_ids)):
+            raise ConversationRuntimeError("CONV-PIN-001", "Effective Research Attention IDs must be unique")
         guards = project.get("guards", project.get("project_guards", {}))
         if not isinstance(guards, Mapping):
             guards = {}
