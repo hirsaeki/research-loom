@@ -9,8 +9,8 @@ from typing import Any, Mapping
 
 from core.conversation import ConversationRuntimeError
 from core.decision import HumanDecisionError
+from plugins.local_application import LocalApplicationError, LocalApplicationFacade
 from plugins.local_application.application import ATTENTION_STORE_NAME
-from plugins.local_application.facade import LocalApplicationError, LocalApplicationFacade
 from plugins.local_application.workspace import LocalWorkspaceError
 from plugins.local_attention_store import LocalAttentionStoreError, validate_attention_store_schema
 
@@ -69,6 +69,10 @@ def build_parser() -> argparse.ArgumentParser:
     status = sub.add_parser("status")
     _add_workspace(status)
     _add_output_json(status)
+
+    resume = sub.add_parser("resume")
+    _add_workspace(resume)
+    _add_output_json(resume)
 
     doctor = sub.add_parser("doctor")
     _add_workspace(doctor)
@@ -142,6 +146,8 @@ def _run(args: argparse.Namespace) -> Mapping[str, Any]:
     with LocalApplicationFacade.open_workspace(args.workspace) as facade:
         if args.command == "status":
             return facade.status()
+        if args.command == "resume":
+            return facade.resume_context()
         if args.command == "actions":
             return facade.list_actions()
         if args.command == "action" and args.action_command == "submit":
