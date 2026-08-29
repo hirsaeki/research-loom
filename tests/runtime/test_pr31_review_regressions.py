@@ -31,11 +31,42 @@ class PR31ReviewRegressionTests(unittest.TestCase):
                 _project_projection(project_config, "PRJ-1")
             self.assertEqual(raised.exception.code, "RESUME-PROJECT-001")
 
+    def test_project_projection_fails_closed_on_non_list_scope_members(self):
+        project = {"project_id": "PRJ-1", "title": "Fixture"}
+        for scope in (
+            {"in_scope": "not-a-list", "out_of_scope": []},
+            {"in_scope": [], "out_of_scope": "not-a-list"},
+            {"in_scope": None, "out_of_scope": []},
+            {"in_scope": [], "out_of_scope": None},
+        ):
+            project_config = {"project": project, "scope": scope}
+            with self.subTest(scope=scope), self.assertRaises(ConversationRuntimeError) as raised:
+                _project_projection(project_config, "PRJ-1")
+            self.assertEqual(raised.exception.code, "RESUME-PROJECT-001")
+
+    def test_project_projection_preserves_valid_scope_lists(self):
+        project_config = {
+            "project": {"project_id": "PRJ-1", "title": "Fixture"},
+            "scope": {"in_scope": ["A"], "out_of_scope": ["B"]},
+        }
+        projected = _project_projection(project_config, "PRJ-1")
+        self.assertEqual(projected["scope"], {"in_scope": ["A"], "out_of_scope": ["B"]})
+
     def test_question_projection_converts_missing_identity_or_text_to_structured_error(self):
         for question in ({}, {"id": "RQ-1"}, {"text": "Question?"}):
             with self.subTest(question=question), self.assertRaises(ConversationRuntimeError) as raised:
                 _question_projection(question, error_code="RESUME-CANDIDATE-001")
             self.assertEqual(raised.exception.code, "RESUME-CANDIDATE-001")
+
+    def test_question_projection_converts_malformed_revision_to_requested_structured_error(self):
+        for error_code in ("RESUME-CANDIDATE-001", "RESUME-STATE-001"):
+            for revision in (None, "not-an-integer", [], {}):
+                question = {"id": "RQ-1", "text": "Question?", "revision": revision}
+                with self.subTest(error_code=error_code, revision=revision), self.assertRaises(
+                    ConversationRuntimeError
+                ) as raised:
+                    _question_projection(question, error_code=error_code)
+                self.assertEqual(raised.exception.code, error_code)
 
 
 if __name__ == "__main__":
