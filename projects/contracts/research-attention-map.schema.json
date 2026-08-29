@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:research-loom:projects:research-attention-map:0.1.0",
+  "title": "research-loom immutable Research Attention Map",
+  "description": "Project-local runtime guidance snapshot. It is not Core Research State, Evidence, a Research Question, Method authority, Publication authority, or Runtime Authorization.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "map_id", "project_id", "project_config", "base", "items", "provenance", "created_at", "map_digest"],
+  "properties": {
+    "schema_version": {"const": "0.1.0"},
+    "map_id": {"type": "string", "pattern": "^ATTMAP-[A-Za-z0-9._-]+$"},
+    "project_id": {"$ref": "#/$defs/identifier"},
+    "project_config": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ref", "digest"],
+      "properties": {
+        "ref": {"type": "string", "minLength": 1},
+        "digest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "base": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["source"],
+          "properties": {"source": {"const": "project_config_baseline"}}
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["source", "map_id", "map_digest"],
+          "properties": {
+            "source": {"const": "active_map"},
+            "map_id": {"type": "string", "pattern": "^ATTMAP-[A-Za-z0-9._-]+$"},
+            "map_digest": {"$ref": "#/$defs/digest"}
+          }
+        }
+      ]
+    },
+    "items": {"type": "array", "items": {"$ref": "#/$defs/attention_item"}},
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_action_proposal_id", "source_action_proposal_digest", "source_input_id"],
+      "properties": {
+        "source_action_proposal_id": {"$ref": "#/$defs/identifier"},
+        "source_action_proposal_digest": {"$ref": "#/$defs/digest"},
+        "source_input_id": {"$ref": "#/$defs/identifier"}
+      }
+    },
+    "created_at": {"type": "string", "format": "date-time"},
+    "map_digest": {"$ref": "#/$defs/digest"}
+  },
+  "$defs": {
+    "identifier": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"},
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "projection_hint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hint_type", "value", "normative"],
+      "properties": {
+        "hint_type": {"enum": ["provisional_outline", "publication_location", "primary_exposition_location", "literal_heading", "chapter_number"]},
+        "value": {"type": "string", "minLength": 1},
+        "normative": {"const": false}
+      }
+    },
+    "attention_item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attention_id", "statement", "disposition"],
+      "properties": {
+        "attention_id": {"$ref": "#/$defs/identifier"},
+        "statement": {"type": "string", "minLength": 1},
+        "rationale": {"type": "string"},
+        "source_reference_ids": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/identifier"}},
+        "related_question_ids": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/identifier"}},
+        "related_question_seed_ids": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/identifier"}},
+        "disposition": {"enum": ["active", "dropped", "out_of_scope"]},
+        "disposition_reason": {"type": "string", "minLength": 1},
+        "projection_hints": {"type": "array", "items": {"$ref": "#/$defs/projection_hint"}}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"disposition": {"enum": ["dropped", "out_of_scope"]}}, "required": ["disposition"]},
+          "then": {"required": ["disposition_reason"]}
+        }
+      ]
+    }
+  }
+}
