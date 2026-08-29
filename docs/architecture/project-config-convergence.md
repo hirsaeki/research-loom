@@ -83,6 +83,8 @@ Literal chapter/publication placement may be a hint       YES, normative=false o
 
 This contract permits a later Writer/Project projection to use provisional reader-routing information without turning chapter layout into research ownership, workflow order, or method authority.
 
+`research_attention` is the immutable Project Config baseline. A later active runtime Attention Map may supply the complete Effective Research Attention snapshot used by future research capability contexts without mutating Project Config or changing `configuration_digest`; runtime Attention Maps remain outside both Project Config and Core Research State.
+
 ## Resource and capability hints
 
 `resource_references` can identify project inputs or existing/planned Core Source/Artifact objects by locator/object ID. Reference registration does not qualify content as Evidence and does not grant runtime access.
