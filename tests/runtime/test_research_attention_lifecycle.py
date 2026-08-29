@@ -6,7 +6,7 @@ import tempfile
 import unittest
 
 from core.conversation import ConversationRuntimeError
-from plugins.local_application import LocalApplicationFacade, LocalResearchApplication
+from plugins.local_application import LocalApplicationError, LocalApplicationFacade, LocalResearchApplication
 from plugins.local_attention_store import attention_map_digest, validate_attention_store_schema
 from runtime_fixtures import project, rq, seed_state
 
@@ -182,8 +182,9 @@ class ResearchAttentionLifecycleTests(unittest.TestCase):
                     {"links": [{"attention_id": "ATT-BASE-1", "statement": "rewrite forbidden"}]},
                 ]
                 for payload in invalid_payloads:
-                    with self.assertRaises(ValueError):
+                    with self.assertRaises(LocalApplicationError) as invalid_payload:
                         facade.submit_action({"action_type": "research_attention.propose", "payload": payload})
+                    self.assertEqual(invalid_payload.exception.code, "APPLICATION-PAYLOAD-001")
 
                 for addition in (
                     {"statement": "bad source", "source_reference_ids": ["REF-UNKNOWN"]},
