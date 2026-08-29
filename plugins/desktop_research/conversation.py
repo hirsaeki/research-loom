@@ -99,9 +99,22 @@ class DesktopResearchConversationMaterializer:
         snapshot = state.current_snapshot
         project = state.project_config
         attention = deepcopy(list(self._attention(state)))
-        attention_ids = [str(item.get("attention_id")) for item in attention if isinstance(item, Mapping)]
-        if len(attention_ids) != len(attention) or len(attention_ids) != len(set(attention_ids)):
-            raise ConversationRuntimeError("CONV-PIN-001", "Effective Research Attention IDs must be unique")
+        attention_ids = []
+        for item in attention:
+            if not isinstance(item, Mapping):
+                raise ConversationRuntimeError(
+                    "CONV-PIN-001", "Effective Research Attention items must be mappings"
+                )
+            attention_id = item.get("attention_id")
+            if not isinstance(attention_id, str) or not attention_id.strip():
+                raise ConversationRuntimeError(
+                    "CONV-PIN-001", "Effective Research Attention IDs must be present and unique"
+                )
+            attention_ids.append(attention_id)
+        if len(attention_ids) != len(set(attention_ids)):
+            raise ConversationRuntimeError(
+                "CONV-PIN-001", "Effective Research Attention IDs must be present and unique"
+            )
         guards = project.get("guards", project.get("project_guards", {}))
         if not isinstance(guards, Mapping):
             guards = {}

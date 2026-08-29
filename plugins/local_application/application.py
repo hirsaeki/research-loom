@@ -274,11 +274,17 @@ class EffectiveResearchAttentionProvider:
             )
         return active
 
-    def __call__(self, state):
+    def resolve(self, state):
         active = self.active(state)
-        if active is None:
-            return deepcopy(list(state.project_config.get("research_attention", ())))
-        return deepcopy(list(active["map"]["items"]))
+        source_items = (
+            active["map"]["items"]
+            if active is not None
+            else state.project_config.get("research_attention", ())
+        )
+        return active, deepcopy(list(source_items))
+
+    def __call__(self, state):
+        return self.resolve(state)[1]
 
 
 class ResearchAttentionStatusHandler:
@@ -286,7 +292,7 @@ class ResearchAttentionStatusHandler:
         self._effective = effective_attention
 
     def execute(self, payload, *, state, actor, proposal):
-        active = self._effective.active(state)
+        active, effective_attention = self._effective.resolve(state)
         return HarnessServiceResult(
             result_reference=(str(active["map_id"]) if active is not None else state.project_config_ref),
             data={
@@ -302,7 +308,7 @@ class ResearchAttentionStatusHandler:
                     }
                     if active is not None else None
                 ),
-                "effective_attention": self._effective(state),
+                "effective_attention": effective_attention,
             },
             research_state_mutation_performed=False,
         )
@@ -365,8 +371,8 @@ class ResearchAttentionProposeHandler:
         self._clock = clock
 
     def execute(self, payload, *, state, actor, proposal):
-        active = self._effective.active(state)
-        items = [deepcopy(dict(item)) for item in self._effective(state)]
+        active, effective_items = self._effective.resolve(state)
+        items = [deepcopy(dict(item)) for item in effective_items]
         by_id = {str(item["attention_id"]): item for item in items}
 
         for addition in payload.get("additions", ()):

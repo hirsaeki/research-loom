@@ -182,7 +182,7 @@ class ResearchAttentionLifecycleTests(unittest.TestCase):
                     {"links": [{"attention_id": "ATT-BASE-1", "statement": "rewrite forbidden"}]},
                 ]
                 for payload in invalid_payloads:
-                    with self.assertRaises(Exception):
+                    with self.assertRaises(ValueError):
                         facade.submit_action({"action_type": "research_attention.propose", "payload": payload})
 
                 for addition in (

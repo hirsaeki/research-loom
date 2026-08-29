@@ -91,6 +91,46 @@ CREATE TABLE IF NOT EXISTS active_attention_map (
 """
 
 
+_REQUIRED_COLUMNS = {
+    "attention_store_meta": {
+        "schema_version": ("TEXT", 0, 1),
+    },
+    "attention_maps": {
+        "map_id": ("TEXT", 0, 1),
+        "project_id": ("TEXT", 1, 0),
+        "map_digest": ("TEXT", 1, 0),
+        "document_json": ("TEXT", 1, 0),
+    },
+    "attention_activation_events": {
+        "activation_id": ("TEXT", 0, 1),
+        "project_id": ("TEXT", 1, 0),
+        "map_id": ("TEXT", 1, 0),
+        "map_digest": ("TEXT", 1, 0),
+        "activated_at": ("TEXT", 1, 0),
+        "event_digest": ("TEXT", 1, 0),
+        "document_json": ("TEXT", 1, 0),
+    },
+    "active_attention_map": {
+        "project_id": ("TEXT", 0, 1),
+        "map_id": ("TEXT", 1, 0),
+        "map_digest": ("TEXT", 1, 0),
+        "activation_id": ("TEXT", 1, 0),
+    },
+}
+
+_REQUIRED_FOREIGN_KEYS = {
+    "attention_store_meta": set(),
+    "attention_maps": set(),
+    "attention_activation_events": {
+        ("map_id", "attention_maps", "map_id"),
+    },
+    "active_attention_map": {
+        ("map_id", "attention_maps", "map_id"),
+        ("activation_id", "attention_activation_events", "activation_id"),
+    },
+}
+
+
 def _read_schema_version(connection: sqlite3.Connection) -> str:
     try:
         row = connection.execute(
@@ -105,6 +145,35 @@ def _read_schema_version(connection: sqlite3.Connection) -> str:
             "ATTENTION-STORE-SCHEMA-001", "Attention store schema version is incompatible"
         )
     return str(row[0])
+
+
+def _validate_schema_shape(connection: sqlite3.Connection) -> None:
+    for table, expected_columns in _REQUIRED_COLUMNS.items():
+        actual_columns = {
+            str(row[1]): (str(row[2]).upper(), int(row[3]), int(row[5]))
+            for row in connection.execute(f"PRAGMA table_info({table})")
+        }
+        if actual_columns != expected_columns:
+            raise LocalAttentionStoreError(
+                "ATTENTION-STORE-SCHEMA-001",
+                f"Attention store table has incompatible columns: {table}",
+            )
+
+        actual_foreign_keys = {
+            (str(row[3]), str(row[2]), str(row[4]))
+            for row in connection.execute(f"PRAGMA foreign_key_list({table})")
+        }
+        if actual_foreign_keys != _REQUIRED_FOREIGN_KEYS[table]:
+            raise LocalAttentionStoreError(
+                "ATTENTION-STORE-SCHEMA-001",
+                f"Attention store table has incompatible foreign keys: {table}",
+            )
+
+    if connection.execute("PRAGMA foreign_key_check").fetchone() is not None:
+        raise LocalAttentionStoreError(
+            "ATTENTION-STORE-SCHEMA-001",
+            "Attention store contains rows that violate required foreign keys",
+        )
 
 
 def validate_attention_store_schema(path: str | Path) -> None:
@@ -122,12 +191,7 @@ def validate_attention_store_schema(path: str | Path) -> None:
                     "ATTENTION-STORE-DB-001", "Attention store SQLite quick_check failed"
                 )
             _read_schema_version(connection)
-            required = {
-                "attention_store_meta",
-                "attention_maps",
-                "attention_activation_events",
-                "active_attention_map",
-            }
+            required = set(_REQUIRED_COLUMNS)
             present = {
                 str(row[0])
                 for row in connection.execute(
@@ -138,6 +202,7 @@ def validate_attention_store_schema(path: str | Path) -> None:
                 raise LocalAttentionStoreError(
                     "ATTENTION-STORE-SCHEMA-001", "Attention store tables are incomplete"
                 )
+            _validate_schema_shape(connection)
         finally:
             connection.close()
     except LocalAttentionStoreError:
