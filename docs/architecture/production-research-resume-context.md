@@ -63,13 +63,14 @@ Resume context uses fixed production bounds. The defaults are intentionally smal
 | authoritative Research Questions | 100 |
 | Research Question candidates | 100 |
 | Attention Maps | 50 |
+| activation references per stored Attention Map | 100 |
 | pending Human Decisions | 100 |
 | Human Decision history used for candidate correlation | 100 |
 | pending Confirmations | 100 |
 | pending Runs | 100 |
 | recent terminal Runs | 20 |
 
-Tests may inject smaller internal limits. There is no generic pagination or query framework.
+Tests may inject smaller internal limits. There is no generic pagination or query framework. `pending_confirmations` and `pending_runs` use the same bounded override mechanism as the other public resume collections; the per-map activation-reference bound remains an internal production bound rather than a new query framework.
 
 The Conversation Store keeps its existing `state_delta_proposals(proposal_id, payload_json)` schema. Project-scoped candidate listing uses SQLite JSON reads against the existing payload; there is no column addition, workspace-version bump, or migration. The same rule applies to the other stores: PR31 adds read helpers only.
 
@@ -97,7 +98,7 @@ no active map  → effective = Project Config baseline
 active map     → effective = active map items
 ```
 
-Stored maps are listed separately. Their activation facts are derived from existing activation events and the active pointer. An inactive stored map with activation references is historical; one with no activation references has never been activated. No new workflow state is persisted.
+Stored maps are listed separately. Their activation facts are derived from existing activation events and the active pointer. An inactive stored map with activation references is historical; one with no activation references has never been activated. Activation references are bounded per map and expose `activation_ids_truncated`; the aggregate `truncated.attention_activation_events` flag reports whether any returned stored-map history was cut off. The active pointer is also checked against its persisted activation event before it is projected. No new workflow state is persisted.
 
 Opening an older workspace with no Attention Store remains read-only. `resume` must not create `attention.sqlite3`; it returns baseline-only Attention and an empty stored-map list.
 
