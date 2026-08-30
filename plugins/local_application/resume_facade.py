@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, Mapping
 
 from plugins.local_application.facade import LocalApplicationFacade as _BaseLocalApplicationFacade
-from plugins.local_application.resume import build_resume_context
+from plugins.local_application.research_question_batch_resume import build_resume_context
 
 
 class LocalApplicationFacade(_BaseLocalApplicationFacade):
