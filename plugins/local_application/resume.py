@@ -5,7 +5,7 @@ from typing import Any, Mapping
 
 from core.conversation import ConversationRuntimeError
 from core.conversation.validation import WorkConversationValidator
-from plugins.local_attention_resume import attention_maps_for_project
+from plugins.local_attention_resume import attention_maps_for_project, validate_active_attention_binding
 from plugins.local_conversation_store.resume import research_question_candidates_for_project
 from plugins.local_decision_store.resume import decision_requests_for_project
 from plugins.local_execution_store.status import pending_runs_for_project, recent_runs_for_project
@@ -16,28 +16,40 @@ DEFAULT_RESUME_LIMITS = {
     "research_question_candidates": 100,
     "attention_maps": 50,
     "human_decision_requests": 100,
+    "pending_confirmations": 100,
     "pending_human_decisions": 100,
+    "pending_runs": 100,
     "recent_runs": 20,
 }
 _CONVERSATION_VALIDATOR = WorkConversationValidator()
 _STATUS_ITEM_LIMIT = 100
+_ATTENTION_ACTIVATION_ITEM_LIMIT = 100
 
 
-def _status_projection(application, project_id: str) -> Mapping[str, Any]:
+def _status_projection(
+    application,
+    project_id: str,
+    *,
+    pending_confirmation_limit: int = _STATUS_ITEM_LIMIT,
+    pending_run_limit: int = _STATUS_ITEM_LIMIT,
+) -> Mapping[str, Any]:
     repo = application.state_repository
     lineage_id = repo.load_active_lineage_ref(project_id)
     state = repo.load_state_view(project_id, lineage_id)
-    probe_limit = _STATUS_ITEM_LIMIT + 1
     confirmations = application.conversation_store.list_pending_confirmation_requests(
-        project_id, limit=probe_limit
+        project_id, limit=pending_confirmation_limit + 1
     )
     decisions = decision_requests_for_project(
         application.decision_store,
         project_id,
-        limit=probe_limit,
+        limit=_STATUS_ITEM_LIMIT + 1,
         statuses=("PENDING", "RESOLVING"),
     )
-    runs = pending_runs_for_project(application.execution_store, project_id, limit=probe_limit)
+    runs = pending_runs_for_project(
+        application.execution_store,
+        project_id,
+        limit=pending_run_limit + 1,
+    )
     snapshot = state.current_snapshot
     return {
         "status": "OK",
@@ -55,7 +67,7 @@ def _status_projection(application, project_id: str) -> Mapping[str, Any]:
                 "digest": state.effective_profile_set_digest,
             },
         },
-        "pending_confirmations": deepcopy(list(confirmations[:_STATUS_ITEM_LIMIT])),
+        "pending_confirmations": deepcopy(list(confirmations[:pending_confirmation_limit])),
         "pending_human_decisions": deepcopy(list(decisions[:_STATUS_ITEM_LIMIT])),
         "pending_runs": [
             {
@@ -68,12 +80,12 @@ def _status_projection(application, project_id: str) -> Mapping[str, Any]:
                 "snapshot_ref": run.snapshot_ref,
                 "snapshot_digest": run.snapshot_digest,
             }
-            for run in runs[:_STATUS_ITEM_LIMIT]
+            for run in runs[:pending_run_limit]
         ],
         "truncated": {
-            "pending_confirmations": len(confirmations) > _STATUS_ITEM_LIMIT,
+            "pending_confirmations": len(confirmations) > pending_confirmation_limit,
             "pending_human_decisions": len(decisions) > _STATUS_ITEM_LIMIT,
-            "pending_runs": len(runs) > _STATUS_ITEM_LIMIT,
+            "pending_runs": len(runs) > pending_run_limit,
         },
     }
 
@@ -133,6 +145,17 @@ def _rq_candidate(candidate: Mapping[str, Any]) -> tuple[Mapping[str, Any], Mapp
     provenance = candidate.get("provenance")
     if not isinstance(provenance, Mapping) or provenance.get("producer") != "research_question.propose@0.1.0":
         return None
+    snapshot_ref = candidate.get("current_snapshot_ref")
+    snapshot_digest = candidate.get("current_snapshot_digest")
+    if (
+        not isinstance(snapshot_ref, str)
+        or not snapshot_ref
+        or not isinstance(snapshot_digest, str)
+        or not snapshot_digest
+    ):
+        raise ConversationRuntimeError(
+            "RESUME-CANDIDATE-001", "RQ candidate snapshot binding is missing or malformed"
+        )
     actions = candidate.get("proposed_actions")
     affected = candidate.get("affected_refs")
     if not isinstance(actions, list) or not isinstance(affected, list):
@@ -168,12 +191,12 @@ def _question_revision(question: Mapping[str, Any], *, error_code: str) -> int:
         raise ConversationRuntimeError(
             error_code, "Research Question revision is missing or malformed"
         )
-    try:
-        return int(question["revision"])
-    except (TypeError, ValueError) as exc:
+    revision = question["revision"]
+    if type(revision) is not int or revision < 0:
         raise ConversationRuntimeError(
             error_code, "Research Question revision is missing or malformed"
-        ) from exc
+        )
+    return revision
 
 
 def _question_projection(
@@ -263,7 +286,14 @@ def build_resume_context(
 ) -> Mapping[str, Any]:
     """Build one bounded read-only projection over existing production stores."""
     effective_limits = _validated_limits(limits)
-    status_projection = _status_projection(application, project_id)
+    pending_confirmation_limit = _limit(effective_limits, "pending_confirmations")
+    pending_run_limit = _limit(effective_limits, "pending_runs")
+    status_projection = _status_projection(
+        application,
+        project_id,
+        pending_confirmation_limit=pending_confirmation_limit,
+        pending_run_limit=pending_run_limit,
+    )
 
     repo = application.state_repository
     lineage_id = repo.load_active_lineage_ref(project_id)
@@ -397,17 +427,19 @@ def build_resume_context(
                     raise ConversationRuntimeError(
                         "RESUME-BINDING-001", "Human Decision Request candidate digest binding is invalid"
                     )
+        snapshot_ref = str(candidate["current_snapshot_ref"])
+        snapshot_digest = str(candidate["current_snapshot_digest"])
         candidate_output.append({
             "state_delta_proposal_id": candidate_id,
             "proposal_digest": str(candidate["proposal_digest"]),
             "question": _question_projection(question, error_code="RESUME-CANDIDATE-001"),
             "bound_snapshot": {
-                "snapshot_id": str(candidate["current_snapshot_ref"]),
-                "content_digest": str(candidate["current_snapshot_digest"]),
+                "snapshot_id": snapshot_ref,
+                "content_digest": snapshot_digest,
             },
             "bound_to_current_snapshot": (
-                str(candidate["current_snapshot_ref"]) == str(state.current_snapshot["id"])
-                and str(candidate["current_snapshot_digest"]) == str(state.current_snapshot["content_digest"])
+                snapshot_ref == str(state.current_snapshot["id"])
+                and snapshot_digest == str(state.current_snapshot["content_digest"])
             ),
             "authoritative_same_id": str(question["id"]) in authoritative_ids,
             "source_action_proposal": {
@@ -419,13 +451,21 @@ def build_resume_context(
         })
 
     attention_limit = _limit(effective_limits, "attention_maps")
+    active_activation_id = None
     try:
         active, effective_attention = application.effective_attention.resolve(state)
         map_probe = attention_maps_for_project(
             application.attention_store,
             project_id,
             limit=attention_limit + 1,
+            activation_limit=_ATTENTION_ACTIVATION_ITEM_LIMIT,
         )
+        if active is not None:
+            active_activation_id = validate_active_attention_binding(
+                application.attention_store,
+                project_id,
+                active,
+            )
     except Exception as exc:
         if isinstance(exc, ConversationRuntimeError):
             raise
@@ -435,8 +475,11 @@ def build_resume_context(
     maps_truncated = len(map_probe) > attention_limit
     stored_maps = []
     active_map_id = str(active["map_id"]) if active is not None else None
+    activation_events_truncated = False
     for stored in map_probe[:attention_limit]:
         document = stored["map"]
+        stored_activation_truncated = bool(stored.get("activation_ids_truncated", False))
+        activation_events_truncated = activation_events_truncated or stored_activation_truncated
         stored_maps.append({
             "map_id": str(document["map_id"]),
             "map_digest": str(document["map_digest"]),
@@ -444,6 +487,7 @@ def build_resume_context(
             "activation": {
                 "is_active": str(document["map_id"]) == active_map_id,
                 "activation_ids": deepcopy(list(stored["activation_ids"])),
+                "activation_ids_truncated": stored_activation_truncated,
             },
             "base": deepcopy(document["base"]),
             "items": deepcopy(list(document["items"])),
@@ -455,7 +499,7 @@ def build_resume_context(
         active_projection = {
             "map_id": str(active["map_id"]),
             "map_digest": str(active["map_digest"]),
-            "activation_id": str(active["activation_id"]),
+            "activation_id": str(active_activation_id),
             "created_at": str(active_document["created_at"]),
             "base": deepcopy(active_document["base"]),
             "items": deepcopy(list(active_document["items"])),
@@ -474,6 +518,7 @@ def build_resume_context(
         "authoritative_research_questions": len(authoritative_all) > authoritative_limit,
         "research_question_candidates": candidates_truncated,
         "attention_maps": maps_truncated,
+        "attention_activation_events": activation_events_truncated,
         "human_decision_requests": decisions_truncated,
         "pending_human_decisions": pending_decisions_truncated,
         "recent_runs": recent_truncated,
