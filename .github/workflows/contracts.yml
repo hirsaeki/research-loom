@@ -37,13 +37,14 @@ jobs:
         shell: bash
         run: |
           set +e
-          ./research-loom invalid-command > launcher.json
+          ./research-loom invalid-command > launcher.stdout 2> launcher.stderr
           launcher_exit=$?
-          uv run --frozen python research-loom invalid-command > direct.json
+          uv run --frozen python research-loom invalid-command > direct.stdout 2> direct.stderr
           direct_exit=$?
           set -e
           test "$launcher_exit" -eq "$direct_exit"
-          cmp launcher.json direct.json
+          cmp launcher.stdout direct.stdout
+          cmp launcher.stderr direct.stderr
       - name: Run canonical contract tests
         run: uv run --frozen python -m unittest discover -s tests/contracts -p 'test_*.py' -v
       - name: Run Research State runtime tests
