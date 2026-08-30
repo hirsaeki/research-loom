@@ -12,9 +12,15 @@ WINDOWS_LAUNCHER = ROOT / "research-loom.cmd"
 
 class RepositoryLauncherContractTests(unittest.TestCase):
     def test_posix_launcher_owns_frozen_uv_execution(self):
-        lines = POSIX_LAUNCHER.read_text(encoding="utf-8").splitlines()
-        self.assertEqual(lines[0], "#!/usr/bin/env -S uv run --frozen python")
-        self.assertNotIn("# /// script", POSIX_LAUNCHER.read_text(encoding="utf-8"))
+        text = POSIX_LAUNCHER.read_text(encoding="utf-8")
+        lines = text.splitlines()
+        self.assertEqual(lines[0], "#!/bin/sh")
+        self.assertEqual(lines[1], "'''exec' uv run --frozen python \"$0\" \"$@\"")
+        self.assertEqual(lines[2], "' '''")
+        self.assertNotIn("/usr/bin/env -S", text)
+        self.assertNotIn("# /// script", text)
+        self.assertNotIn("uv sync", text)
+        compile(text, str(POSIX_LAUNCHER), "exec")
         if os.name != "nt":
             self.assertTrue(os.access(POSIX_LAUNCHER, os.X_OK))
 
