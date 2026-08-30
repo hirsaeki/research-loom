@@ -18,6 +18,42 @@ _DEFAULT_CONTEXT_LIMITS = {
     "max_effective_constraints": 128,
 }
 
+_PROFILE_PIN_FIELDS = (
+    "profile_id",
+    "profile_type",
+    "profile_version",
+    "manifest_sha256",
+)
+
+
+def _desktop_profile_set_pin(effective: Mapping[str, Any], expected_digest: str) -> dict[str, Any]:
+    if effective.get("content_digest") != expected_digest:
+        raise ConversationRuntimeError("CONV-PIN-001", "Effective Profile Set provider returned wrong pin")
+
+    profiles = effective.get("profile_pins")
+    if profiles is None:
+        profiles = effective.get("effective_profiles")
+    if not isinstance(profiles, list):
+        raise ConversationRuntimeError(
+            "CONV-PIN-001", "Effective Profile Set provider returned no projectable profile pins"
+        )
+
+    try:
+        profile_pins = [
+            {field: deepcopy(profile[field]) for field in _PROFILE_PIN_FIELDS}
+            for profile in profiles
+        ]
+        return {
+            "schema_version": deepcopy(effective["schema_version"]),
+            "core_contracts": deepcopy(effective["core_contracts"]),
+            "profile_pins": profile_pins,
+            "content_digest": expected_digest,
+        }
+    except (KeyError, TypeError) as exc:
+        raise ConversationRuntimeError(
+            "CONV-PIN-001", "Effective Profile Set provider returned malformed profile pin material"
+        ) from exc
+
 
 class DesktopResearchConversationMaterializer:
     """PR25 adapter from a typed Desktop action to PR9 + PR11 bounded context.
@@ -93,9 +129,8 @@ class DesktopResearchConversationMaterializer:
                 )
             role_bindings.append({"reference_id": item, "role": role})
 
-        effective = deepcopy(dict(self._profiles(state.project_ref, state.effective_profile_set_digest)))
-        if effective.get("content_digest") != state.effective_profile_set_digest:
-            raise ConversationRuntimeError("CONV-PIN-001", "Effective Profile Set provider returned wrong pin")
+        effective_profile_set = deepcopy(dict(self._profiles(state.project_ref, state.effective_profile_set_digest)))
+        effective = _desktop_profile_set_pin(effective_profile_set, state.effective_profile_set_digest)
         snapshot = state.current_snapshot
         project = state.project_config
         attention = deepcopy(list(self._attention(state)))
