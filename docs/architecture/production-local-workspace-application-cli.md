@@ -134,25 +134,47 @@ The CLI/facade does not add a search engine, browser provider, or LLM provider. 
 
 ## JSON CLI
 
-The first concrete facade adapter is a structured CLI, not a REPL/TUI. The canonical developer/operator path is repository-level `uv` execution so the same root dependency declaration and lockfile are used locally and in CI:
+The first concrete facade adapter is a structured CLI, not a REPL/TUI. Root `pyproject.toml` and `uv.lock` remain the single repository/application dependency contract. Normal operator use goes through the repository launchers, which always enter `uv run --frozen` and do not define a second dependency environment.
 
-```bash
-uv sync --frozen
-uv run --frozen python research-loom init --workspace PATH --project-config FILE --effective-profile-set FILE --json
-uv run --frozen python research-loom status --workspace PATH --json
-uv run --frozen python research-loom doctor --workspace PATH --json
-uv run --frozen python research-loom actions --workspace PATH --json
-uv run --frozen python research-loom action submit --workspace PATH --json -
-uv run --frozen python research-loom confirmation submit --workspace PATH --json -
-uv run --frozen python research-loom decision resolve --workspace PATH --json -
-uv run --frozen python research-loom external collect --workspace PATH --run-id RUN-ID --json -
+Windows / PowerShell:
+
+```powershell
+.\research-loom.cmd init --workspace PATH --project-config FILE --effective-profile-set FILE --json
+.\research-loom.cmd status --workspace PATH --json
+.\research-loom.cmd resume --workspace PATH --json
+.\research-loom.cmd doctor --workspace PATH --json
+.\research-loom.cmd actions --workspace PATH --json
+.\research-loom.cmd action submit --workspace PATH --json INPUT.json
+.\research-loom.cmd confirmation submit --workspace PATH --json INPUT.json
+.\research-loom.cmd decision resolve --workspace PATH --json INPUT.json
+.\research-loom.cmd external collect --workspace PATH --run-id RUN-ID --json INPUT.json
 ```
 
-Research Loom requires Python 3.12+. Root `pyproject.toml` and `uv.lock` own the repository/application dependency contract. The CLI does not run `pip install`, `uv sync`, or any other dependency bootstrap internally.
+POSIX:
 
-Direct `python research-loom ...` or `python -m plugins.local_application.cli ...` execution is equivalent only when the dependency environment has already been prepared. In that alternate mode, dependency consistency is the operator's responsibility. The `uv run --frozen python research-loom ...` form is cross-platform and is the canonical form for fresh checkouts, including PowerShell.
+```bash
+./research-loom init --workspace PATH --project-config FILE --effective-profile-set FILE --json
+./research-loom status --workspace PATH --json
+./research-loom resume --workspace PATH --json
+./research-loom doctor --workspace PATH --json
+./research-loom actions --workspace PATH --json
+./research-loom action submit --workspace PATH --json INPUT.json
+./research-loom confirmation submit --workspace PATH --json INPUT.json
+./research-loom decision resolve --workspace PATH --json INPUT.json
+./research-loom external collect --workspace PATH --run-id RUN-ID --json INPUT.json
+```
 
-stdout is always one JSON document. Workflow states such as `CONFIRMATION_REQUIRED`, `HUMAN_DECISION_REQUIRED`, and `CAPABILITY_EXECUTION_PREPARED` are successful command processing and therefore exit 0. Malformed input, binding/integrity failures, validation failures, and unexpected application errors return structured issues and a non-zero process exit.
+Research Loom requires Python 3.12+ and `uv` on `PATH`. The launchers do not install, download, bootstrap, or upgrade `uv`; they do not run an explicit `uv sync`; and they do not fall back to system Python, an active virtual environment, Conda, a repository `.venv`, or another interpreter when `uv` is unavailable. Structured production input should be supplied through a UTF-8 JSON file rather than relying on stdin in Work command environments.
+
+The explicit developer/debug invocation remains supported:
+
+```bash
+uv run --frozen python research-loom status --workspace PATH --json
+```
+
+That direct form and the repository launchers reach the same CLI and Application Facade. No `[project.scripts]`, package installation, PEP 723 metadata, script-specific dependency list, or script-specific lockfile is introduced.
+
+stdout is always one JSON document. Workflow states such as `CONFIRMATION_REQUIRED`, `HUMAN_DECISION_REQUIRED`, and `CAPABILITY_EXECUTION_PREPARED` are successful command processing and therefore exit 0. Malformed input, binding/integrity failures, validation failures, and unexpected application errors return structured issues and a non-zero process exit. Repository launchers preserve the underlying CLI exit code and do not add wrapper text to stdout or stderr.
 
 ## ChatGPT Work and future transports
 

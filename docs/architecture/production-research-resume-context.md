@@ -26,10 +26,20 @@ Use the transport-neutral application method:
 facade.resume_context()
 ```
 
-or the production JSON CLI:
+or the production repository launcher.
 
-```text
-uv run --frozen python research-loom resume \
+Windows / PowerShell:
+
+```powershell
+.\research-loom.cmd resume `
+  --workspace <WORKSPACE> `
+  --json
+```
+
+POSIX:
+
+```bash
+./research-loom resume \
   --workspace <WORKSPACE> \
   --json
 ```
@@ -114,7 +124,12 @@ The Harness does not generate natural-language conclusions such as “the resear
 
 ## Operator guidance
 
-When resuming a Research Loom conversation, use the public resume context as the primary source of research progress.
+When resuming a Research Loom conversation, use the public resume context as the primary source of research progress. Use the repository launcher rather than selecting a Python environment directly:
+
+```text
+Windows: .\research-loom.cmd resume --workspace <WORKSPACE> --json
+POSIX:   ./research-loom resume --workspace <WORKSPACE> --json
+```
 
 Do not reconstruct ordinary research progress from Git state or history, Codex or ChatGPT memory, prior conversation threads, raw SQLite, or repository implementation unless `resume` fails, reports an inconsistency, or the human explicitly asks for diagnosis. Raw SQLite inspection remains appropriate for corruption investigation and explicit developer debugging, not normal resume behavior.
 
