@@ -164,8 +164,12 @@ def _rq_candidate(candidate: Mapping[str, Any]) -> tuple[Mapping[str, Any], Mapp
 
 
 def _question_revision(question: Mapping[str, Any], *, error_code: str) -> int:
+    if "revision" not in question:
+        raise ConversationRuntimeError(
+            error_code, "Research Question revision is missing or malformed"
+        )
     try:
-        return int(question.get("revision", 0))
+        return int(question["revision"])
     except (TypeError, ValueError) as exc:
         raise ConversationRuntimeError(
             error_code, "Research Question revision is missing or malformed"
