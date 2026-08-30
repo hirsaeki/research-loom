@@ -1,311 +1,326 @@
 # Production Research Question adoption
 
-PR29 adds one production semantic ingress to the local application:
+Production Research Question adoption has two bounded semantic ingress actions:
 
 ```text
-research_question.propose
-    -> candidate-only StateDeltaProposal
+research_question.propose       -> one RQ in one candidate-only StateDeltaProposal
+research_question.propose_many  -> multiple RQs in one candidate-only StateDeltaProposal
 ```
 
-Everything after that boundary reuses the existing State Transition, Confirmation, and Human Decision path.
+Everything after proposal creation reuses the existing State Transition, Confirmation, and Human Decision path. PR33 adds no generic batch mutation API and does not weaken stale-candidate protection.
 
 ## Responsibility split
 
 ```text
-Human + ChatGPT Work
-  form and refine the question
+Human + conversational operator
+  form and refine one question or one intentional group of questions
         |
         v
-research_question.propose
-  validate bounded candidate input
-  allocate Harness-owned RQ identity
-  bind provenance and current state
-  persist candidate-only StateDeltaProposal
+research_question.propose / research_question.propose_many
+  validate bounded caller input
+  allocate Harness-owned RQ identities
+  bind the exact current state
+  persist one candidate-only StateDeltaProposal
         |
-        | Research State is unchanged
+        | authoritative Research State is unchanged
         v
 state.apply_candidate
         |
         v
-PR10 Confirmation
+one Confirmation for the exact candidate packet
         |
         v
-PR26 Human Decision Request
-  dynamic PR20 research_adoption / approve requirement
+existing Human Decision Gate
         |
         v
 approve_exact
         |
         v
-RECORD_DECISION + CREATE_OBJECT(research_question)
-  one atomic authoritative transition
+one atomic StateTransitionRequest
+  RECORD_DECISION + CREATE_OBJECT(research_question) ...
         |
         v
-new immutable Research Snapshot
+one CommitBundle + one new immutable Research Snapshot
 ```
 
-Work or another conversational operator owns question formation and wording. The Harness does not contain an RQ extraction, distillation, planning, or generation model. The Harness owns candidate structure, identity allocation, current-state binding, validation, Confirmation, Human Decision, and authoritative commit semantics.
+The conversational layer owns wording and Human intent. The Harness owns candidate structure, identity allocation, state binding, validation, Confirmation, Human Decision, and authoritative transition semantics.
 
-## Project Config seeds are pre-adoption material
+## Action Registry semantics
 
-`Project Config.research_questions.seeds[]` is question-formation material. A seed is not an authoritative Core Research Question and workspace bootstrap never promotes it automatically.
-
-`research_question.propose` may receive `derived_from_seed_ids`. Every supplied ID must resolve to the current Project Config. The IDs are recorded as candidate provenance only.
-
-They are deliberately not projected into:
-
-- Core `source` objects,
-- Core `evidence` objects,
-- `StateDeltaProposal.source_refs`,
-- Runtime Authorization evidence, or
-- capability resource authorization.
-
-A configured seed is provenance for forming a question, not research Evidence.
-
-## Conversation material is not Evidence
-
-Material pasted or attached to ChatGPT Work can inform question formation, but PR29 does not promote conversation material to a Core Source or Evidence object. If material later supports a research claim, it must enter through the appropriate Source/Evidence path, such as Desktop Research and its normalization/adoption boundary.
-
-## `research_question.propose`
-
-The production Action Registry exposes:
+Both proposal actions are non-authoritative operational writes:
 
 ```text
-action_type: research_question.propose
 effect: read_only
 route: harness_service
 confirmation_required: false
 human_decision_required: false
 ```
 
-Here `read_only` means the action cannot mutate authoritative Research State. It may persist operational Conversation, Action Proposal, and StateDeltaProposal records.
+Here `read_only` means the action cannot mutate authoritative Research State. It may persist Conversation, Action Proposal, Action Receipt, and StateDeltaProposal records.
 
-Minimal payload:
+`research_question.propose` remains the single-RQ happy path and retains its existing contract unchanged.
 
-```json
-{
-  "text": "企業はどの条件でAIへ意思決定を委ねるべきか"
-}
-```
+## Single-RQ proposal
 
-Optional candidate material:
-
-```json
-{
-  "text": "企業はどの条件でAIへ意思決定を委ねるべきか",
-  "rationale": "研究テーマと幹事期待を意思決定条件へ蒸溜した。",
-  "acceptance_criteria": [
-    "委任レベルを比較可能に説明できる",
-    "人間承認が必要な条件を示せる"
-  ],
-  "scope_limits": [
-    "AGI実現時期そのものの予測は対象外"
-  ],
-  "parent_question_id": null,
-  "derived_from_seed_ids": [
-    "RQ-SEED-001"
-  ]
-}
-```
-
-Unknown fields are rejected. Harness-owned fields such as RQ ID, project ID, revision, adoption state, Decision references, transition vocabulary, state pins, commit IDs, and authoritative timestamps cannot be supplied by the caller.
-
-The handler allocates `RQ-...` through the configured `id_provider` and materializes a complete Core candidate whose desired authoritative value has:
-
-```text
-kind = research_question
-revision = 0
-project_id = current project
-adoption_state = approved
-```
-
-`approved` describes the value that would exist if Human Decision approves the exact candidate. The object is not authoritative at proposal time.
-
-When `parent_question_id` is present it must resolve to a current authoritative Research Question in the same project. The handler never fabricates a parent from an ID.
-
-## Candidate-only StateDeltaProposal
-
-The proposal action builds the existing PR20 `StateDeltaProposal` model with an existing `CREATE_OBJECT` action. No RQ-specific transition vocabulary is introduced.
-
-The candidate carries:
-
-- Harness-generated StateDeltaProposal identity,
-- current project and active lineage,
-- current Snapshot ID and digest,
-- exact proposed Core Research Question,
-- affected RQ reference,
-- rationale,
-- producer/action/input provenance,
-- current Project Config ref and digest,
-- optional Project Config seed provenance,
-- canonical proposal digest, and
-- `candidate_only=true`.
-
-It is persisted with the existing Conversation Store `store_state_delta_proposal()` operation. There is no QuestionRepository, candidate database, or RQ draft table.
-
-Keeping pre-adoption candidates out of Research State avoids treating conversational drafts as authoritative research objects and keeps the immutable Snapshot history focused on adopted research state.
-
-## Adoption uses `state.apply_candidate`
-
-PR29 does not add `research_question.approve`, `research_question.commit`, or `research_question.adopt`.
-
-Work takes the returned `state_delta_proposal_id` and submits:
-
-```json
-{
-  "action_type": "state.apply_candidate",
-  "payload": {
-    "state_delta_proposal_id": "SDP-..."
-  }
-}
-```
-
-`state.apply_candidate` retains its existing PR10 Confirmation requirement. Submitting the typed action is not Confirmation.
-
-After explicit Confirmation, the existing PR20 authority validator examines the exact `CREATE_OBJECT(research_question)` candidate. Because the new object has `adoption_state=approved`, `required_decisions_for_action()` derives:
-
-```text
-decision_kind = research_adoption
-choice = approve
-subject = exact generated research_question ID
-```
-
-PR29 does not hard-code that requirement or build an RQ-specific Human Decision request.
-
-The existing Decision Request `candidate_value` carries the exact RQ content, including its rationale, acceptance criteria, scope limits, parent, and candidate provenance context. Confirmation and Human Decision remain separate authority events.
-
-## Work-friendly Human Decision input
-
-The existing `decision resolve` command still accepts a complete canonical Human Decision response. PR29 additionally lets the Application Facade accept this explicit minimal intent:
-
-```json
-{
-  "request_id": "HDREQ-...",
-  "request_digest": "sha256:...",
-  "disposition": "approve_exact",
-  "actor_id": "local-human"
-}
-```
-
-Allowed dispositions remain exactly:
-
-```text
-approve_exact
-decline
-request_revision
-```
-
-For minimal intent, the Facade:
-
-1. loads the exact stored request,
-2. checks the supplied request digest,
-3. checks the request belongs to the Facade project,
-4. checks the explicit disposition and bound human actor,
-5. obtains `responded_at` from the Harness clock,
-6. calls existing `make_response()` to generate canonical response identity and digest, and
-7. passes that response to existing `HumanDecisionService.resolve()`.
-
-No natural-language approval inference is added. Work only converts a Human's explicit response into the typed intent.
-
-## Approval, decline, and revision request
-
-`approve_exact` uses the existing Human Decision service to materialize an authoritative Core Decision, bind its ID to the RQ, and submit `RECORD_DECISION + CREATE_OBJECT` in the same state transition. Successful resolution creates a new immutable Research Snapshot containing the approved RQ.
-
-`decline` and `request_revision` are terminal operational outcomes for that Decision Request. They do not create the RQ and do not move the Research Snapshot HEAD. The historical candidate may remain in the operational store. After a revision request, Work and the Human can refine the wording and create a new `research_question.propose`; PR29 does not try to reuse pre-adoption candidate identity.
-
-Revision, closure, and out-of-scope workflows for an already authoritative RQ remain future work.
-
-## Stale candidates
-
-A StateDeltaProposal is bound to the exact current Snapshot. Existing Human Decision candidate validation and Decision Request snapshot binding fail closed if the lineage HEAD or configuration pins change. PR29 performs no automatic rebase and does not copy an old candidate onto a new HEAD. Work must create a new proposal against the new authoritative state.
-
-## Persistence across Work command invocations
-
-Every command may be a separate OS process. Durable Conversation and Decision stores therefore preserve the path:
-
-```text
-process A: research_question.propose
-process B: state.apply_candidate
-process C: confirmation submit
-process D: decision resolve
-process E: research.status
-```
-
-No part of candidate identity, Confirmation, or Human Decision resolution depends on in-memory-only state.
-
-## Work + frozen uv + temporary JSON files
-
-Production Work execution continues to use the repository-root frozen environment:
-
-```powershell
-uv run --frozen python research-loom ...
-```
-
-Because command-execution stdin can remain at EOF waiting boundaries, structured input can be written as a UTF-8 temporary JSON file.
-
-Example proposal file `rq-proposal.json`:
+Minimal input remains:
 
 ```json
 {
   "action_type": "research_question.propose",
   "payload": {
-    "text": "企業はどの条件でAIへ意思決定を委ねるべきか",
-    "derived_from_seed_ids": ["RQ-SEED-001"]
+    "text": "企業はどの条件でAIへ意思決定を委ねるべきか"
   },
   "actor_id": "local-human"
 }
 ```
 
-Submit it with:
-
-```powershell
-uv run --frozen python research-loom action submit `
-  --workspace <WORKSPACE> `
-  --json rq-proposal.json
-```
-
-Use the returned StateDeltaProposal ID in a second file for `state.apply_candidate`; submit the returned Confirmation Request ID with `confirmation submit`; then write the explicit minimal Human Decision intent to another UTF-8 JSON file and call `decision resolve`.
-
-The stdin form remains supported; PR29 does not redesign CLI I/O.
-
-## Intended conversational UX
-
-The CLI and JSON boundary is infrastructure, not the normal Human-facing interface.
+The optional caller-owned fields remain:
 
 ```text
-Human:
-  このテーマでまず問いを整理したい。資料と幹事期待はこれ。
-
-Work:
-  論点を整理すると主RQ候補はAです。ただし範囲を限定する案を勧めます。
-
-Human:
-  それで。
-
-Work:
-  [research_question.propose]
-  候補を保存しました。Research Stateはまだ変更されていません。
-
-Work:
-  この候補をResearch Stateへ適用する確認が必要です。実行しますか？
-
-Human:
-  はい。
-
-Work:
-  [confirmation submit]
-  この正確なRQを研究上の正式な問いとして採択しますか？
-
-Human:
-  採択する。
-
-Work:
-  [decision resolve / approve_exact]
-  [Decision + RQ are committed atomically]
+text
+rationale
+acceptance_criteria
+scope_limits
+parent_question_id
+derived_from_seed_ids
 ```
 
-At that point `research.status` can return the approved authoritative RQ and downstream Desktop Research has a legitimate research question to target.
+Unknown fields and Harness-owned authority or identity fields are rejected.
 
-## Explicitly outside PR29
+## Multi-RQ proposal
 
-PR29 does not add an RQ LLM, generic CRUD API, arbitrary StateDelta ingress, adopted-RQ revision, automatic Source/Evidence ingestion, attachment ingestion, Desktop Research behavior changes, managed browsing/search, survey/Delphi/case/virtual-runner functionality, Writer/Publication runtimes, MCP/WebMCP, OneDrive integration, Profile resolution, new Core TransitionKind values, or new Confirmation/Human Decision models.
+PR33 adds only this RQ-specific bounded ingress:
+
+```json
+{
+  "action_type": "research_question.propose_many",
+  "payload": {
+    "questions": [
+      {"text": "中心RQ..."},
+      {"text": "副RQ1..."},
+      {"text": "副RQ2..."}
+    ]
+  },
+  "actor_id": "local-human"
+}
+```
+
+`questions` must contain at least two items. Use `research_question.propose` for one item. No arbitrary upper bound is added by PR33.
+
+Every `questions[]` item accepts exactly the same caller-owned fields as the existing single proposal. Caller-supplied RQ IDs, project IDs, revisions, adoption state, Decision references, Snapshot or profile pins, commit IDs, authoritative timestamps, transition vocabulary, and all other unknown fields are rejected.
+
+This is intentionally not a generic StateDelta or generic batch ingress.
+
+## All-or-nothing proposal validation
+
+`research_question.propose_many` validates the complete group before persisting a StateDeltaProposal:
+
+```text
+1. resolve the current authoritative state once
+2. determine the current Project Config / profile / lineage binding
+3. validate every questions[] item
+4. validate every seed and parent reference against that current state
+5. only after all members are valid, allocate Harness-owned RQ IDs
+6. materialize all Core RQ candidate values
+7. persist one StateDeltaProposal
+```
+
+If any member is invalid, no partial StateDeltaProposal is stored and authoritative Research State remains unchanged. ID-provider sequence consumption is not an external contract.
+
+Each generated RQ receives an independent `RQ-...` identity from the same Harness-owned ID provider used by the single path. Response ordering follows input ordering.
+
+## Project Config seeds are pre-adoption material
+
+`Project Config.research_questions.seeds[]` remains question-formation material rather than authoritative Research State or Evidence.
+
+For both single and multi-RQ proposal paths, `derived_from_seed_ids` must resolve in the current Project Config. Batch provenance preserves both the aggregate configured seed references and their generated-RQ bindings. Seeds are not promoted to Core Source or Evidence objects and are not Runtime Authorization resources.
+
+## Parent Research Questions
+
+`parent_question_id`, when supplied, must already resolve to a current authoritative approved Research Question in the same project at proposal time.
+
+PR33 deliberately does not add batch-local symbolic references. A new RQ in `questions[1]` cannot refer to the newly generated RQ in `questions[0]` as its parent in the same proposal. That capability, if needed, is separate future work.
+
+## One existing StateDeltaProposal
+
+A single proposal uses one existing `CREATE_OBJECT(research_question)` action.
+
+A multi-RQ proposal uses one existing `StateDeltaProposal` containing multiple existing actions:
+
+```text
+StateDeltaProposal SDP-X
+  CREATE_OBJECT RQ-A
+  CREATE_OBJECT RQ-B
+  CREATE_OBJECT RQ-C
+  CREATE_OBJECT RQ-D
+  CREATE_OBJECT RQ-E
+```
+
+No new TransitionKind or RQ-specific commit vocabulary is introduced.
+
+The batch has one shared binding to:
+
+- project and active lineage,
+- exact current Snapshot ID and digest,
+- current Project Config ref and digest,
+- the source Action Proposal and Conversation Input, and
+- one canonical StateDeltaProposal digest covering all target actions.
+
+The proposal is `candidate_only=true`, so proposal creation does not change authoritative Research State.
+
+## Adoption reuses `state.apply_candidate`
+
+There is no batch-specific adoption action. Both proposal forms use:
+
+```json
+{
+  "action_type": "state.apply_candidate",
+  "payload": {
+    "state_delta_proposal_id": "SDP-X"
+  }
+}
+```
+
+`state.apply_candidate` remains Confirmation-gated. A multi-RQ candidate produces one Confirmation Request because Confirmation binds the exact candidate packet, not each target action separately.
+
+## Existing Human Decision grouping
+
+After Confirmation, the existing authority validator derives one requirement per protected RQ action:
+
+```text
+decision_kind = research_adoption
+choice = approve
+subject = exact generated RQ ID
+```
+
+The existing PR26 Human Decision Gate groups requirements with the same `(decision_kind, choice)` into one Human Decision Request. Therefore a five-RQ candidate is represented conceptually as:
+
+```text
+research_adoption / approve
+subjects:
+  RQ-A
+  RQ-B
+  RQ-C
+  RQ-D
+  RQ-E
+```
+
+PR33 does not add a new Decision kind, Confirmation model, Human Decision model, or per-RQ Decision Request API.
+
+## `approve_exact` is batch-exact
+
+For a multi-RQ request, `approve_exact` approves the complete exact candidate. Partial approval is not supported.
+
+The existing Decision Service materializes one authoritative research-adoption Decision and binds its Decision ID to each approved RQ action. The existing State Transition service then receives one request containing:
+
+```text
+RECORD_DECISION
+CREATE_OBJECT RQ-A
+CREATE_OBJECT RQ-B
+CREATE_OBJECT RQ-C
+CREATE_OBJECT RQ-D
+CREATE_OBJECT RQ-E
+```
+
+Successful resolution produces one CommitBundle and advances to one new immutable Snapshot containing all target RQs. Transition failure leaves zero target RQs authoritative; PR33 adds no new transaction mechanism because the existing State Transition boundary is already atomic.
+
+`decline` and `request_revision` remain terminal operational outcomes that do not change authoritative Research State. `request_revision` does not mutate the old candidate. The conversational layer must create a new proposal for revised content.
+
+## Exact stale semantics are unchanged
+
+A single or batch StateDeltaProposal is bound to the exact current authoritative state. Existing stale validation remains authoritative:
+
+```text
+S0
+  -> propose_many -> SDP-X bound to S0
+S0
+  -> unrelated authoritative transition -> S1
+SDP-X apply/resolve against S1 -> fail closed
+```
+
+PR33 performs no automatic rebase, carry-forward, semantic conflict analysis, Snapshot-mismatch relaxation, stale Decision reuse, candidate action rewriting, or generated-ID copying into a replacement candidate.
+
+**This PR does not relax stale-candidate protection.**
+
+The purpose of batching is to represent one Human intent atomically before it becomes stale, not to make stale candidates reusable.
+
+## Resume representation
+
+The PR31 resume surface remains a read model. Single-RQ candidate rows keep their existing shape with a singular `question` field.
+
+A PR33 candidate is returned once, not once per contained RQ. Its additive batch shape includes:
+
+```text
+state_delta_proposal_id
+proposal_digest
+batch_size
+questions[]
+bound_snapshot
+bound_to_current_snapshot
+authoritative_same_ids
+source_action_proposal
+pending_confirmation_request_ids
+human_decision_requests
+```
+
+`questions[]` preserves the generated RQ IDs and texts in proposal order. `bound_to_current_snapshot` applies to the whole packet. This prevents an operator from mistaking one multi-RQ proposal for independently adoptable candidates.
+
+## Production CLI usage
+
+PR33 adds no top-level CLI command and does not change the JSON envelope. Use the repository launcher and the existing generic action ingress.
+
+Windows / PowerShell:
+
+```powershell
+.\research-loom.cmd action submit `
+  --workspace <WORKSPACE> `
+  --json rq-batch-proposal.json
+```
+
+POSIX:
+
+```bash
+./research-loom action submit \
+  --workspace <WORKSPACE> \
+  --json rq-batch-proposal.json
+```
+
+Runtime bootstrap details such as direct `uv run --frozen python ...` invocation are developer implementation details rather than operator-facing production syntax.
+
+## Preserved single-RQ semantics
+
+PR33 does not change the existing single-RQ behavior for:
+
+- Harness-owned generated identity,
+- candidate-only persistence,
+- seed provenance,
+- authoritative-parent validation,
+- no Research State mutation at proposal time,
+- Confirmation,
+- Human Decision,
+- `approve_exact`, `decline`, and `request_revision`, and
+- stale fail-closed behavior.
+
+## Explicit non-goals
+
+PR33 does not add:
+
+```text
+generic batch mutation API
+arbitrary StateDelta caller ingress
+automatic candidate rebase
+semantic conflict detection
+stale Decision carry-forward
+partial batch approval
+batch-local symbolic parent references
+adopted RQ revision
+RQ closure / rejection workflow
+Source / Evidence batch adoption redesign
+Desktop Research redesign
+new State Transition vocabulary
+new Decision kind
+new Confirmation model
+new Human Decision model
+```
+
+The production use case is deliberately narrow: when a Human decides that several Research Questions form one adoption intent, the Harness can now represent and commit that intent as one exact authoritative candidate.
