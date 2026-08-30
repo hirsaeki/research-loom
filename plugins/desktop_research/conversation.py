@@ -18,6 +18,42 @@ _DEFAULT_CONTEXT_LIMITS = {
     "max_effective_constraints": 128,
 }
 
+_PROFILE_PIN_FIELDS = (
+    "profile_id",
+    "profile_type",
+    "profile_version",
+    "manifest_sha256",
+)
+
+
+def _desktop_profile_set_pin(effective: Mapping[str, Any], expected_digest: str) -> dict[str, Any]:
+    if effective.get("content_digest") != expected_digest:
+        raise ConversationRuntimeError("CONV-PIN-001", "Effective Profile Set provider returned wrong pin")
+
+    profiles = effective.get("profile_pins")
+    if profiles is None:
+        profiles = effective.get("effective_profiles")
+    if not isinstance(profiles, list):
+        raise ConversationRuntimeError(
+            "CONV-PIN-001", "Effective Profile Set provider returned no projectable profile pins"
+        )
+
+    try:
+        profile_pins = [
+            {field: deepcopy(profile[field]) for field in _PROFILE_PIN_FIELDS}
+            for profile in profiles
+        ]
+        return {
+            "schema_version": deepcopy(effective["schema_version"]),
+            "core_contracts": deepcopy(effective["core_contracts"]),
+            "profile_pins": profile_pins,
+            "content_digest": expected_digest,
+        }
+    except (KeyError, TypeError) as exc:
+        raise ConversationRuntimeError(
+            "CONV-PIN-001", "Effective Profile Set provider returned malformed profile pin material"
+        ) from exc
+
 
 class DesktopResearchConversationMaterializer:
     """PR25 adapter from a typed Desktop action to PR9 + PR11 bounded context.
@@ -93,9 +129,13 @@ class DesktopResearchConversationMaterializer:
                 )
             role_bindings.append({"reference_id": item, "role": role})
 
-        effective = deepcopy(dict(self._profiles(state.project_ref, state.effective_profile_set_digest)))
-        if effective.get("content_digest") != state.effective_profile_set_digest:
-            raise ConversationRuntimeError("CONV-PIN-001", "Effective Profile Set provider returned wrong pin")
+        effective_profile_set = deepcopy(
+            dict(self._profiles(state.project_ref, state.effective_profile_set_digest))
+        )
+        effective = _desktop_profile_set_pin(
+            effective_profile_set,
+            state.effective_profile_set_digest,
+        )
         snapshot = state.current_snapshot
         project = state.project_config
         attention = deepcopy(list(self._attention(state)))
@@ -125,7 +165,11 @@ class DesktopResearchConversationMaterializer:
         }
         raw_constraints = state.effective_constraints
         if isinstance(raw_constraints, Mapping):
-            effective_constraints = [deepcopy(dict(item)) for item in raw_constraints.values() if isinstance(item, Mapping)]
+            effective_constraints = [
+                deepcopy(dict(item))
+                for item in raw_constraints.values()
+                if isinstance(item, Mapping)
+            ]
         else:
             effective_constraints = [deepcopy(dict(item)) for item in raw_constraints]
 
@@ -151,7 +195,9 @@ class DesktopResearchConversationMaterializer:
             "schema_version": "0.1.0",
             "context_pack_id": context_pack_id,
             "project_id": state.project_ref,
-            "purpose": str(proposal_payload.get("purpose") or f"Bounded Desktop Research for {question_id}."),
+            "purpose": str(
+                proposal_payload.get("purpose") or f"Bounded Desktop Research for {question_id}."
+            ),
             "pins": {
                 "project_config": {"configuration_digest": state.project_config_digest},
                 "effective_profile_set": effective,
@@ -190,11 +236,20 @@ class DesktopResearchConversationMaterializer:
             },
             "target": {"target_type": "research_question", "question_id": question_id},
             "retrieval_scope": {
-                "scope_statement": str(policy.get("scope_statement") or f"Investigate bounded external information relevant to {question_id}."),
-                "in_scope": list(policy.get("in_scope", ["authorized external source retrieval"])),
-                "out_of_scope": list(policy.get("out_of_scope", ["Writer/Publication material as research evidence"])),
+                "scope_statement": str(
+                    policy.get("scope_statement")
+                    or f"Investigate bounded external information relevant to {question_id}."
+                ),
+                "in_scope": list(
+                    policy.get("in_scope", ["authorized external source retrieval"])
+                ),
+                "out_of_scope": list(
+                    policy.get("out_of_scope", ["Writer/Publication material as research evidence"])
+                ),
             },
-            "allowed_source_categories": list(policy.get("allowed_source_categories", ["other"])),
+            "allowed_source_categories": list(
+                policy.get("allowed_source_categories", ["other"])
+            ),
             "resource_role_bindings": role_bindings,
             "forbidden_resource_roles": [
                 "writer_material", "publication_material", "publication_feedback", "archive_provenance"
@@ -202,12 +257,22 @@ class DesktopResearchConversationMaterializer:
             "coverage_dimensions": dimensions,
             "budget": {
                 "max_total_resources": len(resources),
-                "max_candidate_source_resources": sum(item["role"] == "candidate_source" for item in role_bindings),
-                "max_artifact_resources": sum(item["role"] == "research_artifact" for item in role_bindings),
-                "max_acquired_source_captures": int(policy.get("max_acquired_source_captures", 20)),
+                "max_candidate_source_resources": sum(
+                    item["role"] == "candidate_source" for item in role_bindings
+                ),
+                "max_artifact_resources": sum(
+                    item["role"] == "research_artifact" for item in role_bindings
+                ),
+                "max_acquired_source_captures": int(
+                    policy.get("max_acquired_source_captures", 20)
+                ),
                 "max_search_trace_entries": int(policy.get("max_search_trace_entries", 50)),
-                "max_text_rendition_bytes": int(policy.get("max_text_rendition_bytes", 2_000_000)),
-                "max_original_capture_bytes": int(policy.get("max_original_capture_bytes", 10_000_000)),
+                "max_text_rendition_bytes": int(
+                    policy.get("max_text_rendition_bytes", 2_000_000)
+                ),
+                "max_original_capture_bytes": int(
+                    policy.get("max_original_capture_bytes", 10_000_000)
+                ),
                 "max_capture_artifacts": int(policy.get("max_capture_artifacts", 40)),
             },
         })
