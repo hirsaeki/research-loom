@@ -24,6 +24,8 @@ DEFAULT_RESUME_LIMITS = {
 _CONVERSATION_VALIDATOR = WorkConversationValidator()
 _STATUS_ITEM_LIMIT = 100
 _ATTENTION_ACTIVATION_ITEM_LIMIT = 100
+_RQ_SINGLE_PRODUCER = "research_question.propose@0.1.0"
+_RQ_BATCH_PRODUCER = "research_question.propose_many@0.1.0"
 
 
 def _status_projection(
@@ -139,12 +141,18 @@ def _validated_confirmation_request(document: Mapping[str, Any], *, project_id: 
     return document
 
 
-def _rq_candidate(candidate: Mapping[str, Any]) -> tuple[Mapping[str, Any], Mapping[str, Any]] | None:
+def _rq_candidate(
+    candidate: Mapping[str, Any],
+) -> tuple[tuple[Mapping[str, Any], ...], Mapping[str, Any], bool] | None:
     if candidate.get("candidate_only") is not True:
         return None
     provenance = candidate.get("provenance")
-    if not isinstance(provenance, Mapping) or provenance.get("producer") != "research_question.propose@0.1.0":
+    if not isinstance(provenance, Mapping):
         return None
+    producer = provenance.get("producer")
+    if producer not in {_RQ_SINGLE_PRODUCER, _RQ_BATCH_PRODUCER}:
+        return None
+    is_batch = producer == _RQ_BATCH_PRODUCER
     snapshot_ref = candidate.get("current_snapshot_ref")
     snapshot_digest = candidate.get("current_snapshot_digest")
     if (
@@ -160,30 +168,56 @@ def _rq_candidate(candidate: Mapping[str, Any]) -> tuple[Mapping[str, Any], Mapp
     affected = candidate.get("affected_refs")
     if not isinstance(actions, list) or not isinstance(affected, list):
         raise ConversationRuntimeError("RESUME-CANDIDATE-001", "RQ candidate structure is malformed")
-    matches: list[Mapping[str, Any]] = []
+
+    questions: list[Mapping[str, Any]] = []
     for action in actions:
         if not isinstance(action, Mapping) or action.get("kind") != "CREATE_OBJECT":
+            if is_batch:
+                raise ConversationRuntimeError(
+                    "RESUME-CANDIDATE-001",
+                    "research_question.propose_many candidate may contain only Research Question CREATE_OBJECT actions",
+                )
             continue
         payload = action.get("payload")
         obj = payload.get("object") if isinstance(payload, Mapping) else None
         if isinstance(obj, Mapping) and obj.get("kind") == "research_question":
-            matches.append(obj)
-    if len(matches) != 1:
-        raise ConversationRuntimeError(
-            "RESUME-CANDIDATE-001", "research_question.propose candidate must contain one Research Question CREATE_OBJECT"
+            questions.append(obj)
+        elif is_batch:
+            raise ConversationRuntimeError(
+                "RESUME-CANDIDATE-001",
+                "research_question.propose_many candidate contains a non-Research-Question action",
+            )
+
+    if (not is_batch and len(questions) != 1) or (is_batch and len(questions) < 2):
+        expected = (
+            "at least two Research Question CREATE_OBJECT actions"
+            if is_batch
+            else "one Research Question CREATE_OBJECT"
         )
-    question = matches[0]
-    question_id = str(question.get("id") or "")
-    if not question_id or not any(
-        isinstance(ref, Mapping)
-        and ref.get("kind") == "research_question"
-        and str(ref.get("id") or "") == question_id
+        raise ConversationRuntimeError(
+            "RESUME-CANDIDATE-001",
+            f"{producer.removesuffix('@0.1.0')} candidate must contain {expected}",
+        )
+
+    question_ids = [str(question.get("id") or "") for question in questions]
+    if any(not question_id for question_id in question_ids) or len(question_ids) != len(set(question_ids)):
+        raise ConversationRuntimeError(
+            "RESUME-CANDIDATE-001", "RQ candidate Research Question identities are missing or duplicated"
+        )
+    affected_ids = [
+        str(ref.get("id") or "")
         for ref in affected
-    ):
+        if isinstance(ref, Mapping) and ref.get("kind") == "research_question"
+    ]
+    if is_batch:
+        valid_affected = len(affected) == len(question_ids) and affected_ids == question_ids
+    else:
+        valid_affected = question_ids[0] in affected_ids
+    if not valid_affected:
         raise ConversationRuntimeError(
-            "RESUME-CANDIDATE-001", "RQ candidate affected_refs do not bind the proposed Research Question"
+            "RESUME-CANDIDATE-001", "RQ candidate affected_refs do not bind the proposed Research Question(s)"
         )
-    return question, provenance
+    return tuple(questions), provenance, is_batch
 
 
 def _question_revision(question: Mapping[str, Any], *, error_code: str) -> int:
@@ -335,12 +369,14 @@ def build_resume_context(
         project_id,
         limit=candidate_limit + 1,
     )
-    rq_candidates: list[tuple[Mapping[str, Any], Mapping[str, Any], Mapping[str, Any]]] = []
+    rq_candidates: list[
+        tuple[Mapping[str, Any], tuple[Mapping[str, Any], ...], Mapping[str, Any], bool]
+    ] = []
     for candidate in candidate_probe:
         parsed = _rq_candidate(candidate)
         if parsed is not None:
-            question, provenance = parsed
-            rq_candidates.append((candidate, question, provenance))
+            questions, provenance, is_batch = parsed
+            rq_candidates.append((candidate, questions, provenance, is_batch))
     candidates_truncated = len(rq_candidates) > candidate_limit
     rq_candidates = rq_candidates[:candidate_limit]
 
@@ -404,7 +440,7 @@ def build_resume_context(
             )
 
     candidate_output = []
-    for candidate, question, provenance in rq_candidates:
+    for candidate, questions, provenance, is_batch in rq_candidates:
         candidate_id = str(candidate["proposal_id"])
         source_binding = provenance.get("source_action_proposal")
         if not isinstance(source_binding, Mapping):
@@ -418,8 +454,13 @@ def build_resume_context(
         )
         if source_proposal.get("proposal_digest") != source_binding.get("proposal_digest"):
             raise ConversationRuntimeError("RESUME-BINDING-001", "RQ candidate source Action Proposal digest mismatch")
-        if source_proposal.get("action", {}).get("action_type") != "research_question.propose":
-            raise ConversationRuntimeError("RESUME-BINDING-001", "RQ candidate source action is not research_question.propose")
+        expected_action_type = (
+            "research_question.propose_many" if is_batch else "research_question.propose"
+        )
+        if source_proposal.get("action", {}).get("action_type") != expected_action_type:
+            raise ConversationRuntimeError(
+                "RESUME-BINDING-001", f"RQ candidate source action is not {expected_action_type}"
+            )
         for request in decision_requests:
             source_candidate = request.get("source_state_delta_proposal", {})
             if str(source_candidate.get("proposal_id") or "") == candidate_id:
@@ -429,10 +470,13 @@ def build_resume_context(
                     )
         snapshot_ref = str(candidate["current_snapshot_ref"])
         snapshot_digest = str(candidate["current_snapshot_digest"])
-        candidate_output.append({
+        projected_questions = [
+            _question_projection(question, error_code="RESUME-CANDIDATE-001")
+            for question in questions
+        ]
+        row: dict[str, Any] = {
             "state_delta_proposal_id": candidate_id,
             "proposal_digest": str(candidate["proposal_digest"]),
-            "question": _question_projection(question, error_code="RESUME-CANDIDATE-001"),
             "bound_snapshot": {
                 "snapshot_id": snapshot_ref,
                 "content_digest": snapshot_digest,
@@ -441,14 +485,29 @@ def build_resume_context(
                 snapshot_ref == str(state.current_snapshot["id"])
                 and snapshot_digest == str(state.current_snapshot["content_digest"])
             ),
-            "authoritative_same_id": str(question["id"]) in authoritative_ids,
             "source_action_proposal": {
                 "proposal_id": str(source_proposal["proposal_id"]),
                 "created_at": str(source_proposal["created_at"]),
             },
             "pending_confirmation_request_ids": sorted(confirmations_by_candidate.get(candidate_id, ())),
             "human_decision_requests": deepcopy(decisions_by_candidate.get(candidate_id, ())),
-        })
+        }
+        if is_batch:
+            row.update({
+                "batch_size": len(projected_questions),
+                "questions": projected_questions,
+                "authoritative_same_ids": [
+                    question["id"]
+                    for question in projected_questions
+                    if question["id"] in authoritative_ids
+                ],
+            })
+        else:
+            row.update({
+                "question": projected_questions[0],
+                "authoritative_same_id": projected_questions[0]["id"] in authoritative_ids,
+            })
+        candidate_output.append(row)
 
     attention_limit = _limit(effective_limits, "attention_maps")
     active_activation_id = None
