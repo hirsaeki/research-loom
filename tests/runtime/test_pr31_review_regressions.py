@@ -60,9 +60,15 @@ class PR31ReviewRegressionTests(unittest.TestCase):
 
     def test_question_projection_converts_malformed_revision_to_requested_structured_error(self):
         for error_code in ("RESUME-CANDIDATE-001", "RESUME-STATE-001"):
-            for revision in (None, "not-an-integer", [], {}):
-                question = {"id": "RQ-1", "text": "Question?", "revision": revision}
-                with self.subTest(error_code=error_code, revision=revision), self.assertRaises(
+            questions = (
+                {"id": "RQ-1", "text": "Question?"},
+                {"id": "RQ-1", "text": "Question?", "revision": None},
+                {"id": "RQ-1", "text": "Question?", "revision": "not-an-integer"},
+                {"id": "RQ-1", "text": "Question?", "revision": []},
+                {"id": "RQ-1", "text": "Question?", "revision": {}},
+            )
+            for question in questions:
+                with self.subTest(error_code=error_code, question=question), self.assertRaises(
                     ConversationRuntimeError
                 ) as raised:
                     _question_projection(question, error_code=error_code)
