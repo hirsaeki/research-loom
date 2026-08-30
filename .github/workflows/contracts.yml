@@ -31,8 +31,19 @@ jobs:
         uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
       - name: Sync locked Python environment
         run: uv sync --frozen
-      - name: Smoke production CLI launcher
-        run: uv run --frozen python research-loom --help
+      - name: Smoke production repository launcher
+        run: ./research-loom --help
+      - name: Compare launcher and direct developer invocation errors
+        shell: bash
+        run: |
+          set +e
+          ./research-loom invalid-command > launcher.json
+          launcher_exit=$?
+          uv run --frozen python research-loom invalid-command > direct.json
+          direct_exit=$?
+          set -e
+          test "$launcher_exit" -eq "$direct_exit"
+          cmp launcher.json direct.json
       - name: Run canonical contract tests
         run: uv run --frozen python -m unittest discover -s tests/contracts -p 'test_*.py' -v
       - name: Run Research State runtime tests

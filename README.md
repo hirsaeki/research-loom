@@ -15,25 +15,39 @@ The legacy directories remain reference material only:
 
 New work should converge toward the canonical areas below rather than adding new cross-cutting concepts to either legacy tree.
 
-## Production Python execution
+## Production CLI
 
-Research Loom requires Python 3.12+ and uses `uv` to prepare the repository-level production environment. Root `pyproject.toml` and `uv.lock` are the canonical dependency declaration and reproducible lock used by local execution and CI.
+Research Loom requires Python 3.12+ and `uv`. Root `pyproject.toml` and `uv.lock` are the single repository/application dependency contract.
 
-From a repository checkout, sync the locked environment once:
+For normal operator use, invoke the repository launcher from the repository root. The launcher owns frozen `uv` execution; callers do not need to select a Python environment.
 
-```bash
-uv sync --frozen
+Windows / PowerShell:
+
+```powershell
+.\research-loom.cmd status --workspace PATH --json
+.\research-loom.cmd resume --workspace PATH --json
+.\research-loom.cmd actions --workspace PATH --json
+.\research-loom.cmd action submit --workspace PATH --json TEMP-INPUT.json
 ```
 
-Then invoke the production CLI through that locked environment:
+POSIX:
+
+```bash
+./research-loom status --workspace PATH --json
+./research-loom resume --workspace PATH --json
+./research-loom actions --workspace PATH --json
+./research-loom action submit --workspace PATH --json TEMP-INPUT.json
+```
+
+Structured production input should be supplied through a UTF-8 JSON file rather than relying on stdin. The launchers do not install, download, bootstrap, or upgrade `uv`, and they do not fall back to system Python or another environment when `uv` is unavailable.
+
+For developer/debug use, the explicit form remains supported:
 
 ```bash
 uv run --frozen python research-loom status --workspace PATH --json
-uv run --frozen python research-loom actions --workspace PATH --json
-uv run --frozen python research-loom action submit --workspace PATH --json -
 ```
 
-The same invocation shape works from PowerShell. The CLI does not install or update dependencies itself; environment preparation remains the operator's responsibility. Direct launcher execution or `python -m plugins.local_application.cli ...` remains valid when an equivalent dependency environment is already prepared, but dependency consistency is then the operator's responsibility.
+No separate script dependency manifest or lockfile exists.
 
 ## Target areas
 
@@ -43,4 +57,4 @@ The same invocation shape works from PowerShell. The CLI does not install or upd
 - `skills/` — writer and publication workflows that consume versioned packages/contracts
 - `projects/` — project-specific configuration, inputs, and artifacts
 
-See [`docs/architecture/monorepo-structure.md`](docs/architecture/monorepo-structure.md) for ownership boundaries and [`docs/architecture/production-local-workspace-application-cli.md`](docs/architecture/production-local-workspace-application-cli.md) for the PR27 local application boundary.
+See [`docs/architecture/monorepo-structure.md`](docs/architecture/monorepo-structure.md) for ownership boundaries and [`docs/architecture/production-local-workspace-application-cli.md`](docs/architecture/production-local-workspace-application-cli.md) for the production local application boundary.
