@@ -7,6 +7,12 @@ import sqlite3
 from core.conversation import ConversationRuntimeError, canonical_digest
 
 
+_RQ_PRODUCERS = (
+    "research_question.propose@0.1.0",
+    "research_question.propose_many@0.1.0",
+)
+
+
 def _validated_state_delta(row, *, project_ref: str):
     try:
         value = json.loads(str(row["payload_json"]))
@@ -41,7 +47,7 @@ def research_question_candidates_for_project(
     *,
     limit: int,
 ):
-    """Return bounded PR29 RQ candidate StateDeltaProposals for one project."""
+    """Return bounded production RQ candidate StateDeltaProposals for one project."""
     if limit <= 0:
         raise ValueError("Research Question candidate query limit must be positive")
     try:
@@ -59,11 +65,11 @@ def research_question_candidates_for_project(
                 FROM state_delta_proposals
                 WHERE json_extract(payload_json, '$.project_ref')=?
                   AND json_extract(payload_json, '$.candidate_only')=1
-                  AND json_extract(payload_json, '$.provenance.producer')='research_question.propose@0.1.0'
+                  AND json_extract(payload_json, '$.provenance.producer') IN (?, ?)
                 ORDER BY rowid DESC
                 LIMIT ?
                 """,
-                (str(project_ref), int(limit)),
+                (str(project_ref), *_RQ_PRODUCERS, int(limit)),
             ).fetchall()
     except ConversationRuntimeError:
         raise
