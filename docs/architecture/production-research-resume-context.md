@@ -2,9 +2,7 @@
 
 ## Purpose
 
-`status` is intentionally a small health/status surface for the local workspace, the current authoritative Research State, and pending operational boundaries. That is not enough to resume an ordinary research conversation: saved Research Question candidates and saved Research Attention Maps are deliberately not authoritative Research State, so a snapshot at revision `0` can still have meaningful pre-adoption progress.
-
-PR31 adds a separate, read-only application projection:
+`status` is intentionally a small health/status surface for the local workspace, current authoritative Research State, and pending operational boundaries. `resume` is the richer read-only projection used to continue an ordinary research conversation without reconstructing progress from Git history, prior chat memory, or raw SQLite.
 
 ```text
 existing production stores
@@ -16,11 +14,11 @@ LocalApplicationFacade.resume_context()
 research-loom resume --workspace <WORKSPACE> --json
 ```
 
-The projection is a read model only. It does not add a Research Stage, workflow phase, next-step model, Core Research Object, Transition kind, Snapshot member, Human Decision kind, database, cache, or persisted resume state.
+The projection remains a read model only. It does not create a Research Stage, next-step model, persisted resume state, Core Research Object, Transition kind, Decision kind, database, or cache.
 
 ## Public surface
 
-Use the transport-neutral application method:
+Use:
 
 ```python
 facade.resume_context()
@@ -44,29 +42,26 @@ POSIX:
   --json
 ```
 
-`resume` takes no structured input. It is a top-level read command like `status`, `doctor`, and `actions`; it is not a typed Conversation Action. Reading resume context therefore does not create a Conversation Input, Action Proposal, Action Receipt, Confirmation, Human Decision, or Capability Run.
+`resume` takes no structured input. It does not create a Conversation Input, Action Proposal, Action Receipt, Confirmation, Human Decision, or Capability Run.
 
 ## Projection contents
 
 The response keeps authoritative and non-authoritative material separate:
 
-- `project`: faithful Project Config identity, objective, and scope.
-- `research_state`: the current lineage, Snapshot, and Project Config / Effective Profile Set bindings used by the status surface.
+- `project`: Project Config identity, objective, and scope.
+- `research_state`: current lineage, Snapshot, Project Config, and Effective Profile Set bindings.
 - `research_questions.seeds`: Project Config pre-adoption seeds.
-- `research_questions.authoritative`: current authoritative Research Question objects only.
-- `research_questions.candidates`: persisted PR29 `research_question.propose` StateDeltaProposal candidates, including exact Snapshot and source Action Proposal bindings.
-- `research_attention.baseline`: Project Config baseline Attention.
-- `research_attention.active_map`: the current persisted active-map binding, or `null`.
-- `research_attention.effective`: the existing `EffectiveResearchAttentionProvider` result.
-- `research_attention.stored_maps`: persisted maps whether active, previously activated, or never activated, represented by objective activation references rather than a new lifecycle enum.
+- `research_questions.authoritative`: current authoritative Research Questions only.
+- `research_questions.candidates`: persisted bounded RQ proposal candidates from both the single and multi-RQ ingress paths.
+- `research_attention`: baseline, active/effective guidance, and stored maps.
 - `workflow`: pending Confirmations, pending Human Decisions, pending Runs, and recent terminal Runs.
-- `truncated`: explicit flags for every bounded collection that can be cut off.
+- `truncated`: explicit flags for bounded collections.
 
-Candidate rows are not semantically deduplicated. A saved candidate is not promoted merely because it exists, and terminal Human Decision status is returned as persisted rather than reinterpreted.
+Candidate rows are not semantically deduplicated or promoted merely because they exist. Human Decision history is reported as persisted rather than reinterpreted.
 
-## Bounded project-scoped reads
+## Bounded reads
 
-Resume context uses fixed production bounds. The defaults are intentionally small and non-pageable in PR31:
+The PR31 production bounds remain unchanged:
 
 | Collection | Default bound |
 | --- | ---: |
@@ -80,86 +75,126 @@ Resume context uses fixed production bounds. The defaults are intentionally smal
 | pending Runs | 100 |
 | recent terminal Runs | 20 |
 
-Tests may inject smaller internal limits. There is no generic pagination or query framework. `pending_confirmations` and `pending_runs` use the same bounded override mechanism as the other public resume collections; the per-map activation-reference bound remains an internal production bound rather than a new query framework.
+PR33 does not add pagination or a generic query framework. Single and batch RQ candidates share the existing `research_question_candidates` bound and are combined into one newest-first bounded collection.
 
-The Conversation Store keeps its existing `state_delta_proposals(proposal_id, payload_json)` schema. Project-scoped candidate listing uses SQLite JSON reads against the existing payload; there is no column addition, workspace-version bump, or migration. The same rule applies to the other stores: PR31 adds read helpers only.
+The Conversation Store retains the existing `state_delta_proposals(proposal_id, payload_json)` schema. PR33 requires no workspace migration or new candidate table.
 
-Unreadable or invalid stored candidate/binding data fails closed. Resume does not skip malformed persisted progress and return a misleading healthy summary.
+Unreadable or invalid persisted candidate/binding data fails closed. Resume must not silently omit malformed progress and return a misleading healthy summary.
 
-## Research Question candidate correlation
+## Single-RQ candidate representation
 
-A resume candidate is identified by the bounded PR29 ingress shape, not by arbitrary StateDelta content:
+The existing PR29/PR31 single candidate is still identified by:
 
-- `candidate_only = true`
-- `provenance.producer = research_question.propose@0.1.0`
-- exactly one `CREATE_OBJECT` whose object kind is `research_question`
-- a matching `affected_refs` Research Question identity
+- `candidate_only = true`,
+- `provenance.producer = research_question.propose@0.1.0`,
+- exactly one `CREATE_OBJECT(research_question)`, and
+- a matching `affected_refs` identity.
 
-The projection reports facts such as candidate proposal ID and digest, Research Question fields, bound Snapshot, whether that binding is still current, whether an authoritative Research Question with the same ID exists, exact source Action Proposal binding, pending Confirmation Request IDs whose bound `state.apply_candidate` proposal references that candidate, and persisted Human Decision Request statuses bound to that candidate.
-
-It does not invent `DRAFT`, `READY`, `SELECTED`, `SUPERSEDED`, or any other candidate lifecycle state.
-
-## Research Attention projection
-
-Baseline and effective Attention reuse PR30 semantics. `EffectiveResearchAttentionProvider` remains the only overlay calculation:
+Its existing output shape is preserved, including the singular:
 
 ```text
-no active map  → effective = Project Config baseline
-active map     → effective = active map items
+question
 ```
 
-Stored maps are listed separately. Their activation facts are derived from existing activation events and the active pointer. An inactive stored map with activation references is historical; one with no activation references has never been activated. Activation references are bounded per map and expose `activation_ids_truncated`; the aggregate `truncated.attention_activation_events` flag reports whether any returned stored-map history was cut off. The active pointer is also checked against its persisted activation event before it is projected. No new workflow state is persisted.
+and the existing fields for candidate identity, bound Snapshot, `bound_to_current_snapshot`, `authoritative_same_id`, source Action Proposal, pending Confirmation IDs, and Human Decision history.
 
-Opening an older workspace with no Attention Store remains read-only. `resume` must not create `attention.sqlite3`; it returns baseline-only Attention and an empty stored-map list.
+## Multi-RQ candidate representation
 
-## Recent execution
+PR33 adds recognition of the bounded producer:
 
-`recent_runs` is a bounded newest-first projection of terminal project-scoped Runs. It reports execution facts only: Run identity, capability/function, execution mode, status, timestamps, handoff reference when present, and Snapshot binding.
+```text
+provenance.producer = research_question.propose_many@0.1.0
+```
 
-A completed Run does **not** imply that research is complete, a Finding is adopted, or Evidence is verified. Research authority remains the current Research State.
+A valid batch candidate must:
+
+- be `candidate_only=true`,
+- contain at least two actions,
+- contain only `CREATE_OBJECT(research_question)` target actions,
+- contain unique generated RQ IDs,
+- have `affected_refs` that exactly match those RQs in proposal order,
+- retain one exact Snapshot binding for the complete packet, and
+- resolve to a source Action Proposal whose action type is `research_question.propose_many` and whose digest matches the stored binding.
+
+A multi-RQ proposal is projected as **one candidate row**, never one row per RQ:
+
+```json
+{
+  "state_delta_proposal_id": "SDP-X",
+  "proposal_digest": "sha256:...",
+  "batch_size": 5,
+  "questions": [
+    {"id": "RQ-A", "text": "Main RQ", "revision": 0},
+    {"id": "RQ-B", "text": "G1", "revision": 0},
+    {"id": "RQ-C", "text": "G2", "revision": 0},
+    {"id": "RQ-D", "text": "M1", "revision": 0},
+    {"id": "RQ-E", "text": "M2", "revision": 0}
+  ],
+  "bound_snapshot": {
+    "snapshot_id": "SNAP-...",
+    "content_digest": "sha256:..."
+  },
+  "bound_to_current_snapshot": true,
+  "authoritative_same_ids": [],
+  "source_action_proposal": {
+    "proposal_id": "PROP-...",
+    "created_at": "..."
+  },
+  "pending_confirmation_request_ids": [],
+  "human_decision_requests": []
+}
+```
+
+The actual question projections also preserve the same optional RQ fields as the single path, such as rationale, parent, acceptance criteria, scope limits, adoption state, and Decision IDs when present.
+
+`batch_size` and `questions[]` make the Human intent explicit: the StateDeltaProposal is one atomic candidate containing several RQs. The UI/operator must not infer that each RQ can be independently applied from this row.
+
+## Current and stale binding
+
+`bound_to_current_snapshot` is evaluated once for the entire candidate packet:
+
+```text
+candidate Snapshot ID == current Snapshot ID
+AND
+candidate Snapshot digest == current Snapshot digest
+```
+
+After any authoritative HEAD advance, an old batch therefore becomes visibly stale as a whole. Resume does not rebase it, copy generated RQ IDs into a replacement proposal, or infer that only some actions remain usable.
+
+If an approved batch is still present in operational history after its successful commit, `authoritative_same_ids` reports which exact generated RQ IDs now exist in authoritative state. Its original Snapshot binding is historical and therefore no longer current after the successful Snapshot advance.
+
+## Confirmation and Human Decision correlation
+
+Pending Confirmation Requests are correlated through their exact `state.apply_candidate` Action Proposal binding.
+
+Human Decision Requests are correlated through their exact `source_state_delta_proposal` ID and digest. The same mechanism works for single and batch candidates. A batch still has one Confirmation and one grouped Human Decision Request; resume does not synthesize one request per RQ.
+
+## Research Attention and execution
+
+PR33 does not change Research Attention or Capability Run projection semantics. Baseline/effective Attention still uses the existing provider, stored Attention Maps remain factual history, and recent Runs report execution facts only.
+
+A completed capability Run does not imply that a Research Question, Evidence item, Finding, or other research object is authoritative.
 
 ## No workflow inference
 
-The Harness does not generate natural-language conclusions such as “the research is in the RQ phase”, “the next step is adoption”, or “Desktop Research is blocked”. There is no `stage`, `phase`, `next_step`, `recommended_action`, or inferred `blocker` field. Resume context returns facts; the operator reasons over them.
+Resume returns facts, not workflow conclusions. It does not add fields such as:
+
+```text
+stage
+phase
+next_step
+recommended_action
+inferred_blocker
+```
+
+The conversational operator interprets the returned facts in ordinary research language.
 
 ## Operator guidance
 
-When resuming a Research Loom conversation, use the public resume context as the primary source of research progress. Use the repository launcher rather than selecting a Python environment directly:
+Use the public resume surface as the primary source of saved research progress. Do not reconstruct normal progress from repository internals, raw SQLite, Git history, or prior chat threads unless resume reports an inconsistency or the Human explicitly asks for diagnosis.
 
-```text
-Windows: .\research-loom.cmd resume --workspace <WORKSPACE> --json
-POSIX:   ./research-loom resume --workspace <WORKSPACE> --json
-```
+Research Loom remains a backend control plane rather than normal conversational vocabulary. For example, a multi-RQ candidate can be summarized to the Human as:
 
-Do not reconstruct ordinary research progress from Git state or history, Codex or ChatGPT memory, prior conversation threads, raw SQLite, or repository implementation unless `resume` fails, reports an inconsistency, or the human explicitly asks for diagnosis. Raw SQLite inspection remains appropriate for corruption investigation and explicit developer debugging, not normal resume behavior.
+> 中心RQと4つの副RQは、5件まとめて採択する1つの候補として保存済みです。まだ正式採択前です。
 
-Research Loom is a backend control plane, not the vocabulary for normal research conversation. Translate the machine facts into ordinary research language. For example:
-
-- saved RQ candidate → “問い候補は保存済み”
-- `active_map = null` with stored maps → “横断論点は候補として残っているが、まだ調査方針には反映していない”
-- pending Human Decision → “ここだけ人の判断待ち”
-
-Be exploratory and permissive in research discussion. Be conservative only when an authoritative or explicitly confirmed mutation boundary is actually reached. The operator should not duplicate Harness mutation guards as conversational prohibitions.
-
-Do not add ceremonial startup reporting for project root, loaded instruction files, workspace path, mutation classification, or Git status unless it is actually needed for the task.
-
-## Probe regression example
-
-The motivating probe had facts equivalent to:
-
-```text
-Snapshot revision = 0
-authoritative Research Questions = 0
-saved Research Question candidates > 0
-active Attention Map = null
-stored Attention Maps > 0
-pending Confirmations = 0
-pending Human Decisions = 0
-pending Runs = 0
-```
-
-That state does **not** mean “initialization only.” A Work operator can accurately summarize it in ordinary language as:
-
-> 問いと横断論点の候補整理までは済んでいます。まだ正式採択やDesktop Researchの実行には進んでいません。
-
-The resume projection makes those saved candidates visible without consulting Git, memory, previous threads, raw SQLite, or implementation details.
+If that batch is stale, say that the saved group is bound to an earlier authoritative state and must be proposed again before adoption; do not imply that individual members can be carried forward automatically.
