@@ -28,6 +28,9 @@ from plugins.desktop_research import (
     DesktopResearchContextValidator, DesktopResearchConversationMaterializer,
     DesktopResearchExternalAdapter, DesktopResearchNormalizer,
 )
+from plugins.local_application.research_question_batch import (
+    ResearchQuestionProposeManyHandler, research_question_propose_many_payload,
+)
 from plugins.local_attention_store import (
     LocalAttentionStore, LocalAttentionStoreError, attention_map_digest,
 )
@@ -819,6 +822,12 @@ class LocalResearchApplication:
             payload_validator=_rq_proposal_payload,
         ))
         actions.register(ActionDefinition(
+            "research_question.propose_many", "research-question-batch-proposal@0.1.0",
+            "read_only", "harness_service", False,
+            human_decision_required=False, service_id="research_question.propose_many",
+            payload_validator=research_question_propose_many_payload,
+        ))
+        actions.register(ActionDefinition(
             "research_attention.status", "research-attention-status@0.1.0", "read_only", "harness_service", False,
             human_decision_required=False, service_id="research_attention.status",
             payload_validator=_attention_status_payload,
@@ -856,6 +865,10 @@ class LocalResearchApplication:
         services.register(
             "research_question.propose",
             ResearchQuestionProposeHandler(self.conversation_store, self.ids),
+        )
+        services.register(
+            "research_question.propose_many",
+            ResearchQuestionProposeManyHandler(self.conversation_store, self.ids),
         )
         services.register("research_attention.status", ResearchAttentionStatusHandler(self.effective_attention))
         services.register(
