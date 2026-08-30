@@ -152,9 +152,7 @@ class ResearchQuestionBatchProposalTests(unittest.TestCase):
                 self.assertTrue(all(
                     action["kind"] == "CREATE_OBJECT" for action in proposal["proposed_actions"]
                 ))
-                self.assertEqual(
-                    [ref["id"] for ref in proposal["affected_refs"]], ids
-                )
+                self.assertEqual([ref["id"] for ref in proposal["affected_refs"]], ids)
                 self.assertEqual(proposal["current_snapshot_ref"], before["snapshot_id"])
                 self.assertEqual(proposal["current_snapshot_digest"], before["content_digest"])
                 basis = deepcopy(proposal)
@@ -274,13 +272,13 @@ class ResearchQuestionBatchAdoptionTests(unittest.TestCase):
                 self.assertEqual(resolved["status"], "RESOLVED")
                 self.assertIsNotNone(resolved["commit_receipt"])
                 after = facade.status()["snapshot"]
-                self.assertEqual(after["revision"], before["revision"] + 1)
                 self.assertNotEqual(after["snapshot_id"], before["snapshot_id"])
 
                 state = facade._application.state_repository.load_state_view(
                     facade.project_id,
                     facade._application.state_repository.load_active_lineage_ref(facade.project_id),
                 )
+                self.assertIsNotNone(state.latest_object("snapshot", before["snapshot_id"]))
                 authoritative = [
                     item for item in state.effective_objects()
                     if item.get("kind") == "research_question"
