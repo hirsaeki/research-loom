@@ -86,8 +86,7 @@ def content_digest(content: Mapping[str, Any]) -> str:
 def normalized_content(content: Mapping[str, Any]) -> dict[str, Any]:
     if not isinstance(content, Mapping) or set(content) != {"representation", "value"}:
         raise LocalResearchExhibitStoreError(
-            "EXHIBIT-CONTENT-001",
-            "content accepts only representation and value",
+            "EXHIBIT-CONTENT-001", "content accepts only representation and value"
         )
     representation = str(content["representation"])
     normalized = {
@@ -134,20 +133,9 @@ def _validate_snapshot_binding(value: Any) -> None:
 
 def validate_exhibit_document(value: Mapping[str, Any]) -> None:
     required = {
-        "schema_version",
-        "exhibit_id",
-        "project_id",
-        "kind",
-        "title",
-        "purpose",
-        "rq_ids",
-        "source_run_ids",
-        "source_artifact_refs",
-        "source_object_ids",
-        "derived_from_exhibit_ids",
-        "captured_against",
-        "content",
-        "content_digest",
+        "schema_version", "exhibit_id", "project_id", "kind", "title", "purpose",
+        "rq_ids", "source_run_ids", "source_artifact_refs", "source_object_ids",
+        "derived_from_exhibit_ids", "captured_against", "content", "content_digest",
         "provenance",
     }
     if not isinstance(value, Mapping) or set(value) != required:
@@ -168,14 +156,12 @@ def validate_exhibit_document(value: Mapping[str, Any]) -> None:
         raise LocalResearchExhibitStoreError(
             "EXHIBIT-DOCUMENT-001", "stored Research Exhibit kind is unsupported"
         )
+    _validate_string_list(value.get("rq_ids"), "rq_ids", required=True)
     for field in (
-        "source_run_ids",
-        "source_artifact_refs",
-        "source_object_ids",
+        "source_run_ids", "source_artifact_refs", "source_object_ids",
         "derived_from_exhibit_ids",
     ):
         _validate_string_list(value.get(field), field)
-    _validate_string_list(value.get("rq_ids"), "rq_ids", required=True)
     _validate_snapshot_binding(value.get("captured_against"))
 
     content = value.get("content")
@@ -245,20 +231,14 @@ def _validate_exhibit_metadata(value: Mapping[str, Any]) -> None:
             "EXHIBIT-STORE-INTEGRITY-001", "stored Research Exhibit metadata shape is invalid"
         )
     for field in (
-        "exhibit_id",
-        "project_id",
-        "kind",
-        "title",
-        "purpose",
-        "content_representation",
-        "content_digest",
-        "captured_at",
-        "capture_origin",
+        "exhibit_id", "project_id", "kind", "title", "purpose",
+        "content_representation", "content_digest", "captured_at", "capture_origin",
     ):
         item = value.get(field)
         if not isinstance(item, str) or not item.strip():
             raise LocalResearchExhibitStoreError(
-                "EXHIBIT-STORE-INTEGRITY-001", f"stored Research Exhibit metadata {field} is invalid"
+                "EXHIBIT-STORE-INTEGRITY-001",
+                f"stored Research Exhibit metadata {field} is invalid",
             )
     if value["kind"] not in SUPPORTED_EXHIBIT_KINDS:
         raise LocalResearchExhibitStoreError(
@@ -266,19 +246,20 @@ def _validate_exhibit_metadata(value: Mapping[str, Any]) -> None:
         )
     if value["content_representation"] not in SUPPORTED_EXHIBIT_REPRESENTATIONS:
         raise LocalResearchExhibitStoreError(
-            "EXHIBIT-STORE-INTEGRITY-001", "stored Research Exhibit metadata representation is unsupported"
+            "EXHIBIT-STORE-INTEGRITY-001",
+            "stored Research Exhibit metadata representation is unsupported",
         )
+    _validate_string_list(value.get("rq_ids"), "rq_ids", required=True)
     for field in (
-        "source_run_ids",
-        "source_artifact_refs",
-        "source_object_ids",
+        "source_run_ids", "source_artifact_refs", "source_object_ids",
         "derived_from_exhibit_ids",
     ):
         _validate_string_list(value.get(field), field)
-    _validate_string_list(value.get("rq_ids"), "rq_ids", required=True)
     _validate_snapshot_binding(value.get("captured_against"))
 
 
+# Keep the original 0.1 research_exhibits shape stable. Metadata optimization is
+# an additive table so pre-optimization 0.1 stores remain readable.
 _SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS exhibit_store_meta (
     schema_version TEXT PRIMARY KEY
@@ -288,7 +269,6 @@ CREATE TABLE IF NOT EXISTS research_exhibits (
     project_id TEXT NOT NULL,
     captured_at TEXT NOT NULL,
     content_digest TEXT NOT NULL,
-    metadata_json TEXT NOT NULL,
     document_json TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS research_exhibits_project_idx
@@ -301,6 +281,16 @@ CREATE TABLE IF NOT EXISTS research_exhibit_rqs (
 );
 CREATE INDEX IF NOT EXISTS research_exhibit_rq_idx
     ON research_exhibit_rqs(rq_id, exhibit_id);
+CREATE TABLE IF NOT EXISTS research_exhibit_metadata (
+    exhibit_id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL,
+    captured_at TEXT NOT NULL,
+    content_digest TEXT NOT NULL,
+    metadata_json TEXT NOT NULL,
+    FOREIGN KEY(exhibit_id) REFERENCES research_exhibits(exhibit_id)
+);
+CREATE INDEX IF NOT EXISTS research_exhibit_metadata_project_idx
+    ON research_exhibit_metadata(project_id, captured_at, exhibit_id);
 """
 
 
@@ -313,6 +303,13 @@ class LocalResearchExhibitStore:
     @property
     def exists(self) -> bool:
         return self.path.is_file()
+
+    @staticmethod
+    def _metadata_table_exists(connection: sqlite3.Connection) -> bool:
+        row = connection.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='research_exhibit_metadata'"
+        ).fetchone()
+        return row is not None
 
     def _read_schema_version(self, connection: sqlite3.Connection) -> None:
         try:
@@ -361,14 +358,17 @@ class LocalResearchExhibitStore:
                 (EXHIBIT_STORE_SCHEMA_VERSION,),
             )
             self._read_schema_version(connection)
+            self._backfill_metadata(connection)
             connection.commit()
             return connection
         except LocalResearchExhibitStoreError:
             if "connection" in locals():
+                connection.rollback()
                 connection.close()
             raise
         except sqlite3.Error as exc:
             if "connection" in locals():
+                connection.rollback()
                 connection.close()
             raise LocalResearchExhibitStoreError(
                 "EXHIBIT-STORE-DB-001", "Research Exhibit store could not be initialized"
@@ -418,6 +418,35 @@ class LocalResearchExhibitStore:
             )
         return value
 
+    def _backfill_metadata(self, connection: sqlite3.Connection) -> None:
+        rows = connection.execute(
+            """
+            SELECT e.exhibit_id, e.project_id, e.captured_at, e.content_digest, e.document_json
+            FROM research_exhibits e
+            LEFT JOIN research_exhibit_metadata m ON m.exhibit_id=e.exhibit_id
+            WHERE m.exhibit_id IS NULL
+            ORDER BY e.exhibit_id
+            """
+        ).fetchall()
+        for row in rows:
+            document = self._decode_document(row)
+            metadata = _metadata_from_document(document)
+            _validate_exhibit_metadata(metadata)
+            connection.execute(
+                """
+                INSERT INTO research_exhibit_metadata(
+                    exhibit_id, project_id, captured_at, content_digest, metadata_json
+                ) VALUES (?,?,?,?,?)
+                """,
+                (
+                    str(document["exhibit_id"]),
+                    str(document["project_id"]),
+                    str(document["provenance"]["captured_at"]),
+                    str(document["content_digest"]),
+                    _canonical_json(metadata),
+                ),
+            )
+
     def capture(self, value: Mapping[str, Any]) -> None:
         document = deepcopy(dict(value))
         validate_exhibit_document(document)
@@ -428,11 +457,10 @@ class LocalResearchExhibitStore:
         connection = self._connect_write()
         try:
             connection.execute("BEGIN IMMEDIATE")
-            existing = connection.execute(
+            if connection.execute(
                 "SELECT 1 FROM research_exhibits WHERE exhibit_id=?",
                 (str(document["exhibit_id"]),),
-            ).fetchone()
-            if existing is not None:
+            ).fetchone() is not None:
                 raise LocalResearchExhibitStoreError(
                     "EXHIBIT-IMMUTABLE-001",
                     "Research Exhibit ID already exists; overwrite is forbidden",
@@ -440,9 +468,22 @@ class LocalResearchExhibitStore:
             connection.execute(
                 """
                 INSERT INTO research_exhibits(
-                    exhibit_id, project_id, captured_at, content_digest,
-                    metadata_json, document_json
-                ) VALUES (?,?,?,?,?,?)
+                    exhibit_id, project_id, captured_at, content_digest, document_json
+                ) VALUES (?,?,?,?,?)
+                """,
+                (
+                    str(document["exhibit_id"]),
+                    str(document["project_id"]),
+                    str(document["provenance"]["captured_at"]),
+                    str(document["content_digest"]),
+                    serialized,
+                ),
+            )
+            connection.execute(
+                """
+                INSERT INTO research_exhibit_metadata(
+                    exhibit_id, project_id, captured_at, content_digest, metadata_json
+                ) VALUES (?,?,?,?,?)
                 """,
                 (
                     str(document["exhibit_id"]),
@@ -450,15 +491,11 @@ class LocalResearchExhibitStore:
                     str(document["provenance"]["captured_at"]),
                     str(document["content_digest"]),
                     metadata_serialized,
-                    serialized,
                 ),
             )
             connection.executemany(
                 "INSERT INTO research_exhibit_rqs(exhibit_id, rq_id) VALUES (?,?)",
-                [
-                    (str(document["exhibit_id"]), str(rq_id))
-                    for rq_id in document["rq_ids"]
-                ],
+                [(str(document["exhibit_id"]), str(rq_id)) for rq_id in document["rq_ids"]],
             )
             connection.commit()
         except LocalResearchExhibitStoreError:
@@ -512,11 +549,42 @@ class LocalResearchExhibitStore:
         if connection is None:
             return ()
         try:
+            if self._metadata_table_exists(connection):
+                if rq_id is None:
+                    rows = connection.execute(
+                        """
+                        SELECT m.exhibit_id, m.project_id, m.captured_at,
+                               m.content_digest, m.metadata_json
+                        FROM research_exhibit_metadata m
+                        WHERE m.project_id=?
+                        ORDER BY m.captured_at DESC, m.exhibit_id DESC
+                        LIMIT ?
+                        """,
+                        (str(project_id), int(limit)),
+                    ).fetchall()
+                else:
+                    rows = connection.execute(
+                        """
+                        SELECT m.exhibit_id, m.project_id, m.captured_at,
+                               m.content_digest, m.metadata_json
+                        FROM research_exhibit_metadata m
+                        JOIN research_exhibit_rqs r ON r.exhibit_id=m.exhibit_id
+                        WHERE m.project_id=? AND r.rq_id=?
+                        ORDER BY m.captured_at DESC, m.exhibit_id DESC
+                        LIMIT ?
+                        """,
+                        (str(project_id), str(rq_id), int(limit)),
+                    ).fetchall()
+                return tuple(self._decode_metadata(row) for row in rows)
+
+            # Compatibility with the pre-optimization PR37 0.1 store. This read
+            # fallback performs no migration or write; the next capture creates
+            # the additive metadata table and backfills these rows.
             if rq_id is None:
                 rows = connection.execute(
                     """
                     SELECT e.exhibit_id, e.project_id, e.captured_at,
-                           e.content_digest, e.metadata_json
+                           e.content_digest, e.document_json
                     FROM research_exhibits e
                     WHERE e.project_id=?
                     ORDER BY e.captured_at DESC, e.exhibit_id DESC
@@ -528,7 +596,7 @@ class LocalResearchExhibitStore:
                 rows = connection.execute(
                     """
                     SELECT e.exhibit_id, e.project_id, e.captured_at,
-                           e.content_digest, e.metadata_json
+                           e.content_digest, e.document_json
                     FROM research_exhibits e
                     JOIN research_exhibit_rqs r ON r.exhibit_id=e.exhibit_id
                     WHERE e.project_id=? AND r.rq_id=?
@@ -537,7 +605,7 @@ class LocalResearchExhibitStore:
                     """,
                     (str(project_id), str(rq_id), int(limit)),
                 ).fetchall()
-            return tuple(self._decode_metadata(row) for row in rows)
+            return tuple(_metadata_from_document(self._decode_document(row)) for row in rows)
         except LocalResearchExhibitStoreError:
             raise
         except sqlite3.Error as exc:
