@@ -56,6 +56,14 @@ def make_app(root: str | Path) -> LocalResearchApplication:
     seed = seed_state(
         objects=[project(), rq(state="approved"), rq_two()],
         snapshot_id="SNP-EXHIBIT-0",
+        project_config={
+            "project": {
+                "project_id": "PRJ-1",
+                "title": "Research Exhibit fixture",
+                "objective": "Exercise Exhibit persistence boundaries.",
+            },
+            "scope": {"in_scope": [], "out_of_scope": []},
+        },
     )
     return LocalResearchApplication(
         root,
