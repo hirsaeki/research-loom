@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from collections import Counter
 from contextlib import contextmanager
+import hashlib
+from pathlib import Path
 from typing import Any, Iterator, Mapping
 
 from core.execution.models import CapabilityRunRecord, ExecutionArtifactMetadata, RunStatus
@@ -30,6 +32,11 @@ class LocalExecutionStore(_BaseExecutionStore):
             with super()._write_transaction():
                 yield
 
+    def register_input_bytes(self, *args: Any, **kwargs: Any):
+        """Keep production blob creation inside the same DB writer serialization."""
+        with self._write_transaction():
+            return super().register_input_bytes(*args, **kwargs)
+
     @contextmanager
     def require_run_status(
         self,
@@ -46,6 +53,18 @@ class LocalExecutionStore(_BaseExecutionStore):
                     f"Run {run_id} must remain {expected_status.value} for this operation"
                 )
             yield persisted
+
+    def _blob_target_for(self, content: bytes) -> Path:
+        digest_hex = hashlib.sha256(content).hexdigest()
+        return self.blob_root / digest_hex[:2] / digest_hex
+
+    @staticmethod
+    def _cleanup_new_blob_targets(paths: set[Path]) -> None:
+        for path in paths:
+            try:
+                path.unlink()
+            except FileNotFoundError:
+                pass
 
     def put_bytes_batch(
         self,
@@ -108,6 +127,7 @@ class LocalExecutionStore(_BaseExecutionStore):
         planned_bytes = Counter()
         for item in normalized:
             planned_bytes[item["role"]] += len(item["content"])
+        planned_total = sum(len(item["content"]) for item in normalized)
 
         with self._write_transaction():
             persisted = self.load_run(run.run_id)
@@ -144,19 +164,47 @@ class LocalExecutionStore(_BaseExecutionStore):
                         f"artifact role byte limit exceeded: {role}"
                     )
 
-            written = []
-            for item in normalized:
-                written.append(
-                    self.put_bytes(
-                        run,
-                        role=item["role"],
-                        media_type=item["media_type"],
-                        content=item["content"],
-                        artifact_id=item["artifact_id"],
-                        provenance=item["provenance"],
-                        parent_artifact_refs=item["parent_artifact_refs"],
-                    )
+            current_total = sum(item.size for item in existing)
+            if current_total + planned_total > self.config.max_run_output_bytes:
+                raise LocalExecutionStoreError(
+                    "Run output exceeds configured max_run_output_bytes"
                 )
+
+            if identities:
+                placeholders = ",".join("?" for _ in identities)
+                rows = self._connection.execute(
+                    f"SELECT artifact_id FROM execution_artifacts WHERE artifact_id IN ({placeholders})",
+                    tuple(identities),
+                ).fetchall()
+                if rows:
+                    raise ValueError("immutable artifact identity collision")
+
+            # All production blob writers are serialized by this DB write lock. A
+            # target absent here cannot acquire a committed store reference until
+            # this batch commits or rolls back, so only those newly-created targets
+            # are safe to remove if the batch fails.
+            new_blob_targets = {
+                target
+                for target in (self._blob_target_for(item["content"]) for item in normalized)
+                if not target.exists()
+            }
+            written: list[ExecutionArtifactMetadata] = []
+            try:
+                for item in normalized:
+                    written.append(
+                        self.put_bytes(
+                            run,
+                            role=item["role"],
+                            media_type=item["media_type"],
+                            content=item["content"],
+                            artifact_id=item["artifact_id"],
+                            provenance=item["provenance"],
+                            parent_artifact_refs=item["parent_artifact_refs"],
+                        )
+                    )
+            except Exception:
+                self._cleanup_new_blob_targets(new_blob_targets)
+                raise
             return tuple(written)
 
 
