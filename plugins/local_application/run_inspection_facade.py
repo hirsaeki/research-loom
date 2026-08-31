@@ -14,11 +14,30 @@ from .facade import LocalApplicationError, _jsonable
 
 
 _RUN_INSPECTION_ITEM_LIMIT = 100
+_INTERNAL_PROVENANCE_KEYS = {
+    "blob_path",
+    "database_path",
+    "filesystem_path",
+    "sqlite_path",
+    "storage_locator",
+}
 
 
 def _bounded(values: Iterable[Any]) -> tuple[list[Any], bool]:
     items = list(values)
     return items[:_RUN_INSPECTION_ITEM_LIMIT], len(items) > _RUN_INSPECTION_ITEM_LIMIT
+
+
+def _public_provenance(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {
+            str(key): _public_provenance(item)
+            for key, item in value.items()
+            if str(key) not in _INTERNAL_PROVENANCE_KEYS
+        }
+    if isinstance(value, (tuple, list)):
+        return [_public_provenance(item) for item in value]
+    return _jsonable(value)
 
 
 def _run_projection(run) -> Mapping[str, Any]:
@@ -86,7 +105,7 @@ def _artifact_projection(artifacts) -> list[Mapping[str, Any]]:
             "byte_length": artifact.size,
             "digest": artifact.digest,
             "execution_mode": artifact.execution_mode,
-            "provenance": _jsonable(artifact.provenance),
+            "provenance": _public_provenance(artifact.provenance),
         }
         for artifact in artifacts
     ]
