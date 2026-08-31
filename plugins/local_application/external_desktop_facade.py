@@ -70,6 +70,9 @@ _RESERVED_CAPTURE_PROVENANCE_FIELDS = {
     "acquired_at",
 }
 
+_ORIGINAL_ROLE = "desktop_research.original_capture"
+_TEXT_ROLE = "desktop_research.text_rendition"
+
 
 def _input_object(value: Mapping[str, Any], allowed: set[str], operation: str) -> dict[str, Any]:
     if not isinstance(value, Mapping):
@@ -248,29 +251,34 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                 "APPLICATION-EXTERNAL-BINDING-001",
                 "Desktop Research Run has no valid capture budget binding",
             )
+        store = self._application.execution_store
         try:
-            original_limit = int(budget["max_original_capture_bytes"])
             text_limit = int(budget["max_text_rendition_bytes"])
             capture_limit = int(budget["max_acquired_source_captures"])
-            artifact_limit = int(budget["max_capture_artifacts"])
+            original_declared = budget.get("max_original_capture_bytes")
+            original_limit = (
+                store.config.max_artifact_bytes
+                if original_declared is None
+                else int(original_declared)
+            )
+            artifact_limit = int(
+                budget.get("max_capture_artifacts", 2 * capture_limit)
+            )
         except (KeyError, TypeError, ValueError) as exc:
             raise LocalApplicationError(
                 "APPLICATION-EXTERNAL-BINDING-001",
                 "Desktop Research Run capture budget is malformed",
             ) from exc
+        if min(original_limit, text_limit, capture_limit, artifact_limit) < 0:
+            raise LocalApplicationError(
+                "APPLICATION-EXTERNAL-BINDING-001",
+                "Desktop Research Run capture budget is malformed",
+            )
 
-        artifacts = self._application.execution_store.artifacts_for(run.run_id)
-        capture_count = sum(
-            item.role == "desktop_research.original_capture" for item in artifacts
-        )
-        capture_artifact_count = sum(
-            item.role in {
-                "desktop_research.original_capture",
-                "desktop_research.text_rendition",
-            }
-            for item in artifacts
-        )
-        if capture_count >= capture_limit or capture_artifact_count + 2 > artifact_limit:
+        # Every capture is exactly one original + one text artifact. This converts
+        # the optional aggregate artifact budget into an equivalent atomic pair cap.
+        pair_limit = min(capture_limit, artifact_limit // 2)
+        if pair_limit <= 0:
             raise LocalApplicationError(
                 "APPLICATION-EXTERNAL-CAPTURE-001",
                 "Desktop Research capture budget is exhausted",
@@ -278,14 +286,14 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
 
         try:
             original_bytes = read_controlled_file(
-                self._application.execution_store,
+                store,
                 original_path,
-                max_bytes=min(original_limit, self._application.execution_store.config.max_artifact_bytes),
+                max_bytes=min(original_limit, store.config.max_artifact_bytes),
             )
             text_bytes = read_controlled_file(
-                self._application.execution_store,
+                store,
                 text_path,
-                max_bytes=min(text_limit, self._application.execution_store.config.max_artifact_bytes),
+                max_bytes=min(text_limit, store.config.max_artifact_bytes),
             )
         except FileNotFoundError as exc:
             raise LocalApplicationError(
@@ -300,7 +308,7 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                 else "APPLICATION-EXTERNAL-FILE-001"
             )
             raise LocalApplicationError(code, message) from exc
-        except (LocalExecutionStoreError, OSError) as exc:
+        except (LocalExecutionStoreError, OSError, ValueError) as exc:
             raise LocalApplicationError(
                 "APPLICATION-EXTERNAL-FILE-002",
                 str(exc),
@@ -314,7 +322,17 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                 "text rendition must be valid UTF-8",
             ) from exc
 
-        service = DesktopResearchCaptureService(self._application.execution_store)
+        role_byte_limits = {_TEXT_ROLE: text_limit}
+        if original_declared is not None:
+            # Result validation treats the optional original-byte budget as
+            # cumulative only when the Context explicitly declares it.
+            role_byte_limits[_ORIGINAL_ROLE] = int(original_declared)
+        role_count_limits = {
+            _ORIGINAL_ROLE: pair_limit,
+            _TEXT_ROLE: pair_limit,
+        }
+
+        service = DesktopResearchCaptureService(store)
         try:
             detail = service.capture(
                 run,
@@ -326,8 +344,18 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                 original_media_type=original_media_type,
                 text_rendition=text_rendition,
                 provenance=provenance,
+                artifact_write_options={
+                    "expected_status": RunStatus.RUNNING,
+                    "role_byte_limits": role_byte_limits,
+                    "role_count_limits": role_count_limits,
+                },
             )
-        except (DesktopResearchCaptureError, LocalExecutionStoreError, ValueError) as exc:
+        except (
+            DesktopResearchCaptureError,
+            LocalExecutionStoreError,
+            TypeError,
+            ValueError,
+        ) as exc:
             raise LocalApplicationError("APPLICATION-EXTERNAL-CAPTURE-001", str(exc)) from exc
         return {"status": "EXTERNAL_SOURCE_CAPTURED", "capture": deepcopy(dict(detail))}
 
