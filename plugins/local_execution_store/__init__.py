@@ -1,11 +1,10 @@
 """Production local execution trace, artifact, resource, and auxiliary stores."""
 
+from .atomic import LocalExecutionStore, LocalOperationalTraceStore
 from .context_extensions import LocalCapabilityContextExtensionStore
 from .intake import bind_controlled_import_root, read_controlled_file
-from .operational_trace import LocalOperationalTraceStore
 from .status import pending_runs_for_project, recent_runs_for_project
 from .store import (
-    LocalExecutionStore,
     LocalExecutionStoreConfig,
     LocalExecutionStoreError,
     LocalExecutionStoreIntegrityError,
