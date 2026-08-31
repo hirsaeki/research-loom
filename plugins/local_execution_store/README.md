@@ -1,8 +1,8 @@
 # Local Execution Store
 
 `plugins.local_execution_store` is the first production local adapter for the
-PR22 execution persistence ports. It is deliberately separate from the
-authoritative Research State repository.
+execution persistence ports. It is deliberately separate from the authoritative
+Research State repository.
 
 ## Boundary
 
@@ -17,11 +17,16 @@ authoritative Research State repository.
 The adapter never calls `StateTransitionService`, never adopts candidate
 Evidence/Findings, and never moves a Research Snapshot or Lineage HEAD.
 
+Ordinary operator inspection goes through the public Application Facade / CLI.
+The CLI does not know SQLite table names or blob layout. Direct reads of
+`execution.db` or `operational-trace.sqlite3` are not a normal operator surface.
+
 ## Layout
 
 ```text
 execution-store/
 ├── execution.db
+├── operational-trace.sqlite3
 ├── blobs/
 │   └── sha256/
 │       └── ab/
@@ -47,6 +52,24 @@ are canonical JSON immutable records. Reusing an identity with different
 content fails closed. Raw Handoffs are stored before canonical Handoff
 validation, preserving rejected/invalid execution output for audit.
 
+## Public Run inspection reads
+
+PR36 reuses the existing Run-scoped read seams (`load_run`, `events_for`,
+`artifacts_for`) and adds only a small bounded persisted-diagnostic read helper.
+The operator-facing `research-loom run show` composes those reads with the
+Desktop Research attempt reconstruction functions; it does not query SQLite
+from the Application Facade.
+
+The projection exposes Run identity/bindings/status/failure, Handoff ref/digest,
+lifecycle, persisted diagnostics, and artifact metadata. For Desktop Research it
+also exposes retrieval-attempt summaries/details and operational terminations,
+including unsuccessful outcomes. Artifact content bytes, `storage_locator`,
+filesystem/blob paths, SQLite paths/row IDs, raw Handoff/Invocation/Context
+payloads, and arbitrary operational events remain private implementation data.
+
+Long operator-facing collections are bounded with explicit truncation markers.
+This is inspection, not an execution-history browser or pagination API.
+
 ## Artifacts and bounded output
 
 `CapabilityExecutionRequest.artifacts` is a `BoundedArtifactSink`. The
@@ -56,18 +79,13 @@ digest, size, Run ID, or execution mode. The trusted Artifact Store is
 explicitly injected by the execution composition root; a read-only
 `ResourceProvider` is never implicitly promoted to a write boundary.
 
-The trusted store:
+The trusted store calculates SHA-256 and actual byte size, enforces configured
+per-artifact and per-Run limits, writes through staging, fsyncs, installs the
+content-addressed blob without overwriting an existing blob, and records
+immutable Run-bound metadata.
 
-1. calculates SHA-256 and actual byte size;
-2. enforces configured per-artifact and per-Run limits;
-3. writes into `staging/`;
-4. flushes and fsyncs;
-5. hard-links the completed staging file into the content-addressed location
-   without overwriting an existing blob;
-6. records immutable Run-bound metadata.
-
-Same bytes may deduplicate physically, but artifact identity, role,
-Run provenance, and `execution_mode` remain distinct. In particular, physical
+Same bytes may deduplicate physically, but artifact identity, role, Run
+provenance, and `execution_mode` remain distinct. In particular, physical
 deduplication never promotes VIRTUAL output into REAL empirical identity.
 
 Operational limits are adapter configuration, not Research/Profile semantics.
@@ -92,10 +110,14 @@ verification, Evidence adoption, or Research State mutation.
 ## Crash and restart behavior
 
 All Run projection/history, immutable execution documents, resource
-registrations, and artifact metadata survive process restart. A process crash
-may leave a Run in `RUNNING`; the store does not guess that it completed or
-failed. `describe_run()` reports the persisted status and last event so the
-runtime/Human recovery policy can decide what to do.
+registrations, diagnostics, operational provenance, and artifact metadata
+survive process restart. A process crash may leave a Run in `RUNNING`; the store
+does not guess that it completed or failed. `describe_run()` and the bounded
+public Run inspection surface report persisted state so runtime/Human recovery
+policy can decide what to do.
+
+Inspection itself never performs recovery, abort, retry, or Research State
+mutation.
 
 Only orphan staging cleanup is provided. Historical artifact GC, backup,
 archive, repair, and publication/export are out of scope.
@@ -115,6 +137,11 @@ archive, repair, and publication/export are out of scope.
 A Run-scoped diagnosis loads and hashes only that Run's documents (plus its
 shared descriptor/context identities), rather than re-hashing unrelated trace
 history. It never repairs or silently rewrites history.
+
+`research-loom run show` does not invoke this integrity doctor and does not
+re-hash artifact blobs. Inspection answers what happened and what metadata was
+persisted; integrity diagnosis answers whether persisted storage is internally
+sound. A future `run diagnose` or `doctor --run-id` remains a separate increment.
 
 ## OneDrive / shared storage
 
@@ -137,4 +164,6 @@ This plugin does not implement a concrete Desktop Research, Survey, Delphi,
 Case Study, or PoC capability; browser/search or LLM providers; dynamic plugin
 loading; production authorization; Work Conversation coordination; automatic
 `StateDeltaProposal` adoption; Writer/Publication execution; export/publish;
-OneDrive/SharePoint; artifact GC; backup/archive; or legacy deletion.
+OneDrive/SharePoint; artifact content export; generic Run history browsing;
+generic operational event querying; pagination; store repair; artifact GC;
+backup/archive; or legacy deletion.

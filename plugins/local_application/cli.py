@@ -88,6 +88,13 @@ def build_parser() -> argparse.ArgumentParser:
     _add_workspace(actions)
     _add_output_json(actions)
 
+    run = sub.add_parser("run")
+    run_sub = run.add_subparsers(dest="run_command", required=True)
+    run_show = run_sub.add_parser("show")
+    _add_workspace(run_show)
+    run_show.add_argument("--run-id", required=True)
+    _add_output_json(run_show)
+
     action = sub.add_parser("action")
     action_sub = action.add_subparsers(dest="action_command", required=True)
     submit = action_sub.add_parser("submit")
@@ -165,6 +172,8 @@ def _run(args: argparse.Namespace) -> Mapping[str, Any]:
             return facade.resume_context()
         if args.command == "actions":
             return facade.list_actions()
+        if args.command == "run" and args.run_command == "show":
+            return facade.show_run(args.run_id)
         if args.command == "action" and args.action_command == "submit":
             return facade.submit_action(_read_input(args.json_input))
         if args.command == "confirmation" and args.confirmation_command == "submit":
