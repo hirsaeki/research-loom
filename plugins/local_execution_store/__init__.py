@@ -2,6 +2,7 @@
 
 from .atomic import LocalExecutionStore, LocalOperationalTraceStore
 from .context_extensions import LocalCapabilityContextExtensionStore
+from .inspection import diagnostics_for
 from .intake import bind_controlled_import_root, read_controlled_file
 from .status import pending_runs_for_project, recent_runs_for_project
 from .store import (
@@ -22,6 +23,7 @@ __all__ = [
     "RegisteredResource",
     "StoreIntegrityDiagnostic",
     "bind_controlled_import_root",
+    "diagnostics_for",
     "pending_runs_for_project",
     "read_controlled_file",
     "recent_runs_for_project",
