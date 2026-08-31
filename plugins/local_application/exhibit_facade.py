@@ -82,6 +82,34 @@ def _metadata_projection(document: Mapping[str, Any]) -> Mapping[str, Any]:
     }
 
 
+def _stored_metadata_projection(metadata: Mapping[str, Any]) -> Mapping[str, Any]:
+    return {
+        "exhibit_id": str(metadata["exhibit_id"]),
+        "kind": str(metadata["kind"]),
+        "title": str(metadata["title"]),
+        "purpose": str(metadata["purpose"]),
+        "rq_ids": list(metadata["rq_ids"]),
+        "source_run_ids": list(metadata["source_run_ids"]),
+        "source_artifact_refs": list(metadata["source_artifact_refs"]),
+        "source_object_ids": list(metadata["source_object_ids"]),
+        "derived_from_exhibit_ids": list(metadata["derived_from_exhibit_ids"]),
+        "content_representation": str(metadata["content_representation"]),
+        "content_digest": str(metadata["content_digest"]),
+        "captured_against": deepcopy(dict(metadata["captured_against"])),
+        "captured_at": str(metadata["captured_at"]),
+        "capture_origin": str(metadata["capture_origin"]),
+    }
+
+
+def _state_binding(state) -> tuple[str, str, str]:
+    snapshot = state.current_snapshot
+    return (
+        str(state.active_lineage_ref),
+        str(snapshot["id"]),
+        str(snapshot["content_digest"]),
+    )
+
+
 class LocalApplicationFacade(_BaseLocalApplicationFacade):
     """Production facade extended with immutable Research Exhibit persistence."""
 
@@ -255,6 +283,14 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
         store = self._exhibit_store()
         self._validate_derived_exhibits(derived_from, store)
 
+        latest = self._current_state()
+        if _state_binding(latest) != _state_binding(state):
+            raise LocalApplicationError(
+                "APPLICATION-EXHIBIT-STATE-STALE-001",
+                "Research State changed while validating the Research Exhibit",
+            )
+        state = latest
+
         captured_at = self._application.clock.now()
         snapshot = state.current_snapshot
         document: dict[str, Any] = {
@@ -315,7 +351,7 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
             "project_id": self._project_id,
             "rq_id": rq_id,
             "exhibits": [
-                _metadata_projection(item)
+                _stored_metadata_projection(item)
                 for item in probe[:_EXHIBIT_LIST_LIMIT]
             ],
             "truncated": truncated,

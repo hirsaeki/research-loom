@@ -19,6 +19,23 @@ _MEDIA_TYPES = {
     "json": "application/json",
     "text": "text/plain",
 }
+_METADATA_FIELDS = {
+    "exhibit_id",
+    "project_id",
+    "kind",
+    "title",
+    "purpose",
+    "rq_ids",
+    "source_run_ids",
+    "source_artifact_refs",
+    "source_object_ids",
+    "derived_from_exhibit_ids",
+    "content_representation",
+    "content_digest",
+    "captured_against",
+    "captured_at",
+    "capture_origin",
+}
 
 
 class LocalResearchExhibitStoreError(RuntimeError):
@@ -87,6 +104,34 @@ def normalized_content(content: Mapping[str, Any]) -> dict[str, Any]:
     return normalized
 
 
+def _validate_string_list(value: Any, field: str, *, required: bool = False) -> None:
+    if (
+        not isinstance(value, list)
+        or any(not isinstance(item, str) or not item.strip() for item in value)
+        or len(value) != len(set(value))
+        or (required and not value)
+    ):
+        raise LocalResearchExhibitStoreError(
+            "EXHIBIT-DOCUMENT-001", f"Research Exhibit {field} is invalid"
+        )
+
+
+def _validate_snapshot_binding(value: Any) -> None:
+    if not isinstance(value, Mapping) or set(value) != {
+        "lineage_ref", "snapshot_ref", "snapshot_digest"
+    }:
+        raise LocalResearchExhibitStoreError(
+            "EXHIBIT-DOCUMENT-001", "Research Exhibit snapshot binding is invalid"
+        )
+    if any(
+        not isinstance(value.get(field), str) or not value[field].strip()
+        for field in ("lineage_ref", "snapshot_ref", "snapshot_digest")
+    ):
+        raise LocalResearchExhibitStoreError(
+            "EXHIBIT-DOCUMENT-001", "Research Exhibit snapshot binding is incomplete"
+        )
+
+
 def validate_exhibit_document(value: Mapping[str, Any]) -> None:
     required = {
         "schema_version",
@@ -124,39 +169,14 @@ def validate_exhibit_document(value: Mapping[str, Any]) -> None:
             "EXHIBIT-DOCUMENT-001", "stored Research Exhibit kind is unsupported"
         )
     for field in (
-        "rq_ids",
         "source_run_ids",
         "source_artifact_refs",
         "source_object_ids",
         "derived_from_exhibit_ids",
     ):
-        items = value.get(field)
-        if not isinstance(items, list) or any(
-            not isinstance(item, str) or not item.strip() for item in items
-        ) or len(items) != len(set(items)):
-            raise LocalResearchExhibitStoreError(
-                "EXHIBIT-DOCUMENT-001", f"Research Exhibit {field} is invalid"
-            )
-    if not value["rq_ids"]:
-        raise LocalResearchExhibitStoreError(
-            "EXHIBIT-DOCUMENT-001", "Research Exhibit requires at least one RQ binding"
-        )
-
-    captured_against = value.get("captured_against")
-    if not isinstance(captured_against, Mapping) or set(captured_against) != {
-        "lineage_ref", "snapshot_ref", "snapshot_digest"
-    }:
-        raise LocalResearchExhibitStoreError(
-            "EXHIBIT-DOCUMENT-001", "Research Exhibit snapshot binding is invalid"
-        )
-    if any(
-        not isinstance(captured_against.get(field), str)
-        or not captured_against[field].strip()
-        for field in ("lineage_ref", "snapshot_ref", "snapshot_digest")
-    ):
-        raise LocalResearchExhibitStoreError(
-            "EXHIBIT-DOCUMENT-001", "Research Exhibit snapshot binding is incomplete"
-        )
+        _validate_string_list(value.get(field), field)
+    _validate_string_list(value.get("rq_ids"), "rq_ids", required=True)
+    _validate_snapshot_binding(value.get("captured_against"))
 
     content = value.get("content")
     if not isinstance(content, Mapping) or set(content) != {
@@ -199,6 +219,66 @@ def validate_exhibit_document(value: Mapping[str, Any]) -> None:
             )
 
 
+def _metadata_from_document(document: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "exhibit_id": str(document["exhibit_id"]),
+        "project_id": str(document["project_id"]),
+        "kind": str(document["kind"]),
+        "title": str(document["title"]),
+        "purpose": str(document["purpose"]),
+        "rq_ids": list(document["rq_ids"]),
+        "source_run_ids": list(document["source_run_ids"]),
+        "source_artifact_refs": list(document["source_artifact_refs"]),
+        "source_object_ids": list(document["source_object_ids"]),
+        "derived_from_exhibit_ids": list(document["derived_from_exhibit_ids"]),
+        "content_representation": str(document["content"]["representation"]),
+        "content_digest": str(document["content_digest"]),
+        "captured_against": deepcopy(dict(document["captured_against"])),
+        "captured_at": str(document["provenance"]["captured_at"]),
+        "capture_origin": str(document["provenance"]["capture_origin"]),
+    }
+
+
+def _validate_exhibit_metadata(value: Mapping[str, Any]) -> None:
+    if not isinstance(value, Mapping) or set(value) != _METADATA_FIELDS:
+        raise LocalResearchExhibitStoreError(
+            "EXHIBIT-STORE-INTEGRITY-001", "stored Research Exhibit metadata shape is invalid"
+        )
+    for field in (
+        "exhibit_id",
+        "project_id",
+        "kind",
+        "title",
+        "purpose",
+        "content_representation",
+        "content_digest",
+        "captured_at",
+        "capture_origin",
+    ):
+        item = value.get(field)
+        if not isinstance(item, str) or not item.strip():
+            raise LocalResearchExhibitStoreError(
+                "EXHIBIT-STORE-INTEGRITY-001", f"stored Research Exhibit metadata {field} is invalid"
+            )
+    if value["kind"] not in SUPPORTED_EXHIBIT_KINDS:
+        raise LocalResearchExhibitStoreError(
+            "EXHIBIT-STORE-INTEGRITY-001", "stored Research Exhibit metadata kind is unsupported"
+        )
+    if value["content_representation"] not in SUPPORTED_EXHIBIT_REPRESENTATIONS:
+        raise LocalResearchExhibitStoreError(
+            "EXHIBIT-STORE-INTEGRITY-001", "stored Research Exhibit metadata representation is unsupported"
+        )
+    for field in (
+        "source_run_ids",
+        "source_artifact_refs",
+        "source_object_ids",
+        "derived_from_exhibit_ids",
+    ):
+        _validate_string_list(value.get(field), field)
+    _validate_string_list(value.get("rq_ids"), "rq_ids", required=True)
+    _validate_snapshot_binding(value.get("captured_against"))
+
+
 _SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS exhibit_store_meta (
     schema_version TEXT PRIMARY KEY
@@ -208,6 +288,7 @@ CREATE TABLE IF NOT EXISTS research_exhibits (
     project_id TEXT NOT NULL,
     captured_at TEXT NOT NULL,
     content_digest TEXT NOT NULL,
+    metadata_json TEXT NOT NULL,
     document_json TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS research_exhibits_project_idx
@@ -294,7 +375,7 @@ class LocalResearchExhibitStore:
             ) from exc
 
     @staticmethod
-    def _decode(row: sqlite3.Row) -> Mapping[str, Any]:
+    def _decode_document(row: sqlite3.Row) -> Mapping[str, Any]:
         try:
             value = json.loads(str(row["document_json"]))
         except json.JSONDecodeError as exc:
@@ -315,10 +396,35 @@ class LocalResearchExhibitStore:
             )
         return value
 
+    @staticmethod
+    def _decode_metadata(row: sqlite3.Row) -> Mapping[str, Any]:
+        try:
+            value = json.loads(str(row["metadata_json"]))
+        except json.JSONDecodeError as exc:
+            raise LocalResearchExhibitStoreError(
+                "EXHIBIT-STORE-INTEGRITY-001",
+                "stored Research Exhibit metadata is not valid JSON",
+            ) from exc
+        _validate_exhibit_metadata(value)
+        if (
+            str(value["exhibit_id"]) != str(row["exhibit_id"])
+            or str(value["project_id"]) != str(row["project_id"])
+            or str(value["content_digest"]) != str(row["content_digest"])
+            or str(value["captured_at"]) != str(row["captured_at"])
+        ):
+            raise LocalResearchExhibitStoreError(
+                "EXHIBIT-STORE-INTEGRITY-001",
+                "stored Research Exhibit metadata does not match index columns",
+            )
+        return value
+
     def capture(self, value: Mapping[str, Any]) -> None:
         document = deepcopy(dict(value))
         validate_exhibit_document(document)
+        metadata = _metadata_from_document(document)
+        _validate_exhibit_metadata(metadata)
         serialized = _canonical_json(document)
+        metadata_serialized = _canonical_json(metadata)
         connection = self._connect_write()
         try:
             connection.execute("BEGIN IMMEDIATE")
@@ -334,14 +440,16 @@ class LocalResearchExhibitStore:
             connection.execute(
                 """
                 INSERT INTO research_exhibits(
-                    exhibit_id, project_id, captured_at, content_digest, document_json
-                ) VALUES (?,?,?,?,?)
+                    exhibit_id, project_id, captured_at, content_digest,
+                    metadata_json, document_json
+                ) VALUES (?,?,?,?,?,?)
                 """,
                 (
                     str(document["exhibit_id"]),
                     str(document["project_id"]),
                     str(document["provenance"]["captured_at"]),
                     str(document["content_digest"]),
+                    metadata_serialized,
                     serialized,
                 ),
             )
@@ -375,10 +483,13 @@ class LocalResearchExhibitStore:
             return None
         try:
             row = connection.execute(
-                "SELECT * FROM research_exhibits WHERE exhibit_id=?",
+                """
+                SELECT exhibit_id, project_id, captured_at, content_digest, document_json
+                FROM research_exhibits WHERE exhibit_id=?
+                """,
                 (str(exhibit_id),),
             ).fetchone()
-            return None if row is None else self._decode(row)
+            return None if row is None else self._decode_document(row)
         except LocalResearchExhibitStoreError:
             raise
         except sqlite3.Error as exc:
@@ -404,7 +515,8 @@ class LocalResearchExhibitStore:
             if rq_id is None:
                 rows = connection.execute(
                     """
-                    SELECT e.*
+                    SELECT e.exhibit_id, e.project_id, e.captured_at,
+                           e.content_digest, e.metadata_json
                     FROM research_exhibits e
                     WHERE e.project_id=?
                     ORDER BY e.captured_at DESC, e.exhibit_id DESC
@@ -415,7 +527,8 @@ class LocalResearchExhibitStore:
             else:
                 rows = connection.execute(
                     """
-                    SELECT e.*
+                    SELECT e.exhibit_id, e.project_id, e.captured_at,
+                           e.content_digest, e.metadata_json
                     FROM research_exhibits e
                     JOIN research_exhibit_rqs r ON r.exhibit_id=e.exhibit_id
                     WHERE e.project_id=? AND r.rq_id=?
@@ -424,7 +537,7 @@ class LocalResearchExhibitStore:
                     """,
                     (str(project_id), str(rq_id), int(limit)),
                 ).fetchall()
-            return tuple(self._decode(row) for row in rows)
+            return tuple(self._decode_metadata(row) for row in rows)
         except LocalResearchExhibitStoreError:
             raise
         except sqlite3.Error as exc:
