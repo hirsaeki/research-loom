@@ -113,7 +113,16 @@ class RunInspectionTests(unittest.TestCase):
                     media_type="text/plain",
                     content=b"original",
                     artifact_id="ART-1",
-                    provenance={"capture_id": "CAP-1"},
+                    provenance={
+                        "capture_id": "CAP-1",
+                        "exact_locator": "https://example.test/source#section",
+                        "path": "/internal/should-not-leak",
+                        "nested": {
+                            "local_path": "C:/internal/should-not-leak",
+                            "storage_locator": "artifact://internal/should-not-leak",
+                            "note": "keep this provenance note",
+                        },
+                    },
                 )
                 app.execution_store.put_bytes(
                     run,
@@ -176,6 +185,10 @@ class RunInspectionTests(unittest.TestCase):
                     facade._application.execution_store,
                     "diagnose_integrity",
                     side_effect=AssertionError("run show must not call diagnose_integrity"),
+                ), patch.object(
+                    facade._application.execution_store,
+                    "artifacts_for",
+                    side_effect=AssertionError("run show must use bounded artifact metadata read"),
                 ):
                     result = facade.show_run(run.run_id)
                 self.assertEqual(result["run"]["status"], "RUNNING")
@@ -188,6 +201,12 @@ class RunInspectionTests(unittest.TestCase):
                 self.assertTrue(result["truncated"]["retrieval_attempts"])
                 self.assertNotIn("storage_locator", result["artifacts"][0])
                 self.assertNotIn("content", result["artifacts"][0])
+                provenance = result["artifacts"][0]["provenance"]
+                self.assertEqual(provenance["exact_locator"], "https://example.test/source#section")
+                self.assertNotIn("path", provenance)
+                self.assertNotIn("local_path", provenance["nested"])
+                self.assertNotIn("storage_locator", provenance["nested"])
+                self.assertEqual(provenance["nested"]["note"], "keep this provenance note")
                 summary = result["desktop_research"]["retrieval_attempt_summary"]
                 self.assertEqual(summary["total"], 4)
                 for outcome in ("source_captured", "blocked", "out_of_scope", "no_relevant_source"):

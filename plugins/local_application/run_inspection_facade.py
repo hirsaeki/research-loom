@@ -7,7 +7,7 @@ from plugins.desktop_research.attempts import (
     operational_terminations,
     reconstruct_attempts,
 )
-from plugins.local_execution_store import diagnostics_for
+from plugins.local_execution_store import artifact_metadata_for, diagnostics_for
 
 from .external_desktop_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
 from .facade import LocalApplicationError, _jsonable
@@ -15,10 +15,11 @@ from .facade import LocalApplicationError, _jsonable
 
 _RUN_INSPECTION_ITEM_LIMIT = 100
 _INTERNAL_PROVENANCE_KEYS = {
-    "blob_path",
-    "database_path",
-    "filesystem_path",
-    "sqlite_path",
+    "blob_locator",
+    "database_locator",
+    "filesystem_locator",
+    "path",
+    "sqlite_locator",
     "storage_locator",
 }
 
@@ -28,12 +29,17 @@ def _bounded(values: Iterable[Any]) -> tuple[list[Any], bool]:
     return items[:_RUN_INSPECTION_ITEM_LIMIT], len(items) > _RUN_INSPECTION_ITEM_LIMIT
 
 
+def _internal_provenance_key(key: Any) -> bool:
+    normalized = str(key).casefold()
+    return normalized in _INTERNAL_PROVENANCE_KEYS or normalized.endswith("_path")
+
+
 def _public_provenance(value: Any) -> Any:
     if isinstance(value, Mapping):
         return {
             str(key): _public_provenance(item)
             for key, item in value.items()
-            if str(key) not in _INTERNAL_PROVENANCE_KEYS
+            if not _internal_provenance_key(key)
         }
     if isinstance(value, (tuple, list)):
         return [_public_provenance(item) for item in value]
@@ -176,7 +182,11 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                 _jsonable(diagnostic_probe)
             )
 
-            artifact_probe = self._application.execution_store.artifacts_for(run_id)
+            artifact_probe = artifact_metadata_for(
+                self._application.execution_store,
+                run_id,
+                limit=probe_limit,
+            )
             artifact_items, artifacts_truncated = _bounded(
                 _artifact_projection(artifact_probe)
             )
