@@ -1,15 +1,11 @@
 from __future__ import annotations
 
-from contextlib import contextmanager
 from collections import Counter
+from contextlib import contextmanager
 from typing import Any, Iterator, Mapping
 
-from core.execution.models import (
-    CapabilityRunRecord,
-    ExecutionArtifactMetadata,
-    OperationalTraceEvent,
-    RunStatus,
-)
+from core.execution.models import CapabilityRunRecord, ExecutionArtifactMetadata, RunStatus
+from core.execution.operational_trace import OperationalTraceEvent
 
 from .operational_trace import LocalOperationalTraceStore as _BaseOperationalTraceStore
 from .store import (
