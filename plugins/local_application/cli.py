@@ -51,6 +51,12 @@ def _add_input_json(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def _add_external_input(parser: argparse.ArgumentParser) -> None:
+    _add_workspace(parser)
+    parser.add_argument("--run-id", required=True)
+    _add_input_json(parser)
+
+
 class _JsonArgumentParser(argparse.ArgumentParser):
     def error(self, message: str) -> None:
         raise LocalApplicationError("CLI-COMMAND-001", message)
@@ -102,10 +108,19 @@ def build_parser() -> argparse.ArgumentParser:
 
     external = sub.add_parser("external")
     external_sub = external.add_subparsers(dest="external_command", required=True)
+
+    attempt = external_sub.add_parser("attempt")
+    attempt_sub = attempt.add_subparsers(dest="attempt_command", required=True)
+    attempt_start = attempt_sub.add_parser("start")
+    _add_external_input(attempt_start)
+    attempt_complete = attempt_sub.add_parser("complete")
+    _add_external_input(attempt_complete)
+
+    capture = external_sub.add_parser("capture")
+    _add_external_input(capture)
+
     collect = external_sub.add_parser("collect")
-    _add_workspace(collect)
-    collect.add_argument("--run-id", required=True)
-    _add_input_json(collect)
+    _add_external_input(collect)
 
     return parser
 
@@ -156,8 +171,24 @@ def _run(args: argparse.Namespace) -> Mapping[str, Any]:
             return facade.submit_confirmation(_read_input(args.json_input))
         if args.command == "decision" and args.decision_command == "resolve":
             return facade.resolve_human_decision(_read_input(args.json_input))
-        if args.command == "external" and args.external_command == "collect":
-            return facade.collect_external(args.run_id, _read_input(args.json_input))
+        if args.command == "external":
+            if args.external_command == "attempt" and args.attempt_command == "start":
+                return facade.start_external_retrieval_attempt(
+                    args.run_id,
+                    _read_input(args.json_input),
+                )
+            if args.external_command == "attempt" and args.attempt_command == "complete":
+                return facade.complete_external_retrieval_attempt(
+                    args.run_id,
+                    _read_input(args.json_input),
+                )
+            if args.external_command == "capture":
+                return facade.capture_external_source(
+                    args.run_id,
+                    _read_input(args.json_input),
+                )
+            if args.external_command == "collect":
+                return facade.collect_external(args.run_id, _read_input(args.json_input))
     raise LocalApplicationError("CLI-COMMAND-001", "unsupported command")
 
 
