@@ -222,25 +222,15 @@ class LocalOperationalTraceStore(_BaseOperationalTraceStore):
         event_id: str | None = None,
     ) -> OperationalTraceEvent:
         guard = getattr(self._run_store, "require_run_status", None)
-        if callable(guard):
-            with guard(run_id, expected_status):
-                return self.append(
-                    run_id,
-                    event_type,
-                    occurred_at,
-                    payload,
-                    event_id=event_id,
-                )
-
-        persisted = self._run_store.load_run(run_id)
-        if persisted is None or persisted.status is not expected_status:
-            raise ValueError(
-                f"Run {run_id} must remain {expected_status.value} for this operation"
+        if not callable(guard):
+            raise TypeError(
+                "Run-status-conditioned append requires an atomic require_run_status guard"
             )
-        return self.append(
-            run_id,
-            event_type,
-            occurred_at,
-            payload,
-            event_id=event_id,
-        )
+        with guard(run_id, expected_status):
+            return self.append(
+                run_id,
+                event_type,
+                occurred_at,
+                payload,
+                event_id=event_id,
+            )
