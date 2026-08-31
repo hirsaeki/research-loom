@@ -49,6 +49,33 @@ class DesktopResearchAttemptRecorder:
         ):
             raise ValueError("attempt recorder Run binding no longer matches persisted Run")
 
+    def _append_running(
+        self,
+        event_type: str,
+        payload: Mapping[str, Any],
+        *,
+        event_id: str | None = None,
+    ):
+        occurred_at = self._clock.now()
+        append_if_status = getattr(self._operations, "append_if_run_status", None)
+        if callable(append_if_status):
+            return append_if_status(
+                self._run.run_id,
+                RunStatus.RUNNING,
+                event_type,
+                occurred_at,
+                payload,
+                event_id=event_id,
+            )
+        self._require_running()
+        return self._operations.append(
+            self._run.run_id,
+            event_type,
+            occurred_at,
+            payload,
+            event_id=event_id,
+        )
+
     def start_attempt(
         self,
         attempt_id: str,
@@ -74,10 +101,8 @@ class DesktopResearchAttemptRecorder:
             "target_locator": target_locator,
             "provenance": dict(provenance or {}),
         }
-        event = self._operations.append(
-            self._run.run_id,
+        event = self._append_running(
             ATTEMPT_STARTED,
-            self._clock.now(),
             payload,
             event_id=f"{self._run.run_id}.{attempt_id}.start",
         )
@@ -121,10 +146,8 @@ class DesktopResearchAttemptRecorder:
             "resulting_capture_id": resulting_capture_id,
             "provenance": dict(provenance or {}),
         }
-        self._operations.append(
-            self._run.run_id,
+        self._append_running(
             ATTEMPT_COMPLETED,
-            self._clock.now(),
             payload,
             event_id=f"{self._run.run_id}.{attempt_id}.complete",
         )
@@ -138,10 +161,8 @@ class DesktopResearchAttemptRecorder:
         coverage_dimension_ids: tuple[str, ...] = (),
     ) -> None:
         self._require_running()
-        self._operations.append(
-            self._run.run_id,
+        self._append_running(
             OPERATIONAL_TERMINATION,
-            self._clock.now(),
             {
                 "reason": reason,
                 "detail": detail,
