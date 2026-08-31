@@ -95,6 +95,23 @@ def build_parser() -> argparse.ArgumentParser:
     run_show.add_argument("--run-id", required=True)
     _add_output_json(run_show)
 
+    exhibit = sub.add_parser("exhibit")
+    exhibit_sub = exhibit.add_subparsers(dest="exhibit_command", required=True)
+
+    exhibit_capture = exhibit_sub.add_parser("capture")
+    _add_workspace(exhibit_capture)
+    _add_input_json(exhibit_capture)
+
+    exhibit_list = exhibit_sub.add_parser("list")
+    _add_workspace(exhibit_list)
+    exhibit_list.add_argument("--rq-id")
+    _add_output_json(exhibit_list)
+
+    exhibit_show = exhibit_sub.add_parser("show")
+    _add_workspace(exhibit_show)
+    exhibit_show.add_argument("--exhibit-id", required=True)
+    _add_output_json(exhibit_show)
+
     action = sub.add_parser("action")
     action_sub = action.add_subparsers(dest="action_command", required=True)
     submit = action_sub.add_parser("submit")
@@ -174,6 +191,13 @@ def _run(args: argparse.Namespace) -> Mapping[str, Any]:
             return facade.list_actions()
         if args.command == "run" and args.run_command == "show":
             return facade.show_run(args.run_id)
+        if args.command == "exhibit":
+            if args.exhibit_command == "capture":
+                return facade.capture_exhibit(_read_input(args.json_input))
+            if args.exhibit_command == "list":
+                return facade.list_exhibits(rq_id=args.rq_id)
+            if args.exhibit_command == "show":
+                return facade.show_exhibit(args.exhibit_id)
         if args.command == "action" and args.action_command == "submit":
             return facade.submit_action(_read_input(args.json_input))
         if args.command == "confirmation" and args.confirmation_command == "submit":
