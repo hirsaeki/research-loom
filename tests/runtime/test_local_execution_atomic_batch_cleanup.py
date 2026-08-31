@@ -6,7 +6,11 @@ import unittest
 from unittest.mock import patch
 
 from core.execution import CapabilityRunRecord, RunStatus
-from plugins.local_execution_store import LocalExecutionStore, LocalExecutionStoreError
+from plugins.local_execution_store import (
+    LocalExecutionStore,
+    LocalExecutionStoreError,
+    LocalOperationalTraceStore,
+)
 
 
 def running_run(run_id: str = "RUN-BATCH-CLEANUP") -> CapabilityRunRecord:
@@ -51,6 +55,11 @@ def batch(content_a: bytes, content_b: bytes):
             "parent_artifact_refs": ("ART-BATCH-A",),
         },
     )
+
+
+class NonAtomicRunStore:
+    def load_run(self, _run_id: str):
+        return running_run("RUN-NON-ATOMIC")
 
 
 class LocalExecutionAtomicBatchCleanupTests(unittest.TestCase):
@@ -115,6 +124,28 @@ class LocalExecutionAtomicBatchCleanupTests(unittest.TestCase):
                 }
                 self.assertEqual(after, before)
                 self.assertEqual(len(store.artifacts_for(run.run_id)), 2)
+            finally:
+                store.close()
+
+    def test_conditioned_operational_append_fails_closed_without_atomic_guard(self):
+        with tempfile.TemporaryDirectory() as temp:
+            store = LocalOperationalTraceStore(
+                Path(temp) / "operational",
+                NonAtomicRunStore(),
+            )
+            try:
+                with self.assertRaisesRegex(
+                    TypeError,
+                    "requires an atomic require_run_status guard",
+                ):
+                    store.append_if_run_status(
+                        "RUN-NON-ATOMIC",
+                        RunStatus.RUNNING,
+                        "desktop_research.retrieval_attempt_started",
+                        "2026-08-31T00:00:00Z",
+                        {"attempt_id": "ATT-NON-ATOMIC"},
+                    )
+                self.assertEqual(store.events_for("RUN-NON-ATOMIC"), ())
             finally:
                 store.close()
 
