@@ -12,7 +12,6 @@ from unittest.mock import patch
 
 import rfc8785
 
-from core.runtime import canonical_digest
 from plugins.desktop_research import DesktopResearchExternalAdapter, build_result_extension
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade, LocalResearchApplication
 from plugins.local_application.cli import main as cli_main
@@ -358,7 +357,7 @@ class ExternalDesktopResearchIntakeTests(unittest.TestCase):
                 result = facade.collect_external(run_id, {"handoff": handoff, "extension": extension})
                 after = app.state_repository.load_state_view("PRJ-1", "LIN-1").current_snapshot
 
-                self.assertEqual(result["status"], "SUCCEEDED")
+                self.assertEqual(result["status"], "CAPABILITY_RESULT_COLLECTED")
                 self.assertTrue(result["execution_result"]["state_delta_proposal"]["candidate_only"])
                 self.assertEqual(
                     (before["id"], before["content_digest"]),
