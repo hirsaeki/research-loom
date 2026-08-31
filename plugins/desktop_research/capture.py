@@ -41,6 +41,7 @@ class DesktopResearchCaptureService:
         original_media_type: str,
         text_rendition: str | bytes,
         provenance: Mapping[str, Any] | None = None,
+        artifact_write_options: Mapping[str, Any] | None = None,
     ) -> Mapping[str, Any]:
         if not capture_id or not source_category or not exact_locator:
             raise DesktopResearchCaptureError("capture identity/category/exact locator are required")
@@ -62,6 +63,8 @@ class DesktopResearchCaptureService:
             text_bytes = text_rendition
         else:
             raise DesktopResearchCaptureError("text rendition must be str or UTF-8 bytes")
+        if artifact_write_options is not None and not isinstance(artifact_write_options, Mapping):
+            raise DesktopResearchCaptureError("artifact_write_options must be a mapping")
 
         trusted = {
             "capture_id": capture_id,
@@ -70,23 +73,55 @@ class DesktopResearchCaptureService:
             "acquired_at": acquired_at,
             **dict(provenance or {}),
         }
-        original = self._artifacts.put_bytes(
-            run,
-            role="desktop_research.original_capture",
-            media_type=original_media_type,
-            content=original_bytes,
-            artifact_id=f"{run.run_id}.{capture_id}.original",
-            provenance={**trusted, "rendition_role": "original"},
-        )
-        text = self._artifacts.put_bytes(
-            run,
-            role="desktop_research.text_rendition",
-            media_type="text/plain",
-            content=text_bytes,
-            artifact_id=f"{run.run_id}.{capture_id}.text",
-            provenance={**trusted, "rendition_role": "text"},
-            parent_artifact_refs=(original.artifact_id,),
-        )
+        original_id = f"{run.run_id}.{capture_id}.original"
+        text_id = f"{run.run_id}.{capture_id}.text"
+        original_spec = {
+            "role": "desktop_research.original_capture",
+            "media_type": original_media_type,
+            "content": original_bytes,
+            "artifact_id": original_id,
+            "provenance": {**trusted, "rendition_role": "original"},
+            "parent_artifact_refs": (),
+        }
+        text_spec = {
+            "role": "desktop_research.text_rendition",
+            "media_type": "text/plain",
+            "content": text_bytes,
+            "artifact_id": text_id,
+            "provenance": {**trusted, "rendition_role": "text"},
+            "parent_artifact_refs": (original_id,),
+        }
+
+        batch_writer = getattr(self._artifacts, "put_bytes_batch", None)
+        if callable(batch_writer):
+            original, text = batch_writer(
+                run,
+                (original_spec, text_spec),
+                **dict(artifact_write_options or {}),
+            )
+        else:
+            if artifact_write_options:
+                raise DesktopResearchCaptureError(
+                    "artifact store does not support required atomic capture constraints"
+                )
+            original = self._artifacts.put_bytes(
+                run,
+                role=original_spec["role"],
+                media_type=original_spec["media_type"],
+                content=original_spec["content"],
+                artifact_id=original_spec["artifact_id"],
+                provenance=original_spec["provenance"],
+                parent_artifact_refs=original_spec["parent_artifact_refs"],
+            )
+            text = self._artifacts.put_bytes(
+                run,
+                role=text_spec["role"],
+                media_type=text_spec["media_type"],
+                content=text_spec["content"],
+                artifact_id=text_spec["artifact_id"],
+                provenance=text_spec["provenance"],
+                parent_artifact_refs=text_spec["parent_artifact_refs"],
+            )
         return self._detail(
             capture_id,
             source_category,
