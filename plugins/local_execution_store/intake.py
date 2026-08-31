@@ -25,6 +25,6 @@ def read_controlled_file(
     max_bytes: int,
 ) -> bytes:
     """Read through LocalExecutionStore's single controlled-intake implementation."""
-    if max_bytes <= 0:
-        raise ValueError("max_bytes must be positive")
+    if max_bytes < 0:
+        raise ValueError("max_bytes must be non-negative")
     return store._read_controlled_file(source_path, max_bytes=max_bytes)
