@@ -37,7 +37,7 @@ class DesktopResearchRetentionReopenTests(unittest.TestCase):
                     root,
                     "reopen",
                     b"large-original-survives-reopen",
-                    b"rendition",
+                    b"text",
                 )
                 captured = facade.capture_external_source(
                     run_id,
