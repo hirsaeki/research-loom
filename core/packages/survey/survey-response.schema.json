@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:research-loom:core:survey-response:0.1.0",
+  "title": "research-loom canonical detailed Survey response record",
+  "description": "Provider-neutral detailed Survey response shape shared by VIRTUAL pre-REAL validation and future REAL intake. It preserves the canonical Survey response metadata while adding identity namespace and answer-level values needed for structural validation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "object_type",
+    "response_id",
+    "raw_data_ref_id",
+    "participant_id",
+    "identity_namespace",
+    "epistemic_mode",
+    "synthetic",
+    "response_status",
+    "eligibility_status",
+    "duplicate_disposition",
+    "verified_evidence_claimed",
+    "dropout",
+    "answers"
+  ],
+  "properties": {
+    "schema_version": {"const": "0.1.0"},
+    "object_type": {"const": "survey_response_record"},
+    "response_id": {"$ref": "#/$defs/identifier"},
+    "raw_data_ref_id": {"$ref": "#/$defs/identifier"},
+    "participant_id": {"$ref": "#/$defs/identifier"},
+    "identity_namespace": {"type": "string", "pattern": "^(synthetic|real):[A-Za-z0-9._:-]+$"},
+    "epistemic_mode": {"enum": ["empirical", "virtual", "synthetic"]},
+    "synthetic": {"type": "boolean"},
+    "response_status": {"enum": ["complete", "partial"]},
+    "eligibility_status": {"enum": ["eligible", "excluded", "unknown"]},
+    "duplicate_disposition": {"enum": ["not_duplicate", "kept", "excluded", "unresolved"]},
+    "verified_evidence_claimed": {"const": false},
+    "dropout": {"type": "boolean"},
+    "answers": {"type": "array", "items": {"$ref": "#/$defs/answer"}},
+    "response_timestamp": {"type": "string", "format": "date-time"},
+    "exclusion_reason": {"type": "string", "minLength": 1}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"synthetic": {"const": true}}, "required": ["synthetic"]},
+      "then": {
+        "properties": {
+          "epistemic_mode": {"enum": ["virtual", "synthetic"]},
+          "identity_namespace": {"pattern": "^synthetic:"}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"synthetic": {"const": false}}, "required": ["synthetic"]},
+      "then": {
+        "properties": {
+          "epistemic_mode": {"const": "empirical"},
+          "identity_namespace": {"pattern": "^real:"}
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "identifier": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"},
+    "answer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["response_key", "state"],
+      "properties": {
+        "response_key": {"$ref": "#/$defs/identifier"},
+        "state": {"enum": ["answered", "missing", "unknown", "not_applicable", "prefer_not_to_answer"]},
+        "value": {}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"state": {"const": "answered"}}, "required": ["state"]},
+          "then": {"required": ["value"]}
+        },
+        {
+          "if": {
+            "properties": {"state": {"enum": ["missing", "unknown", "not_applicable", "prefer_not_to_answer"]}},
+            "required": ["state"]
+          },
+          "then": {"not": {"required": ["value"]}}
+        }
+      ]
+    }
+  }
+}
