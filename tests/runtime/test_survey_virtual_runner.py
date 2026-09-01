@@ -1,3 +1,5 @@
+import json
+
 from tests.runtime.survey_virtual_runner_test_support import *  # noqa: F403
 
 
