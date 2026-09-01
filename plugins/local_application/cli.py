@@ -19,6 +19,26 @@ def _emit(value: Mapping[str, Any]) -> None:
     sys.stdout.write(json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n")
 
 
+def _emit_external_materials_human(value: Mapping[str, Any]) -> None:
+    materials = value.get("materials", [])
+    sys.stdout.write(f"Captured external materials: {len(materials)}\n")
+    for index, material in enumerate(materials, start=1):
+        locators = material.get("source_locators") or []
+        original = material.get("original") or {}
+        label = locators[0] if locators else original.get("artifact_id", material.get("material_id", "material"))
+        runs = ", ".join(material.get("run_ids") or [])
+        renditions = material.get("renditions") or []
+        rendition_ids = ", ".join(str(item.get("artifact_id")) for item in renditions)
+        sys.stdout.write(f"\n{index}. {label}\n")
+        sys.stdout.write(f"   Digest: {material.get('original_digest')}\n")
+        sys.stdout.write(f"   Runs: {runs}\n")
+        sys.stdout.write(
+            "   Original: "
+            f"{original.get('artifact_id')} ({original.get('media_type')}, {original.get('size_bytes')} bytes)\n"
+        )
+        sys.stdout.write(f"   Rendition: {rendition_ids}\n")
+
+
 def _read_input(source: str | None) -> dict[str, Any]:
     source = source or "-"
     try:
@@ -146,6 +166,12 @@ def build_parser() -> argparse.ArgumentParser:
     collect = external_sub.add_parser("collect")
     _add_external_input(collect)
 
+    materials = external_sub.add_parser("materials")
+    materials_sub = materials.add_subparsers(dest="materials_command", required=True)
+    materials_list = materials_sub.add_parser("list")
+    _add_workspace(materials_list)
+    _add_output_json(materials_list)
+
     return parser
 
 
@@ -222,6 +248,8 @@ def _run(args: argparse.Namespace) -> Mapping[str, Any]:
                 )
             if args.external_command == "collect":
                 return facade.collect_external(args.run_id, _read_input(args.json_input))
+            if args.external_command == "materials" and args.materials_command == "list":
+                return facade.list_external_materials()
     raise LocalApplicationError("CLI-COMMAND-001", "unsupported command")
 
 
@@ -229,7 +257,16 @@ def main(argv: list[str] | None = None) -> int:
     try:
         args = build_parser().parse_args(argv)
         result = _run(args)
-        _emit(result)
+        human_materials = (
+            args.command == "external"
+            and args.external_command == "materials"
+            and args.materials_command == "list"
+            and not args.json
+        )
+        if human_materials:
+            _emit_external_materials_human(result)
+        else:
+            _emit(result)
         return 1 if result.get("status") == "ERROR" else 0
     except (LocalWorkspaceError, LocalApplicationError, ConversationRuntimeError, HumanDecisionError) as exc:
         _emit({
