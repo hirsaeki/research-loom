@@ -10,6 +10,7 @@ from .store import LocalExecutionStoreIntegrityError
 
 _ORIGINAL_ROLE = "desktop_research.original_capture"
 _TEXT_ROLE = "desktop_research.text_rendition"
+_RUN_BATCH_SIZE = 400
 
 
 def _artifact_from_row(row) -> ExecutionArtifactMetadata:
@@ -36,6 +37,15 @@ def _artifact_from_row(row) -> ExecutionArtifactMetadata:
     )
 
 
+def _capture_id(artifact: ExecutionArtifactMetadata) -> str:
+    capture_id = artifact.provenance.get("capture_id")
+    if not isinstance(capture_id, str) or not capture_id:
+        raise LocalExecutionStoreIntegrityError(
+            "persisted external capture provenance is missing capture_id"
+        )
+    return capture_id
+
+
 def external_capture_artifact_metadata_for_project(
     store,
     project_ref: str,
@@ -46,6 +56,11 @@ def external_capture_artifact_metadata_for_project(
     """Read one bounded material page of persisted Desktop Research captures.
 
     ``after`` is the exclusive ``(first_captured_at, material_id)`` page key.
+    The page bound limits projected materials and artifact metadata. Discovering
+    material keys still aggregates the project-wide original-capture history so
+    cross-Run digest identity and first-capture ordering remain exact without a
+    second persisted material index.
+
     Callers receive artifact metadata only, never SQLite rows, paths, or blob bytes.
     """
     if limit <= 0:
@@ -127,34 +142,40 @@ def external_capture_artifact_metadata_for_project(
             (str(project_ref), _ORIGINAL_ROLE, *digests),
         ).fetchall()
 
-        rendition_rows = store._connection.execute(
-            f"""
-            SELECT t.artifact_id, t.run_id, t.role, t.media_type, t.size, t.digest,
-                   t.storage_locator, t.execution_mode, t.provenance_json
-            FROM execution_artifacts AS t
-            JOIN runs AS r ON r.run_id = t.run_id
-            WHERE r.project_ref = ?
-              AND r.capability_id = 'desktop-research'
-              AND r.function_id = 'investigate'
-              AND r.execution_mode = 'real'
-              AND t.role = ?
-              AND EXISTS (
-                  SELECT 1
-                  FROM execution_artifacts AS o
-                  WHERE o.run_id = t.run_id
-                    AND o.role = ?
-                    AND o.digest IN ({placeholders})
-                    AND json_extract(o.provenance_json, '$.capture_id')
-                        = json_extract(t.provenance_json, '$.capture_id')
-              )
-            ORDER BY r.prepared_at, t.run_id, t.artifact_id
-            """,
-            (str(project_ref), _TEXT_ROLE, _ORIGINAL_ROLE, *digests),
-        ).fetchall()
+        originals = tuple(_artifact_from_row(row) for row in original_rows)
+        if not originals:
+            raise LocalExecutionStoreIntegrityError(
+                "persisted external material page has no original captures"
+            )
+        capture_keys = {
+            (artifact.run_id, _capture_id(artifact))
+            for artifact in originals
+        }
+        run_ids = sorted({artifact.run_id for artifact in originals})
 
-    artifacts = tuple(
-        _artifact_from_row(row)
-        for row in (*original_rows, *rendition_rows)
+        rendition_rows = []
+        for offset in range(0, len(run_ids), _RUN_BATCH_SIZE):
+            run_batch = run_ids[offset : offset + _RUN_BATCH_SIZE]
+            run_placeholders = ",".join("?" for _ in run_batch)
+            rendition_rows.extend(
+                store._connection.execute(
+                    f"""
+                    SELECT artifact_id, run_id, role, media_type, size, digest,
+                           storage_locator, execution_mode, provenance_json
+                    FROM execution_artifacts
+                    WHERE role = ?
+                      AND run_id IN ({run_placeholders})
+                    ORDER BY run_id, artifact_id
+                    """,
+                    (_TEXT_ROLE, *run_batch),
+                ).fetchall()
+            )
+
+    renditions = tuple(
+        artifact
+        for artifact in (_artifact_from_row(row) for row in rendition_rows)
+        if (artifact.run_id, _capture_id(artifact)) in capture_keys
     )
+    artifacts = (*originals, *renditions)
     next_after = material_keys[-1] if len(material_rows) > limit else None
     return artifacts, next_after
