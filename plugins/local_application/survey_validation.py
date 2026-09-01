@@ -130,6 +130,9 @@ def validate_questionnaire(
             "question_id and response variable identities must be unique",
         )
     id_set = set(ids)
+    question_by_id = {
+        str(question["question_id"]): question for question in questions
+    }
     sections = list(questionnaire.get("sections") or [])
     section_ids = [str(item.get("section_id")) for item in sections]
     if len(section_ids) != len(set(section_ids)):
@@ -176,17 +179,25 @@ def validate_questionnaire(
         option_id_set = set(option_ids)
         missing = question.get("missing_value_semantics")
         if isinstance(missing, Mapping):
+            semantic_option_ids = []
             for field in (
                 "unknown_option_id",
                 "not_applicable_option_id",
                 "prefer_not_to_answer_option_id",
             ):
                 option_id = missing.get(field)
-                if option_id is not None and str(option_id) not in option_id_set:
-                    raise LocalApplicationError(
-                        "APPLICATION-SURVEY-QUESTIONNAIRE-001",
-                        f"{field} does not resolve to a response option for {question_id}",
-                    )
+                if option_id is not None:
+                    semantic_option_ids.append(str(option_id))
+                    if str(option_id) not in option_id_set:
+                        raise LocalApplicationError(
+                            "APPLICATION-SURVEY-QUESTIONNAIRE-001",
+                            f"{field} does not resolve to a response option for {question_id}",
+                        )
+            if len(semantic_option_ids) != len(set(semantic_option_ids)):
+                raise LocalApplicationError(
+                    "APPLICATION-SURVEY-QUESTIONNAIRE-001",
+                    f"explicit missing-value categories must use distinct response options for {question_id}",
+                )
 
         for branch in question.get("branching", []):
             condition = str(branch.get("condition_question_id"))
@@ -203,5 +214,22 @@ def validate_questionnaire(
                     "APPLICATION-SURVEY-BRANCH-001",
                     "show/skip branching requires target_question_id",
                 )
+            condition_options = list(
+                question_by_id[condition].get("response_options", [])
+            )
+            if (
+                condition_options
+                and branch.get("operator") in {"equals", "not_equals", "contains"}
+                and "value" in branch
+            ):
+                stable_values = {
+                    str(option.get("value", option["option_id"]))
+                    for option in condition_options
+                }
+                if str(branch["value"]) not in stable_values:
+                    raise LocalApplicationError(
+                        "APPLICATION-SURVEY-BRANCH-001",
+                        "branch choice condition must use the condition question's stable response value",
+                    )
 
     validate_rqs(sorted(traced), state)
