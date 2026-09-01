@@ -135,13 +135,11 @@ def build_output(
             "produced_at": str(provenance["generated_at"]),
             "implementation_id": IMPLEMENTATION_ID,
             "implementation_version": IMPLEMENTATION_VERSION,
-            "input_content_digests": list(dict.fromkeys([
-                str(request.run.invocation_digest),
+            "input_content_digests": [
+                str(request.run.descriptor_digest),
                 str(request.run.context_pack_digest),
-                str(extension["design_ref"]["content_digest"]),
-                str(extension["instrument_ref"]["content_digest"]),
-                str(extension["run_spec"]["content_digest"]),
-            ])),
+                str(request.run.invocation_digest),
+            ],
         },
         "adoption_boundary": {
             "research_state_mutation_performed": False,
