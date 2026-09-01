@@ -18,7 +18,6 @@ from .survey_response_core import (
     _RESPONSE_FIELDS,
 )
 from .survey_response_inspection import SurveyResponseInspectionMixin
-from .survey_validation import required_string
 
 
 _SURVEY_RESPONSE_ACTIONS = (
@@ -59,6 +58,13 @@ def _payload_fields(payload: Mapping[str, Any], allowed: set[str], label: str) -
         )
 
 
+def _nonempty_string(payload: Mapping[str, Any], field: str) -> str:
+    value = payload.get(field)
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{field} must be a non-empty string")
+    return value
+
+
 def _response_payload(payload: Mapping[str, Any]) -> None:
     _payload_fields(payload, _RESPONSE_FIELDS, "Survey response")
 
@@ -69,7 +75,7 @@ def _dataset_payload(payload: Mapping[str, Any]) -> None:
 
 def _response_show_payload(payload: Mapping[str, Any]) -> None:
     _payload_fields(payload, {"response_id", "identity_namespace"}, "Survey response show")
-    required_string(payload, "response_id")
+    _nonempty_string(payload, "response_id")
     namespace = payload.get("identity_namespace")
     if namespace is not None and (not isinstance(namespace, str) or not namespace):
         raise ValueError("identity_namespace must be a non-empty string when supplied")
@@ -77,7 +83,7 @@ def _response_show_payload(payload: Mapping[str, Any]) -> None:
 
 def _dataset_show_payload(payload: Mapping[str, Any]) -> None:
     _payload_fields(payload, {"dataset_id", "limit", "offset"}, "Survey response Dataset show")
-    required_string(payload, "dataset_id")
+    _nonempty_string(payload, "dataset_id")
     if "limit" in payload and not isinstance(payload["limit"], int):
         raise ValueError("limit must be an integer")
     if "offset" in payload and not isinstance(payload["offset"], int):
@@ -108,14 +114,14 @@ class _SurveyResponseActionHandler:
             result = facade.capture_survey_response(payload)
         elif self._operation == "show_response":
             result = facade.show_survey_response(
-                required_string(payload, "response_id"),
+                _nonempty_string(payload, "response_id"),
                 identity_namespace=payload.get("identity_namespace"),
             )
         elif self._operation == "capture_dataset":
             result = facade.capture_survey_response_dataset(payload)
         elif self._operation == "show_dataset":
             result = facade.show_survey_response_dataset(
-                required_string(payload, "dataset_id"),
+                _nonempty_string(payload, "dataset_id"),
                 limit=payload.get("limit", 25),
                 offset=payload.get("offset", 0),
             )
