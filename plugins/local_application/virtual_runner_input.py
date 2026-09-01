@@ -198,6 +198,11 @@ def _payload(payload: Mapping[str, Any]) -> dict[str, Any]:
             "stress_faults contains an unsupported structural fault",
         )
     prior = _string_list(payload.get("prior_virtual_run_ids", []), "prior_virtual_run_ids")
+    if len(prior) > 16:
+        raise LocalApplicationError(
+            "APPLICATION-VIRTUAL-PAYLOAD-001",
+            "prior_virtual_run_ids may contain at most 16 Run IDs",
+        )
     policy = payload.get(
         "readiness_policy",
         {

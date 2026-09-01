@@ -125,6 +125,25 @@ class SurveyVirtualRunnerProductionTestsA2(SurveyVirtualRunnerTestBase):
         self.assertNotIn("usefulness", keys)
         self.assertNotIn("count", keys)
 
+        restoring = extended_questionnaire()
+        restoring["questions"][1]["branching"][0]["value"] = "contributor"
+        restoring["questions"][2]["branching"] = [{
+            "condition_question_id": "Q2",
+            "operator": "missing",
+            "action": "show",
+            "target_question_id": "Q3",
+        }]
+        records, _ = generate_records(
+            restoring,
+            scenario_class="STANDARD",
+            population_size=1,
+            identity_namespace="synthetic:survey:restore",
+            stress_faults=(),
+        )
+        keys = {item["response_key"] for item in records[0]["answers"]}
+        self.assertNotIn("usefulness", keys)
+        self.assertIn("count", keys)
+
         numeric = extended_questionnaire()
         numeric["questions"][2]["numeric_constraints"] = {"minimum": None}
         records, _ = generate_records(

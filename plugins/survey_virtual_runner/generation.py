@@ -76,21 +76,36 @@ def _prune_unreachable(questionnaire: Mapping[str, Any], record: dict[str, Any])
         stable_response_key(question): str(question["question_id"])
         for question in questionnaire.get("questions", ())
     }
+    original = list(record.get("answers", ()))
+    working = list(original)
+    seen: set[tuple[str, ...]] = set()
     while True:
+        signature = tuple(
+            str(item.get("response_key"))
+            for item in working
+            if isinstance(item, Mapping)
+        )
+        if signature in seen:
+            # Cyclic/ambiguous branching is not repaired by the generator. Preserve the
+            # original structural record so shared validation can report the defect.
+            record["answers"] = original
+            return
+        seen.add(signature)
         answers = {
             str(item["response_key"]): item
-            for item in record.get("answers", ())
+            for item in working
             if isinstance(item, Mapping) and item.get("response_key")
         }
         reachable = reachable_questions(questionnaire, answers)
         filtered = [
             item
-            for item in record.get("answers", ())
+            for item in original
             if question_id_by_key.get(str(item.get("response_key"))) in reachable
         ]
-        if len(filtered) == len(record.get("answers", ())):
+        if filtered == working:
+            record["answers"] = filtered
             return
-        record["answers"] = filtered
+        working = filtered
 
 
 def _base_record(questionnaire: Mapping[str, Any], *, index: int, namespace: str) -> dict[str, Any]:
