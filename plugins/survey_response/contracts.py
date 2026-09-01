@@ -3,6 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 import hashlib
 import json
+import math
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -13,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[2]
 RAW_SCHEMA_PATH = ROOT / "core/packages/survey/survey-raw-response.schema.json"
 CANONICAL_RESPONSE_SCHEMA_PATH = ROOT / "core/packages/survey/survey-response-canonical.schema.json"
 DATASET_SCHEMA_PATH = ROOT / "core/packages/survey/survey-response-dataset.schema.json"
+_MAX_SAFE_INTEGER = 9_007_199_254_740_991
 
 
 def _validator(path: Path) -> Draft202012Validator:
@@ -37,6 +39,71 @@ def canonical_digest(value: Any) -> str:
 
 def raw_input_digest(value: Any) -> str:
     return canonical_digest(value)
+
+
+def _diagnostic_projection(value: Any) -> Any:
+    """Project malformed non-JSON/RFC8785 input into a durable diagnostic value."""
+    if value is None or isinstance(value, (str, bool)):
+        return value
+    if isinstance(value, int) and not isinstance(value, bool):
+        if -_MAX_SAFE_INTEGER <= value <= _MAX_SAFE_INTEGER:
+            return value
+        return {"$noncanonical_integer": str(value)}
+    if isinstance(value, float):
+        if math.isfinite(value):
+            return value
+        if math.isnan(value):
+            label = "NaN"
+        elif value > 0:
+            label = "Infinity"
+        else:
+            label = "-Infinity"
+        return {"$noncanonical_number": label}
+    if isinstance(value, Mapping):
+        if all(isinstance(key, str) for key in value):
+            return {
+                str(key): _diagnostic_projection(item)
+                for key, item in value.items()
+            }
+        return {
+            "$mapping_entries": [
+                [_diagnostic_projection(key), _diagnostic_projection(item)]
+                for key, item in value.items()
+            ]
+        }
+    if isinstance(value, (list, tuple)):
+        return [_diagnostic_projection(item) for item in value]
+    if isinstance(value, (set, frozenset)):
+        projected = [_diagnostic_projection(item) for item in value]
+        return {
+            "$set_items": sorted(
+                projected,
+                key=lambda item: json.dumps(
+                    item, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+                ),
+            )
+        }
+    return {
+        "$unsupported_type": f"{type(value).__module__}.{type(value).__qualname__}",
+        "$repr": repr(value),
+    }
+
+
+def preserve_raw_input(value: Any) -> tuple[Any, str, dict[str, Any] | None]:
+    """Return a persistable raw value and digest without hiding malformed input."""
+    try:
+        return deepcopy(value), raw_input_digest(value), None
+    except ValueError:
+        projected = _diagnostic_projection(value)
+        digest = canonical_digest({"noncanonical_raw_input": projected})
+        return projected, digest, {
+            "code": "SURVEY_RESPONSE_MALFORMED",
+            "severity": "error",
+            "message": (
+                "raw input is not RFC8785-canonicalizable; "
+                "a diagnostic projection was preserved"
+            ),
+        }
 
 
 def response_content_digest(document: Mapping[str, Any]) -> str:

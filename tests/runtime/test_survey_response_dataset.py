@@ -209,12 +209,19 @@ class SurveyResponseDatasetProductionTests(SurveyVirtualRunnerTestBase):
                 "action_type": "survey_response_dataset.capture",
                 "payload": intake(questionnaire, responses=[raw_response()]),
                 "actor_id": "HUMAN-SURVEY",
+                "conversation_id": "CONV-SURVEY-RESPONSE",
+                "rationale": "Capture one canonical Survey response Dataset.",
             }
-            code, captured_dataset = run_cli(
+            code, captured_action = run_cli(
                 ["action", "submit", "--workspace", str(workspace), "--json", "-"],
                 json.dumps(action),
             )
             self.assertEqual(code, 0)
+            self.assertEqual(captured_action["status"], "SUCCEEDED")
+            self.assertEqual(captured_action["proposal"]["conversation_id"], "CONV-SURVEY-RESPONSE")
+            self.assertEqual(captured_action["proposal"]["initiating_actor"]["actor_id"], "HUMAN-SURVEY")
+            self.assertIn("action_receipt", captured_action)
+            captured_dataset = captured_action["data"]
             self.assertEqual(captured_dataset["accepted_count"], 1)
 
             show_action = {
@@ -225,12 +232,16 @@ class SurveyResponseDatasetProductionTests(SurveyVirtualRunnerTestBase):
                     "offset": 0,
                 },
                 "actor_id": "HUMAN-SURVEY",
+                "conversation_id": "CONV-SURVEY-RESPONSE",
+                "rationale": "Inspect the captured Dataset through the same audited action path.",
             }
-            code, shown = run_cli(
+            code, shown_action = run_cli(
                 ["action", "submit", "--workspace", str(workspace), "--json", "-"],
                 json.dumps(show_action),
             )
             self.assertEqual(code, 0)
+            self.assertEqual(shown_action["status"], "SUCCEEDED")
+            shown = shown_action["data"]
             self.assertEqual(shown["pagination"]["returned"], 1)
             self.assertEqual(shown["dataset"]["accepted_count"], 1)
 

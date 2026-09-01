@@ -72,7 +72,28 @@ class SurveyResponseCaptureMixin:
             response = outcome["canonical_response"]
             issues = list(outcome["issues"])
             raw = outcome["raw_input"]
+            raw_response_id = (
+                str(raw["response_id"])
+                if isinstance(raw, Mapping)
+                and isinstance(raw.get("response_id"), str)
+                and raw["response_id"]
+                else None
+            )
+            duplicate_response_id = (
+                raw_response_id is not None and raw_response_id in seen_ids
+            )
+            if raw_response_id is not None and not duplicate_response_id:
+                seen_ids.add(raw_response_id)
+
             if response is None:
+                if duplicate_response_id:
+                    issues.append(
+                        _issue(
+                            "SURVEY_RESPONSE_DUPLICATE_RECORD",
+                            "response_id is duplicated within the Dataset intake",
+                            response_id=raw_response_id,
+                        )
+                    )
                 for issue in issues:
                     issue_counts[str(issue["code"])] += 1
                 rejected_inputs.append(
@@ -85,7 +106,7 @@ class SurveyResponseCaptureMixin:
                 continue
 
             response_id = str(response["response_id"])
-            if response_id in seen_ids:
+            if duplicate_response_id:
                 duplicate = _issue(
                     "SURVEY_RESPONSE_DUPLICATE_RECORD",
                     "response_id is duplicated within the Dataset intake",
@@ -102,7 +123,6 @@ class SurveyResponseCaptureMixin:
                     }
                 )
                 continue
-            seen_ids.add(response_id)
 
             if enforce_unique_participant:
                 participant = (
