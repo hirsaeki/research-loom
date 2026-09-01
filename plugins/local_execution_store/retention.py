@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import stat
 import tempfile
+import time
 from typing import Any, Iterator, Mapping
 
 from core.execution.models import CapabilityRunRecord, ExecutionArtifactMetadata, RunStatus
@@ -25,6 +26,59 @@ class LocalExecutionStore(_AtomicExecutionStore):
     @property
     def _large_original_root(self) -> Path:
         return self.root / "large-originals" / "sha256"
+
+    @contextmanager
+    def _large_capture_run_reservation(self, run_id: str) -> Iterator[None]:
+        """Serialize managed capture staging per Run across store connections/processes."""
+        lock_root = self.root / "large-original-locks"
+        lock_root.mkdir(parents=True, exist_ok=True)
+        lock_name = hashlib.sha256(run_id.encode("utf-8")).hexdigest() + ".lock"
+        lock_path = lock_root / lock_name
+        fd = os.open(
+            lock_path,
+            os.O_CREAT | os.O_RDWR | getattr(os, "O_BINARY", 0),
+            0o600,
+        )
+        locked = False
+        try:
+            if os.name == "nt":
+                import msvcrt
+
+                if os.fstat(fd).st_size == 0:
+                    os.write(fd, b"\0")
+                    os.fsync(fd)
+                os.lseek(fd, 0, os.SEEK_SET)
+                while True:
+                    try:
+                        msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+                        locked = True
+                        break
+                    except OSError as exc:
+                        if exc.errno not in {
+                            errno.EACCES,
+                            errno.EAGAIN,
+                            errno.EDEADLK,
+                        }:
+                            raise
+                        time.sleep(0.05)
+            else:
+                import fcntl
+
+                fcntl.flock(fd, fcntl.LOCK_EX)
+                locked = True
+            yield
+        finally:
+            if locked:
+                if os.name == "nt":
+                    import msvcrt
+
+                    os.lseek(fd, 0, os.SEEK_SET)
+                    msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+                else:
+                    import fcntl
+
+                    fcntl.flock(fd, fcntl.LOCK_UN)
+            os.close(fd)
 
     def _locator_path(self, locator: str, expected_digest: str) -> Path:
         prefix = f"{_LARGE_ORIGINAL_SCHEME}://sha256/"
@@ -331,44 +385,20 @@ class LocalExecutionStore(_AtomicExecutionStore):
         except UnicodeDecodeError as exc:
             raise LocalExecutionStoreError("text rendition must be valid UTF-8") from exc
 
-        # Secure fstat gives us the size needed for deterministic guard checks
-        # without reading or staging the large payload. Recheck after staging in
-        # case the source changes between the two controlled opens.
-        with self._controlled_file_fd(
-            original_path,
-            max_bytes=max_original_bytes,
-        ) as (_source_fd, original_size_hint):
-            pass
-        with self._write_transaction():
-            self._validate_desktop_research_capture_pair(
-                run,
-                original_size=original_size_hint,
-                text_size=len(text_content),
-                original_artifact_id=original_artifact_id,
-                text_artifact_id=text_artifact_id,
-                role_byte_limits=role_byte_limits,
-                role_count_limits=role_count_limits,
-                expected_status=expected_status,
-            )
-
-        staged, original_digest, original_size = self._stage_controlled_original(
-            original_path,
-            max_bytes=max_original_bytes,
-        )
-        large = original_size > self.config.max_artifact_bytes
-        original_role = "desktop_research.original_capture"
-        text_role = "desktop_research.text_rendition"
-        original_target: Path | None = None
-        original_created = False
-        text_target: Path | None = None
-        text_target_was_absent = False
-        try:
-            text_target = self._blob_target_for(text_content)
-            text_target_was_absent = not text_target.exists()
+        # A small OS lock is the reservation: only one managed capture for this
+        # Run may pass preflight and occupy staging at a time, including across
+        # separate LocalExecutionStore connections/processes. The lock file is
+        # not correctness state; the kernel lock is released automatically on exit.
+        with self._large_capture_run_reservation(run.run_id):
+            with self._controlled_file_fd(
+                original_path,
+                max_bytes=max_original_bytes,
+            ) as (_source_fd, original_size_hint):
+                pass
             with self._write_transaction():
                 self._validate_desktop_research_capture_pair(
                     run,
-                    original_size=original_size,
+                    original_size=original_size_hint,
                     text_size=len(text_content),
                     original_artifact_id=original_artifact_id,
                     text_artifact_id=text_artifact_id,
@@ -377,69 +407,95 @@ class LocalExecutionStore(_AtomicExecutionStore):
                     expected_status=expected_status,
                 )
 
-                original_locator, original_target, original_created = self._install_staged_original(
-                    staged,
-                    digest=original_digest,
-                    size=original_size,
-                    large=large,
-                )
-                text_digest, text_locator = self._store_blob(text_content, scheme="artifact")
-                original_trusted = dict(original_provenance)
-                original_trusted.update(
-                    {
-                        "source_run_id": run.run_id,
-                        "execution_mode": run.execution_mode,
-                        "stored_by": "plugins.local_execution_store",
-                        "stored_at": _now(),
-                        "parent_artifact_refs": [],
-                    }
-                )
-                text_trusted = dict(text_provenance)
-                text_trusted.update(
-                    {
-                        "source_run_id": run.run_id,
-                        "execution_mode": run.execution_mode,
-                        "stored_by": "plugins.local_execution_store",
-                        "stored_at": _now(),
-                        "parent_artifact_refs": [original_artifact_id],
-                    }
-                )
-                original = ExecutionArtifactMetadata(
-                    original_artifact_id,
-                    run.run_id,
-                    original_role,
-                    str(original_media_type),
-                    original_size,
-                    original_digest,
-                    original_locator,
-                    run.execution_mode,
-                    original_trusted,
-                )
-                text = ExecutionArtifactMetadata(
-                    text_artifact_id,
-                    run.run_id,
-                    text_role,
-                    "text/plain",
-                    len(text_content),
-                    text_digest,
-                    text_locator,
-                    run.execution_mode,
-                    text_trusted,
-                )
-                self._register_output_artifact_in_transaction(original)
-                self._register_output_artifact_in_transaction(text)
-                return original, text
-        except Exception:
-            if original_created and original_target is not None:
-                self._cleanup_new_blob_targets({original_target})
-            if text_target_was_absent and text_target is not None:
-                self._cleanup_new_blob_targets({text_target})
-            raise
-        finally:
+            staged, original_digest, original_size = self._stage_controlled_original(
+                original_path,
+                max_bytes=max_original_bytes,
+            )
+            large = original_size > self.config.max_artifact_bytes
+            original_role = "desktop_research.original_capture"
+            text_role = "desktop_research.text_rendition"
+            original_target: Path | None = None
+            original_created = False
+            text_target: Path | None = None
+            text_target_was_absent = False
             try:
-                staged.unlink()
-            except FileNotFoundError:
-                pass
+                text_target = self._blob_target_for(text_content)
+                text_target_was_absent = not text_target.exists()
+                with self._write_transaction():
+                    self._validate_desktop_research_capture_pair(
+                        run,
+                        original_size=original_size,
+                        text_size=len(text_content),
+                        original_artifact_id=original_artifact_id,
+                        text_artifact_id=text_artifact_id,
+                        role_byte_limits=role_byte_limits,
+                        role_count_limits=role_count_limits,
+                        expected_status=expected_status,
+                    )
+
+                    original_locator, original_target, original_created = self._install_staged_original(
+                        staged,
+                        digest=original_digest,
+                        size=original_size,
+                        large=large,
+                    )
+                    text_digest, text_locator = self._store_blob(text_content, scheme="artifact")
+                    original_trusted = dict(original_provenance)
+                    original_trusted.update(
+                        {
+                            "source_run_id": run.run_id,
+                            "execution_mode": run.execution_mode,
+                            "stored_by": "plugins.local_execution_store",
+                            "stored_at": _now(),
+                            "parent_artifact_refs": [],
+                        }
+                    )
+                    text_trusted = dict(text_provenance)
+                    text_trusted.update(
+                        {
+                            "source_run_id": run.run_id,
+                            "execution_mode": run.execution_mode,
+                            "stored_by": "plugins.local_execution_store",
+                            "stored_at": _now(),
+                            "parent_artifact_refs": [original_artifact_id],
+                        }
+                    )
+                    original = ExecutionArtifactMetadata(
+                        original_artifact_id,
+                        run.run_id,
+                        original_role,
+                        str(original_media_type),
+                        original_size,
+                        original_digest,
+                        original_locator,
+                        run.execution_mode,
+                        original_trusted,
+                    )
+                    text = ExecutionArtifactMetadata(
+                        text_artifact_id,
+                        run.run_id,
+                        text_role,
+                        "text/plain",
+                        len(text_content),
+                        text_digest,
+                        text_locator,
+                        run.execution_mode,
+                        text_trusted,
+                    )
+                    self._register_output_artifact_in_transaction(original)
+                    self._register_output_artifact_in_transaction(text)
+                    return original, text
+            except Exception:
+                if original_created and original_target is not None:
+                    self._cleanup_new_blob_targets({original_target})
+                if text_target_was_absent and text_target is not None:
+                    self._cleanup_new_blob_targets({text_target})
+                raise
+            finally:
+                try:
+                    staged.unlink()
+                except FileNotFoundError:
+                    pass
 
     def verify_artifact_integrity(self, artifact_id: str) -> None:
         with self._lock:
