@@ -15,13 +15,29 @@ instrument:
   questionnaire_contract: questionnaire@0.1.0
   questionnaire_is_core_method: false
   question_identity_stable_across_versions: true
+  response_key_may_be_explicit: true
+  response_key_defaults_to_question_id: true
+  option_identity_is_stable_value_default: true
+  option_value_may_be_explicit: true
+  display_label_is_not_response_identity: true
+  sections_may_be_explicit: true
   supported_question_types: [single_choice, multiple_choice, scale, numeric, free_text]
   branching_and_skip_logic_explicit: true
   randomized_order_explicit_where_used: true
   construct_rq_gap_traceability_required: true
+  missing_response_is_no_response: true
+  explicit_missing_value_categories: [unknown, not_applicable, prefer_not_to_answer]
   generation_is_instrument_approval: false
   wording_or_scale_change_is_material_revision: true
   material_questionnaire_revision_requires_human_decision: true
+production_exchange:
+  canonical_instrument_is_provider_neutral: true
+  design_and_questionnaire_are_distinct: true
+  exchange_is_deterministic_projection: true
+  export_mutates_research_state: false
+  provider_ids_are_canonical: false
+  provider_payloads_are_canonical: false
+  virtual_runner_uses_same_questionnaire: true
 execution:
   run_identity_owned_by: capability-invocation@0.1.0
   pinned_protocol_and_runspec_owned_by: research-method-context-extension@0.1.0
@@ -68,7 +84,7 @@ errors:
   - {id: SV-DESIGN-AUTHORITY-001, meaning: "SurveyDesign is treated as an authoritative Core Method or target sample as research sufficiency."}
   - {id: SV-DESIGN-BINDING-001, meaning: "SurveyDesign resource or sampling-frame reference is not exactly bound to the PR9 Context Pack."}
   - {id: SV-QUESTIONNAIRE-DIGEST-001, meaning: "Questionnaire digest does not match canonical content."}
-  - {id: SV-QUESTIONNAIRE-IDENTITY-001, meaning: "Question identity, branching, randomization, or traceability is invalid or silently lost across versions."}
+  - {id: SV-QUESTIONNAIRE-IDENTITY-001, meaning: "Question identity, response identity, branching, randomization, section binding, or traceability is invalid or silently lost across versions."}
   - {id: SV-QUESTIONNAIRE-REVISION-001, meaning: "A wording/scale material change is not represented as a material questionnaire revision."}
   - {id: SV-QUESTIONNAIRE-APPROVAL-001, meaning: "Questionnaire approval or material revision lacks Human Decision authority."}
   - {id: SV-CONTEXT-DIGEST-001, meaning: "Survey Context extension digest does not match canonical content."}
