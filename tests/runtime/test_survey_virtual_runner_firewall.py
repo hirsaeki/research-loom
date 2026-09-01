@@ -1,3 +1,4 @@
+from plugins.survey_virtual_runner.generation import generate_records
 from tests.runtime.survey_virtual_runner_test_support import *  # noqa: F403
 
 
@@ -55,6 +56,24 @@ class SurveyVirtualRunnerProductionTestsA2(SurveyVirtualRunnerTestBase):
                     "APPLICATION-VIRTUAL-PAYLOAD-001",
                 )
 
+                too_many_prior = execution_payload(
+                    scenario="STANDARD",
+                    instrument_version=questionnaire["version"],
+                    instrument_digest=questionnaire["content_digest"],
+                )
+                too_many_prior["prior_virtual_run_ids"] = [
+                    f"RUN-PRIOR-{index:02d}" for index in range(17)
+                ]
+                with self.assertRaises(LocalApplicationError) as bounded:
+                    facade.submit_action({
+                        "action_type": "virtual_runner.survey.execute",
+                        "payload": too_many_prior,
+                    })
+                self.assertEqual(
+                    bounded.exception.code,
+                    "APPLICATION-VIRTUAL-PAYLOAD-001",
+                )
+
                 q = extended_questionnaire()
                 record = {
                     "schema_version": "0.1.0",
@@ -83,3 +102,51 @@ class SurveyVirtualRunnerProductionTestsA2(SurveyVirtualRunnerTestBase):
                 self.assertIn("SURVEY_RESPONSE_IDENTITY_FIREWALL", codes)
             finally:
                 app.close()
+
+    def test_structural_generator_handles_branch_chains_and_null_numeric_minimum(self):
+        chained = extended_questionnaire()
+        chained["questions"][1]["branching"][0]["value"] = "contributor"
+        chained["questions"][2]["branching"] = [{
+            "condition_question_id": "Q2",
+            "operator": "equals",
+            "value": 1,
+            "action": "show",
+            "target_question_id": "Q3",
+        }]
+        records, injected = generate_records(
+            chained,
+            scenario_class="STANDARD",
+            population_size=1,
+            identity_namespace="synthetic:survey:chain",
+            stress_faults=(),
+        )
+        self.assertEqual(injected, ())
+        keys = {item["response_key"] for item in records[0]["answers"]}
+        self.assertNotIn("usefulness", keys)
+        self.assertNotIn("count", keys)
+
+        numeric = extended_questionnaire()
+        numeric["questions"][2]["numeric_constraints"] = {"minimum": None}
+        records, _ = generate_records(
+            numeric,
+            scenario_class="STANDARD",
+            population_size=1,
+            identity_namespace="synthetic:survey:numeric",
+            stress_faults=(),
+        )
+        count = next(
+            item
+            for item in records[0]["answers"]
+            if item["response_key"] == "count"
+        )
+        self.assertEqual(count["value"], 0)
+        validation = SurveyResponseValidator().validate(
+            numeric,
+            records,
+            expected_epistemic_mode="virtual",
+            expected_identity_namespace="synthetic:survey:numeric",
+        )
+        self.assertNotIn(
+            "SURVEY_RESPONSE_OUT_OF_RANGE",
+            {item["code"] for item in validation["issues"]},
+        )

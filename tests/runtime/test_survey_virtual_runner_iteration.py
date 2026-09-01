@@ -111,6 +111,27 @@ class SurveyVirtualRunnerProductionTestsB(SurveyVirtualRunnerTestBase):
                         instrument_digest=q1["content_digest"],
                     ),
                 })
+                self.assertEqual(first["status"], "SUCCEEDED")
+
+                gap_mismatch = execution_payload(
+                    scenario="STRESS",
+                    instrument_version=q1["version"],
+                    instrument_digest=q1["content_digest"],
+                    prior=(first["run_id"],),
+                )
+                gap_mismatch["evidence_gap_refs"][0]["gap_id"] = "GAP-OTHER"
+                gap_result = facade.submit_action({
+                    "action_type": "virtual_runner.survey.execute",
+                    "payload": gap_mismatch,
+                })
+                self.assertEqual(gap_result["status"], "ERROR")
+                self.assertIn(
+                    "VR-FREEZE-STALE-001",
+                    {
+                        item["code"]
+                        for item in gap_result["execution_result"].get("issues", [])
+                    },
+                )
 
                 q2 = extended_questionnaire()
                 q2["version"] = "1.1.0"

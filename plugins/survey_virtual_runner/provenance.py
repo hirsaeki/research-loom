@@ -61,10 +61,14 @@ def generation_provenance(request, extension: Mapping[str, Any]) -> dict[str, An
 
 def input_pins(request, extension: Mapping[str, Any], provenance: Mapping[str, Any]) -> dict[str, Any]:
     run_spec = extension["run_spec"]
+    research_method = extension["research_method_context"]
     return {
+        "project_id": str(request.context_pack["project_id"]),
         "design": deepcopy(dict(extension["design_ref"])),
         "instrument": deepcopy(dict(extension["instrument_ref"])),
         "rq_ids": list(request.context_pack["question_ids"]),
+        "evidence_gap_refs": deepcopy(list(research_method["targets"]["evidence_gap_refs"])),
+        "human_decision_bindings": deepcopy(dict(research_method["human_decision_bindings"])),
         "core_method": deepcopy(dict(extension["core_method_ref"])),
         "protocol": deepcopy(dict(extension["protocol_ref"])),
         "run_spec": {

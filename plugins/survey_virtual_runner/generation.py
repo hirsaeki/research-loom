@@ -30,7 +30,8 @@ def _value(question: Mapping[str, Any], *, extreme: bool = False) -> Any:
         limits = question.get("numeric_constraints") or {}
         if extreme and limits.get("maximum") is not None:
             return limits["maximum"]
-        return limits.get("minimum", 0)
+        minimum = limits.get("minimum")
+        return minimum if minimum is not None else 0
     return "SYNTHETIC_TEXT_001"
 
 
@@ -71,21 +72,25 @@ def _set_value(record: dict[str, Any], question: Mapping[str, Any], value: Any) 
 
 
 def _prune_unreachable(questionnaire: Mapping[str, Any], record: dict[str, Any]) -> None:
-    answers = {
-        str(item["response_key"]): item
-        for item in record.get("answers", ())
-        if isinstance(item, Mapping) and item.get("response_key")
-    }
-    reachable = reachable_questions(questionnaire, answers)
     question_id_by_key = {
         stable_response_key(question): str(question["question_id"])
         for question in questionnaire.get("questions", ())
     }
-    record["answers"] = [
-        item
-        for item in record.get("answers", ())
-        if question_id_by_key.get(str(item.get("response_key"))) in reachable
-    ]
+    while True:
+        answers = {
+            str(item["response_key"]): item
+            for item in record.get("answers", ())
+            if isinstance(item, Mapping) and item.get("response_key")
+        }
+        reachable = reachable_questions(questionnaire, answers)
+        filtered = [
+            item
+            for item in record.get("answers", ())
+            if question_id_by_key.get(str(item.get("response_key"))) in reachable
+        ]
+        if len(filtered) == len(record.get("answers", ())):
+            return
+        record["answers"] = filtered
 
 
 def _base_record(questionnaire: Mapping[str, Any], *, index: int, namespace: str) -> dict[str, Any]:

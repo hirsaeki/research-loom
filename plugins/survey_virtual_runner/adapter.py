@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Mapping
+from typing import Mapping
 
 from core.execution import ExecutionStyle
 from core.execution.models import CapabilityExecutionError
@@ -44,7 +44,11 @@ class StructuralSurveyVirtualRunnerAdapter:
         questionnaire = extension.get("instrument")
         population = extension.get("synthetic_population")
         runner_configuration = extension.get("runner_configuration")
-        if not isinstance(questionnaire, Mapping) or not isinstance(population, Mapping) or not isinstance(runner_configuration, Mapping):
+        if (
+            not isinstance(questionnaire, Mapping)
+            or not isinstance(population, Mapping)
+            or not isinstance(runner_configuration, Mapping)
+        ):
             raise CapabilityExecutionError(
                 "VR-CONTEXT-BINDING-001",
                 "Survey Virtual Runner immutable execution inputs are incomplete",
@@ -57,6 +61,7 @@ class StructuralSurveyVirtualRunnerAdapter:
             self._execution_store,
             runner_configuration.get("prior_virtual_run_ids", ()),
             current_pins=pins,
+            current_project_ref=str(request.run.project_ref),
         )
 
         records, injected = generate_records(
