@@ -1,15 +1,14 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping
 
 from plugins.survey_virtual_runner.response_support import reachable_questions, stable_response_key
 from plugins.survey_virtual_runner.response_validation import SurveyResponseValidator
 
 from .contracts import (
     RAW_RESPONSE_VALIDATOR,
-    canonical_digest,
-    raw_input_digest,
+    preserve_raw_input,
     registry_digest,
     response_content_digest,
     schema_issues,
@@ -186,12 +185,14 @@ def normalize_response(
     source_run_id: str | None = None,
     source_provenance: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    raw_digest = raw_input_digest(raw)
     malformed = schema_issues(RAW_RESPONSE_VALIDATOR, raw)
+    preserved_raw, raw_digest, canonicalization_issue = preserve_raw_input(raw)
+    if canonicalization_issue is not None:
+        malformed.append(canonicalization_issue)
     if malformed:
         return {
             "raw_input_digest": raw_digest,
-            "raw_input": deepcopy(raw),
+            "raw_input": preserved_raw,
             "canonical_response": None,
             "issues": malformed,
         }
