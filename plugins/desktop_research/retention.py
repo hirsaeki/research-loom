@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 import re
+from types import SimpleNamespace
 from typing import Any, Mapping
 
 from .digest import canonical_extension_digest
@@ -10,6 +11,47 @@ from .result_validation import DesktopResearchResultValidator as _BaseValidator
 
 
 _VALIDATION_WHITESPACE = re.compile(r"[ \t\r\n]+")
+_LARGE_ORIGINAL_PREFIX = "external-original://sha256/"
+
+
+class _SizedContent:
+    """Length-only content projection used after streaming integrity verification."""
+
+    def __init__(self, size: int) -> None:
+        self._size = size
+
+    def __len__(self) -> int:
+        return self._size
+
+
+class _ValidationArtifactStore:
+    """Avoid materializing managed large originals during result validation."""
+
+    def __init__(self, delegate) -> None:
+        self._delegate = delegate
+        self._metadata: dict[str, Any] = {}
+
+    def artifacts_for(self, run_id: str):
+        artifacts = self._delegate.artifacts_for(run_id)
+        self._metadata.update({item.artifact_id: item for item in artifacts})
+        return artifacts
+
+    def load_artifact(self, artifact_id: str):
+        meta = self._metadata.get(artifact_id)
+        verifier = getattr(self._delegate, "verify_artifact_integrity", None)
+        if (
+            meta is not None
+            and meta.role == "desktop_research.original_capture"
+            and meta.storage_locator.startswith(_LARGE_ORIGINAL_PREFIX)
+            and callable(verifier)
+        ):
+            verifier(artifact_id)
+            return SimpleNamespace(
+                content=_SizedContent(meta.size),
+                digest=meta.digest,
+                media_type=meta.media_type,
+            )
+        return self._delegate.load_artifact(artifact_id)
 
 
 def _normalized_whitespace(value: str) -> str:
@@ -74,6 +116,14 @@ def _coverage_projection(
 
 class DesktopResearchResultValidator(_BaseValidator):
     """PR39 validation projection for omitted coverage and PDF whitespace."""
+
+    def __init__(self, artifact_store, operational_store, *, diagnostic_store=None) -> None:
+        self._retention_artifacts = artifact_store
+        super().__init__(
+            _ValidationArtifactStore(artifact_store),
+            operational_store,
+            diagnostic_store=diagnostic_store,
+        )
 
     def _citation_projection(
         self,
