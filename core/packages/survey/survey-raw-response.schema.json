@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:research-loom:core:survey-raw-response:0.1.0",
+  "title": "research-loom provider-neutral raw Survey response input",
+  "description": "Provider-neutral raw response record accepted at the shared Survey response normalization boundary. Provider-specific metadata belongs in provenance, not answer semantics.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["response_id", "participant_id", "identity_namespace", "answers"],
+  "properties": {
+    "response_id": {"$ref": "#/$defs/identifier"},
+    "participant_id": {"$ref": "#/$defs/identifier"},
+    "identity_namespace": {"type": "string", "pattern": "^(synthetic|real):[A-Za-z0-9._:-]+$"},
+    "response_status": {"enum": ["complete", "partial"]},
+    "dropout": {"type": "boolean"},
+    "started_at": {"type": "string", "format": "date-time"},
+    "completed_at": {"type": "string", "format": "date-time"},
+    "answers": {
+      "type": "object",
+      "additionalProperties": {"$ref": "#/$defs/raw_answer"}
+    },
+    "provenance": {"type": "object"}
+  },
+  "$defs": {
+    "identifier": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"},
+    "raw_answer": {
+      "oneOf": [
+        {"type": "string"},
+        {"type": "number"},
+        {"type": "boolean"},
+        {"type": "null"},
+        {
+          "type": "array",
+          "items": {"type": ["string", "number", "boolean"]}
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["state"],
+          "properties": {
+            "state": {"type": "string", "minLength": 1},
+            "value": {}
+          },
+          "allOf": [
+            {
+              "if": {"properties": {"state": {"const": "answered"}}, "required": ["state"]},
+              "then": {"required": ["value"]}
+            },
+            {
+              "if": {"properties": {"state": {"enum": ["missing", "unknown", "not_applicable", "prefer_not_to_answer", "not_asked"]}}, "required": ["state"]},
+              "then": {"not": {"required": ["value"]}}
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

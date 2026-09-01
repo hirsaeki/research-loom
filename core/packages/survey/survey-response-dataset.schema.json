@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:research-loom:core:survey-response-dataset:0.1.0",
+  "title": "research-loom canonical immutable SurveyResponseDataset",
+  "description": "Immutable homogeneous Survey response collection bound to one exact Instrument revision and one response origin. Rejected raw inputs remain inspectable and cannot enter the accepted analysis population.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "object_type", "project_id", "dataset_id", "instrument_ref",
+    "response_origin", "epistemic_status", "accepted_response_refs",
+    "rejected_response_refs", "rejected_inputs", "response_count", "accepted_count",
+    "rejected_count", "created_at", "captured_against", "project_config_digest",
+    "effective_profile_set_digest", "capture_origin", "source_run_ids",
+    "source_provenance", "validation_summary", "research_state_mutation_performed",
+    "content_digest", "registry_digest"
+  ],
+  "properties": {
+    "schema_version": {"const": "0.1.0"},
+    "object_type": {"const": "survey_response_dataset"},
+    "project_id": {"$ref": "#/$defs/identifier"},
+    "dataset_id": {"$ref": "#/$defs/identifier"},
+    "instrument_ref": {"$ref": "#/$defs/instrument_ref"},
+    "response_origin": {"enum": ["synthetic", "real"]},
+    "epistemic_status": {"enum": ["SYNTHETIC_TEST_ONLY", "EMPIRICAL"]},
+    "accepted_response_refs": {"type": "array", "items": {"$ref": "#/$defs/response_ref"}},
+    "rejected_response_refs": {"type": "array", "items": {"$ref": "#/$defs/response_ref"}},
+    "rejected_inputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["raw_input_digest", "raw_input", "issues"],
+        "properties": {
+          "raw_input_digest": {"$ref": "#/$defs/digest"},
+          "raw_input": {},
+          "canonical_response_ref": {"$ref": "#/$defs/response_ref"},
+          "issues": {"type": "array", "items": {"$ref": "#/$defs/issue"}}
+        }
+      }
+    },
+    "response_count": {"type": "integer", "minimum": 0},
+    "accepted_count": {"type": "integer", "minimum": 0},
+    "rejected_count": {"type": "integer", "minimum": 0},
+    "created_at": {"type": "string", "format": "date-time"},
+    "captured_against": {
+      "type": "object", "additionalProperties": false,
+      "required": ["lineage_ref", "snapshot_ref", "snapshot_digest"],
+      "properties": {
+        "lineage_ref": {"$ref": "#/$defs/identifier"},
+        "snapshot_ref": {"$ref": "#/$defs/identifier"},
+        "snapshot_digest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "project_config_digest": {"$ref": "#/$defs/digest"},
+    "effective_profile_set_digest": {"$ref": "#/$defs/digest"},
+    "capture_origin": {"type": "string", "minLength": 1},
+    "source_run_ids": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/identifier"}},
+    "source_provenance": {"type": "object"},
+    "validation_summary": {
+      "type": "object", "additionalProperties": false,
+      "required": ["issue_count", "issue_code_counts"],
+      "properties": {
+        "issue_count": {"type": "integer", "minimum": 0},
+        "issue_code_counts": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 1}}
+      }
+    },
+    "research_state_mutation_performed": {"const": false},
+    "content_digest": {"$ref": "#/$defs/digest"},
+    "registry_digest": {"$ref": "#/$defs/digest"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"response_origin": {"const": "synthetic"}}, "required": ["response_origin"]},
+      "then": {"properties": {"epistemic_status": {"const": "SYNTHETIC_TEST_ONLY"}}}
+    },
+    {
+      "if": {"properties": {"response_origin": {"const": "real"}}, "required": ["response_origin"]},
+      "then": {"properties": {"epistemic_status": {"const": "EMPIRICAL"}}}
+    }
+  ],
+  "$defs": {
+    "identifier": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"},
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "semver": {"type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"},
+    "instrument_ref": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "version", "content_digest"],
+      "properties": {
+        "id": {"$ref": "#/$defs/identifier"},
+        "version": {"$ref": "#/$defs/semver"},
+        "content_digest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "response_ref": {
+      "type": "object", "additionalProperties": false,
+      "required": ["response_id", "identity_namespace", "content_digest"],
+      "properties": {
+        "response_id": {"$ref": "#/$defs/identifier"},
+        "identity_namespace": {"type": "string", "pattern": "^(synthetic|real):[A-Za-z0-9._:-]+$"},
+        "content_digest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "issue": {
+      "type": "object",
+      "required": ["code", "severity", "message"],
+      "properties": {
+        "code": {"type": "string", "minLength": 1},
+        "severity": {"enum": ["error", "warning"]},
+        "message": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": true
+    }
+  }
+}

@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from plugins.local_application.facade import LocalApplicationError, _AUTHORITY_PAYLOAD_FIELDS, _INGRESS_FIELDS
-from plugins.local_application.survey_facade import LocalApplicationFacade as SurveyApplicationFacade
+from plugins.local_application.survey_response_facade import LocalApplicationFacade as SurveyResponseApplicationFacade
 from .virtual_runner_binding import build_survey_virtual_extension
 from .virtual_runner_input import _payload
 from .virtual_runner_method_context import build_method_context
@@ -19,8 +19,8 @@ DESCRIPTOR_PATH = ROOT / "core/packages/virtual-runner/virtual-runner-capability
 _MAX_PRIOR_VIRTUAL_RUN_IDS = 16
 
 
-class LocalApplicationFacade(VirtualRunnerInspectionMixin, VirtualRunnerExecuteMixin, SurveyApplicationFacade):
-    """Final local Application Facade including the Survey Virtual Runner production binding."""
+class LocalApplicationFacade(VirtualRunnerInspectionMixin, VirtualRunnerExecuteMixin, SurveyResponseApplicationFacade):
+    """Final local Application Facade including Survey response intake and the Virtual Runner."""
 
     def list_actions(self) -> Mapping[str, Any]:
         result = deepcopy(dict(super().list_actions()))
