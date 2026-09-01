@@ -6,10 +6,30 @@ from pathlib import Path
 import sqlite3
 from typing import Any, Mapping, Sequence
 
-from plugins.survey_response.contracts import validate_canonical_response, validate_dataset
+from plugins.survey_response.contracts import (
+    canonical_digest,
+    validate_canonical_response,
+    validate_dataset,
+)
 
 
 SURVEY_RESPONSE_STORE_SCHEMA_VERSION = "0.1.0"
+_REQUIRED_COLUMNS = {
+    "survey_response_store_meta": {"schema_version"},
+    "survey_responses": {
+        "project_id", "response_id", "identity_namespace", "instrument_id",
+        "instrument_version", "content_digest", "response_origin",
+        "validation_status", "ingested_at", "document_json", "raw_input_json",
+    },
+    "survey_response_datasets": {
+        "project_id", "dataset_id", "instrument_id", "instrument_version",
+        "content_digest", "response_origin", "created_at", "summary_digest",
+        "summary_json", "document_json",
+    },
+    "survey_response_dataset_entries": {
+        "project_id", "dataset_id", "entry_index", "kind", "payload_json",
+    },
+}
 
 
 class LocalSurveyResponseStoreError(RuntimeError):
@@ -45,9 +65,21 @@ CREATE TABLE IF NOT EXISTS survey_response_datasets (
     content_digest TEXT NOT NULL,
     response_origin TEXT NOT NULL,
     created_at TEXT NOT NULL,
+    summary_digest TEXT NOT NULL,
+    summary_json TEXT NOT NULL,
     document_json TEXT NOT NULL,
     PRIMARY KEY(project_id, dataset_id)
 );
+CREATE TABLE IF NOT EXISTS survey_response_dataset_entries (
+    project_id TEXT NOT NULL,
+    dataset_id TEXT NOT NULL,
+    entry_index INTEGER NOT NULL,
+    kind TEXT NOT NULL,
+    payload_json TEXT NOT NULL,
+    PRIMARY KEY(project_id, dataset_id, entry_index)
+);
+CREATE INDEX IF NOT EXISTS survey_response_dataset_entries_page
+ON survey_response_dataset_entries(project_id, dataset_id, entry_index);
 """
 
 
@@ -68,17 +100,36 @@ class LocalSurveyResponseStore:
     @staticmethod
     def _schema_version(connection: sqlite3.Connection) -> None:
         try:
-            row = connection.execute("SELECT schema_version FROM survey_response_store_meta").fetchone()
+            rows = connection.execute(
+                "SELECT schema_version FROM survey_response_store_meta"
+            ).fetchall()
+            if (
+                len(rows) != 1
+                or str(rows[0][0]) != SURVEY_RESPONSE_STORE_SCHEMA_VERSION
+            ):
+                raise LocalSurveyResponseStoreError(
+                    "SURVEY-RESPONSE-STORE-SCHEMA-001",
+                    "Survey response registry schema version is incompatible",
+                )
+            for table_name, required in _REQUIRED_COLUMNS.items():
+                columns = {
+                    str(row["name"])
+                    for row in connection.execute(
+                        f"PRAGMA table_info({table_name})"
+                    ).fetchall()
+                }
+                if not required <= columns:
+                    raise LocalSurveyResponseStoreError(
+                        "SURVEY-RESPONSE-STORE-SCHEMA-001",
+                        f"Survey response registry table is incompatible: {table_name}",
+                    )
+        except LocalSurveyResponseStoreError:
+            raise
         except sqlite3.Error as exc:
             raise LocalSurveyResponseStoreError(
                 "SURVEY-RESPONSE-STORE-SCHEMA-001",
                 "Survey response registry schema is missing or incompatible",
             ) from exc
-        if row is None or str(row[0]) != SURVEY_RESPONSE_STORE_SCHEMA_VERSION:
-            raise LocalSurveyResponseStoreError(
-                "SURVEY-RESPONSE-STORE-SCHEMA-001",
-                "Survey response registry schema version is incompatible",
-            )
 
     def _read(self) -> sqlite3.Connection | None:
         if not self.exists:
@@ -102,20 +153,21 @@ class LocalSurveyResponseStore:
 
     def _write(self) -> sqlite3.Connection:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        existed = self.exists
         try:
-            connection = sqlite3.connect(self.path)
+            connection = sqlite3.connect(self.path, timeout=5.0)
             connection.row_factory = sqlite3.Row
-            if existed:
-                self._schema_version(connection)
-            else:
-                connection.executescript(_SCHEMA_SQL)
+            connection.execute("PRAGMA busy_timeout=5000")
+            connection.executescript(_SCHEMA_SQL)
+            rows = connection.execute(
+                "SELECT schema_version FROM survey_response_store_meta"
+            ).fetchall()
+            if not rows:
                 connection.execute(
-                    "INSERT INTO survey_response_store_meta(schema_version) VALUES (?)",
+                    "INSERT OR IGNORE INTO survey_response_store_meta(schema_version) VALUES (?)",
                     (SURVEY_RESPONSE_STORE_SCHEMA_VERSION,),
                 )
-                self._schema_version(connection)
-                connection.commit()
+            self._schema_version(connection)
+            connection.commit()
             return connection
         except LocalSurveyResponseStoreError:
             if "connection" in locals():
@@ -130,6 +182,71 @@ class LocalSurveyResponseStore:
                 "SURVEY-RESPONSE-STORE-DB-001",
                 "Survey response registry could not be initialized",
             ) from exc
+
+    @staticmethod
+    def _dataset_summary(document: Mapping[str, Any]) -> dict[str, Any]:
+        summary = deepcopy(dict(document))
+        for field in (
+            "accepted_response_refs",
+            "rejected_response_refs",
+            "rejected_inputs",
+        ):
+            summary.pop(field, None)
+        return summary
+
+    @staticmethod
+    def _dataset_entries(document: Mapping[str, Any]) -> list[dict[str, Any]]:
+        entries: list[dict[str, Any]] = []
+        for ref in document["accepted_response_refs"]:
+            entries.append({
+                "kind": "accepted_response",
+                "response_ref": deepcopy(ref),
+            })
+
+        rejected_by_ref = {
+            (
+                str(item["canonical_response_ref"]["identity_namespace"]),
+                str(item["canonical_response_ref"]["response_id"]),
+            ): item
+            for item in document["rejected_inputs"]
+            if item.get("canonical_response_ref")
+        }
+        for ref in document["rejected_response_refs"]:
+            key = (str(ref["identity_namespace"]), str(ref["response_id"]))
+            rejected = rejected_by_ref.get(key)
+            if rejected is None:
+                raise ValueError(
+                    "SurveyResponseDataset rejected response lacks rejected-input provenance"
+                )
+            entries.append({
+                "kind": "rejected_response",
+                "response_ref": deepcopy(ref),
+                "issues": deepcopy(rejected["issues"]),
+            })
+
+        for rejected in document["rejected_inputs"]:
+            if rejected.get("canonical_response_ref"):
+                continue
+            entries.append({
+                "kind": "rejected_raw_input",
+                "raw_input_digest": str(rejected["raw_input_digest"]),
+                "raw_input": deepcopy(rejected["raw_input"]),
+                "issues": deepcopy(rejected["issues"]),
+            })
+
+        entries.sort(
+            key=lambda item: (
+                str(item["kind"]),
+                str((item.get("response_ref") or {}).get("identity_namespace", "")),
+                str((item.get("response_ref") or {}).get("response_id", "")),
+                str((item.get("response_ref") or {}).get("content_digest", "")),
+                str(item.get("raw_input_digest", "")),
+                canonical_digest(item),
+            )
+        )
+        if len(entries) != int(document["response_count"]):
+            raise ValueError("SurveyResponseDataset entry projection is inconsistent")
+        return entries
 
     @staticmethod
     def _decode_response(row: sqlite3.Row) -> dict[str, Any]:
@@ -161,15 +278,7 @@ class LocalSurveyResponseStore:
         return {"response": deepcopy(document), "raw_input": deepcopy(raw_input)}
 
     @staticmethod
-    def _decode_dataset(row: sqlite3.Row) -> dict[str, Any]:
-        try:
-            document = json.loads(str(row["document_json"]))
-            validate_dataset(document)
-        except (json.JSONDecodeError, ValueError) as exc:
-            raise LocalSurveyResponseStoreError(
-                "SURVEY-RESPONSE-STORE-INTEGRITY-001",
-                "stored SurveyResponseDataset is invalid",
-            ) from exc
+    def _validate_dataset_row(document: Mapping[str, Any], row: sqlite3.Row) -> None:
         instrument = document["instrument_ref"]
         if (
             str(document["project_id"]) != str(row["project_id"])
@@ -184,7 +293,33 @@ class LocalSurveyResponseStore:
                 "SURVEY-RESPONSE-STORE-INTEGRITY-001",
                 "stored SurveyResponseDataset row metadata does not match its document",
             )
+
+    @classmethod
+    def _decode_dataset(cls, row: sqlite3.Row) -> dict[str, Any]:
+        try:
+            document = json.loads(str(row["document_json"]))
+            validate_dataset(document)
+        except (json.JSONDecodeError, ValueError) as exc:
+            raise LocalSurveyResponseStoreError(
+                "SURVEY-RESPONSE-STORE-INTEGRITY-001",
+                "stored SurveyResponseDataset is invalid",
+            ) from exc
+        cls._validate_dataset_row(document, row)
         return deepcopy(document)
+
+    @classmethod
+    def _decode_dataset_summary(cls, row: sqlite3.Row) -> dict[str, Any]:
+        try:
+            summary = json.loads(str(row["summary_json"]))
+            if canonical_digest(summary) != str(row["summary_digest"]):
+                raise ValueError("summary digest mismatch")
+        except (json.JSONDecodeError, ValueError) as exc:
+            raise LocalSurveyResponseStoreError(
+                "SURVEY-RESPONSE-STORE-INTEGRITY-001",
+                "stored SurveyResponseDataset summary is invalid",
+            ) from exc
+        cls._validate_dataset_row(summary, row)
+        return deepcopy(summary)
 
     def capture_dataset(
         self,
@@ -193,6 +328,9 @@ class LocalSurveyResponseStore:
     ) -> bool:
         try:
             validate_dataset(dataset)
+            entries = self._dataset_entries(dataset)
+            summary = self._dataset_summary(dataset)
+            summary_digest = canonical_digest(summary)
             response_by_id: dict[tuple[str, str], Mapping[str, Any]] = {}
             for response, _raw in responses:
                 validate_canonical_response(response)
@@ -294,8 +432,9 @@ class LocalSurveyResponseStore:
                 """
                 INSERT INTO survey_response_datasets(
                     project_id,dataset_id,instrument_id,instrument_version,
-                    content_digest,response_origin,created_at,document_json
-                ) VALUES (?,?,?,?,?,?,?,?)
+                    content_digest,response_origin,created_at,summary_digest,
+                    summary_json,document_json
+                ) VALUES (?,?,?,?,?,?,?,?,?,?)
                 """,
                 (
                     str(dataset["project_id"]),
@@ -305,9 +444,26 @@ class LocalSurveyResponseStore:
                     str(dataset["content_digest"]),
                     str(dataset["response_origin"]),
                     str(dataset["created_at"]),
+                    summary_digest,
+                    self._encoded(summary),
                     self._encoded(dataset),
                 ),
             )
+            for index, entry in enumerate(entries):
+                connection.execute(
+                    """
+                    INSERT INTO survey_response_dataset_entries(
+                        project_id,dataset_id,entry_index,kind,payload_json
+                    ) VALUES (?,?,?,?,?)
+                    """,
+                    (
+                        str(dataset["project_id"]),
+                        str(dataset["dataset_id"]),
+                        index,
+                        str(entry["kind"]),
+                        self._encoded(entry),
+                    ),
+                )
             connection.commit()
             return True
         except LocalSurveyResponseStoreError:
@@ -370,10 +526,95 @@ class LocalSurveyResponseStore:
                 (project_id, dataset_id),
             ).fetchone()
             return None if row is None else self._decode_dataset(row)
+        except LocalSurveyResponseStoreError:
+            raise
         except sqlite3.Error as exc:
             raise LocalSurveyResponseStoreError(
                 "SURVEY-RESPONSE-STORE-DB-001",
                 "Survey response registry read failed",
+            ) from exc
+        finally:
+            connection.close()
+
+    def load_dataset_entries(
+        self,
+        project_id: str,
+        dataset_id: str,
+        *,
+        limit: int,
+        offset: int,
+    ) -> dict[str, Any] | None:
+        connection = self._read()
+        if connection is None:
+            return None
+        try:
+            row = connection.execute(
+                "SELECT * FROM survey_response_datasets WHERE project_id=? AND dataset_id=?",
+                (project_id, dataset_id),
+            ).fetchone()
+            if row is None:
+                return None
+            summary = self._decode_dataset_summary(row)
+            counts = connection.execute(
+                """
+                SELECT
+                    COUNT(*) AS total,
+                    SUM(CASE WHEN kind='accepted_response' THEN 1 ELSE 0 END) AS accepted
+                FROM survey_response_dataset_entries
+                WHERE project_id=? AND dataset_id=?
+                """,
+                (project_id, dataset_id),
+            ).fetchone()
+            total = int(counts["total"] or 0)
+            accepted = int(counts["accepted"] or 0)
+            if (
+                total != int(summary["response_count"])
+                or accepted != int(summary["accepted_count"])
+                or total - accepted != int(summary["rejected_count"])
+            ):
+                raise LocalSurveyResponseStoreError(
+                    "SURVEY-RESPONSE-STORE-INTEGRITY-001",
+                    "stored SurveyResponseDataset entry index is inconsistent",
+                )
+            rows = connection.execute(
+                """
+                SELECT entry_index,kind,payload_json
+                FROM survey_response_dataset_entries
+                WHERE project_id=? AND dataset_id=?
+                ORDER BY entry_index
+                LIMIT ? OFFSET ?
+                """,
+                (project_id, dataset_id, limit, offset),
+            ).fetchall()
+            entries: list[dict[str, Any]] = []
+            for entry_row in rows:
+                try:
+                    entry = json.loads(str(entry_row["payload_json"]))
+                except json.JSONDecodeError as exc:
+                    raise LocalSurveyResponseStoreError(
+                        "SURVEY-RESPONSE-STORE-INTEGRITY-001",
+                        "stored SurveyResponseDataset entry is invalid",
+                    ) from exc
+                if (
+                    not isinstance(entry, Mapping)
+                    or str(entry.get("kind")) != str(entry_row["kind"])
+                ):
+                    raise LocalSurveyResponseStoreError(
+                        "SURVEY-RESPONSE-STORE-INTEGRITY-001",
+                        "stored SurveyResponseDataset entry metadata is inconsistent",
+                    )
+                entries.append(deepcopy(dict(entry)))
+            return {
+                "dataset": summary,
+                "entries": entries,
+                "total": total,
+            }
+        except LocalSurveyResponseStoreError:
+            raise
+        except sqlite3.Error as exc:
+            raise LocalSurveyResponseStoreError(
+                "SURVEY-RESPONSE-STORE-DB-001",
+                "Survey response registry bounded read failed",
             ) from exc
         finally:
             connection.close()
