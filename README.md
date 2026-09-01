@@ -27,6 +27,9 @@ Windows / PowerShell:
 .\research-loom.cmd status --workspace PATH --json
 .\research-loom.cmd resume --workspace PATH --json
 .\research-loom.cmd actions --workspace PATH --json
+.\research-loom.cmd run show --workspace PATH --run-id RUN-ID --json
+.\research-loom.cmd external materials list --workspace PATH
+.\research-loom.cmd external materials list --workspace PATH --json
 .\research-loom.cmd action submit --workspace PATH --json TEMP-INPUT.json
 ```
 
@@ -36,8 +39,15 @@ POSIX:
 ./research-loom status --workspace PATH --json
 ./research-loom resume --workspace PATH --json
 ./research-loom actions --workspace PATH --json
+./research-loom run show --workspace PATH --run-id RUN-ID --json
+./research-loom external materials list --workspace PATH
+./research-loom external materials list --workspace PATH --json
 ./research-loom action submit --workspace PATH --json TEMP-INPUT.json
 ```
+
+Use `external materials list` to answer which external research materials were actually captured in the workspace. It is material-centric: capture pairs are grouped across Runs only when their persisted original-byte content digests are identical. Retrieval attempts which produced no capture are not materials. Use `run show` when the question is about one Run's retrieval attempts, failures, diagnostics, or artifact provenance.
+
+Ordinary operator workflow should not inspect `execution.db`, other SQLite stores, or artifact/blob directory layout to decide what has been captured. Research Exhibits are separate working analytical artifacts and are not included in the external material inventory.
 
 Structured production input should be supplied through a UTF-8 JSON file rather than relying on stdin. The launchers do not install, download, bootstrap, or upgrade `uv`, and they do not fall back to system Python or another environment when `uv` is unavailable.
 
