@@ -1,6 +1,7 @@
 """Production local execution trace, artifact, resource, and auxiliary stores."""
 
-from .atomic import LocalExecutionStore, LocalOperationalTraceStore
+from .retention import LocalExecutionStore
+from .atomic import LocalOperationalTraceStore
 from .context_extensions import LocalCapabilityContextExtensionStore
 from .inspection import artifact_metadata_for, diagnostics_for
 from .intake import bind_controlled_import_root, read_controlled_file
