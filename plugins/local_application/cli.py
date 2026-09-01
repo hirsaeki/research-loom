@@ -154,6 +154,37 @@ def build_parser() -> argparse.ArgumentParser:
     exhibit_show.add_argument("--exhibit-id", required=True)
     _add_output_json(exhibit_show)
 
+    survey = sub.add_parser("survey")
+    survey_sub = survey.add_subparsers(dest="survey_command", required=True)
+
+    survey_design = survey_sub.add_parser("design")
+    survey_design_sub = survey_design.add_subparsers(dest="survey_design_command", required=True)
+    survey_design_capture = survey_design_sub.add_parser("capture")
+    _add_workspace(survey_design_capture)
+    _add_input_json(survey_design_capture)
+    survey_design_show = survey_design_sub.add_parser("show")
+    _add_workspace(survey_design_show)
+    survey_design_show.add_argument("--survey-design-id", required=True)
+    survey_design_show.add_argument("--version", required=True)
+    _add_output_json(survey_design_show)
+
+    survey_instrument = survey_sub.add_parser("instrument")
+    survey_instrument_sub = survey_instrument.add_subparsers(dest="survey_instrument_command", required=True)
+    survey_instrument_capture = survey_instrument_sub.add_parser("capture")
+    _add_workspace(survey_instrument_capture)
+    _add_input_json(survey_instrument_capture)
+    survey_instrument_show = survey_instrument_sub.add_parser("show")
+    _add_workspace(survey_instrument_show)
+    survey_instrument_show.add_argument("--instrument-id", required=True)
+    survey_instrument_show.add_argument("--version", required=True)
+    _add_output_json(survey_instrument_show)
+    survey_instrument_export = survey_instrument_sub.add_parser("export")
+    _add_workspace(survey_instrument_export)
+    survey_instrument_export.add_argument("--instrument-id", required=True)
+    survey_instrument_export.add_argument("--version", required=True)
+    survey_instrument_export.add_argument("--format", required=True, choices=("json", "markdown"))
+    _add_output_json(survey_instrument_export)
+
     action = sub.add_parser("action")
     action_sub = action.add_subparsers(dest="action_command", required=True)
     submit = action_sub.add_parser("submit")
@@ -256,6 +287,23 @@ def _run(args: argparse.Namespace) -> Mapping[str, Any]:
                 return facade.list_exhibits(rq_id=args.rq_id)
             if args.exhibit_command == "show":
                 return facade.show_exhibit(args.exhibit_id)
+        if args.command == "survey":
+            if args.survey_command == "design":
+                if args.survey_design_command == "capture":
+                    return facade.capture_survey_design(_read_input(args.json_input))
+                if args.survey_design_command == "show":
+                    return facade.show_survey_design(args.survey_design_id, args.version)
+            if args.survey_command == "instrument":
+                if args.survey_instrument_command == "capture":
+                    return facade.capture_survey_instrument(_read_input(args.json_input))
+                if args.survey_instrument_command == "show":
+                    return facade.show_survey_instrument(args.instrument_id, args.version)
+                if args.survey_instrument_command == "export":
+                    return facade.export_survey_instrument(
+                        args.instrument_id,
+                        args.version,
+                        format=args.format,
+                    )
         if args.command == "action" and args.action_command == "submit":
             return facade.submit_action(_read_input(args.json_input))
         if args.command == "confirmation" and args.confirmation_command == "submit":
