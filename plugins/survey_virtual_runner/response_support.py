@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import json
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping
 
 from jsonschema import Draft202012Validator, FormatChecker
-
 
 ROOT = Path(__file__).resolve().parents[2]
 _RESPONSE_SCHEMA = json.loads(
@@ -26,11 +24,7 @@ def _issue(
     response_key: str | None = None,
     severity: str = "error",
 ) -> dict[str, Any]:
-    value: dict[str, Any] = {
-        "code": code,
-        "severity": severity,
-        "message": message,
-    }
+    value: dict[str, Any] = {"code": code, "severity": severity, "message": message}
     if response_id:
         value["response_id"] = response_id
     if response_key:
@@ -61,7 +55,9 @@ def _stable_option_value(option: Mapping[str, Any]) -> str:
     return str(value) if isinstance(value, str) and value else str(option["option_id"])
 
 
-def _answers_by_key(record: Mapping[str, Any]) -> tuple[dict[str, Mapping[str, Any]], list[dict[str, Any]]]:
+def _answers_by_key(
+    record: Mapping[str, Any],
+) -> tuple[dict[str, Mapping[str, Any]], list[dict[str, Any]]]:
     result: dict[str, Mapping[str, Any]] = {}
     issues: list[dict[str, Any]] = []
     response_id = str(record.get("response_id") or "")
@@ -88,7 +84,11 @@ def _answers_by_key(record: Mapping[str, Any]) -> tuple[dict[str, Mapping[str, A
     return result, issues
 
 
-def _condition_matches(rule: Mapping[str, Any], answers: Mapping[str, Mapping[str, Any]], key_by_question: Mapping[str, str]) -> bool:
+def _condition_matches(
+    rule: Mapping[str, Any],
+    answers: Mapping[str, Mapping[str, Any]],
+    key_by_question: Mapping[str, str],
+) -> bool:
     source_key = key_by_question.get(str(rule["condition_question_id"]))
     if source_key is None:
         return False
@@ -100,7 +100,7 @@ def _condition_matches(rule: Mapping[str, Any], answers: Mapping[str, Mapping[st
     if operator == "missing":
         return state == "missing"
     if operator == "answered":
-        return state != "missing"
+        return state == "answered"
     if state != "answered":
         return False
     value = answer.get("value")
@@ -123,12 +123,13 @@ def reachable_questions(
         str(question["question_id"]): stable_response_key(question)
         for question in questions
     }
-    rules_by_target: dict[str, list[Mapping[str, Any]]] = {}
-    end_after_index: int | None = None
     index_by_question = {
         str(question["question_id"]): index
         for index, question in enumerate(questions)
     }
+    rules_by_target: dict[str, list[Mapping[str, Any]]] = {}
+    end_after_index: int | None = None
+
     for owner in questions:
         owner_index = index_by_question[str(owner["question_id"])]
         for rule in owner.get("branching", ()):
@@ -138,10 +139,13 @@ def reachable_questions(
             if target:
                 rules_by_target.setdefault(target, []).append(rule)
             if (
-                str(rule.get("action")) == "end"
+                rule.get("action") == "end"
                 and _condition_matches(rule, answers, key_by_question)
             ):
-                condition_index = index_by_question.get(str(rule["condition_question_id"]), owner_index)
+                condition_index = index_by_question.get(
+                    str(rule["condition_question_id"]),
+                    owner_index,
+                )
                 end_after_index = (
                     condition_index
                     if end_after_index is None
@@ -154,8 +158,8 @@ def reachable_questions(
         if end_after_index is not None and index > end_after_index:
             continue
         rules = rules_by_target.get(qid, ())
-        show_rules = [rule for rule in rules if str(rule.get("action")) == "show"]
-        skip_rules = [rule for rule in rules if str(rule.get("action")) == "skip"]
+        show_rules = [rule for rule in rules if rule.get("action") == "show"]
+        skip_rules = [rule for rule in rules if rule.get("action") == "skip"]
         visible = True
         if show_rules:
             visible = any(
@@ -211,7 +215,10 @@ def _validate_answer_value(
         values = value if qtype == "multiple_choice" else [value]
         if (
             not isinstance(values, list)
-            or (qtype == "multiple_choice" and len(values) != len(set(map(str, values))))
+            or (
+                qtype == "multiple_choice"
+                and len(values) != len(set(map(str, values)))
+            )
             or any(not isinstance(item, str) or item not in allowed for item in values)
         ):
             issues.append(
@@ -224,12 +231,13 @@ def _validate_answer_value(
             )
     elif qtype == "scale":
         scale = question.get("scale") or {}
-        if (
+        invalid = (
             isinstance(value, bool)
             or not isinstance(value, (int, float))
             or value < scale.get("minimum")
             or value > scale.get("maximum")
-        ):
+        )
+        if invalid:
             issues.append(
                 _issue(
                     "SURVEY_RESPONSE_OUT_OF_RANGE",
@@ -254,14 +262,13 @@ def _validate_answer_value(
                     response_key=key,
                 )
             )
-    elif qtype == "free_text":
-        if not isinstance(value, str) or not value:
-            issues.append(
-                _issue(
-                    "SURVEY_RESPONSE_INVALID_TEXT",
-                    f"response variable {key} requires non-empty text when answered",
-                    response_id=response_id,
-                    response_key=key,
-                )
+    elif qtype == "free_text" and (not isinstance(value, str) or not value):
+        issues.append(
+            _issue(
+                "SURVEY_RESPONSE_INVALID_TEXT",
+                f"response variable {key} requires non-empty text when answered",
+                response_id=response_id,
+                response_key=key,
             )
+        )
     return issues

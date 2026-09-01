@@ -8,24 +8,76 @@ class SurveyVirtualRunnerProductionTestsA2(SurveyVirtualRunnerTestBase):
             try:
                 facade = LocalApplicationFacade(app, "PRJ-1")
                 questionnaire = self._capture(facade)
-                stale = execution_payload(scenario="STANDARD", instrument_version=questionnaire["version"], instrument_digest="sha256:" + "0" * 64)
+
+                stale = execution_payload(
+                    scenario="STANDARD",
+                    instrument_version=questionnaire["version"],
+                    instrument_digest="sha256:" + "0" * 64,
+                )
                 with self.assertRaises(LocalApplicationError) as error:
-                    facade.submit_action({"action_type": "virtual_runner.survey.execute", "payload": stale})
+                    facade.submit_action({
+                        "action_type": "virtual_runner.survey.execute",
+                        "payload": stale,
+                    })
                 self.assertEqual(error.exception.code, "APPLICATION-VIRTUAL-PIN-001")
-                promotion = execution_payload(scenario="STANDARD", instrument_version=questionnaire["version"], instrument_digest=questionnaire["content_digest"])
+
+                promotion = execution_payload(
+                    scenario="STANDARD",
+                    instrument_version=questionnaire["version"],
+                    instrument_digest=questionnaire["content_digest"],
+                )
                 promotion["epistemic_mode"] = "empirical"
                 with self.assertRaises(LocalApplicationError) as forbidden:
-                    facade.submit_action({"action_type": "virtual_runner.survey.execute", "payload": promotion})
-                self.assertEqual(forbidden.exception.code, "APPLICATION-VIRTUAL-PAYLOAD-001")
+                    facade.submit_action({
+                        "action_type": "virtual_runner.survey.execute",
+                        "payload": promotion,
+                    })
+                self.assertEqual(
+                    forbidden.exception.code,
+                    "APPLICATION-VIRTUAL-PAYLOAD-001",
+                )
+
+                malformed_synth = execution_payload(
+                    scenario="STANDARD",
+                    instrument_version=questionnaire["version"],
+                    instrument_digest=questionnaire["content_digest"],
+                )
+                malformed_synth["synthetic_population"] = {
+                    "scenario_dimensions": 1,
+                }
+                with self.assertRaises(LocalApplicationError) as malformed:
+                    facade.submit_action({
+                        "action_type": "virtual_runner.survey.execute",
+                        "payload": malformed_synth,
+                    })
+                self.assertEqual(
+                    malformed.exception.code,
+                    "APPLICATION-VIRTUAL-PAYLOAD-001",
+                )
+
                 q = extended_questionnaire()
                 record = {
-                    "schema_version": "0.1.0", "object_type": "survey_response_record", "response_id": "REAL-R1",
-                    "raw_data_ref_id": "REAL-DATA-1", "participant_id": "REAL-P1", "identity_namespace": "real:survey",
-                    "epistemic_mode": "empirical", "synthetic": False, "response_status": "complete",
-                    "eligibility_status": "eligible", "duplicate_disposition": "not_duplicate",
-                    "verified_evidence_claimed": False, "dropout": False, "answers": [],
+                    "schema_version": "0.1.0",
+                    "object_type": "survey_response_record",
+                    "response_id": "REAL-R1",
+                    "raw_data_ref_id": "REAL-DATA-1",
+                    "participant_id": "REAL-P1",
+                    "identity_namespace": "real:survey",
+                    "epistemic_mode": "empirical",
+                    "synthetic": False,
+                    "response_status": "complete",
+                    "eligibility_status": "eligible",
+                    "duplicate_disposition": "not_duplicate",
+                    "verified_evidence_claimed": False,
+                    "dropout": False,
+                    "answers": [],
                 }
-                validation = SurveyResponseValidator().validate(q, [record], expected_epistemic_mode="virtual", expected_identity_namespace="synthetic:survey:test")
+                validation = SurveyResponseValidator().validate(
+                    q,
+                    [record],
+                    expected_epistemic_mode="virtual",
+                    expected_identity_namespace="synthetic:survey:test",
+                )
                 codes = {item["code"] for item in validation["issues"]}
                 self.assertIn("SURVEY_RESPONSE_EPISTEMIC_FIREWALL", codes)
                 self.assertIn("SURVEY_RESPONSE_IDENTITY_FIREWALL", codes)
