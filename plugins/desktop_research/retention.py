@@ -48,8 +48,6 @@ def _matching_whitespace_slice(text: str, excerpt: str) -> str | None:
 def _coverage_projection(
     extension: Mapping[str, Any],
     context_extension: Mapping[str, Any],
-    *,
-    validation_only: bool,
 ) -> dict[str, Any]:
     projected = deepcopy(dict(extension))
     dimensions = projected["coverage_assessment"]["dimensions"]
@@ -65,11 +63,7 @@ def _coverage_projection(
         dimensions.append(
             {
                 "dimension_id": dimension_id,
-                # The legacy 0.1.0 validator schema does not know the new status.
-                # Validation uses a neutral non-coverage placeholder only to exercise
-                # the existing structural checks; the canonical result below stores
-                # the explicit unknown status.
-                "status": "not_applicable" if validation_only else "unknown",
+                "status": "unknown",
                 "trace_entry_ids": [],
                 "rationale": "Coverage was not declared by the submitted result; retained as unassessed.",
             }
@@ -131,8 +125,7 @@ class DesktopResearchResultValidator(_BaseValidator):
                 continue
             matched = _matching_whitespace_slice(text, excerpt)
             if matched is not None:
-                # This object is validation-only. The submitted/canonical citation
-                # excerpt remains byte-for-byte unchanged in persisted provenance.
+                # Validation copy only; persisted/canonical citation text stays exact.
                 citation["excerpt"] = matched
         projected["extension_digest"] = canonical_extension_digest(projected)
         return projected
@@ -154,7 +147,7 @@ class DesktopResearchResultValidator(_BaseValidator):
                 context_extension,
                 run_id=run_id,
             )
-        # Never repair a submission whose declared extension digest is already bad.
+        # Do not repair a submission whose own declared digest is already invalid.
         if extension.get("extension_digest") != canonical_extension_digest(extension):
             return super().validate(
                 handoff,
@@ -163,11 +156,7 @@ class DesktopResearchResultValidator(_BaseValidator):
                 context_extension,
                 run_id=run_id,
             )
-        projected = _coverage_projection(
-            extension,
-            context_extension,
-            validation_only=True,
-        )
+        projected = _coverage_projection(extension, context_extension)
         projected = self._citation_projection(projected, run_id=run_id)
         return super().validate(
             handoff,
@@ -181,12 +170,23 @@ class DesktopResearchResultValidator(_BaseValidator):
 class DesktopResearchNormalizer(_BaseNormalizer):
     """Base normalizer with explicit canonical unknown coverage completion."""
 
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        super().__init__(*args, **kwargs)
+    def __init__(
+        self,
+        trace_store,
+        context_extension_store,
+        artifact_store,
+        operational_store,
+    ) -> None:
+        super().__init__(
+            trace_store,
+            context_extension_store,
+            artifact_store,
+            operational_store,
+        )
         self._validator = DesktopResearchResultValidator(
-            self._artifacts,
-            self._validator._operations,
-            diagnostic_store=self._traces,
+            artifact_store,
+            operational_store,
+            diagnostic_store=trace_store,
         )
 
     def normalize(
@@ -198,9 +198,5 @@ class DesktopResearchNormalizer(_BaseNormalizer):
         if extension is None:
             return super().normalize(handoff, extension, context)
         _run, _context_pack, context_extension = self._load_inputs(handoff)
-        canonical = _coverage_projection(
-            extension,
-            context_extension,
-            validation_only=False,
-        )
+        canonical = _coverage_projection(extension, context_extension)
         return super().normalize(handoff, canonical, context)
