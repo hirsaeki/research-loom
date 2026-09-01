@@ -167,6 +167,51 @@ class ExternalMaterialInventoryGuardTests(unittest.TestCase):
         finally:
             store._connection.close()
 
+    def test_rendition_lookup_ignores_unselected_rows_without_capture_id(self):
+        store = _store_fixture()
+        try:
+            _insert_capture(
+                store,
+                run_id="RUN-A",
+                prepared_at="2026-09-01T00:00:00Z",
+                capture_id="CAP-A",
+                original_digest="sha256:material-a",
+                stored_at="2026-09-01T00:00:01Z",
+            )
+            store._connection.execute(
+                "INSERT INTO execution_artifacts VALUES (?,?,?,?,?,?,?,?,?)",
+                (
+                    "RUN-A.unrelated.text",
+                    "RUN-A",
+                    _TEXT_ROLE,
+                    "text/plain",
+                    1,
+                    "sha256:unrelated",
+                    "artifact://unrelated",
+                    "real",
+                    json.dumps(
+                        {
+                            "stored_at": "2026-09-01T00:00:02Z",
+                            "rendition_role": "text",
+                        }
+                    ),
+                ),
+            )
+
+            artifacts, next_after = external_capture_artifact_metadata_for_project(
+                store,
+                "PROJECT-1",
+                limit=1,
+            )
+
+            self.assertIsNone(next_after)
+            self.assertEqual(
+                [item.artifact_id for item in artifacts],
+                ["RUN-A.CAP-A.original", "RUN-A.CAP-A.text"],
+            )
+        finally:
+            store._connection.close()
+
     def test_human_material_output_escapes_terminal_controls(self):
         value = {
             "materials": [

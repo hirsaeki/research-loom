@@ -10,7 +10,7 @@ from .store import LocalExecutionStoreIntegrityError
 
 _ORIGINAL_ROLE = "desktop_research.original_capture"
 _TEXT_ROLE = "desktop_research.text_rendition"
-_RUN_BATCH_SIZE = 400
+_CAPTURE_KEY_BATCH_SIZE = 300
 
 
 def _artifact_from_row(row) -> ExecutionArtifactMetadata:
@@ -147,35 +147,42 @@ def external_capture_artifact_metadata_for_project(
             raise LocalExecutionStoreIntegrityError(
                 "persisted external material page has no original captures"
             )
-        capture_keys = {
-            (artifact.run_id, _capture_id(artifact))
-            for artifact in originals
-        }
-        run_ids = sorted({artifact.run_id for artifact in originals})
+        capture_keys = sorted(
+            {
+                (artifact.run_id, _capture_id(artifact))
+                for artifact in originals
+            }
+        )
 
         rendition_rows = []
-        for offset in range(0, len(run_ids), _RUN_BATCH_SIZE):
-            run_batch = run_ids[offset : offset + _RUN_BATCH_SIZE]
-            run_placeholders = ",".join("?" for _ in run_batch)
+        for offset in range(0, len(capture_keys), _CAPTURE_KEY_BATCH_SIZE):
+            capture_batch = capture_keys[offset : offset + _CAPTURE_KEY_BATCH_SIZE]
+            selected_values = ",".join("(?, ?)" for _ in capture_batch)
+            selected_params = [
+                value
+                for run_id, capture_id in capture_batch
+                for value in (run_id, capture_id)
+            ]
             rendition_rows.extend(
                 store._connection.execute(
                     f"""
-                    SELECT artifact_id, run_id, role, media_type, size, digest,
-                           storage_locator, execution_mode, provenance_json
-                    FROM execution_artifacts
-                    WHERE role = ?
-                      AND run_id IN ({run_placeholders})
-                    ORDER BY run_id, artifact_id
+                    WITH selected(run_id, capture_id) AS (
+                        VALUES {selected_values}
+                    )
+                    SELECT t.artifact_id, t.run_id, t.role, t.media_type, t.size,
+                           t.digest, t.storage_locator, t.execution_mode,
+                           t.provenance_json
+                    FROM selected AS s
+                    JOIN execution_artifacts AS t ON t.run_id = s.run_id
+                    WHERE t.role = ?
+                      AND json_extract(t.provenance_json, '$.capture_id') = s.capture_id
+                    ORDER BY t.run_id, t.artifact_id
                     """,
-                    (_TEXT_ROLE, *run_batch),
+                    (*selected_params, _TEXT_ROLE),
                 ).fetchall()
             )
 
-    renditions = tuple(
-        artifact
-        for artifact in (_artifact_from_row(row) for row in rendition_rows)
-        if (artifact.run_id, _capture_id(artifact)) in capture_keys
-    )
+    renditions = tuple(_artifact_from_row(row) for row in rendition_rows)
     artifacts = (*originals, *renditions)
     next_after = material_keys[-1] if len(material_rows) > limit else None
     return artifacts, next_after
