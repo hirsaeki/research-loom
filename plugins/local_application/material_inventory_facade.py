@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import base64
+import binascii
 from copy import deepcopy
+import json
 from typing import Any, Mapping
 
 from plugins.local_execution_store import external_capture_artifact_metadata_for_project
@@ -12,6 +15,8 @@ from .run_inspection_facade import _public_provenance
 
 _ORIGINAL_ROLE = "desktop_research.original_capture"
 _TEXT_ROLE = "desktop_research.text_rendition"
+_MATERIAL_LIST_DEFAULT_LIMIT = 100
+_MATERIAL_LIST_MAX_LIMIT = 100
 
 
 def _required_provenance_string(provenance: Mapping[str, Any], field: str) -> str:
@@ -19,6 +24,57 @@ def _required_provenance_string(provenance: Mapping[str, Any], field: str) -> st
     if not isinstance(value, str) or not value:
         raise ValueError(f"external capture provenance is missing {field}")
     return value
+
+
+def _encode_material_cursor(key: tuple[str, str]) -> str:
+    raw = json.dumps(
+        {"first_captured_at": key[0], "material_id": key[1]},
+        ensure_ascii=True,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
+
+
+def _decode_material_cursor(cursor: str | None) -> tuple[str, str] | None:
+    if cursor is None:
+        return None
+    if not isinstance(cursor, str) or not cursor:
+        raise LocalApplicationError(
+            "APPLICATION-MATERIAL-INPUT-001",
+            "external material cursor must be a non-empty string",
+        )
+    try:
+        padding = "=" * (-len(cursor) % 4)
+        raw = base64.b64decode(
+            (cursor + padding).encode("ascii"),
+            altchars=b"-_",
+            validate=True,
+        )
+        value = json.loads(raw.decode("utf-8"))
+    except (UnicodeError, ValueError, binascii.Error, json.JSONDecodeError) as exc:
+        raise LocalApplicationError(
+            "APPLICATION-MATERIAL-INPUT-001",
+            "external material cursor is invalid",
+        ) from exc
+    if not isinstance(value, Mapping) or set(value) != {"first_captured_at", "material_id"}:
+        raise LocalApplicationError(
+            "APPLICATION-MATERIAL-INPUT-001",
+            "external material cursor is invalid",
+        )
+    captured_at = value.get("first_captured_at")
+    material_id = value.get("material_id")
+    if (
+        not isinstance(captured_at, str)
+        or not captured_at
+        or not isinstance(material_id, str)
+        or not material_id
+    ):
+        raise LocalApplicationError(
+            "APPLICATION-MATERIAL-INPUT-001",
+            "external material cursor is invalid",
+        )
+    return captured_at, material_id
 
 
 def _artifact_projection(artifact) -> Mapping[str, Any]:
@@ -67,13 +123,7 @@ def _capture_projection(original, rendition) -> Mapping[str, Any]:
         "acquired_at": acquired_at,
         "captured_at": captured_at,
         "original": _artifact_projection(original),
-        "renditions": [
-            {
-                **_artifact_projection(rendition),
-                "kind": "utf8_text",
-                "encoding": "UTF-8",
-            }
-        ],
+        "renditions": [{**_artifact_projection(rendition), "kind": "utf8_text", "encoding": "UTF-8"}],
         "provenance": _public_provenance(deepcopy(dict(original_provenance))),
     }
 
@@ -105,11 +155,30 @@ def _material_projection(captures: list[Mapping[str, Any]]) -> Mapping[str, Any]
 class LocalApplicationFacade(_BaseLocalApplicationFacade):
     """Production facade extended with captured external material inventory."""
 
-    def list_external_materials(self) -> Mapping[str, Any]:
+    def list_external_materials(
+        self,
+        *,
+        limit: int = _MATERIAL_LIST_DEFAULT_LIMIT,
+        cursor: str | None = None,
+    ) -> Mapping[str, Any]:
+        if (
+            not isinstance(limit, int)
+            or isinstance(limit, bool)
+            or limit <= 0
+            or limit > _MATERIAL_LIST_MAX_LIMIT
+        ):
+            raise LocalApplicationError(
+                "APPLICATION-MATERIAL-INPUT-001",
+                f"external material limit must be between 1 and {_MATERIAL_LIST_MAX_LIMIT}",
+            )
+        after = _decode_material_cursor(cursor)
+
         try:
-            artifacts = external_capture_artifact_metadata_for_project(
+            artifacts, next_after = external_capture_artifact_metadata_for_project(
                 self._application.execution_store,
                 self._project_id,
+                limit=limit,
+                after=after,
             )
             by_capture: dict[tuple[str, str], dict[str, Any]] = {}
             for artifact in artifacts:
@@ -138,14 +207,20 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
 
             materials = [_material_projection(captures) for captures in grouped.values()]
             materials.sort(key=lambda item: (str(item["first_captured_at"]), str(item["material_id"])))
+        except LocalApplicationError:
+            raise
         except Exception as exc:
             raise LocalApplicationError(
                 "APPLICATION-MATERIAL-READ-001",
                 "persisted external material inventory could not be read",
             ) from exc
 
+        next_cursor = _encode_material_cursor(next_after) if next_after is not None else None
         return {
             "status": "OK",
             "project_id": self._project_id,
             "materials": materials,
+            "limit": limit,
+            "truncated": next_cursor is not None,
+            "next_cursor": next_cursor,
         }

@@ -19,24 +19,46 @@ def _emit(value: Mapping[str, Any]) -> None:
     sys.stdout.write(json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n")
 
 
+def _terminal_safe(value: Any) -> str:
+    return "".join(
+        character if character.isprintable() else f"\\u{ord(character):04x}"
+        for character in str(value)
+    )
+
+
 def _emit_external_materials_human(value: Mapping[str, Any]) -> None:
     materials = value.get("materials", [])
     sys.stdout.write(f"Captured external materials: {len(materials)}\n")
     for index, material in enumerate(materials, start=1):
         locators = material.get("source_locators") or []
         original = material.get("original") or {}
-        label = locators[0] if locators else original.get("artifact_id", material.get("material_id", "material"))
-        runs = ", ".join(material.get("run_ids") or [])
+        label = _terminal_safe(
+            locators[0]
+            if locators
+            else original.get("artifact_id", material.get("material_id", "material"))
+        )
+        runs = ", ".join(_terminal_safe(item) for item in material.get("run_ids") or [])
         renditions = material.get("renditions") or []
-        rendition_ids = ", ".join(str(item.get("artifact_id")) for item in renditions)
+        rendition_ids = ", ".join(
+            _terminal_safe(item.get("artifact_id")) for item in renditions
+        )
         sys.stdout.write(f"\n{index}. {label}\n")
-        sys.stdout.write(f"   Digest: {material.get('original_digest')}\n")
+        sys.stdout.write(
+            f"   Digest: {_terminal_safe(material.get('original_digest'))}\n"
+        )
         sys.stdout.write(f"   Runs: {runs}\n")
         sys.stdout.write(
             "   Original: "
-            f"{original.get('artifact_id')} ({original.get('media_type')}, {original.get('size_bytes')} bytes)\n"
+            f"{_terminal_safe(original.get('artifact_id'))} "
+            f"({_terminal_safe(original.get('media_type'))}, "
+            f"{_terminal_safe(original.get('size_bytes'))} bytes)\n"
         )
         sys.stdout.write(f"   Rendition: {rendition_ids}\n")
+    if value.get("truncated"):
+        sys.stdout.write(
+            "\nMore materials available. Next cursor: "
+            f"{_terminal_safe(value.get('next_cursor'))}\n"
+        )
 
 
 def _read_input(source: str | None) -> dict[str, Any]:
@@ -170,6 +192,16 @@ def build_parser() -> argparse.ArgumentParser:
     materials_sub = materials.add_subparsers(dest="materials_command", required=True)
     materials_list = materials_sub.add_parser("list")
     _add_workspace(materials_list)
+    materials_list.add_argument(
+        "--limit",
+        type=int,
+        default=100,
+        help="materials per page (1-100)",
+    )
+    materials_list.add_argument(
+        "--cursor",
+        help="opaque next_cursor from a previous materials list response",
+    )
     _add_output_json(materials_list)
 
     return parser
@@ -249,7 +281,10 @@ def _run(args: argparse.Namespace) -> Mapping[str, Any]:
             if args.external_command == "collect":
                 return facade.collect_external(args.run_id, _read_input(args.json_input))
             if args.external_command == "materials" and args.materials_command == "list":
-                return facade.list_external_materials()
+                return facade.list_external_materials(
+                    limit=args.limit,
+                    cursor=args.cursor,
+                )
     raise LocalApplicationError("CLI-COMMAND-001", "unsupported command")
 
 
