@@ -102,7 +102,7 @@ def validate_rqs(rq_ids: list[str], state) -> None:
         for obj in state.effective_objects()
         if obj.get("kind") == "research_question"
         and str(obj.get("project_id", state.project_ref)) == state.project_ref
-        and obj.get("adoption_state") == "approved"
+        and obj.get("adoption_state") in {"approved", "revised"}
     }
     missing = sorted(set(rq_ids) - authoritative)
     if missing:

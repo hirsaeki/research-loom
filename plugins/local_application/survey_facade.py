@@ -119,14 +119,17 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                 "Survey Design belongs to a different Research lineage",
             )
         if (
-            str(design_record["project_config_digest"])
+            str(binding["snapshot_ref"]) != str(state.current_snapshot["id"])
+            or str(binding["snapshot_digest"])
+            != str(state.current_snapshot["content_digest"])
+            or str(design_record["project_config_digest"])
             != str(state.project_config_digest)
             or str(design_record["effective_profile_set_digest"])
             != str(state.effective_profile_set_digest)
         ):
             raise LocalApplicationError(
                 "APPLICATION-SURVEY-DESIGN-BINDING-001",
-                "Survey Design provenance does not match the current project/profile binding",
+                "Survey Design provenance does not match the current Snapshot/project/profile binding",
             )
 
     def capture_survey_design(
