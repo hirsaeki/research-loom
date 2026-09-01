@@ -19,6 +19,9 @@ from .facade import LocalApplicationError
 from .material_inventory_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
 
 
+_LARGE_ORIGINAL_PREFIX = "external-original://sha256/"
+
+
 class LocalApplicationFacade(_BaseLocalApplicationFacade):
     """PR39 facade: preserve the normal capture path and add oversized fallback."""
 
@@ -27,6 +30,16 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
         run_id: str,
         submission: Mapping[str, Any],
     ) -> Mapping[str, Any]:
+        # Once a Run contains a managed large original, keep later capture-pair
+        # accounting on the same seam so that the large payload never consumes the
+        # generic Run-output budget used by bounded artifacts.
+        self._desktop_external_run(run_id)
+        if any(
+            artifact.role == _ORIGINAL_ROLE
+            and artifact.storage_locator.startswith(_LARGE_ORIGINAL_PREFIX)
+            for artifact in self._application.execution_store.artifacts_for(run_id)
+        ):
+            return self._capture_external_source_with_large_original(run_id, submission)
         try:
             return super().capture_external_source(run_id, submission)
         except LocalApplicationError as exc:
@@ -124,8 +137,6 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
             raise LocalApplicationError("APPLICATION-EXTERNAL-FILE-002", str(exc)) from exc
 
         if original_declared is None or original_limit <= store.config.max_artifact_bytes:
-            # The initial normal path already proved this is not a valid large-original
-            # case; do not use the fallback to weaken legacy/generic intake limits.
             raise LocalApplicationError(
                 "APPLICATION-EXTERNAL-CAPTURE-001",
                 "original capture is not permitted to exceed the generic artifact bound",
