@@ -2,7 +2,7 @@
 
 from .application import LocalResearchApplication, LocalStaticAuthorizationProvider
 from .facade import LocalApplicationError
-from .material_inventory_facade import LocalApplicationFacade
+from .retention_facade import LocalApplicationFacade
 from .workspace import LocalWorkspace, LocalWorkspaceError, OpenedLocalWorkspace
 
 __all__ = [
