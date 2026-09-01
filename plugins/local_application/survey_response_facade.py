@@ -152,9 +152,13 @@ class LocalApplicationFacade(
 ):
     """Canonical Survey response normalization, persistence, and inspection."""
 
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
+    def list_actions(self) -> Mapping[str, Any]:
         self._ensure_survey_response_actions()
+        return super().list_actions()
+
+    def submit_action(self, draft_input: Mapping[str, Any]) -> Mapping[str, Any]:
+        self._ensure_survey_response_actions()
+        return super().submit_action(draft_input)
 
     def _ensure_survey_response_actions(self) -> None:
         """Compose PR42 actions into the existing audited Coordinator registry."""
