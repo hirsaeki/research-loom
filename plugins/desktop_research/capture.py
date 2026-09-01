@@ -23,6 +23,25 @@ def _looks_like_real_web_locator(locator: str) -> bool:
     return locator.startswith("http://") or locator.startswith("https://")
 
 
+def validate_capture_identity(
+    run: CapabilityRunRecord,
+    *,
+    capture_id: str,
+    source_category: str,
+    exact_locator: str,
+    acquired_at: str,
+) -> None:
+    """Validate capture metadata shared by bounded and managed-original intake paths."""
+    if not capture_id or not source_category or not exact_locator:
+        raise DesktopResearchCaptureError("capture identity/category/exact locator are required")
+    if not _is_utc(acquired_at):
+        raise DesktopResearchCaptureError("acquired_at must be RFC3339 UTC")
+    if run.execution_mode != "real" and _looks_like_real_web_locator(exact_locator):
+        raise DesktopResearchCaptureError(
+            "virtual/synthetic capture may not masquerade a placeholder as a real web locator"
+        )
+
+
 class DesktopResearchCaptureService:
     """Run-bound trusted source-capture intake backed by the PR23 Artifact Store."""
 
@@ -43,14 +62,13 @@ class DesktopResearchCaptureService:
         provenance: Mapping[str, Any] | None = None,
         artifact_write_options: Mapping[str, Any] | None = None,
     ) -> Mapping[str, Any]:
-        if not capture_id or not source_category or not exact_locator:
-            raise DesktopResearchCaptureError("capture identity/category/exact locator are required")
-        if not _is_utc(acquired_at):
-            raise DesktopResearchCaptureError("acquired_at must be RFC3339 UTC")
-        if run.execution_mode != "real" and _looks_like_real_web_locator(exact_locator):
-            raise DesktopResearchCaptureError(
-                "virtual/synthetic capture may not masquerade a placeholder as a real web locator"
-            )
+        validate_capture_identity(
+            run,
+            capture_id=capture_id,
+            source_category=source_category,
+            exact_locator=exact_locator,
+            acquired_at=acquired_at,
+        )
         if not isinstance(original_bytes, bytes):
             raise DesktopResearchCaptureError("original capture must be bytes")
         if isinstance(text_rendition, str):

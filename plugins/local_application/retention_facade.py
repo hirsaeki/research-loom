@@ -5,6 +5,7 @@ from typing import Any, Mapping
 
 from core.execution import RunStatus
 from plugins.desktop_research import DesktopResearchCaptureService
+from plugins.desktop_research.capture import DesktopResearchCaptureError, validate_capture_identity
 from plugins.local_execution_store import LocalExecutionStoreError, read_controlled_file
 
 from .external_desktop_facade import (
@@ -61,6 +62,16 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
         source_category = _required_string(value, "source_category")
         exact_locator = _required_string(value, "exact_locator")
         acquired_at = _required_string(value, "acquired_at")
+        try:
+            validate_capture_identity(
+                run,
+                capture_id=capture_id,
+                source_category=source_category,
+                exact_locator=exact_locator,
+                acquired_at=acquired_at,
+            )
+        except DesktopResearchCaptureError as exc:
+            raise LocalApplicationError("APPLICATION-EXTERNAL-CAPTURE-001", str(exc)) from exc
         original_media_type = _required_string(value, "original_media_type")
         original_path = self._workspace_capture_path(_required_string(value, "original_file"))
         text_path = self._workspace_capture_path(_required_string(value, "text_rendition_file"))

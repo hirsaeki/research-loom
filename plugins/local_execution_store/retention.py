@@ -230,6 +230,79 @@ class LocalExecutionStore(_AtomicExecutionStore):
         scheme = _LARGE_ORIGINAL_SCHEME if large else "artifact"
         return f"{scheme}://sha256/{digest_hex}", target, created
 
+    def _validate_desktop_research_capture_pair(
+        self,
+        run: CapabilityRunRecord,
+        *,
+        original_size: int,
+        text_size: int,
+        original_artifact_id: str,
+        text_artifact_id: str,
+        role_byte_limits: Mapping[str, int],
+        role_count_limits: Mapping[str, int],
+        expected_status: RunStatus,
+    ) -> None:
+        """Validate pair guards inside a store transaction without touching payload bytes."""
+        original_role = "desktop_research.original_capture"
+        text_role = "desktop_research.text_rendition"
+        persisted = self.load_run(run.run_id)
+        if persisted is None:
+            raise LocalExecutionStoreError(
+                "artifact Run must already exist in the execution trace"
+            )
+        if (
+            persisted.execution_mode != run.execution_mode
+            or persisted.capability_id != run.capability_id
+        ):
+            raise LocalExecutionStoreIntegrityError(
+                "artifact Run binding does not match persisted Run"
+            )
+        if persisted.status is not expected_status:
+            raise LocalExecutionStoreError(
+                f"artifact Run must remain {expected_status.value}"
+            )
+
+        existing = self.artifacts_for(run.run_id)
+        counts = Counter(item.role for item in existing)
+        role_bytes = Counter()
+        for artifact in existing:
+            role_bytes[artifact.role] += artifact.size
+        for role in (original_role, text_role):
+            if counts[role] + 1 > int(role_count_limits[role]):
+                raise LocalExecutionStoreError(
+                    f"artifact role count limit exceeded: {role}"
+                )
+        if role_bytes[original_role] + original_size > int(role_byte_limits[original_role]):
+            raise LocalExecutionStoreError(
+                f"artifact role byte limit exceeded: {original_role}"
+            )
+        if role_bytes[text_role] + text_size > int(role_byte_limits[text_role]):
+            raise LocalExecutionStoreError(
+                f"artifact role byte limit exceeded: {text_role}"
+            )
+
+        generic_total_row = self._connection.execute(
+            """
+            SELECT COALESCE(SUM(size), 0) AS total
+            FROM execution_artifacts
+            WHERE run_id = ? AND storage_locator NOT LIKE 'external-original://%'
+            """,
+            (run.run_id,),
+        ).fetchone()
+        large = original_size > self.config.max_artifact_bytes
+        generic_planned = text_size + (0 if large else original_size)
+        if int(generic_total_row["total"]) + generic_planned > self.config.max_run_output_bytes:
+            raise LocalExecutionStoreError(
+                "Run output exceeds configured max_run_output_bytes"
+            )
+
+        collision = self._connection.execute(
+            "SELECT artifact_id FROM execution_artifacts WHERE artifact_id IN (?,?)",
+            (original_artifact_id, text_artifact_id),
+        ).fetchone()
+        if collision is not None:
+            raise ValueError("immutable artifact identity collision")
+
     def put_desktop_research_capture_files(
         self,
         run: CapabilityRunRecord,
@@ -258,6 +331,26 @@ class LocalExecutionStore(_AtomicExecutionStore):
         except UnicodeDecodeError as exc:
             raise LocalExecutionStoreError("text rendition must be valid UTF-8") from exc
 
+        # Secure fstat gives us the size needed for deterministic guard checks
+        # without reading or staging the large payload. Recheck after staging in
+        # case the source changes between the two controlled opens.
+        with self._controlled_file_fd(
+            original_path,
+            max_bytes=max_original_bytes,
+        ) as (_source_fd, original_size_hint):
+            pass
+        with self._write_transaction():
+            self._validate_desktop_research_capture_pair(
+                run,
+                original_size=original_size_hint,
+                text_size=len(text_content),
+                original_artifact_id=original_artifact_id,
+                text_artifact_id=text_artifact_id,
+                role_byte_limits=role_byte_limits,
+                role_count_limits=role_count_limits,
+                expected_status=expected_status,
+            )
+
         staged, original_digest, original_size = self._stage_controlled_original(
             original_path,
             max_bytes=max_original_bytes,
@@ -267,67 +360,22 @@ class LocalExecutionStore(_AtomicExecutionStore):
         text_role = "desktop_research.text_rendition"
         original_target: Path | None = None
         original_created = False
-        text_target = self._blob_target_for(text_content)
-        text_target_was_absent = not text_target.exists()
+        text_target: Path | None = None
+        text_target_was_absent = False
         try:
+            text_target = self._blob_target_for(text_content)
+            text_target_was_absent = not text_target.exists()
             with self._write_transaction():
-                persisted = self.load_run(run.run_id)
-                if persisted is None:
-                    raise LocalExecutionStoreError(
-                        "artifact Run must already exist in the execution trace"
-                    )
-                if (
-                    persisted.execution_mode != run.execution_mode
-                    or persisted.capability_id != run.capability_id
-                ):
-                    raise LocalExecutionStoreIntegrityError(
-                        "artifact Run binding does not match persisted Run"
-                    )
-                if persisted.status is not expected_status:
-                    raise LocalExecutionStoreError(
-                        f"artifact Run must remain {expected_status.value}"
-                    )
-
-                existing = self.artifacts_for(run.run_id)
-                counts = Counter(item.role for item in existing)
-                role_bytes = Counter()
-                for artifact in existing:
-                    role_bytes[artifact.role] += artifact.size
-                for role, planned in ((original_role, 1), (text_role, 1)):
-                    if counts[role] + planned > int(role_count_limits[role]):
-                        raise LocalExecutionStoreError(
-                            f"artifact role count limit exceeded: {role}"
-                        )
-                if role_bytes[original_role] + original_size > int(role_byte_limits[original_role]):
-                    raise LocalExecutionStoreError(
-                        f"artifact role byte limit exceeded: {original_role}"
-                    )
-                if role_bytes[text_role] + len(text_content) > int(role_byte_limits[text_role]):
-                    raise LocalExecutionStoreError(
-                        f"artifact role byte limit exceeded: {text_role}"
-                    )
-
-                generic_total_row = self._connection.execute(
-                    """
-                    SELECT COALESCE(SUM(size), 0) AS total
-                    FROM execution_artifacts
-                    WHERE run_id = ? AND storage_locator NOT LIKE 'external-original://%'
-                    """,
-                    (run.run_id,),
-                ).fetchone()
-                generic_planned = len(text_content) + (0 if large else original_size)
-                if int(generic_total_row["total"]) + generic_planned > self.config.max_run_output_bytes:
-                    raise LocalExecutionStoreError(
-                        "Run output exceeds configured max_run_output_bytes"
-                    )
-
-                placeholders = "?,?"
-                collision = self._connection.execute(
-                    f"SELECT artifact_id FROM execution_artifacts WHERE artifact_id IN ({placeholders})",
-                    (original_artifact_id, text_artifact_id),
-                ).fetchone()
-                if collision is not None:
-                    raise ValueError("immutable artifact identity collision")
+                self._validate_desktop_research_capture_pair(
+                    run,
+                    original_size=original_size,
+                    text_size=len(text_content),
+                    original_artifact_id=original_artifact_id,
+                    text_artifact_id=text_artifact_id,
+                    role_byte_limits=role_byte_limits,
+                    role_count_limits=role_count_limits,
+                    expected_status=expected_status,
+                )
 
                 original_locator, original_target, original_created = self._install_staged_original(
                     staged,
@@ -384,7 +432,7 @@ class LocalExecutionStore(_AtomicExecutionStore):
         except Exception:
             if original_created and original_target is not None:
                 self._cleanup_new_blob_targets({original_target})
-            if text_target_was_absent:
+            if text_target_was_absent and text_target is not None:
                 self._cleanup_new_blob_targets({text_target})
             raise
         finally:
