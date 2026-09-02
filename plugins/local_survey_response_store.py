@@ -29,6 +29,9 @@ _REQUIRED_COLUMNS = {
     "survey_response_dataset_entries": {
         "project_id", "dataset_id", "entry_index", "kind", "payload_json",
     },
+    "survey_response_dataset_entry_counts": {
+        "project_id", "dataset_id", "entry_count", "accepted_count",
+    },
 }
 
 
@@ -78,6 +81,54 @@ CREATE TABLE IF NOT EXISTS survey_response_dataset_entries (
     payload_json TEXT NOT NULL,
     PRIMARY KEY(project_id, dataset_id, entry_index)
 );
+CREATE TABLE IF NOT EXISTS survey_response_dataset_entry_counts (
+    project_id TEXT NOT NULL,
+    dataset_id TEXT NOT NULL,
+    entry_count INTEGER NOT NULL DEFAULT 0,
+    accepted_count INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY(project_id, dataset_id)
+);
+CREATE TRIGGER IF NOT EXISTS survey_response_dataset_count_init
+AFTER INSERT ON survey_response_datasets
+BEGIN
+    INSERT OR IGNORE INTO survey_response_dataset_entry_counts(
+        project_id,dataset_id,entry_count,accepted_count
+    ) VALUES (NEW.project_id,NEW.dataset_id,0,0);
+END;
+CREATE TRIGGER IF NOT EXISTS survey_response_dataset_count_insert
+AFTER INSERT ON survey_response_dataset_entries
+BEGIN
+    INSERT INTO survey_response_dataset_entry_counts(
+        project_id,dataset_id,entry_count,accepted_count
+    ) VALUES (
+        NEW.project_id,
+        NEW.dataset_id,
+        1,
+        CASE WHEN NEW.kind='accepted_response' THEN 1 ELSE 0 END
+    )
+    ON CONFLICT(project_id,dataset_id) DO UPDATE SET
+        entry_count=entry_count+1,
+        accepted_count=accepted_count+
+            CASE WHEN NEW.kind='accepted_response' THEN 1 ELSE 0 END;
+END;
+CREATE TRIGGER IF NOT EXISTS survey_response_dataset_count_delete
+AFTER DELETE ON survey_response_dataset_entries
+BEGIN
+    UPDATE survey_response_dataset_entry_counts
+    SET entry_count=entry_count-1,
+        accepted_count=accepted_count-
+            CASE WHEN OLD.kind='accepted_response' THEN 1 ELSE 0 END
+    WHERE project_id=OLD.project_id AND dataset_id=OLD.dataset_id;
+END;
+CREATE TRIGGER IF NOT EXISTS survey_response_dataset_count_kind_update
+AFTER UPDATE OF kind ON survey_response_dataset_entries
+BEGIN
+    UPDATE survey_response_dataset_entry_counts
+    SET accepted_count=accepted_count
+        - CASE WHEN OLD.kind='accepted_response' THEN 1 ELSE 0 END
+        + CASE WHEN NEW.kind='accepted_response' THEN 1 ELSE 0 END
+    WHERE project_id=NEW.project_id AND dataset_id=NEW.dataset_id;
+END;
 CREATE INDEX IF NOT EXISTS survey_response_dataset_entries_page
 ON survey_response_dataset_entries(project_id, dataset_id, entry_index);
 """
@@ -556,6 +607,25 @@ class LocalSurveyResponseStore:
                 return None
             summary = self._decode_dataset_summary(row)
             total = int(summary["response_count"])
+            counts = connection.execute(
+                """
+                SELECT entry_count,accepted_count
+                FROM survey_response_dataset_entry_counts
+                WHERE project_id=? AND dataset_id=?
+                """,
+                (project_id, dataset_id),
+            ).fetchone()
+            if (
+                counts is None
+                or int(counts["entry_count"]) != total
+                or int(counts["accepted_count"]) != int(summary["accepted_count"])
+                or int(counts["entry_count"]) - int(counts["accepted_count"])
+                != int(summary["rejected_count"])
+            ):
+                raise LocalSurveyResponseStoreError(
+                    "SURVEY-RESPONSE-STORE-INTEGRITY-001",
+                    "stored SurveyResponseDataset entry index is inconsistent",
+                )
             expected = min(limit, max(total - offset, 0))
             rows = connection.execute(
                 """
