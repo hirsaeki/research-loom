@@ -48,52 +48,102 @@ class ExternalDesktopResearchAttemptLifecycleTests(unittest.TestCase):
             finally:
                 facade.close()
 
-    def\İØÛÛXİÜÙ\šX[^™\×Ø][\Üİ\İ›İYÚØÛÛ\]Yİ˜[œÚ][ÛŠÙ[ŠN‚ˆ[\ˆH^\›˜[\ÚİÜ™\ÙX\˜Ú[ZÙU\İÊY]Ù˜[YOHœ[•\İŠBˆÚ][\š[K•[\Ü˜\Q\™XİÜJ
-H\È[\‚ˆ›ÛİH]
-[\
-Bˆ\K˜XØYLHH[\‹›XZÙWÙ˜XØYJ›Ûİ
-Bˆ\ˆH›Û™Bˆ˜XØYLˆH›Û™BˆN‚ˆ[—ÚYH[\‹œ™\\™J˜XØYLJVÈœ[—ÚY—Bˆ˜XØYLKœİ\Ù^\›˜[Ü™]šY]˜[Ø][\
-[—ÚYÂˆ˜][\ÚYˆULH‹ˆœİ˜]YŞHˆœİ\ÜÙX\˜Ú‹ˆ˜Ûİ™\˜YÙWÙ[Y[œÚ[Û—ÚYÈˆÈÓÕ‹TÕTÔ•—KˆJBˆ[\‹Üš]WØØ\\™WÙš[\Ê›Ûİ
-BˆØ\\™HH˜XØYLK˜Ø\\™WÙ^\›˜[ÜÛİ\˜ÙJ[—ÚYÂˆ˜Ø\\™WÚYˆĞTLH‹ˆœÛİ\˜ÙWØØ]YÛÜHˆ›İ\ˆ‹ˆ™^XİÛØØ]ÜˆˆšÎ‹ËÙ^[\K\İÜÛİ\˜ÙKXHÜÙXİ[Û‹LH‹ˆ˜XÜ]Z\™YØ]ˆŒŒ‹LLÌUŒŒˆ‹ˆ›ÜšYÚ[˜[Ùš[Hˆ˜Ø\\™\ËÜ˜]ËÜÛİ\˜ÙKXKš[‹ˆ›ÜšYÚ[˜[ÛYYXWİ\Hˆ^Ú[‹ˆ^Ü™[™][Û—Ùš[Hˆ˜Ø\\™\Ëİ^ÜÛİ\˜ÙKXK‹ˆœ›İ™[˜[˜ÙHˆßKˆJVÈ˜Ø\\™H—Bˆ˜XØYLK˜ÛÛ\]WÙ^\›˜[Ü™]šY]˜[Ø][\
-[—ÚYÂˆ˜][\ÚYˆULH‹ˆ›İ]ÛÛYHˆœÛİ\˜ÙWØØ\\™Y‹ˆ\™Ù]ÛØØ]ÜˆˆšÎ‹ËÙ^[\K\İÜÛİ\˜ÙKXHÜÙXİ[Û‹LH‹ˆœ™\İ[[™×ØØ\\™WÚYˆĞTLH‹ˆJBˆ˜XØYLKœİ\Ù^\›˜[Ü™]šY]˜[Ø][\
-[—ÚYÂˆ˜][\ÚYˆULˆ‹ˆœİ˜]YŞHˆ˜Ûİ[\ˆÙX\˜Ú‹ˆ˜Ûİ™\˜YÙWÙ[Y[œÚ[Û—ÚYÈˆÈÓÕ‹PÓÕS•Tˆ—KˆJBˆ˜XØYLK˜ÛÛ\]WÙ^\›˜[Ü™]šY]˜[Ø][\
-[—ÚYÂˆ˜][\ÚYˆULˆ‹ˆ›İ]ÛÛYHˆ››×Ü™[]˜[ÜÛİ\˜ÙH‹ˆJBˆ[™Ù™‹^[œÚ[ÛˆHÛÛ[—ÜİX›Z\ÜÚ[ÛŠ\K[—ÚYØ\\™JB‚ˆ\ˆHØØ[™\ÙX\˜Ú\XØ][ÛŠˆ›ÛİÈ‹œ™\ÙX\˜Ú[ÛÛH‹ˆ™\ÛÛ™\S[™\ÛÛ™\Š
-KˆY™™Xİ]™WÜ›Ùš[WÜÙ]Ü›İšY\\›Ùš[WÜ›İšY\‹ˆ
-Bˆ˜XØYLˆHØØ[\XØ][Û‘˜XØYJ\‹”’‹LH‹ÛÜšÜÜXÙWÜ›Ûİ\›Ûİ
-Bˆ[\™YØÚXÚÈH]™[
+    def test_collect_serializes_attempt_start_through_completed_transition(self):
+        helper = ExternalDesktopResearchIntakeTests(methodName="runTest")
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            app1, facade1 = helper.make_facade(root)
+            app2 = None
+            facade2 = None
+            try:
+                run_id = helper.prepare(facade1)["run_id"]
+                facade1.start_external_retrieval_attempt(run_id, {
+                    "attempt_id": "ATT-1",
+                    "strategy": "support search",
+                    "coverage_dimension_ids": ["COV-SUPPORT"],
+                })
+                helper.write_capture_files(root)
+                capture = facade1.capture_external_source(run_id, {
+                    "capture_id": "CAP-1",
+                    "source_category": "other",
+                    "exact_locator": "https://example.test/source-a#section-1",
+                    "acquired_at": "2026-08-31T00:00:00Z",
+                    "original_file": "captures/raw/source-a.html",
+                    "original_media_type": "text/html",
+                    "text_rendition_file": "captures/text/source-a.txt",
+                    "provenance": {},
+                })["capture"]
+                facade1.complete_external_retrieval_attempt(run_id, {
+                    "attempt_id": "ATT-1",
+                    "outcome": "source_captured",
+                    "target_locator": "https://example.test/source-a#section-1",
+                    "resulting_capture_id": "CAP-1",
+                })
+                facade1.start_external_retrieval_attempt(run_id, {
+                    "attempt_id": "ATT-2",
+                    "strategy": "counter search",
+                    "coverage_dimension_ids": ["COV-COUNTER"],
+                })
+                facade1.complete_external_retrieval_attempt(run_id, {
+                    "attempt_id": "ATT-2",
+                    "outcome": "no_relevant_source",
+                })
+                handoff, extension = golden_submission(app1, run_id, capture)
 
-Bˆ™[X\ÙWØÚXÚÈH]™[
+                app2 = LocalResearchApplication(
+                    root / ".research-loom",
+                    resolver=NullResolver(),
+                    effective_profile_set_provider=profile_provider,
+                )
+                facade2 = LocalApplicationFacade(app2, "PRJ-1", workspace_root=root)
+                entered_check = Event()
+                release_check = Event()
+                real_reconstruct = reconstruct_attempts
 
-Bˆ™X[Ü™XÛÛœİXİH™XÛÛœİXİØ][\Â‚ˆYˆ[^YYÜ™XÛÛœİXİ
+                def delayed_reconstruct(*args, **kwargs):
+                    result = real_reconstruct(*args, **kwargs)
+                    entered_check.set()
+                    self.assertTrue(release_check.wait(timeout=5))
+                    return result
 
-˜\™ÜË
-ŠšİØ\™ÜÊN‚ˆ™\İ[H™X[Ü™XÛÛœİXİ
+                with patch(
+                    "plugins.local_application.external_attempt_lifecycle_facade.reconstruct_attempts",
+                    side_effect=delayed_reconstruct,
+                ):
+                    with ThreadPoolExecutor(max_workers=2) as pool:
+                        collect_future = pool.submit(
+                            facade1.collect_external,
+                            run_id,
+                            {"handoff": handoff, "extension": extension},
+                        )
+                        self.assertTrue(entered_check.wait(timeout=5))
+                        attempt_future = pool.submit(
+                            facade2.start_external_retrieval_attempt,
+                            run_id,
+                            {
+                                "attempt_id": "ATT-RACE",
+                                "strategy": "late race search",
+                                "coverage_dimension_ids": ["COV-SUPPORT"],
+                            },
+                        )
+                        with self.assertRaises(FutureTimeout):
+                            attempt_future.result(timeout=0.1)
+                        release_check.set()
+                        result = collect_future.result(timeout=5)
+                        with self.assertRaises(LocalApplicationError) as blocked:
+                            attempt_future.result(timeout=5)
 
-˜\™ÜË
-ŠšİØ\™ÜÊBˆ[\™YØÚXÚËœÙ]
+                self.assertEqual(result["status"], "CAPABILITY_RESULT_COLLECTED")
+                self.assertEqual(app1.execution_store.load_run(run_id).status.value, "COMPLETED")
+                self.assertEqual(blocked.exception.code, "APPLICATION-EXTERNAL-RUN-STATE-001")
+                attempts = reconstruct_attempts(app1.operational_store, run_id)
+                self.assertNotIn("ATT-RACE", attempts)
+                self.assertTrue(all(item["completed_at"] is not None for item in attempts.values()))
+            finally:
+                if facade2 is not None:
+                    facade2.close()
+                facade1.close()
 
-BˆÙ[‹˜\ÜÙ\YJ™[X\ÙWØÚXÚËØZ]
-[Y[İ]MJJBˆ™]\›ˆ™\İ[‚ˆÚ]]Ú
-ˆœYÚ[œË›ØØ[Ø\XØ][Û‹™^\›˜[Ø][\ÛY™XŞXÛWÙ˜XØYKœ™XÛÛœİXİØ][\È‹ˆÚYWÙY™™XİY[^YYÜ™XÛÛœİXİˆ
-N‚ˆÚ]™XYÛÛ^Xİ]ÜŠX^İÛÜšÙ\œÏLŠH\ÈÛÛ‚ˆÛÛXİÙ]\™HHÛÛœİX›Z]
-ˆ˜XØYLK˜ÛÛXİÙ^\›˜[ˆ[—ÚYˆÈš[™Ù™ˆˆ[™Ù™‹™^[œÚ[Ûˆˆ^[œÚ[ÛŸKˆ
-BˆÙ[‹˜\ÜÙ\YJ[\™YØÚXÚËØZ]
-[Y[İ]MJJBˆ][\Ù]\™HHÛÛœİX›Z]
-ˆ˜XØYL‹œİ\Ù^\›˜[Ü™]šY]˜[Ø][\ˆ[—ÚYˆÂˆ˜][\ÚYˆUTPÑH‹ˆœİ˜]YŞHˆ›]H˜XÙHÙX\˜Ú‹ˆ˜Ûİ™\˜YÙWÙ[Y[œÚ[Û—ÚYÈˆÈÓÕ‹TÕTÔ•—KˆKˆ
-BˆÚ]Ù[‹˜\ÜÙ\˜Z\Ù\Ê]\™U[Y[İ]
-N‚ˆ][\Ù]\™Kœ™\İ[
-[Y[İ]LŒJBˆ™[X\ÙWØÚXÚËœÙ]
 
-Bˆ™\İ[HÛÛXİÙ]\™Kœ™\İ[
-[Y[İ]MJBˆÚ]Ù[‹˜\ÜÙ\˜Z\Ù\ÊØØ[\XØ][Û‘\œ›ÜŠH\È›ØÚÙY‚ˆ][\Ù]\™Kœ™\İ[
-[Y[İ]MJB‚ˆÙ[‹˜\ÜÙ\\]X[
-™\İ[Èœİ]\È—KĞTP’SUWÔ‘TÕSĞÓÓPÕQŠBˆÙ[‹˜\ÜÙ\\]X[
-\K™^Xİ][Û—ÜİÜ™K›ØYÜ[Š[—ÚY
-Kœİ]\Ë˜[YKÓÓTUQŠBˆÙ[‹˜\ÜÙ\\]X[
-›ØÚÙY™^Ù\[Û‹˜ÛÙKTPĞUSÓ‹QVT“ST•S‹TÕUKLHŠBˆ][\ÈH™XÛÛœİXİØ][\Ê\K›Ü\˜][Û˜[ÜİÜ™K[—ÚY
-BˆÙ[‹˜\ÜÙ\›İ[ŠUTPÑH‹][\ÊBˆÙ[‹˜\ÜÙ\YJ[
-][VÈ˜ÛÛ\]YØ]—H\È›İ›Û™H›Üˆ][H[ˆ][\Ë˜[Y\Ê
-JJBˆš[˜[N‚ˆYˆ˜XØYLˆ\È›İ›Û™N‚ˆ˜XØYL‹˜ÛÜÙJ
-Bˆ˜XØYLK˜ÛÜÙJ
-B‚‚šYˆ×Û˜[YW×ÈOH—×ÛXZ[—×È‚ˆ[š]\İ›XZ[Š
-B
+if __name__ == "__main__":
+    unittest.main()
