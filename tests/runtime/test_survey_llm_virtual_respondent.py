@@ -2,6 +2,10 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+from copy import deepcopy
+from unittest.mock import patch
+
+from core.conversation.validation import canonical_digest
 
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade, LocalResearchApplication
 from plugins.survey_virtual_runner.llm_backend import DeterministicFakeVirtualRespondentBackend
@@ -135,6 +139,258 @@ class SurveyLlmVirtualRespondentProductionTests(SurveyVirtualRunnerTestBase):
                 self.assertEqual(state_signature(reopened), before)
             finally:
                 reopened.close()
+
+    def test_joined_pretest_inspection_preserves_explicit_profile_response_lineage(self):
+        with tempfile.TemporaryDirectory() as temp:
+            app = make_virtual_app(temp)
+            facade = LocalApplicationFacade(app, "PRJ-1")
+            try:
+                questionnaire = self._capture(facade, questionnaire=analysis_questionnaire())
+                before = state_signature(app)
+                facade._virtual_respondent_backend = lambda _payload: DeterministicFakeVirtualRespondentBackend(
+                    ANSWERS, backend_id="openai_responses"
+                )
+                run = facade.submit_action({
+                    "action_type": "virtual_runner.survey.execute",
+                    "payload": llm_payload(questionnaire),
+                    "actor_id": "HUMAN-LLM-VR",
+                })
+                shown = facade.show_survey_virtual_pretest(run["run_id"])
+                self.assertEqual(shown["profile_response_binding"], "explicit")
+                self.assertEqual(shown["synthetic_firewall"], {
+                    "response_origin": "synthetic",
+                    "epistemic_status": "SYNTHETIC_TEST_ONLY",
+                    "population_estimate": False,
+                    "empirical_evidence": False,
+                    "validity_certification": False,
+                })
+                self.assertEqual(len(shown["respondents"]), len(PROFILES))
+                by_profile = {item["profile"]["profile_id"]: item for item in shown["respondents"]}
+                for profile in PROFILES:
+                    row = by_profile[profile["profile_id"]]
+                    self.assertEqual(row["profile"]["profile_digest"], canonical_digest(profile))
+                    self.assertEqual(row["generation_status"], "generated")
+                    self.assertEqual(row["response"]["validation_status"], "accepted")
+                manager_b = by_profile["SYN-PROFILE-MANAGER-B"]
+                readiness = next(item for item in manager_b["response"]["answers"] if item["response_key"] == "readiness")
+                self.assertEqual(readiness["response_state"], "unknown")
+                notes = next(item for item in manager_b["response"]["answers"] if item["response_key"] == "notes")
+                self.assertEqual(notes["stable_value"], "synthetic engineering note")
+                self.assertEqual(shown["dataset_ref"]["id"], run["response_dataset"]["dataset_id"])
+                self.assertEqual(shown["aggregate_result_ref"]["id"], run["aggregate_result"]["aggregate_result_id"])
+                self.assertEqual(
+                    {item["analysis_type"] for item in shown["aggregate_inspection"]["result_items"]},
+                    {"frequency", "missingness", "scale_summary", "cross_tab", "free_text_listing"},
+                )
+                routed = facade.submit_action({
+                    "action_type": "survey_virtual_pretest.show",
+                    "payload": {"run_id": run["run_id"]},
+                    "actor_id": "HUMAN-LLM-VR",
+                })
+                self.assertEqual(routed["data"]["profile_response_binding"], "explicit")
+                self.assertEqual(state_signature(app), before)
+                run_id = run["run_id"]
+            finally:
+                app.close()
+
+            reopened = LocalResearchApplication(temp, resolver=NullResolver(), effective_profile_set_provider=profile_provider)
+            try:
+                reopened_facade = LocalApplicationFacade(reopened, "PRJ-1")
+                shown = reopened_facade.show_survey_virtual_pretest(run_id)
+                self.assertEqual(shown["profile_response_binding"], "explicit")
+                self.assertEqual(
+                    {row["profile"]["profile_id"] for row in shown["respondents"]},
+                    {profile["profile_id"] for profile in PROFILES},
+                )
+                self.assertEqual(state_signature(reopened), before)
+            finally:
+                reopened.close()
+
+    def test_joined_pretest_partial_failure_uses_explicit_binding_not_response_order(self):
+        with tempfile.TemporaryDirectory() as temp:
+            app = make_virtual_app(temp)
+            facade = LocalApplicationFacade(app, "PRJ-1")
+            try:
+                questionnaire = self._capture(facade, questionnaire=analysis_questionnaire())
+                profiles = [
+                    {"profile_id": "SYN-PROFILE-001", "attributes": {"slot": "A"}, "knowledge_scope": ["own work"]},
+                    {"profile_id": "SYN-PROFILE-002", "attributes": {"slot": "B"}, "knowledge_scope": ["own work"]},
+                    {"profile_id": "SYN-PROFILE-003", "attributes": {"slot": "C"}, "knowledge_scope": ["own work"]},
+                ]
+                answers = {
+                    "SYN-PROFILE-001": ANSWERS["SYN-PROFILE-MANAGER-A"],
+                    "SYN-PROFILE-003": ANSWERS["SYN-PROFILE-MANAGER-C"],
+                }
+                facade._virtual_respondent_backend = lambda _payload: DeterministicFakeVirtualRespondentBackend(answers, backend_id="openai_responses")
+                payload = llm_payload(questionnaire)
+                payload["respondent_profiles"] = profiles
+                payload["population_size"] = 3
+                payload["minimum_valid_response_count"] = 2
+                run = facade.submit_action({"action_type": "virtual_runner.survey.execute", "payload": payload, "actor_id": "HUMAN-LLM-VR"})
+                shown = facade.show_survey_virtual_pretest(run["run_id"])
+                rows = {item["profile"]["profile_id"]: item for item in shown["respondents"]}
+                self.assertEqual(rows["SYN-PROFILE-001"]["response"]["response_id"], "SYN-RESP-0001")
+                self.assertEqual(rows["SYN-PROFILE-002"]["generation_status"], "failed")
+                self.assertIsNone(rows["SYN-PROFILE-002"]["response"])
+                self.assertEqual(rows["SYN-PROFILE-003"]["response"]["response_id"], "SYN-RESP-0002")
+            finally:
+                app.close()
+
+    def test_joined_pretest_rejected_response_keeps_profile_binding(self):
+        with tempfile.TemporaryDirectory() as temp:
+            app = make_virtual_app(temp)
+            facade = LocalApplicationFacade(app, "PRJ-1")
+            try:
+                questionnaire = self._capture(facade, questionnaire=analysis_questionnaire())
+                invalid_answers = dict(ANSWERS)
+                invalid_answers["SYN-PROFILE-MANAGER-B"] = {**ANSWERS["SYN-PROFILE-MANAGER-B"], "role": "not-a-stable-choice"}
+                facade._virtual_respondent_backend = lambda _payload: DeterministicFakeVirtualRespondentBackend(invalid_answers, backend_id="openai_responses")
+                run = facade.submit_action({"action_type": "virtual_runner.survey.execute", "payload": llm_payload(questionnaire), "actor_id": "HUMAN-LLM-VR"})
+                shown = facade.show_survey_virtual_pretest(run["run_id"])
+                row = next(item for item in shown["respondents"] if item["profile"]["profile_id"] == "SYN-PROFILE-MANAGER-B")
+                self.assertEqual(row["generation_status"], "generated")
+                self.assertEqual(row["response"]["validation_status"], "rejected")
+                self.assertTrue(any(item["code"] == "SURVEY_RESPONSE_INVALID_CHOICE" for item in row["response"]["validation_issues"]))
+                stored = facade.show_survey_response(row["response"]["response_id"], identity_namespace=row["response"]["identity_namespace"])
+                self.assertEqual(stored["response"]["source_provenance"]["producer"]["respondent_profile_ref"]["profile_id"], "SYN-PROFILE-MANAGER-B")
+                self.assertEqual(stored["raw_input"]["provenance"]["respondent_profile_ref"]["profile_id"], "SYN-PROFILE-MANAGER-B")
+            finally:
+                app.close()
+
+    def test_legacy_llm_run_does_not_retrofit_profile_binding_from_ordinals(self):
+        with tempfile.TemporaryDirectory() as temp:
+            app = make_virtual_app(temp)
+            facade = LocalApplicationFacade(app, "PRJ-1")
+            try:
+                questionnaire = self._capture(facade, questionnaire=analysis_questionnaire())
+                facade._virtual_respondent_backend = lambda _payload: DeterministicFakeVirtualRespondentBackend(ANSWERS, backend_id="openai_responses")
+                from plugins.survey_virtual_runner import output_builder
+                original = output_builder.build_output
+
+                def legacy_output(request, extension, **kwargs):
+                    records = deepcopy(list(kwargs["records"]))
+                    for record in records:
+                        record.pop("producer_provenance", None)
+                    attempts = deepcopy(list(kwargs["generation_attempts"]))
+                    for attempt in attempts:
+                        attempt.pop("generation_attempt_id", None)
+                        attempt.pop("respondent_profile_digest", None)
+                        attempt.pop("response_ref", None)
+                    kwargs["records"] = records
+                    kwargs["generation_attempts"] = attempts
+                    return original(request, extension, **kwargs)
+
+                with patch("plugins.survey_virtual_runner.llm_adapter.build_output", legacy_output):
+                    run = facade.submit_action({"action_type": "virtual_runner.survey.execute", "payload": llm_payload(questionnaire), "actor_id": "HUMAN-LLM-VR"})
+                shown = facade.show_survey_virtual_pretest(run["run_id"])
+                self.assertEqual(shown["profile_response_binding"], "unavailable")
+                self.assertEqual(len(shown["unbound_responses"]), 4)
+                self.assertTrue(all(item["response"] is None for item in shown["respondents"]))
+            finally:
+                app.close()
+
+    def test_joined_pretest_fails_closed_on_profile_lineage_tampering(self):
+        from plugins.survey_virtual_runner import output_builder
+        original = output_builder.build_output
+        cases = (
+            ("unknown_profile", lambda records: records[0]["producer_provenance"]["respondent_profile_ref"].update({"profile_id": "SYN-PROFILE-999"})),
+            ("digest_mismatch", lambda records: records[0]["producer_provenance"]["respondent_profile_ref"].update({"profile_digest": "sha256:" + "0" * 64})),
+            ("duplicate_binding", lambda records: records[1]["producer_provenance"]["respondent_profile_ref"].update(deepcopy(records[0]["producer_provenance"]["respondent_profile_ref"]))),
+        )
+        for label, mutate in cases:
+            with self.subTest(label=label), tempfile.TemporaryDirectory() as temp:
+                app = make_virtual_app(temp)
+                facade = LocalApplicationFacade(app, "PRJ-1")
+                try:
+                    questionnaire = self._capture(facade, questionnaire=analysis_questionnaire())
+                    facade._virtual_respondent_backend = lambda _payload: DeterministicFakeVirtualRespondentBackend(ANSWERS, backend_id="openai_responses")
+
+                    def tampered_output(request, extension, **kwargs):
+                        records = deepcopy(list(kwargs["records"]))
+                        mutate(records)
+                        kwargs["records"] = records
+                        return original(request, extension, **kwargs)
+
+                    with patch("plugins.survey_virtual_runner.llm_adapter.build_output", tampered_output):
+                        run = facade.submit_action({"action_type": "virtual_runner.survey.execute", "payload": llm_payload(questionnaire), "actor_id": "HUMAN-LLM-VR"})
+                    with self.assertRaises(LocalApplicationError) as mismatch:
+                        facade.show_survey_virtual_pretest(run["run_id"])
+                    self.assertEqual(mismatch.exception.code, "APPLICATION-SURVEY-VIRTUAL-PRETEST-001")
+                finally:
+                    app.close()
+
+    def test_joined_pretest_fails_closed_on_dataset_and_aggregate_binding_mismatch(self):
+        with tempfile.TemporaryDirectory() as temp:
+            app = make_virtual_app(temp)
+            facade = LocalApplicationFacade(app, "PRJ-1")
+            try:
+                questionnaire = self._capture(facade, questionnaire=analysis_questionnaire())
+                facade._virtual_respondent_backend = lambda _payload: DeterministicFakeVirtualRespondentBackend(ANSWERS, backend_id="openai_responses")
+                run = facade.submit_action({"action_type": "virtual_runner.survey.execute", "payload": llm_payload(questionnaire), "actor_id": "HUMAN-LLM-VR"})
+
+                response_store = facade._survey_response_store()
+
+                class ResponseStoreProxy:
+                    def load_dataset(self, project_id, dataset_id):
+                        value = deepcopy(response_store.load_dataset(project_id, dataset_id))
+                        value["source_run_ids"] = ["RUN-NOT-THE-SOURCE"]
+                        return value
+
+                    def __getattr__(self, name):
+                        return getattr(response_store, name)
+
+                with patch.object(facade, "_survey_response_store", return_value=ResponseStoreProxy()):
+                    with self.assertRaises(LocalApplicationError) as mismatch:
+                        facade.show_survey_virtual_pretest(run["run_id"])
+                self.assertEqual(mismatch.exception.code, "APPLICATION-SURVEY-VIRTUAL-PRETEST-001")
+
+                analysis_store = facade._survey_analysis_store()
+
+                class AnalysisStoreProxy:
+                    def find_results_by_dataset(self, project_id, dataset_id):
+                        values = deepcopy(analysis_store.find_results_by_dataset(project_id, dataset_id))
+                        values[0]["dataset_ref"] = {"id": "SRD-WRONG", "content_digest": "sha256:" + "0" * 64}
+                        return values
+
+                    def __getattr__(self, name):
+                        return getattr(analysis_store, name)
+
+                with patch.object(facade, "_survey_analysis_store", return_value=AnalysisStoreProxy()):
+                    with self.assertRaises(LocalApplicationError) as mismatch:
+                        facade.show_survey_virtual_pretest(run["run_id"])
+                self.assertEqual(mismatch.exception.code, "APPLICATION-SURVEY-VIRTUAL-PRETEST-001")
+            finally:
+                app.close()
+
+    def test_joined_pretest_requires_exact_aggregate_when_dataset_has_multiple_results(self):
+        with tempfile.TemporaryDirectory() as temp:
+            app = make_virtual_app(temp)
+            facade = LocalApplicationFacade(app, "PRJ-1")
+            try:
+                questionnaire = self._capture(facade, questionnaire=analysis_questionnaire())
+                facade._virtual_respondent_backend = lambda _payload: DeterministicFakeVirtualRespondentBackend(ANSWERS, backend_id="openai_responses")
+                run = facade.submit_action({"action_type": "virtual_runner.survey.execute", "payload": llm_payload(questionnaire), "actor_id": "HUMAN-LLM-VR"})
+                second_spec = facade.capture_survey_analysis_spec({
+                    "dataset_id": run["response_dataset"]["dataset_id"],
+                    "dataset_digest": run["response_dataset"]["content_digest"],
+                    "analysis_items": [{"item_id": "MISS-ONLY", "analysis_type": "missingness", "question_id": "Q8"}],
+                })
+                second_result = facade.run_survey_aggregation({
+                    "analysis_spec_id": second_spec["analysis_spec_id"],
+                    "analysis_spec_digest": second_spec["content_digest"],
+                    "dataset_id": run["response_dataset"]["dataset_id"],
+                    "dataset_digest": run["response_dataset"]["content_digest"],
+                })
+                self.assertNotEqual(second_result["aggregate_result_id"], run["aggregate_result"]["aggregate_result_id"])
+                with self.assertRaises(LocalApplicationError) as ambiguous:
+                    facade.show_survey_virtual_pretest(run["run_id"])
+                self.assertEqual(ambiguous.exception.code, "APPLICATION-SURVEY-VIRTUAL-PRETEST-001")
+                shown = facade.show_survey_virtual_pretest(
+                    run["run_id"], aggregate_result_id=run["aggregate_result"]["aggregate_result_id"]
+                )
+                self.assertEqual(shown["aggregate_result_ref"]["id"], run["aggregate_result"]["aggregate_result_id"])
+            finally:
+                app.close()
 
     def test_generation_failure_is_partial_and_minimum_rule_prevents_aggregate(self):
         with tempfile.TemporaryDirectory() as temp:

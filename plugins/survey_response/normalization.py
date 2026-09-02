@@ -407,7 +407,14 @@ def virtual_record_to_raw(record: Any) -> Any:
         "response_status": str(record.get("response_status", "complete")),
         "dropout": bool(record.get("dropout", False)),
         "answers": answers,
-        "provenance": {"producer_shape": "survey_response_record@0.1.0"},
+        "provenance": {
+            "producer_shape": "survey_response_record@0.1.0",
+            **(
+                deepcopy(dict(record["producer_provenance"]))
+                if isinstance(record.get("producer_provenance"), Mapping)
+                else {}
+            ),
+        },
     }
     if record.get("response_timestamp"):
         result["completed_at"] = str(record["response_timestamp"])

@@ -106,3 +106,36 @@ Run artifacts, response Dataset, and aggregate results are immutable. Re-running
 ## Non-goals
 
 This slice does not add automatic profile synthesis, cognitive interviews, questionnaire scoring/certification, automatic Instrument revision, REAL Forms/CSV/Excel intake, population inference, confidence intervals, REAL-population weighting, psychometric validity claims, model benchmarking, ensembles, dashboards, or automatic Evidence/Finding/Recommendation adoption.
+
+## Profile-response lineage and joined pretest inspection
+
+New LLM Virtual Respondent Runs preserve an explicit producer lineage from each generated response to the exact pinned synthetic profile. The detailed Virtual response record carries producer provenance separately from answer semantics; PR42 moves that producer metadata into canonical `SurveyResponse.source_provenance.producer`.
+
+The binding contains only the minimum immutable references needed to prove lineage:
+
+```text
+Synthetic Respondent Profile
+  profile_id + pinned profile digest
+        ↓
+Generation Attempt
+  attempt id + parsed-answer digest
+        ↓
+Canonical SurveyResponse
+  producer provenance ref only
+```
+
+The full `attributes`, `knowledge_scope`, and optional `scenario_notes` remain authoritative in the existing `survey_virtual.generation_report` / pinned respondent plan. They are not copied into canonical answers. Answer objects never gain provider/model/persona fields.
+
+The MVP interaction contract remains one explicit profile to at most one generated Survey response. Generation failure produces no dummy response. Canonical validation rejection does not erase the producer binding: the canonical rejected response, or the bounded rejected raw input when canonicalization cannot form a response, retains the profile reference and validation issues.
+
+Historical completed Runs are immutable. If an older LLM Run predates explicit producer binding, joined inspection reports `profile_response_binding = unavailable` and does not infer a mapping from profile order, response order, participant IDs, or numeric suffixes.
+
+The audited read-only action:
+
+```text
+survey_virtual_pretest.show
+```
+
+joins the existing Run, Instrument pin, generation report, canonical Dataset, individual responses/validation, AnalysisSpec, and existing `SurveyAggregateResult`. It validates exact Run/Instrument/Dataset/Aggregate/profile/attempt bindings and fails closed on mismatches. When more than one AggregateResult exists for the Dataset, the caller must supply `aggregate_result_id`; the inspection path never chooses an implicit latest result and never recalculates aggregation.
+
+The joined projection is Human inspection material only. It keeps `response_origin = synthetic` and `SYNTHETIC_TEST_ONLY`, and explicitly makes no population estimate, empirical-evidence claim, questionnaire-validity certification, automatic Instrument revision, Research Exhibit capture, or Research State mutation.

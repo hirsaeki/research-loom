@@ -3,6 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any, Mapping
 
+from core.conversation.validation import canonical_digest
 from core.execution import ExecutionStyle
 from core.execution.models import CapabilityExecutionError
 
@@ -13,7 +14,14 @@ from .response_validation import SurveyResponseValidator, stable_response_key
 from .runtime_state import candidate_change_requests, defects_from_issues, readiness_assessment
 
 
-def _record_from_payload(payload: Mapping[str, Any], instrument: Mapping[str, Any], *, index: int, namespace: str) -> dict[str, Any]:
+def _record_from_payload(
+    payload: Mapping[str, Any],
+    instrument: Mapping[str, Any],
+    *,
+    index: int,
+    namespace: str,
+    producer_provenance: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
     aliases = {}
     for question in instrument.get("questions", ()):
         stable = stable_response_key(question)
@@ -55,8 +63,27 @@ def _record_from_payload(payload: Mapping[str, Any], instrument: Mapping[str, An
         "verified_evidence_claimed": False,
         "dropout": False,
         "answers": answers,
+        **({"producer_provenance": deepcopy(dict(producer_provenance))} if producer_provenance else {}),
     }
 
+
+def _profile_digest_map(extension: Mapping[str, Any], profiles: list[Mapping[str, Any]]) -> dict[str, str]:
+    plan = extension.get("respondent_plan")
+    if not isinstance(plan, Mapping) or not isinstance(plan.get("profile_digests"), list):
+        raise CapabilityExecutionError("VR-PROFILE-LINEAGE-001", "LLM respondent plan is missing profile digests")
+    expected_ids = [str(profile.get("profile_id", "")) for profile in profiles]
+    digests: dict[str, str] = {}
+    for item in plan["profile_digests"]:
+        if not isinstance(item, Mapping):
+            raise CapabilityExecutionError("VR-PROFILE-LINEAGE-001", "LLM respondent plan contains malformed profile digest binding")
+        profile_id = str(item.get("profile_id", ""))
+        content_digest = str(item.get("content_digest", ""))
+        if not profile_id or not content_digest.startswith("sha256:") or profile_id in digests:
+            raise CapabilityExecutionError("VR-PROFILE-LINEAGE-001", "LLM respondent plan contains invalid or duplicate profile digest binding")
+        digests[profile_id] = content_digest
+    if set(digests) != set(expected_ids) or len(expected_ids) != len(set(expected_ids)):
+        raise CapabilityExecutionError("VR-PROFILE-LINEAGE-001", "LLM respondent plan profile digest bindings do not match the explicit profiles")
+    return digests
 
 
 class LlmSurveyVirtualRunnerAdapter:
@@ -93,7 +120,10 @@ class LlmSurveyVirtualRunnerAdapter:
         pins = input_pins(request, extension, provenance)
         records: list[Any] = []
         generation_attempts: list[dict[str, Any]] = []
+        profile_digests = _profile_digest_map(extension, profiles)
         for index, profile in enumerate(profiles):
+            profile_id = str(profile["profile_id"])
+            attempt_id = f"GEN-ATTEMPT-{index + 1:04d}"
             try:
                 generated = self._backend.generate_response(
                     instrument=questionnaire,
@@ -103,7 +133,9 @@ class LlmSurveyVirtualRunnerAdapter:
                 )
             except VirtualRespondentBackendError as exc:
                 generation_attempts.append({
-                    "respondent_profile_id": profile["profile_id"],
+                    "generation_attempt_id": attempt_id,
+                    "respondent_profile_id": profile_id,
+                    "respondent_profile_digest": profile_digests[profile_id],
                     "status": "failed",
                     "failure_code": exc.code,
                     "failure_message": exc.message,
@@ -112,9 +144,40 @@ class LlmSurveyVirtualRunnerAdapter:
                     "attempts": deepcopy(exc.attempts),
                 })
                 continue
-            records.append(_record_from_payload(generated["parsed_answer_payload"], questionnaire, index=index, namespace=str(population["identity_namespace"])))
+            parsed_payload = generated.get("parsed_answer_payload")
+            if not isinstance(parsed_payload, Mapping):
+                raise CapabilityExecutionError(
+                    "VR-PROFILE-LINEAGE-001",
+                    "LLM generation result is missing a structured parsed answer payload",
+                )
+            parsed_digest = canonical_digest(parsed_payload)
+            declared_parsed_digest = generated.get("parsed_answer_payload_digest")
+            if declared_parsed_digest is not None and declared_parsed_digest != parsed_digest:
+                raise CapabilityExecutionError(
+                    "VR-PROFILE-LINEAGE-001",
+                    "LLM generation result parsed answer payload digest is inconsistent",
+                )
+            record = _record_from_payload(
+                parsed_payload,
+                questionnaire,
+                index=len(records),
+                namespace=str(population["identity_namespace"]),
+                producer_provenance={
+                    "producer_type": "virtual_respondent",
+                    "source_run_id": str(request.run.run_id),
+                    "respondent_profile_ref": {
+                        "profile_id": profile_id,
+                        "profile_digest": profile_digests[profile_id],
+                    },
+                    "generation_attempt_ref": {"attempt_id": attempt_id},
+                    "parsed_answer_payload_digest": parsed_digest,
+                },
+            )
+            records.append(record)
             generation_attempts.append({
-                "respondent_profile_id": profile["profile_id"],
+                "generation_attempt_id": attempt_id,
+                "respondent_profile_id": profile_id,
+                "respondent_profile_digest": profile_digests[profile_id],
                 "status": "generated",
                 "provider_request_id": generated.get("provider_request_id"),
                 "attempt_count": len(generated.get("attempts", [])),
@@ -123,9 +186,13 @@ class LlmSurveyVirtualRunnerAdapter:
                 "attempts": deepcopy(generated.get("attempts", [])),
                 "semantic_input_digest": generated.get("semantic_input_digest"),
                 "request_digest": generated.get("request_digest"),
-                "parsed_answer_payload_digest": generated.get("parsed_answer_payload_digest"),
+                "parsed_answer_payload_digest": parsed_digest,
                 "provider_response_digest": generated.get("provider_response_digest"),
                 "provider_response": deepcopy(generated.get("provider_response")),
+                "response_ref": {
+                    "response_id": record["response_id"],
+                    "identity_namespace": record["identity_namespace"],
+                },
             })
 
         validation = SurveyResponseValidator().validate(
