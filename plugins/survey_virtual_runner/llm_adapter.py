@@ -3,6 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any, Mapping
 
+from core.conversation.validation import canonical_digest
 from core.execution import ExecutionStyle
 from core.execution.models import CapabilityExecutionError
 
@@ -143,8 +144,21 @@ class LlmSurveyVirtualRunnerAdapter:
                     "attempts": deepcopy(exc.attempts),
                 })
                 continue
+            parsed_payload = generated.get("parsed_answer_payload")
+            if not isinstance(parsed_payload, Mapping):
+                raise CapabilityExecutionError(
+                    "VR-PROFILE-LINEAGE-001",
+                    "LLM generation result is missing a structured parsed answer payload",
+                )
+            parsed_digest = canonical_digest(parsed_payload)
+            declared_parsed_digest = generated.get("parsed_answer_payload_digest")
+            if declared_parsed_digest is not None and declared_parsed_digest != parsed_digest:
+                raise CapabilityExecutionError(
+                    "VR-PROFILE-LINEAGE-001",
+                    "LLM generation result parsed answer payload digest is inconsistent",
+                )
             record = _record_from_payload(
-                generated["parsed_answer_payload"],
+                parsed_payload,
                 questionnaire,
                 index=len(records),
                 namespace=str(population["identity_namespace"]),
@@ -156,7 +170,7 @@ class LlmSurveyVirtualRunnerAdapter:
                         "profile_digest": profile_digests[profile_id],
                     },
                     "generation_attempt_ref": {"attempt_id": attempt_id},
-                    "parsed_answer_payload_digest": generated.get("parsed_answer_payload_digest"),
+                    "parsed_answer_payload_digest": parsed_digest,
                 },
             )
             records.append(record)
@@ -172,7 +186,7 @@ class LlmSurveyVirtualRunnerAdapter:
                 "attempts": deepcopy(generated.get("attempts", [])),
                 "semantic_input_digest": generated.get("semantic_input_digest"),
                 "request_digest": generated.get("request_digest"),
-                "parsed_answer_payload_digest": generated.get("parsed_answer_payload_digest"),
+                "parsed_answer_payload_digest": parsed_digest,
                 "provider_response_digest": generated.get("provider_response_digest"),
                 "provider_response": deepcopy(generated.get("provider_response")),
                 "response_ref": {

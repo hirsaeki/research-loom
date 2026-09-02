@@ -189,7 +189,10 @@ class SurveyVirtualPretestInspectionMixin:
         accepted, rejected = self._dataset_population(dataset)
         for response in [*accepted, *rejected]:
             producer = response.get("source_provenance", {}).get("producer")
-            ref = producer.get("respondent_profile_ref") if isinstance(producer, Mapping) else None
+            if not isinstance(producer, Mapping) or producer.get("producer_type") != "virtual_respondent":
+                unbound_responses.append(deepcopy(response))
+                continue
+            ref = producer.get("respondent_profile_ref")
             if not isinstance(ref, Mapping):
                 unbound_responses.append(deepcopy(response))
                 continue
@@ -223,7 +226,13 @@ class SurveyVirtualPretestInspectionMixin:
                 continue
             raw = item.get("raw_input")
             producer = _producer_from_raw(raw)
-            ref = producer.get("respondent_profile_ref") if isinstance(producer, Mapping) else None
+            if not isinstance(producer, Mapping):
+                continue
+            if producer.get("producer_type") != "virtual_respondent":
+                if explicit_lineage_expected:
+                    raise LocalApplicationError(_ERROR, "rejected raw response producer type is inconsistent")
+                continue
+            ref = producer.get("respondent_profile_ref")
             if not isinstance(ref, Mapping):
                 continue
             profile_id = str(ref.get("profile_id", ""))
