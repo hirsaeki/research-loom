@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from threading import RLock
 from typing import Any, Mapping
 
 from core.conversation import (
@@ -47,6 +48,7 @@ _SURVEY_RESPONSE_ACTIONS = (
         "show_dataset",
     ),
 )
+_ACTION_REGISTRATION_LOCK = RLock()
 
 
 def _payload_fields(payload: Mapping[str, Any], allowed: set[str], label: str) -> None:
@@ -165,44 +167,50 @@ class LocalApplicationFacade(
         coordinator = self._application.coordinator
         action_registry = coordinator._actions
         service_registry = coordinator._services
-        existing = {
-            definition.action_type: definition
-            for definition in coordinator.action_definitions()
-        }
 
-        for action_type, payload_contract, operation in _SURVEY_RESPONSE_ACTIONS:
-            definition = existing.get(action_type)
-            if definition is None:
-                action_registry.register(
-                    ActionDefinition(
-                        action_type,
-                        payload_contract,
-                        "read_only",
-                        "harness_service",
-                        False,
-                        human_decision_required=False,
-                        service_id=action_type,
-                        payload_validator=_ACTION_VALIDATORS[action_type],
+        # ActionRegistry/HarnessServiceRegistry predate lazy PR42 composition and
+        # expose no atomic register-if-absent API. Serialize this small composition
+        # boundary so concurrent first use cannot race between lookup and register.
+        with _ACTION_REGISTRATION_LOCK:
+            existing = {
+                definition.action_type: definition
+                for definition in coordinator.action_definitions()
+            }
+
+            for action_type, payload_contract, operation in _SURVEY_RESPONSE_ACTIONS:
+                definition = existing.get(action_type)
+                if definition is None:
+                    action_registry.register(
+                        ActionDefinition(
+                            action_type,
+                            payload_contract,
+                            "read_only",
+                            "harness_service",
+                            False,
+                            human_decision_required=False,
+                            service_id=action_type,
+                            payload_validator=_ACTION_VALIDATORS[action_type],
+                        )
                     )
-                )
-            elif (
-                definition.payload_contract != payload_contract
-                or definition.effect != "read_only"
-                or definition.route_kind != "harness_service"
-                or definition.confirmation_required
-                or definition.service_id != action_type
-            ):
-                raise LocalApplicationError(
-                    "APPLICATION-SURVEY-RESPONSE-ROUTE-001",
-                    f"registered action conflicts with Survey response route: {action_type}",
-                )
+                    existing[action_type] = action_registry.get(action_type)
+                elif (
+                    definition.payload_contract != payload_contract
+                    or definition.effect != "read_only"
+                    or definition.route_kind != "harness_service"
+                    or definition.confirmation_required
+                    or definition.service_id != action_type
+                ):
+                    raise LocalApplicationError(
+                        "APPLICATION-SURVEY-RESPONSE-ROUTE-001",
+                        f"registered action conflicts with Survey response route: {action_type}",
+                    )
 
-            try:
-                service_registry.resolve(action_type)
-            except ConversationRuntimeError as exc:
-                if exc.code != "CONV-ROUTE-001":
-                    raise
-                service_registry.register(
-                    action_type,
-                    _SurveyResponseActionHandler(self._application, operation),
-                )
+                try:
+                    service_registry.resolve(action_type)
+                except ConversationRuntimeError as exc:
+                    if exc.code != "CONV-ROUTE-001":
+                        raise
+                    service_registry.register(
+                        action_type,
+                        _SurveyResponseActionHandler(self._application, operation),
+                    )
