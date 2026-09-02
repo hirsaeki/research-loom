@@ -84,6 +84,17 @@ class VirtualRunnerExecuteMixin:
         after = (str(after_state.current_snapshot["id"]), str(after_state.current_snapshot["content_digest"]))
         if before != after:
             raise LocalApplicationError("VR-EPISTEMIC-FIREWALL-001", "Virtual Runner execution mutated authoritative Research State")
+
+        response_dataset = None
+        if result.run.status.value == "COMPLETED":
+            response_dataset = self.capture_virtual_run_response_dataset(
+                run_id,
+                instrument_ref={
+                    "id": questionnaire["questionnaire_id"],
+                    "version": questionnaire["version"],
+                    "content_digest": questionnaire["content_digest"],
+                },
+            )
         return {
             "status": "SUCCEEDED" if result.run.status.value == "COMPLETED" else "ERROR",
             "project_id": self._project_id,
@@ -92,6 +103,7 @@ class VirtualRunnerExecuteMixin:
             "scenario_class": payload["scenario_class"],
             "instrument_pin": {"id": questionnaire["questionnaire_id"], "version": questionnaire["version"], "content_digest": questionnaire["content_digest"]},
             "execution_result": _jsonable(result),
+            "response_dataset": response_dataset,
             "research_state_mutation_performed": False,
             "real_execution_started": False,
         }
