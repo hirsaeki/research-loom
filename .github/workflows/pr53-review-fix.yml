@@ -10,16 +10,20 @@ permissions:
 
 jobs:
   apply:
-    if: ${{ hashFiles('tmp-pr53-review-fix.py') != '' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
         with:
           ref: tmp/pr53-review-fix-1
           fetch-depth: 0
+      - name: Stop before payload is staged
+        if: ${{ hashFiles('tmp-pr53-review-fix.py') == '' }}
+        run: exit 0
       - name: Apply review fixes
+        if: ${{ hashFiles('tmp-pr53-review-fix.py') != '' }}
         run: python tmp-pr53-review-fix.py
       - name: Validate patch
+        if: ${{ hashFiles('tmp-pr53-review-fix.py') != '' }}
         run: |
           git diff --check
           python -m py_compile \
@@ -27,6 +31,7 @@ jobs:
             plugins/local_application/survey_virtual_pretest_inspection.py \
             tests/runtime/test_survey_llm_lineage_review_fixes.py
       - name: Commit applied fix
+        if: ${{ hashFiles('tmp-pr53-review-fix.py') != '' }}
         run: |
           rm -f tmp-pr53-review-fix.py .github/workflows/pr53-review-fix.yml
           git config user.name "github-actions[bot]"
