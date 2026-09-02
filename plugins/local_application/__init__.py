@@ -2,7 +2,7 @@
 
 from .application import LocalResearchApplication, LocalStaticAuthorizationProvider
 from .facade import LocalApplicationError
-from .virtual_runner_facade import LocalApplicationFacade
+from .survey_analysis_facade import LocalApplicationFacade
 from .workspace import LocalWorkspace, LocalWorkspaceError, OpenedLocalWorkspace
 
 __all__ = [

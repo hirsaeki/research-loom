@@ -1,0 +1,296 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:research-loom:core:survey-aggregate-result:0.1.0",
+  "title": "research-loom canonical SurveyAggregateResult",
+  "description": "Immutable descriptive aggregation result over one exact canonical SurveyResponseDataset. Aggregation does not adopt Evidence, Findings, Recommendations, or Research State authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "object_type", "project_id", "aggregate_result_id",
+    "analysis_spec_ref", "dataset_ref", "instrument_ref", "response_origin",
+    "epistemic_status", "population", "exclusions", "aggregation_implementation",
+    "result_items", "warnings", "provenance", "generated_at",
+    "synthetic_population_estimate_claimed", "research_state_mutation_performed",
+    "content_digest", "registry_digest"
+  ],
+  "properties": {
+    "schema_version": {"const": "0.1.0"},
+    "object_type": {"const": "survey_aggregate_result"},
+    "project_id": {"$ref": "#/$defs/identifier"},
+    "aggregate_result_id": {"$ref": "#/$defs/identifier"},
+    "analysis_spec_ref": {"$ref": "#/$defs/spec_ref"},
+    "dataset_ref": {"$ref": "#/$defs/dataset_ref"},
+    "instrument_ref": {"$ref": "#/$defs/instrument_ref"},
+    "response_origin": {"enum": ["synthetic", "real"]},
+    "epistemic_status": {"enum": ["SYNTHETIC_TEST_ONLY", "EMPIRICAL"]},
+    "population": {"$ref": "#/$defs/population"},
+    "exclusions": {"$ref": "#/$defs/exclusions"},
+    "aggregation_implementation": {"$ref": "#/$defs/implementation"},
+    "result_items": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/result_item"}
+    },
+    "warnings": {"type": "array", "items": {"$ref": "#/$defs/warning"}},
+    "provenance": {"$ref": "#/$defs/provenance"},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "synthetic_population_estimate_claimed": {"const": false},
+    "research_state_mutation_performed": {"const": false},
+    "content_digest": {"$ref": "#/$defs/digest"},
+    "registry_digest": {"$ref": "#/$defs/digest"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"response_origin": {"const": "synthetic"}}, "required": ["response_origin"]},
+      "then": {"properties": {"epistemic_status": {"const": "SYNTHETIC_TEST_ONLY"}}}
+    },
+    {
+      "if": {"properties": {"response_origin": {"const": "real"}}, "required": ["response_origin"]},
+      "then": {"properties": {"epistemic_status": {"const": "EMPIRICAL"}}}
+    }
+  ],
+  "$defs": {
+    "identifier": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"},
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "semver": {"type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"},
+    "dataset_ref": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "content_digest"],
+      "properties": {"id": {"$ref": "#/$defs/identifier"}, "content_digest": {"$ref": "#/$defs/digest"}}
+    },
+    "instrument_ref": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "version", "content_digest"],
+      "properties": {
+        "id": {"$ref": "#/$defs/identifier"},
+        "version": {"$ref": "#/$defs/semver"},
+        "content_digest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "spec_ref": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "content_digest"],
+      "properties": {"id": {"$ref": "#/$defs/identifier"}, "content_digest": {"$ref": "#/$defs/digest"}}
+    },
+    "population": {
+      "type": "object", "additionalProperties": false,
+      "required": ["dataset_response_count", "accepted_response_count", "excluded_response_count"],
+      "properties": {
+        "dataset_response_count": {"type": "integer", "minimum": 0},
+        "accepted_response_count": {"type": "integer", "minimum": 0},
+        "excluded_response_count": {"type": "integer", "minimum": 0}
+      }
+    },
+    "exclusions": {
+      "type": "object", "additionalProperties": false,
+      "required": ["rejected_count", "rejected_canonical_response_count", "rejected_raw_input_count", "issue_code_counts"],
+      "properties": {
+        "rejected_count": {"type": "integer", "minimum": 0},
+        "rejected_canonical_response_count": {"type": "integer", "minimum": 0},
+        "rejected_raw_input_count": {"type": "integer", "minimum": 0},
+        "issue_code_counts": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}}
+      }
+    },
+    "implementation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["implementation_id", "version"],
+      "properties": {
+        "implementation_id": {"const": "survey_shared_aggregation"},
+        "version": {"const": "0.1.0"}
+      }
+    },
+    "warning": {
+      "type": "object", "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {"code": {"type": "string", "minLength": 1}, "message": {"type": "string", "minLength": 1}}
+    },
+    "provenance": {
+      "type": "object", "additionalProperties": false,
+      "required": ["dataset_id", "dataset_digest", "analysis_spec_id", "analysis_spec_digest", "instrument_id", "instrument_version", "instrument_digest", "source_run_ids"],
+      "properties": {
+        "dataset_id": {"$ref": "#/$defs/identifier"},
+        "dataset_digest": {"$ref": "#/$defs/digest"},
+        "analysis_spec_id": {"$ref": "#/$defs/identifier"},
+        "analysis_spec_digest": {"$ref": "#/$defs/digest"},
+        "instrument_id": {"$ref": "#/$defs/identifier"},
+        "instrument_version": {"$ref": "#/$defs/semver"},
+        "instrument_digest": {"$ref": "#/$defs/digest"},
+        "source_run_ids": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/identifier"}}
+      }
+    },
+    "item_provenance": {
+      "type": "object", "additionalProperties": false,
+      "required": ["analysis_item_id", "dataset_id", "question_ids"],
+      "properties": {
+        "analysis_item_id": {"$ref": "#/$defs/identifier"},
+        "dataset_id": {"$ref": "#/$defs/identifier"},
+        "question_ids": {"type": "array", "minItems": 1, "maxItems": 2, "uniqueItems": true, "items": {"$ref": "#/$defs/identifier"}}
+      }
+    },
+    "missingness": {
+      "type": "object", "additionalProperties": false,
+      "required": ["answered", "missing", "unknown", "not_applicable", "prefer_not_to_answer", "not_asked"],
+      "properties": {
+        "answered": {"type": "integer", "minimum": 0},
+        "missing": {"type": "integer", "minimum": 0},
+        "unknown": {"type": "integer", "minimum": 0},
+        "not_applicable": {"type": "integer", "minimum": 0},
+        "prefer_not_to_answer": {"type": "integer", "minimum": 0},
+        "not_asked": {"type": "integer", "minimum": 0}
+      }
+    },
+    "denominator_counts": {
+      "type": "object", "additionalProperties": false,
+      "required": ["all_responses", "asked_responses", "valid_responses"],
+      "properties": {
+        "all_responses": {"type": "integer", "minimum": 0},
+        "asked_responses": {"type": "integer", "minimum": 0},
+        "valid_responses": {"type": "integer", "minimum": 0}
+      }
+    },
+    "category": {
+      "type": "object", "additionalProperties": false,
+      "required": ["value", "label", "count", "percentage"],
+      "properties": {
+        "value": {},
+        "label": {"type": "string"},
+        "count": {"type": "integer", "minimum": 0},
+        "percentage": {"type": ["number", "null"], "minimum": 0}
+      }
+    },
+    "frequency_result": {
+      "type": "object", "additionalProperties": false,
+      "required": ["item_id", "analysis_type", "question_id", "response_key", "question_type", "denominator_rule", "denominator_count", "denominator_counts", "missingness", "count_semantics", "percentage_semantics", "categories", "provenance"],
+      "properties": {
+        "item_id": {"$ref": "#/$defs/identifier"},
+        "analysis_type": {"const": "frequency"},
+        "question_id": {"$ref": "#/$defs/identifier"},
+        "response_key": {"$ref": "#/$defs/identifier"},
+        "question_type": {"enum": ["single_choice", "multiple_choice"]},
+        "denominator_rule": {"enum": ["all_responses", "asked_responses", "valid_responses"]},
+        "denominator_count": {"type": "integer", "minimum": 0},
+        "denominator_counts": {"$ref": "#/$defs/denominator_counts"},
+        "missingness": {"$ref": "#/$defs/missingness"},
+        "count_semantics": {"enum": ["respondent_count", "selection_count"]},
+        "percentage_semantics": {"type": "string", "minLength": 1},
+        "selection_count_total": {"type": "integer", "minimum": 0},
+        "categories": {"type": "array", "items": {"$ref": "#/$defs/category"}},
+        "provenance": {"$ref": "#/$defs/item_provenance"}
+      }
+    },
+    "missingness_result": {
+      "type": "object", "additionalProperties": false,
+      "required": ["item_id", "analysis_type", "question_id", "response_key", "counts", "excluded_response_count", "provenance"],
+      "properties": {
+        "item_id": {"$ref": "#/$defs/identifier"},
+        "analysis_type": {"const": "missingness"},
+        "question_id": {"$ref": "#/$defs/identifier"},
+        "response_key": {"$ref": "#/$defs/identifier"},
+        "counts": {"$ref": "#/$defs/missingness"},
+        "excluded_response_count": {"type": "integer", "minimum": 0},
+        "provenance": {"$ref": "#/$defs/item_provenance"}
+      }
+    },
+    "scale_distribution": {
+      "type": "object", "additionalProperties": false,
+      "required": ["value", "count", "percentage"],
+      "properties": {
+        "value": {},
+        "count": {"type": "integer", "minimum": 0},
+        "percentage": {"type": ["number", "null"], "minimum": 0}
+      }
+    },
+    "scale_result": {
+      "type": "object", "additionalProperties": false,
+      "required": ["item_id", "analysis_type", "question_id", "response_key", "denominator_rule", "denominator_count", "denominator_counts", "count", "missingness", "distribution", "provenance"],
+      "properties": {
+        "item_id": {"$ref": "#/$defs/identifier"},
+        "analysis_type": {"const": "scale_summary"},
+        "question_id": {"$ref": "#/$defs/identifier"},
+        "response_key": {"$ref": "#/$defs/identifier"},
+        "denominator_rule": {"enum": ["all_responses", "asked_responses", "valid_responses"]},
+        "denominator_count": {"type": "integer", "minimum": 0},
+        "denominator_counts": {"$ref": "#/$defs/denominator_counts"},
+        "count": {"type": "integer", "minimum": 0},
+        "missingness": {"$ref": "#/$defs/missingness"},
+        "distribution": {"type": "array", "items": {"$ref": "#/$defs/scale_distribution"}},
+        "provenance": {"$ref": "#/$defs/item_provenance"}
+      }
+    },
+    "free_text_row": {
+      "type": "object", "additionalProperties": false,
+      "required": ["question_id", "response_id", "participant_id", "identity_namespace", "text", "response_origin"],
+      "properties": {
+        "question_id": {"$ref": "#/$defs/identifier"},
+        "response_id": {"$ref": "#/$defs/identifier"},
+        "participant_id": {"$ref": "#/$defs/identifier"},
+        "identity_namespace": {"type": "string", "minLength": 1},
+        "text": {"type": "string", "minLength": 1},
+        "response_origin": {"enum": ["synthetic", "real"]}
+      }
+    },
+    "free_text_result": {
+      "type": "object", "additionalProperties": false,
+      "required": ["item_id", "analysis_type", "question_id", "response_key", "non_empty_count", "returned_count", "truncated", "rows", "provenance"],
+      "properties": {
+        "item_id": {"$ref": "#/$defs/identifier"},
+        "analysis_type": {"const": "free_text_listing"},
+        "question_id": {"$ref": "#/$defs/identifier"},
+        "response_key": {"$ref": "#/$defs/identifier"},
+        "non_empty_count": {"type": "integer", "minimum": 0},
+        "returned_count": {"type": "integer", "minimum": 0},
+        "truncated": {"type": "boolean"},
+        "rows": {"type": "array", "maxItems": 100, "items": {"$ref": "#/$defs/free_text_row"}},
+        "provenance": {"$ref": "#/$defs/item_provenance"}
+      }
+    },
+    "column_denominator": {
+      "type": "object", "additionalProperties": false,
+      "required": ["value", "count"],
+      "properties": {"value": {}, "count": {"type": "integer", "minimum": 0}}
+    },
+    "cross_tab_cell": {
+      "type": "object", "additionalProperties": false,
+      "required": ["column_value", "count", "row_percentage", "column_percentage"],
+      "properties": {
+        "column_value": {},
+        "count": {"type": "integer", "minimum": 0},
+        "row_percentage": {"type": ["number", "null"], "minimum": 0},
+        "column_percentage": {"type": ["number", "null"], "minimum": 0}
+      }
+    },
+    "cross_tab_row": {
+      "type": "object", "additionalProperties": false,
+      "required": ["row_value", "row_count", "cells"],
+      "properties": {
+        "row_value": {},
+        "row_count": {"type": "integer", "minimum": 0},
+        "cells": {"type": "array", "items": {"$ref": "#/$defs/cross_tab_cell"}}
+      }
+    },
+    "cross_tab_result": {
+      "type": "object", "additionalProperties": false,
+      "required": ["item_id", "analysis_type", "row_question_id", "column_question_id", "pair_denominator_rule", "pair_denominator_count", "column_denominators", "rows", "provenance"],
+      "properties": {
+        "item_id": {"$ref": "#/$defs/identifier"},
+        "analysis_type": {"const": "cross_tab"},
+        "row_question_id": {"$ref": "#/$defs/identifier"},
+        "column_question_id": {"$ref": "#/$defs/identifier"},
+        "pair_denominator_rule": {"const": "valid_pairs"},
+        "pair_denominator_count": {"type": "integer", "minimum": 0},
+        "column_denominators": {"type": "array", "items": {"$ref": "#/$defs/column_denominator"}},
+        "rows": {"type": "array", "items": {"$ref": "#/$defs/cross_tab_row"}},
+        "provenance": {"$ref": "#/$defs/item_provenance"}
+      }
+    },
+    "result_item": {
+      "oneOf": [
+        {"$ref": "#/$defs/frequency_result"},
+        {"$ref": "#/$defs/missingness_result"},
+        {"$ref": "#/$defs/scale_result"},
+        {"$ref": "#/$defs/free_text_result"},
+        {"$ref": "#/$defs/cross_tab_result"}
+      ]
+    }
+  }
+}
