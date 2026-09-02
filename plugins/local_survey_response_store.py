@@ -555,39 +555,30 @@ class LocalSurveyResponseStore:
             if row is None:
                 return None
             summary = self._decode_dataset_summary(row)
-            counts = connection.execute(
-                """
-                SELECT
-                    COUNT(*) AS total,
-                    SUM(CASE WHEN kind='accepted_response' THEN 1 ELSE 0 END) AS accepted
-                FROM survey_response_dataset_entries
-                WHERE project_id=? AND dataset_id=?
-                """,
-                (project_id, dataset_id),
-            ).fetchone()
-            total = int(counts["total"] or 0)
-            accepted = int(counts["accepted"] or 0)
-            if (
-                total != int(summary["response_count"])
-                or accepted != int(summary["accepted_count"])
-                or total - accepted != int(summary["rejected_count"])
-            ):
-                raise LocalSurveyResponseStoreError(
-                    "SURVEY-RESPONSE-STORE-INTEGRITY-001",
-                    "stored SurveyResponseDataset entry index is inconsistent",
-                )
+            total = int(summary["response_count"])
+            expected = min(limit, max(total - offset, 0))
             rows = connection.execute(
                 """
                 SELECT entry_index,kind,payload_json
                 FROM survey_response_dataset_entries
-                WHERE project_id=? AND dataset_id=?
+                WHERE project_id=? AND dataset_id=? AND entry_index>=?
                 ORDER BY entry_index
-                LIMIT ? OFFSET ?
+                LIMIT ?
                 """,
-                (project_id, dataset_id, limit, offset),
+                (project_id, dataset_id, offset, limit),
             ).fetchall()
+            if len(rows) != expected:
+                raise LocalSurveyResponseStoreError(
+                    "SURVEY-RESPONSE-STORE-INTEGRITY-001",
+                    "stored SurveyResponseDataset entry index is inconsistent",
+                )
             entries: list[dict[str, Any]] = []
-            for entry_row in rows:
+            for position, entry_row in enumerate(rows):
+                if int(entry_row["entry_index"]) != offset + position:
+                    raise LocalSurveyResponseStoreError(
+                        "SURVEY-RESPONSE-STORE-INTEGRITY-001",
+                        "stored SurveyResponseDataset entry index is inconsistent",
+                    )
                 try:
                     entry = json.loads(str(entry_row["payload_json"]))
                 except json.JSONDecodeError as exc:
