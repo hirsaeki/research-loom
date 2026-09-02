@@ -52,18 +52,16 @@ class ExternalDesktopResearchAttemptLifecycleTests(unittest.TestCase):
         helper = ExternalDesktopResearchIntakeTests(methodName="runTest")
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            app1, facade1 = helper.make_facade(root)
-            app2 = None
-            facade2 = None
+            setup_app, setup_facade = helper.make_facade(root)
             try:
-                run_id = helper.prepare(facade1)["run_id"]
-                facade1.start_external_retrieval_attempt(run_id, {
+                run_id = helper.prepare(setup_facade)["run_id"]
+                setup_facade.start_external_retrieval_attempt(run_id, {
                     "attempt_id": "ATT-1",
                     "strategy": "support search",
                     "coverage_dimension_ids": ["COV-SUPPORT"],
                 })
                 helper.write_capture_files(root)
-                capture = facade1.capture_external_source(run_id, {
+                capture = setup_facade.capture_external_source(run_id, {
                     "capture_id": "CAP-1",
                     "source_category": "other",
                     "exact_locator": "https://example.test/source-a#section-1",
@@ -73,76 +71,96 @@ class ExternalDesktopResearchAttemptLifecycleTests(unittest.TestCase):
                     "text_rendition_file": "captures/text/source-a.txt",
                     "provenance": {},
                 })["capture"]
-                facade1.complete_external_retrieval_attempt(run_id, {
+                setup_facade.complete_external_retrieval_attempt(run_id, {
                     "attempt_id": "ATT-1",
                     "outcome": "source_captured",
                     "target_locator": "https://example.test/source-a#section-1",
                     "resulting_capture_id": "CAP-1",
                 })
-                facade1.start_external_retrieval_attempt(run_id, {
+                setup_facade.start_external_retrieval_attempt(run_id, {
                     "attempt_id": "ATT-2",
                     "strategy": "counter search",
                     "coverage_dimension_ids": ["COV-COUNTER"],
                 })
-                facade1.complete_external_retrieval_attempt(run_id, {
+                setup_facade.complete_external_retrieval_attempt(run_id, {
                     "attempt_id": "ATT-2",
                     "outcome": "no_relevant_source",
                 })
-                handoff, extension = golden_submission(app1, run_id, capture)
+                handoff, extension = golden_submission(setup_app, run_id, capture)
+            finally:
+                setup_facade.close()
 
-                app2 = LocalResearchApplication(
+            entered_check = Event()
+            release_check = Event()
+            real_reconstruct = reconstruct_attempts
+
+            def open_facade():
+                app = LocalResearchApplication(
                     root / ".research-loom",
                     resolver=NullResolver(),
                     effective_profile_set_provider=profile_provider,
                 )
-                facade2 = LocalApplicationFacade(app2, "PRJ-1", workspace_root=root)
-                entered_check = Event()
-                release_check = Event()
-                real_reconstruct = reconstruct_attempts
+                return LocalApplicationFacade(app, "PRJ-1", workspace_root=root)
 
-                def delayed_reconstruct(*args, **kwargs):
-                    result = real_reconstruct(*args, **kwargs)
-                    entered_check.set()
-                    self.assertTrue(release_check.wait(timeout=5))
-                    return result
+            def collect_in_worker():
+                facade = open_facade()
+                try:
+                    return facade.collect_external(
+                        run_id,
+                        {"handoff": handoff, "extension": extension},
+                    )
+                finally:
+                    facade.close()
 
-                with patch(
-                    "plugins.local_application.external_attempt_lifecycle_facade.reconstruct_attempts",
-                    side_effect=delayed_reconstruct,
-                ):
-                    with ThreadPoolExecutor(max_workers=2) as pool:
-                        collect_future = pool.submit(
-                            facade1.collect_external,
-                            run_id,
-                            {"handoff": handoff, "extension": extension},
-                        )
-                        self.assertTrue(entered_check.wait(timeout=5))
-                        attempt_future = pool.submit(
-                            facade2.start_external_retrieval_attempt,
-                            run_id,
-                            {
-                                "attempt_id": "ATT-RACE",
-                                "strategy": "late race search",
-                                "coverage_dimension_ids": ["COV-SUPPORT"],
-                            },
-                        )
-                        with self.assertRaises(FutureTimeout):
-                            attempt_future.result(timeout=0.1)
-                        release_check.set()
-                        result = collect_future.result(timeout=5)
-                        with self.assertRaises(LocalApplicationError) as blocked:
-                            attempt_future.result(timeout=5)
+            def start_attempt_in_worker():
+                facade = open_facade()
+                try:
+                    return facade.start_external_retrieval_attempt(
+                        run_id,
+                        {
+                            "attempt_id": "ATT-RACE",
+                            "strategy": "late race search",
+                            "coverage_dimension_ids": ["COV-SUPPORT"],
+                        },
+                    )
+                finally:
+                    facade.close()
 
-                self.assertEqual(result["status"], "CAPABILITY_RESULT_COLLECTED")
-                self.assertEqual(app1.execution_store.load_run(run_id).status.value, "COMPLETED")
-                self.assertEqual(blocked.exception.code, "APPLICATION-EXTERNAL-RUN-STATE-001")
-                attempts = reconstruct_attempts(app1.operational_store, run_id)
+            def delayed_reconstruct(*args, **kwargs):
+                result = real_reconstruct(*args, **kwargs)
+                entered_check.set()
+                self.assertTrue(release_check.wait(timeout=5))
+                return result
+
+            with patch(
+                "plugins.local_application.external_attempt_lifecycle_facade.reconstruct_attempts",
+                side_effect=delayed_reconstruct,
+            ):
+                with ThreadPoolExecutor(max_workers=2) as pool:
+                    collect_future = pool.submit(collect_in_worker)
+                    self.assertTrue(entered_check.wait(timeout=5))
+                    attempt_future = pool.submit(start_attempt_in_worker)
+                    with self.assertRaises(FutureTimeout):
+                        attempt_future.result(timeout=0.1)
+                    release_check.set()
+                    result = collect_future.result(timeout=5)
+                    with self.assertRaises(LocalApplicationError) as blocked:
+                        attempt_future.result(timeout=5)
+
+            self.assertEqual(result["status"], "CAPABILITY_RESULT_COLLECTED")
+            self.assertEqual(blocked.exception.code, "APPLICATION-EXTERNAL-RUN-STATE-001")
+
+            inspect_facade = open_facade()
+            try:
+                self.assertEqual(
+                    inspect_facade._application.execution_store.load_run(run_id).status.value,
+                    "COMPLETED",
+                )
+                attempts = reconstruct_attempts(inspect_facade._application.operational_store, run_id)
                 self.assertNotIn("ATT-RACE", attempts)
                 self.assertTrue(all(item["completed_at"] is not None for item in attempts.values()))
             finally:
-                if facade2 is not None:
-                    facade2.close()
-                facade1.close()
+                inspect_facade.close()
 
 
 if __name__ == "__main__":
