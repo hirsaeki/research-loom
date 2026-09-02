@@ -376,6 +376,27 @@ class LocalSurveyAnalysisStore:
         finally:
             connection.close()
 
+
+    def find_results_by_dataset(self, project_id: str, dataset_id: str) -> list[dict[str, Any]]:
+        connection = self._read()
+        if connection is None:
+            return []
+        try:
+            rows = connection.execute(
+                "SELECT * FROM survey_aggregate_results WHERE project_id=? AND dataset_id=? ORDER BY generated_at,aggregate_result_id",
+                (project_id, dataset_id),
+            ).fetchall()
+            return [self._decode_result(row) for row in rows]
+        except LocalSurveyAnalysisStoreError:
+            raise
+        except sqlite3.Error as exc:
+            raise LocalSurveyAnalysisStoreError(
+                "SURVEY-ANALYSIS-STORE-DB-001",
+                "Survey analysis registry read failed",
+            ) from exc
+        finally:
+            connection.close()
+
     def load_result(self, project_id: str, aggregate_result_id: str) -> dict[str, Any] | None:
         connection = self._read()
         if connection is None:

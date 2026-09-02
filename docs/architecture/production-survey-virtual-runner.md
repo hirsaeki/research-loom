@@ -62,6 +62,10 @@ research-loom run show --workspace <workspace> --run-id <RUN-ID> --json
 
 For Survey Virtual Runner Runs, `run show` adds a `virtual_runner` projection containing execution mode/scenario, exact input pins, synthetic population specification, generation provenance, validation failures/preservation events, defects/warnings, candidate change requests, and candidate readiness. Ordinary Run diagnostics remain separate from the Virtual Runner defect register.
 
+## Generator backends
+
+The Survey Virtual Runner supports two deliberately separate generator roles. The PR41 structural generator remains the schema/branch/STRESS backend. The LLM Virtual Respondent is an additive semantic synthetic-response backend; it still uses `execution_mode = virtual`, and its first slice uses `scenario_class = STANDARD`. Both backends must feed the same canonical Survey response boundary rather than defining backend-specific response or aggregation semantics. See `production-survey-llm-virtual-respondent.md`.
+
 ## Structural generator
 
 The built-in generator is intentionally structural. It uses only declared Instrument values and bounds, explicit missing-value states, branch rules, and synthetic placeholders such as `SYNTHETIC_TEXT_001`.
@@ -104,4 +108,4 @@ The first production slice does not hard-code universal Core thresholds or run c
 
 ## Out of scope
 
-PR41 does not implement Microsoft/Google Forms execution, REAL response intake or participant registry, empirical analysis, LLM personas, Delphi/Case Study production bindings, dashboards, or distributed runner infrastructure.
+PR41 itself did not implement Microsoft/Google Forms execution, REAL response intake or participant registry, empirical analysis, LLM respondents, Delphi/Case Study production bindings, dashboards, or distributed runner infrastructure. The later LLM Survey Virtual Respondent slice adds only the semantic synthetic-response backend described above; the remaining non-goals stay unchanged.

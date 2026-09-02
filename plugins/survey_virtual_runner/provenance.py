@@ -22,12 +22,12 @@ STRUCTURAL_TEMPLATE = (
 RESPONSE_SCHEMA_PATH = ROOT / "core/packages/survey/survey-response.schema.json"
 
 
-def runner_digest() -> str:
+def runner_digest(*, implementation_id: str = IMPLEMENTATION_ID, implementation_version: str = IMPLEMENTATION_VERSION, template_digest: str | None = None) -> str:
     return canonical_digest({
-        "implementation_id": IMPLEMENTATION_ID,
-        "implementation_version": IMPLEMENTATION_VERSION,
+        "implementation_id": implementation_id,
+        "implementation_version": implementation_version,
         "runner_version": RUNNER_VERSION,
-        "template_digest": text_digest(STRUCTURAL_TEMPLATE),
+        "template_digest": template_digest or text_digest(STRUCTURAL_TEMPLATE),
         "response_schema_digest": file_digest(RESPONSE_SCHEMA_PATH),
     })
 
@@ -37,19 +37,41 @@ def survey_binding_digest() -> str:
 
 
 def generation_provenance(request, extension: Mapping[str, Any]) -> dict[str, Any]:
-    configuration_digest = canonical_digest({
-        "scenario_class": extension["scenario_class"],
-        "synthetic_population": extension["synthetic_population"],
-        "runner_configuration": extension["runner_configuration"],
-    })
-    return {
-        "generator_identity": IMPLEMENTATION_ID,
-        "prompt_template_version": STRUCTURAL_TEMPLATE_VERSION,
-        "prompt_template_digest": text_digest(STRUCTURAL_TEMPLATE),
+    backend = str(extension.get("generator_backend", "structural"))
+    if backend == "llm":
+        backend_config = extension["llm_backend_configuration"]
+        prompt = extension["prompt_template"]
+        implementation_id = "plugin.survey-virtual-runner.llm"
+        implementation_version = "1.0.0"
+        template_version = str(prompt["template_version"])
+        template_digest = str(prompt["template_digest"])
+        configuration_payload = {
+            "scenario_class": extension["scenario_class"],
+            "synthetic_population": extension["synthetic_population"],
+            "respondent_plan": extension["respondent_plan"],
+            "backend_config_digest": extension["llm_backend_config_digest"],
+            "prompt_template": prompt,
+        }
+    else:
+        backend_config = {}
+        implementation_id = IMPLEMENTATION_ID
+        implementation_version = IMPLEMENTATION_VERSION
+        template_version = STRUCTURAL_TEMPLATE_VERSION
+        template_digest = text_digest(STRUCTURAL_TEMPLATE)
+        configuration_payload = {
+            "scenario_class": extension["scenario_class"],
+            "synthetic_population": extension["synthetic_population"],
+            "runner_configuration": extension["runner_configuration"],
+        }
+    configuration_digest = canonical_digest(configuration_payload)
+    value = {
+        "generator_identity": implementation_id,
+        "prompt_template_version": template_version,
+        "prompt_template_digest": template_digest,
         "schema_version": "1.0.0",
         "schema_digest": file_digest(RESPONSE_SCHEMA_PATH),
         "runner_version": RUNNER_VERSION,
-        "runner_digest": runner_digest(),
+        "runner_digest": runner_digest(implementation_id=implementation_id, implementation_version=implementation_version, template_digest=template_digest),
         "sampling_seed": extension["runner_configuration"].get("sampling_seed"),
         "generated_at": request.run.started_at or request.run.prepared_at,
         "generation_configuration_digest": configuration_digest,
@@ -57,12 +79,19 @@ def generation_provenance(request, extension: Mapping[str, Any]) -> dict[str, An
         "byte_identical_rerun_assumed": False,
         "seed_proves_determinism": False,
     }
+    if backend == "llm":
+        value.update({
+            "provider_identity": str(backend_config["backend_id"]),
+            "model_identity": str(backend_config["model_id"]),
+            "model_version_ref": str(backend_config["model_id"]),
+        })
+    return value
 
 
 def input_pins(request, extension: Mapping[str, Any], provenance: Mapping[str, Any]) -> dict[str, Any]:
     run_spec = extension["run_spec"]
     research_method = extension["research_method_context"]
-    return {
+    pins = {
         "project_id": str(request.context_pack["project_id"]),
         "design": deepcopy(dict(extension["design_ref"])),
         "instrument": deepcopy(dict(extension["instrument_ref"])),
@@ -88,6 +117,16 @@ def input_pins(request, extension: Mapping[str, Any], provenance: Mapping[str, A
         "runner_digest": str(provenance["runner_digest"]),
         "survey_binding_digest": survey_binding_digest(),
     }
+    if extension.get("generator_backend") == "llm":
+        pins["generator_backend"] = "llm"
+        pins["respondent_plan"] = deepcopy(dict(extension["respondent_plan"]))
+        pins["backend"] = {
+            "backend_id": str(extension["llm_backend_configuration"]["backend_id"]),
+            "model_id": str(extension["llm_backend_configuration"]["model_id"]),
+            "backend_config_digest": str(extension["llm_backend_config_digest"]),
+        }
+        pins["prompt_template"] = deepcopy(dict(extension["prompt_template"]))
+    return pins
 
 
 def build_virtual_context(request, extension: Mapping[str, Any], provenance: Mapping[str, Any]) -> dict[str, Any]:
@@ -142,7 +181,7 @@ def build_virtual_context(request, extension: Mapping[str, Any], provenance: Map
         "synthetic_population": deepcopy(dict(extension["synthetic_population"])),
         "generation_provenance": deepcopy(dict(provenance)),
         "runner_configuration_pin": {
-            "runner_id": "survey-structural-runner",
+            "runner_id": "survey-llm-respondent" if extension.get("generator_backend") == "llm" else "survey-structural-runner",
             "version": RUNNER_VERSION,
             "content_digest": canonical_digest(extension["runner_configuration"]),
         },

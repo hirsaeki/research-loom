@@ -132,9 +132,11 @@ survey_aggregate.show
 
 The show surfaces return structured JSON. Free-text rows are bounded by the captured AnalysisSpec (`1..100`, default `25`), and aggregate result items are bounded by the show surface (`1..100` per page), so persisted inspection does not require direct SQLite access.
 
-## PR41 / PR42 composition
+## Virtual / REAL composition
 
-The production smoke path is:
+The production aggregation input remains the canonical PR42 Dataset regardless of producer. Structural Virtual and LLM Virtual therefore share the same PR43 semantics, and future REAL intake must do the same. Synthetic aggregation remains `SYNTHETIC_TEST_ONLY` and is never a population estimate.
+
+The structural production smoke path is:
 
 ```text
 PR41 STANDARD / STRESS
@@ -151,3 +153,21 @@ SurveyAggregateResult
 ```
 
 For STRESS output, invalid/rejected responses remain visible in exclusion summaries but cannot enter valid frequencies or cross-tabs. Valid extreme responses remain in the accepted population. Branch-derived `not_asked` remains distinct from missing.
+
+The LLM Virtual Respondent path composes identically after generation:
+
+```text
+LLM Virtual Respondent
+        ↓
+PR42 normalization and validation
+        ↓
+SurveyResponseDataset
+        ↓
+existing SurveyAnalysisSpec
+        ↓
+PR43 shared aggregation
+        ↓
+SurveyAggregateResult
+        ↓
+Human inspection
+```

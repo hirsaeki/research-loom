@@ -4,6 +4,8 @@ from copy import deepcopy
 
 from plugins.local_application.facade import LocalApplicationError
 from plugins.survey_virtual_runner.contracts import document_digest, validate_survey_context
+from plugins.survey_virtual_runner.llm_backend import prompt_template_pin
+from core.conversation.validation import canonical_digest
 
 
 def build_survey_virtual_extension(record, design_record, payload, *, context_pack_id, binding, questionnaire, method, protocol_ref, run_spec, research_method):
@@ -24,14 +26,16 @@ def build_survey_virtual_extension(record, design_record, payload, *, context_pa
         raise LocalApplicationError("APPLICATION-VIRTUAL-PIN-001", f"Survey execute context is invalid: {error}")
 
     synth_config = payload["synthetic_population"]
+    profiles = payload.get("respondent_profiles", [])
+    profile_dimensions = sorted({str(key) for profile in profiles for key in profile.get("attributes", {})})
     population = {
         "identity_namespace": f"synthetic:survey:{context_pack_id}",
         "real_identity_namespaces": ["real:survey"],
         "population_size": int(payload["population_size"]),
         "composition_intent": str(synth_config.get("composition_intent") or "Exercise Survey contract paths without claiming empirical representation."),
-        "scenario_dimensions": list(synth_config.get("scenario_dimensions") or ["branching", "missingness", "validation"]),
-        "role_attribute_constraints": list(synth_config.get("role_attribute_constraints") or ["structural synthetic labels only; no real employee personas"]),
-        "allowed_variation_dimensions": list(synth_config.get("allowed_variation_dimensions") or ["stable_response_value", "missing_value_state", "branch_path"]),
+        "scenario_dimensions": list(synth_config.get("scenario_dimensions") or (profile_dimensions if payload.get("generator_backend") == "llm" and profile_dimensions else ["branching", "missingness", "validation"])),
+        "role_attribute_constraints": list(synth_config.get("role_attribute_constraints") or (["explicit synthetic respondent profiles only; no real-person identity"] if payload.get("generator_backend") == "llm" else ["structural synthetic labels only; no real employee personas"])),
+        "allowed_variation_dimensions": list(synth_config.get("allowed_variation_dimensions") or ((profile_dimensions + ["sampling_parameters"]) if payload.get("generator_backend") == "llm" else ["stable_response_value", "missing_value_state", "branch_path"])),
         "forbidden_inference_dimensions": list(synth_config.get("forbidden_inference_dimensions") or ["real-person-identity", "population-prevalence", "organizational-distribution"]),
         "real_identity_mapping_refs": [],
         "synthetic_personas_are_real_people": False,
@@ -39,10 +43,12 @@ def build_survey_virtual_extension(record, design_record, payload, *, context_pa
         "target_population_representation_claimed": False,
     }
     runner_config = {
+        "generator_backend": payload.get("generator_backend", "structural"),
         "sampling_seed": payload.get("sampling_seed", 0),
         "stress_faults": payload["stress_faults"],
         "readiness_policy": payload["readiness_policy"],
         "prior_virtual_run_ids": payload["prior_virtual_run_ids"],
+        "minimum_valid_response_count": payload.get("minimum_valid_response_count", 1),
     }
     extension = {
         "schema_version": "0.1.0",
@@ -60,6 +66,23 @@ def build_survey_virtual_extension(record, design_record, payload, *, context_pa
         "instrument": questionnaire,
         "synthetic_population": population,
         "runner_configuration": runner_config,
+        "generator_backend": payload.get("generator_backend", "structural"),
+        **({
+            "respondent_profiles": deepcopy(payload["respondent_profiles"]),
+            "respondent_plan": {
+                "profile_ids": [item["profile_id"] for item in payload["respondent_profiles"]],
+                "profile_digests": [
+                    {"profile_id": item["profile_id"], "content_digest": canonical_digest(item)}
+                    for item in payload["respondent_profiles"]
+                ],
+                "profiles_digest": canonical_digest(payload["respondent_profiles"]),
+                "composition_intent": population["composition_intent"],
+                "interaction_model": "full_instrument_single_call",
+            },
+            "llm_backend_configuration": deepcopy(payload["llm_backend"]),
+            "llm_backend_config_digest": canonical_digest(payload["llm_backend"]),
+            "prompt_template": prompt_template_pin(),
+        } if payload.get("generator_backend") == "llm" else {}),
     }
     extension["extension_digest"] = document_digest(extension, "extension_digest")
     return extension
