@@ -60,7 +60,7 @@ class SurveyResponseCaptureMixin:
                 )
             )
 
-        seen_ids: set[str] = set()
+        seen_response_keys: set[tuple[str, str]] = set()
         seen_participants: set[tuple[str, str]] = set()
         persistable: list[tuple[Mapping[str, Any], Any]] = []
         accepted_refs: list[dict[str, str]] = []
@@ -72,18 +72,21 @@ class SurveyResponseCaptureMixin:
             response = outcome["canonical_response"]
             issues = list(outcome["issues"])
             raw = outcome["raw_input"]
-            raw_response_id = (
-                str(raw["response_id"])
+            raw_response_key = (
+                (str(raw["identity_namespace"]), str(raw["response_id"]))
                 if isinstance(raw, Mapping)
+                and isinstance(raw.get("identity_namespace"), str)
+                and raw["identity_namespace"]
                 and isinstance(raw.get("response_id"), str)
                 and raw["response_id"]
                 else None
             )
             duplicate_response_id = (
-                raw_response_id is not None and raw_response_id in seen_ids
+                raw_response_key is not None
+                and raw_response_key in seen_response_keys
             )
-            if raw_response_id is not None and not duplicate_response_id:
-                seen_ids.add(raw_response_id)
+            if raw_response_key is not None and not duplicate_response_id:
+                seen_response_keys.add(raw_response_key)
 
             if response is None:
                 if duplicate_response_id:
@@ -91,7 +94,7 @@ class SurveyResponseCaptureMixin:
                         _issue(
                             "SURVEY_RESPONSE_DUPLICATE_RECORD",
                             "response_id is duplicated within the Dataset intake",
-                            response_id=raw_response_id,
+                            response_id=raw_response_key[1] if raw_response_key else None,
                         )
                     )
                 for issue in issues:
