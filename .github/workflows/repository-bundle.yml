@@ -1,0 +1,33 @@
+name: repository-bundle
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bundle:
+    name: create repository bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Create git bundle
+        run: git bundle create "$RUNNER_TEMP/repo.bundle" --all
+
+      - name: Verify git bundle
+        run: git bundle verify "$RUNNER_TEMP/repo.bundle"
+
+      - name: Upload git bundle
+        uses: actions/upload-artifact@v7
+        with:
+          name: research-loom-git-bundle-${{ github.sha }}
+          path: ${{ runner.temp }}/repo.bundle
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
