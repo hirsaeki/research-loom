@@ -55,7 +55,7 @@ def llm_payload(questionnaire):
         "llm_backend": {
             "backend_id": "openai_responses",
             "model_id": "gpt-test",
-            "credential_env": "NOT_USED_BY_FAKE",
+            "credential_env": "OPENAI_API_KEY",
             "temperature": 0.2,
             "max_output_tokens": 500,
             "max_transport_retries": 1,
@@ -210,9 +210,69 @@ class SurveyLlmVirtualRespondentProductionTests(SurveyVirtualRunnerTestBase):
                 self.assertEqual(profile.exception.code, "PROFILE_INVALID")
 
                 payload = llm_payload(questionnaire)
+                payload["respondent_profiles"] = [{
+                    "profile_id": "SYN-PROFILE-BAD",
+                    "attributes": {"contact": {"email": "person@example.com"}},
+                }]
+                payload["population_size"] = 1
+                with self.assertRaises(LocalApplicationError) as nested_profile:
+                    facade.run_survey_virtual(payload)
+                self.assertEqual(nested_profile.exception.code, "PROFILE_INVALID")
+
+                for field, value in (
+                    ("scenario_notes", "contact person@example.com"),
+                    ("knowledge_scope", ["employee id EMP-12345"]),
+                ):
+                    payload = llm_payload(questionnaire)
+                    profile_payload = {"profile_id": "SYN-PROFILE-BAD", "attributes": {}}
+                    profile_payload[field] = value
+                    payload["respondent_profiles"] = [profile_payload]
+                    payload["population_size"] = 1
+                    with self.assertRaises(LocalApplicationError) as free_text_profile:
+                        facade.run_survey_virtual(payload)
+                    self.assertEqual(free_text_profile.exception.code, "PROFILE_INVALID")
+
+                payload = llm_payload(questionnaire)
                 payload["llm_backend"]["api_key"] = "must-not-be-accepted"
                 with self.assertRaises(LocalApplicationError):
                     facade.run_survey_virtual(payload)
+
+                for field, value in (
+                    ("credential_env", "AWS_SECRET_ACCESS_KEY"),
+                    ("endpoint", "https://example.invalid/v1/responses"),
+                ):
+                    payload = llm_payload(questionnaire)
+                    payload["llm_backend"][field] = value
+                    with self.assertRaises(LocalApplicationError) as backend_config:
+                        facade.run_survey_virtual(payload)
+                    self.assertEqual(backend_config.exception.code, "BACKEND_UNAVAILABLE")
+
+                payload = llm_payload(questionnaire)
+                payload["generator_backend"] = []
+                with self.assertRaises(LocalApplicationError) as backend_type:
+                    facade.run_survey_virtual(payload)
+                self.assertEqual(backend_type.exception.code, "APPLICATION-VIRTUAL-PAYLOAD-001")
+
+                payload = llm_payload(questionnaire)
+                payload["respondent_profiles"] = [
+                    {"profile_id": f"SYN-PROFILE-{index:02d}", "attributes": {"segment": index}}
+                    for index in range(9)
+                ]
+                payload["population_size"] = 9
+                with self.assertRaises(LocalApplicationError) as profile_limit:
+                    facade.run_survey_virtual(payload)
+                self.assertEqual(profile_limit.exception.code, "PROFILE_INVALID")
+
+                for field, value in (
+                    ("timeout_seconds", 31),
+                    ("max_transport_retries", 2),
+                    ("max_repair_attempts", 2),
+                ):
+                    payload = llm_payload(questionnaire)
+                    payload["llm_backend"][field] = value
+                    with self.assertRaises(LocalApplicationError) as bounded:
+                        facade.run_survey_virtual(payload)
+                    self.assertEqual(bounded.exception.code, "APPLICATION-VIRTUAL-PAYLOAD-001")
             finally:
                 app.close()
 

@@ -58,11 +58,11 @@ generator_backend = structural | llm
 
 The core port is intentionally small: `VirtualRespondentBackend.generate_response(...)` accepts the exact Instrument, one explicit synthetic respondent profile, generation configuration, and prompt-template pin. Provider-specific request/response shapes remain inside the adapter.
 
-The concrete production adapter is `openai_responses`. It uses the Responses API with schema-constrained structured output and `store=false`. Credentials are read at call time from a configured environment-variable name (default `OPENAI_API_KEY`). The credential value is never persisted in Project Config, Run artifacts, provenance, or logs.
+The concrete production adapter is `openai_responses`. It uses the Responses API with schema-constrained structured output and `store=false`. Production ingress fixes the endpoint to `https://api.openai.com/v1/responses` and the credential environment variable to `OPENAI_API_KEY`; request payloads cannot redirect credentials to another endpoint or select another environment secret. The credential value is never persisted in Project Config, Run artifacts, provenance, or logs.
 
 ## Synthetic respondent plan
 
-The first slice accepts explicit structured profiles only. Profiles use a synthetic namespace such as `SYN-PROFILE-*` and may contain declared project dimensions in `attributes`, a bounded `knowledge_scope`, and optional scenario notes. Direct identifiers such as names, email addresses, employee IDs, or staff IDs are rejected.
+The first slice accepts explicit structured profiles only. Profiles use a synthetic namespace such as `SYN-PROFILE-*` and may contain declared project dimensions in `attributes`, a bounded `knowledge_scope`, and optional scenario notes. Direct-identifier keys are rejected recursively, and obvious identifier tokens such as email addresses or employee/staff IDs are rejected from profile free text. The bounded MVP accepts at most eight LLM respondent profiles per Run.
 
 Profile composition is a test configuration. It does not claim to represent an organization or population. Profile generation by another LLM, demographic simulation, population weighting, respondent societies, memory, and model ensembles are out of scope.
 
@@ -89,7 +89,7 @@ No chain-of-thought or hidden reasoning is requested or persisted. Sanitized pro
 
 ## Retry and partial success
 
-Retries are bounded independently for transport failure and serialization-only repair. A repair request may repair JSON serialization; it must not reinterpret or improve answer content. Runtime/backend failures and Survey validation issues remain separate categories.
+Retries are bounded independently for transport failure and serialization-only repair. The production MVP permits at most one transport retry and one serialization repair per respondent, with request timeout capped at 30 seconds. Combined with the eight-profile Run cap, the synchronous adapter has a finite production bound without introducing a concurrency framework in this slice. A repair request may repair JSON serialization; it must not reinterpret or improve answer content. Runtime/backend failures and Survey validation issues remain separate categories.
 
 A generation report retains respondent profile IDs, attempt count/history, provider request ID where available, sanitized provider output/digest, parsed-answer digest, and failure codes. Partial generation success is allowed. The caller may set a small `minimum_valid_response_count`; shared aggregation is not produced when the canonical Dataset does not meet that minimum, and zero valid responses cannot become a successful aggregate.
 

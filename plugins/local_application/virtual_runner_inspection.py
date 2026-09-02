@@ -29,9 +29,20 @@ class VirtualRunnerInspectionMixin:
         response_dataset = None
         aggregate_result = None
         if hasattr(self, "_survey_response_store"):
-            response_dataset = self._survey_response_store().load_dataset(
+            response_store = self._survey_response_store()
+            response_dataset = response_store.load_dataset(
                 self._project_id, f"SRD-{run_id}"
             )
+            if response_dataset is None:
+                legacy_datasets = response_store.find_datasets_by_source_run(
+                    self._project_id, str(run_id)
+                )
+                if len(legacy_datasets) > 1:
+                    raise LocalApplicationError(
+                        "APPLICATION-RUN-INSPECTION-001",
+                        "Virtual Runner Run resolves to multiple Survey response datasets",
+                    )
+                response_dataset = legacy_datasets[0] if legacy_datasets else None
             if response_dataset is not None and hasattr(self, "_survey_analysis_store"):
                 aggregates = self._survey_analysis_store().find_results_by_dataset(
                     self._project_id, str(response_dataset["dataset_id"])

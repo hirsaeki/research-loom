@@ -38,6 +38,14 @@ _DIGEST = re.compile(r"^sha256:[0-9a-f]{64}$")
 _SEMVER = re.compile(r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
 
 _SENSITIVE_PROFILE_KEYS = {"name", "full_name", "email", "email_address", "employee_id", "employee_number", "staff_id"}
+_PII_TEXT_PATTERNS = (
+    re.compile(r"(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b"),
+    re.compile(r"(?i)\b(?:employee|staff)[ _-]?(?:id|number)\s*[:=#-]?\s*[A-Z0-9][A-Z0-9._-]{2,}\b"),
+)
+_TRUSTED_LLM_ENDPOINT = "https://api.openai.com/v1/responses"
+_TRUSTED_LLM_CREDENTIAL_ENV = "OPENAI_API_KEY"
+_MAX_LLM_PROFILES = 8
+_MAX_LLM_TIMEOUT_SECONDS = 30
 _ALLOWED_LLM_BACKEND_FIELDS = {
     "backend_id", "model_id", "endpoint", "credential_env", "temperature", "top_p",
     "max_output_tokens", "timeout_seconds", "max_transport_retries", "max_repair_attempts",
@@ -58,6 +66,19 @@ def _nonempty(value: Any, field: str) -> str:
             f"{field} must be a non-empty string",
         )
     return value
+
+
+def _contains_profile_identifier(value: Any) -> bool:
+    if isinstance(value, Mapping):
+        for key, nested in value.items():
+            if str(key).lower() in _SENSITIVE_PROFILE_KEYS or _contains_profile_identifier(nested):
+                return True
+        return False
+    if isinstance(value, list):
+        return any(_contains_profile_identifier(item) for item in value)
+    if isinstance(value, str):
+        return any(pattern.search(value) for pattern in _PII_TEXT_PATTERNS)
+    return False
 
 
 def _string_list(value: Any, field: str) -> list[str]:
@@ -267,7 +288,7 @@ def _payload(payload: Mapping[str, Any]) -> dict[str, Any]:
             )
 
     generator_backend = payload.get("generator_backend", "structural")
-    if generator_backend not in {"structural", "llm"}:
+    if not isinstance(generator_backend, str) or generator_backend not in {"structural", "llm"}:
         raise LocalApplicationError("APPLICATION-VIRTUAL-PAYLOAD-001", "generator_backend must be structural or llm")
 
     profiles = payload.get("respondent_profiles", [])
@@ -283,8 +304,11 @@ def _payload(payload: Mapping[str, Any]) -> dict[str, Any]:
             raise LocalApplicationError("APPLICATION-VIRTUAL-PAYLOAD-001", "LLM Virtual Respondent backend currently supports scenario_class STANDARD only")
         if faults:
             raise LocalApplicationError("APPLICATION-VIRTUAL-PAYLOAD-001", "stress_faults belong to the structural generator and are not accepted by the LLM backend")
-        if not isinstance(profiles, list) or not profiles or len(profiles) > 128:
-            raise LocalApplicationError("PROFILE_INVALID", "respondent_profiles must contain 1 through 128 explicit synthetic profiles")
+        if not isinstance(profiles, list) or not profiles or len(profiles) > _MAX_LLM_PROFILES:
+            raise LocalApplicationError(
+                "PROFILE_INVALID",
+                f"respondent_profiles must contain 1 through {_MAX_LLM_PROFILES} explicit synthetic profiles for the bounded LLM backend",
+            )
         seen_profiles = set()
         for index, profile in enumerate(profiles):
             if not isinstance(profile, Mapping) or set(profile) - {"profile_id", "attributes", "knowledge_scope", "scenario_notes"}:
@@ -296,17 +320,23 @@ def _payload(payload: Mapping[str, Any]) -> dict[str, Any]:
             attributes = profile.get("attributes", {})
             if not isinstance(attributes, Mapping):
                 raise LocalApplicationError("PROFILE_INVALID", f"respondent_profiles[{index}].attributes must be an object")
-            lowered = {str(key).lower() for key in attributes}
-            if lowered & _SENSITIVE_PROFILE_KEYS:
+            if _contains_profile_identifier(attributes):
                 raise LocalApplicationError("PROFILE_INVALID", "synthetic profiles must not contain direct real-person identifiers")
             knowledge_scope = profile.get("knowledge_scope", [])
             if not isinstance(knowledge_scope, list) or any(not isinstance(item, str) or not item.strip() for item in knowledge_scope):
                 raise LocalApplicationError("PROFILE_INVALID", f"respondent_profiles[{index}].knowledge_scope must be an array of strings")
+            if _contains_profile_identifier(knowledge_scope):
+                raise LocalApplicationError("PROFILE_INVALID", "synthetic profile free text must not contain direct real-person identifiers")
+            scenario_notes = None
+            if profile.get("scenario_notes") is not None:
+                scenario_notes = _nonempty(profile["scenario_notes"], f"respondent_profiles[{index}].scenario_notes")
+                if _contains_profile_identifier(scenario_notes):
+                    raise LocalApplicationError("PROFILE_INVALID", "synthetic profile free text must not contain direct real-person identifiers")
             normalized_profiles.append({
                 "profile_id": profile_id,
                 "attributes": deepcopy(dict(attributes)),
                 "knowledge_scope": list(knowledge_scope),
-                **({"scenario_notes": _nonempty(profile["scenario_notes"], f"respondent_profiles[{index}].scenario_notes")} if profile.get("scenario_notes") is not None else {}),
+                **({"scenario_notes": scenario_notes} if scenario_notes is not None else {}),
             })
         if "population_size" in payload and population_size != len(normalized_profiles):
             raise LocalApplicationError("PROFILE_INVALID", "population_size must equal the number of explicit respondent_profiles for the LLM backend")
@@ -320,16 +350,28 @@ def _payload(payload: Mapping[str, Any]) -> dict[str, Any]:
         normalized_llm = deepcopy(dict(llm_backend))
         normalized_llm["backend_id"] = backend_id
         normalized_llm["model_id"] = model_id
-        normalized_llm.setdefault("credential_env", "OPENAI_API_KEY")
-        normalized_llm.setdefault("timeout_seconds", 60)
+        normalized_llm.setdefault("credential_env", _TRUSTED_LLM_CREDENTIAL_ENV)
+        normalized_llm.setdefault("endpoint", _TRUSTED_LLM_ENDPOINT)
+        normalized_llm.setdefault("timeout_seconds", 30)
         normalized_llm.setdefault("max_transport_retries", 1)
         normalized_llm.setdefault("max_repair_attempts", 1)
+        if normalized_llm["credential_env"] != _TRUSTED_LLM_CREDENTIAL_ENV:
+            raise LocalApplicationError("BACKEND_UNAVAILABLE", "llm_backend.credential_env is not allowed")
+        if normalized_llm["endpoint"] != _TRUSTED_LLM_ENDPOINT:
+            raise LocalApplicationError("BACKEND_UNAVAILABLE", "llm_backend.endpoint is not allowed")
         for field in ("max_transport_retries", "max_repair_attempts"):
             value = normalized_llm[field]
-            if not isinstance(value, int) or isinstance(value, bool) or not 0 <= value <= 3:
-                raise LocalApplicationError("APPLICATION-VIRTUAL-PAYLOAD-001", f"llm_backend.{field} must be an integer from 0 through 3")
-        if not isinstance(normalized_llm["timeout_seconds"], (int, float)) or isinstance(normalized_llm["timeout_seconds"], bool) or normalized_llm["timeout_seconds"] <= 0:
-            raise LocalApplicationError("APPLICATION-VIRTUAL-PAYLOAD-001", "llm_backend.timeout_seconds must be positive")
+            if not isinstance(value, int) or isinstance(value, bool) or not 0 <= value <= 1:
+                raise LocalApplicationError("APPLICATION-VIRTUAL-PAYLOAD-001", f"llm_backend.{field} must be 0 or 1 for the bounded LLM backend")
+        if (
+            not isinstance(normalized_llm["timeout_seconds"], (int, float))
+            or isinstance(normalized_llm["timeout_seconds"], bool)
+            or not 0 < float(normalized_llm["timeout_seconds"]) <= _MAX_LLM_TIMEOUT_SECONDS
+        ):
+            raise LocalApplicationError(
+                "APPLICATION-VIRTUAL-PAYLOAD-001",
+                f"llm_backend.timeout_seconds must be greater than 0 and at most {_MAX_LLM_TIMEOUT_SECONDS}",
+            )
         for field in ("temperature", "top_p"):
             if normalized_llm.get(field) is not None and (
                 not isinstance(normalized_llm[field], (int, float))
@@ -347,10 +389,6 @@ def _payload(payload: Mapping[str, Any]) -> dict[str, Any]:
         ):
             raise LocalApplicationError("APPLICATION-VIRTUAL-PAYLOAD-001", "llm_backend.max_output_tokens must be a positive integer")
         _nonempty(normalized_llm["credential_env"], "llm_backend.credential_env")
-        if normalized_llm.get("endpoint") is not None:
-            endpoint = _nonempty(normalized_llm["endpoint"], "llm_backend.endpoint")
-            if not endpoint.startswith(("https://", "http://")):
-                raise LocalApplicationError("APPLICATION-VIRTUAL-PAYLOAD-001", "llm_backend.endpoint must be an HTTP(S) URL")
         if minimum_valid > len(normalized_profiles):
             raise LocalApplicationError("PROFILE_INVALID", "minimum_valid_response_count cannot exceed respondent profile count")
         if analysis_items is not None and not isinstance(analysis_items, list):

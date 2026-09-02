@@ -186,15 +186,24 @@ def _sanitized_provider_response(payload: Mapping[str, Any]) -> dict[str, Any]:
 class OpenAIResponsesVirtualRespondentBackend:
     """Minimal production adapter for the OpenAI Responses API.
 
-    Credentials are read at call time from the configured environment-variable name and are
-    never returned in provenance or persisted artifacts.
+    Credentials are read at call time from the adapter's trusted environment-variable name and
+    are never returned in provenance or persisted artifacts. Request configuration cannot redirect
+    credentials to a different endpoint or environment variable.
     """
 
     backend_id = "openai_responses"
     adapter_version = "1.0.0"
 
-    def __init__(self, *, transport=None) -> None:
+    def __init__(
+        self,
+        *,
+        transport=None,
+        endpoint: str = "https://api.openai.com/v1/responses",
+        credential_env: str = "OPENAI_API_KEY",
+    ) -> None:
         self._transport = transport or _UrllibTransport()
+        self._endpoint = endpoint
+        self._credential_env = credential_env
 
     def generate_response(
         self,
@@ -207,13 +216,18 @@ class OpenAIResponsesVirtualRespondentBackend:
         expected_prompt = prompt_template_pin()
         if dict(prompt_template) != expected_prompt:
             raise VirtualRespondentBackendError("PROMPT_BINDING_INVALID", "prompt template pin does not match the implemented stable template")
-        endpoint = str(generation_config.get("endpoint") or "https://api.openai.com/v1/responses")
-        credential_env = str(generation_config.get("credential_env") or "OPENAI_API_KEY")
-        api_key = os.environ.get(credential_env)
+        endpoint = str(generation_config.get("endpoint") or self._endpoint)
+        credential_env = str(generation_config.get("credential_env") or self._credential_env)
+        if endpoint != self._endpoint or credential_env != self._credential_env:
+            raise VirtualRespondentBackendError(
+                "BACKEND_UNAVAILABLE",
+                "LLM endpoint and credential environment must match the trusted adapter configuration",
+            )
+        api_key = os.environ.get(self._credential_env)
         if not api_key:
             raise VirtualRespondentBackendError(
                 "AUTH_CONFIGURATION_MISSING",
-                f"credential environment variable {credential_env} is not set",
+                f"credential environment variable {self._credential_env} is not set",
             )
         model = str(generation_config["model_id"])
         max_transport_retries = int(generation_config.get("max_transport_retries", 1))

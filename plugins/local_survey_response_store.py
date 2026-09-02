@@ -610,6 +610,32 @@ class LocalSurveyResponseStore:
         finally:
             connection.close()
 
+    def find_datasets_by_source_run(self, project_id: str, run_id: str) -> list[dict[str, Any]]:
+        connection = self._read()
+        if connection is None:
+            return []
+        try:
+            rows = connection.execute(
+                """
+                SELECT DISTINCT d.*
+                FROM survey_response_datasets AS d
+                JOIN json_each(d.document_json, '$.source_run_ids') AS source_run
+                WHERE d.project_id=? AND source_run.value=?
+                ORDER BY d.created_at, d.dataset_id
+                """,
+                (project_id, run_id),
+            ).fetchall()
+            return [self._decode_dataset(row) for row in rows]
+        except LocalSurveyResponseStoreError:
+            raise
+        except sqlite3.Error as exc:
+            raise LocalSurveyResponseStoreError(
+                "SURVEY-RESPONSE-STORE-DB-001",
+                "Survey response registry source-Run lookup failed",
+            ) from exc
+        finally:
+            connection.close()
+
     def load_dataset(self, project_id: str, dataset_id: str) -> dict[str, Any] | None:
         connection = self._read()
         if connection is None:
