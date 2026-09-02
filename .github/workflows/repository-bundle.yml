@@ -2,18 +2,27 @@ name: repository-bundle
 
 on:
   workflow_dispatch:
+  issues:
+    types: [opened]
 
 permissions:
   contents: read
 
 jobs:
   bundle:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event.issue.user.login == github.repository_owner &&
+        startsWith(github.event.issue.title, '[repository-bundle]')
+      )
     name: create repository bundle
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
 
