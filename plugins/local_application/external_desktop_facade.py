@@ -9,8 +9,8 @@ from plugins.desktop_research import (
     DesktopResearchAttemptRecorder,
     DesktopResearchCaptureService,
     DesktopResearchExternalAdapter,
-    reconstruct_attempts,
 )
+from plugins.desktop_research.attempts import reconstruct_attempts
 from plugins.desktop_research.capture import DesktopResearchCaptureError
 from plugins.local_execution_store import (
     LocalExecutionStoreError,
