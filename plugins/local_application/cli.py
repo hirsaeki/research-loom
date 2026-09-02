@@ -136,6 +136,10 @@ def build_parser() -> argparse.ArgumentParser:
     _add_workspace(run_show)
     run_show.add_argument("--run-id", required=True)
     _add_output_json(run_show)
+    run_replay = run_sub.add_parser("replay")
+    _add_workspace(run_replay)
+    run_replay.add_argument("--run-id", required=True)
+    _add_output_json(run_replay)
 
     exhibit = sub.add_parser("exhibit")
     exhibit_sub = exhibit.add_subparsers(dest="exhibit_command", required=True)
@@ -280,6 +284,8 @@ def _run(args: argparse.Namespace) -> Mapping[str, Any]:
             return facade.list_actions()
         if args.command == "run" and args.run_command == "show":
             return facade.show_run(args.run_id)
+        if args.command == "run" and args.run_command == "replay":
+            return facade.replay_completed_desktop_research_run(args.run_id)
         if args.command == "exhibit":
             if args.exhibit_command == "capture":
                 return facade.capture_exhibit(_read_input(args.json_input))

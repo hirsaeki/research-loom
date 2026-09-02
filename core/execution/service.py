@@ -324,6 +324,11 @@ class CapabilityExecutionService:
                     ExecutionFailureCode.INVOCATION_INVALID,
                     "retry must use a new Run ID",
                 )
+            if parent.project_ref != str(invocation["project_id"]):
+                raise CapabilityExecutionError(
+                    ExecutionFailureCode.INVOCATION_INVALID,
+                    "retry parent must belong to the same project",
+                )
             if (
                 parent.capability_id,
                 parent.capability_version,

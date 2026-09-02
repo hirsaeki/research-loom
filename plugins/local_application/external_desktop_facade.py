@@ -9,6 +9,7 @@ from plugins.desktop_research import (
     DesktopResearchAttemptRecorder,
     DesktopResearchCaptureService,
     DesktopResearchExternalAdapter,
+    reconstruct_attempts,
 )
 from plugins.desktop_research.capture import DesktopResearchCaptureError
 from plugins.local_execution_store import (
@@ -143,6 +144,91 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                     "APPLICATION-EXTERNAL-FILE-001",
                     "workspace could not be bound as the controlled intake root",
                 ) from exc
+
+
+    def replay_completed_desktop_research_run(self, run_id: str) -> Mapping[str, Any]:
+        if not isinstance(run_id, str) or not run_id:
+            raise LocalApplicationError("APPLICATION-RUN-REPLAY-001", "run_id is required")
+        parent = self._application.execution_store.load_run(run_id)
+        if parent is None or parent.project_ref != self._project_id:
+            raise LocalApplicationError(
+                "APPLICATION-RUN-REPLAY-001",
+                "replay parent Run does not resolve in this project",
+            )
+        if (
+            parent.capability_id != "desktop-research"
+            or parent.function_id != "investigate"
+            or parent.execution_mode != "real"
+        ):
+            raise LocalApplicationError(
+                "APPLICATION-RUN-REPLAY-001",
+                "run replay currently supports external Desktop Research investigate Runs only",
+            )
+        if parent.status is not RunStatus.COMPLETED:
+            raise LocalApplicationError(
+                "APPLICATION-RUN-REPLAY-001",
+                "replay parent Run must be COMPLETED",
+            )
+        attempts = reconstruct_attempts(self._application.operational_store, run_id)
+        unresolved = [
+            deepcopy(item)
+            for item in attempts.values()
+            if item.get("completed_at") is None
+        ]
+        if not unresolved:
+            raise LocalApplicationError(
+                "APPLICATION-RUN-REPLAY-001",
+                "completed Run has no unresolved retrieval attempts to replay",
+            )
+        correlation = self._application.conversation_store.load_run_correlation(run_id)
+        if correlation is None:
+            raise LocalApplicationError(
+                "APPLICATION-RUN-REPLAY-001",
+                "replay parent Run is not correlated to a public conversation action",
+            )
+        proposal = self._application.conversation_store.load_proposal(
+            str(correlation["proposal_id"])
+        )
+        if proposal is None or proposal.get("action", {}).get("action_type") != "desktop_research.investigate":
+            raise LocalApplicationError(
+                "APPLICATION-RUN-REPLAY-001",
+                "replay parent action is unavailable or unsupported",
+            )
+        payload = deepcopy(dict(proposal["action"]["payload"]))
+        payload["parent_run_id"] = run_id
+        replay = self.submit_action({
+            "action_type": "desktop_research.investigate",
+            "payload": payload,
+            "rationale": f"Replay unresolved retrieval work from completed Run {run_id}.",
+        })
+        child_run_id = replay.get("run_id")
+        if not isinstance(child_run_id, str) or not child_run_id:
+            raise LocalApplicationError(
+                "APPLICATION-RUN-REPLAY-001",
+                "replay did not prepare a related child Run",
+            )
+        carried = []
+        for attempt in unresolved:
+            provenance = deepcopy(dict(attempt.get("provenance") or {}))
+            provenance["replayed_from_run_id"] = run_id
+            provenance["replayed_from_attempt_id"] = str(attempt["attempt_id"])
+            started = self.start_external_retrieval_attempt(child_run_id, {
+                "attempt_id": str(attempt["attempt_id"]),
+                "strategy": str(attempt["strategy"]),
+                "coverage_dimension_ids": list(attempt["coverage_dimension_ids"]),
+                "query_or_target": attempt.get("query_or_target"),
+                "provider_or_tool": attempt.get("provider_or_tool"),
+                "target_locator": attempt.get("target_locator"),
+                "provenance": provenance,
+            })
+            carried.append(started["attempt"])
+        return {
+            "status": "RUN_REPLAY_PREPARED",
+            "parent_run_id": run_id,
+            "run_id": child_run_id,
+            "attempt": self._application.execution_store.load_run(child_run_id).attempt,
+            "carried_unresolved_attempts": carried,
+        }
 
     def start_external_retrieval_attempt(
         self,

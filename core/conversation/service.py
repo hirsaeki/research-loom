@@ -634,6 +634,9 @@ class WorkConversationService:
             "runtime_authorization_evidence": deepcopy(dict(authorization)),
             "trace": {"trace_id": self._ids.new("TRACE-")},
         }
+        parent_run_id = proposal["action"]["payload"].get("parent_run_id")
+        if parent_run_id:
+            invocation["trace"]["parent_run_id"] = str(parent_run_id)
         invocation["invocation_digest"] = canonical_digest(invocation)
         return invocation
 
