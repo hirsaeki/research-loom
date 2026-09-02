@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:research-loom:core:survey-analysis-spec:0.1.0",
+  "title": "research-loom canonical SurveyAnalysisSpec",
+  "description": "Immutable descriptive Survey analysis specification bound to one exact canonical SurveyResponseDataset and one exact Survey Instrument revision.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "object_type", "project_id", "analysis_spec_id",
+    "dataset_ref", "instrument_ref", "analysis_items", "created_at",
+    "content_digest", "registry_digest"
+  ],
+  "properties": {
+    "schema_version": {"const": "0.1.0"},
+    "object_type": {"const": "survey_analysis_spec"},
+    "project_id": {"$ref": "#/$defs/identifier"},
+    "analysis_spec_id": {"$ref": "#/$defs/identifier"},
+    "dataset_ref": {"$ref": "#/$defs/dataset_ref"},
+    "instrument_ref": {"$ref": "#/$defs/instrument_ref"},
+    "analysis_items": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/analysis_item"}
+    },
+    "created_at": {"type": "string", "format": "date-time"},
+    "content_digest": {"$ref": "#/$defs/digest"},
+    "registry_digest": {"$ref": "#/$defs/digest"}
+  },
+  "$defs": {
+    "identifier": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"},
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "semver": {"type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"},
+    "dataset_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "content_digest"],
+      "properties": {
+        "id": {"$ref": "#/$defs/identifier"},
+        "content_digest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "instrument_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "content_digest"],
+      "properties": {
+        "id": {"$ref": "#/$defs/identifier"},
+        "version": {"$ref": "#/$defs/semver"},
+        "content_digest": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "denominator_rule": {
+      "enum": ["all_responses", "asked_responses", "valid_responses"]
+    },
+    "frequency_item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["item_id", "analysis_type", "question_id", "denominator_rule"],
+      "properties": {
+        "item_id": {"$ref": "#/$defs/identifier"},
+        "analysis_type": {"const": "frequency"},
+        "question_id": {"$ref": "#/$defs/identifier"},
+        "denominator_rule": {"$ref": "#/$defs/denominator_rule"}
+      }
+    },
+    "missingness_item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["item_id", "analysis_type", "question_id"],
+      "properties": {
+        "item_id": {"$ref": "#/$defs/identifier"},
+        "analysis_type": {"const": "missingness"},
+        "question_id": {"$ref": "#/$defs/identifier"}
+      }
+    },
+    "scale_summary_item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["item_id", "analysis_type", "question_id", "denominator_rule"],
+      "properties": {
+        "item_id": {"$ref": "#/$defs/identifier"},
+        "analysis_type": {"const": "scale_summary"},
+        "question_id": {"$ref": "#/$defs/identifier"},
+        "denominator_rule": {"$ref": "#/$defs/denominator_rule"}
+      }
+    },
+    "free_text_item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["item_id", "analysis_type", "question_id", "max_rows"],
+      "properties": {
+        "item_id": {"$ref": "#/$defs/identifier"},
+        "analysis_type": {"const": "free_text_listing"},
+        "question_id": {"$ref": "#/$defs/identifier"},
+        "max_rows": {"type": "integer", "minimum": 1, "maximum": 100}
+      }
+    },
+    "cross_tab_item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["item_id", "analysis_type", "row_question_id", "column_question_id"],
+      "properties": {
+        "item_id": {"$ref": "#/$defs/identifier"},
+        "analysis_type": {"const": "cross_tab"},
+        "row_question_id": {"$ref": "#/$defs/identifier"},
+        "column_question_id": {"$ref": "#/$defs/identifier"}
+      }
+    },
+    "analysis_item": {
+      "oneOf": [
+        {"$ref": "#/$defs/frequency_item"},
+        {"$ref": "#/$defs/missingness_item"},
+        {"$ref": "#/$defs/scale_summary_item"},
+        {"$ref": "#/$defs/free_text_item"},
+        {"$ref": "#/$defs/cross_tab_item"}
+      ]
+    }
+  }
+}
