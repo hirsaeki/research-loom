@@ -1,0 +1,36 @@
+name: pr53-review-fix
+
+on:
+  push:
+    branches:
+      - tmp/pr53-review-fix-1
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: ${{ hashFiles('tmp-pr53-review-fix.py') != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: tmp/pr53-review-fix-1
+          fetch-depth: 0
+      - name: Apply review fixes
+        run: python tmp-pr53-review-fix.py
+      - name: Validate patch
+        run: |
+          git diff --check
+          python -m py_compile \
+            plugins/survey_virtual_runner/llm_adapter.py \
+            plugins/local_application/survey_virtual_pretest_inspection.py \
+            tests/runtime/test_survey_llm_lineage_review_fixes.py
+      - name: Commit applied fix
+        run: |
+          rm -f tmp-pr53-review-fix.py .github/workflows/pr53-review-fix.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix(survey): harden virtual respondent lineage validation"
+          git push origin HEAD:tmp/pr53-review-fix-1
