@@ -27,6 +27,7 @@ from .facade import LocalApplicationError
 from .survey_facade import _snapshot
 from .survey_validation import input_object, required_string
 from .virtual_runner_facade import LocalApplicationFacade as VirtualRunnerApplicationFacade
+from .survey_virtual_pretest_inspection import SurveyVirtualPretestInspectionMixin
 
 _STORE_NAME = "survey-analysis-registry.sqlite3"
 _ANALYSIS_SPEC_CAPTURE_FIELDS = {"dataset_id", "dataset_digest", "analysis_items"}
@@ -38,6 +39,7 @@ _AGGREGATE_RUN_FIELDS = {
     "dataset_digest",
 }
 _AGGREGATE_SHOW_FIELDS = {"aggregate_result_id", "limit", "offset"}
+_VIRTUAL_PRETEST_SHOW_FIELDS = {"run_id", "aggregate_result_id"}
 
 _SURVEY_ANALYSIS_ACTIONS = (
     (
@@ -59,6 +61,11 @@ _SURVEY_ANALYSIS_ACTIONS = (
         "survey_aggregate.show",
         "survey-aggregate-show@0.1.0",
         "show_result",
+    ),
+    (
+        "survey_virtual_pretest.show",
+        "survey-virtual-pretest-show@0.1.0",
+        "show_virtual_pretest",
     ),
 )
 _ACTION_REGISTRATION_LOCK = RLock()
@@ -100,6 +107,13 @@ def _aggregate_run_payload(payload: Mapping[str, Any]) -> None:
         _nonempty_string(payload, field)
 
 
+def _virtual_pretest_show_payload(payload: Mapping[str, Any]) -> None:
+    _payload_fields(payload, _VIRTUAL_PRETEST_SHOW_FIELDS, "Survey Virtual pretest show")
+    _nonempty_string(payload, "run_id")
+    if "aggregate_result_id" in payload:
+        _nonempty_string(payload, "aggregate_result_id")
+
+
 def _aggregate_show_payload(payload: Mapping[str, Any]) -> None:
     _payload_fields(payload, _AGGREGATE_SHOW_FIELDS, "Survey aggregate show")
     _nonempty_string(payload, "aggregate_result_id")
@@ -114,6 +128,7 @@ _ACTION_VALIDATORS = {
     "survey_analysis_spec.show": _analysis_spec_show_payload,
     "survey_aggregate.run": _aggregate_run_payload,
     "survey_aggregate.show": _aggregate_show_payload,
+    "survey_virtual_pretest.show": _virtual_pretest_show_payload,
 }
 
 
@@ -140,6 +155,11 @@ class _SurveyAnalysisActionHandler:
                 limit=payload.get("limit", 25),
                 offset=payload.get("offset", 0),
             )
+        elif self._operation == "show_virtual_pretest":
+            result = facade.show_survey_virtual_pretest(
+                _nonempty_string(payload, "run_id"),
+                aggregate_result_id=payload.get("aggregate_result_id"),
+            )
         else:  # pragma: no cover - registration is closed above.
             raise ConversationRuntimeError(
                 "CONV-ROUTE-001",
@@ -159,7 +179,7 @@ class _SurveyAnalysisActionHandler:
         )
 
 
-class LocalApplicationFacade(VirtualRunnerApplicationFacade):
+class LocalApplicationFacade(SurveyVirtualPretestInspectionMixin, VirtualRunnerApplicationFacade):
     """Final production facade including shared Survey aggregation and inspection."""
 
     def _survey_analysis_store(self) -> LocalSurveyAnalysisStore:

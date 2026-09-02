@@ -148,3 +148,7 @@ PR42 does not implement:
 - UI
 
 Those can consume this boundary later without changing producer-specific response semantics.
+
+### Producer lineage extension
+
+Provider-specific response production metadata belongs in raw response `provenance`, which canonical normalization projects into `SurveyResponse.source_provenance.producer`. LLM Virtual Respondent Runs use this existing extension point for the exact synthetic profile ID/digest, source Run, generation-attempt ref, and parsed-answer digest. These fields are response-level provenance; they are not question-answer semantics. Future REAL producers can use the same producer-provenance boundary without adding LLM-specific answer fields.
