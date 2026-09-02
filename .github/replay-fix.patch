@@ -1,0 +1,312 @@
+diff --git a/core/conversation/service.py b/core/conversation/service.py
+index c92023e..ccca446 100644
+--- a/core/conversation/service.py
++++ b/core/conversation/service.py
+@@ -634,6 +634,9 @@ class WorkConversationService:
+             "runtime_authorization_evidence": deepcopy(dict(authorization)),
+             "trace": {"trace_id": self._ids.new("TRACE-")},
+         }
++        parent_run_id = proposal["action"]["payload"].get("parent_run_id")
++        if parent_run_id:
++            invocation["trace"]["parent_run_id"] = str(parent_run_id)
+         invocation["invocation_digest"] = canonical_digest(invocation)
+         return invocation
+ 
+diff --git a/core/execution/service.py b/core/execution/service.py
+index f222067..df4fd1c 100644
+--- a/core/execution/service.py
++++ b/core/execution/service.py
+@@ -324,6 +324,11 @@ class CapabilityExecutionService:
+                     ExecutionFailureCode.INVOCATION_INVALID,
+                     "retry must use a new Run ID",
+                 )
++            if parent.project_ref != str(invocation["project_id"]):
++                raise CapabilityExecutionError(
++                    ExecutionFailureCode.INVOCATION_INVALID,
++                    "retry parent must belong to the same project",
++                )
+             if (
+                 parent.capability_id,
+                 parent.capability_version,
+diff --git a/docs/architecture/production-local-workspace-application-cli.md b/docs/architecture/production-local-workspace-application-cli.md
+index 94c3611..18609dd 100644
+--- a/docs/architecture/production-local-workspace-application-cli.md
++++ b/docs/architecture/production-local-workspace-application-cli.md
+@@ -129,6 +129,7 @@ PR36 adds:
+ 
+ ```text
+ research-loom run show --workspace PATH --run-id RUN-ID --json
++research-loom run replay --workspace PATH --run-id RUN-ID --json
+ ```
+ 
+ for one explicitly named Run. The Application Facade validates that the Run exists and belongs to the opened project, then projects only persisted Run-bound information:
+@@ -147,6 +148,8 @@ Diagnostics, artifacts, retrieval attempts, and operational terminations are cap
+ 
+ `run show` deliberately does **not** call `diagnose_integrity()`. Ordinary inspection asks what happened and what was persisted. Store integrity diagnosis asks whether persisted storage is internally corrupt and may re-hash artifact bytes. Those responsibilities stay separate; `run diagnose` / `doctor --run-id` are not introduced by PR36.
+ 
++`run replay` is a bounded recovery path for a historical `COMPLETED` external Desktop Research Run that still has unresolved retrieval attempts. It never mutates the parent Run, its artifacts, attempts, Handoff, or Research State. Instead it re-materializes the original public `desktop_research.investigate` action against current authoritative Research State, prepares a new child Run through the existing `parent_run_id` retry contract, and carries only unresolved retrieval attempts into that child as new in-progress attempt records. Already captured sources are not copied or silently re-acquired. The child Run exposes `parent_run_id` and incremented `attempt` through the normal `run show` surface. If the original action can no longer be re-materialized against current Research State, replay fails closed rather than rebasing historical provenance silently.
++
+ Unknown Runs, cross-project Runs, corrupt persisted inspection data, and unexpected store read failures fail closed with application-level errors rather than leaking SQLite schema/table details.
+ 
+ ## Research Exhibit capture and retrieval
+diff --git a/docs/architecture/research-lineage-fork-recovery.md b/docs/architecture/research-lineage-fork-recovery.md
+index fb297a1..f302db2 100644
+--- a/docs/architecture/research-lineage-fork-recovery.md
++++ b/docs/architecture/research-lineage-fork-recovery.md
+@@ -13,3 +13,5 @@ Fork creation and active-lineage selection are separate state-changing operation
+ PR18 downstream artifacts are immutable historical products. A companion Research Package lineage binding pins the exact package digest, source Lineage digest, and source Snapshot digest so packages can be classified as current, stale, non-current, or rebuild-required after an active-lineage switch.
+ 
+ PR17 remains the only VIRTUAL→REAL cutover boundary. Fork semantics permit only REAL→REAL or VIRTUAL→VIRTUAL lineage ancestry and cannot promote synthetic research content into empirical state.
++
++Production-local Run replay is deliberately narrower than Research State recovery. A completed external Desktop Research Run with unresolved retrieval work may be replayed as a new child Run using the existing execution `parent_run_id` contract. The parent Run and its persisted provenance remain immutable; only unresolved attempts are carried forward, while the action is re-materialized against current authoritative Research State. If that current binding cannot be satisfied, the operation fails closed. Research lineage fork/recovery remains the mechanism for changing Research State ancestry; Run replay does not adopt candidate results or switch lineages.
+diff --git a/plugins/local_application/application.py b/plugins/local_application/application.py
+index e0cb742..ecfd90a 100644
+--- a/plugins/local_application/application.py
++++ b/plugins/local_application/application.py
+@@ -702,11 +702,22 @@ def _attention_activate_payload(payload: Mapping[str, Any]) -> None:
+ 
+ 
+ def _desktop_payload(payload: Mapping[str, Any]) -> None:
+-    allowed = {"question_id", "purpose", "resource_reference_ids", "coverage_dimensions", "desktop_policy"}
++    allowed = {
++        "question_id",
++        "purpose",
++        "resource_reference_ids",
++        "coverage_dimensions",
++        "desktop_policy",
++        "parent_run_id",
++    }
+     if set(payload) - allowed or not isinstance(payload.get("question_id"), str) or not payload["question_id"]:
+         raise ValueError("desktop_research.investigate payload is invalid")
+     if "resource_reference_ids" in payload and not isinstance(payload["resource_reference_ids"], list):
+         raise ValueError("resource_reference_ids must be pre-registered IDs")
++    if "parent_run_id" in payload and (
++        not isinstance(payload["parent_run_id"], str) or not payload["parent_run_id"].strip()
++    ):
++        raise ValueError("parent_run_id must be a non-empty Run ID")
+ 
+ 
+ def _abort_payload(payload: Mapping[str, Any]) -> None:
+diff --git a/plugins/local_application/cli.py b/plugins/local_application/cli.py
+index 07317ee..92f2230 100644
+--- a/plugins/local_application/cli.py
++++ b/plugins/local_application/cli.py
+@@ -136,6 +136,10 @@ def build_parser() -> argparse.ArgumentParser:
+     _add_workspace(run_show)
+     run_show.add_argument("--run-id", required=True)
+     _add_output_json(run_show)
++    run_replay = run_sub.add_parser("replay")
++    _add_workspace(run_replay)
++    run_replay.add_argument("--run-id", required=True)
++    _add_output_json(run_replay)
+ 
+     exhibit = sub.add_parser("exhibit")
+     exhibit_sub = exhibit.add_subparsers(dest="exhibit_command", required=True)
+@@ -280,6 +284,8 @@ def _run(args: argparse.Namespace) -> Mapping[str, Any]:
+             return facade.list_actions()
+         if args.command == "run" and args.run_command == "show":
+             return facade.show_run(args.run_id)
++        if args.command == "run" and args.run_command == "replay":
++            return facade.replay_completed_desktop_research_run(args.run_id)
+         if args.command == "exhibit":
+             if args.exhibit_command == "capture":
+                 return facade.capture_exhibit(_read_input(args.json_input))
+diff --git a/plugins/local_application/external_desktop_facade.py b/plugins/local_application/external_desktop_facade.py
+index 96fe38b..3003d5a 100644
+--- a/plugins/local_application/external_desktop_facade.py
++++ b/plugins/local_application/external_desktop_facade.py
+@@ -9,6 +9,7 @@ from plugins.desktop_research import (
+     DesktopResearchAttemptRecorder,
+     DesktopResearchCaptureService,
+     DesktopResearchExternalAdapter,
++    reconstruct_attempts,
+ )
+ from plugins.desktop_research.capture import DesktopResearchCaptureError
+ from plugins.local_execution_store import (
+@@ -144,6 +145,91 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
+                     "workspace could not be bound as the controlled intake root",
+                 ) from exc
+ 
++
++    def replay_completed_desktop_research_run(self, run_id: str) -> Mapping[str, Any]:
++        if not isinstance(run_id, str) or not run_id:
++            raise LocalApplicationError("APPLICATION-RUN-REPLAY-001", "run_id is required")
++        parent = self._application.execution_store.load_run(run_id)
++        if parent is None or parent.project_ref != self._project_id:
++            raise LocalApplicationError(
++                "APPLICATION-RUN-REPLAY-001",
++                "replay parent Run does not resolve in this project",
++            )
++        if (
++            parent.capability_id != "desktop-research"
++            or parent.function_id != "investigate"
++            or parent.execution_mode != "real"
++        ):
++            raise LocalApplicationError(
++                "APPLICATION-RUN-REPLAY-001",
++                "run replay currently supports external Desktop Research investigate Runs only",
++            )
++        if parent.status is not RunStatus.COMPLETED:
++            raise LocalApplicationError(
++                "APPLICATION-RUN-REPLAY-001",
++                "replay parent Run must be COMPLETED",
++            )
++        attempts = reconstruct_attempts(self._application.operational_store, run_id)
++        unresolved = [
++            deepcopy(item)
++            for item in attempts.values()
++            if item.get("completed_at") is None
++        ]
++        if not unresolved:
++            raise LocalApplicationError(
++                "APPLICATION-RUN-REPLAY-001",
++                "completed Run has no unresolved retrieval attempts to replay",
++            )
++        correlation = self._application.conversation_store.load_run_correlation(run_id)
++        if correlation is None:
++            raise LocalApplicationError(
++                "APPLICATION-RUN-REPLAY-001",
++                "replay parent Run is not correlated to a public conversation action",
++            )
++        proposal = self._application.conversation_store.load_proposal(
++            str(correlation["proposal_id"])
++        )
++        if proposal is None or proposal.get("action", {}).get("action_type") != "desktop_research.investigate":
++            raise LocalApplicationError(
++                "APPLICATION-RUN-REPLAY-001",
++                "replay parent action is unavailable or unsupported",
++            )
++        payload = deepcopy(dict(proposal["action"]["payload"]))
++        payload["parent_run_id"] = run_id
++        replay = self.submit_action({
++            "action_type": "desktop_research.investigate",
++            "payload": payload,
++            "rationale": f"Replay unresolved retrieval work from completed Run {run_id}.",
++        })
++        child_run_id = replay.get("run_id")
++        if not isinstance(child_run_id, str) or not child_run_id:
++            raise LocalApplicationError(
++                "APPLICATION-RUN-REPLAY-001",
++                "replay did not prepare a related child Run",
++            )
++        carried = []
++        for attempt in unresolved:
++            provenance = deepcopy(dict(attempt.get("provenance") or {}))
++            provenance["replayed_from_run_id"] = run_id
++            provenance["replayed_from_attempt_id"] = str(attempt["attempt_id"])
++            started = self.start_external_retrieval_attempt(child_run_id, {
++                "attempt_id": str(attempt["attempt_id"]),
++                "strategy": str(attempt["strategy"]),
++                "coverage_dimension_ids": list(attempt["coverage_dimension_ids"]),
++                "query_or_target": attempt.get("query_or_target"),
++                "provider_or_tool": attempt.get("provider_or_tool"),
++                "target_locator": attempt.get("target_locator"),
++                "provenance": provenance,
++            })
++            carried.append(started["attempt"])
++        return {
++            "status": "RUN_REPLAY_PREPARED",
++            "parent_run_id": run_id,
++            "run_id": child_run_id,
++            "attempt": self._application.execution_store.load_run(child_run_id).attempt,
++            "carried_unresolved_attempts": carried,
++        }
++
+     def start_external_retrieval_attempt(
+         self,
+         run_id: str,
+--- a/tests/runtime/test_external_desktop_research_attempt_lifecycle.py
++++ b/tests/runtime/test_external_desktop_research_attempt_lifecycle.py
+@@ -13,6 +13,7 @@
+     LocalApplicationFacade,
+     LocalResearchApplication,
+ )
++from plugins.local_application.facade import LocalApplicationFacade as PreAttemptGuardFacade
+ from test_external_desktop_research_intake import (
+     ExternalDesktopResearchIntakeTests,
+     NullResolver,
+@@ -167,6 +168,84 @@
+             finally:
+                 inspect_facade.close()
+ 
++    def test_replay_completed_historical_run_carries_only_unresolved_attempts(self):
++        helper = ExternalDesktopResearchIntakeTests(methodName="runTest")
++        with tempfile.TemporaryDirectory() as temp:
++            root = Path(temp)
++            app, facade = helper.make_facade(root)
++            try:
++                run_id = helper.prepare(facade)["run_id"]
++                helper.write_capture_files(root)
++                capture = facade.capture_external_source(run_id, {
++                    "capture_id": "CAP-1",
++                    "source_category": "other",
++                    "exact_locator": "https://example.test/source-a#section-1",
++                    "acquired_at": "2026-08-31T00:00:00Z",
++                    "original_file": "captures/raw/source-a.html",
++                    "original_media_type": "text/html",
++                    "text_rendition_file": "captures/text/source-a.txt",
++                    "provenance": {},
++                })["capture"]
++                facade.start_external_retrieval_attempt(run_id, {
++                    "attempt_id": "ATT-DONE",
++                    "strategy": "support search",
++                    "coverage_dimension_ids": ["COV-SUPPORT"],
++                })
++                facade.complete_external_retrieval_attempt(run_id, {
++                    "attempt_id": "ATT-DONE",
++                    "outcome": "source_captured",
++                    "target_locator": "https://example.test/source-a#section-1",
++                    "resulting_capture_id": "CAP-1",
++                })
++                facade.start_external_retrieval_attempt(run_id, {
++                    "attempt_id": "ATT-OPEN",
++                    "strategy": "counter search",
++                    "coverage_dimension_ids": ["COV-COUNTER"],
++                    "query_or_target": "missing counter source",
++                })
++                handoff, extension = golden_submission(app, run_id, capture)
++
++                # Simulate a historical pre-guard Run without rewriting its provenance.
++                historical = PreAttemptGuardFacade.collect_external(
++                    facade,
++                    run_id,
++                    {"handoff": handoff, "extension": extension},
++                )
++                self.assertEqual(historical["status"], "CAPABILITY_RESULT_COLLECTED")
++                self.assertEqual(app.execution_store.load_run(run_id).status.value, "COMPLETED")
++
++                replay = facade.replay_completed_desktop_research_run(run_id)
++                child_run_id = replay["run_id"]
++                child = app.execution_store.load_run(child_run_id)
++                self.assertEqual(replay["status"], "RUN_REPLAY_PREPARED")
++                self.assertEqual(child.parent_run_id, run_id)
++                self.assertEqual(child.attempt, 2)
++                self.assertEqual(child.status.value, "RUNNING")
++
++                original_attempts = reconstruct_attempts(app.operational_store, run_id)
++                child_attempts = reconstruct_attempts(app.operational_store, child_run_id)
++                self.assertEqual(set(original_attempts), {"ATT-DONE", "ATT-OPEN"})
++                self.assertEqual(set(child_attempts), {"ATT-OPEN"})
++                self.assertIsNone(child_attempts["ATT-OPEN"]["completed_at"])
++                self.assertEqual(
++                    child_attempts["ATT-OPEN"]["provenance"]["replayed_from_run_id"],
++                    run_id,
++                )
++                self.assertEqual(
++                    child_attempts["ATT-OPEN"]["provenance"]["replayed_from_attempt_id"],
++                    "ATT-OPEN",
++                )
++
++                shown = facade.show_run(child_run_id)
++                self.assertEqual(shown["run"]["parent_run_id"], run_id)
++                self.assertEqual(
++                    shown["desktop_research"]["retrieval_attempt_summary"]["in_progress"],
++                    1,
++                )
++            finally:
++                app.close()
++
++
+ 
+ if __name__ == "__main__":
+     unittest.main()

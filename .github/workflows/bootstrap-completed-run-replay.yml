@@ -1,0 +1,35 @@
+name: bootstrap completed Run replay patch
+
+on:
+  push:
+    branches:
+      - fix/completed-run-replay
+
+permissions:
+  contents: write
+
+jobs:
+  apply-patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/completed-run-replay
+          fetch-depth: 0
+      - name: Apply validated Sandbox patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! -f .github/replay-fix.patch ]]; then
+            echo "Patch already consumed."
+            exit 0
+          fi
+          git apply --check .github/replay-fix.patch
+          git apply .github/replay-fix.patch
+          rm .github/replay-fix.patch
+          git diff --check
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m "Add completed Desktop Research Run replay"
+          git push origin HEAD:fix/completed-run-replay
