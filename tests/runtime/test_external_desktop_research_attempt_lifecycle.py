@@ -46,7 +46,7 @@ class ExternalDesktopResearchAttemptLifecycleTests(unittest.TestCase):
                 })
                 self.assertEqual(completed["attempt"]["outcome"], "no_relevant_source")
             finally:
-                facade.close()
+                app.close()
 
     def test_collect_serializes_attempt_start_through_completed_transition(self):
         helper = ExternalDesktopResearchIntakeTests(methodName="runTest")
@@ -88,7 +88,7 @@ class ExternalDesktopResearchAttemptLifecycleTests(unittest.TestCase):
                 })
                 handoff, extension = golden_submission(setup_app, run_id, capture)
             finally:
-                setup_facade.close()
+                setup_app.close()
 
             entered_check = Event()
             release_check = Event()
@@ -100,7 +100,7 @@ class ExternalDesktopResearchAttemptLifecycleTests(unittest.TestCase):
                     resolver=NullResolver(),
                     effective_profile_set_provider=profile_provider,
                 )
-                return LocalApplicationFacade(app, "PRJ-1", workspace_root=root)
+                return LocalApplicationFacade(app, "PRJ-1", workspace_root=root, owns_application=True)
 
             def collect_in_worker():
                 facade = open_facade()
