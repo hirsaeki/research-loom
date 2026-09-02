@@ -362,15 +362,11 @@ def _payload(payload: Mapping[str, Any]) -> dict[str, Any]:
     purpose = payload.get("purpose")
     if purpose is not None:
         _nonempty(purpose, "purpose")
-    return {
+    normalized = {
         **deepcopy(dict(payload)),
         "protocol": deepcopy(dict(protocol)),
         "population_size": population_size,
         "generator_backend": generator_backend,
-        "respondent_profiles": normalized_profiles,
-        "llm_backend": normalized_llm,
-        "analysis_items": deepcopy(analysis_items),
-        "minimum_valid_response_count": minimum_valid,
         "readiness_policy": {
             "require_standard": bool(policy["require_standard"]),
             "require_stress": bool(policy["require_stress"]),
@@ -380,3 +376,17 @@ def _payload(payload: Mapping[str, Any]) -> dict[str, Any]:
         "stress_faults": faults,
         "synthetic_population": normalized_synth,
     }
+    if generator_backend == "llm":
+        normalized.update({
+            "respondent_profiles": normalized_profiles,
+            "llm_backend": normalized_llm,
+            "analysis_items": deepcopy(analysis_items),
+            "minimum_valid_response_count": minimum_valid,
+        })
+    else:
+        for field in (
+            "respondent_profiles", "llm_backend", "analysis_items",
+            "minimum_valid_response_count",
+        ):
+            normalized.pop(field, None)
+    return normalized

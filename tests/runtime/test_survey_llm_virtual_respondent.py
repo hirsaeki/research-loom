@@ -23,7 +23,7 @@ PROFILES = [
 
 ANSWERS = {
     "SYN-PROFILE-MANAGER-A": {
-        "role": "manager", "usefulness": 4, "count": {"state": "unknown"}, "notes": "synthetic manager note",
+        "role": "manager", "usefulness": 4, "count": 3, "notes": "synthetic manager note",
         "approval": "yes", "actions": ["assist", "recommend"], "segment": "east", "readiness": "ready",
     },
     "SYN-PROFILE-MANAGER-B": {
@@ -31,7 +31,7 @@ ANSWERS = {
         "approval": "no", "actions": ["assist", "execute"], "segment": "west", "readiness": {"state": "unknown"},
     },
     "SYN-PROFILE-CONTRIB-A": {
-        "role": "contributor", "count": {"state": "not_applicable"}, "notes": "synthetic contributor note",
+        "role": "contributor", "notes": "synthetic contributor note",
         "actions": ["recommend"], "segment": "east", "readiness": {"state": "not_applicable"},
     },
     "SYN-PROFILE-MANAGER-C": {
