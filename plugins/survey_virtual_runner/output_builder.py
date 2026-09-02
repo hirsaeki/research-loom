@@ -37,12 +37,17 @@ def build_output(
     readiness: Mapping[str, Any],
     provenance: Mapping[str, Any],
     pins: Mapping[str, Any],
+    implementation_id: str = IMPLEMENTATION_ID,
+    implementation_version: str = IMPLEMENTATION_VERSION,
+    generation_attempts: Sequence[Mapping[str, Any]] = (),
+    respondent_profiles: Sequence[Mapping[str, Any]] = (),
 ) -> CapabilityExecutionOutput:
     run_id = str(request.run.run_id)
     artifact_provenance = {
         "evidence_status": "SYNTHETIC_TEST_ONLY",
         "scenario_class": str(extension["scenario_class"]),
         "instrument_digest": str(extension["instrument_ref"]["content_digest"]),
+        "generator_backend": str(extension.get("generator_backend", "structural")),
     }
     response_batch = {
         "schema_version": "0.1.0",
@@ -80,6 +85,22 @@ def build_output(
         value=readiness,
         provenance=artifact_provenance,
     )
+
+    generation_artifact = None
+    if generation_attempts or respondent_profiles:
+        generation_artifact = _artifact(
+            request,
+            role="survey_virtual.generation_report",
+            artifact_id=f"ART-VR-GEN-{run_id}",
+            value={
+                "generator_backend": str(extension.get("generator_backend", "structural")),
+                "respondent_profiles": list(respondent_profiles),
+                "generation_attempts": list(generation_attempts),
+                "prompt_template": deepcopy(extension.get("prompt_template")),
+                "backend_config_digest": extension.get("llm_backend_config_digest"),
+            },
+            provenance=artifact_provenance,
+        )
 
     next_action = {
         "proposal_id": f"VRNEXT-{run_id}",
@@ -133,8 +154,8 @@ def build_output(
         "provenance": {
             "trace_id": str(request.invocation["trace"]["trace_id"]),
             "produced_at": str(provenance["generated_at"]),
-            "implementation_id": IMPLEMENTATION_ID,
-            "implementation_version": IMPLEMENTATION_VERSION,
+            "implementation_id": implementation_id,
+            "implementation_version": implementation_version,
             "input_content_digests": [
                 str(request.run.descriptor_digest),
                 str(request.run.context_pack_digest),
@@ -148,6 +169,14 @@ def build_output(
         },
     }
     handoff["handoff_digest"] = document_digest(handoff, "handoff_digest")
+
+    completion_status = "complete"
+    if extension.get("generator_backend") == "llm":
+        failed_generations = sum(1 for item in generation_attempts if item.get("status") == "failed")
+        if failed_generations == len(respondent_profiles) and respondent_profiles:
+            completion_status = "failed"
+        elif failed_generations or validation.get("issues"):
+            completion_status = "partial"
 
     vr_result = {
         "schema_version": "0.1.0",
@@ -164,7 +193,7 @@ def build_output(
         },
         "scenario_class": str(extension["scenario_class"]),
         "evidence_status": "SYNTHETIC_TEST_ONLY",
-        "completion_status": "complete",
+        "completion_status": completion_status,
         "synthetic_outputs": [{
             "output_id": response_artifact.artifact_id,
             "kind": "raw_data",
@@ -183,7 +212,7 @@ def build_output(
         "readiness_assessment": deepcopy(dict(readiness)),
         "execution_trace": [
             "exact Survey/Research Method pins validated",
-            f"structural synthetic generation ({extension['scenario_class']})",
+            (f"LLM synthetic respondent generation ({extension['scenario_class']})" if extension.get("generator_backend") == "llm" else f"structural synthetic generation ({extension['scenario_class']})"),
             "canonical Survey response validation",
             "defect and preservation classification",
             "candidate pre-REAL readiness assessment",
@@ -205,6 +234,8 @@ def build_output(
         "input_pins": deepcopy(dict(pins)),
         "synthetic_population": deepcopy(dict(extension["synthetic_population"])),
         "generation_provenance": deepcopy(dict(provenance)),
+        "generator_backend": str(extension.get("generator_backend", "structural")),
+        **({"respondent_plan": deepcopy(extension.get("respondent_plan")), "generation_attempts": deepcopy(list(generation_attempts))} if extension.get("generator_backend") == "llm" else {}),
         "validation_failures": deepcopy(list(validation["issues"])),
         "preservation_events": deepcopy(list(validation["preservation_events"])),
         "defects": deepcopy(list(defects)),
@@ -224,14 +255,11 @@ def build_output(
         provenance=artifact_provenance,
     )
 
+    artifacts = [response_artifact, validation_artifact, defect_artifact, readiness_artifact, result_artifact]
+    if generation_artifact is not None:
+        artifacts.append(generation_artifact)
     return CapabilityExecutionOutput(
         handoff=handoff,
         extension=result_extension,
-        artifacts=(
-            response_artifact,
-            validation_artifact,
-            defect_artifact,
-            readiness_artifact,
-            result_artifact,
-        ),
+        artifacts=tuple(artifacts),
     )

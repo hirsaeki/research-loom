@@ -11,6 +11,8 @@ from core.runtime import CapabilityNormalizationBoundary
 from plugins.local_application.facade import LocalApplicationError, _jsonable
 from plugins.local_survey_store import LocalSurveyStoreError
 from plugins.survey_virtual_runner.adapter import StructuralSurveyVirtualRunnerAdapter
+from plugins.survey_virtual_runner.llm_adapter import LlmSurveyVirtualRunnerAdapter
+from plugins.survey_virtual_runner.llm_backend import OpenAIResponsesVirtualRespondentBackend
 from plugins.survey_virtual_runner.contracts import SurveyVirtualRunnerContextValidator
 from plugins.survey_virtual_runner.normalization import SurveyVirtualRunnerNormalizer
 from .virtual_runner_input import _payload
@@ -20,6 +22,10 @@ DESCRIPTOR_PATH = ROOT / "core/packages/virtual-runner/virtual-runner-capability
 
 
 class VirtualRunnerExecuteMixin:
+    def _virtual_respondent_backend(self, payload: Mapping[str, Any]):
+        del payload
+        return OpenAIResponsesVirtualRespondentBackend()
+
     def run_survey_virtual(self, payload: Mapping[str, Any]) -> Mapping[str, Any]:
         payload = _payload(payload)
         state = self._state()
@@ -45,7 +51,14 @@ class VirtualRunnerExecuteMixin:
         context, extension, _method = self._build_context(state, record, design_record, payload, context_pack_id=context_pack_id)
 
         registry = CapabilityRegistry()
-        adapter = StructuralSurveyVirtualRunnerAdapter(execution_store=self._application.execution_store, clock=self._application.clock)
+        if payload.get("generator_backend") == "llm":
+            adapter = LlmSurveyVirtualRunnerAdapter(
+                execution_store=self._application.execution_store,
+                clock=self._application.clock,
+                backend=self._virtual_respondent_backend(payload),
+            )
+        else:
+            adapter = StructuralSurveyVirtualRunnerAdapter(execution_store=self._application.execution_store, clock=self._application.clock)
         registry.register(adapter, descriptor)
         execution = CapabilityExecutionService(
             registry,
@@ -86,7 +99,10 @@ class VirtualRunnerExecuteMixin:
             raise LocalApplicationError("VR-EPISTEMIC-FIREWALL-001", "Virtual Runner execution mutated authoritative Research State")
 
         response_dataset = None
-        if result.run.status.value == "COMPLETED":
+        analysis_spec = None
+        aggregate_result = None
+        completion_ok = result.run.status.value == "COMPLETED"
+        if completion_ok:
             response_dataset = self.capture_virtual_run_response_dataset(
                 run_id,
                 instrument_ref={
@@ -95,15 +111,33 @@ class VirtualRunnerExecuteMixin:
                     "content_digest": questionnaire["content_digest"],
                 },
             )
+            if payload.get("generator_backend") == "llm":
+                minimum_valid = int(payload.get("minimum_valid_response_count", 1))
+                completion_ok = int(response_dataset["accepted_count"]) >= minimum_valid
+                if completion_ok and hasattr(self, "capture_survey_analysis_spec") and hasattr(self, "run_survey_aggregation"):
+                    analysis_spec = self.capture_survey_analysis_spec({
+                        "dataset_id": response_dataset["dataset_id"],
+                        "dataset_digest": response_dataset["content_digest"],
+                        **({"analysis_items": deepcopy(payload["analysis_items"])} if payload.get("analysis_items") is not None else {}),
+                    })
+                    aggregate_result = self.run_survey_aggregation({
+                        "analysis_spec_id": analysis_spec["analysis_spec_id"],
+                        "analysis_spec_digest": analysis_spec["content_digest"],
+                        "dataset_id": response_dataset["dataset_id"],
+                        "dataset_digest": response_dataset["content_digest"],
+                    })
         return {
-            "status": "SUCCEEDED" if result.run.status.value == "COMPLETED" else "ERROR",
+            "status": "SUCCEEDED" if completion_ok else "ERROR",
             "project_id": self._project_id,
             "run_id": run_id,
             "execution_mode": "virtual",
             "scenario_class": payload["scenario_class"],
+            "generator_backend": payload.get("generator_backend", "structural"),
             "instrument_pin": {"id": questionnaire["questionnaire_id"], "version": questionnaire["version"], "content_digest": questionnaire["content_digest"]},
             "execution_result": _jsonable(result),
             "response_dataset": response_dataset,
+            "analysis_spec": analysis_spec,
+            "aggregate_result": aggregate_result,
             "research_state_mutation_performed": False,
             "real_execution_started": False,
         }

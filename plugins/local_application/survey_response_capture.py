@@ -174,7 +174,7 @@ class SurveyResponseCaptureMixin:
             "schema_version": "0.1.0",
             "object_type": "survey_response_dataset",
             "project_id": self._project_id,
-            "dataset_id": self._application.ids.new("SRD-"),
+            "dataset_id": (f"SRD-{source_run_id}" if source_run_id and origin == "synthetic" else self._application.ids.new("SRD-")),
             "instrument_ref": instrument_ref,
             "response_origin": origin,
             "epistemic_status": epistemic,
@@ -324,10 +324,15 @@ class SurveyResponseCaptureMixin:
             "responses": [virtual_record_to_raw(item) for item in batch["responses"]],
             "source_run_id": run_id,
             "source_provenance": {
-                "producer": "survey_virtual_runner@0.1.0",
+                "producer": (
+                    "survey_virtual_runner.llm@1.0.0"
+                    if provenance.get("generator_backend") == "llm"
+                    else "survey_virtual_runner.structural@0.1.0"
+                ),
                 "response_artifact_id": artifact_id,
                 "response_artifact_digest": metadata.digest,
                 "scenario_class": batch.get("scenario_class"),
+                "generator_backend": provenance.get("generator_backend", "structural"),
             },
             "capture_origin": "survey_virtual_runner",
         }
