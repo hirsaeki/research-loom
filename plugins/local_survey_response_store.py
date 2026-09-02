@@ -567,6 +567,49 @@ class LocalSurveyResponseStore:
         finally:
             connection.close()
 
+    def load_responses(
+        self,
+        project_id: str,
+        response_keys: Sequence[tuple[str, str]],
+    ) -> dict[tuple[str, str], dict[str, Any]]:
+        keys = list(dict.fromkeys((str(namespace), str(response_id)) for namespace, response_id in response_keys))
+        if not keys:
+            return {}
+        connection = self._read()
+        if connection is None:
+            return {}
+        try:
+            loaded: dict[tuple[str, str], dict[str, Any]] = {}
+            # Keep well below SQLite's common 999-parameter limit while reusing one connection.
+            chunk_size = 400
+            for start in range(0, len(keys), chunk_size):
+                chunk = keys[start:start + chunk_size]
+                pairs = ",".join("(?,?)" for _ in chunk)
+                parameters: list[str] = [project_id]
+                for identity_namespace, response_id in chunk:
+                    parameters.extend((identity_namespace, response_id))
+                rows = connection.execute(
+                    f"""
+                    SELECT * FROM survey_responses
+                    WHERE project_id=?
+                      AND (identity_namespace,response_id) IN ({pairs})
+                    """,
+                    parameters,
+                ).fetchall()
+                for row in rows:
+                    key = (str(row["identity_namespace"]), str(row["response_id"]))
+                    loaded[key] = self._decode_response(row)
+            return loaded
+        except LocalSurveyResponseStoreError:
+            raise
+        except sqlite3.Error as exc:
+            raise LocalSurveyResponseStoreError(
+                "SURVEY-RESPONSE-STORE-DB-001",
+                "Survey response registry read failed",
+            ) from exc
+        finally:
+            connection.close()
+
     def load_dataset(self, project_id: str, dataset_id: str) -> dict[str, Any] | None:
         connection = self._read()
         if connection is None:

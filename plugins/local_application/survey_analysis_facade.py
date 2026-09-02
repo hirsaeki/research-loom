@@ -296,19 +296,25 @@ class LocalApplicationFacade(VirtualRunnerApplicationFacade):
         accepted: list[dict[str, Any]] = []
         rejected: list[dict[str, Any]] = []
         expected_instrument = dataset["instrument_ref"]
+        response_keys = [
+            (str(ref["identity_namespace"]), str(ref["response_id"]))
+            for field in ("accepted_response_refs", "rejected_response_refs")
+            for ref in dataset[field]
+        ]
+        try:
+            records = self._survey_response_store().load_responses(
+                self._project_id,
+                response_keys,
+            )
+        except LocalSurveyResponseStoreError as exc:
+            raise LocalApplicationError(exc.code, exc.message) from exc
         for field, expected_status, target in (
             ("accepted_response_refs", "accepted", accepted),
             ("rejected_response_refs", "rejected", rejected),
         ):
             for ref in dataset[field]:
-                try:
-                    record = self._survey_response_store().load_response(
-                        self._project_id,
-                        str(ref["response_id"]),
-                        identity_namespace=str(ref["identity_namespace"]),
-                    )
-                except LocalSurveyResponseStoreError as exc:
-                    raise LocalApplicationError(exc.code, exc.message) from exc
+                key = (str(ref["identity_namespace"]), str(ref["response_id"]))
+                record = records.get(key)
                 if record is None:
                     raise LocalApplicationError(
                         "APPLICATION-SURVEY-ANALYSIS-DATASET-001",

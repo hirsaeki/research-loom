@@ -449,7 +449,9 @@ def _free_text_listing(
     dataset_id: str,
 ) -> dict[str, Any]:
     qid = str(item["question_id"])
+    max_rows = int(item["max_rows"])
     rows: list[dict[str, Any]] = []
+    non_empty_count = 0
     for response, answers in zip(responses, answer_maps):
         answer = answers[qid]
         if answer["state"] != "answered":
@@ -459,26 +461,25 @@ def _free_text_listing(
             raise ValueError("accepted free_text answer must contain a string")
         if not text.strip():
             continue
-        rows.append({
-            "question_id": qid,
-            "response_id": str(response["response_id"]),
-            "participant_id": str(response["participant_id"]),
-            "identity_namespace": str(response["identity_namespace"]),
-            "text": text,
-            "response_origin": str(response["response_origin"]),
-        })
-    rows.sort(key=lambda row: (row["identity_namespace"], row["response_id"], row["participant_id"]))
-    max_rows = int(item["max_rows"])
-    returned = rows[:max_rows]
+        non_empty_count += 1
+        if len(rows) < max_rows:
+            rows.append({
+                "question_id": qid,
+                "response_id": str(response["response_id"]),
+                "participant_id": str(response["participant_id"]),
+                "identity_namespace": str(response["identity_namespace"]),
+                "text": text,
+                "response_origin": str(response["response_origin"]),
+            })
     return {
         "item_id": str(item["item_id"]),
         "analysis_type": "free_text_listing",
         "question_id": qid,
         "response_key": stable_response_key(question),
-        "non_empty_count": len(rows),
-        "returned_count": len(returned),
-        "truncated": len(rows) > len(returned),
-        "rows": returned,
+        "non_empty_count": non_empty_count,
+        "returned_count": len(rows),
+        "truncated": non_empty_count > len(rows),
+        "rows": rows,
         "provenance": {
             "analysis_item_id": str(item["item_id"]),
             "dataset_id": dataset_id,
