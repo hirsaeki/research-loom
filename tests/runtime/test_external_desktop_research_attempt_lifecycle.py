@@ -163,6 +163,81 @@ class ExternalDesktopResearchAttemptLifecycleTests(unittest.TestCase):
             finally:
                 inspect_facade.close()
 
+
+    def _completed_historical_run_with_open_attempt(self, root: Path):
+        helper = ExternalDesktopResearchIntakeTests(methodName="runTest")
+        app, facade = helper.make_facade(root)
+        run_id = helper.prepare(facade)["run_id"]
+        helper.write_capture_files(root)
+        capture = facade.capture_external_source(run_id, {
+            "capture_id": "CAP-REPLAY",
+            "source_category": "other",
+            "exact_locator": "https://example.test/replay#source",
+            "acquired_at": "2026-08-31T00:00:00Z",
+            "original_file": "captures/raw/source-a.html",
+            "original_media_type": "text/html",
+            "text_rendition_file": "captures/text/source-a.txt",
+            "provenance": {},
+        })["capture"]
+        facade.start_external_retrieval_attempt(run_id, {
+            "attempt_id": "ATT-OPEN",
+            "strategy": "counter search",
+            "coverage_dimension_ids": ["COV-COUNTER"],
+            "query_or_target": "missing counter source",
+        })
+        handoff, extension = golden_submission(app, run_id, capture)
+        historical = PreAttemptGuardFacade.collect_external(
+            facade,
+            run_id,
+            {"handoff": handoff, "extension": extension},
+        )
+        self.assertEqual(historical["status"], "CAPABILITY_RESULT_COLLECTED")
+        self.assertEqual(app.execution_store.load_run(run_id).status.value, "COMPLETED")
+        return app, facade, run_id
+
+    def test_replay_normalizes_unreadable_attempt_history(self):
+        with tempfile.TemporaryDirectory() as temp:
+            app, facade, run_id = self._completed_historical_run_with_open_attempt(Path(temp))
+            try:
+                with patch(
+                    "plugins.local_application.external_desktop_facade.reconstruct_attempts",
+                    side_effect=ValueError("corrupt attempt history"),
+                ):
+                    with self.assertRaises(LocalApplicationError) as blocked:
+                        facade.replay_completed_desktop_research_run(run_id)
+                self.assertEqual(blocked.exception.code, "APPLICATION-RUN-REPLAY-001")
+                self.assertIn("unreadable retrieval history", str(blocked.exception))
+            finally:
+                app.close()
+
+    def test_replay_aborts_child_when_attempt_carry_forward_fails(self):
+        with tempfile.TemporaryDirectory() as temp:
+            app, facade, run_id = self._completed_historical_run_with_open_attempt(Path(temp))
+            try:
+                with patch.object(
+                    facade,
+                    "start_external_retrieval_attempt",
+                    side_effect=LocalApplicationError(
+                        "APPLICATION-EXTERNAL-ATTEMPT-001",
+                        "synthetic carry failure",
+                    ),
+                ), patch.object(
+                    app.capability_execution_service,
+                    "abort",
+                    wraps=app.capability_execution_service.abort,
+                ) as abort:
+                    with self.assertRaises(LocalApplicationError) as blocked:
+                        facade.replay_completed_desktop_research_run(run_id)
+
+                self.assertEqual(blocked.exception.code, "APPLICATION-RUN-REPLAY-001")
+                abort.assert_called_once()
+                child_run_id = abort.call_args.args[0]
+                child = app.execution_store.load_run(child_run_id)
+                self.assertEqual(child.parent_run_id, run_id)
+                self.assertEqual(child.status.value, "ABORTED")
+            finally:
+                app.close()
+
     def test_replay_completed_historical_run_carries_only_unresolved_attempts(self):
         helper = ExternalDesktopResearchIntakeTests(methodName="runTest")
         with tempfile.TemporaryDirectory() as temp:
