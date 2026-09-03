@@ -70,6 +70,7 @@ def _run_projection(run) -> Mapping[str, Any]:
             if run.failure is not None
             else None
         ),
+        "execution_provenance": _public_provenance(run.provenance),
         "bindings": {
             "invocation_id": run.invocation_id,
             "invocation_digest": run.invocation_digest,
