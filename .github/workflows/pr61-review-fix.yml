@@ -1,0 +1,34 @@
+name: apply PR61 review fixes
+
+on:
+  push:
+    branches:
+      - fix/completed-run-replay
+
+permissions:
+  contents: write
+
+jobs:
+  apply-review-fixes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: fix/completed-run-replay
+          fetch-depth: 0
+      - name: Apply reviewed Sandbox patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git apply --check .github/pr61-review-fixes.patch
+          git apply .github/pr61-review-fixes.patch
+          rm .github/pr61-review-fixes.patch .github/workflows/pr61-review-fix.yml
+          python -m py_compile \
+            plugins/local_application/external_desktop_facade.py \
+            tests/runtime/test_external_desktop_research_attempt_lifecycle.py
+          git diff --check
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m "Address completed Run replay review findings"
+          git push origin HEAD:fix/completed-run-replay
