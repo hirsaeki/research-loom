@@ -13,6 +13,7 @@ from plugins.local_application import (
     LocalApplicationFacade,
     LocalResearchApplication,
 )
+from plugins.local_application.facade import LocalApplicationFacade as PreAttemptGuardFacade
 from test_external_desktop_research_intake import (
     ExternalDesktopResearchIntakeTests,
     NullResolver,
@@ -161,6 +162,159 @@ class ExternalDesktopResearchAttemptLifecycleTests(unittest.TestCase):
                 self.assertTrue(all(item["completed_at"] is not None for item in attempts.values()))
             finally:
                 inspect_facade.close()
+
+
+    def _completed_historical_run_with_open_attempt(self, root: Path):
+        helper = ExternalDesktopResearchIntakeTests(methodName="runTest")
+        app, facade = helper.make_facade(root)
+        run_id = helper.prepare(facade)["run_id"]
+        helper.write_capture_files(root)
+        capture = facade.capture_external_source(run_id, {
+            "capture_id": "CAP-REPLAY",
+            "source_category": "other",
+            "exact_locator": "https://example.test/replay#source",
+            "acquired_at": "2026-08-31T00:00:00Z",
+            "original_file": "captures/raw/source-a.html",
+            "original_media_type": "text/html",
+            "text_rendition_file": "captures/text/source-a.txt",
+            "provenance": {},
+        })["capture"]
+        facade.start_external_retrieval_attempt(run_id, {
+            "attempt_id": "ATT-OPEN",
+            "strategy": "counter search",
+            "coverage_dimension_ids": ["COV-COUNTER"],
+            "query_or_target": "missing counter source",
+        })
+        handoff, extension = golden_submission(app, run_id, capture)
+        historical = PreAttemptGuardFacade.collect_external(
+            facade,
+            run_id,
+            {"handoff": handoff, "extension": extension},
+        )
+        self.assertEqual(historical["status"], "CAPABILITY_RESULT_COLLECTED")
+        self.assertEqual(app.execution_store.load_run(run_id).status.value, "COMPLETED")
+        return app, facade, run_id
+
+    def test_replay_normalizes_unreadable_attempt_history(self):
+        with tempfile.TemporaryDirectory() as temp:
+            app, facade, run_id = self._completed_historical_run_with_open_attempt(Path(temp))
+            try:
+                with patch(
+                    "plugins.local_application.external_desktop_facade.reconstruct_attempts",
+                    side_effect=ValueError("corrupt attempt history"),
+                ):
+                    with self.assertRaises(LocalApplicationError) as blocked:
+                        facade.replay_completed_desktop_research_run(run_id)
+                self.assertEqual(blocked.exception.code, "APPLICATION-RUN-REPLAY-001")
+                self.assertIn("unreadable retrieval history", str(blocked.exception))
+            finally:
+                app.close()
+
+    def test_replay_aborts_child_when_attempt_carry_forward_fails(self):
+        with tempfile.TemporaryDirectory() as temp:
+            app, facade, run_id = self._completed_historical_run_with_open_attempt(Path(temp))
+            try:
+                with patch.object(
+                    facade,
+                    "start_external_retrieval_attempt",
+                    side_effect=LocalApplicationError(
+                        "APPLICATION-EXTERNAL-ATTEMPT-001",
+                        "synthetic carry failure",
+                    ),
+                ), patch.object(
+                    app.capability_execution_service,
+                    "abort",
+                    wraps=app.capability_execution_service.abort,
+                ) as abort:
+                    with self.assertRaises(LocalApplicationError) as blocked:
+                        facade.replay_completed_desktop_research_run(run_id)
+
+                self.assertEqual(blocked.exception.code, "APPLICATION-RUN-REPLAY-001")
+                abort.assert_called_once()
+                child_run_id = abort.call_args.args[0]
+                child = app.execution_store.load_run(child_run_id)
+                self.assertEqual(child.parent_run_id, run_id)
+                self.assertEqual(child.status.value, "ABORTED")
+            finally:
+                app.close()
+
+    def test_replay_completed_historical_run_carries_only_unresolved_attempts(self):
+        helper = ExternalDesktopResearchIntakeTests(methodName="runTest")
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            app, facade = helper.make_facade(root)
+            try:
+                run_id = helper.prepare(facade)["run_id"]
+                helper.write_capture_files(root)
+                capture = facade.capture_external_source(run_id, {
+                    "capture_id": "CAP-1",
+                    "source_category": "other",
+                    "exact_locator": "https://example.test/source-a#section-1",
+                    "acquired_at": "2026-08-31T00:00:00Z",
+                    "original_file": "captures/raw/source-a.html",
+                    "original_media_type": "text/html",
+                    "text_rendition_file": "captures/text/source-a.txt",
+                    "provenance": {},
+                })["capture"]
+                facade.start_external_retrieval_attempt(run_id, {
+                    "attempt_id": "ATT-DONE",
+                    "strategy": "support search",
+                    "coverage_dimension_ids": ["COV-SUPPORT"],
+                })
+                facade.complete_external_retrieval_attempt(run_id, {
+                    "attempt_id": "ATT-DONE",
+                    "outcome": "source_captured",
+                    "target_locator": "https://example.test/source-a#section-1",
+                    "resulting_capture_id": "CAP-1",
+                })
+                facade.start_external_retrieval_attempt(run_id, {
+                    "attempt_id": "ATT-OPEN",
+                    "strategy": "counter search",
+                    "coverage_dimension_ids": ["COV-COUNTER"],
+                    "query_or_target": "missing counter source",
+                })
+                handoff, extension = golden_submission(app, run_id, capture)
+
+                # Simulate a historical pre-guard Run without rewriting its provenance.
+                historical = PreAttemptGuardFacade.collect_external(
+                    facade,
+                    run_id,
+                    {"handoff": handoff, "extension": extension},
+                )
+                self.assertEqual(historical["status"], "CAPABILITY_RESULT_COLLECTED")
+                self.assertEqual(app.execution_store.load_run(run_id).status.value, "COMPLETED")
+
+                replay = facade.replay_completed_desktop_research_run(run_id)
+                child_run_id = replay["run_id"]
+                child = app.execution_store.load_run(child_run_id)
+                self.assertEqual(replay["status"], "RUN_REPLAY_PREPARED")
+                self.assertEqual(child.parent_run_id, run_id)
+                self.assertEqual(child.attempt, 2)
+                self.assertEqual(child.status.value, "RUNNING")
+
+                original_attempts = reconstruct_attempts(app.operational_store, run_id)
+                child_attempts = reconstruct_attempts(app.operational_store, child_run_id)
+                self.assertEqual(set(original_attempts), {"ATT-DONE", "ATT-OPEN"})
+                self.assertEqual(set(child_attempts), {"ATT-OPEN"})
+                self.assertIsNone(child_attempts["ATT-OPEN"]["completed_at"])
+                self.assertEqual(
+                    child_attempts["ATT-OPEN"]["provenance"]["replayed_from_run_id"],
+                    run_id,
+                )
+                self.assertEqual(
+                    child_attempts["ATT-OPEN"]["provenance"]["replayed_from_attempt_id"],
+                    "ATT-OPEN",
+                )
+
+                shown = facade.show_run(child_run_id)
+                self.assertEqual(shown["run"]["parent_run_id"], run_id)
+                self.assertEqual(
+                    shown["desktop_research"]["retrieval_attempt_summary"]["in_progress"],
+                    1,
+                )
+            finally:
+                app.close()
+
 
 
 if __name__ == "__main__":

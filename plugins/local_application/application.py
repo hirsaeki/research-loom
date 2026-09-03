@@ -702,11 +702,22 @@ def _attention_activate_payload(payload: Mapping[str, Any]) -> None:
 
 
 def _desktop_payload(payload: Mapping[str, Any]) -> None:
-    allowed = {"question_id", "purpose", "resource_reference_ids", "coverage_dimensions", "desktop_policy"}
+    allowed = {
+        "question_id",
+        "purpose",
+        "resource_reference_ids",
+        "coverage_dimensions",
+        "desktop_policy",
+        "parent_run_id",
+    }
     if set(payload) - allowed or not isinstance(payload.get("question_id"), str) or not payload["question_id"]:
         raise ValueError("desktop_research.investigate payload is invalid")
     if "resource_reference_ids" in payload and not isinstance(payload["resource_reference_ids"], list):
         raise ValueError("resource_reference_ids must be pre-registered IDs")
+    if "parent_run_id" in payload and (
+        not isinstance(payload["parent_run_id"], str) or not payload["parent_run_id"].strip()
+    ):
+        raise ValueError("parent_run_id must be a non-empty Run ID")
 
 
 def _abort_payload(payload: Mapping[str, Any]) -> None:

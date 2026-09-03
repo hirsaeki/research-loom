@@ -10,7 +10,9 @@ from plugins.desktop_research import (
     DesktopResearchCaptureService,
     DesktopResearchExternalAdapter,
 )
+from plugins.desktop_research.attempts import reconstruct_attempts
 from plugins.desktop_research.capture import DesktopResearchCaptureError
+from plugins.local_conversation_store import LocalConversationStoreError
 from plugins.local_execution_store import (
     LocalExecutionStoreError,
     bind_controlled_import_root,
@@ -143,6 +145,136 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                     "APPLICATION-EXTERNAL-FILE-001",
                     "workspace could not be bound as the controlled intake root",
                 ) from exc
+
+
+    def replay_completed_desktop_research_run(self, run_id: str) -> Mapping[str, Any]:
+        if not isinstance(run_id, str) or not run_id:
+            raise LocalApplicationError("APPLICATION-RUN-REPLAY-001", "run_id is required")
+        try:
+            parent = self._application.execution_store.load_run(run_id)
+        except (KeyError, ValueError, LocalExecutionStoreError) as exc:
+            raise LocalApplicationError(
+                "APPLICATION-RUN-REPLAY-001",
+                "replay parent Run could not be read",
+            ) from exc
+        if parent is None or parent.project_ref != self._project_id:
+            raise LocalApplicationError(
+                "APPLICATION-RUN-REPLAY-001",
+                "replay parent Run does not resolve in this project",
+            )
+        if (
+            parent.capability_id != "desktop-research"
+            or parent.function_id != "investigate"
+            or parent.execution_mode != "real"
+        ):
+            raise LocalApplicationError(
+                "APPLICATION-RUN-REPLAY-001",
+                "run replay currently supports external Desktop Research investigate Runs only",
+            )
+        if parent.status is not RunStatus.COMPLETED:
+            raise LocalApplicationError(
+                "APPLICATION-RUN-REPLAY-001",
+                "replay parent Run must be COMPLETED",
+            )
+        try:
+            attempts = reconstruct_attempts(self._application.operational_store, run_id)
+        except (KeyError, ValueError, LocalExecutionStoreError) as exc:
+            raise LocalApplicationError(
+                "APPLICATION-RUN-REPLAY-001",
+                "replay parent Run has corrupt or unreadable retrieval history",
+            ) from exc
+        unresolved = [
+            deepcopy(item)
+            for item in attempts.values()
+            if item.get("completed_at") is None
+        ]
+        if not unresolved:
+            raise LocalApplicationError(
+                "APPLICATION-RUN-REPLAY-001",
+                "completed Run has no unresolved retrieval attempts to replay",
+            )
+        try:
+            correlation = self._application.conversation_store.load_run_correlation(run_id)
+            proposal = (
+                self._application.conversation_store.load_proposal(
+                    str(correlation["proposal_id"])
+                )
+                if correlation is not None
+                else None
+            )
+        except (KeyError, ValueError, LocalConversationStoreError) as exc:
+            raise LocalApplicationError(
+                "APPLICATION-RUN-REPLAY-001",
+                "replay parent action history could not be read",
+            ) from exc
+        if correlation is None:
+            raise LocalApplicationError(
+                "APPLICATION-RUN-REPLAY-001",
+                "replay parent Run is not correlated to a public conversation action",
+            )
+        if proposal is None or proposal.get("action", {}).get("action_type") != "desktop_research.investigate":
+            raise LocalApplicationError(
+                "APPLICATION-RUN-REPLAY-001",
+                "replay parent action is unavailable or unsupported",
+            )
+        payload = deepcopy(dict(proposal["action"]["payload"]))
+        payload["parent_run_id"] = run_id
+        replay = self.submit_action({
+            "action_type": "desktop_research.investigate",
+            "payload": payload,
+            "rationale": f"Replay unresolved retrieval work from completed Run {run_id}.",
+        })
+        child_run_id = replay.get("run_id")
+        if not isinstance(child_run_id, str) or not child_run_id:
+            raise LocalApplicationError(
+                "APPLICATION-RUN-REPLAY-001",
+                "replay did not prepare a related child Run",
+            )
+        carried = []
+        try:
+            for attempt in unresolved:
+                provenance = deepcopy(dict(attempt.get("provenance") or {}))
+                provenance["replayed_from_run_id"] = run_id
+                provenance["replayed_from_attempt_id"] = str(attempt["attempt_id"])
+                started = self.start_external_retrieval_attempt(child_run_id, {
+                    "attempt_id": str(attempt["attempt_id"]),
+                    "strategy": str(attempt["strategy"]),
+                    "coverage_dimension_ids": list(attempt["coverage_dimension_ids"]),
+                    "query_or_target": attempt.get("query_or_target"),
+                    "provider_or_tool": attempt.get("provider_or_tool"),
+                    "target_locator": attempt.get("target_locator"),
+                    "provenance": provenance,
+                })
+                carried.append(started["attempt"])
+        except Exception as exc:
+            self._application.capability_execution_service.abort(
+                child_run_id,
+                reason="replay attempt transfer failed",
+            )
+            raise LocalApplicationError(
+                "APPLICATION-RUN-REPLAY-001",
+                "replay could not carry unresolved retrieval attempts",
+            ) from exc
+
+        prepared = replay.get("prepared_execution")
+        prepared_run = prepared.get("run") if isinstance(prepared, Mapping) else None
+        child_attempt = prepared_run.get("attempt") if isinstance(prepared_run, Mapping) else None
+        if not isinstance(child_attempt, int):
+            self._application.capability_execution_service.abort(
+                child_run_id,
+                reason="replay result projection was incomplete",
+            )
+            raise LocalApplicationError(
+                "APPLICATION-RUN-REPLAY-001",
+                "replay did not return a complete child Run projection",
+            )
+        return {
+            "status": "RUN_REPLAY_PREPARED",
+            "parent_run_id": run_id,
+            "run_id": child_run_id,
+            "attempt": child_attempt,
+            "carried_unresolved_attempts": carried,
+        }
 
     def start_external_retrieval_attempt(
         self,

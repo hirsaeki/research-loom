@@ -129,6 +129,7 @@ PR36 adds:
 
 ```text
 research-loom run show --workspace PATH --run-id RUN-ID --json
+research-loom run replay --workspace PATH --run-id RUN-ID --json
 ```
 
 for one explicitly named Run. The Application Facade validates that the Run exists and belongs to the opened project, then projects only persisted Run-bound information:
@@ -146,6 +147,8 @@ Artifact bytes, raw Handoff/Invocation/Context payloads, storage locators, files
 Diagnostics, artifacts, retrieval attempts, and operational terminations are capped at 100 returned items and carry explicit `truncated` flags. Lifecycle is already intrinsically bounded by the Run state machine. The command is entirely read-only and does not retry, abort, recover, normalize, adopt, or mutate Research State.
 
 `run show` deliberately does **not** call `diagnose_integrity()`. Ordinary inspection asks what happened and what was persisted. Store integrity diagnosis asks whether persisted storage is internally corrupt and may re-hash artifact bytes. Those responsibilities stay separate; `run diagnose` / `doctor --run-id` are not introduced by PR36.
+
+`run replay` is a bounded recovery path for a historical `COMPLETED` external Desktop Research Run that still has unresolved retrieval attempts. It never mutates the parent Run, its artifacts, attempts, Handoff, or Research State. Instead it re-materializes the original public `desktop_research.investigate` action against current authoritative Research State, prepares a new child Run through the existing `parent_run_id` retry contract, and carries only unresolved retrieval attempts into that child as new in-progress attempt records. Already captured sources are not copied or silently re-acquired. The child Run exposes `parent_run_id` and incremented `attempt` through the normal `run show` surface. If the original action can no longer be re-materialized against current Research State, replay fails closed rather than rebasing historical provenance silently.
 
 Unknown Runs, cross-project Runs, corrupt persisted inspection data, and unexpected store read failures fail closed with application-level errors rather than leaking SQLite schema/table details.
 
