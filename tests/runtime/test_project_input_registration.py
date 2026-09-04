@@ -114,6 +114,42 @@ class ProjectInputRegistrationTests(unittest.TestCase):
                     },
                 })
                 self.assertFalse(keep_current["data"]["question_review"]["material_change"])
+
+                with self.assertRaises(LocalApplicationError) as too_many:
+                    facade.submit_action({
+                        "action_type": "research_question.review",
+                        "payload": {
+                            "operation": "KEEP",
+                            "question_ids": [question_id],
+                            "rationale": "bounded project inputs",
+                            "review_inputs": {"project_input_ids": [f"PIN-{i}" for i in range(65)]},
+                        },
+                    })
+                self.assertEqual(too_many.exception.code, "APPLICATION-PROJECT-INPUT-001")
+            finally:
+                facade.close()
+
+    def test_existing_content_addressed_blob_is_verified(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace = make_workspace(Path(tmp))
+            facade = LocalApplicationFacade.open_workspace(workspace)
+            try:
+                source = workspace / "theme.md"
+                source.write_text("theme", encoding="utf-8")
+                snap = facade.resume_context()["research_state"]["snapshot"]
+                payload = {
+                    "file": str(source),
+                    "role": "theme",
+                    "expected_snapshot_id": snap["snapshot_id"],
+                    "expected_snapshot_digest": snap["content_digest"],
+                }
+                registered = facade.register_project_input(payload)["project_input"]
+                digest_hex = registered["content_digest"].split(":", 1)[1]
+                blob = workspace / ".research-loom" / "project-inputs" / "blobs" / digest_hex[:2] / digest_hex
+                blob.write_bytes(b"corrupt")
+                with self.assertRaises(LocalApplicationError) as corrupted:
+                    facade.register_project_input(payload)
+                self.assertEqual(corrupted.exception.code, "APPLICATION-PROJECT-INPUT-INTEGRITY-001")
             finally:
                 facade.close()
 
@@ -144,6 +180,19 @@ class ProjectInputRegistrationTests(unittest.TestCase):
                         "expected_snapshot_digest": snap["content_digest"],
                     })
                 self.assertEqual(directory.exception.code, "APPLICATION-PROJECT-INPUT-FILE-001")
+
+                oversized = workspace / "oversized.bin"
+                with oversized.open("wb") as stream:
+                    stream.seek(8 * 1024 * 1024)
+                    stream.write(b"x")
+                with self.assertRaises(LocalApplicationError) as size_error:
+                    facade.register_project_input({
+                        "file": str(oversized),
+                        "role": "other",
+                        "expected_snapshot_id": snap["snapshot_id"],
+                        "expected_snapshot_digest": snap["content_digest"],
+                    })
+                self.assertEqual(size_error.exception.code, "APPLICATION-PROJECT-INPUT-FILE-001")
 
                 outside = Path(tmp).parent / "outside-project-input.txt"
                 outside.write_text("x", encoding="utf-8")

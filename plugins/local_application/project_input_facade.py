@@ -5,16 +5,23 @@ from datetime import datetime, timezone
 import hashlib
 import json
 import mimetypes
+import os
 from pathlib import Path
 import sqlite3
+import tempfile
 from typing import Any, Mapping
 
-from plugins.local_execution_store import bind_controlled_import_root, read_controlled_file
+from plugins.local_execution_store import (
+    LocalExecutionStoreError,
+    bind_controlled_import_root,
+    read_controlled_file,
+)
 from .facade import LocalApplicationError
 from .external_attempt_lifecycle_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
 
 _ROLES = {"theme", "expectations", "project_brief", "scope", "methodology", "publication_brief", "other"}
 _MAX_BYTES = 8 * 1024 * 1024
+_MAX_PROJECT_INPUT_IDS = 64
 
 
 def _now() -> str:
@@ -44,7 +51,7 @@ class _ProjectInputRegistry:
                 lineage_ref TEXT NOT NULL,
                 snapshot_id TEXT NOT NULL,
                 snapshot_digest TEXT NOT NULL,
-                UNIQUE(project_id, role, content_digest, snapshot_id, snapshot_digest)
+                UNIQUE(project_id, role, content_digest, lineage_ref, snapshot_id, snapshot_digest)
             )
             """
         )
@@ -57,28 +64,67 @@ class _ProjectInputRegistry:
                  source_path: str, provenance: Mapping[str, Any], lineage_ref: str,
                  snapshot_id: str, snapshot_digest: str) -> dict[str, Any]:
         digest = "sha256:" + hashlib.sha256(content).hexdigest()
-        identity_seed = f"{project_id}\0{role}\0{digest}\0{snapshot_id}\0{snapshot_digest}".encode("utf-8")
+        identity_seed = (
+            f"{project_id}\0{role}\0{digest}\0{lineage_ref}\0{snapshot_id}\0{snapshot_digest}"
+        ).encode("utf-8")
         input_id = "PIN-" + hashlib.sha256(identity_seed).hexdigest()[:24]
         registered_at = _now()
-        row = self.db.execute(
-            "SELECT * FROM project_inputs WHERE project_id=? AND role=? AND content_digest=? AND snapshot_id=? AND snapshot_digest=?",
-            (project_id, role, digest, snapshot_id, snapshot_digest),
-        ).fetchone()
-        if row is None:
-            hex_digest = digest.split(":", 1)[1]
-            target = self.blobs / hex_digest[:2] / hex_digest
-            target.parent.mkdir(parents=True, exist_ok=True)
-            if not target.exists():
-                target.write_bytes(content)
+        self._store_verified_blob(content, digest)
+        binding = (project_id, role, digest, lineage_ref, snapshot_id, snapshot_digest)
+        try:
+            self.db.execute("BEGIN IMMEDIATE")
             self.db.execute(
-                """INSERT INTO project_inputs VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+                """INSERT OR IGNORE INTO project_inputs VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (input_id, project_id, role, media_type, len(content), digest, source_path,
                  json.dumps(dict(provenance), ensure_ascii=False, sort_keys=True, separators=(",", ":")),
                  registered_at, lineage_ref, snapshot_id, snapshot_digest),
             )
+            row = self.db.execute(
+                """SELECT * FROM project_inputs
+                   WHERE project_id=? AND role=? AND content_digest=?
+                     AND lineage_ref=? AND snapshot_id=? AND snapshot_digest=?""",
+                binding,
+            ).fetchone()
+            if row is None:
+                raise sqlite3.IntegrityError("project input registration was not persisted")
             self.db.commit()
-            row = self.db.execute("SELECT * FROM project_inputs WHERE input_id=?", (input_id,)).fetchone()
+        except Exception:
+            if self.db.in_transaction:
+                self.db.rollback()
+            raise
         return self._project(row)
+
+    def _store_verified_blob(self, content: bytes, digest: str) -> None:
+        hex_digest = digest.split(":", 1)[1]
+        target_dir = self.blobs / hex_digest[:2]
+        target_dir.mkdir(parents=True, exist_ok=True)
+        target = target_dir / hex_digest
+        if target.exists():
+            self._verify_blob(target, digest, len(content))
+            return
+        fd, temporary_name = tempfile.mkstemp(prefix="project-input-", dir=self.root)
+        temporary = Path(temporary_name)
+        try:
+            with os.fdopen(fd, "wb") as stream:
+                stream.write(content)
+                stream.flush()
+                os.fsync(stream.fileno())
+            try:
+                os.link(temporary, target)
+            except FileExistsError:
+                self._verify_blob(target, digest, len(content))
+        finally:
+            temporary.unlink(missing_ok=True)
+
+    @staticmethod
+    def _verify_blob(path: Path, expected_digest: str, expected_size: int) -> None:
+        content = path.read_bytes()
+        actual_digest = "sha256:" + hashlib.sha256(content).hexdigest()
+        if len(content) != expected_size or actual_digest != expected_digest:
+            raise LocalApplicationError(
+                "APPLICATION-PROJECT-INPUT-INTEGRITY-001",
+                "content-addressed project-input blob failed digest/size verification",
+            )
 
     def get(self, input_id: str, project_id: str) -> dict[str, Any] | None:
         row = self.db.execute(
@@ -151,7 +197,7 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
             raise LocalApplicationError("APPLICATION-PROJECT-INPUT-STALE-001", "project input registration is not bound to the exact current Snapshot")
         try:
             content = read_controlled_file(self._application.execution_store, path, max_bytes=_MAX_BYTES)
-        except (OSError, PermissionError, ValueError) as exc:
+        except (OSError, PermissionError, ValueError, LocalExecutionStoreError) as exc:
             raise LocalApplicationError("APPLICATION-PROJECT-INPUT-FILE-001", "project input file is not an allowed regular workspace file") from exc
         media_type = value.get("media_type")
         if media_type is None:
@@ -182,6 +228,11 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
             if ids:
                 if not isinstance(ids, list) or any(not isinstance(item, str) for item in ids):
                     raise LocalApplicationError("APPLICATION-PROJECT-INPUT-001", "project_input_ids must be an array of IDs")
+                if len(ids) > _MAX_PROJECT_INPUT_IDS:
+                    raise LocalApplicationError(
+                        "APPLICATION-PROJECT-INPUT-001",
+                        f"project_input_ids must contain at most {_MAX_PROJECT_INPUT_IDS} IDs",
+                    )
                 registry = self._registry()
                 resolved = {item: registry.get(item, self._project_id) for item in ids}
                 missing = [item for item, value in resolved.items() if value is None]
