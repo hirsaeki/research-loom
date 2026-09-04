@@ -270,7 +270,11 @@ def append_question_review_candidates(
     authoritative_ids = {
         str(item.get("id"))
         for item in state.effective_objects()
-        if item.get("kind") == "research_question" and item.get("id")
+        if (
+            item.get("kind") == "research_question"
+            and item.get("id")
+            and item.get("adoption_state") == "approved"
+        )
     }
     rows: list[dict[str, Any]] = []
     for candidate in probe[:candidate_limit]:

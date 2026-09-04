@@ -280,6 +280,31 @@ class ResearchQuestionReviewTests(unittest.TestCase):
                 )
                 self.assertTrue(all(row["bound_to_current_snapshot"] for row in rows.values()))
 
+    def test_closed_question_is_not_reported_as_authoritative_for_stale_review_candidate(self):
+        with tempfile.TemporaryDirectory() as temp:
+            with LocalApplicationFacade.open_workspace(_workspace(Path(temp))) as facade:
+                qid = _adopt_question(facade, "Q1")
+                close = facade.submit_action({
+                    "action_type": "research_question.review",
+                    "payload": {
+                        "operation": "CLOSE",
+                        "question_ids": [qid],
+                        "rationale": "answered",
+                    },
+                    "actor_id": "H",
+                })
+                candidate_id = close["data"]["state_delta_proposal_id"]
+                _apply(facade, candidate_id)
+
+                resumed = facade.resume_context()
+                row = next(
+                    item
+                    for item in resumed["research_questions"]["candidates"]
+                    if item["state_delta_proposal_id"] == candidate_id
+                )
+                self.assertFalse(row["bound_to_current_snapshot"])
+                self.assertEqual(row["authoritative_same_ids"], [])
+
     def test_question_review_payload_is_bounded(self):
         with tempfile.TemporaryDirectory() as temp:
             with LocalApplicationFacade.open_workspace(_workspace(Path(temp))) as facade:
