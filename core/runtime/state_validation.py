@@ -31,9 +31,26 @@ def _validate_reference_integrity(current_state: StateView, reduction: Reduction
 def _validate_core_invariants(current_state: StateView, request: StateTransitionRequest, reduction: ReductionResult) -> list[ValidationIssue]:
     issues: list[ValidationIssue] = []
     effective = _effective_object_map(current_state, reduction.object_revisions)
+    revisions = _object_revision_map(current_state.objects, reduction.object_revisions)
     for obj in effective.values():
         kind = obj.get("kind")
-        if kind == "evidence":
+        if kind == "research_question":
+            for source in obj.get("derived_from_question_revisions", ()) or ():
+                if not isinstance(source, Mapping):
+                    continue
+                key = (
+                    "research_question",
+                    str(source.get("id", "")),
+                    int(source.get("revision", -1)),
+                )
+                if key not in revisions:
+                    issues.append(_issue(
+                        "RT-CORE-PROV-005",
+                        ValidationStage.CORE_INVARIANTS,
+                        "Research Question derivation must resolve to an exact immutable source revision.",
+                        (str(obj.get("id", "")), str(source.get("id", ""))),
+                    ))
+        elif kind == "evidence":
             if not obj.get("source_id") or not obj.get("locator"):
                 issues.append(_issue("RT-CORE-TRACE-001", ValidationStage.CORE_INVARIANTS, "Evidence must retain Source and exact locator.", (str(obj.get("id", "")),)))
         elif kind == "finding" and not obj.get("question_ids"):
@@ -211,8 +228,14 @@ def _references_from_object(obj: Mapping[str, Any]) -> Iterable[tuple[str, str]]
     project_id = obj.get("project_id")
     if project_id:
         yield ("project", str(project_id))
-    if kind == "research_question" and obj.get("parent_question_id"):
-        yield ("research_question", str(obj["parent_question_id"]))
+    if kind == "research_question":
+        if obj.get("parent_question_id"):
+            yield ("research_question", str(obj["parent_question_id"]))
+        if obj.get("question_lineage_id"):
+            yield ("research_question", str(obj["question_lineage_id"]))
+        for ref in obj.get("downstream_review_required_refs", ()) or ():
+            if isinstance(ref, Mapping) and ref.get("kind") and ref.get("id"):
+                yield (str(ref["kind"]), str(ref["id"]))
     elif kind == "claim":
         if obj.get("question_id"):
             yield ("research_question", str(obj["question_id"]))

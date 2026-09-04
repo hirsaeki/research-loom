@@ -89,7 +89,36 @@
             "rationale": {"type": "string"},
             "acceptance_criteria": {"type": "array", "items": {"type": "string"}},
             "scope_limits": {"type": "array", "items": {"type": "string"}},
-            "adoption_state": {"enum": ["candidate", "proposed", "approved", "revised", "rejected", "closed", "out_of_scope"]}
+            "adoption_state": {"enum": ["candidate", "proposed", "approved", "revised", "rejected", "closed", "out_of_scope"]},
+            "question_lineage_id": {"$ref": "#/$defs/identifier"},
+            "derived_from_question_revisions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id", "revision"],
+                "properties": {
+                  "id": {"$ref": "#/$defs/identifier"},
+                  "revision": {"type": "integer", "minimum": 0}
+                }
+              },
+              "uniqueItems": true
+            },
+            "question_delta": {"enum": ["REFINE", "SPLIT", "MERGE", "CLOSE"]},
+            "review_inputs": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "uncovered_attention_ids": {"$ref": "#/$defs/ids"},
+                "evidence_gap_ids": {"$ref": "#/$defs/ids"},
+                "publication_feedback_ids": {"$ref": "#/$defs/ids"}
+              }
+            },
+            "downstream_review_required_refs": {
+              "type": "array",
+              "items": {"$ref": "#/$defs/object_ref"},
+              "uniqueItems": true
+            }
           }
         }
       ],

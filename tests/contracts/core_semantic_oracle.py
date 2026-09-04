@@ -38,7 +38,10 @@ FIXTURE_EVIDENCE_QUALIFICATION_DECISION = ("evidence_qualification", "verify")
 FIXTURE_EVIDENCE_RECLASSIFICATION_DECISION = ("evidence_reclassification", "reclassify")
 
 SCALAR_REFERENCE_FIELDS = {
-    "research_question": {"parent_question_id": "research_question"},
+    "research_question": {
+        "parent_question_id": "research_question",
+        "question_lineage_id": "research_question",
+    },
     "claim": {"question_id": "research_question"},
     "evidence": {"source_id": "source"},
     "analysis": {"method_id": "method"},
@@ -78,6 +81,7 @@ LIST_REFERENCE_FIELDS = {
 }
 
 OBJECT_REFERENCE_FIELDS = {
+    "research_question": {"downstream_review_required_refs": True},
     "counter_review": {"target": False},
     "next_action": {"target": False},
     "decision": {"subjects": True},
