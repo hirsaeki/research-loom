@@ -78,6 +78,7 @@ LIST_REFERENCE_FIELDS = {
 }
 
 OBJECT_REFERENCE_FIELDS = {
+    "research_question": {"downstream_review_required_refs": True},
     "counter_review": {"target": False},
     "next_action": {"target": False},
     "decision": {"subjects": True},

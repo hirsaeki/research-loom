@@ -6,7 +6,7 @@ from core.execution import RunStatus
 from plugins.desktop_research.attempts import reconstruct_attempts
 
 from .facade import LocalApplicationError
-from .survey_analysis_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
+from .question_review_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
 
 
 class LocalApplicationFacade(_BaseLocalApplicationFacade):
