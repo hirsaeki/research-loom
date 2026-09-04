@@ -231,8 +231,9 @@ def _references_from_object(obj: Mapping[str, Any]) -> Iterable[tuple[str, str]]
     if kind == "research_question":
         if obj.get("parent_question_id"):
             yield ("research_question", str(obj["parent_question_id"]))
-        if obj.get("question_lineage_id"):
-            yield ("research_question", str(obj["question_lineage_id"]))
+        # question_lineage_id is a historical lineage identity, not a
+        # current-snapshot object reference. Exact source revisions are
+        # validated through derived_from_question_revisions.
         for ref in obj.get("downstream_review_required_refs", ()) or ():
             if isinstance(ref, Mapping) and ref.get("kind") and ref.get("id"):
                 yield (str(ref["kind"]), str(ref["id"]))

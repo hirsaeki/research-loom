@@ -24,6 +24,8 @@ A review result is exactly one of:
 
 Approved changes create a new immutable RQ revision or derived RQ identity. Historical RQ revisions, Runs, Snapshots, Evidence, Decisions, and Publication feedback remain addressable against the revision they originally referenced.
 
+The production review ingress is bounded: a material review may name at most 16 source RQs, SPLIT may create at most 16 questions, free-text question/rationale fields are capped at 8,192 characters, and list-valued review/criteria/scope fields are capped at 64 items of at most 4,096 characters each. Oversized inputs fail closed before candidate persistence.
+
 ## Subsequent Run binding
 
 Capability Context Packs for subsequent Runs MUST bind the selected current RQ identity and exact revision through `research_object_references`. A material Question Delta MUST NOT silently rebind historical Runs.

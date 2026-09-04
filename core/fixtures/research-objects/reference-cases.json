@@ -29,7 +29,6 @@
     {"rule":"base.decision_ids","object_id":"CLM-A","field":"decision_ids","value":["MISSING-REF"]},
     {"rule":"base.project_id","object_id":"CLM-A","field":"project_id","value":"MISSING-REF"},
     {"rule":"research_question.parent_question_id","object_id":"RQ-CHILD","field":"parent_question_id","value":"MISSING-REF"},
-    {"rule":"research_question.question_lineage_id","object_id":"RQ-CHILD","field":"question_lineage_id","value":"MISSING-REF"},
     {"rule":"research_question.downstream_review_required_refs","object_id":"RQ-CHILD","field":"downstream_review_required_refs","value":[{"kind":"claim","id":"MISSING-REF"}]},
     {"rule":"claim.question_id","object_id":"CLM-A","field":"question_id","value":"MISSING-REF"},
     {"rule":"claim.supporting_evidence_ids","object_id":"CLM-A","field":"supporting_evidence_ids","value":["MISSING-REF"]},

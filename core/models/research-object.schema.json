@@ -90,7 +90,7 @@
             "acceptance_criteria": {"type": "array", "items": {"type": "string"}},
             "scope_limits": {"type": "array", "items": {"type": "string"}},
             "adoption_state": {"enum": ["candidate", "proposed", "approved", "revised", "rejected", "closed", "out_of_scope"]},
-            "question_lineage_id": {"$ref": "#/$defs/identifier"},
+            "question_lineage_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"},
             "derived_from_question_revisions": {
               "type": "array",
               "items": {

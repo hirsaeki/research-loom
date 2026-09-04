@@ -10,7 +10,7 @@ import unittest
 import rfc8785
 
 from core.runtime import canonical_digest
-from plugins.local_application import LocalApplicationFacade
+from plugins.local_application import LocalApplicationError, LocalApplicationFacade
 
 ROOT = Path(__file__).resolve().parents[2]
 PROJECT_FIXTURE = ROOT / "projects/fixtures/valid/generic-project-config.json"
@@ -190,6 +190,122 @@ class ResearchQuestionReviewTests(unittest.TestCase):
                 _apply(facade, close["data"]["state_delta_proposal_id"])
                 state = facade._application.state_repository.load_state_view(facade.project_id, facade._application.state_repository.load_active_lineage_ref(facade.project_id))
                 self.assertEqual(state.latest_object("research_question", merged["id"])["adoption_state"], "closed")
+
+
+    def test_child_research_question_is_marked_for_downstream_review(self):
+        with tempfile.TemporaryDirectory() as temp:
+            with LocalApplicationFacade.open_workspace(_workspace(Path(temp))) as facade:
+                parent_id = _adopt_question(facade, "Parent")
+                child = facade.submit_action({
+                    "action_type": "research_question.propose",
+                    "payload": {"text": "Child", "parent_question_id": parent_id},
+                    "actor_id": "H",
+                })
+                _apply(facade, child["data"]["state_delta_proposal_id"])
+                child_id = child["data"]["research_question_candidate"]["id"]
+
+                split = facade.submit_action({
+                    "action_type": "research_question.review",
+                    "payload": {
+                        "operation": "SPLIT",
+                        "question_ids": [parent_id],
+                        "rationale": "separate decisions",
+                        "questions": [{"text": "Parent A"}, {"text": "Parent B"}],
+                    },
+                    "actor_id": "H",
+                })
+                self.assertIn(
+                    {"kind": "research_question", "id": child_id},
+                    split["data"]["question_delta"]["downstream_review_required_refs"],
+                )
+
+    def test_material_review_candidates_remain_visible_in_resume(self):
+        with tempfile.TemporaryDirectory() as temp:
+            with LocalApplicationFacade.open_workspace(_workspace(Path(temp))) as facade:
+                q1 = _adopt_question(facade, "Q1")
+                q2 = _adopt_question(facade, "Q2")
+                candidates = [
+                    facade.submit_action({
+                        "action_type": "research_question.review",
+                        "payload": {
+                            "operation": "REFINE", "question_ids": [q1],
+                            "rationale": "narrow", "text": "Q1 refined",
+                        },
+                        "actor_id": "H",
+                    }),
+                    facade.submit_action({
+                        "action_type": "research_question.review",
+                        "payload": {
+                            "operation": "CLOSE", "question_ids": [q2],
+                            "rationale": "answered",
+                        },
+                        "actor_id": "H",
+                    }),
+                    facade.submit_action({
+                        "action_type": "research_question.review",
+                        "payload": {
+                            "operation": "SPLIT", "question_ids": [q1],
+                            "rationale": "two decisions",
+                            "questions": [{"text": "Q1a"}, {"text": "Q1b"}],
+                        },
+                        "actor_id": "H",
+                    }),
+                    facade.submit_action({
+                        "action_type": "research_question.review",
+                        "payload": {
+                            "operation": "MERGE", "question_ids": [q1, q2],
+                            "rationale": "same decision", "text": "Merged",
+                        },
+                        "actor_id": "H",
+                    }),
+                ]
+                expected_ids = {item["data"]["state_delta_proposal_id"] for item in candidates}
+                resumed = facade.resume_context()
+                rows = {
+                    row["state_delta_proposal_id"]: row
+                    for row in resumed["research_questions"]["candidates"]
+                    if row["state_delta_proposal_id"] in expected_ids
+                }
+                self.assertEqual(set(rows), expected_ids)
+                by_delta = {row["question_delta"]: row for row in rows.values()}
+                self.assertEqual(len(by_delta["REFINE"]["questions"]), 1)
+                self.assertEqual(by_delta["REFINE"]["questions"][0]["revision"], 1)
+                self.assertEqual(by_delta["REFINE"]["questions"][0]["question_lineage_id"], q1)
+                self.assertEqual(by_delta["CLOSE"]["questions"][0]["adoption_state"], "closed")
+                self.assertEqual(len(by_delta["SPLIT"]["questions"]), 3)
+                self.assertEqual(len(by_delta["MERGE"]["questions"]), 3)
+                self.assertEqual(
+                    by_delta["MERGE"]["source_question_revisions"],
+                    [{"id": q1, "revision": 0}, {"id": q2, "revision": 0}],
+                )
+                self.assertTrue(all(row["bound_to_current_snapshot"] for row in rows.values()))
+
+    def test_question_review_payload_is_bounded(self):
+        with tempfile.TemporaryDirectory() as temp:
+            with LocalApplicationFacade.open_workspace(_workspace(Path(temp))) as facade:
+                qid = _adopt_question(facade)
+                invalid_payloads = [
+                    {
+                        "operation": "SPLIT", "question_ids": [qid], "rationale": "split",
+                        "questions": [{"text": f"Q{i}"} for i in range(17)],
+                    },
+                    {
+                        "operation": "MERGE",
+                        "question_ids": [f"RQ-{i}" for i in range(17)],
+                        "rationale": "merge", "text": "Merged",
+                    },
+                    {
+                        "operation": "REFINE", "question_ids": [qid],
+                        "rationale": "r", "text": "x" * 8_193,
+                    },
+                ]
+                for payload in invalid_payloads:
+                    with self.subTest(operation=payload["operation"]), self.assertRaises(LocalApplicationError):
+                        facade.submit_action({
+                            "action_type": "research_question.review",
+                            "payload": payload,
+                            "actor_id": "H",
+                        })
 
     def test_material_delta_goes_stale_when_head_advances(self):
         with tempfile.TemporaryDirectory() as temp:

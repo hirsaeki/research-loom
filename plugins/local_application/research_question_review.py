@@ -14,13 +14,37 @@ _COMMON_FIELDS = {
 }
 _REVIEW_INPUT_FIELDS = {"uncovered_attention_ids", "evidence_gap_ids", "publication_feedback_ids"}
 _QUESTION_FIELDS = {"text", "rationale", "acceptance_criteria", "scope_limits"}
+_MAX_QUESTION_IDS = 16
+_MAX_SPLIT_QUESTIONS = 16
+_MAX_LIST_ITEMS = 64
+_MAX_ID_LENGTH = 256
+_MAX_TEXT_LENGTH = 8_192
+_MAX_LIST_ITEM_LENGTH = 4_096
 
 
-def _non_empty_strings(value: Any, field: str, *, min_items: int = 0) -> None:
-    if not isinstance(value, list) or len(value) < min_items or any(
-        not isinstance(item, str) or not item.strip() for item in value
+def _non_empty_string(value: Any, field: str, *, max_length: int = _MAX_TEXT_LENGTH) -> None:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{field} must be a non-empty string")
+    if len(value) > max_length:
+        raise ValueError(f"{field} must contain at most {max_length} characters")
+
+
+def _non_empty_strings(
+    value: Any,
+    field: str,
+    *,
+    min_items: int = 0,
+    max_items: int = _MAX_LIST_ITEMS,
+    max_length: int = _MAX_LIST_ITEM_LENGTH,
+) -> None:
+    if not isinstance(value, list) or len(value) < min_items or len(value) > max_items or any(
+        not isinstance(item, str) or not item.strip() or len(item) > max_length
+        for item in value
     ):
-        raise ValueError(f"{field} must be an array of non-empty strings")
+        raise ValueError(
+            f"{field} must be an array of {min_items} through {max_items} non-empty strings "
+            f"with at most {max_length} characters each"
+        )
     if len(value) != len(set(value)):
         raise ValueError(f"{field} must not contain duplicates")
 
@@ -35,15 +59,20 @@ def research_question_review_payload(payload: Mapping[str, Any]) -> None:
     operation = payload.get("operation")
     if operation not in _OPERATIONS:
         raise ValueError("operation must be one of KEEP, REFINE, SPLIT, MERGE, CLOSE")
-    _non_empty_strings(payload.get("question_ids"), "question_ids", min_items=1)
+    _non_empty_strings(
+        payload.get("question_ids"),
+        "question_ids",
+        min_items=1,
+        max_items=_MAX_QUESTION_IDS,
+        max_length=_MAX_ID_LENGTH,
+    )
     question_ids = payload["question_ids"]
     if operation == "MERGE" and len(question_ids) < 2:
         raise ValueError("MERGE requires at least two question_ids")
     if operation != "MERGE" and len(question_ids) != 1:
         raise ValueError(f"{operation} requires exactly one question_id")
     rationale = payload.get("rationale")
-    if not isinstance(rationale, str) or not rationale.strip():
-        raise ValueError("rationale must be a non-empty string")
+    _non_empty_string(rationale, "rationale")
     review_inputs = payload.get("review_inputs", {})
     if not isinstance(review_inputs, Mapping) or set(review_inputs) - _REVIEW_INPUT_FIELDS:
         raise ValueError("review_inputs contains unknown fields")
@@ -51,8 +80,7 @@ def research_question_review_payload(payload: Mapping[str, Any]) -> None:
         _non_empty_strings(value, f"review_inputs.{field}")
 
     if operation in {"REFINE", "MERGE"}:
-        if not isinstance(payload.get("text"), str) or not payload["text"].strip():
-            raise ValueError(f"{operation} requires non-empty text")
+        _non_empty_string(payload.get("text"), f"{operation}.text")
         for field in ("acceptance_criteria", "scope_limits"):
             if field in payload:
                 _non_empty_strings(payload[field], field)
@@ -61,17 +89,20 @@ def research_question_review_payload(payload: Mapping[str, Any]) -> None:
 
     if operation == "SPLIT":
         questions = payload.get("questions")
-        if not isinstance(questions, list) or len(questions) < 2:
-            raise ValueError("SPLIT requires at least two questions")
+        if (
+            not isinstance(questions, list)
+            or len(questions) < 2
+            or len(questions) > _MAX_SPLIT_QUESTIONS
+        ):
+            raise ValueError(
+                f"SPLIT requires between 2 and {_MAX_SPLIT_QUESTIONS} questions"
+            )
         for index, item in enumerate(questions):
             if not isinstance(item, Mapping) or set(item) - _QUESTION_FIELDS:
                 raise ValueError(f"questions[{index}] contains unknown fields")
-            if not isinstance(item.get("text"), str) or not item["text"].strip():
-                raise ValueError(f"questions[{index}] requires non-empty text")
-            if "rationale" in item and (
-                not isinstance(item["rationale"], str) or not item["rationale"].strip()
-            ):
-                raise ValueError(f"questions[{index}].rationale must be non-empty")
+            _non_empty_string(item.get("text"), f"questions[{index}].text")
+            if "rationale" in item:
+                _non_empty_string(item["rationale"], f"questions[{index}].rationale")
             for field in ("acceptance_criteria", "scope_limits"):
                 if field in item:
                     _non_empty_strings(item[field], f"questions[{index}].{field}")
@@ -97,7 +128,10 @@ def _question_by_id(state, question_id: str) -> Mapping[str, Any]:
 def _downstream_refs(state, question_ids: set[str]) -> list[dict[str, str]]:
     refs: list[dict[str, str]] = []
     for item in state.effective_objects():
-        if item.get("kind") == "research_question":
+        if (
+            item.get("kind") == "research_question"
+            and str(item.get("id", "")) in question_ids
+        ):
             continue
         linked = False
         for field in ("question_id", "parent_question_id"):

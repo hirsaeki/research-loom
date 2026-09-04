@@ -9,6 +9,7 @@ from .research_question_review import (
     ResearchQuestionReviewHandler,
     research_question_review_payload,
 )
+from .question_review_resume import append_question_review_candidates
 from .survey_analysis_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
 
 _ACTION_REGISTRATION_LOCK = RLock()
@@ -63,6 +64,13 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                     ):
                         if key in source:
                             item[key] = deepcopy(source[key])
+        append_question_review_candidates(
+            result,
+            application=self._application,
+            project_id=self._project_id,
+            state=state,
+            limits=limits,
+        )
         return result
 
     def _ensure_question_review_action(self) -> None:
