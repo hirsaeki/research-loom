@@ -22,6 +22,8 @@ from .external_attempt_lifecycle_facade import LocalApplicationFacade as _BaseLo
 _ROLES = {"theme", "expectations", "project_brief", "scope", "methodology", "publication_brief", "other"}
 _MAX_BYTES = 8 * 1024 * 1024
 _MAX_PROJECT_INPUT_IDS = 64
+_SCHEMA_VERSION = 2
+_BLOB_HASH_CHUNK_BYTES = 1024 * 1024
 
 
 def _now() -> str:
@@ -36,9 +38,12 @@ class _ProjectInputRegistry:
         self.blobs.mkdir(parents=True, exist_ok=True)
         self.db = sqlite3.connect(self.root / "project-inputs.sqlite3")
         self.db.row_factory = sqlite3.Row
-        self.db.execute(
-            """
-            CREATE TABLE IF NOT EXISTS project_inputs(
+        self._ensure_schema()
+
+    @staticmethod
+    def _create_table_sql(table: str = "project_inputs") -> str:
+        return f"""
+            CREATE TABLE {table}(
                 input_id TEXT PRIMARY KEY,
                 project_id TEXT NOT NULL,
                 role TEXT NOT NULL,
@@ -53,9 +58,59 @@ class _ProjectInputRegistry:
                 snapshot_digest TEXT NOT NULL,
                 UNIQUE(project_id, role, content_digest, lineage_ref, snapshot_id, snapshot_digest)
             )
-            """
-        )
-        self.db.commit()
+        """
+
+    def _has_current_unique_binding(self) -> bool:
+        expected = [
+            "project_id", "role", "content_digest",
+            "lineage_ref", "snapshot_id", "snapshot_digest",
+        ]
+        for index in self.db.execute("PRAGMA index_list(project_inputs)").fetchall():
+            if not bool(index[2]):
+                continue
+            columns = [
+                row[2] for row in self.db.execute(
+                    f"PRAGMA index_info({json.dumps(str(index[1]))})"
+                ).fetchall()
+            ]
+            if columns == expected:
+                return True
+        return False
+
+    def _ensure_schema(self) -> None:
+        table = self.db.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='project_inputs'"
+        ).fetchone()
+        if table is None:
+            self.db.execute(self._create_table_sql())
+            self.db.execute(f"PRAGMA user_version={_SCHEMA_VERSION}")
+            self.db.commit()
+            return
+        if self._has_current_unique_binding():
+            if int(self.db.execute("PRAGMA user_version").fetchone()[0]) < _SCHEMA_VERSION:
+                self.db.execute(f"PRAGMA user_version={_SCHEMA_VERSION}")
+                self.db.commit()
+            return
+        try:
+            self.db.execute("BEGIN IMMEDIATE")
+            self.db.execute("ALTER TABLE project_inputs RENAME TO project_inputs_legacy")
+            self.db.execute(self._create_table_sql())
+            self.db.execute(
+                """INSERT INTO project_inputs(
+                       input_id,project_id,role,media_type,byte_length,content_digest,
+                       source_path,provenance_json,registered_at,lineage_ref,snapshot_id,snapshot_digest
+                   )
+                   SELECT input_id,project_id,role,media_type,byte_length,content_digest,
+                          source_path,provenance_json,registered_at,lineage_ref,snapshot_id,snapshot_digest
+                   FROM project_inputs_legacy"""
+            )
+            self.db.execute("DROP TABLE project_inputs_legacy")
+            self.db.execute(f"PRAGMA user_version={_SCHEMA_VERSION}")
+            self.db.commit()
+        except Exception:
+            if self.db.in_transaction:
+                self.db.rollback()
+            raise
 
     def close(self) -> None:
         self.db.close()
@@ -118,9 +173,43 @@ class _ProjectInputRegistry:
 
     @staticmethod
     def _verify_blob(path: Path, expected_digest: str, expected_size: int) -> None:
-        content = path.read_bytes()
-        actual_digest = "sha256:" + hashlib.sha256(content).hexdigest()
-        if len(content) != expected_size or actual_digest != expected_digest:
+        try:
+            actual_size = path.stat().st_size
+        except OSError as exc:
+            raise LocalApplicationError(
+                "APPLICATION-PROJECT-INPUT-INTEGRITY-001",
+                "content-addressed project-input blob could not be inspected",
+            ) from exc
+        if actual_size != expected_size:
+            raise LocalApplicationError(
+                "APPLICATION-PROJECT-INPUT-INTEGRITY-001",
+                "content-addressed project-input blob failed digest/size verification",
+            )
+        hasher = hashlib.sha256()
+        remaining = expected_size
+        try:
+            with path.open("rb") as stream:
+                while remaining:
+                    chunk = stream.read(min(_BLOB_HASH_CHUNK_BYTES, remaining))
+                    if not chunk:
+                        raise LocalApplicationError(
+                            "APPLICATION-PROJECT-INPUT-INTEGRITY-001",
+                            "content-addressed project-input blob changed during verification",
+                        )
+                    hasher.update(chunk)
+                    remaining -= len(chunk)
+                if stream.read(1):
+                    raise LocalApplicationError(
+                        "APPLICATION-PROJECT-INPUT-INTEGRITY-001",
+                        "content-addressed project-input blob changed during verification",
+                    )
+        except OSError as exc:
+            raise LocalApplicationError(
+                "APPLICATION-PROJECT-INPUT-INTEGRITY-001",
+                "content-addressed project-input blob could not be verified",
+            ) from exc
+        actual_digest = "sha256:" + hasher.hexdigest()
+        if actual_digest != expected_digest:
             raise LocalApplicationError(
                 "APPLICATION-PROJECT-INPUT-INTEGRITY-001",
                 "content-addressed project-input blob failed digest/size verification",
