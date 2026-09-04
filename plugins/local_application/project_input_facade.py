@@ -44,7 +44,7 @@ class _ProjectInputRegistry:
                 lineage_ref TEXT NOT NULL,
                 snapshot_id TEXT NOT NULL,
                 snapshot_digest TEXT NOT NULL,
-                UNIQUE(project_id, role, content_digest)
+                UNIQUE(project_id, role, content_digest, snapshot_id, snapshot_digest)
             )
             """
         )
@@ -57,12 +57,12 @@ class _ProjectInputRegistry:
                  source_path: str, provenance: Mapping[str, Any], lineage_ref: str,
                  snapshot_id: str, snapshot_digest: str) -> dict[str, Any]:
         digest = "sha256:" + hashlib.sha256(content).hexdigest()
-        identity_seed = f"{project_id}\0{role}\0{digest}".encode("utf-8")
+        identity_seed = f"{project_id}\0{role}\0{digest}\0{snapshot_id}\0{snapshot_digest}".encode("utf-8")
         input_id = "PIN-" + hashlib.sha256(identity_seed).hexdigest()[:24]
         registered_at = _now()
         row = self.db.execute(
-            "SELECT * FROM project_inputs WHERE project_id=? AND role=? AND content_digest=?",
-            (project_id, role, digest),
+            "SELECT * FROM project_inputs WHERE project_id=? AND role=? AND content_digest=? AND snapshot_id=? AND snapshot_digest=?",
+            (project_id, role, digest, snapshot_id, snapshot_digest),
         ).fetchone()
         if row is None:
             hex_digest = digest.split(":", 1)[1]
@@ -127,11 +127,11 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
             self._project_input_registry = _ProjectInputRegistry(self._workspace_root)
         return self._project_input_registry
 
-    def _current_binding(self) -> tuple[Any, str, str, str]:
+    def _current_binding(self) -> tuple[str, str, str]:
         repo = self._application.state_repository
         lineage = repo.load_active_lineage_ref(self._project_id)
         state = repo.load_state_view(self._project_id, lineage)
-        return state, str(lineage), str(state.current_snapshot["id"]), str(state.current_snapshot["content_digest"])
+        return str(lineage), str(state.current_snapshot["id"]), str(state.current_snapshot["content_digest"])
 
     def register_project_input(self, value: Mapping[str, Any]) -> Mapping[str, Any]:
         allowed = {"file", "role", "media_type", "provenance", "expected_snapshot_id", "expected_snapshot_digest"}
@@ -146,7 +146,7 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
         provenance = value.get("provenance", {})
         if not isinstance(provenance, Mapping):
             raise LocalApplicationError("APPLICATION-PROJECT-INPUT-001", "provenance must be an object")
-        state, lineage, snapshot_id, snapshot_digest = self._current_binding()
+        lineage, snapshot_id, snapshot_digest = self._current_binding()
         if value.get("expected_snapshot_id") != snapshot_id or value.get("expected_snapshot_digest") != snapshot_digest:
             raise LocalApplicationError("APPLICATION-PROJECT-INPUT-STALE-001", "project input registration is not bound to the exact current Snapshot")
         try:
@@ -183,7 +183,22 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                 if not isinstance(ids, list) or any(not isinstance(item, str) for item in ids):
                     raise LocalApplicationError("APPLICATION-PROJECT-INPUT-001", "project_input_ids must be an array of IDs")
                 registry = self._registry()
-                missing = [item for item in ids if registry.get(item, self._project_id) is None]
+                resolved = {item: registry.get(item, self._project_id) for item in ids}
+                missing = [item for item, value in resolved.items() if value is None]
                 if missing:
                     raise LocalApplicationError("APPLICATION-PROJECT-INPUT-404", "Question Review references unknown project inputs: " + ", ".join(missing))
+                lineage, snapshot_id, snapshot_digest = self._current_binding()
+                stale = [
+                    item for item, value in resolved.items()
+                    if value is not None and (
+                        value["lineage_ref"] != lineage
+                        or value["snapshot_id"] != snapshot_id
+                        or value["snapshot_digest"] != snapshot_digest
+                    )
+                ]
+                if stale:
+                    raise LocalApplicationError(
+                        "APPLICATION-PROJECT-INPUT-STALE-001",
+                        "Question Review references project inputs that are not bound to the exact current Snapshot: " + ", ".join(stale),
+                    )
         return super().submit_action(draft_input)

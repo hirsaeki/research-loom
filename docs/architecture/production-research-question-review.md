@@ -87,11 +87,13 @@ document is supplied after initialization, operators register the explicit local
 the public `research-input register` surface. Registration is bounded to regular files under
 the workspace-controlled intake root and records immutable content bytes, SHA-256 digest,
 media type, typed logical role, source-path/provenance, project/lineage binding, and the exact
-current Research Snapshot. Re-registering the same project/role/content digest returns the
-same project-input identity.
+current Research Snapshot. Re-registering the same project/role/content digest against the same
+Snapshot returns the same project-input identity; after a Snapshot change, a new immutable
+registration identity points at the same content-addressed bytes.
 
 Project inputs are Question Review provenance, not Evidence, Attention, or Human authority.
-A review may name registered IDs in `review_inputs.project_input_ids`; unknown IDs fail closed.
+A review may name registered IDs in `review_inputs.project_input_ids`; unknown IDs or IDs bound
+to an older Snapshot fail closed.
 Registration itself requires the caller to pin `expected_snapshot_id` and
 `expected_snapshot_digest`, so a stale head cannot be silently rebased or carried forward.
 `KEEP` remains a no-op, while material Question Deltas continue through the existing
