@@ -12,7 +12,7 @@ _COMMON_FIELDS = {
     "operation", "question_ids", "rationale", "review_inputs",
     "text", "acceptance_criteria", "scope_limits", "questions",
 }
-_REVIEW_INPUT_FIELDS = {"uncovered_attention_ids", "evidence_gap_ids", "publication_feedback_ids"}
+_REVIEW_INPUT_FIELDS = {"uncovered_attention_ids", "evidence_gap_ids", "publication_feedback_ids", "project_input_ids"}
 _QUESTION_FIELDS = {"text", "rationale", "acceptance_criteria", "scope_limits"}
 _MAX_QUESTION_IDS = 16
 _MAX_SPLIT_QUESTIONS = 16

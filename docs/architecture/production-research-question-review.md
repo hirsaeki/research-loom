@@ -41,6 +41,7 @@ A review may bind the cycle inputs that motivated the review without treating th
 - `uncovered_attention_ids`
 - `evidence_gap_ids`
 - `publication_feedback_ids`
+- `project_input_ids`
 
 These references are provenance for Question Review. They do not become Evidence and cannot authorize a material Question Delta.
 
@@ -78,3 +79,26 @@ The Initial baseline remains visible as revision `0` in historical state, while 
 ## Scope boundaries
 
 This lifecycle does not change Evidence adoption, Publication Eligibility, Publication approval, or Capability execution boundaries. It only closes the gap between the Initial Question Baseline and later Question Review cycles.
+
+## Same-workspace project input additions
+
+Bootstrap Theme/Expectations remain part of workspace initialization. When a project-input
+document is supplied after initialization, operators register the explicit local file through
+the public `research-input register` surface. Registration is bounded to regular files under
+the workspace-controlled intake root and records immutable content bytes, SHA-256 digest,
+media type, typed logical role, source-path/provenance, project/lineage binding, and the exact
+current Research Snapshot. Re-registering the same project/role/content digest against the same
+Snapshot returns the same project-input identity; after a Snapshot change, a new immutable
+registration identity points at the same content-addressed bytes.
+
+Project inputs are Question Review provenance, not Evidence, Attention, or Human authority.
+A review may name registered IDs in `review_inputs.project_input_ids`; unknown IDs or IDs bound
+to an older Snapshot fail closed.
+Registration itself requires the caller to pin `expected_snapshot_id` and
+`expected_snapshot_digest`, so a stale head cannot be silently rebased or carried forward.
+`KEEP` remains a no-op, while material Question Deltas continue through the existing
+Confirmation and Human Decision path.
+
+This is distinct from raw Attention intake and from external Desktop Research materials:
+project inputs describe the project's supplied framing/context, while external materials are
+retrieved research sources and may later support Evidence through their existing adoption path.
