@@ -205,6 +205,16 @@ class DesktopResearchNormalizer:
                     raise NormalizationRejected(
                         f"Desktop Evidence source resource {reference_id} lacks object_id or digest"
                     )
+                try:
+                    payload = self._artifacts.load(resource)
+                except Exception as exc:
+                    raise NormalizationRejected(
+                        f"Desktop Evidence source resource {reference_id} failed integrity verification"
+                    ) from exc
+                if str(payload.digest) != str(digest):
+                    raise NormalizationRejected(
+                        f"Desktop Evidence source resource {reference_id} digest does not match verified payload"
+                    )
                 return str(object_id), str(digest)
 
             for item in handoff["outputs"]["evidence_candidates"]:
