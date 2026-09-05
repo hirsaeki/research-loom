@@ -4,6 +4,7 @@ import hashlib
 import re
 from typing import Any, Mapping
 
+from core.runtime.normalization import NormalizationRejected
 from core.runtime.transition_models import (
     ObjectRef,
     StateDeltaProposal,
@@ -182,12 +183,12 @@ class DesktopResearchNormalizer:
                     source_id = source_ids.get(capture_id)
                     detail = details.get(capture_id)
                     if source_id is None or detail is None:
-                        raise ValueError(
+                        raise NormalizationRejected(
                             f"Desktop Evidence basis references unresolved source capture {capture_id}"
                         )
                     digest = detail["original_capture"].get("content_digest")
                     if not digest:
-                        raise ValueError(
+                        raise NormalizationRejected(
                             f"Desktop Evidence source capture {capture_id} has no original capture digest"
                         )
                     return source_id, str(digest)
@@ -195,13 +196,13 @@ class DesktopResearchNormalizer:
                 reference_id = str(basis["resource_reference_id"])
                 resource = resources.get(reference_id)
                 if not resource or resource.get("reference_type") != "source":
-                    raise ValueError(
+                    raise NormalizationRejected(
                         f"Desktop Evidence basis references unresolved source resource {reference_id}"
                     )
                 object_id = resource.get("object_id")
                 digest = resource.get("digest")
                 if object_id is None or not digest:
-                    raise ValueError(
+                    raise NormalizationRejected(
                         f"Desktop Evidence source resource {reference_id} lacks object_id or digest"
                     )
                 return str(object_id), str(digest)
