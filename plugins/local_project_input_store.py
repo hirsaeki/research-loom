@@ -11,7 +11,7 @@ import sqlite3
 import tempfile
 from typing import Any, Mapping
 
-_SCHEMA_VERSION = 2
+_SCHEMA_VERSION = 3
 _BLOB_HASH_CHUNK_BYTES = 1024 * 1024
 _MAX_PAGE_SIZE = 100
 
@@ -100,19 +100,27 @@ class LocalProjectInputStore:
                 return True
         return False
 
+    def _ensure_page_index(self) -> None:
+        self.db.execute(
+            """CREATE INDEX IF NOT EXISTS project_inputs_page_idx
+               ON project_inputs(project_id, registered_at, input_id)"""
+        )
+
     def _ensure_schema(self) -> None:
         table = self.db.execute(
             "SELECT 1 FROM sqlite_master WHERE type='table' AND name='project_inputs'"
         ).fetchone()
         if table is None:
             self.db.execute(self._create_table_sql())
+            self._ensure_page_index()
             self.db.execute(f"PRAGMA user_version={_SCHEMA_VERSION}")
             self.db.commit()
             return
         if self._has_current_unique_binding():
+            self._ensure_page_index()
             if int(self.db.execute("PRAGMA user_version").fetchone()[0]) < _SCHEMA_VERSION:
                 self.db.execute(f"PRAGMA user_version={_SCHEMA_VERSION}")
-                self.db.commit()
+            self.db.commit()
             return
         try:
             self.db.execute("BEGIN IMMEDIATE")
@@ -128,6 +136,7 @@ class LocalProjectInputStore:
                    FROM project_inputs_legacy"""
             )
             self.db.execute("DROP TABLE project_inputs_legacy")
+            self._ensure_page_index()
             self.db.execute(f"PRAGMA user_version={_SCHEMA_VERSION}")
             self.db.commit()
         except Exception:
