@@ -224,11 +224,10 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                 missing: list[str] = []
                 try:
                     for item in ids:
-                        verified = registry.read_content(item, self._project_id)
-                        if verified is None:
+                        document = registry.verify_content(item, self._project_id)
+                        if document is None:
                             missing.append(item)
                             continue
-                        document, _content = verified
                         resolved[item] = document
                 except LocalProjectInputStoreError as exc:
                     raise LocalApplicationError(exc.code, exc.message) from exc
