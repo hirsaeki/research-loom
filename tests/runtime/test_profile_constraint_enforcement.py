@@ -93,6 +93,7 @@ class ProductionProfileConstraintEnforcementTests(unittest.TestCase):
                     "schema_version": "0.1.0", "id": "ART-CORE-FLOOR", "kind": "artifact", "revision": 0,
                     "project_id": opened.project_id, "role": "output", "lane": "publication",
                     "artifact_class": "input", "locator": "fixture://artifact/core-floor", "evidence_eligible": True,
+                    "content_digest": "sha256:" + "2" * 64,
                 }
                 rejected = opened.application.state_transition_service.apply(make_request(
                     state,

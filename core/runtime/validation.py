@@ -11,7 +11,7 @@ from .authority_validation import (
 )
 from .state_validation import (
     _validate_adoption_boundaries, _validate_core_invariants, _validate_epistemic_postconditions,
-    _validate_lineage_postconditions, _validate_next_state,
+    _validate_lineage_postconditions, _validate_next_state, _validate_profile_strengthening,
     _validate_project_guards, _validate_reference_integrity,
 )
 
@@ -38,6 +38,7 @@ def validate_post_reduction(
     issues: list[ValidationIssue] = []
     issues.extend(_validate_reference_integrity(current_state, reduction))
     issues.extend(_validate_core_invariants(current_state, request, reduction))
+    issues.extend(_validate_profile_strengthening(current_state, reduction))
     issues.extend(_validate_resolved_profile_constraints(current_state, reduction))
     issues.extend(_validate_project_guards(current_state, reduction))
     issues.extend(_validate_adoption_boundaries(current_state, request, reduction))
