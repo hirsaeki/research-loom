@@ -95,7 +95,23 @@ Project inputs are Question Review provenance, not Evidence, Attention, or Human
 A review may name registered IDs in `review_inputs.project_input_ids`; unknown IDs or IDs bound
 to an older Snapshot fail closed.
 Registration itself requires the caller to pin `expected_snapshot_id` and
-`expected_snapshot_digest`, so a stale head cannot be silently rebased or carried forward.
+`expected_snapshot_digest`. The final project-input persistence is performed while holding the
+same local Research State HEAD writer guard used by Survey/Research Exhibit capture, so a HEAD
+change that occurs while the source file is being read is rejected rather than persisted against
+a stale Snapshot.
+
+Registered content is retrieved from the immutable content-addressed store, never by reopening
+the original `source_path`. `research-input show --format text` exposes verified UTF-8 content for
+textual media types, while `--format base64` provides a bounded binary-safe representation. Every
+content read rechecks stored byte length and SHA-256 digest and fails closed on a missing or
+corrupt blob. Metadata-only `show` remains the default and advertises the supported content
+formats for the registered media type.
+
+`research-input list` uses stable `(registered_at, input_id)` ordering and bounded keyset
+pagination. `--limit` accepts 1..100 and `--cursor` consumes the opaque `next_cursor` from the
+previous response; `truncated` explicitly reports whether another page exists. This preserves
+historical registrations across Snapshot changes while making every item reachable.
+
 `KEEP` remains a no-op, while material Question Deltas continue through the existing
 Confirmation and Human Decision path.
 
