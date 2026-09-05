@@ -6,7 +6,7 @@ import tempfile
 import unittest
 
 from core.runtime import CommitReceipt, StateTransitionRejected, TransitionAction, TransitionKind
-from plugins.local_application.workspace import LocalWorkspace
+from plugins.local_application.workspace import LocalWorkspace, LocalWorkspaceError
 from runtime_fixtures import make_request
 from test_research_question_adoption import _bootstrap_config
 
@@ -15,21 +15,20 @@ ROOT = Path(__file__).resolve().parents[2]
 PROFILE_FIXTURE = ROOT / "profiles/fixtures/valid/effective-profile-set.json"
 
 
-def _profile_set(*, enforce_capture_digest: bool) -> dict:
+def _profile_set(*, ablate_capture_digest: bool) -> dict:
     value = json.loads(PROFILE_FIXTURE.read_text(encoding="utf-8"))
-    constraints = value["effective_constraints"]
-    required = next(item for item in constraints if item["path"] == "evidence.capture.required_fields")
-    required["value"] = ["capture_digest", "locator", "source_id"]
-    if not enforce_capture_digest:
-        required["value"] = ["locator", "source_id"]
+    if ablate_capture_digest:
+        constraints = value["effective_constraints"]
+        required = next(item for item in constraints if item["path"] == "evidence.capture.required_fields")
+        required["value"] = [field for field in required["value"] if field != "capture_digest"]
     return value
 
 
-def _open_workspace(root: Path, *, enforce_capture_digest: bool):
+def _open_workspace(root: Path, *, ablate_capture_digest: bool = False):
     config_path = root / "project-config.json"
     profile_path = root / "effective-profile-set.json"
     config_path.write_text(json.dumps(_bootstrap_config()), encoding="utf-8")
-    profile_path.write_text(json.dumps(_profile_set(enforce_capture_digest=enforce_capture_digest)), encoding="utf-8")
+    profile_path.write_text(json.dumps(_profile_set(ablate_capture_digest=ablate_capture_digest)), encoding="utf-8")
     return LocalWorkspace.init(root / "workspace", config_path, profile_path)
 
 
@@ -67,7 +66,7 @@ class ProductionProfileConstraintEnforcementTests(unittest.TestCase):
 
     def test_workspace_profile_required_field_is_enforced_before_commit(self):
         with tempfile.TemporaryDirectory() as temp:
-            with _open_workspace(Path(temp), enforce_capture_digest=True) as opened:
+            with _open_workspace(Path(temp)) as opened:
                 before, result = self._apply_evidence(opened, with_capture_digest=False, suffix="41")
                 self.assertIsInstance(result, StateTransitionRejected)
                 self.assertIn("RT-PROFILE-002", {issue.error_code for issue in result.issues})
@@ -78,13 +77,13 @@ class ProductionProfileConstraintEnforcementTests(unittest.TestCase):
 
     def test_workspace_profile_required_field_accepts_satisfying_input(self):
         with tempfile.TemporaryDirectory() as temp:
-            with _open_workspace(Path(temp), enforce_capture_digest=True) as opened:
+            with _open_workspace(Path(temp)) as opened:
                 _before, result = self._apply_evidence(opened, with_capture_digest=True, suffix="42")
                 self.assertIsInstance(result, CommitReceipt)
 
     def test_ablation_changes_profile_result_but_not_core_floor(self):
         with tempfile.TemporaryDirectory() as temp:
-            with _open_workspace(Path(temp), enforce_capture_digest=False) as opened:
+            with _open_workspace(Path(temp), ablate_capture_digest=True) as opened:
                 _before, result = self._apply_evidence(opened, with_capture_digest=False, suffix="43")
                 self.assertIsInstance(result, CommitReceipt)
 
@@ -101,7 +100,23 @@ class ProductionProfileConstraintEnforcementTests(unittest.TestCase):
                     suffix="44",
                 ))
                 self.assertIsInstance(rejected, StateTransitionRejected)
-                self.assertIn("RT-CORE-FW-001", {issue.error_code for issue in rejected.issues})
+                self.assertIn("RT-SCHEMA-CORE-001", {issue.error_code for issue in rejected.issues})
+
+
+    def test_malformed_required_field_shape_fails_closed(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config_path = root / "project-config.json"
+            profile_path = root / "effective-profile-set.json"
+            config_path.write_text(json.dumps(_bootstrap_config()), encoding="utf-8")
+            profile = _profile_set(ablate_capture_digest=False)
+            required = next(item for item in profile["effective_constraints"] if item["path"] == "evidence.capture.required_fields")
+            required["value"] = [["capture_digest"]]
+            profile_path.write_text(json.dumps(profile), encoding="utf-8")
+            with self.assertRaises(LocalWorkspaceError) as raised:
+                LocalWorkspace.init(root / "workspace", config_path, profile_path)
+            self.assertEqual("WORKSPACE-PROFILE-SET-SCHEMA-001", raised.exception.code)
+
 
 
 if __name__ == "__main__":

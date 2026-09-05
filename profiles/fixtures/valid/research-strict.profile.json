@@ -7,7 +7,7 @@
   "core_compatibility": {"research_contract": ">=0.1.0 <0.2.0", "invariant_contract": ">=0.1.0 <0.2.0"},
   "extends": [{"profile_id": "fixture.research-base", "profile_type": "research", "version": ">=1.0.0 <2.0.0"}],
   "constraints": [
-    {"id": "FIX-RES-002", "path": "evidence.capture.required_fields", "merge_strategy": "union", "value": ["captured_hash"], "rationale": "Adds one synthetic capture field without replacement."},
+    {"id": "FIX-RES-002", "path": "evidence.capture.required_fields", "merge_strategy": "union", "value": ["capture_digest"], "rationale": "Adds one synthetic capture field without replacement."},
     {"id": "FIX-RES-003", "path": "evidence.capture.locator_precision", "merge_strategy": "must_equal", "value": "exact", "rationale": "Synthetic strengthening tied to Core traceability for fixture coverage."}
   ],
   "core_invariant_strengthenings": [{

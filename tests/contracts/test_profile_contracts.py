@@ -71,6 +71,15 @@ class ProfileContractTests(unittest.TestCase):
         for ref in eps["candidate_universe"] + eps["effective_profiles"]:
             self.assertEqual(actual[keyver_of(ref)], ref["manifest_sha256"])
 
+    def test_required_fields_constraint_rejects_non_string_members(self):
+        eps = load_json(ROOT / "profiles/fixtures/valid/effective-profile-set.json")
+        required = next(
+            item for item in eps["effective_constraints"]
+            if item["path"] == "evidence.capture.required_fields"
+        )
+        required["value"] = [["capture_digest"]]
+        self.assertTrue(list(self.effective_validator.iter_errors(eps)))
+
     def test_schema_invalid_fixtures_fail(self):
         for name in [
             "cross-type-extends.profile.json",
@@ -159,7 +168,7 @@ class ProfileContractTests(unittest.TestCase):
             self.assertEqual(expected, normalized)
         self.assertEqual(sorted(c["path"] for c in composed), [c["path"] for c in composed])
         union = next(c for c in composed if c["path"] == "evidence.capture.required_fields")
-        self.assertEqual(["captured_hash", "locator", "source_id"], union["value"])
+        self.assertEqual(["capture_digest", "locator", "source_id"], union["value"])
         self.assertEqual(sorted(union["provenance"], key=canonical_constraint_source_key), union["provenance"])
 
     def test_set_like_serialization_uses_rfc8785_for_numbers_objects_and_unicode(self):
