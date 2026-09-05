@@ -33,6 +33,49 @@ _TEXTUAL_MEDIA_TYPES = {
 }
 
 
+def validate_question_review_project_inputs(facade, draft_input: Mapping[str, Any]) -> None:
+    """Enforce exact project-input bindings before Question Review dispatch."""
+    if not isinstance(draft_input, Mapping) or draft_input.get("action_type") != "research_question.review":
+        return
+    payload = draft_input.get("payload")
+    review_inputs = payload.get("review_inputs") if isinstance(payload, Mapping) else None
+    ids = review_inputs.get("project_input_ids", []) if isinstance(review_inputs, Mapping) else []
+    if not ids:
+        return
+    if not isinstance(ids, list) or any(not isinstance(item, str) for item in ids):
+        raise LocalApplicationError("APPLICATION-PROJECT-INPUT-001", "project_input_ids must be an array of IDs")
+    if len(ids) > _MAX_PROJECT_INPUT_IDS:
+        raise LocalApplicationError(
+            "APPLICATION-PROJECT-INPUT-001",
+            f"project_input_ids must contain at most {_MAX_PROJECT_INPUT_IDS} IDs",
+        )
+    registry = facade._registry()
+    resolved = {item: registry.get(item, facade._project_id) for item in ids}
+    missing = [item for item, value in resolved.items() if value is None]
+    if missing:
+        raise LocalApplicationError(
+            "APPLICATION-PROJECT-INPUT-404",
+            "Question Review references unknown project inputs: " + ", ".join(missing),
+        )
+    lineage, snapshot_id, snapshot_digest = facade._current_binding()
+    stale = [
+        item
+        for item, value in resolved.items()
+        if value is not None
+        and (
+            value["lineage_ref"] != lineage
+            or value["snapshot_id"] != snapshot_id
+            or value["snapshot_digest"] != snapshot_digest
+        )
+    ]
+    if stale:
+        raise LocalApplicationError(
+            "APPLICATION-PROJECT-INPUT-STALE-001",
+            "Question Review references project inputs that are not bound to the exact current Snapshot: "
+            + ", ".join(stale),
+        )
+
+
 class LocalApplicationFacade(_BaseLocalApplicationFacade):
     """Same-workspace immutable project-input registration and Question Review linkage."""
 
@@ -207,35 +250,5 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
         return formats
 
     def submit_action(self, draft_input: Mapping[str, Any]) -> Mapping[str, Any]:
-        if isinstance(draft_input, Mapping) and draft_input.get("action_type") == "research_question.review":
-            payload = draft_input.get("payload")
-            review_inputs = payload.get("review_inputs") if isinstance(payload, Mapping) else None
-            ids = review_inputs.get("project_input_ids", []) if isinstance(review_inputs, Mapping) else []
-            if ids:
-                if not isinstance(ids, list) or any(not isinstance(item, str) for item in ids):
-                    raise LocalApplicationError("APPLICATION-PROJECT-INPUT-001", "project_input_ids must be an array of IDs")
-                if len(ids) > _MAX_PROJECT_INPUT_IDS:
-                    raise LocalApplicationError(
-                        "APPLICATION-PROJECT-INPUT-001",
-                        f"project_input_ids must contain at most {_MAX_PROJECT_INPUT_IDS} IDs",
-                    )
-                registry = self._registry()
-                resolved = {item: registry.get(item, self._project_id) for item in ids}
-                missing = [item for item, value in resolved.items() if value is None]
-                if missing:
-                    raise LocalApplicationError("APPLICATION-PROJECT-INPUT-404", "Question Review references unknown project inputs: " + ", ".join(missing))
-                lineage, snapshot_id, snapshot_digest = self._current_binding()
-                stale = [
-                    item for item, value in resolved.items()
-                    if value is not None and (
-                        value["lineage_ref"] != lineage
-                        or value["snapshot_id"] != snapshot_id
-                        or value["snapshot_digest"] != snapshot_digest
-                    )
-                ]
-                if stale:
-                    raise LocalApplicationError(
-                        "APPLICATION-PROJECT-INPUT-STALE-001",
-                        "Question Review references project inputs that are not bound to the exact current Snapshot: " + ", ".join(stale),
-                    )
+        validate_question_review_project_inputs(self, draft_input)
         return super().submit_action(draft_input)
