@@ -19,16 +19,27 @@ jobs:
         shell: bash
         run: |
           python - <<'PY'
+          import json
           from pathlib import Path
           p = Path('core/fixtures/conversation/valid/generic-conversation-flow.json')
-          s = p.read_text()
+          raw = p.read_text(encoding='utf-8')
+          data = json.loads(raw)
+          matches = [d for d in data['documents'] if d.get('action_receipt_id') == 'AR-CAP']
+          if len(matches) != 1:
+              raise SystemExit(f'expected one AR-CAP receipt, found {len(matches)}')
+          receipt = matches[0]
           old = 'sha256:' + '8' * 63
           new = 'sha256:' + '8' * 64
-          if s.count(old) != 1:
-              raise SystemExit(f'expected exactly one 63-digit state digest, found {s.count(old)}')
-          p.write_text(s.replace(old, new), encoding='utf-8')
+          if receipt['state_after']['content_digest'] != old:
+              raise SystemExit('AR-CAP state_after digest does not match expected broken value')
+          needle = '"state_after":{"state_id":"STATE-8","revision":8,"content_digest":"' + old + '"}'
+          replacement = '"state_after":{"state_id":"STATE-8","revision":8,"content_digest":"' + new + '"}'
+          if raw.count(needle) != 1:
+              raise SystemExit(f'expected one exact AR-CAP serialized state_after, found {raw.count(needle)}')
+          p.write_text(raw.replace(needle, replacement), encoding='utf-8')
           PY
           git diff --check
+          git diff --exit-code -- . ':(exclude)core/fixtures/conversation/valid/generic-conversation-flow.json'
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add core/fixtures/conversation/valid/generic-conversation-flow.json
