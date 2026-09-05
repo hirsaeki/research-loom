@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from typing import Mapping, Sequence
 
 from .transition_models import CommitBundle, ReductionResult, StateTransitionRequest, StateView, TransitionKind, ValidationIssue, ValidationStage
 from ._validation_common import _issue, _snapshot_digest
@@ -10,7 +11,7 @@ from .authority_validation import (
 )
 from .state_validation import (
     _validate_adoption_boundaries, _validate_core_invariants, _validate_epistemic_postconditions,
-    _validate_lineage_postconditions, _validate_next_state, _validate_profile_strengthening,
+    _validate_lineage_postconditions, _validate_next_state,
     _validate_project_guards, _validate_reference_integrity,
 )
 
@@ -37,13 +38,59 @@ def validate_post_reduction(
     issues: list[ValidationIssue] = []
     issues.extend(_validate_reference_integrity(current_state, reduction))
     issues.extend(_validate_core_invariants(current_state, request, reduction))
-    issues.extend(_validate_profile_strengthening(current_state, reduction))
+    issues.extend(_validate_profile_core_floor(current_state))
+    issues.extend(_validate_resolved_profile_constraints(current_state, reduction))
     issues.extend(_validate_project_guards(current_state, reduction))
     issues.extend(_validate_adoption_boundaries(current_state, request, reduction))
     issues.extend(_validate_lineage_postconditions(current_state, request, reduction))
     issues.extend(_validate_epistemic_postconditions(current_state, request, reduction))
     issues.extend(_validate_next_state(current_state, reduction))
     return tuple(issues)
+
+
+def _validate_profile_core_floor(current_state: StateView) -> list[ValidationIssue]:
+    constraints = current_state.effective_constraints
+    if constraints.get("weakens_core") or constraints.get("core_override_requests"):
+        return [_issue(
+            "RT-PROFILE-001",
+            ValidationStage.PROFILE_CONSTRAINTS,
+            "Effective Profile Set attempts to weaken/override a non-overridable Core invariant.",
+        )]
+    return []
+
+
+def _validate_resolved_profile_constraints(
+    current_state: StateView,
+    reduction: ReductionResult,
+) -> list[ValidationIssue]:
+    """Execute the canonical resolved Profile constraints supported at this boundary."""
+    issues: list[ValidationIssue] = []
+    constraint = current_state.effective_constraints.get("evidence.capture.required_fields")
+    if not isinstance(constraint, Mapping):
+        return issues
+    required_fields = constraint.get("value", ())
+    if (
+        not isinstance(required_fields, Sequence)
+        or isinstance(required_fields, (str, bytes))
+        or any(not isinstance(field, str) for field in required_fields)
+    ):
+        return [_issue(
+            "RT-PROFILE-002",
+            ValidationStage.PROFILE_CONSTRAINTS,
+            "Resolved Profile evidence.capture.required_fields must be an array of field names.",
+        )]
+    for obj in reduction.object_revisions:
+        if obj.get("kind") != "evidence":
+            continue
+        missing = [field for field in required_fields if field not in obj]
+        if missing:
+            issues.append(_issue(
+                "RT-PROFILE-002",
+                ValidationStage.PROFILE_CONSTRAINTS,
+                f"Resolved Profile strengthening requires fields: {', '.join(map(str, missing))}.",
+                (str(obj.get("id", "")),),
+            ))
+    return issues
 
 
 def validate_commit_bundle(bundle: CommitBundle) -> tuple[ValidationIssue, ...]:
@@ -184,7 +231,7 @@ def _validate_pins(current_state: StateView, request: StateTransitionRequest) ->
         issues.append(_issue(
             "RT-PIN-001",
             ValidationStage.PINS,
-            "StateTransitionRequest digest does not match the pinned request payload.",
+            "StateTransitionRequest digest does not match its pinned request payload.",
             (request.transition_id,),
         ))
     if request.project_config_ref != current_state.project_config_ref or request.project_config_digest != current_state.project_config_digest:
