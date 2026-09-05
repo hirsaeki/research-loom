@@ -52,6 +52,10 @@ def _artifact_pair_for_capture(store, project_id: str, run_id: str, capture_id: 
             "persisted external capture pair is incomplete or ambiguous"
         )
     original, rendition = originals[0], renditions[0]
+    if original.provenance.get("parent_artifact_refs") != []:
+        raise LocalExecutionStoreIntegrityError(
+            "persisted external original capture has invalid parent provenance"
+        )
     projection = _capture_projection(original, rendition)
     if projection["capture_id"] != capture_id or projection["run_id"] != run_id:
         raise LocalExecutionStoreIntegrityError(
@@ -60,22 +64,29 @@ def _artifact_pair_for_capture(store, project_id: str, run_id: str, capture_id: 
     return run, original, rendition, projection
 
 
-def _bounded_utf8_view(content: bytes, limit: int) -> Mapping[str, Any]:
-    try:
-        full_text = content.decode("utf-8")
-    except UnicodeDecodeError as exc:
-        raise LocalExecutionStoreIntegrityError(
-            "persisted external text rendition is not valid UTF-8"
-        ) from exc
-    if len(content) <= limit:
+def _bounded_utf8_view(
+    content: bytes,
+    limit: int,
+    *,
+    total_bytes: int | None = None,
+) -> Mapping[str, Any]:
+    total = len(content) if total_bytes is None else total_bytes
+    truncated = total > limit
+    prefix = content[:limit]
+    if not truncated:
+        try:
+            text = prefix.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise LocalExecutionStoreIntegrityError(
+                "persisted external text rendition is not valid UTF-8"
+            ) from exc
         return {
             "encoding": "UTF-8",
-            "content": full_text,
-            "displayed_bytes": len(content),
-            "total_bytes": len(content),
+            "content": text,
+            "displayed_bytes": len(prefix),
+            "total_bytes": total,
             "truncated": False,
         }
-    prefix = content[:limit]
     while prefix:
         try:
             text = prefix.decode("utf-8")
@@ -92,7 +103,7 @@ def _bounded_utf8_view(content: bytes, limit: int) -> Mapping[str, Any]:
         "encoding": "UTF-8",
         "content": text,
         "displayed_bytes": len(prefix),
-        "total_bytes": len(content),
+        "total_bytes": total,
         "truncated": True,
     }
 
@@ -181,8 +192,17 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
             run, _original, rendition, capture = _artifact_pair_for_capture(
                 self._application.execution_store, self._project_id, run_id, capture_id
             )
-            rendition_payload = self._application.execution_store.load_artifact(rendition.artifact_id)
-            view = _bounded_utf8_view(rendition_payload.content, max_text_bytes)
+            rendition_payload, total_bytes = (
+                self._application.execution_store.load_artifact_verified_prefix(
+                    rendition.artifact_id,
+                    max_bytes=max_text_bytes,
+                )
+            )
+            view = _bounded_utf8_view(
+                rendition_payload.content,
+                max_text_bytes,
+                total_bytes=total_bytes,
+            )
         except LocalApplicationError:
             raise
         except Exception as exc:
@@ -222,7 +242,9 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                 self._application.execution_store, self._project_id, run_id, capture_id
             )
             selected = original if kind == "original" else rendition
-            payload = self._application.execution_store.load_artifact(selected.artifact_id)
+            payload = self._application.execution_store.load_artifact_verified_once(
+                selected.artifact_id
+            )
             _write_exclusive_bytes(target, payload.content)
         except LocalApplicationError:
             raise
