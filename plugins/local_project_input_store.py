@@ -11,7 +11,7 @@ import sqlite3
 import tempfile
 from typing import Any, Mapping
 
-_SCHEMA_VERSION = 3
+_SCHEMA_VERSION = 2
 _BLOB_HASH_CHUNK_BYTES = 1024 * 1024
 _MAX_PAGE_SIZE = 100
 
@@ -120,7 +120,7 @@ class LocalProjectInputStore:
             self._ensure_page_index()
             if int(self.db.execute("PRAGMA user_version").fetchone()[0]) < _SCHEMA_VERSION:
                 self.db.execute(f"PRAGMA user_version={_SCHEMA_VERSION}")
-            self.db.commit()
+                self.db.commit()
             return
         try:
             self.db.execute("BEGIN IMMEDIATE")
