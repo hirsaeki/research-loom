@@ -148,10 +148,17 @@ def build_parser() -> argparse.ArgumentParser:
     _add_input_json(research_input_register)
     research_input_list = research_input_sub.add_parser("list")
     _add_workspace(research_input_list)
+    research_input_list.add_argument("--limit", type=int, default=100)
+    research_input_list.add_argument("--cursor")
     _add_output_json(research_input_list)
     research_input_show = research_input_sub.add_parser("show")
     _add_workspace(research_input_show)
     research_input_show.add_argument("--input-id", required=True)
+    research_input_show.add_argument(
+        "--format",
+        choices=("metadata", "text", "base64"),
+        default="metadata",
+    )
     _add_output_json(research_input_show)
 
     exhibit = sub.add_parser("exhibit")
@@ -327,9 +334,9 @@ def _run(args: argparse.Namespace) -> Mapping[str, Any]:
             if args.research_input_command == "register":
                 return facade.register_project_input(_read_input(args.json_input))
             if args.research_input_command == "list":
-                return facade.list_project_inputs()
+                return facade.list_project_inputs(limit=args.limit, cursor=args.cursor)
             if args.research_input_command == "show":
-                return facade.show_project_input(args.input_id)
+                return facade.show_project_input(args.input_id, format=args.format)
         if args.command == "action" and args.action_command == "submit":
             return facade.submit_action(_read_input(args.json_input))
         if args.command == "confirmation" and args.confirmation_command == "submit":
