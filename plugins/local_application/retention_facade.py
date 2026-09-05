@@ -17,7 +17,7 @@ from .external_desktop_facade import (
     _required_string,
 )
 from .facade import LocalApplicationError
-from .material_inventory_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
+from .material_content_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
 
 
 _LARGE_ORIGINAL_PREFIX = "external-original://sha256/"
