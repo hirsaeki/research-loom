@@ -1,0 +1,36 @@
+name: issue74-fixture-fix
+
+on:
+  push:
+    branches: [tmp/issue74-fixture-fix]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: fix/issue-74-profile-state-validation
+          fetch-depth: 0
+      - name: Patch exact fixture typo
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('core/fixtures/conversation/valid/generic-conversation-flow.json')
+          s = p.read_text()
+          old = 'sha256:' + '8' * 63
+          new = 'sha256:' + '8' * 64
+          if s.count(old) != 1:
+              raise SystemExit(f'expected exactly one 63-digit state digest, found {s.count(old)}')
+          p.write_text(s.replace(old, new), encoding='utf-8')
+          PY
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add core/fixtures/conversation/valid/generic-conversation-flow.json
+          git commit -m 'Fix action receipt state digest fixture'
+          git push origin HEAD:fix/issue-74-profile-state-validation
