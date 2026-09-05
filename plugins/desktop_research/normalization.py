@@ -4,6 +4,7 @@ import hashlib
 import re
 from typing import Any, Mapping
 
+from core.runtime.normalization import NormalizationRejected
 from core.runtime.transition_models import (
     ObjectRef,
     StateDeltaProposal,
@@ -175,20 +176,53 @@ class DesktopResearchNormalizer:
             resources = {
                 str(item["reference_id"]): item for item in context_pack["resources"]
             }
+            verified_resources: set[tuple[str, str]] = set()
 
-            def source_for_basis(basis: Mapping[str, Any]) -> str | None:
+            def provenance_for_basis(basis: Mapping[str, Any]) -> tuple[str, str]:
                 if basis["basis_type"] == "source_capture":
-                    return source_ids.get(str(basis["capture_id"]))
-                resource = resources.get(str(basis["resource_reference_id"]))
-                if resource and resource.get("reference_type") == "source":
-                    object_id = resource.get("object_id")
-                    return str(object_id) if object_id is not None else None
-                return None
+                    capture_id = str(basis["capture_id"])
+                    source_id = source_ids.get(capture_id)
+                    detail = details.get(capture_id)
+                    if source_id is None or detail is None:
+                        raise NormalizationRejected(
+                            f"Desktop Evidence basis references unresolved source capture {capture_id}"
+                        )
+                    digest = detail["original_capture"].get("content_digest")
+                    if not digest:
+                        raise NormalizationRejected(
+                            f"Desktop Evidence source capture {capture_id} has no original capture digest"
+                        )
+                    return source_id, str(digest)
+
+                reference_id = str(basis["resource_reference_id"])
+                resource = resources.get(reference_id)
+                if not resource or resource.get("reference_type") != "source":
+                    raise NormalizationRejected(
+                        f"Desktop Evidence basis references unresolved source resource {reference_id}"
+                    )
+                object_id = resource.get("object_id")
+                digest = resource.get("digest")
+                if object_id is None or not digest:
+                    raise NormalizationRejected(
+                        f"Desktop Evidence source resource {reference_id} lacks object_id or digest"
+                    )
+                verification_key = (reference_id, str(digest))
+                if verification_key not in verified_resources:
+                    try:
+                        payload = self._artifacts.load(resource)
+                    except Exception as exc:
+                        raise NormalizationRejected(
+                            f"Desktop Evidence source resource {reference_id} failed integrity verification"
+                        ) from exc
+                    if str(payload.digest) != str(digest):
+                        raise NormalizationRejected(
+                            f"Desktop Evidence source resource {reference_id} digest does not match verified payload"
+                        )
+                    verified_resources.add(verification_key)
+                return str(object_id), str(digest)
 
             for item in handoff["outputs"]["evidence_candidates"]:
-                source_id = source_for_basis(item["source_basis"])
-                if source_id is None:
-                    continue
+                source_id, capture_digest = provenance_for_basis(item["source_basis"])
                 output_id = str(item["evidence_candidate_id"])
                 eid = _id("EVD", f"{run.run_id}:{output_id}")
                 evidence_ids[output_id] = eid
@@ -196,14 +230,13 @@ class DesktopResearchNormalizer:
                     "schema_version": "0.1.0", "id": eid, "kind": "evidence",
                     "revision": 0, "project_id": project_ref, "source_id": source_id,
                     "locator": str(item["locator"]), "statement": str(item["statement"]),
+                    "capture_digest": capture_digest,
                     "evidence_kind": "supporting", "verification_status": "unverified",
                     "evidence_mode": "empirical", "limitations": list(item.get("limitations", ())),
                 })
 
             for item in handoff["outputs"]["counterevidence"]:
-                source_id = source_for_basis(item["source_basis"])
-                if source_id is None:
-                    continue
+                source_id, capture_digest = provenance_for_basis(item["source_basis"])
                 output_id = str(item["counterevidence_id"])
                 eid = _id("EVD", f"{run.run_id}:{output_id}")
                 counter_ids[output_id] = eid
@@ -211,6 +244,7 @@ class DesktopResearchNormalizer:
                     "schema_version": "0.1.0", "id": eid, "kind": "evidence",
                     "revision": 0, "project_id": project_ref, "source_id": source_id,
                     "locator": str(item["locator"]), "statement": str(item["statement"]),
+                    "capture_digest": capture_digest,
                     "evidence_kind": "counterevidence", "verification_status": "unverified",
                     "evidence_mode": "empirical", "limitations": [],
                 })
