@@ -83,39 +83,25 @@ class ProjectInputRegistrationTests(unittest.TestCase):
                 _adopt_question(facade, "Second question")
                 current = facade.resume_context()["research_state"]["snapshot"]
                 self.assertNotEqual(current["snapshot_id"], first["snapshot_id"])
-                with self.assertRaises(LocalApplicationError) as stale_review:
-                    facade.submit_action({
-                        "action_type": "research_question.review",
-                        "payload": {
-                            "operation": "KEEP",
-                            "question_ids": [question_id],
-                            "rationale": "stale project input",
-                            "review_inputs": {"project_input_ids": [first["input_id"]]},
-                        },
-                    })
-                self.assertEqual(stale_review.exception.code, "APPLICATION-PROJECT-INPUT-STALE-001")
-
-                current_payload = dict(payload)
-                current_payload["expected_snapshot_id"] = current["snapshot_id"]
-                current_payload["expected_snapshot_digest"] = current["content_digest"]
-                current_registration = facade.register_project_input(current_payload)["project_input"]
-                self.assertNotEqual(first["input_id"], current_registration["input_id"])
-                self.assertEqual(first["content_digest"], current_registration["content_digest"])
-                self.assertEqual(len(facade.list_project_inputs()["project_inputs"]), 2)
-                self.assertEqual(
-                    facade.show_project_input(first["input_id"])["project_input"]["snapshot_id"],
-                    first["snapshot_id"],
-                )
-                keep_current = facade.submit_action({
+                reused = facade.submit_action({
                     "action_type": "research_question.review",
                     "payload": {
                         "operation": "KEEP",
                         "question_ids": [question_id],
-                        "rationale": "current project input",
-                        "review_inputs": {"project_input_ids": [current_registration["input_id"]]},
+                        "rationale": "reuse immutable project input",
+                        "review_inputs": {"project_input_ids": [first["input_id"]]},
                     },
                 })
-                self.assertFalse(keep_current["data"]["question_review"]["material_change"])
+                self.assertFalse(reused["data"]["question_review"]["material_change"])
+                self.assertEqual(
+                    reused["data"]["question_review"]["bound_snapshot"]["snapshot_id"],
+                    current["snapshot_id"],
+                )
+                self.assertEqual(len(facade.list_project_inputs()["project_inputs"]), 1)
+                self.assertEqual(
+                    facade.show_project_input(first["input_id"])["project_input"]["snapshot_id"],
+                    first["snapshot_id"],
+                )
 
                 with self.assertRaises(LocalApplicationError) as too_many:
                     facade.submit_action({

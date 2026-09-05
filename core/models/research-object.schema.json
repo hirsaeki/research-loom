@@ -111,7 +111,8 @@
               "properties": {
                 "uncovered_attention_ids": {"$ref": "#/$defs/ids"},
                 "evidence_gap_ids": {"$ref": "#/$defs/ids"},
-                "publication_feedback_ids": {"$ref": "#/$defs/ids"}
+                "publication_feedback_ids": {"$ref": "#/$defs/ids"},
+                "project_input_ids": {"$ref": "#/$defs/ids"}
               }
             },
             "downstream_review_required_refs": {
