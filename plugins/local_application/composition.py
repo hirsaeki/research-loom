@@ -30,6 +30,7 @@ from .survey_response_facade import (
     LocalApplicationFacade as _SurveyResponseImplementation,
     _SURVEY_RESPONSE_ACTIONS,
     _ACTION_VALIDATORS as _SURVEY_RESPONSE_VALIDATORS,
+    _ACTION_REGISTRATION_LOCK as _SURVEY_RESPONSE_ACTION_REGISTRATION_LOCK,
     _nonempty_string as _survey_response_string,
 )
 from .virtual_runner_execute import VirtualRunnerExecuteMixin
@@ -39,6 +40,7 @@ from .survey_analysis_facade import (
     LocalApplicationFacade as _SurveyAnalysisImplementation,
     _SURVEY_ANALYSIS_ACTIONS,
     _ACTION_VALIDATORS as _SURVEY_ANALYSIS_VALIDATORS,
+    _ACTION_REGISTRATION_LOCK as _SURVEY_ANALYSIS_ACTION_REGISTRATION_LOCK,
     _nonempty_string as _survey_analysis_string,
 )
 from .survey_virtual_pretest_inspection import SurveyVirtualPretestInspectionMixin
@@ -126,7 +128,7 @@ class _ComposedSurveyActionHandler:
                 result = facade.run_survey_aggregation(payload)
             elif self._operation == "show_result":
                 result = facade.show_survey_aggregate_result(
-                    _survey_analysis_string(payload, "aggregate_result_id"),
+                 _survey_analysis_string(payload, "aggregate_result_id"),
                     limit=payload.get("limit", 25),
                     offset=payload.get("offset", 0),
                 )
@@ -294,43 +296,47 @@ class LocalApplicationFacade(_CoreFacade):
         coordinator = self._application.coordinator
         action_registry = coordinator._actions
         service_registry = coordinator._services
-        existing = {definition.action_type: definition for definition in coordinator.action_definitions()}
-        for action_type, payload_contract, operation in actions:
-            definition = existing.get(action_type)
-            if definition is None:
-                action_registry.register(
-                    ActionDefinition(
-                        action_type,
-                        payload_contract,
-                        "read_only",
-                        "harness_service",
-                        False,
-                        human_decision_required=False,
-                        service_id=action_type,
-                        payload_validator=validators[action_type],
+        with _SURVEY_RESPONSE_ACTION_REGISTRATION_LOCK, _SURVEY_ANALYSIS_ACTION_REGISTRATION_LOCK:
+            existing = {
+                definition.action_type: definition
+                for definition in coordinator.action_definitions()
+            }
+            for action_type, payload_contract, operation in actions:
+                definition = existing.get(action_type)
+                if definition is None:
+                    action_registry.register(
+                        ActionDefinition(
+                            action_type,
+                            payload_contract,
+                            "read_only",
+                            "harness_service",
+                            False,
+                            human_decision_required=False,
+                            service_id=action_type,
+                            payload_validator=validators[action_type],
+                        )
                     )
-                )
-                existing[action_type] = action_registry.get(action_type)
-            elif (
-                definition.payload_contract != payload_contract
-                or definition.effect != "read_only"
-                or definition.route_kind != "harness_service"
-                or definition.confirmation_required
-                or definition.service_id != action_type
-            ):
-                raise LocalApplicationError(
-                    conflict_code,
-                    f"registered action conflicts with Survey {family} route: {action_type}",
-                )
-            try:
-                service_registry.resolve(action_type)
-            except ConversationRuntimeError as exc:
-                if exc.code != "CONV-ROUTE-001":
-                    raise
-                service_registry.register(
-                    action_type,
-                    _ComposedSurveyActionHandler(self._application, family, operation),
-                )
+                    existing[action_type] = action_registry.get(action_type)
+                elif (
+                    definition.payload_contract != payload_contract
+                    or definition.effect != "read_only"
+                    or definition.route_kind != "harness_service"
+                    or definition.confirmation_required
+                    or definition.service_id != action_type
+                ):
+                    raise LocalApplicationError(
+                        conflict_code,
+                        f"registered action conflicts with Survey {family} route: {action_type}",
+                    )
+                try:
+                    service_registry.resolve(action_type)
+                except ConversationRuntimeError as exc:
+                    if exc.code != "CONV-ROUTE-001":
+                        raise
+                    service_registry.register(
+                        action_type,
+                        _ComposedSurveyActionHandler(self._application, family, operation),
+                    )
 
     def close(self) -> None:
         if self._project_input_store is not None:
@@ -443,7 +449,7 @@ class LocalApplicationFacade(_CoreFacade):
                     for attempt_id, attempt in attempts.items()
                     if attempt.get("completed_at") is None
                 )
-                if in_progress:
+                if in_progress :
                     raise LocalApplicationError(
                         "APPLICATION-EXTERNAL-ATTEMPT-001",
                         "external collect requires every retrieval attempt to have a terminal outcome; "
@@ -467,7 +473,7 @@ class LocalApplicationFacade(_CoreFacade):
 
     # ---- Research Exhibits --------------------------------------------------------
     def _exhibit_store(self):
-        delegate = self._features.exhibits.call("_exhibit_store")
+        delegate = self._features.exhibits.call("_exhibit_stor")
         return _StateGuardedResearchExhibitStore(
             delegate, self._application.state_repository
         )
