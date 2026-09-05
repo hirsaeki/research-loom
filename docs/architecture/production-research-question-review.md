@@ -88,12 +88,15 @@ the public `research-input register` surface. Registration is bounded to regular
 the workspace-controlled intake root and records immutable content bytes, SHA-256 digest,
 media type, typed logical role, source-path/provenance, project/lineage binding, and the exact
 current Research Snapshot. Re-registering the same project/role/content digest against the same
-Snapshot returns the same project-input identity; after a Snapshot change, a new immutable
-registration identity points at the same content-addressed bytes.
+Snapshot returns the same project-input identity. Explicit registration after a Snapshot change
+creates a distinct immutable registration identity, but Question Review does not require that
+re-registration merely to reuse the original input within the same Research Lineage.
 
 Project inputs are Question Review provenance, not Evidence, Attention, or Human authority.
-A review may name registered IDs in `review_inputs.project_input_ids`; unknown IDs or IDs bound
-to an older Snapshot fail closed.
+A review may name registered IDs in `review_inputs.project_input_ids`. Unknown IDs, inputs from
+a different project or Research Lineage, and missing or tampered stored content fail closed. An
+immutable input registered against an older Snapshot remains reusable within the same lineage;
+its original registration Snapshot is preserved while the Review binds the current Snapshot.
 Registration itself requires the caller to pin `expected_snapshot_id` and
 `expected_snapshot_digest`. The final project-input persistence is performed while holding the
 same local Research State HEAD writer guard used by Survey/Research Exhibit capture, so a HEAD

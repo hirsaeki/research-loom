@@ -208,7 +208,17 @@ class LocalProjectInputStore:
         return self._project(row)
 
     def _blob_path(self, digest: str) -> Path:
-        hex_digest = digest.split(":", 1)[1]
+        prefix = "sha256:"
+        if (
+            not digest.startswith(prefix)
+            or len(digest) != len(prefix) + 64
+            or any(character not in "0123456789abcdef" for character in digest[len(prefix):])
+        ):
+            raise LocalProjectInputStoreError(
+                "APPLICATION-PROJECT-INPUT-INTEGRITY-001",
+                "project-input content digest is malformed",
+            )
+        hex_digest = digest[len(prefix):]
         return self.blobs / hex_digest[:2] / hex_digest
 
     def _store_verified_blob(self, content: bytes, digest: str) -> None:
@@ -319,6 +329,21 @@ class LocalProjectInputStore:
                 "content-addressed project-input blob failed digest/size verification",
             )
         return bytes(content)
+
+    def verify_content(self, input_id: str, project_id: str) -> dict[str, Any] | None:
+        row = self.db.execute(
+            "SELECT * FROM project_inputs WHERE input_id=? AND project_id=?",
+            (input_id, project_id),
+        ).fetchone()
+        if row is None:
+            return None
+        digest = str(row["content_digest"])
+        self._verify_blob(
+            self._blob_path(digest),
+            digest,
+            int(row["byte_length"]),
+        )
+        return self._project(row)
 
     def read_content(self, input_id: str, project_id: str) -> tuple[dict[str, Any], bytes] | None:
         row = self.db.execute(

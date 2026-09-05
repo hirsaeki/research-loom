@@ -220,22 +220,31 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                         f"project_input_ids must contain at most {_MAX_PROJECT_INPUT_IDS} IDs",
                     )
                 registry = self._registry()
-                resolved = {item: registry.get(item, self._project_id) for item in ids}
-                missing = [item for item, value in resolved.items() if value is None]
+                resolved: dict[str, Mapping[str, Any]] = {}
+                missing: list[str] = []
+                try:
+                    for item in ids:
+                        document = registry.verify_content(item, self._project_id)
+                        if document is None:
+                            missing.append(item)
+                            continue
+                        resolved[item] = document
+                except LocalProjectInputStoreError as exc:
+                    raise LocalApplicationError(exc.code, exc.message) from exc
                 if missing:
-                    raise LocalApplicationError("APPLICATION-PROJECT-INPUT-404", "Question Review references unknown project inputs: " + ", ".join(missing))
-                lineage, snapshot_id, snapshot_digest = self._current_binding()
-                stale = [
-                    item for item, value in resolved.items()
-                    if value is not None and (
-                        value["lineage_ref"] != lineage
-                        or value["snapshot_id"] != snapshot_id
-                        or value["snapshot_digest"] != snapshot_digest
+                    raise LocalApplicationError(
+                        "APPLICATION-PROJECT-INPUT-404",
+                        "Question Review references unknown project inputs: " + ", ".join(missing),
                     )
+                lineage, _snapshot_id, _snapshot_digest = self._current_binding()
+                foreign_lineage = [
+                    item for item, value in resolved.items()
+                    if value["lineage_ref"] != lineage
                 ]
-                if stale:
+                if foreign_lineage:
                     raise LocalApplicationError(
                         "APPLICATION-PROJECT-INPUT-STALE-001",
-                        "Question Review references project inputs that are not bound to the exact current Snapshot: " + ", ".join(stale),
+                        "Question Review references project inputs from a different Research Lineage: "
+                        + ", ".join(foreign_lineage),
                     )
         return super().submit_action(draft_input)
