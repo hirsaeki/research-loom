@@ -208,7 +208,17 @@ class LocalProjectInputStore:
         return self._project(row)
 
     def _blob_path(self, digest: str) -> Path:
-        hex_digest = digest.split(":", 1)[1]
+        prefix = "sha256:"
+        if (
+            not digest.startswith(prefix)
+            or len(digest) != len(prefix) + 64
+            or any(character not in "0123456789abcdef" for character in digest[len(prefix):])
+        ):
+            raise LocalProjectInputStoreError(
+                "APPLICATION-PROJECT-INPUT-INTEGRITY-001",
+                "project-input content digest is malformed",
+            )
+        hex_digest = digest[len(prefix):]
         return self.blobs / hex_digest[:2] / hex_digest
 
     def _store_verified_blob(self, content: bytes, digest: str) -> None:

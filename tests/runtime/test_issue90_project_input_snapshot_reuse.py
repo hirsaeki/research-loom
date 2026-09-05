@@ -145,6 +145,12 @@ class Issue90ProjectInputSnapshotReuseTests(unittest.TestCase):
                     self._review(facade, q1, input_id)
                 self.assertEqual(lineage.exception.code, "APPLICATION-PROJECT-INPUT-STALE-001")
                 registry.db.execute("UPDATE project_inputs SET lineage_ref=? WHERE input_id=?", (facade._current_binding()[0], input_id))
+                registry.db.execute("UPDATE project_inputs SET content_digest=? WHERE input_id=?", ("bad", input_id))
+                registry.db.commit()
+                with self.assertRaises(LocalApplicationError) as malformed_digest:
+                    self._review(facade, q1, input_id)
+                self.assertEqual(malformed_digest.exception.code, "APPLICATION-PROJECT-INPUT-INTEGRITY-001")
+                registry.db.execute("UPDATE project_inputs SET content_digest=? WHERE input_id=?", (item["content_digest"], input_id))
                 registry.db.commit()
 
                 digest_hex = item["content_digest"].split(":", 1)[1]
