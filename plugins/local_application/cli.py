@@ -259,6 +259,26 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_output_json(materials_list)
 
+    materials_show = materials_sub.add_parser("show")
+    _add_workspace(materials_show)
+    materials_show.add_argument("--run-id", required=True)
+    materials_show.add_argument("--capture-id", required=True)
+    materials_show.add_argument(
+        "--max-text-bytes",
+        type=int,
+        default=64 * 1024,
+        help="maximum UTF-8 rendition bytes to display (1-1048576)",
+    )
+    _add_output_json(materials_show)
+
+    materials_export = materials_sub.add_parser("export")
+    _add_workspace(materials_export)
+    materials_export.add_argument("--run-id", required=True)
+    materials_export.add_argument("--capture-id", required=True)
+    materials_export.add_argument("--kind", choices=("original", "rendition"), required=True)
+    materials_export.add_argument("--output", required=True, help="new output file; existing paths are never overwritten")
+    _add_output_json(materials_export)
+
     return parser
 
 
@@ -365,6 +385,19 @@ def _run(args: argparse.Namespace) -> Mapping[str, Any]:
                 return facade.list_external_materials(
                     limit=args.limit,
                     cursor=args.cursor,
+                )
+            if args.external_command == "materials" and args.materials_command == "show":
+                return facade.show_external_material(
+                    args.run_id,
+                    args.capture_id,
+                    max_text_bytes=args.max_text_bytes,
+                )
+            if args.external_command == "materials" and args.materials_command == "export":
+                return facade.export_external_material(
+                    args.run_id,
+                    args.capture_id,
+                    kind=args.kind,
+                    output_file=args.output,
                 )
     raise LocalApplicationError("CLI-COMMAND-001", "unsupported command")
 
