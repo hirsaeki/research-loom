@@ -4,6 +4,7 @@ import hashlib
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade
 from tests.runtime.test_research_question_review import _adopt_question, _workspace
@@ -57,7 +58,11 @@ class Issue90ProjectInputSnapshotReuseTests(unittest.TestCase):
                 facade.close()
 
             with LocalApplicationFacade.open_workspace(workspace) as facade:
-                keep1 = self._review(facade, q1, item["input_id"])
+                with patch(
+                    "plugins.local_project_input_store.LocalProjectInputStore._read_verified_blob",
+                    side_effect=AssertionError("Review must not materialize verified blob content"),
+                ):
+                    keep1 = self._review(facade, q1, item["input_id"])
                 self.assertEqual(keep1["status"], "SUCCEEDED")
                 self.assertFalse(keep1["data"]["question_review"]["material_change"])
                 self.assertEqual(keep1["data"]["question_review"]["bound_snapshot"]["snapshot_id"], s1["snapshot_id"])
