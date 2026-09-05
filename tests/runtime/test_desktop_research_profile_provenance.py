@@ -5,7 +5,7 @@ from pathlib import Path
 import tempfile
 from unittest.mock import patch
 
-from core.runtime import CommitReceipt, StateTransitionRejected
+from core.runtime import CommitReceipt, NormalizationRejected, StateTransitionRejected
 from runtime_fixtures import make_request
 from tests.runtime.test_desktop_research import Flow
 from tests.runtime.test_profile_constraint_enforcement import _open_workspace
@@ -110,7 +110,7 @@ def test_resource_reference_uses_registered_source_digest_and_missing_digest_fai
         with patch.object(flow.normalizer._traces, "load_context_pack", return_value=context):
             try:
                 flow.normalizer.normalize(handoff, extension, normalize_context)
-            except ValueError as exc:
+            except NormalizationRejected as exc:
                 assert "lacks object_id or digest" in str(exc)
             else:
                 raise AssertionError("missing source resource digest must fail closed")
