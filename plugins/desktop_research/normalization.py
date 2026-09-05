@@ -176,6 +176,7 @@ class DesktopResearchNormalizer:
             resources = {
                 str(item["reference_id"]): item for item in context_pack["resources"]
             }
+            verified_resources: set[tuple[str, str]] = set()
 
             def provenance_for_basis(basis: Mapping[str, Any]) -> tuple[str, str]:
                 if basis["basis_type"] == "source_capture":
@@ -205,16 +206,19 @@ class DesktopResearchNormalizer:
                     raise NormalizationRejected(
                         f"Desktop Evidence source resource {reference_id} lacks object_id or digest"
                     )
-                try:
-                    payload = self._artifacts.load(resource)
-                except Exception as exc:
-                    raise NormalizationRejected(
-                        f"Desktop Evidence source resource {reference_id} failed integrity verification"
-                    ) from exc
-                if str(payload.digest) != str(digest):
-                    raise NormalizationRejected(
-                        f"Desktop Evidence source resource {reference_id} digest does not match verified payload"
-                    )
+                verification_key = (reference_id, str(digest))
+                if verification_key not in verified_resources:
+                    try:
+                        payload = self._artifacts.load(resource)
+                    except Exception as exc:
+                        raise NormalizationRejected(
+                            f"Desktop Evidence source resource {reference_id} failed integrity verification"
+                        ) from exc
+                    if str(payload.digest) != str(digest):
+                        raise NormalizationRejected(
+                            f"Desktop Evidence source resource {reference_id} digest does not match verified payload"
+                        )
+                    verified_resources.add(verification_key)
                 return str(object_id), str(digest)
 
             for item in handoff["outputs"]["evidence_candidates"]:
