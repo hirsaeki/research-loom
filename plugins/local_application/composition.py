@@ -473,7 +473,7 @@ class LocalApplicationFacade(_CoreFacade):
 
     # ---- Research Exhibits --------------------------------------------------------
     def _exhibit_store(self):
-        delegate = self._features.exhibits.call("_exhibit_stor")
+        delegate = self._features.exhibits.call("_exhibit_store")
         return _StateGuardedResearchExhibitStore(
             delegate, self._application.state_repository
         )
