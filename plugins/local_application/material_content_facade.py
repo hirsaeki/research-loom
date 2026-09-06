@@ -204,6 +204,10 @@ def _windows_open_export_handle(path: Path) -> int:
     if handle == invalid_handle:
         raise OSError(ctypes.get_last_error(), "CreateFileW failed")
     try:
+        # Mark the native handle delete-pending before CRT ownership transfer.
+        # If open_osfhandle fails, closing this exact handle removes only the
+        # file created by this export without resolving the pathname again.
+        _windows_set_handle_delete_disposition(handle, True)
         return msvcrt.open_osfhandle(
             handle,
             os.O_WRONLY | getattr(os, "O_BINARY", 0),
@@ -216,16 +220,14 @@ def _windows_open_export_handle(path: Path) -> int:
         raise
 
 
-def _windows_set_delete_disposition(fd: int, delete: bool) -> None:
-    """Toggle delete-on-close for the exact Windows file handle owned by this export."""
+def _windows_set_handle_delete_disposition(handle: int, delete: bool) -> None:
+    """Toggle delete-on-close for one exact Windows native file handle."""
     import ctypes
-    import msvcrt
     from ctypes import wintypes
 
     class _FileDispositionInfo(ctypes.Structure):
         _fields_ = [("DeleteFile", wintypes.BOOL)]
 
-    handle = msvcrt.get_osfhandle(fd)
     kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
     func = kernel32.SetFileInformationByHandle
     func.argtypes = [
@@ -238,6 +240,13 @@ def _windows_set_delete_disposition(fd: int, delete: bool) -> None:
     info = _FileDispositionInfo(bool(delete))
     if not func(handle, 4, ctypes.byref(info), ctypes.sizeof(info)):
         raise OSError(ctypes.get_last_error(), "SetFileInformationByHandle failed")
+
+
+def _windows_set_delete_disposition(fd: int, delete: bool) -> None:
+    """Toggle delete-on-close for the exact Windows fd owned by this export."""
+    import msvcrt
+
+    _windows_set_handle_delete_disposition(msvcrt.get_osfhandle(fd), delete)
 
 
 def _windows_final_path(fd: int) -> Path:
@@ -270,7 +279,6 @@ def _write_exclusive_bytes(target: _ExportTarget, content: bytes) -> None:
     fd: int | None = None
     parent_fd: int | None = None
     created = False
-    created_path: Path | None = None
     try:
         if (
             os.name != "nt"
@@ -307,13 +315,9 @@ def _write_exclusive_bytes(target: _ExportTarget, content: bytes) -> None:
         elif os.name == "nt":
             fd = _windows_open_export_handle(target.path)
             created = True
-            # Keep the exact created handle delete-pending until validation and
-            # the complete write both succeed. If final-path inspection or the
-            # write fails, closing this handle removes our file without resolving
-            # the pathname again and therefore cannot unlink another process' file.
-            _windows_set_delete_disposition(fd, True)
+            # The helper returns an fd whose exact native handle is already
+            # delete-pending, so every failure from here is cleaned up by close.
             final_path = _windows_final_path(fd)
-            created_path = final_path
             final_parent = final_path.parent.resolve(strict=True)
             current_stat = final_parent.stat()
             expected_parent = target.parent.resolve(strict=True)
@@ -358,12 +362,9 @@ def _write_exclusive_bytes(target: _ExportTarget, content: bytes) -> None:
         if fd is not None:
             os.close(fd)
             fd = None
-        if created:
+        if created and parent_fd is not None:
             try:
-                if parent_fd is not None:
-                    os.unlink(target.path.name, dir_fd=parent_fd)
-                elif created_path is not None:
-                    created_path.unlink()
+                os.unlink(target.path.name, dir_fd=parent_fd)
             except FileNotFoundError:
                 pass
         raise

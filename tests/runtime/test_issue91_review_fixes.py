@@ -90,7 +90,12 @@ class Issue91ReviewFixTests(unittest.TestCase):
         native_handle = 0x1234567887654321
         create_file = Mock(return_value=native_handle)
         close_handle = Mock(return_value=False)
-        kernel32 = SimpleNamespace(CreateFileW=create_file, CloseHandle=close_handle)
+        set_disposition = Mock(return_value=True)
+        kernel32 = SimpleNamespace(
+            CreateFileW=create_file,
+            CloseHandle=close_handle,
+            SetFileInformationByHandle=set_disposition,
+        )
         open_error = RuntimeError("open_osfhandle failed")
         fake_msvcrt = SimpleNamespace(open_osfhandle=Mock(side_effect=open_error))
 
@@ -101,6 +106,8 @@ class Issue91ReviewFixTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "open_osfhandle failed"):
                 material_content._windows_open_export_handle(Path("C:/issue91/export.bin"))
 
+        set_disposition.assert_called_once()
+        self.assertEqual(set_disposition.call_args.args[0], native_handle)
         close_handle.assert_called_once_with(native_handle)
         self.assertEqual(close_handle.argtypes, [ctypes.wintypes.HANDLE])
         self.assertIs(close_handle.restype, ctypes.wintypes.BOOL)
@@ -131,6 +138,7 @@ class Issue91ReviewFixTests(unittest.TestCase):
                 material_content,
                 "_windows_set_delete_disposition",
             ) as disposition,
+            patch.object(material_content.Path, "unlink") as path_unlink,
             patch.object(
                 material_content,
                 "_windows_final_path",
@@ -141,8 +149,52 @@ class Issue91ReviewFixTests(unittest.TestCase):
                 material_content._write_exclusive_bytes(target, b"payload")
 
         open_export.assert_called_once_with(target.path)
-        disposition.assert_called_once_with(101, True)
+        disposition.assert_not_called()
         close_fd.assert_called_once_with(101)
+        path_unlink.assert_not_called()
+
+
+    def test_windows_post_validation_failure_never_path_unlinks_replacement(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            output = root / "export.bin"
+            stat_result = root.stat()
+            target = material_content._ExportTarget(
+                path=output,
+                parent=root,
+                parent_dev=stat_result.st_dev,
+                parent_ino=stat_result.st_ino,
+                managed_root=root / ".research-loom",
+            )
+
+            def close_and_replace(fd):
+                output.write_bytes(b"other-process")
+
+            with (
+                patch.object(material_content.os, "name", "nt"),
+                patch.object(
+                    material_content,
+                    "_windows_open_export_handle",
+                    return_value=202,
+                ),
+                patch.object(
+                    material_content,
+                    "_windows_final_path",
+                    return_value=output,
+                ),
+                patch.object(
+                    material_content,
+                    "_is_within",
+                    return_value=True,
+                ),
+                patch.object(material_content.os, "close", side_effect=close_and_replace),
+                patch.object(material_content.Path, "unlink") as path_unlink,
+            ):
+                with self.assertRaises(LocalApplicationError):
+                    material_content._write_exclusive_bytes(target, b"payload")
+
+            self.assertEqual(output.read_bytes(), b"other-process")
+            path_unlink.assert_not_called()
 
     def test_export_writes_the_same_bytes_that_were_verified(self):
         with tempfile.TemporaryDirectory() as temp:
