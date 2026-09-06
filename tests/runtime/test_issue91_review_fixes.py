@@ -112,7 +112,7 @@ class Issue91ReviewFixTests(unittest.TestCase):
             parent=root,
             parent_dev=1,
             parent_ino=2,
-            manaed_root=root / ".research-loom",
+            managed_root=root / ".research-loom",
         )
         with (
             patch.object(material_content.os, "name", "nt"),

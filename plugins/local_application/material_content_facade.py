@@ -258,9 +258,9 @@ def _windows_final_path(fd: int) -> Path:
     if written == 0 or written >= len(buffer):
         raise OSError(ctypes.get_last_error(), "GetFinalPathNameByHandleW failed")
     value = buffer.value
-    if value.startswith("\\\\?\\\UNC\\\"):
-        value = "\\\\\\" + value[8:]
-    elif value.startswith("\\\\?\\\"):
+    if value.startswith("\\\\?\\UNC\\"):
+        value = "\\\\" + value[8:]
+    elif value.startswith("\\\\?\\"):
         value = value[4:]
     return Path(value)
 
