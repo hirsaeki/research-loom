@@ -169,6 +169,50 @@ def _is_within(path: Path, root: Path | None) -> bool:
     return True
 
 
+def _windows_open_export_handle(path: Path) -> int:
+    """Create one new Windows export file with write and delete rights."""
+    import ctypes
+    import msvcrt
+    from ctypes import wintypes
+
+    generic_write = 0x40000000
+    delete_access = 0x00010000
+    create_new = 1
+    file_attribute_normal = 0x00000080
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    create_file = kernel32.CreateFileW
+    create_file.argtypes = [
+        wintypes.LPCWSTR,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        wintypes.LPVOID,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        wintypes.HANDLE,
+    ]
+    create_file.restype = wintypes.HANDLE
+    handle = create_file(
+        str(path),
+        generic_write | delete_access,
+        0,
+        None,
+        create_new,
+        file_attribute_normal,
+        None,
+    )
+    invalid_handle = ctypes.c_void_p(-1).value
+    if handle == invalid_handle:
+        raise OSError(ctypes.get_last_error(), "CreateFileW failed")
+    try:
+        return msvcrt.open_osfhandle(
+            handle,
+            os.O_WRONLY | getattr(os, "O_BINARY", 0),
+        )
+    except Exception:
+        kernel32.CloseHandle(handle)
+        raise
+
+
 def _windows_set_delete_disposition(fd: int, delete: bool) -> None:
     """Toggle delete-on-close for the exact Windows file handle owned by this export."""
     import ctypes
@@ -258,7 +302,7 @@ def _write_exclusive_bytes(target: _ExportTarget, content: bytes) -> None:
             )
             created = True
         elif os.name == "nt":
-            fd = os.open(target.path, flags, 0o600)
+            fd = _windows_open_export_handle(target.path)
             created = True
             # Keep the exact created handle delete-pending until validation and
             # the complete write both succeed. If final-path inspection or the

@@ -90,7 +90,16 @@ class Issue91ReviewFixTests(unittest.TestCase):
         )
         with (
             patch.object(material_content.os, "name", "nt"),
-            patch.object(material_content.os, "open", return_value=101),
+            patch.object(
+                material_content,
+                "_windows_open_export_handle",
+                return_value=101,
+            ) as open_export,
+            patch.object(
+                material_content.os,
+                "open",
+                side_effect=AssertionError("Windows export must use CreateFileW helper"),
+            ),
             patch.object(material_content.os, "close") as close_fd,
             patch.object(
                 material_content,
@@ -105,6 +114,7 @@ class Issue91ReviewFixTests(unittest.TestCase):
             with self.assertRaises(OSError):
                 material_content._write_exclusive_bytes(target, b"payload")
 
+        open_export.assert_called_once_with(target.path)
         disposition.assert_called_once_with(101, True)
         close_fd.assert_called_once_with(101)
 
