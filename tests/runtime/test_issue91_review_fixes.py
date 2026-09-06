@@ -113,6 +113,40 @@ class Issue91ReviewFixTests(unittest.TestCase):
         self.assertEqual(close_handle.argtypes, [ctypes.wintypes.HANDLE])
         self.assertIs(close_handle.restype, ctypes.wintypes.BOOL)
 
+    def test_windows_delete_disposition_failure_uses_handle_only_fallback(self):
+        import ctypes
+        import sys
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+
+        native_handle = 0x1234567887654321
+        create_file = Mock(return_value=native_handle)
+        close_handle = Mock(return_value=True)
+        kernel32 = SimpleNamespace(CreateFileW=create_file, CloseHandle=close_handle)
+        fake_msvcrt = SimpleNamespace(open_osfhandle=Mock())
+        legacy_error = OSError("legacy disposition failed")
+
+        with (
+            patch.dict(sys.modules, {"msvcrt": fake_msvcrt}),
+            patch.object(ctypes, "WinDLL", return_value=kernel32, create=True),
+            patch.object(
+                material_content,
+                "_windows_set_handle_delete_disposition",
+                side_effect=legacy_error,
+            ) as legacy_disposition,
+            patch.object(
+                material_content,
+                "_windows_set_handle_delete_disposition_ex",
+            ) as fallback_disposition,
+        ):
+            with self.assertRaisesRegex(OSError, "legacy disposition failed"):
+                material_content._windows_open_export_handle(Path("C:/issue91/export.bin"))
+
+        legacy_disposition.assert_called_once_with(native_handle, True)
+        fallback_disposition.assert_called_once_with(native_handle)
+        fake_msvcrt.open_osfhandle.assert_not_called()
+        close_handle.assert_called_once_with(native_handle)
+
     def test_windows_final_path_failure_keeps_created_handle_delete_pending(self):
         root = Path("C:/issue91")
         target = material_content._ExportTarget(
@@ -276,6 +310,28 @@ class Issue91WindowsRealIoTests(unittest.TestCase):
             ):
                 with self.assertRaisesRegex(OSError, "after real Windows file creation"):
                     material_content._write_exclusive_bytes(target, b"payload")
+
+            self.assertEqual(observed_created, [0])
+            self.assertFalse(output.exists())
+
+    def test_real_windows_file_io_delete_disposition_failure_removes_created_output(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            output = root / "delete-disposition-failure.bin"
+            observed_created = []
+
+            def fail_initial_disposition(handle: int, delete: bool) -> None:
+                self.assertTrue(output.exists())
+                observed_created.append(output.stat().st_size)
+                raise OSError("injected delete disposition failure after real CreateFileW")
+
+            with patch.object(
+                material_content,
+                "_windows_set_handle_delete_disposition",
+                side_effect=fail_initial_disposition,
+            ):
+                with self.assertRaisesRegex(OSError, "delete disposition failure"):
+                    material_content._windows_open_export_handle(output)
 
             self.assertEqual(observed_created, [0])
             self.assertFalse(output.exists())

@@ -203,19 +203,30 @@ def _windows_open_export_handle(path: Path) -> int:
     invalid_handle = ctypes.c_void_p(-1).value
     if handle == invalid_handle:
         raise OSError(ctypes.get_last_error(), "CreateFileW failed")
+    close_handle = kernel32.CloseHandle
+    close_handle.argtypes = [wintypes.HANDLE]
+    close_handle.restype = wintypes.BOOL
     try:
         # Mark the native handle delete-pending before CRT ownership transfer.
-        # If open_osfhandle fails, closing this exact handle removes only the
-        # file created by this export without resolving the pathname again.
-        _windows_set_handle_delete_disposition(handle, True)
+        # If the legacy disposition class itself fails, keep ownership on this
+        # native handle and use the newer handle-only class as cleanup fallback.
+        try:
+            _windows_set_handle_delete_disposition(handle, True)
+        except Exception as exc:
+            # The legacy disposition class can fail before ownership is moved
+            # into a CRT fd. Fall back to the newer handle-only disposition
+            # class so cleanup still targets this exact file object, never a
+            # pathname that another process could replace.
+            try:
+                _windows_set_handle_delete_disposition_ex(handle)
+            except Exception as cleanup_exc:
+                raise cleanup_exc from exc
+            raise
         return msvcrt.open_osfhandle(
             handle,
             os.O_WRONLY | getattr(os, "O_BINARY", 0),
         )
     except Exception:
-        close_handle = kernel32.CloseHandle
-        close_handle.argtypes = [wintypes.HANDLE]
-        close_handle.restype = wintypes.BOOL
         close_handle(handle)
         raise
 
@@ -240,6 +251,28 @@ def _windows_set_handle_delete_disposition(handle: int, delete: bool) -> None:
     info = _FileDispositionInfo(bool(delete))
     if not func(handle, 4, ctypes.byref(info), ctypes.sizeof(info)):
         raise OSError(ctypes.get_last_error(), "SetFileInformationByHandle failed")
+
+
+def _windows_set_handle_delete_disposition_ex(handle: int) -> None:
+    """Mark one exact Windows handle for cleanup using FileDispositionInfoEx."""
+    import ctypes
+    from ctypes import wintypes
+
+    class _FileDispositionInfoEx(ctypes.Structure):
+        _fields_ = [("Flags", wintypes.DWORD)]
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    func = kernel32.SetFileInformationByHandle
+    func.argtypes = [
+        wintypes.HANDLE,
+        ctypes.c_int,
+        wintypes.LPVOID,
+        wintypes.DWORD,
+    ]
+    func.restype = wintypes.BOOL
+    info = _FileDispositionInfoEx(0x00000001)  # FILE_DISPOSITION_FLAG_DELETE
+    if not func(handle, 21, ctypes.byref(info), ctypes.sizeof(info)):
+        raise OSError(ctypes.get_last_error(), "SetFileInformationByHandle(FileDispositionInfoEx) failed")
 
 
 def _windows_set_delete_disposition(fd: int, delete: bool) -> None:
