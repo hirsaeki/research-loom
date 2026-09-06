@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -242,6 +243,62 @@ class Issue91ReviewFixTests(unittest.TestCase):
                 self.assertNotEqual(blob.read_bytes(), verified_bytes)
             finally:
                 opened.close()
+
+
+@unittest.skipUnless(os.name == "nt", "real Windows filesystem evidence")
+class Issue91WindowsRealIoTests(unittest.TestCase):
+    def _target(self, root: Path, output: Path) -> material_content._ExportTarget:
+        stat_result = root.stat()
+        return material_content._ExportTarget(
+            path=output,
+            parent=root,
+            parent_dev=stat_result.st_dev,
+            parent_ino=stat_result.st_ino,
+            managed_root=root / ".research-loom",
+        )
+
+    def test_real_windows_file_io_post_creation_failure_removes_owned_output(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            output = root / "post-create-failure.bin"
+            target = self._target(root, output)
+            observed_created = []
+
+            def fail_after_real_create(fd: int) -> Path:
+                self.assertTrue(output.exists())
+                observed_created.append(output.stat().st_size)
+                raise OSError("injected after real Windows file creation")
+
+            with patch.object(
+                material_content,
+                "_windows_final_path",
+                side_effect=fail_after_real_create,
+            ):
+                with self.assertRaisesRegex(OSError, "after real Windows file creation"):
+                    material_content._write_exclusive_bytes(target, b"payload")
+
+            self.assertEqual(observed_created, [0])
+            self.assertFalse(output.exists())
+
+    def test_real_windows_file_io_open_osfhandle_failure_removes_created_output(self):
+        import msvcrt
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            output = root / "open-osfhandle-failure.bin"
+            observed_created = []
+
+            def fail_conversion(handle: int, flags: int) -> int:
+                self.assertTrue(output.exists())
+                observed_created.append(output.stat().st_size)
+                raise OSError("injected open_osfhandle failure after real CreateFileW")
+
+            with patch.object(msvcrt, "open_osfhandle", side_effect=fail_conversion):
+                with self.assertRaisesRegex(OSError, "open_osfhandle failure"):
+                    material_content._windows_open_export_handle(output)
+
+            self.assertEqual(observed_created, [0])
+            self.assertFalse(output.exists())
 
 
 if __name__ == "__main__":

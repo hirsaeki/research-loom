@@ -49,3 +49,28 @@ jobs:
         run: uv run --frozen python -m unittest discover -s tests/contracts -p 'test_*.py' -v
       - name: Run Research State runtime tests
         run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_*.py' -v
+
+
+  issue91-windows:
+    name: issue91-windows
+    runs-on: windows-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+      - name: Sync locked Python environment
+        run: uv sync --frozen
+      - name: Smoke production Windows launcher
+        run: .\research-loom.cmd --help
+      - name: Run Issue 91 C acceptance tests
+        run: uv run --frozen python -m unittest -v tests.runtime.test_issue91_external_material_content
+      - name: Run Issue 91 mocked review regressions
+        run: uv run --frozen python -m unittest -v tests.runtime.test_issue91_review_fixes.Issue91ReviewFixTests
+      - name: Run Issue 91 real Windows file I/O regressions
+        run: uv run --frozen python -m unittest -v tests.runtime.test_issue91_review_fixes.Issue91WindowsRealIoTests
