@@ -7,6 +7,7 @@ import unittest
 from unittest.mock import patch
 
 from plugins.local_application.facade import LocalApplicationError
+from plugins.local_application import material_content_facade as material_content
 from plugins.local_application import LocalApplicationFacade
 from plugins.local_application.workspace import LocalWorkspace
 from tests.runtime.test_external_material_inventory import _capture, _create_running, _write_inputs
@@ -77,6 +78,35 @@ class Issue91ReviewFixTests(unittest.TestCase):
                 self.assertGreater(shown["text_rendition_view"]["total_bytes"], 4)
             finally:
                 opened.close()
+
+    def test_windows_final_path_failure_keeps_created_handle_delete_pending(self):
+        root = Path("C:/issue91")
+        target = material_content._ExportTarget(
+            path=root / "export.bin",
+            parent=root,
+            parent_dev=1,
+            parent_ino=2,
+            managed_root=root / ".research-loom",
+        )
+        with (
+            patch.object(material_content.os, "name", "nt"),
+            patch.object(material_content.os, "open", return_value=101),
+            patch.object(material_content.os, "close") as close_fd,
+            patch.object(
+                material_content,
+                "_windows_set_delete_disposition",
+            ) as disposition,
+            patch.object(
+                material_content,
+                "_windows_final_path",
+                side_effect=OSError("final path unavailable"),
+            ),
+        ):
+            with self.assertRaises(OSError):
+                material_content._write_exclusive_bytes(target, b"payload")
+
+        disposition.assert_called_once_with(101, True)
+        close_fd.assert_called_once_with(101)
 
     def test_export_writes_the_same_bytes_that_were_verified(self):
         with tempfile.TemporaryDirectory() as temp:

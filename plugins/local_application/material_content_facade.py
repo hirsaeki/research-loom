@@ -169,6 +169,30 @@ def _is_within(path: Path, root: Path | None) -> bool:
     return True
 
 
+def _windows_set_delete_disposition(fd: int, delete: bool) -> None:
+    """Toggle delete-on-close for the exact Windows file handle owned by this export."""
+    import ctypes
+    import msvcrt
+    from ctypes import wintypes
+
+    class _FileDispositionInfo(ctypes.Structure):
+        _fields_ = [("DeleteFile", wintypes.BOOL)]
+
+    handle = msvcrt.get_osfhandle(fd)
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    func = kernel32.SetFileInformationByHandle
+    func.argtypes = [
+        wintypes.HANDLE,
+        ctypes.c_int,
+        wintypes.LPVOID,
+        wintypes.DWORD,
+    ]
+    func.restype = wintypes.BOOL
+    info = _FileDispositionInfo(bool(delete))
+    if not func(handle, 4, ctypes.byref(info), ctypes.sizeof(info)):
+        raise OSError(ctypes.get_last_error(), "SetFileInformationByHandle failed")
+
+
 def _windows_final_path(fd: int) -> Path:
     import ctypes
     import msvcrt
@@ -236,6 +260,11 @@ def _write_exclusive_bytes(target: _ExportTarget, content: bytes) -> None:
         elif os.name == "nt":
             fd = os.open(target.path, flags, 0o600)
             created = True
+            # Keep the exact created handle delete-pending until validation and
+            # the complete write both succeed. If final-path inspection or the
+            # write fails, closing this handle removes our file without resolving
+            # the pathname again and therefore cannot unlink another process' file.
+            _windows_set_delete_disposition(fd, True)
             final_path = _windows_final_path(fd)
             created_path = final_path
             final_parent = final_path.parent.resolve(strict=True)
@@ -258,11 +287,21 @@ def _write_exclusive_bytes(target: _ExportTarget, content: bytes) -> None:
             )
 
         assert fd is not None
-        with os.fdopen(fd, "wb") as stream:
-            fd = None
-            stream.write(content)
-            stream.flush()
-            os.fsync(stream.fileno())
+        if os.name == "nt":
+            # Do not let fdopen close the fd until delete-pending is cleared only
+            # after the complete verified payload is durable.
+            with os.fdopen(fd, "wb", closefd=False) as stream:
+                stream.write(content)
+                stream.flush()
+                os.fsync(stream.fileno())
+            _windows_set_delete_disposition(fd, False)
+            created = False
+        else:
+            with os.fdopen(fd, "wb") as stream:
+                fd = None
+                stream.write(content)
+                stream.flush()
+                os.fsync(stream.fileno())
     except FileExistsError as exc:
         raise LocalApplicationError(
             "APPLICATION-MATERIAL-EXPORT-001",
