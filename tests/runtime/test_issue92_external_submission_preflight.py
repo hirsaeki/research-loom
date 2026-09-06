@@ -206,6 +206,70 @@ class Issue92ExternalSubmissionPreflightTests(intake.ExternalDesktopResearchInta
                 self.assertIsNone(result["execution_result"]["state_delta_proposal"])
             finally: facade.close()
 
+    def test_review_fix_operator_shape_errors_are_correctable_but_internal_fields_are_hard(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp); app, facade = self.make_facade(root)
+            try:
+                run_id, valid, _ = self.prepared(root, facade)
+                broken = deepcopy(valid); broken["outputs"] = []
+                preflight = facade.preflight_external(run_id, {"research_result": broken})
+                self.assertEqual(preflight["status"], "PREFLIGHT_REJECTED")
+                self.assertEqual(preflight["issues"][0]["code"], "APPLICATION-EXTERNAL-SUBMISSION-CONTENT-001")
+                collected = facade.collect_external(run_id, {"research_result": broken})
+                self.assertEqual(collected["execution_result"]["run"]["status"], "RUNNING")
+                self.assertEqual(collected["execution_result"]["issues"][0]["code"], "APPLICATION-EXTERNAL-SUBMISSION-CONTENT-001")
+                self.assert_running(app, run_id)
+
+                missing = deepcopy(valid); missing["outputs"].pop("unknowns")
+                missing_result = facade.collect_external(run_id, {"research_result": missing})
+                self.assertEqual(missing_result["execution_result"]["run"]["status"], "RUNNING")
+                self.assert_running(app, run_id)
+
+                forbidden = deepcopy(valid); forbidden["outputs"]["source_captures"] = []
+                with self.assertRaises(LocalApplicationError) as caught:
+                    facade.preflight_external(run_id, {"research_result": forbidden})
+                self.assertEqual(caught.exception.code, "APPLICATION-EXTERNAL-SUBMISSION-001")
+
+                accepted = facade.collect_external(run_id, {"research_result": valid})
+                self.assertEqual(accepted["execution_result"]["run"]["status"], "COMPLETED")
+            finally:
+                facade.close()
+
+    def test_review_fix_authorization_denial_is_not_a_correctable_submission(self):
+        from core.execution.testing import AllowListedAuthorizationProvider
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp); app, facade = self.make_facade(root)
+            try:
+                run_id, valid, _ = self.prepared(root, facade)
+                app.authorization = AllowListedAuthorizationProvider(denied=True)
+                with self.assertRaises(LocalApplicationError) as preflight:
+                    facade.preflight_external(run_id, {"research_result": valid})
+                self.assertEqual(preflight.exception.code, "APPLICATION-EXTERNAL-BINDING-001")
+                with self.assertRaises(LocalApplicationError) as collect:
+                    facade.collect_external(run_id, {"research_result": valid})
+                self.assertEqual(collect.exception.code, "APPLICATION-EXTERNAL-BINDING-001")
+                self.assert_running(app, run_id)
+            finally:
+                facade.close()
+
+    def test_review_fix_rejected_handoff_requires_valid_desktop_extension(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp); app, facade = self.make_facade(root)
+            try:
+                run_id, valid, _ = self.prepared(root, facade)
+                rejected = deepcopy(valid)
+                rejected["validation"] = {"status": "rejected", "issues": [{
+                    "code": "SOURCE-QUALITY", "severity": "error", "message": "Formal research rejection."
+                }]}
+                rejected["citation_details"][0]["excerpt"] = "not present in captured text"
+                with self.assertRaises(LocalApplicationError) as caught:
+                    facade.collect_external(run_id, {"research_result": rejected})
+                self.assertEqual(caught.exception.code, "APPLICATION-EXTERNAL-INTEGRITY-001")
+                self.assert_running(app, run_id)
+            finally:
+                facade.close()
+
 
 if __name__ == "__main__":
     unittest.main()

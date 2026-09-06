@@ -6,7 +6,11 @@ from typing import Any, Mapping
 from core.execution import RunStatus
 from plugins.desktop_research.attempts import reconstruct_attempts
 
-from .external_submission import assemble_external_submission, validate_external_submission
+from .external_submission import (
+    CorrectableExternalSubmissionError,
+    assemble_external_submission,
+    validate_external_submission,
+)
 from .facade import LocalApplicationError
 from .question_review_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
 
@@ -18,9 +22,12 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
         run, context_extension = self._desktop_external_run(run_id)
         research_result = self._research_result_input(submission, preflight=True)
         attempts = self._completed_attempts(run.run_id)
-        handoff, extension = assemble_external_submission(
-            self._application, run, research_result, attempts
-        )
+        try:
+            handoff, extension = assemble_external_submission(
+                self._application, run, research_result, attempts
+            )
+        except CorrectableExternalSubmissionError as exc:
+            return self._preflight_rejection(run, exc)
         issues = validate_external_submission(
             self._application, run, context_extension, handoff, extension
         )
@@ -48,9 +55,12 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
             with guard(run.run_id, RunStatus.RUNNING):
                 attempts = self._completed_attempts(run.run_id)
                 if research_result is not None:
-                    handoff, extension = assemble_external_submission(
-                        self._application, run, research_result, attempts
-                    )
+                    try:
+                        handoff, extension = assemble_external_submission(
+                            self._application, run, research_result, attempts
+                        )
+                    except CorrectableExternalSubmissionError as exc:
+                        return self._correctable_rejection(run, (self._submission_issue(exc),))
                     issues = validate_external_submission(
                         self._application, run, context_extension, handoff, extension
                     )
@@ -97,6 +107,20 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                 "research_result must be an object",
             )
         return deepcopy(dict(value))
+
+    @staticmethod
+    def _submission_issue(exc: CorrectableExternalSubmissionError):
+        return {"code": exc.code, "message": exc.message, "retryable": False}
+
+    @classmethod
+    def _preflight_rejection(cls, run, exc: CorrectableExternalSubmissionError):
+        return {
+            "status": "PREFLIGHT_REJECTED",
+            "run_id": run.run_id,
+            "run_status": run.status.value,
+            "issues": [cls._submission_issue(exc)],
+            "assembled_submission": None,
+        }
 
     @staticmethod
     def _correctable_rejection(run, issues):

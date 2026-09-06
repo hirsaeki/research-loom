@@ -13,6 +13,11 @@ from plugins.local_execution_store import LocalExecutionStoreError
 from .facade import LocalApplicationError
 
 
+class CorrectableExternalSubmissionError(LocalApplicationError):
+    """Operator-owned submission content can be corrected on the same RUNNING Run."""
+
+
+
 _RESULT_FIELDS = {
     "validation", "outputs", "capture_ids", "citation_details", "search_trace",
     "null_results", "evidence_gap_assessments", "coverage_assessment",
@@ -32,13 +37,13 @@ _SEARCH_LINK_FIELDS = {"attempt_id", "related_handoff_output_ids", "notes"}
 
 def _mapping(value: Any, field: str) -> dict[str, Any]:
     if not isinstance(value, Mapping):
-        raise LocalApplicationError("APPLICATION-EXTERNAL-SUBMISSION-001", f"{field} must be an object")
+        raise CorrectableExternalSubmissionError("APPLICATION-EXTERNAL-SUBMISSION-CONTENT-001", f"{field} must be an object")
     return deepcopy(dict(value))
 
 
 def _list(value: Any, field: str) -> list[Any]:
     if not isinstance(value, list):
-        raise LocalApplicationError("APPLICATION-EXTERNAL-SUBMISSION-001", f"{field} must be an array")
+        raise CorrectableExternalSubmissionError("APPLICATION-EXTERNAL-SUBMISSION-CONTENT-001", f"{field} must be an array")
     return deepcopy(value)
 
 
@@ -68,24 +73,23 @@ def assemble_external_submission(
         )
 
     outputs = _mapping(value.get("outputs"), "outputs")
-    if set(outputs) != _OUTPUT_FIELDS:
-        extra = sorted(set(outputs) - _OUTPUT_FIELDS)
-        missing = sorted(_OUTPUT_FIELDS - set(outputs))
-        detail = []
-        if extra:
-            detail.append("forbidden/unknown: " + ", ".join(extra))
-        if missing:
-            detail.append("missing: " + ", ".join(missing))
+    extra = sorted(set(outputs) - _OUTPUT_FIELDS)
+    if extra:
         raise LocalApplicationError(
             "APPLICATION-EXTERNAL-SUBMISSION-001",
-            "outputs must contain only operator-owned research result collections ("
-            + "; ".join(detail) + ")",
+            "outputs contains internal, unknown, or forbidden fields: " + ", ".join(extra),
+        )
+    missing = sorted(_OUTPUT_FIELDS - set(outputs))
+    if missing:
+        raise CorrectableExternalSubmissionError(
+            "APPLICATION-EXTERNAL-SUBMISSION-CONTENT-001",
+            "outputs is missing required research result collections: " + ", ".join(missing),
         )
 
     capture_ids = _list(value.get("capture_ids", []), "capture_ids")
     if any(not isinstance(item, str) or not item for item in capture_ids) or len(capture_ids) != len(set(capture_ids)):
-        raise LocalApplicationError(
-            "APPLICATION-EXTERNAL-SUBMISSION-001",
+        raise CorrectableExternalSubmissionError(
+            "APPLICATION-EXTERNAL-SUBMISSION-CONTENT-001",
             "capture_ids must contain unique non-empty strings",
         )
     source_captures, capture_details, texts = _resolve_captures(application, run.run_id, capture_ids)
@@ -167,26 +171,38 @@ def validate_external_submission(
     validator = CanonicalCapabilityExecutionValidator()
     try:
         validator.validate_documents(descriptor, invocation, context)
-        if (
-            invocation.get("invocation_digest") != run.invocation_digest
-            or context.get("context_pack_digest") != run.context_pack_digest
-            or descriptor.get("descriptor_digest") != run.descriptor_digest
-        ):
-            raise LocalApplicationError(
-                "APPLICATION-EXTERNAL-BINDING-001",
-                "stored execution documents no longer match Run pins",
-             )
-        decision = application.authorization.validate(
-            invocation["runtime_authorization_evidence"],
-            invocation=invocation,
-            context_pack=context,
-            now=application.clock.now(),
+    except CapabilityExecutionError as exc:
+        raise LocalApplicationError(
+            "APPLICATION-EXTERNAL-BINDING-001", exc.issue.message
+        ) from exc
+    if (
+        invocation.get("invocation_digest") != run.invocation_digest
+        or context.get("context_pack_digest") != run.context_pack_digest
+        or descriptor.get("descriptor_digest") != run.descriptor_digest
+    ):
+        raise LocalApplicationError(
+            "APPLICATION-EXTERNAL-BINDING-001",
+            "stored execution documents no longer match Run pins",
         )
-        if not decision.allowed:
-            return [_issue("AUTHORIZATION_DENIED", "; ".join(item.message for item in decision.issues) or "runtime authorization denied")]
-        required = {str(item["reference_id"]) for item in context["resources"]}
-        if not required.issubset(set(decision.resource_reference_ids)):
-            return [_issue("AUTHORIZATION_DENIED", "authorization provider did not grant every bounded Context Pack resource")]
+    decision = application.authorization.validate(
+        invocation["runtime_authorization_evidence"],
+        invocation=invocation,
+        context_pack=context,
+        now=application.clock.now(),
+    )
+    if not decision.allowed:
+        raise LocalApplicationError(
+            "APPLICATION-EXTERNAL-BINDING-001",
+            "; ".join(item.message for item in decision.issues)
+            or "runtime authorization denied",
+        )
+    required = {str(item["reference_id"]) for item in context["resources"]}
+    if not required.issubset(set(decision.resource_reference_ids)):
+        raise LocalApplicationError(
+            "APPLICATION-EXTERNAL-BINDING-001",
+            "authorization provider did not grant every bounded Context Pack resource",
+        )
+    try:
         validator.validate_handoff(handoff, invocation, context)
     except CapabilityExecutionError as exc:
         return [_issue(exc.issue.code, exc.issue.message, retryable=exc.issue.retryable)]
@@ -197,9 +213,6 @@ def validate_external_submission(
         or provenance["implementation_version"] != run.implementation_version
     ):
         return [_issue("CAP-HANDOFF-PROVENANCE-001", "Handoff implementation provenance does not match the pinned adapter")]
-    if str(handoff["validation"]["status"]) == "rejected":
-        return []
-
     codes = DesktopResearchResultValidator(store, application.operational_store).validate(
         handoff,
         extension,
@@ -207,6 +220,14 @@ def validate_external_submission(
         context_extension,
         run_id=run.run_id,
     )
+    if str(handoff["validation"]["status"]) == "rejected":
+        if codes:
+            raise LocalApplicationError(
+                "APPLICATION-EXTERNAL-INTEGRITY-001",
+                "rejected Handoff has an invalid Desktop Research result extension: "
+                + ", ".join(str(code) for code in codes),
+            )
+        return []
     return [_issue(str(code), str(code)) for code in codes]
 
 
@@ -240,10 +261,15 @@ def _resolve_captures(application, run_id: str, capture_ids: list[str]):
     for capture_id in capture_ids:
         slot = by_capture.get(capture_id, {})
         original, text = slot.get("original"), slot.get("text")
+        if not slot:
+            raise CorrectableExternalSubmissionError(
+                "APPLICATION-EXTERNAL-SUBMISSION-CONTENT-001",
+                f"selected capture does not resolve for this Run: {capture_id}",
+            )
         if original is None or text is None:
             raise LocalApplicationError(
-                "APPLICATION-EXTERNAL-SUBMISSION-001",
-                f"selected capture does not resolve to one persisted original/text pair: {capture_id}",
+                "APPLICATION-EXTERNAL-INTEGRITY-001",
+                f"selected capture has an incomplete persisted original/text pair: {capture_id}",
             )
         provenance = original.provenance
         if any(not isinstance(provenance.get(field), str) or not provenance.get(field) for field in ("source_category", "exact_locator", "acquired_at")):
@@ -309,21 +335,29 @@ def _citations(value, capture_details, texts):
     assembled = []
     for raw in _list(value.get("citation_details", []), "citation_details"):
         citation = _mapping(raw, "citation_details[]")
-        if set(citation) != _CITATION_FIELDS:
+        extra = sorted(set(citation) - _CITATION_FIELDS)
+        if extra:
             raise LocalApplicationError(
                 "APPLICATION-EXTERNAL-SUBMISSION-001",
-                "citation_details entries must contain only operator-owned citation fields",
+                "citation_details contains internal, unknown, or forbidden fields: "
+                + ", ".join(extra),
+            )
+        missing = sorted(_CITATION_FIELDS - set(citation))
+        if missing:
+            raise CorrectableExternalSubmissionError(
+                "APPLICATION-EXTERNAL-SUBMISSION-CONTENT-001",
+                "citation_details entry is missing required fields: " + ", ".join(missing),
             )
         capture_id = str(citation["capture_id"])
         detail, text = details.get(capture_id), texts.get(capture_id)
         if detail is None or text is None:
-            raise LocalApplicationError(
-                "APPLICATION-EXTERNAL-SUBMISSION-001",
+            raise CorrectableExternalSubmissionError(
+                "APPLICATION-EXTERNAL-SUBMISSION-CONTENT-001",
                 f"citation references unresolved selected capture: {capture_id}",
             )
         excerpt = citation.get("excerpt")
         if not isinstance(excerpt, str) or not excerpt:
-            raise LocalApplicationError("APPLICATION-EXTERNAL-SUBMISSION-001", "citation excerpt must be a non-empty string")
+            raise CorrectableExternalSubmissionError("APPLICATION-EXTERNAL-SUBMISSION-CONTENT-001", "citation excerpt must be a non-empty string")
         assembled.append({
             **citation,
             "text_rendition_digest": detail["text_rendition"]["content_digest"],
@@ -336,26 +370,40 @@ def _citations(value, capture_details, texts):
 
 def _search_trace(value, attempts):
     search = _mapping(value.get("search_trace"), "search_trace")
-    if set(search) != {"entries"}:
+    extra = sorted(set(search) - {"entries"})
+    if extra:
         raise LocalApplicationError(
             "APPLICATION-EXTERNAL-SUBMISSION-001",
-            "search_trace accepts only entries; attempt facts are resolved from the ledger",
+            "search_trace contains internal, unknown, or forbidden fields: " + ", ".join(extra),
+        )
+    if "entries" not in search:
+        raise CorrectableExternalSubmissionError(
+            "APPLICATION-EXTERNAL-SUBMISSION-CONTENT-001",
+            "search_trace is missing required entries",
         )
     links = {}
     for raw in _list(search.get("entries"), "search_trace.entries"):
         link = _mapping(raw, "search_trace.entries[]")
-        if set(link) - _SEARCH_LINK_FIELDS or not {"attempt_id", "related_handoff_output_ids"}.issubset(link):
+        extra = sorted(set(link) - _SEARCH_LINK_FIELDS)
+        if extra:
             raise LocalApplicationError(
                 "APPLICATION-EXTERNAL-SUBMISSION-001",
-                "search_trace entries may supply only attempt_id, related_handoff_output_ids, and notes",
+                "search_trace entry contains internal, unknown, or forbidden fields: "
+                + ", ".join(extra),
+            )
+        missing = sorted({"attempt_id", "related_handoff_output_ids"} - set(link))
+        if missing:
+            raise CorrectableExternalSubmissionError(
+                "APPLICATION-EXTERNAL-SUBMISSION-CONTENT-001",
+                "search_trace entry is missing required fields: " + ", ".join(missing),
             )
         attempt_id = str(link["attempt_id"])
         if attempt_id in links:
-            raise LocalApplicationError("APPLICATION-EXTERNAL-SUBMISSION-001", f"duplicate search_trace attempt_id: {attempt_id}")
+            raise CorrectableExternalSubmissionError("APPLICATION-EXTERNAL-SUBMISSION-CONTENT-001", f"duplicate search_trace attempt_id: {attempt_id}")
         links[attempt_id] = link
     if set(links) != set(attempts):
-        raise LocalApplicationError(
-            "APPLICATION-EXTERNAL-SUBMISSION-001",
+        raise CorrectableExternalSubmissionError(
+            "APPLICATION-EXTERNAL-SUBMISSION-CONTENT-001",
             "search_trace must link every persisted retrieval attempt exactly once",
         )
     entries = []
