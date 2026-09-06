@@ -79,6 +79,32 @@ class Issue91ReviewFixTests(unittest.TestCase):
             finally:
                 opened.close()
 
+
+
+    def test_windows_open_osfhandle_failure_closes_full_width_handle_and_preserves_error(self):
+        import ctypes
+        import sys
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+
+        native_handle = 0x1234567887654321
+        create_file = Mock(return_value=native_handle)
+        close_handle = Mock(return_value=False)
+        kernel32 = SimpleNamespace(CreateFileW=create_file, CloseHandle=close_handle)
+        open_error = RuntimeError("open_osfhandle failed")
+        fake_msvcrt = SimpleNamespace(open_osfhandle=Mock(side_effect=open_error))
+
+        with (
+            patch.dict(sys.modules, {"msvcrt": fake_msvcrt}),
+            patch.object(ctypes, "WinDLL", return_value=kernel32, create=True),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "open_osfhandle failed"):
+                material_content._windows_open_export_handle(Path("C:/issue91/export.bin"))
+
+        close_handle.assert_called_once_with(native_handle)
+        self.assertEqual(close_handle.argtypes, [ctypes.wintypes.HANDLE])
+        self.assertIs(close_handle.restype, ctypes.wintypes.BOOL)
+
     def test_windows_final_path_failure_keeps_created_handle_delete_pending(self):
         root = Path("C:/issue91")
         target = material_content._ExportTarget(
@@ -86,7 +112,7 @@ class Issue91ReviewFixTests(unittest.TestCase):
             parent=root,
             parent_dev=1,
             parent_ino=2,
-            managed_root=root / ".research-loom",
+            manaed_root=root / ".research-loom",
         )
         with (
             patch.object(material_content.os, "name", "nt"),

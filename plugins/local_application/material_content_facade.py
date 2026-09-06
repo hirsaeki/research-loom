@@ -209,7 +209,10 @@ def _windows_open_export_handle(path: Path) -> int:
             os.O_WRONLY | getattr(os, "O_BINARY", 0),
         )
     except Exception:
-        kernel32.CloseHandle(handle)
+        close_handle = kernel32.CloseHandle
+        close_handle.argtypes = [wintypes.HANDLE]
+        close_handle.restype = wintypes.BOOL
+        close_handle(handle)
         raise
 
 
@@ -255,9 +258,9 @@ def _windows_final_path(fd: int) -> Path:
     if written == 0 or written >= len(buffer):
         raise OSError(ctypes.get_last_error(), "GetFinalPathNameByHandleW failed")
     value = buffer.value
-    if value.startswith("\\\\?\\UNC\\"):
-        value = "\\\\" + value[8:]
-    elif value.startswith("\\\\?\\"):
+    if value.startswith("\\\\?\\\UNC\\\"):
+        value = "\\\\\\" + value[8:]
+    elif value.startswith("\\\\?\\\"):
         value = value[4:]
     return Path(value)
 
