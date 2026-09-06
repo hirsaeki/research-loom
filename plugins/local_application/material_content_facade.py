@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 import os
 from pathlib import Path
 from typing import Any, Mapping
@@ -8,7 +9,6 @@ from plugins.local_execution_store import LocalExecutionStoreIntegrityError
 
 from .facade import LocalApplicationError
 from .material_inventory_facade import (
-    LocalApplicationFacade as _BaseLocalApplicationFacade,
     _ORIGINAL_ROLE,
     _TEXT_ROLE,
     _artifact_projection,
@@ -18,6 +18,15 @@ from .material_inventory_facade import (
 
 _MATERIAL_SHOW_DEFAULT_BYTES = 64 * 1024
 _MATERIAL_SHOW_MAX_BYTES = 1024 * 1024
+
+
+@dataclass(frozen=True)
+class _ExportTarget:
+    path: Path
+    parent: Path
+    parent_dev: int
+    parent_ino: int
+    managed_root: Path | None
 
 
 def _artifact_pair_for_capture(store, project_id: str, run_id: str, capture_id: str):
@@ -108,25 +117,33 @@ def _bounded_utf8_view(
     }
 
 
-def _export_target(workspace_root: Path | None, output_file: str | Path) -> Path:
+def _export_target(workspace_root: Path | None, output_file: str | Path) -> _ExportTarget:
     if not isinstance(output_file, (str, Path)) or not str(output_file):
         raise LocalApplicationError(
             "APPLICATION-MATERIAL-EXPORT-001",
             "external material export output must be a non-empty path",
         )
     raw = Path(output_file).expanduser()
-    target = (Path.cwd() / raw if not raw.is_absolute() else raw).resolve(strict=False)
+    absolute = Path.cwd() / raw if not raw.is_absolute() else raw
+    try:
+        parent = absolute.parent.resolve(strict=True)
+    except OSError as exc:
+        raise LocalApplicationError(
+            "APPLICATION-MATERIAL-EXPORT-001",
+            "external material export parent directory must already exist",
+        ) from exc
+    if not parent.is_dir():
+        raise LocalApplicationError(
+            "APPLICATION-MATERIAL-EXPORT-001",
+            "external material export parent directory must already exist",
+        )
+    target = parent / absolute.name
     if target.exists():
         raise LocalApplicationError(
             "APPLICATION-MATERIAL-EXPORT-001",
             "external material export will not overwrite an existing path",
         )
-    parent = target.parent
-    if not parent.exists() or not parent.is_dir():
-        raise LocalApplicationError(
-            "APPLICATION-MATERIAL-EXPORT-001",
-            "external material export parent directory must already exist",
-        )
+    managed = None
     if workspace_root is not None:
         managed = (workspace_root / ".research-loom").resolve(strict=False)
         try:
@@ -138,35 +155,148 @@ def _export_target(workspace_root: Path | None, output_file: str | Path) -> Path
                 "APPLICATION-MATERIAL-EXPORT-001",
                 "external material export may not write inside managed workspace state",
             )
-    return target
+    stat_result = parent.stat()
+    return _ExportTarget(target, parent, stat_result.st_dev, stat_result.st_ino, managed)
 
 
-def _write_exclusive_bytes(target: Path, content: bytes) -> None:
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0)
+def _is_within(path: Path, root: Path | None) -> bool:
+    if root is None:
+        return False
     try:
-        fd = os.open(target, flags, 0o600)
+        path.relative_to(root)
+    except ValueError:
+        return False
+    return True
+
+
+def _windows_final_path(fd: int) -> Path:
+    import ctypes
+    import msvcrt
+    from ctypes import wintypes
+
+    handle = msvcrt.get_osfhandle(fd)
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    func = kernel32.GetFinalPathNameByHandleW
+    func.argtypes = [wintypes.HANDLE, wintypes.LPWSTR, wintypes.DWORD, wintypes.DWORD]
+    func.restype = wintypes.DWORD
+    size = func(handle, None, 0, 0)
+    if size == 0:
+        raise OSError(ctypes.get_last_error(), "GetFinalPathNameByHandleW failed")
+    buffer = ctypes.create_unicode_buffer(size + 1)
+    written = func(handle, buffer, len(buffer), 0)
+    if written == 0 or written >= len(buffer):
+        raise OSError(ctypes.get_last_error(), "GetFinalPathNameByHandleW failed")
+    value = buffer.value
+    if value.startswith("\\\\?\\UNC\\"):
+        value = "\\\\" + value[8:]
+    elif value.startswith("\\\\?\\"):
+        value = value[4:]
+    return Path(value)
+
+
+def _write_exclusive_bytes(target: _ExportTarget, content: bytes) -> None:
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0)
+    fd: int | None = None
+    parent_fd: int | None = None
+    created = False
+    created_path: Path | None = None
+    try:
+        if (
+            os.name != "nt"
+            and hasattr(os, "O_NOFOLLOW")
+            and hasattr(os, "O_DIRECTORY")
+            and os.open in os.supports_dir_fd
+        ):
+            try:
+                parent_fd = os.open(
+                    target.parent,
+                    os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+                )
+            except OSError as exc:
+                raise LocalApplicationError(
+                    "APPLICATION-MATERIAL-EXPORT-001",
+                    "external material export parent changed before file creation",
+                ) from exc
+            parent_stat = os.fstat(parent_fd)
+            if (parent_stat.st_dev, parent_stat.st_ino) != (
+                target.parent_dev,
+                target.parent_ino,
+            ):
+                raise LocalApplicationError(
+                    "APPLICATION-MATERIAL-EXPORT-001",
+                    "external material export parent changed before file creation",
+                )
+            fd = os.open(
+                target.path.name,
+                flags | os.O_NOFOLLOW,
+                0o600,
+                dir_fd=parent_fd,
+            )
+            created = True
+        elif os.name == "nt":
+            fd = os.open(target.path, flags, 0o600)
+            created = True
+            final_path = _windows_final_path(fd)
+            created_path = final_path
+            final_parent = final_path.parent.resolve(strict=True)
+            current_stat = final_parent.stat()
+            expected_parent = target.parent.resolve(strict=True)
+            if (
+                os.path.normcase(str(final_parent)) != os.path.normcase(str(expected_parent))
+                or (current_stat.st_dev, current_stat.st_ino)
+                != (target.parent_dev, target.parent_ino)
+                or _is_within(final_path, target.managed_root)
+            ):
+                raise LocalApplicationError(
+                    "APPLICATION-MATERIAL-EXPORT-001",
+                    "external material export parent changed before file creation",
+                )
+        else:
+            raise LocalApplicationError(
+                "APPLICATION-MATERIAL-EXPORT-001",
+                "external material export cannot safely verify the output parent",
+            )
+
+        assert fd is not None
+        with os.fdopen(fd, "wb") as stream:
+            fd = None
+            stream.write(content)
+            stream.flush()
+            os.fsync(stream.fileno())
     except FileExistsError as exc:
         raise LocalApplicationError(
             "APPLICATION-MATERIAL-EXPORT-001",
             "external material export will not overwrite an existing path",
         ) from exc
-    try:
-        with os.fdopen(fd, "wb") as stream:
-            stream.write(content)
-            stream.flush()
-            os.fsync(stream.fileno())
     except Exception:
-        try:
-            target.unlink()
-        except FileNotFoundError:
-            pass
+        if fd is not None:
+            os.close(fd)
+            fd = None
+        if created:
+            try:
+                if parent_fd is not None:
+                    os.unlink(target.path.name, dir_fd=parent_fd)
+                elif created_path is not None:
+                    created_path.unlink()
+            except FileNotFoundError:
+                pass
         raise
+    finally:
+        if fd is not None:
+            os.close(fd)
+        if parent_fd is not None:
+            os.close(parent_fd)
 
 
-class LocalApplicationFacade(_BaseLocalApplicationFacade):
-    """Verified public read/export surface for one persisted external capture."""
+class ExternalMaterialContentService:
+    """Explicit-dependency content reader used by the existing public facade."""
 
-    def show_external_material(
+    def __init__(self, store, project_id: str, workspace_root: Path | None) -> None:
+        self._store = store
+        self._project_id = project_id
+        self._workspace_root = workspace_root
+
+    def show(
         self,
         run_id: str,
         capture_id: str,
@@ -190,13 +320,11 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
             )
         try:
             run, _original, rendition, capture = _artifact_pair_for_capture(
-                self._application.execution_store, self._project_id, run_id, capture_id
+                self._store, self._project_id, run_id, capture_id
             )
-            rendition_payload, total_bytes = (
-                self._application.execution_store.load_artifact_verified_prefix(
-                    rendition.artifact_id,
-                    max_bytes=max_text_bytes,
-                )
+            rendition_payload, total_bytes = self._store.load_artifact_verified_prefix(
+                rendition.artifact_id,
+                max_bytes=max_text_bytes,
             )
             view = _bounded_utf8_view(
                 rendition_payload.content,
@@ -223,7 +351,7 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
             "text_rendition_view": view,
         }
 
-    def export_external_material(
+    def export(
         self,
         run_id: str,
         capture_id: str,
@@ -239,20 +367,14 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
         target = _export_target(self._workspace_root, output_file)
         try:
             run, original, rendition, capture = _artifact_pair_for_capture(
-                self._application.execution_store, self._project_id, run_id, capture_id
+                self._store, self._project_id, run_id, capture_id
             )
             selected = original if kind == "original" else rendition
-            payload = self._application.execution_store.load_artifact_verified_once(
-                selected.artifact_id
-            )
+            payload = self._store.load_artifact_verified_once(selected.artifact_id)
             _write_exclusive_bytes(target, payload.content)
         except LocalApplicationError:
             raise
         except Exception as exc:
-            try:
-                target.unlink()
-            except FileNotFoundError:
-                pass
             raise LocalApplicationError(
                 "APPLICATION-MATERIAL-INTEGRITY-001",
                 "persisted external material content could not be verified or exported",
@@ -264,7 +386,7 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
             "capture_id": capture["capture_id"],
             "kind": kind,
             "artifact": _artifact_projection(selected),
-            "output_file": str(target),
+            "output_file": str(target.path),
             "byte_length": len(payload.content),
             "digest": payload.digest,
         }

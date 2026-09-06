@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -8,7 +9,6 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from core.execution import ExecutionIssue, RunLifecycleEvent, RunStatus
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade
 from plugins.local_execution_store import LocalExecutionStoreConfig
 from tests.runtime.test_research_question_review import _adopt_question, _workspace
@@ -157,13 +157,23 @@ class Issue91ExternalMaterialContentTests(unittest.TestCase):
                 run_id = _prepare(facade, question_id, policy=policy)
                 original = b"large-original-" * 8
                 rendition = b"0123456789abcdefghijklmnop"
-                _capture(facade, workspace, run_id, "CAP-C2", original, rendition, name="c2")
+                captured, _raw, _text = _capture(
+                    facade, workspace, run_id, "CAP-C2", original, rendition, name="c2"
+                )
                 shown = facade.show_external_material(run_id, "CAP-C2", max_text_bytes=7)
                 self.assertTrue(shown["text_rendition_view"]["truncated"])
                 self.assertEqual(shown["text_rendition_view"]["content"], "0123456")
                 output = root / "large.bin"
                 facade.export_external_material(run_id, "CAP-C2", kind="original", output_file=output)
                 self.assertEqual(output.read_bytes(), original)
+                rendition_out = root / "large-rendition.txt"
+                exported = facade.export_external_material(
+                    run_id, "CAP-C2", kind="rendition", output_file=rendition_out
+                )
+                self.assertEqual(rendition_out.read_bytes(), rendition)
+                self.assertEqual(
+                    exported["digest"], captured["text_rendition"]["content_digest"]
+                )
 
     def test_c3_explicit_capture_selects_version_and_cli_requires_capture_id(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -186,6 +196,17 @@ class Issue91ExternalMaterialContentTests(unittest.TestCase):
                     facade.show_external_material(run_b, "CAP-B")["text_rendition_view"]["content"],
                     "rendition-B",
                 )
+                out_a = root / "rendition-a.txt"
+                out_b = root / "rendition-b.txt"
+                facade.export_external_material(
+                    run_a, "CAP-A", kind="rendition", output_file=out_a
+                )
+                facade.export_external_material(
+                    run_b, "CAP-B", kind="rendition", output_file=out_b
+                )
+                self.assertEqual(out_a.read_bytes(), b"rendition-A")
+                self.assertEqual(out_b.read_bytes(), b"rendition-B")
+                self.assertNotEqual(out_a.read_bytes(), out_b.read_bytes())
             process, result = _cli(
                 "external", "materials", "show", "--workspace", str(workspace),
                 "--run-id", run_a, "--json",
@@ -232,6 +253,26 @@ class Issue91ExternalMaterialContentTests(unittest.TestCase):
                     store._connection.commit()
 
                 rendition = next(a for a in store.artifacts_for(run_id) if a.role.endswith("text_rendition"))
+                rendition_blob = store._locator_path(rendition.storage_locator, rendition.digest)
+                rendition_saved = rendition_blob.read_bytes()
+                rendition_blob.write_bytes(
+                    bytes([rendition_saved[0] ^ 1]) + rendition_saved[1:]
+                )
+                with self.assertRaises(LocalApplicationError) as rendition_corrupt:
+                    facade.show_external_material(run_id, "CAP-C4")
+                self.assertEqual(
+                    rendition_corrupt.exception.code, "APPLICATION-MATERIAL-INTEGRITY-001"
+                )
+                rendition_blob.write_bytes(rendition_saved)
+                rendition_blob.unlink()
+                with self.assertRaises(LocalApplicationError) as rendition_missing:
+                    facade.show_external_material(run_id, "CAP-C4")
+                self.assertEqual(
+                    rendition_missing.exception.code, "APPLICATION-MATERIAL-INTEGRITY-001"
+                )
+                rendition_blob.parent.mkdir(parents=True, exist_ok=True)
+                rendition_blob.write_bytes(rendition_saved)
+
                 good_prov = dict(rendition.provenance)
                 bad_prov = dict(good_prov); bad_prov["parent_artifact_refs"] = ["ART-wrong"]
                 with store._lock:
@@ -282,34 +323,50 @@ class Issue91ExternalMaterialContentTests(unittest.TestCase):
             with LocalApplicationFacade.open_workspace(workspace) as facade:
                 question_id = _adopt_question(facade, "Issue 91 C5")
                 run_id = _prepare(facade, question_id)
-                _capture(facade, workspace, run_id, "CAP-C5", b"terminal", b"terminal text", name="c5")
-                store = facade._application.execution_store
-                running = store.load_run(run_id)
-                failed = running.with_status(
-                    RunStatus.FAILED,
-                    completed_at="2026-09-06T00:02:00Z",
-                    failure=ExecutionIssue("fixture", "terminal fixture"),
+                _capture(
+                    facade, workspace, run_id, "CAP-C5",
+                    b"terminal", b"terminal text", name="c5"
                 )
-                changed = store.transition_run(
-                    RunStatus.RUNNING,
-                    failed,
-                    RunLifecycleEvent(
-                        run_id, 3, RunStatus.RUNNING, RunStatus.FAILED,
-                        "2026-09-06T00:02:00Z", "fixture terminal",
-                    ),
+                before = facade.show_run(run_id)
+                failed = facade.collect_external(
+                    run_id, {"handoff": {"invalid": True}, "extension": {}}
                 )
-                self.assertTrue(changed)
-                self.assertEqual(facade.show_external_material(run_id, "CAP-C5")["run"]["status"], "FAILED")
+                self.assertEqual(failed["status"], "CAPABILITY_RESULT_COLLECTED")
+                terminal = facade.show_run(run_id)
+                self.assertEqual(terminal["run"]["status"], "FAILED")
+                terminal_failure = terminal["run"]["failure"]
+                terminal_artifacts = terminal["artifacts"]
+                terminal_attempts = terminal["desktop_research"]["retrieval_attempt_summary"]
 
-                attempt_only = _prepare(facade, question_id)
-                facade.start_external_retrieval_attempt(attempt_only, {
-                    "attempt_id": "ATT-ONLY", "strategy": "none", "coverage_dimension_ids": ["COV-SUPPORT"]
+            with LocalApplicationFacade.open_workspace(workspace) as reopened:
+                shown = reopened.show_external_material(run_id, "CAP-C5")
+                self.assertEqual(shown["run"]["status"], "FAILED")
+                self.assertEqual(shown["text_rendition_view"]["content"], "terminal text")
+                output = root / "terminal-rendition.txt"
+                reopened.export_external_material(
+                    run_id, "CAP-C5", kind="rendition", output_file=output
+                )
+                self.assertEqual(output.read_bytes(), b"terminal text")
+                after = reopened.show_run(run_id)
+                self.assertEqual(after["run"], terminal["run"])
+                self.assertEqual(after["run"]["failure"], terminal_failure)
+                self.assertEqual(after["artifacts"], terminal_artifacts)
+                self.assertEqual(
+                    after["desktop_research"]["retrieval_attempt_summary"],
+                    terminal_attempts,
+                )
+                self.assertEqual(len(after["artifacts"]), len(before["artifacts"]))
+
+                attempt_only = _prepare(reopened, question_id)
+                reopened.start_external_retrieval_attempt(attempt_only, {
+                    "attempt_id": "ATT-ONLY", "strategy": "none",
+                    "coverage_dimension_ids": ["COV-SUPPORT"]
                 })
-                facade.complete_external_retrieval_attempt(attempt_only, {
+                reopened.complete_external_retrieval_attempt(attempt_only, {
                     "attempt_id": "ATT-ONLY", "outcome": "no_relevant_source"
                 })
                 with self.assertRaises(LocalApplicationError) as missing:
-                    facade.show_external_material(attempt_only, "CAP-none")
+                    reopened.show_external_material(attempt_only, "CAP-none")
                 self.assertEqual(missing.exception.code, "APPLICATION-MATERIAL-404")
 
     def test_c6_export_never_overwrites_or_writes_managed_state(self):
@@ -330,6 +387,51 @@ class Issue91ExternalMaterialContentTests(unittest.TestCase):
                     facade.export_external_material(run_id, "CAP-C6", kind="original", output_file=managed)
                 self.assertEqual(internal.exception.code, "APPLICATION-MATERIAL-EXPORT-001")
                 self.assertFalse(managed.exists())
+
+                store = facade._application.execution_store
+                sentinel = root / "race-sentinel.bin"
+                original_loader = store.load_artifact_verified_once
+
+                def create_sentinel_then_fail(artifact_id):
+                    sentinel.write_bytes(b"other process")
+                    raise RuntimeError("fixture read failure")
+
+                with patch.object(
+                    store, "load_artifact_verified_once", side_effect=create_sentinel_then_fail
+                ):
+                    with self.assertRaises(LocalApplicationError):
+                        facade.export_external_material(
+                            run_id, "CAP-C6", kind="original", output_file=sentinel
+                        )
+                self.assertEqual(sentinel.read_bytes(), b"other process")
+
+                if (
+                    os.name != "nt"
+                    and hasattr(os, "symlink")
+                    and hasattr(os, "O_NOFOLLOW")
+                    and hasattr(os, "O_DIRECTORY")
+                    and os.open in os.supports_dir_fd
+                ):
+                    safe_parent = root / "safe-parent"
+                    safe_parent.mkdir()
+                    old_parent = root / "safe-parent-old"
+                    redirected = workspace / ".research-loom" / "redirect-target"
+                    redirected.mkdir()
+                    race_output = safe_parent / "escaped.bin"
+
+                    def swap_parent_then_load(artifact_id):
+                        safe_parent.rename(old_parent)
+                        safe_parent.symlink_to(redirected, target_is_directory=True)
+                        return original_loader(artifact_id)
+
+                    with patch.object(
+                        store, "load_artifact_verified_once", side_effect=swap_parent_then_load
+                    ):
+                        with self.assertRaises(LocalApplicationError):
+                            facade.export_external_material(
+                                run_id, "CAP-C6", kind="original", output_file=race_output
+                            )
+                    self.assertFalse((redirected / "escaped.bin").exists())
 
     def test_ablation_digest_guard_is_the_control_for_same_size_corruption(self):
         with tempfile.TemporaryDirectory() as temp:

@@ -17,7 +17,8 @@ from .external_desktop_facade import (
     _required_string,
 )
 from .facade import LocalApplicationError
-from .material_content_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
+from .material_inventory_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
+from .material_content_facade import ExternalMaterialContentService
 
 
 _LARGE_ORIGINAL_PREFIX = "external-original://sha256/"
@@ -25,6 +26,25 @@ _LARGE_ORIGINAL_PREFIX = "external-original://sha256/"
 
 class LocalApplicationFacade(_BaseLocalApplicationFacade):
     """PR39 facade: preserve the normal capture path and add oversized fallback."""
+
+
+    def show_external_material(
+        self, run_id: str, capture_id: str, *, max_text_bytes: int = 64 * 1024
+    ) -> Mapping[str, Any]:
+        service = ExternalMaterialContentService(
+            self._application.execution_store, self._project_id, self._workspace_root
+        )
+        return service.show(run_id, capture_id, max_text_bytes=max_text_bytes)
+
+    def export_external_material(
+        self, run_id: str, capture_id: str, *, kind: str, output_file
+    ) -> Mapping[str, Any]:
+        service = ExternalMaterialContentService(
+            self._application.execution_store, self._project_id, self._workspace_root
+        )
+        return service.export(
+            run_id, capture_id, kind=kind, output_file=output_file
+        )
 
     def capture_external_source(
         self,
