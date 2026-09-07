@@ -21,6 +21,11 @@ class LocalExecutionStore(VerifiedArtifactReadMixin, _RetentionLocalExecutionSto
     """Production store with single-read and bounded verified artifact reads."""
 
 
+def canonical_handoff_for(store: LocalExecutionStore, handoff_id: str):
+    """Read one persisted canonical Handoff through the store document verifier."""
+    return store._load_document("handoff", str(handoff_id))
+
+
 __all__ = [
     "LocalCapabilityContextExtensionStore",
     "LocalExecutionStore",
@@ -32,6 +37,7 @@ __all__ = [
     "StoreIntegrityDiagnostic",
     "artifact_metadata_for",
     "bind_controlled_import_root",
+    "canonical_handoff_for",
     "diagnostics_for",
     "external_capture_artifact_metadata_for_project",
     "pending_runs_for_project",

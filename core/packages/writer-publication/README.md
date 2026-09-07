@@ -13,6 +13,7 @@ Writer may return a `Writing Feedback Package`; Writer or Publication preview ma
 `research-package.schema.json` is the only Harness -> Writer research-content boundary. It is snapshot/content bound, carries resolved Effective Profile Set pins, Communication Brief, selected research-object references, preservation constraints, project must-not-claim constraints, and publication-facing requirements. Writer does not read runtime storage or resolve Profile files independently.
 
 A package sourced from PR17 virtual research uses the same envelope as REAL research but preserves `SYNTHETIC_TEST_ONLY`, `preview_only=true`, `authoritative_research_freeze=false`, and `release_eligible=false`.
+For self-contained `0.2.0` packages, `source_research_snapshot.execution_mode` records the pinned authoritative Snapshot mode; a production Virtual Runner may therefore contribute VIRTUAL working material while remaining pinned to a REAL authoritative Snapshot. The selected working material provenance, not a rewritten Snapshot mode, determines the synthetic package status. Legacy `0.1.0` virtual fixtures keep their original virtual-Snapshot contract.
 
 ## Writer preview
 

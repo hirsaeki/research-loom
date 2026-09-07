@@ -178,9 +178,34 @@ def build_parser() -> argparse.ArgumentParser:
     exhibit_show.add_argument("--exhibit-id", required=True)
     _add_output_json(exhibit_show)
 
+    research_package = sub.add_parser("research-package")
+    research_package_sub = research_package.add_subparsers(dest="research_package_command", required=True)
+
+    research_package_build = research_package_sub.add_parser("build")
+    _add_workspace(research_package_build)
+    _add_input_json(research_package_build)
+
+    research_package_list = research_package_sub.add_parser("list")
+    _add_workspace(research_package_list)
+    _add_output_json(research_package_list)
+
+    research_package_show = research_package_sub.add_parser("show")
+    _add_workspace(research_package_show)
+    research_package_show.add_argument("--package-id", required=True)
+    _add_output_json(research_package_show)
+
+    research_package_export = research_package_sub.add_parser("export")
+    _add_workspace(research_package_export)
+    research_package_export.add_argument("--package-id", required=True)
+    research_package_export.add_argument("--output", required=True)
+    _add_output_json(research_package_export)
+
+    research_package_verify = research_package_sub.add_parser("verify")
+    research_package_verify.add_argument("--input", required=True, help="exported Research Package directory")
+    _add_output_json(research_package_verify)
+
     survey = sub.add_parser("survey")
     survey_sub = survey.add_subparsers(dest="survey_command", required=True)
-
     survey_design = survey_sub.add_parser("design")
     survey_design_sub = survey_design.add_subparsers(dest="survey_design_command", required=True)
     survey_design_capture = survey_design_sub.add_parser("capture")
@@ -189,9 +214,8 @@ def build_parser() -> argparse.ArgumentParser:
     survey_design_show = survey_design_sub.add_parser("show")
     _add_workspace(survey_design_show)
     survey_design_show.add_argument("--survey-design-id", required=True)
-    survey_design_show.add_argument("--version", required=True)
+    survey_design_show.add_argument("--version", type=int)
     _add_output_json(survey_design_show)
-
     survey_instrument = survey_sub.add_parser("instrument")
     survey_instrument_sub = survey_instrument.add_subparsers(dest="survey_instrument_command", required=True)
     survey_instrument_capture = survey_instrument_sub.add_parser("capture")
@@ -200,93 +224,82 @@ def build_parser() -> argparse.ArgumentParser:
     survey_instrument_show = survey_instrument_sub.add_parser("show")
     _add_workspace(survey_instrument_show)
     survey_instrument_show.add_argument("--instrument-id", required=True)
-    survey_instrument_show.add_argument("--version", required=True)
+    survey_instrument_show.add_argument("--version", type=int)
     _add_output_json(survey_instrument_show)
     survey_instrument_export = survey_instrument_sub.add_parser("export")
     _add_workspace(survey_instrument_export)
     survey_instrument_export.add_argument("--instrument-id", required=True)
-    survey_instrument_export.add_argument("--version", required=True)
-    survey_instrument_export.add_argument("--format", required=True, choices=("json", "markdown"))
+    survey_instrument_export.add_argument("--version", type=int)
+    survey_instrument_export.add_argument("--format", choices=("json", "yaml"), default="json")
     _add_output_json(survey_instrument_export)
 
     action = sub.add_parser("action")
     action_sub = action.add_subparsers(dest="action_command", required=True)
-    submit = action_sub.add_parser("submit")
-    _add_workspace(submit)
-    _add_input_json(submit)
+    action_submit = action_sub.add_parser("submit")
+    _add_workspace(action_submit)
+    _add_input_json(action_submit)
 
     confirmation = sub.add_parser("confirmation")
     confirmation_sub = confirmation.add_subparsers(dest="confirmation_command", required=True)
-    confirm = confirmation_sub.add_parser("submit")
-    _add_workspace(confirm)
-    _add_input_json(confirm)
+    confirmation_submit = confirmation_sub.add_parser("submit")
+    _add_workspace(confirmation_submit)
+    _add_input_json(confirmation_submit)
 
     decision = sub.add_parser("decision")
     decision_sub = decision.add_subparsers(dest="decision_command", required=True)
-    resolve = decision_sub.add_parser("resolve")
-    _add_workspace(resolve)
-    _add_input_json(resolve)
+    decision_resolve = decision_sub.add_parser("resolve")
+    _add_workspace(decision_resolve)
+    _add_input_json(decision_resolve)
 
     external = sub.add_parser("external")
     external_sub = external.add_subparsers(dest="external_command", required=True)
 
-    attempt = external_sub.add_parser("attempt")
-    attempt_sub = attempt.add_subparsers(dest="attempt_command", required=True)
-    attempt_start = attempt_sub.add_parser("start")
-    _add_external_input(attempt_start)
-    attempt_complete = attempt_sub.add_parser("complete")
-    _add_external_input(attempt_complete)
+    external_attempt = external_sub.add_parser("attempt")
+    external_attempt_sub = external_attempt.add_subparsers(dest="attempt_command", required=True)
+    external_attempt_start = external_attempt_sub.add_parser("start")
+    _add_external_input(external_attempt_start)
+    external_attempt_complete = external_attempt_sub.add_parser("complete")
+    _add_external_input(external_attempt_complete)
 
-    capture = external_sub.add_parser("capture")
-    _add_external_input(capture)
+    external_capture = external_sub.add_parser("capture")
+    _add_external_input(external_capture)
 
-    collect = external_sub.add_parser("collect")
-    _add_external_input(collect)
+    external_collect = external_sub.add_parser("collect")
+    _add_external_input(external_collect)
 
-    materials = external_sub.add_parser("materials")
-    materials_sub = materials.add_subparsers(dest="materials_command", required=True)
-    materials_list = materials_sub.add_parser("list")
-    _add_workspace(materials_list)
-    materials_list.add_argument(
-        "--limit",
-        type=int,
-        default=100,
-        help="materials per page (1-100)",
-    )
-    materials_list.add_argument(
-        "--cursor",
-        help="opaque next_cursor from a previous materials list response",
-    )
-    _add_output_json(materials_list)
+    external_materials = external_sub.add_parser("materials")
+    external_materials_sub = external_materials.add_subparsers(dest="materials_command", required=True)
 
-    materials_show = materials_sub.add_parser("show")
-    _add_workspace(materials_show)
-    materials_show.add_argument("--run-id", required=True)
-    materials_show.add_argument("--capture-id", required=True)
-    materials_show.add_argument(
-        "--max-text-bytes",
-        type=int,
-        default=64 * 1024,
-        help="maximum UTF-8 rendition bytes to display (1-1048576)",
-    )
-    _add_output_json(materials_show)
+    external_materials_list = external_materials_sub.add_parser("list")
+    _add_workspace(external_materials_list)
+    external_materials_list.add_argument("--limit", type=int, default=100)
+    external_materials_list.add_argument("--cursor")
+    _add_output_json(external_materials_list)
 
-    materials_export = materials_sub.add_parser("export")
-    _add_workspace(materials_export)
-    materials_export.add_argument("--run-id", required=True)
-    materials_export.add_argument("--capture-id", required=True)
-    materials_export.add_argument("--kind", choices=("original", "rendition"), required=True)
-    materials_export.add_argument("--output", required=True, help="new output file; existing paths are never overwritten")
-    _add_output_json(materials_export)
+    external_materials_show = external_materials_sub.add_parser("show")
+    _add_workspace(external_materials_show)
+    external_materials_show.add_argument("--run-id", required=True)
+    external_materials_show.add_argument("--capture-id", required=True)
+    external_materials_show.add_argument("--max-text-bytes", type=int, default=65_536)
+    _add_output_json(external_materials_show)
+
+    external_materials_export = external_materials_sub.add_parser("export")
+    _add_workspace(external_materials_export)
+    external_materials_export.add_argument("--run-id", required=True)
+    external_materials_export.add_argument("--capture-id", required=True)
+    external_materials_export.add_argument("--kind", choices=("original", "text"), default="text")
+    external_materials_export.add_argument("--output", required=True)
+    _add_output_json(external_materials_export)
 
     return parser
 
 
+
 def _doctor_with_optional_attention(workspace: str | Path) -> Mapping[str, Any]:
-    result = deepcopy(dict(LocalApplicationFacade.doctor_workspace(workspace)))
-    if result.get("status") != "OK":
+    result = deepcopy(LocalApplicationFacade.doctor_workspace(workspace))
+    if result.get("status") == "ERROR":
         return result
-    attention_path = Path(workspace).expanduser().resolve(strict=False) / ".research-loom" / ATTENTION_STORE_NAME
+    attention_path = Path(workspace) / ".research-loom" / ATTENTION_STORE_NAME
     if not attention_path.exists():
         result.setdefault("checks", []).append({
             "check": "attention_store",
@@ -303,7 +316,6 @@ def _doctor_with_optional_attention(workspace: str | Path) -> Mapping[str, Any]:
     result.setdefault("checks", []).append({"check": "attention_store", "status": "OK"})
     return result
 
-
 def _run(args: argparse.Namespace) -> Mapping[str, Any]:
     if args.command == "init":
         return LocalApplicationFacade.initialize_workspace(
@@ -314,6 +326,10 @@ def _run(args: argparse.Namespace) -> Mapping[str, Any]:
 
     if args.command == "doctor":
         return _doctor_with_optional_attention(args.workspace)
+
+    if args.command == "research-package" and args.research_package_command == "verify":
+        from plugins.local_application.research_package_service import verify_export_root
+        return verify_export_root(args.input)
 
     with LocalApplicationFacade.open_workspace(args.workspace) as facade:
         if args.command == "status":
@@ -326,6 +342,15 @@ def _run(args: argparse.Namespace) -> Mapping[str, Any]:
             return facade.show_run(args.run_id)
         if args.command == "run" and args.run_command == "replay":
             return facade.replay_completed_desktop_research_run(args.run_id)
+        if args.command == "research-package":
+            if args.research_package_command == "build":
+                return facade.build_research_package(_read_input(args.json_input))
+            if args.research_package_command == "list":
+                return facade.list_research_packages()
+            if args.research_package_command == "show":
+                return facade.show_research_package(args.package_id)
+            if args.research_package_command == "export":
+                return facade.export_research_package(args.package_id, args.output)
         if args.command == "exhibit":
             if args.exhibit_command == "capture":
                 return facade.capture_exhibit(_read_input(args.json_input))
