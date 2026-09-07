@@ -91,10 +91,11 @@ class ResearchPackageAcceptanceTests(unittest.TestCase):
         handoff, extension = intake.golden_submission(facade._application, run_id, capture)
         collected=facade.collect_external(run_id,{"handoff":handoff,"extension":extension})
         self.assertEqual(collected["execution_result"]["run"]["status"],"COMPLETED")
+        proposal=deepcopy(collected["execution_result"]["state_delta_proposal"])
         exhibit=facade.capture_exhibit(exhibits.exhibit_payload(rq_id=rq_id,source_run_ids=[run_id],source_artifact_refs=[f"{run_id}.CAP-1.text"],source_object_ids=[]))["exhibit"]
         state2=facade._application.state_repository.load_state_view(facade.project_id, facade._application.state_repository.load_active_lineage_ref(facade.project_id))
         build_input={"snapshot_id":state2.current_snapshot["id"],"rq_id":rq_id,"run_ids":[run_id],"exhibit_ids":[exhibit["exhibit_id"]],"materials":[{"run_id":run_id,"capture_id":"CAP-1"}],"gap_ids":["GAP-1"]}
-        return facade,{"rq_id":rq_id,"run_id":run_id,"capture":capture,"exhibit_id":exhibit["exhibit_id"],"source_text":exact,"before":before,"build_input":build_input}
+        return facade,{"rq_id":rq_id,"run_id":run_id,"capture":capture,"exhibit_id":exhibit["exhibit_id"],"source_text":exact,"before":before,"proposal":proposal,"build_input":build_input}
 
     def _build(self):
         facade,case=self._prepare_case(); result=facade.build_research_package(case["build_input"]); case["package_id"]=result["package"]["package_id"]; case["digest"]=result["package"]["package_digest"]; return facade,case
@@ -126,10 +127,17 @@ class ResearchPackageAcceptanceTests(unittest.TestCase):
         root = self.root / "virtual-workspace"
         root.mkdir()
         (root / "effective-profile-set.json").write_text(json.dumps(effective), encoding="utf-8")
+        def virtual_profile_provider(_project, expected):
+            if expected != effective_digest:
+                return None
+            projected = deepcopy(effective)
+            projected["content_digest"] = expected
+            return projected
+
         app = LocalResearchApplication(
             root,
             resolver=NullResolver(),
-            effective_profile_set_provider=lambda _project, expected: effective if expected == effective_digest else None,
+            effective_profile_set_provider=virtual_profile_provider,
             seed_state=seed,
         )
         return LocalApplicationFacade(app, "PRJ-1", workspace_root=root, owns_application=True)
@@ -148,18 +156,66 @@ class ResearchPackageAcceptanceTests(unittest.TestCase):
         verified=verify_export_root(out); self.assertEqual(verified["status"],"VERIFIED")
         package=json.loads((out/"research-package.json").read_text(encoding="utf-8"))
         self.assertEqual((out/package["resolved_content"]["materials"][0]["text_rendition"]["attachment_path"]).read_text(encoding="utf-8"),case["source_text"])
-        self.assertIn("consumes", (out/"attachments/profile/narrative-semantics.yaml").read_text(encoding="utf-8"))
-        self.assertIn("GAP-1",(out/"research-package.md").read_text(encoding="utf-8"))
+        narrative=(out/package["resolved_profiles"]["narrative_semantics"]["contract_path"]).read_text(encoding="utf-8")
+        self.assertIn("narrative.semantic_stages",narrative); self.assertIn("produces",narrative)
 
     def test_rp2_in_progress_real_and_candidate_authority_are_preserved(self):
-        facade,case=self._build()
+        facade,case=self._prepare_case()
         try:
-            p=facade.show_research_package(case["package_id"])["package"]
-            self.assertEqual(p["source_epistemic_status"],"EMPIRICAL_RESEARCH_STATE")
-            self.assertTrue(p["preview_only"]); self.assertFalse(p["authoritative_research_freeze"]); self.assertFalse(p["release_eligible"])
+            first=facade.build_research_package(case["build_input"]); p=facade.show_research_package(first["package"]["package_id"])["package"]
+            self.assertEqual(p["source_epistemic_status"],"EMPIRICAL_RESEARCH_STATE"); self.assertTrue(p["preview_only"]); self.assertFalse(p["authoritative_research_freeze"]); self.assertFalse(p["release_eligible"])
             self.assertEqual(p["content"]["finding_refs"],[])
             run=p["resolved_content"]["working_material"]["run_candidates"][0]
             self.assertTrue(run["candidate_only"]); self.assertTrue(run["handoff"]["outputs"]["candidate_findings"])
+
+            proposal=case["proposal"]
+            pending=facade.submit_action({
+                "action_type":"state.apply_candidate",
+                "payload":{"state_delta_proposal_id":proposal["proposal_id"]},
+                "actor_id":"HUMAN-RP2",
+            })
+            decision_request=facade.submit_confirmation({
+                "confirmation_request_id":pending["confirmation_request"]["confirmation_request_id"],
+                "actor_id":"HUMAN-RP2",
+            })["decision_request"]
+            resolved=facade.resolve_human_decision({
+                "request_id":decision_request["request_id"],
+                "request_digest":decision_request["request_digest"],
+                "disposition":"approve_exact",
+                "actor_id":"HUMAN-RP2",
+            })
+            self.assertEqual(resolved["status"],"RESOLVED")
+
+            state=facade._application.state_repository.load_state_view(
+                facade.project_id,
+                facade._application.state_repository.load_active_lineage_ref(facade.project_id),
+            )
+            candidate_objects=[]
+            expected={}
+            for action in proposal["proposed_actions"]:
+                obj=action.get("payload",{}).get("object")
+                if isinstance(obj,dict) and obj.get("kind") in {"source","evidence","finding"}:
+                    candidate_objects.append(obj["id"])
+                    expected[obj["id"]]=deepcopy(obj)
+            self.assertTrue(candidate_objects)
+            second=facade.build_research_package({
+                "snapshot_id":state.current_snapshot["id"],
+                "rq_id":case["rq_id"],
+                "object_ids":candidate_objects,
+                "run_ids":[case["run_id"]],
+            })
+            package=facade.show_research_package(second["package"]["package_id"])["package"]
+            resolved_objects={obj["id"]:obj for obj in package["resolved_content"]["research_objects"]}
+            for object_id in candidate_objects:
+                self.assertEqual(resolved_objects[object_id],expected[object_id])
+                self.assertEqual(resolved_objects[object_id].get("adoption_state"),"candidate")
+            finding=next(obj for obj in resolved_objects.values() if obj.get("kind")=="finding")
+            expected_finding=next(obj for obj in expected.values() if obj.get("kind")=="finding")
+            self.assertEqual(finding.get("evidence_ids"),expected_finding.get("evidence_ids"))
+            self.assertEqual(finding.get("counter_evidence_ids"),expected_finding.get("counter_evidence_ids"))
+            self.assertEqual(finding.get("boundary_conditions"),expected_finding.get("boundary_conditions"))
+            self.assertEqual(finding.get("limitations"),expected_finding.get("limitations"))
+            self.assertTrue(package["resolved_content"]["working_material"]["run_candidates"][0]["candidate_only"])
         finally: facade.close()
 
     def test_rp3_saved_package_survives_head_advance_and_source_loss(self):
