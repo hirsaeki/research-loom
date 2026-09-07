@@ -133,8 +133,12 @@ def golden_submission(app, run_id: str, capture: dict) -> tuple[dict, dict]:
         },
         "preserved_context": {
             "research_attention_ids": [item["attention_id"] for item in context["research_attention"]],
-            "project_guard_ids": [],
-            "effective_constraint_paths": [],
+            "project_guard_ids": [
+                guard["guard_id"]
+                for key in ("requirements", "prohibitions", "must_not_claim")
+                for guard in context["project_constraints"][key]
+            ],
+            "effective_constraint_paths": [item["path"] for item in context["effective_constraints"]],
         },
         "validation": {"status": "valid", "issues": []},
         "outputs": {
