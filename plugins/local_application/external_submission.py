@@ -5,12 +5,16 @@ from typing import Any, Mapping
 
 from core.conversation.validation import canonical_digest
 from core.execution import CapabilityExecutionError
+from core.runtime.normalization import NormalizationRejected
 from core.execution.validation import CanonicalCapabilityExecutionValidator
 from plugins.desktop_research import DesktopResearchResultValidator, build_result_extension
+from plugins.desktop_research.normalization import verified_resource_basis_provenance
+from plugins.desktop_research.retention import _matching_whitespace_slice
 from plugins.desktop_research.attempts import UNSUCCESSFUL_OUTCOMES
 from plugins.local_execution_store import LocalExecutionStoreError
 
 from .facade import LocalApplicationError
+from .material_content_facade import _artifact_pair_for_capture
 
 
 class CorrectableExternalSubmissionError(LocalApplicationError):
@@ -47,6 +51,37 @@ def _list(value: Any, field: str) -> list[Any]:
     return deepcopy(value)
 
 
+def _mapping_list(value: Any, field: str) -> list[dict[str, Any]]:
+    items = _list(value, field)
+    result = []
+    for index, item in enumerate(items):
+        if not isinstance(item, Mapping):
+            raise CorrectableExternalSubmissionError(
+                "APPLICATION-EXTERNAL-SUBMISSION-CONTENT-001",
+                f"{field}[{index}] must be an object",
+            )
+        result.append(deepcopy(dict(item)))
+    return result
+
+
+def _validate_nested_content(value: Mapping[str, Any]) -> None:
+    coverage = _mapping(value.get("coverage_assessment"), "coverage_assessment")
+    if "dimensions" not in coverage:
+        raise CorrectableExternalSubmissionError(
+            "APPLICATION-EXTERNAL-SUBMISSION-CONTENT-001",
+            "coverage_assessment is missing required dimensions",
+        )
+    _mapping_list(coverage.get("dimensions"), "coverage_assessment.dimensions")
+    _mapping_list(value.get("null_results", []), "null_results")
+    _mapping_list(value.get("evidence_gap_assessments", []), "evidence_gap_assessments")
+    methods = _list(value.get("candidate_next_method_ids", []), "candidate_next_method_ids")
+    if any(not isinstance(item, str) or not item for item in methods):
+        raise CorrectableExternalSubmissionError(
+            "APPLICATION-EXTERNAL-SUBMISSION-CONTENT-001",
+            "candidate_next_method_ids must contain non-empty strings",
+        )
+
+
 def assemble_external_submission(
     application,
     run,
@@ -61,6 +96,7 @@ def assemble_external_submission(
             "research_result contains internal, unknown, or forbidden fields: "
             + ", ".join(sorted(unknown)),
         )
+    _validate_nested_content(value)
 
     store = application.execution_store
     context = store.load_context_pack(run.context_pack_id)
@@ -142,8 +178,8 @@ def assemble_external_submission(
         source_capture_details=capture_details,
         citation_details=_citations(value, capture_details, texts),
         search_trace=_search_trace(value, attempts),
-        null_results=_list(value.get("null_results", []), "null_results"),
-        evidence_gap_assessments=_list(value.get("evidence_gap_assessments", []), "evidence_gap_assessments"),
+        null_results=_mapping_list(value.get("null_results", []), "null_results"),
+        evidence_gap_assessments=_mapping_list(value.get("evidence_gap_assessments", []), "evidence_gap_assessments"),
         coverage_assessment=_mapping(value.get("coverage_assessment"), "coverage_assessment"),
         candidate_next_method_ids=_list(value.get("candidate_next_method_ids", []), "candidate_next_method_ids"),
     )
@@ -213,6 +249,19 @@ def validate_external_submission(
         or provenance["implementation_version"] != run.implementation_version
     ):
         return [_issue("CAP-HANDOFF-PROVENANCE-001", "Handoff implementation provenance does not match the pinned adapter")]
+
+    for collection in ("evidence_candidates", "counterevidence"):
+        for item in handoff["outputs"].get(collection, ()):
+            basis = item.get("source_basis") if isinstance(item, Mapping) else None
+            if not isinstance(basis, Mapping) or basis.get("basis_type") != "resource_reference":
+                continue
+            try:
+                verified_resource_basis_provenance(store, context, basis)
+            except NormalizationRejected as exc:
+                raise LocalApplicationError(
+                    "APPLICATION-EXTERNAL-INTEGRITY-001", str(exc)
+                ) from exc
+
     codes = DesktopResearchResultValidator(store, application.operational_store).validate(
         handoff,
         extension,
@@ -237,46 +286,27 @@ def _issue(code: str, message: str, *, retryable: bool = False) -> dict[str, Any
 
 def _resolve_captures(application, run_id: str, capture_ids: list[str]):
     store = application.execution_store
-    by_capture: dict[str, dict[str, Any]] = {}
-    for artifact in store.artifacts_for(run_id):
-        capture_id = artifact.provenance.get("capture_id")
-        if not isinstance(capture_id, str) or capture_id not in capture_ids:
-            continue
-        key = (
-            "original" if artifact.role == "desktop_research.original_capture"
-            else "text" if artifact.role == "desktop_research.text_rendition"
-            else None
-        )
-        if key is None:
-            continue
-        slot = by_capture.setdefault(capture_id, {})
-        if key in slot:
-            raise LocalApplicationError(
-                "APPLICATION-EXTERNAL-INTEGRITY-001",
-                f"selected capture has duplicate persisted {key} artifacts: {capture_id}",
-            )
-        slot[key] = artifact
-
+    run_record = store.load_run(run_id)
+    if run_record is None:
+        raise LocalApplicationError("APPLICATION-EXTERNAL-RUN-STATE-001", "external Run no longer resolves")
     source_captures, details, texts = [], [], {}
     for capture_id in capture_ids:
-        slot = by_capture.get(capture_id, {})
-        original, text = slot.get("original"), slot.get("text")
-        if not slot:
-            raise CorrectableExternalSubmissionError(
-                "APPLICATION-EXTERNAL-SUBMISSION-CONTENT-001",
-                f"selected capture does not resolve for this Run: {capture_id}",
+        try:
+            _run, original, text, projection = _artifact_pair_for_capture(
+                store, run_record.project_ref, run_id, capture_id
             )
-        if original is None or text is None:
+        except LocalApplicationError as exc:
+            if exc.code == "APPLICATION-MATERIAL-404":
+                raise CorrectableExternalSubmissionError(
+                    "APPLICATION-EXTERNAL-SUBMISSION-CONTENT-001",
+                    f"selected capture does not resolve for this Run: {capture_id}",
+                ) from exc
+            raise
+        except (KeyError, OSError, ValueError, LocalExecutionStoreError) as exc:
             raise LocalApplicationError(
                 "APPLICATION-EXTERNAL-INTEGRITY-001",
-                f"selected capture has an incomplete persisted original/text pair: {capture_id}",
-            )
-        provenance = original.provenance
-        if any(not isinstance(provenance.get(field), str) or not provenance.get(field) for field in ("source_category", "exact_locator", "acquired_at")):
-            raise LocalApplicationError(
-                "APPLICATION-EXTERNAL-INTEGRITY-001",
-                f"selected capture provenance is incomplete: {capture_id}",
-            )
+                f"selected capture provenance failed integrity verification: {capture_id}",
+            ) from exc
         try:
             original_payload = store.load_artifact(original.artifact_id)
             text_payload = store.load_artifact(text.artifact_id)
@@ -297,7 +327,8 @@ def _resolve_captures(application, run_id: str, capture_ids: list[str]):
                 "APPLICATION-EXTERNAL-INTEGRITY-001",
                 f"selected capture rendition is not valid UTF-8: {capture_id}",
             ) from exc
-        locator = str(provenance["exact_locator"])
+        provenance = original.provenance
+        locator = str(projection["source_locator"])
         source_captures.append({
             "capture_id": capture_id,
             "origin": {
@@ -309,9 +340,9 @@ def _resolve_captures(application, run_id: str, capture_ids: list[str]):
         })
         details.append({
             "capture_id": capture_id,
-            "source_category": str(provenance["source_category"]),
+            "source_category": str(projection["source_category"]),
             "exact_locator": locator,
-            "acquired_at": str(provenance["acquired_at"]),
+            "acquired_at": str(projection["acquired_at"]),
             "original_capture": {
                 "content_reference": original.artifact_id,
                 "content_digest": original.digest,
@@ -362,7 +393,7 @@ def _citations(value, capture_details, texts):
             **citation,
             "text_rendition_digest": detail["text_rendition"]["content_digest"],
             "capture_integrity_verified": True,
-            "excerpt_containment_verified": excerpt in text,
+            "excerpt_containment_verified": excerpt in text or _matching_whitespace_slice(text, excerpt) is not None,
             "evidence_adoption_performed": False,
         })
     return assembled

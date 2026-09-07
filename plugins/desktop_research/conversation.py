@@ -150,7 +150,7 @@ class DesktopResearchConversationMaterializer:
             raise ConversationRuntimeError(
                 "CONV-PIN-001", "Effective Research Attention IDs must be present and unique"
             )
-        guards = project.get("guards", project.get("project_guards", {}))
+        guards = project.get("project_constraints", project.get("guards", project.get("project_guards", {})))
         if not isinstance(guards, Mapping):
             guards = {}
         project_constraints = {

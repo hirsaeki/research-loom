@@ -18,6 +18,34 @@ from .result_validation import DesktopResearchResultValidator
 _SAFE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 
 
+def verified_resource_basis_provenance(artifact_store, context_pack: Mapping[str, Any], basis: Mapping[str, Any]) -> tuple[str, str]:
+    """Resolve one source resource basis through the same verified read used by normalization."""
+    reference_id = str(basis["resource_reference_id"])
+    resources = {str(item["reference_id"]): item for item in context_pack["resources"]}
+    resource = resources.get(reference_id)
+    if not resource or resource.get("reference_type") != "source":
+        raise NormalizationRejected(
+            f"Desktop Evidence basis references unresolved source resource {reference_id}"
+        )
+    object_id = resource.get("object_id")
+    digest = resource.get("digest")
+    if object_id is None or not digest:
+        raise NormalizationRejected(
+            f"Desktop Evidence source resource {reference_id} lacks object_id or digest"
+        )
+    try:
+        payload = artifact_store.load(resource)
+    except Exception as exc:
+        raise NormalizationRejected(
+            f"Desktop Evidence source resource {reference_id} failed integrity verification"
+        ) from exc
+    if str(payload.digest) != str(digest):
+        raise NormalizationRejected(
+            f"Desktop Evidence source resource {reference_id} digest does not match verified payload"
+        )
+    return str(object_id), str(digest)
+
+
 def _id(prefix: str, basis: str) -> str:
     candidate = f"{prefix}-{basis}"
     if len(candidate) <= 128 and _SAFE_ID.match(candidate):
@@ -196,29 +224,21 @@ class DesktopResearchNormalizer:
 
                 reference_id = str(basis["resource_reference_id"])
                 resource = resources.get(reference_id)
-                if not resource or resource.get("reference_type") != "source":
+                if resource is None:
                     raise NormalizationRejected(
                         f"Desktop Evidence basis references unresolved source resource {reference_id}"
                     )
-                object_id = resource.get("object_id")
                 digest = resource.get("digest")
+                verification_key = (reference_id, str(digest))
+                if verification_key not in verified_resources:
+                    result = verified_resource_basis_provenance(self._artifacts, context_pack, basis)
+                    verified_resources.add(verification_key)
+                    return result
+                object_id = resource.get("object_id")
                 if object_id is None or not digest:
                     raise NormalizationRejected(
                         f"Desktop Evidence source resource {reference_id} lacks object_id or digest"
                     )
-                verification_key = (reference_id, str(digest))
-                if verification_key not in verified_resources:
-                    try:
-                        payload = self._artifacts.load(resource)
-                    except Exception as exc:
-                        raise NormalizationRejected(
-                            f"Desktop Evidence source resource {reference_id} failed integrity verification"
-                        ) from exc
-                    if str(payload.digest) != str(digest):
-                        raise NormalizationRejected(
-                            f"Desktop Evidence source resource {reference_id} digest does not match verified payload"
-                        )
-                    verified_resources.add(verification_key)
                 return str(object_id), str(digest)
 
             for item in handoff["outputs"]["evidence_candidates"]:
