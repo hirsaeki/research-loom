@@ -23,6 +23,7 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
         research_result = self._research_result_input(submission, preflight=True)
         attempts = self._completed_attempts(run.run_id)
         try:
+            self._enforce_capture_budget(research_result, context_extension)
             handoff, extension = assemble_external_submission(
                 self._application, run, research_result, attempts
             )
@@ -56,6 +57,7 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                 attempts = self._completed_attempts(run.run_id)
                 if research_result is not None:
                     try:
+                        self._enforce_capture_budget(research_result, context_extension)
                         handoff, extension = assemble_external_submission(
                             self._application, run, research_result, attempts
                         )
@@ -107,6 +109,29 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                 "research_result must be an object",
             )
         return deepcopy(dict(value))
+
+    @staticmethod
+    def _enforce_capture_budget(research_result: Mapping[str, Any], context_extension: Mapping[str, Any]):
+        capture_ids = research_result.get("capture_ids")
+        if not isinstance(capture_ids, list):
+            return
+        try:
+            capture_limit = int(context_extension["budget"]["max_acquired_source_captures"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise LocalApplicationError(
+                "APPLICATION-EXTERNAL-BINDING-001",
+                "Desktop Research Context extension has an invalid capture budget",
+            ) from exc
+        if capture_limit < 0:
+            raise LocalApplicationError(
+                "APPLICATION-EXTERNAL-BINDING-001",
+                "Desktop Research Context extension has an invalid capture budget",
+            )
+        if len(capture_ids) > capture_limit:
+            raise CorrectableExternalSubmissionError(
+                "APPLICATION-EXTERNAL-SUBMISSION-CONTENT-001",
+                f"capture_ids exceeds pinned max_acquired_source_captures ({capture_limit})",
+            )
 
     @staticmethod
     def _submission_issue(exc: CorrectableExternalSubmissionError):

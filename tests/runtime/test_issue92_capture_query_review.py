@@ -56,12 +56,40 @@ class Issue92CaptureQueryReviewTests(unittest.TestCase):
                 original_limit = connection.getlimit(sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER)
                 try:
                     connection.setlimit(sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER, 8)
-                    capture_ids = ["CAP-1", *(f"CAP-MISSING-{index}" for index in range(20))]
-                    selected = artifacts_for_capture_ids(app.execution_store, run_id, capture_ids)
+                    selected = artifacts_for_capture_ids(
+                        app.execution_store,
+                        run_id,
+                        ["CAP-1", *[f"CAP-MISSING-{index}" for index in range(20)]],
+                    )
                 finally:
                     connection.setlimit(sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER, original_limit)
                 self.assertEqual(len(selected), 2)
                 self.assertEqual({item.provenance.get("capture_id") for item in selected}, {"CAP-1"})
+            finally:
+                facade.close()
+
+    def test_submission_capture_ids_are_bounded_before_storage_query(self):
+        fixture = issue92.Issue92ExternalSubmissionPreflightTests(methodName="runTest")
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            app, facade = fixture.make_facade(root)
+            try:
+                run_id, valid, _ = fixture.prepared(root, facade)
+                oversized = dict(valid)
+                oversized["capture_ids"] = ["CAP-1", *[f"CAP-MISSING-{index}" for index in range(20)]]
+                with patch(
+                    "plugins.local_application.external_submission.artifacts_for_capture_ids",
+                    wraps=artifacts_for_capture_ids,
+                ) as selected_query:
+                    rejected = facade.preflight_external(run_id, {"research_result": oversized})
+                self.assertEqual(rejected["status"], "PREFLIGHT_REJECTED")
+                self.assertEqual(rejected["issues"][0]["code"], "APPLICATION-EXTERNAL-SUBMISSION-CONTENT-001")
+                self.assertIn("max_acquired_source_captures", rejected["issues"][0]["message"])
+                selected_query.assert_not_called()
+                self.assertEqual(
+                    facade.preflight_external(run_id, {"research_result": valid})["status"],
+                    "PREFLIGHT_OK",
+                )
             finally:
                 facade.close()
 
