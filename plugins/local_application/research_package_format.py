@@ -88,28 +88,66 @@ def narrative_refs(constraints:list[Mapping[str,Any]])->dict[str,Any]:
                 if isinstance(x,Mapping) and all(isinstance(x.get(k),str) for k in ("from_stage","to_stage","relation")): edges.append({k:str(x[k]) for k in ("from_stage","to_stage","relation")})
     return {"stage_refs":list(dict.fromkeys(stages)),"section_purpose_refs":list(dict.fromkeys(purposes)),"required_preservation_refs":list(dict.fromkeys(preserve)),"partial_order_edges":edges}
 
+
+def _bounded_file_digest(path:Path,maximum:int)->tuple[int,str]:
+    try:
+        size=path.stat().st_size
+    except OSError as exc:
+        raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",f"missing file: {path.name}") from exc
+    if size>maximum:
+        raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-BOUND-001","Research Package export exceeds output bound")
+    digest=hashlib.sha256()
+    read=0
+    try:
+        with path.open("rb") as handle:
+            while True:
+                chunk=handle.read(min(64*1024,maximum-read+1))
+                if not chunk: break
+                read+=len(chunk)
+                if read>maximum:
+                    raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-BOUND-001","Research Package export exceeds output bound")
+                digest.update(chunk)
+    except LocalApplicationError:
+        raise
+    except OSError as exc:
+        raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",f"unreadable file: {path.name}") from exc
+    if read!=size:
+        raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",f"file changed while verifying: {path.name}")
+    return size,"sha256:"+digest.hexdigest()
+
 def verify_export_root(root:str|Path,*,verify_package_digest:bool=True)->Mapping[str,Any]:
     try: base=Path(root).expanduser().resolve(strict=True)
     except OSError as exc: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001","export root does not exist") from exc
-    try: package=json.loads((base/"research-package.json").read_text(encoding="utf-8"))
+    package_path=base/"research-package.json"
+    try:
+        package_size=package_path.stat().st_size
+    except OSError as exc:
+        raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001","invalid research-package.json") from exc
+    if package_size>MAX_OUTPUT_BYTES: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-BOUND-001","Research Package export exceeds output bound")
+    try: package=json.loads(package_path.read_text(encoding="utf-8"))
     except (OSError,UnicodeError,json.JSONDecodeError) as exc: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001","invalid research-package.json") from exc
     if not isinstance(package,Mapping): raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001","research-package.json must be an object")
     validate_schema(package)
     if verify_package_digest and package.get("package_digest")!=digest_json(without_digest(package)): raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001","Research Package digest mismatch")
-    total=(base/"research-package.json").stat().st_size; seen=set()
+    total=package_size; seen=set()
     for a in package.get("attachments",[]):
         rel=str(a["path"]); p=Path(rel)
         if p.is_absolute() or ".." in p.parts or rel in seen: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001","unsafe or duplicate attachment path")
         seen.add(rel); path=(base/p).resolve(strict=False)
         if not path.is_relative_to(base): raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001","attachment escapes export root")
-        try:data=path.read_bytes()
+        try: size=path.stat().st_size
         except OSError as exc: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",f"missing attachment: {rel}") from exc
-        if len(data)!=int(a["byte_length"]) or digest_bytes(data)!=a["content_digest"]: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",f"attachment digest/size mismatch: {rel}")
-        total+=len(data)
-    try: md=(base/"research-package.md").read_bytes()
+        if total+size>MAX_OUTPUT_BYTES: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-BOUND-001","Research Package export exceeds output bound")
+        if size!=int(a["byte_length"]): raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",f"attachment digest/size mismatch: {rel}")
+        _,digest=_bounded_file_digest(path,MAX_OUTPUT_BYTES-total)
+        if digest!=a["content_digest"]: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",f"attachment digest/size mismatch: {rel}")
+        total+=size
+    md_path=base/"research-package.md"
+    try: md_size=md_path.stat().st_size
     except OSError as exc: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001","missing Research Package Markdown") from exc
+    if total+md_size>MAX_OUTPUT_BYTES: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-BOUND-001","Research Package export exceeds output bound")
+    _,md_digest=_bounded_file_digest(md_path,MAX_OUTPUT_BYTES-total)
     proj=package.get("projections",{}).get("markdown",{})
-    if proj.get("path")!="research-package.md" or int(proj.get("byte_length",-1))!=len(md) or proj.get("content_digest")!=digest_bytes(md): raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001","Research Package Markdown integrity mismatch")
-    total+=len(md)
-    if total>MAX_OUTPUT_BYTES: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-BOUND-001","Research Package export exceeds output bound")
+    if proj.get("path")!="research-package.md" or int(proj.get("byte_length",-1))!=md_size or proj.get("content_digest")!=md_digest: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001","Research Package Markdown integrity mismatch")
+    total+=md_size
     return {"status":"VERIFIED","package_id":package["package_id"],"package_digest":package["package_digest"],"attachment_count":len(package.get("attachments",[])),"total_verified_bytes":total}
