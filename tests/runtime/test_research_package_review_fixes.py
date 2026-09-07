@@ -7,12 +7,12 @@ from unittest.mock import patch
 from core.execution import CapabilityRunRecord, RunStatus
 from plugins.local_application import LocalApplicationError
 from plugins.local_application.research_package_service import verify_export_root
-from test_research_package_acceptance import ResearchPackageAcceptanceTests
+import test_research_package_acceptance as acceptance
 
 
 class ResearchPackageReviewFixTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.fixture = ResearchPackageAcceptanceTests(
+        self.fixture = acceptance.ResearchPackageAcceptanceTests(
             methodName="test_rp1_detached_show_export_and_verify_reads_exact_materials"
         )
         self.fixture.setUp()
