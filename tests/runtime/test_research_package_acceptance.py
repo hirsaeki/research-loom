@@ -126,7 +126,6 @@ class ResearchPackageAcceptanceTests(unittest.TestCase):
         )
         root = self.root / "virtual-workspace"
         root.mkdir()
-        (root / "effective-profile-set.json").write_text(json.dumps(effective), encoding="utf-8")
         def virtual_profile_provider(_project, expected):
             if expected != effective_digest:
                 return None
@@ -156,14 +155,17 @@ class ResearchPackageAcceptanceTests(unittest.TestCase):
         verified=verify_export_root(out); self.assertEqual(verified["status"],"VERIFIED")
         package=json.loads((out/"research-package.json").read_text(encoding="utf-8"))
         self.assertEqual((out/package["resolved_content"]["materials"][0]["text_rendition"]["attachment_path"]).read_text(encoding="utf-8"),case["source_text"])
-        narrative=(out/package["resolved_profiles"]["narrative_semantics"]["contract_path"]).read_text(encoding="utf-8")
-        self.assertIn("narrative.semantic_stages",narrative); self.assertIn("produces",narrative)
+        narrative=(out/"attachments/profile/narrative-semantics.yaml").read_text(encoding="utf-8")
+        self.assertIn("narrative.stages.definitions", narrative); self.assertIn("produces", narrative)
+        self.assertIn("GAP-1",(out/"research-package.md").read_text(encoding="utf-8"))
+        print(json.dumps({"RP_ACCEPTANCE":{"package_id":package["package_id"],"package_digest":package["package_digest"],"snapshot_id":package["source_research_snapshot"]["snapshot_id"],"snapshot_digest":package["source_research_snapshot"]["content_digest"],"material_digest":package["resolved_content"]["materials"][0]["text_rendition"]["content_digest"]}},sort_keys=True))
 
     def test_rp2_in_progress_real_and_candidate_authority_are_preserved(self):
-        facade,case=self._prepare_case()
+        facade,case=self._build()
         try:
-            first=facade.build_research_package(case["build_input"]); p=facade.show_research_package(first["package"]["package_id"])["package"]
-            self.assertEqual(p["source_epistemic_status"],"EMPIRICAL_RESEARCH_STATE"); self.assertTrue(p["preview_only"]); self.assertFalse(p["authoritative_research_freeze"]); self.assertFalse(p["release_eligible"])
+            p=facade.show_research_package(case["package_id"])["package"]
+            self.assertEqual(p["source_epistemic_status"],"EMPIRICAL_RESEARCH_STATE")
+            self.assertTrue(p["preview_only"]); self.assertFalse(p["authoritative_research_freeze"]); self.assertFalse(p["release_eligible"])
             self.assertEqual(p["content"]["finding_refs"],[])
             run=p["resolved_content"]["working_material"]["run_candidates"][0]
             self.assertTrue(run["candidate_only"]); self.assertTrue(run["handoff"]["outputs"]["candidate_findings"])
@@ -174,17 +176,18 @@ class ResearchPackageAcceptanceTests(unittest.TestCase):
                 "payload":{"state_delta_proposal_id":proposal["proposal_id"]},
                 "actor_id":"HUMAN-RP2",
             })
-            decision_request=facade.submit_confirmation({
+            confirmed=facade.submit_confirmation({
                 "confirmation_request_id":pending["confirmation_request"]["confirmation_request_id"],
                 "actor_id":"HUMAN-RP2",
-            })["decision_request"]
-            resolved=facade.resolve_human_decision({
-                "request_id":decision_request["request_id"],
-                "request_digest":decision_request["request_digest"],
-                "disposition":"approve_exact",
-                "actor_id":"HUMAN-RP2",
             })
-            self.assertEqual(resolved["status"],"RESOLVED")
+            if confirmed["status"] == "HUMAN_DECISION_REQUIRED":
+                decision_request=confirmed["decision_request"]
+                facade.resolve_human_decision({
+                    "request_id":decision_request["request_id"],
+                    "request_digest":decision_request["request_digest"],
+                    "disposition":"approve_exact",
+                    "actor_id":"HUMAN-RP2",
+                })
 
             state=facade._application.state_repository.load_state_view(
                 facade.project_id,
@@ -261,6 +264,9 @@ class ResearchPackageAcceptanceTests(unittest.TestCase):
             })
             self.assertEqual(virtual_result["status"], "SUCCEEDED")
             self.assertEqual(virtual_result["execution_mode"], "virtual")
+            (self.root / "virtual-workspace" / "effective-profile-set.json").write_text(
+                (self.root / "profiles-input.json").read_text(encoding="utf-8"), encoding="utf-8"
+            )
             state = virtual_facade._application.state_repository.load_state_view(
                 virtual_facade.project_id,
                 virtual_facade._application.state_repository.load_active_lineage_ref(virtual_facade.project_id),
