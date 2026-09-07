@@ -54,10 +54,13 @@ class Issue92ReviewRound3Tests(unittest.TestCase):
                     "original_file": "captures/raw/source-b.html", "original_media_type": "text/html",
                     "text_rendition_file": "captures/text/source-b.txt",
                 })
-                original = app.execution_store.artifacts_for
-                with patch.object(app.execution_store, "artifacts_for", wraps=original) as artifacts_for:
+                with patch.object(
+                    submission_module,
+                    "artifacts_for_capture_ids",
+                    wraps=submission_module.artifacts_for_capture_ids,
+                ) as selected_query:
                     captures, details, texts = submission_module._resolve_captures(app, run_id, ["CAP-1", "CAP-2"])
-                self.assertEqual(artifacts_for.call_count, 1)
+                selected_query.assert_called_once_with(app.execution_store, run_id, ["CAP-1", "CAP-2"])
                 self.assertEqual([item["capture_id"] for item in captures], ["CAP-1", "CAP-2"])
                 self.assertEqual(len(details), 2); self.assertEqual(set(texts), {"CAP-1", "CAP-2"})
             finally:

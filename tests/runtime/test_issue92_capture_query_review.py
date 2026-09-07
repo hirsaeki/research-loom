@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import sqlite3
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -41,6 +42,26 @@ class Issue92CaptureQueryReviewTests(unittest.TestCase):
                         "PREFLIGHT_OK",
                     )
                 selected_query.assert_called_once_with(app.execution_store, run_id, ["CAP-1"])
+            finally:
+                facade.close()
+
+    def test_selected_capture_query_chunks_below_sqlite_variable_limit(self):
+        fixture = issue92.Issue92ExternalSubmissionPreflightTests(methodName="runTest")
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            app, facade = fixture.make_facade(root)
+            try:
+                run_id, _, _ = fixture.prepared(root, facade)
+                connection = app.execution_store._connection
+                original_limit = connection.getlimit(sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER)
+                try:
+                    connection.setlimit(sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER, 8)
+                    capture_ids = ["CAP-1", *(f"CAP-MISSING-{index}" for index in range(20))]
+                    selected = artifacts_for_capture_ids(app.execution_store, run_id, capture_ids)
+                finally:
+                    connection.setlimit(sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER, original_limit)
+                self.assertEqual(len(selected), 2)
+                self.assertEqual({item.provenance.get("capture_id") for item in selected}, {"CAP-1"})
             finally:
                 facade.close()
 

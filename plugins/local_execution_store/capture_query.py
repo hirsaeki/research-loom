@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 
 from core.execution.models import ExecutionArtifactMetadata
 
@@ -10,19 +11,26 @@ def artifacts_for_capture_ids(store, run_id: str, capture_ids: list[str] | tuple
     selected = tuple(dict.fromkeys(capture_ids))
     if not selected:
         return ()
-    placeholders = ",".join("?" for _ in selected)
+    rows = []
     with store._lock:
-        rows = store._connection.execute(
-            f"""
-            SELECT artifact_id, run_id, role, media_type, size, digest,
-                   storage_locator, execution_mode, provenance_json
-            FROM execution_artifacts
-            WHERE run_id = ?
-              AND json_extract(provenance_json, '$.capture_id') IN ({placeholders})
-            ORDER BY artifact_id
-            """,
-            (run_id, *selected),
-        ).fetchall()
+        variable_limit = store._connection.getlimit(sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER)
+        chunk_size = max(1, min(900, variable_limit - 1))
+        for start in range(0, len(selected), chunk_size):
+            chunk = selected[start : start + chunk_size]
+            placeholders = ",".join("?" for _ in chunk)
+            rows.extend(
+                store._connection.execute(
+                    f"""
+                    SELECT artifact_id, run_id, role, media_type, size, digest,
+                           storage_locator, execution_mode, provenance_json
+                    FROM execution_artifacts
+                    WHERE run_id = ?
+                      AND json_extract(provenance_json, '$.capture_id') IN ({placeholders})
+                    """,
+                    (run_id, *chunk),
+                ).fetchall()
+            )
+    rows.sort(key=lambda row: str(row["artifact_id"]))
     return tuple(
         ExecutionArtifactMetadata(
             str(row["artifact_id"]),
