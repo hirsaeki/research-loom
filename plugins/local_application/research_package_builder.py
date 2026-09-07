@@ -5,6 +5,7 @@ import json
 from typing import Any, Mapping
 import uuid
 import rfc8785
+from core.execution import RunStatus
 from core.runtime import canonical_digest as core_canonical_digest
 from .facade import LocalApplicationError
 from .research_package_format import (
@@ -21,10 +22,11 @@ def build_package(service, value:Mapping[str,Any])->Mapping[str,Any]:
     state=service._state(); snapshot=service._snapshot(sid,state)
     for field,actual in (("snapshot_digest",snapshot.get("content_digest")),("lineage_ref",state.active_lineage_ref),("project_config_digest",state.project_config_digest),("effective_profile_set_digest",state.effective_profile_set_digest)):
         if value.get(field) is not None and value.get(field)!=actual: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-BINDING-001",f"explicit {field} contradicts persisted binding")
-    objects=service._objects(snapshot); rq=objects.get(rqid)
+    requested_object_ids=str_list(value.get("object_ids"),"object_ids",MAX_OBJECTS)
+    objects=service._objects(snapshot,{rqid,*requested_object_ids}); rq=objects.get(rqid)
     if rq is None or rq.get("kind")!="research_question": raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INPUT-001","selected RQ does not exist in selected Snapshot")
     selected=[deepcopy(dict(rq))]
-    for oid in str_list(value.get("object_ids"),"object_ids",MAX_OBJECTS):
+    for oid in requested_object_ids:
         if oid==rqid: continue
         if oid not in objects: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INPUT-001",f"unknown selected object: {oid}")
         selected.append(deepcopy(dict(objects[oid])))
@@ -34,8 +36,11 @@ def build_package(service, value:Mapping[str,Any])->Mapping[str,Any]:
         run=service.app.execution_store.load_run(rid)
         if run is None: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INPUT-001",f"unknown selected Run: {rid}")
         if run.project_ref!=service.project_id or run.lineage_ref!=state.active_lineage_ref: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-BINDING-001",f"selected Run belongs to another project/lineage: {rid}")
+        if run.status is not RunStatus.COMPLETED: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INPUT-001",f"selected Run is not completed: {rid}")
+        h=service._handoff(run)
+        if h is None: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",f"completed Run has no persisted Handoff: {rid}")
         modes.add("virtual" if str(run.execution_mode) in {"virtual","synthetic_test"} else "real")
-        h=service._handoff(run); outputs=deepcopy(dict(h.get("outputs",{}))) if isinstance(h,Mapping) else {}
+        outputs=deepcopy(dict(h.get("outputs",{})))
         for gap in outputs.get("evidence_gaps",[]) if isinstance(outputs.get("evidence_gaps",[]),list) else []:
             if isinstance(gap,Mapping) and isinstance(gap.get("gap_id"),str): gaps.append({"source_run_id":rid,**deepcopy(dict(gap))})
         runs.append({"run_id":rid,"execution_mode":str(run.execution_mode),"historical_binding":{"lineage_ref":str(run.lineage_ref),"snapshot_id":str(run.snapshot_ref),"snapshot_digest":str(run.snapshot_digest)},"handoff":deepcopy(dict(h)) if isinstance(h,Mapping) else None,"candidate_only":True})
@@ -70,7 +75,7 @@ def build_package(service, value:Mapping[str,Any])->Mapping[str,Any]:
         if view.get("truncated"): raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-BOUND-001",f"material rendition exceeds per-item bound: {cid}")
         data=str(view.get("content","")).encode(); capture=shown.get("capture",{}); rend=(capture.get("renditions") or [{}])[0]
         if rend.get("digest") and digest_bytes(data)!=rend.get("digest"): raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",f"material rendition digest mismatch: {cid}")
-        path=f"attachments/materials/{safe_component(str(cid),'capture_id')}.txt"; attachments.append((path,data,"text/plain",f"external_material:{rid}:{cid}")); materials.append({"run_id":rid,"historical_binding":{"lineage_ref":str(run.lineage_ref),"snapshot_id":str(run.snapshot_ref),"snapshot_digest":str(run.snapshot_digest)},"capture":deepcopy(dict(capture)),"text_rendition":{"encoding":"UTF-8","byte_length":len(data),"content_digest":digest_bytes(data),"attachment_path":path}})
+        path=f"attachments/materials/{safe_component(str(rid),'run_id')}/{safe_component(str(cid),'capture_id')}.txt"; attachments.append((path,data,"text/plain",f"external_material:{rid}:{cid}")); materials.append({"run_id":rid,"historical_binding":{"lineage_ref":str(run.lineage_ref),"snapshot_id":str(run.snapshot_ref),"snapshot_digest":str(run.snapshot_digest)},"capture":deepcopy(dict(capture)),"text_rendition":{"encoding":"UTF-8","byte_length":len(data),"content_digest":digest_bytes(data),"attachment_path":path}})
     if len(modes)>1: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-EPISTEMIC-001","REAL and VIRTUAL material may not be mixed")
     requested=str_list(value.get("gap_ids"),"gap_ids",MAX_OBJECTS)
     if requested:
