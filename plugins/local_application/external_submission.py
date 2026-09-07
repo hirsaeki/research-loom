@@ -12,6 +12,7 @@ from plugins.desktop_research.normalization import verified_resource_basis_prove
 from plugins.desktop_research.retention import _matching_whitespace_slice
 from plugins.desktop_research.attempts import UNSUCCESSFUL_OUTCOMES
 from plugins.local_execution_store import LocalExecutionStoreError
+from plugins.local_execution_store.capture_query import artifacts_for_capture_ids
 
 from .facade import LocalApplicationError
 from .material_content_facade import _artifact_pair_for_capture
@@ -299,7 +300,7 @@ def _resolve_captures(application, run_id: str, capture_ids: list[str]):
     run_record = store.load_run(run_id)
     if run_record is None:
         raise LocalApplicationError("APPLICATION-EXTERNAL-RUN-STATE-001", "external Run no longer resolves")
-    artifacts = store.artifacts_for(run_id)
+    artifacts = artifacts_for_capture_ids(store, run_id, capture_ids)
     by_capture: dict[str, list[Any]] = {}
     for artifact in artifacts:
         capture_id = artifact.provenance.get("capture_id")
