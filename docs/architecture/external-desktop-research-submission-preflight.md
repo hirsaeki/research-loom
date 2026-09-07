@@ -81,7 +81,7 @@ uv run --frozen python -m unittest discover \
   -v
 ```
 
-The test file subclasses the existing production external-intake fixture, so the target executes the six Issue #92 cases plus the four inherited baseline intake tests (10 tests total).
+The test file subclasses the existing production external-intake fixture. The target currently executes the six D1-D6 cases, four inherited baseline intake tests, and eight review regressions defined in the file (18 tests total). Additional Issue #92 review coverage in `test_issue92_review_round3.py` and `test_issue92_capture_query_review.py` runs in the full runtime suite; use the latest CI log as the execution authority rather than older fixed counts.
 
 ## Ablation procedure
 
@@ -102,7 +102,7 @@ The additional PR review round is covered by these Issue #92 runtime cases:
 - `test_review_round2_capture_pair_parent_provenance_fails_closed`: original/text capture lineage, including rendition parent binding, is checked through the same material-pair projection used by public material reads.
 - `test_review_round2_whitespace_equivalent_citation_is_accepted`: exact citation text and ASCII-whitespace-only differences share the existing retention matcher; substantive citation drift remains rejectable.
 - `test_review_round2_nested_schema_errors_are_correctable`: nested operator-owned shape errors are diagnosed before projection/build helpers can raise raw `KeyError`/`TypeError`, and correction on the same Run succeeds.
-- `test_review_round2_real_profile_public_cli_connects_a_through_d`: a real fixture Profile/Project Config path keeps non-empty Attention, guards, and effective constraints in the assembled Handoff, reuses a registered project input across a later RQ adoption, reads captured material after source-file removal, then performs invalid and corrected `external collect` through the public CLI while keeping Research State unchanged and emitting candidate-only Evidence/Finding objects.
+- `test_review_round2_real_profile_public_cli_connects_a_through_d`: a real fixture Profile/Project Config path keeps non-empty Attention, guards, and effective constraints in the assembled Handoff, reuses a registered project input through an actual `research_question.review` `KEEP` after a later RQ adoption, reads captured material after source-file removal, then performs invalid and corrected `external collect` through the public CLI while keeping Research State unchanged and emitting candidate-only Evidence/Finding objects.
 
 The public CLI input for the final step remains the same provider-neutral shape:
 
@@ -132,4 +132,4 @@ The public CLI input for the final step remains the same provider-neutral shape:
 }
 ```
 
-Additional ablations were run without changing the fixture: removing the pre-terminal resource verified-read makes the resource mutation/missing-blob test fail, and removing the shared capture-pair parent binding makes the parent-provenance test fail. Both ablation edits were restored before the final baseline.
+Additional ablations were run without changing the fixture: removing the pre-terminal resource verified-read makes the resource mutation/missing-blob test fail, removing the shared capture-pair parent binding makes the parent-provenance test fail, and restoring the old project-input registration-Snapshot equality guard makes the connected A-D test fail at the reuse step. All ablation edits were restored before the final baseline.
