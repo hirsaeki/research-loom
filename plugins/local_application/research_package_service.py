@@ -29,9 +29,10 @@ class ResearchPackageService:
             if not isinstance(prior,str) or not prior: break
             current=repo.load_snapshot(prior)
         raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-BINDING-001","selected Snapshot is not in active project lineage")
-    def _objects(self,snapshot)->dict[str,Mapping[str,Any]]:
+    def _objects(self,snapshot,object_ids:set[str])->dict[str,Mapping[str,Any]]:
         out={}; repo=self.app.state_repository
-        for member in snapshot.get("members",[]):
+        members=[member for member in snapshot.get("members",[]) if str(member.get("id")) in object_ids]
+        for member in members:
             obj=repo.load_object_revision(str(member["kind"]),str(member["id"]),int(member["revision"]))
             if obj is None: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",f"missing Snapshot member: {member['id']}")
             if core_canonical_digest(obj)!=str(member["digest"]): raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",f"Snapshot member digest mismatch: {member['id']}")
@@ -84,7 +85,19 @@ class ResearchPackageService:
         if not self.root.exists(): return {"status":"OK","project_id":self.project_id,"packages":[],"truncated":False}
         roots=[x for x in sorted(self.root.iterdir()) if x.is_dir() and not x.name.startswith(".rp-")]
         selected=roots[:MAX_PACKAGES]
-        return {"status":"OK","project_id":self.project_id,"packages":[self._summary(self._load(x.name)) for x in selected],"truncated":len(roots)>MAX_PACKAGES}
+        packages=[]
+        for root in selected:
+            path=root/"research-package.json"
+            try:
+                if path.stat().st_size>MAX_OUTPUT_BYTES: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-BOUND-001","Research Package metadata exceeds output bound")
+                value=json.loads(path.read_text(encoding="utf-8"))
+            except LocalApplicationError:
+                raise
+            except (OSError,UnicodeError,json.JSONDecodeError) as exc:
+                raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",f"invalid saved Research Package metadata: {root.name}") from exc
+            if not isinstance(value,Mapping): raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",f"invalid saved Research Package metadata: {root.name}")
+            packages.append(self._summary(value))
+        return {"status":"OK","project_id":self.project_id,"packages":packages,"truncated":len(roots)>MAX_PACKAGES}
     def show(self,pid): return {"status":"OK","package":self._load(pid)}
     def export(self,pid,output_dir):
         p=self._load(pid); raw=Path(output_dir).expanduser(); out=raw if raw.is_absolute() else Path.cwd()/raw
