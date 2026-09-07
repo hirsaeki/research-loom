@@ -449,6 +449,25 @@ class Issue92ExternalSubmissionPreflightTests(intake.ExternalDesktopResearchInta
                 self.assertNotEqual(snap0["snapshot_id"], snap1["snapshot_id"])
                 stored = facade.show_project_input(registered["input_id"])["project_input"]
                 self.assertEqual(stored["content_digest"], registered["content_digest"])
+                input_count = len(facade.list_project_inputs()["project_inputs"])
+                reused = facade.submit_action({
+                    "action_type": "research_question.review",
+                    "payload": {
+                        "operation": "KEEP",
+                        "question_ids": [rq1],
+                        "rationale": "Issue 92 A-D connected input reuse.",
+                        "review_inputs": {"project_input_ids": [registered["input_id"]]},
+                    },
+                    "actor_id": "H",
+                })
+                self.assertEqual(reused["status"], "SUCCEEDED")
+                review = reused["data"]["question_review"]
+                self.assertFalse(review["material_change"])
+                self.assertEqual(review["bound_snapshot"]["snapshot_id"], snap1["snapshot_id"])
+                self.assertEqual(review["bound_snapshot"]["snapshot_digest"], snap1["content_digest"])
+                self.assertEqual(facade.resume_context()["research_state"]["snapshot"], snap1)
+                self.assertEqual(facade.show_project_input(registered["input_id"])["project_input"], stored)
+                self.assertEqual(len(facade.list_project_inputs()["project_inputs"]), input_count)
                 prepared = facade.submit_action({
                     "action_type": "desktop_research.investigate",
                     "payload": {"question_id": rq1, "purpose": "Issue 92 A-D connected acceptance."},
