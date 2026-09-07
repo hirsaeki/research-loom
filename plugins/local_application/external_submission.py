@@ -250,10 +250,19 @@ def validate_external_submission(
     ):
         return [_issue("CAP-HANDOFF-PROVENANCE-001", "Handoff implementation provenance does not match the pinned adapter")]
 
+    verified_resource_bases = set()
     for collection in ("evidence_candidates", "counterevidence"):
         for item in handoff["outputs"].get(collection, ()):
             basis = item.get("source_basis") if isinstance(item, Mapping) else None
             if not isinstance(basis, Mapping) or basis.get("basis_type") != "resource_reference":
+                continue
+            reference_id = str(basis.get("resource_reference_id"))
+            resource = next(
+                (item for item in context["resources"] if str(item.get("reference_id")) == reference_id),
+                None,
+            )
+            key = (reference_id, str(resource.get("digest")) if isinstance(resource, Mapping) else "")
+            if key in verified_resource_bases:
                 continue
             try:
                 verified_resource_basis_provenance(store, context, basis)
@@ -261,6 +270,7 @@ def validate_external_submission(
                 raise LocalApplicationError(
                     "APPLICATION-EXTERNAL-INTEGRITY-001", str(exc)
                 ) from exc
+            verified_resource_bases.add(key)
 
     codes = DesktopResearchResultValidator(store, application.operational_store).validate(
         handoff,
@@ -289,11 +299,33 @@ def _resolve_captures(application, run_id: str, capture_ids: list[str]):
     run_record = store.load_run(run_id)
     if run_record is None:
         raise LocalApplicationError("APPLICATION-EXTERNAL-RUN-STATE-001", "external Run no longer resolves")
+    artifacts = store.artifacts_for(run_id)
+    by_capture: dict[str, list[Any]] = {}
+    for artifact in artifacts:
+        capture_id = artifact.provenance.get("capture_id")
+        if isinstance(capture_id, str) and capture_id:
+            by_capture.setdefault(capture_id, []).append(artifact)
+
+    class _IndexedStoreView:
+        def __init__(self, selected):
+            self._selected = selected
+
+        def load_run(self, selected_run_id):
+            return store.load_run(selected_run_id)
+
+        def artifacts_for(self, selected_run_id):
+            if selected_run_id != run_id:
+                return []
+            return self._selected
+
     source_captures, details, texts = [], [], {}
     for capture_id in capture_ids:
         try:
             _run, original, text, projection = _artifact_pair_for_capture(
-                store, run_record.project_ref, run_id, capture_id
+                _IndexedStoreView(by_capture.get(capture_id, [])),
+                run_record.project_ref,
+                run_id,
+                capture_id,
             )
         except LocalApplicationError as exc:
             if exc.code == "APPLICATION-MATERIAL-404":
@@ -366,7 +398,7 @@ def _citations(value, capture_details, texts):
     assembled = []
     for raw in _list(value.get("citation_details", []), "citation_details"):
         citation = _mapping(raw, "citation_details[]")
-        extra = sorted(set(citation) - _CITATION_FIELDS)
+        extra = sorted(str(key) for key in set(citation) - _CITATION_FIELDS)
         if extra:
             raise LocalApplicationError(
                 "APPLICATION-EXTERNAL-SUBMISSION-001",
@@ -401,7 +433,7 @@ def _citations(value, capture_details, texts):
 
 def _search_trace(value, attempts):
     search = _mapping(value.get("search_trace"), "search_trace")
-    extra = sorted(set(search) - {"entries"})
+    extra = sorted(str(key) for key in set(search) - {"entries"})
     if extra:
         raise LocalApplicationError(
             "APPLICATION-EXTERNAL-SUBMISSION-001",
@@ -415,7 +447,7 @@ def _search_trace(value, attempts):
     links = {}
     for raw in _list(search.get("entries"), "search_trace.entries"):
         link = _mapping(raw, "search_trace.entries[]")
-        extra = sorted(set(link) - _SEARCH_LINK_FIELDS)
+        extra = sorted(str(key) for key in set(link) - _SEARCH_LINK_FIELDS)
         if extra:
             raise LocalApplicationError(
                 "APPLICATION-EXTERNAL-SUBMISSION-001",
