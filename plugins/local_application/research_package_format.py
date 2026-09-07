@@ -124,7 +124,16 @@ def verify_export_root(root:str|Path,*,verify_package_digest:bool=True)->Mapping
     except OSError as exc:
         raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001","invalid research-package.json") from exc
     if package_size>MAX_OUTPUT_BYTES: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-BOUND-001","Research Package export exceeds output bound")
-    try: package=json.loads(package_path.read_text(encoding="utf-8"))
+    try:
+        with package_path.open("rb") as handle:
+            package_raw=handle.read(MAX_OUTPUT_BYTES+1)
+        if len(package_raw)>MAX_OUTPUT_BYTES:
+            raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-BOUND-001","Research Package export exceeds output bound")
+        if len(package_raw)!=package_size:
+            raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001","file changed while verifying: research-package.json")
+        package=json.loads(package_raw.decode("utf-8"))
+    except LocalApplicationError:
+        raise
     except (OSError,UnicodeError,json.JSONDecodeError) as exc: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001","invalid research-package.json") from exc
     if not isinstance(package,Mapping): raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001","research-package.json must be an object")
     validate_schema(package)

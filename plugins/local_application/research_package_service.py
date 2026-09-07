@@ -7,7 +7,7 @@ from core.runtime import canonical_digest as core_canonical_digest
 from plugins.local_execution_store import canonical_handoff_for
 from .facade import LocalApplicationError
 from .research_package_builder import build_package
-from .research_package_format import MAX_OUTPUT_BYTES, MAX_PACKAGES, safe_component, verify_export_root
+from .research_package_format import MAX_OUTPUT_BYTES, MAX_PACKAGES, safe_component, validate_schema, verify_export_root
 
 class ResearchPackageService:
     def __init__(self,facade)->None:
@@ -89,14 +89,24 @@ class ResearchPackageService:
         for root in selected:
             path=root/"research-package.json"
             try:
-                if path.stat().st_size>MAX_OUTPUT_BYTES: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-BOUND-001","Research Package metadata exceeds output bound")
-                value=json.loads(path.read_text(encoding="utf-8"))
+                metadata_size=path.stat().st_size
+                if metadata_size>MAX_OUTPUT_BYTES: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-BOUND-001","Research Package metadata exceeds output bound")
+                with path.open("rb") as handle:
+                    raw=handle.read(MAX_OUTPUT_BYTES+1)
+                if len(raw)>MAX_OUTPUT_BYTES: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-BOUND-001","Research Package metadata exceeds output bound")
+                if len(raw)!=metadata_size: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",f"saved Research Package metadata changed while reading: {root.name}")
+                value=json.loads(raw.decode("utf-8"))
             except LocalApplicationError:
                 raise
             except (OSError,UnicodeError,json.JSONDecodeError) as exc:
                 raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",f"invalid saved Research Package metadata: {root.name}") from exc
             if not isinstance(value,Mapping): raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",f"invalid saved Research Package metadata: {root.name}")
-            packages.append(self._summary(value))
+            try:
+                validate_schema(value)
+                packages.append(self._summary(value))
+            except (LocalApplicationError,KeyError,TypeError,ValueError) as exc:
+                if isinstance(exc,LocalApplicationError) and exc.code!="APPLICATION-RESEARCH-PACKAGE-SCHEMA-001": raise
+                raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",f"invalid saved Research Package metadata: {root.name}") from exc
         return {"status":"OK","project_id":self.project_id,"packages":packages,"truncated":len(roots)>MAX_PACKAGES}
     def show(self,pid): return {"status":"OK","package":self._load(pid)}
     def export(self,pid,output_dir):
