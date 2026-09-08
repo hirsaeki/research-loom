@@ -75,9 +75,13 @@ class ResearchPackageCompletionReviewTests(ResearchPackageAcceptanceSupport):
     def test_build_rejects_corrupted_saved_material_before_packaging(self):
         facade, case = self._prepare_case()
         try:
-            rendition = (case["capture"].get("renditions") or [{}])[0]
-            digest = str(rendition.get("digest", ""))
-            value = digest.removeprefix("sha256:")
+            artifact_id = case["capture"]["text_rendition"]["content_reference"]
+            artifact = next(
+                item
+                for item in facade._application.execution_store.artifacts_for(case["run_id"])
+                if item.artifact_id == artifact_id
+            )
+            value = str(artifact.digest).removeprefix("sha256:")
             self.assertEqual(len(value), 64)
             blob = facade._application.execution_store.blob_root / value[:2] / value
             original = blob.read_bytes()
