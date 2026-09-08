@@ -349,7 +349,8 @@
         "snapshot_id": {"$ref": "#/$defs/id"},
         "revision": {"type": "integer", "minimum": 0},
         "content_digest": {"$ref": "#/$defs/digest"},
-        "execution_mode": {"enum": ["virtual", "real"]}
+        "execution_mode": {"enum": ["virtual", "real"]},
+        "lineage_ref": {"$ref": "#/$defs/id"}
       }
     },
     "source_ref": {

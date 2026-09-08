@@ -199,6 +199,45 @@ def build_parser() -> argparse.ArgumentParser:
     research_package_verify.add_argument("--input", required=True)
     _add_output_json(research_package_verify)
 
+    writer_composition = sub.add_parser("writer-composition")
+    writer_composition_sub = writer_composition.add_subparsers(dest="writer_composition_command", required=True)
+    wc_capture = writer_composition_sub.add_parser("capture")
+    _add_workspace(wc_capture)
+    wc_capture.add_argument("--package-id", required=True)
+    _add_input_json(wc_capture)
+    wc_list = writer_composition_sub.add_parser("list")
+    _add_workspace(wc_list)
+    _add_output_json(wc_list)
+    wc_show = writer_composition_sub.add_parser("show")
+    _add_workspace(wc_show)
+    wc_show.add_argument("--composition-id", required=True)
+    wc_show.add_argument("--version", type=int, required=True)
+    _add_output_json(wc_show)
+    wc_diff = writer_composition_sub.add_parser("diff")
+    _add_workspace(wc_diff)
+    wc_diff.add_argument("--composition-id", required=True)
+    wc_diff.add_argument("--from-version", type=int, required=True)
+    wc_diff.add_argument("--to-version", type=int, required=True)
+    _add_output_json(wc_diff)
+    wc_export = writer_composition_sub.add_parser("export")
+    _add_workspace(wc_export)
+    wc_export.add_argument("--composition-id", required=True)
+    wc_export.add_argument("--version", type=int, required=True)
+    wc_export.add_argument("--output", required=True)
+    _add_output_json(wc_export)
+    wc_select = writer_composition_sub.add_parser("select")
+    _add_workspace(wc_select)
+    wc_select.add_argument("--composition-id", required=True)
+    wc_select.add_argument("--version", type=int, required=True)
+    wc_select.add_argument("--digest", required=True)
+    _add_output_json(wc_select)
+    wc_section = writer_composition_sub.add_parser("section-input")
+    _add_workspace(wc_section)
+    wc_section.add_argument("--composition-id", required=True)
+    wc_section.add_argument("--section-id", required=True)
+    wc_section.add_argument("--output", required=True)
+    _add_output_json(wc_section)
+
     survey = sub.add_parser("survey")
     survey_sub = survey.add_subparsers(dest="survey_command", required=True)
 
@@ -360,6 +399,21 @@ def _run(args: argparse.Namespace) -> Mapping[str, Any]:
                 return facade.show_research_package(args.package_id)
             if args.research_package_command == "export":
                 return facade.export_research_package(args.package_id, args.output)
+        if args.command == "writer-composition":
+            if args.writer_composition_command == "capture":
+                return facade.capture_writer_composition(args.package_id, _read_input(args.json_input))
+            if args.writer_composition_command == "list":
+                return facade.list_writer_compositions()
+            if args.writer_composition_command == "show":
+                return facade.show_writer_composition(args.composition_id, args.version)
+            if args.writer_composition_command == "diff":
+                return facade.diff_writer_composition(args.composition_id, args.from_version, args.to_version)
+            if args.writer_composition_command == "export":
+                return facade.export_writer_composition(args.composition_id, args.version, args.output)
+            if args.writer_composition_command == "select":
+                return facade.select_writer_composition(args.composition_id, args.version, args.digest)
+            if args.writer_composition_command == "section-input":
+                return facade.export_writer_section_input(args.composition_id, args.section_id, args.output)
         if args.command == "exhibit":
             if args.exhibit_command == "capture":
                 return facade.capture_exhibit(_read_input(args.json_input))

@@ -1,0 +1,24 @@
+{
+  "purpose": "Explain the supplied research material without upgrading candidate content to authoritative research.",
+  "audience": ["reviewer"],
+  "created_by": {"type": "external_or_human"},
+  "sections": [
+    {
+      "section_id": "SEC-001",
+      "order": 1,
+      "heading": "Framing",
+      "reader_question": "What is the question and what material is available?",
+      "purpose": "Frame the question using only the supplied Research Package.",
+      "narrative_stage_refs": ["framing"],
+      "semantic_purpose_refs": ["frame_problem"],
+      "messages": ["Keep candidate, authoritative, and unresolved material distinct."],
+      "opening_intent": "State the bounded question.",
+      "closing_intent": "Hand off to the next section.",
+      "material_refs": ["RUN-ID:CAPTURE-ID"],
+      "exhibit_refs": ["EXHIBIT-ID"],
+      "gap_refs": ["GAP-ID"],
+      "prohibited_claims": ["Do not claim that candidate material is adopted research."],
+      "detailed": true
+    }
+  ]
+}
