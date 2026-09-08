@@ -19,9 +19,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cat .issue80-payload.part-* | base64 -d > /tmp/issue80.tar.gz
+          cat .issue80-payload2.part-* | base64 -d > /tmp/issue80.tar.gz
           tar -xzf /tmp/issue80.tar.gz
-          rm -f .issue80-payload.part-* .github/workflows/issue80-bootstrap.yml
+          rm -f .issue80-payload.part-* .issue80-payload2.part-* .github/workflows/issue80-bootstrap.yml
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add -A
