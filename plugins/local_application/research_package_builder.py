@@ -57,6 +57,48 @@ def _validate_selected_reference_closure(selected: list[Mapping[str, Any]]) -> N
             "selected research content has unresolved required references: "+", ".join(sorted(set(missing))),
         )
 
+
+def _collect_exhibit_modes(service, exhibit: Mapping[str, Any], state, visited: set[str]) -> set[str]:
+    modes: set[str] = set()
+    stack = [exhibit]
+    while stack:
+        current = stack.pop()
+        exhibit_id = str(current.get("exhibit_id", ""))
+        if exhibit_id in visited:
+            continue
+        visited.add(exhibit_id)
+        if len(visited) > MAX_EXHIBITS:
+            raise LocalApplicationError(
+                "APPLICATION-RESEARCH-PACKAGE-BOUND-001",
+                "Research Exhibit provenance exceeds supported bound",
+            )
+        captured = current.get("captured_against", {})
+        if (
+            str(current.get("project_id", service.project_id)) != service.project_id
+            or captured.get("lineage_ref") != state.active_lineage_ref
+        ):
+            raise LocalApplicationError(
+                "APPLICATION-RESEARCH-PACKAGE-BINDING-001",
+                f"Research Exhibit provenance belongs to another project/lineage: {exhibit_id}",
+            )
+        for source_run_id in current.get("source_run_ids", []) or []:
+            run = service.app.execution_store.load_run(str(source_run_id))
+            if run is None or run.project_ref != service.project_id or run.lineage_ref != state.active_lineage_ref:
+                raise LocalApplicationError(
+                    "APPLICATION-RESEARCH-PACKAGE-BINDING-001",
+                    f"Research Exhibit source Run belongs to another project/lineage: {source_run_id}",
+                )
+            modes.add("virtual" if str(run.execution_mode) in {"virtual", "synthetic_test"} else "real")
+        for parent_id in current.get("derived_from_exhibit_ids", []) or []:
+            parent = service.facade.show_exhibit(str(parent_id)).get("exhibit")
+            if not isinstance(parent, Mapping):
+                raise LocalApplicationError(
+                    "APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",
+                    f"derived-from Research Exhibit did not resolve: {parent_id}",
+                )
+            stack.append(parent)
+    return modes
+
 def build_package(service, value:Mapping[str,Any])->Mapping[str,Any]:
     if not isinstance(value,Mapping) or set(value)-ALLOWED: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INPUT-001","build input contains unknown fields")
     sid,rqid=value.get("snapshot_id"),value.get("rq_id")
@@ -89,7 +131,7 @@ def build_package(service, value:Mapping[str,Any])->Mapping[str,Any]:
         runs.append({"run_id":rid,"execution_mode":str(run.execution_mode),"historical_binding":{"lineage_ref":str(run.lineage_ref),"snapshot_id":str(run.snapshot_ref),"snapshot_digest":str(run.snapshot_digest)},"handoff":deepcopy(dict(h)) if isinstance(h,Mapping) else None,"candidate_only":True})
     if len(modes)>1: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-EPISTEMIC-001","REAL and VIRTUAL Run material may not be mixed")
 
-    exhs=[]; inputs=[]; attachments=[]
+    exhs=[]; inputs=[]; attachments=[]; exhibit_provenance_seen=set()
     for eid in str_list(value.get("exhibit_ids"),"exhibit_ids",MAX_EXHIBITS):
         ex=service.facade.show_exhibit(eid).get("exhibit")
         if not isinstance(ex,Mapping): raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",f"Research Exhibit did not resolve: {eid}")
@@ -99,11 +141,7 @@ def build_package(service, value:Mapping[str,Any])->Mapping[str,Any]:
         if rep=="json": data=rfc8785.dumps(raw); ext="json"; media="application/json"
         else: data=str(raw).encode(); ext="md" if rep=="markdown" else "txt"; media="text/markdown" if rep=="markdown" else "text/plain"
         if len(data)>MAX_ITEM_BYTES: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-BOUND-001",f"Research Exhibit exceeds per-item bound: {eid}")
-        for source_run_id in ex.get("source_run_ids", []) or []:
-            run=service.app.execution_store.load_run(str(source_run_id))
-            if run is None or run.project_ref!=service.project_id or run.lineage_ref!=state.active_lineage_ref:
-                raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-BINDING-001",f"Research Exhibit source Run belongs to another project/lineage: {source_run_id}")
-            modes.add("virtual" if str(run.execution_mode) in {"virtual","synthetic_test"} else "real")
+        modes.update(_collect_exhibit_modes(service, ex, state, exhibit_provenance_seen))
         path=f"attachments/exhibits/{safe_component(eid,'exhibit_id')}.{ext}"; attachments.append((path,data,media,f"research_exhibit:{eid}")); exhs.append(deepcopy(dict(ex)))
     for iid in str_list(value.get("project_input_ids"),"project_input_ids",MAX_INPUTS):
         shown=service.facade.show_project_input(iid,format="text"); item=shown.get("project_input",{}); content=shown.get("content",{})
@@ -123,7 +161,24 @@ def build_package(service, value:Mapping[str,Any])->Mapping[str,Any]:
         if view.get("truncated"): raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-BOUND-001",f"material rendition exceeds per-item bound: {cid}")
         data=str(view.get("content","")).encode(); capture=shown.get("capture",{}); rend=(capture.get("renditions") or [{}])[0]
         if rend.get("digest") and digest_bytes(data)!=rend.get("digest"): raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",f"material rendition digest mismatch: {cid}")
-        path=f"attachments/materials/{safe_component(str(rid),'run_id')}/{safe_component(str(cid),'capture_id')}.txt"; attachments.append((path,data,"text/plain",f"external_material:{rid}:{cid}")); materials.append({"run_id":rid,"historical_binding":{"lineage_ref":str(run.lineage_ref),"snapshot_id":str(run.snapshot_ref),"snapshot_digest":str(run.snapshot_digest)},"capture":deepcopy(dict(capture)),"text_rendition":{"encoding":"UTF-8","byte_length":len(data),"content_digest":digest_bytes(data),"attachment_path":path}})
+        source_matches = [
+            str(obj["id"])
+            for obj in selected
+            if obj.get("kind") == "source"
+            and str(obj.get("canonical_locator", "")) == str(capture.get("source_locator", ""))
+            and str(obj.get("content_digest", "")) == str(capture.get("original", {}).get("digest", ""))
+        ]
+        if len(source_matches) > 1:
+            raise LocalApplicationError(
+                "APPLICATION-RESEARCH-PACKAGE-REFERENCE-001",
+                f"selected material ambiguously resolves multiple Sources: {rid}:{cid}",
+            )
+        path=f"attachments/materials/{safe_component(str(rid),'run_id')}/{safe_component(str(cid),'capture_id')}.txt"
+        attachments.append((path,data,"text/plain",f"external_material:{rid}:{cid}"))
+        material_row={"run_id":rid,"historical_binding":{"lineage_ref":str(run.lineage_ref),"snapshot_id":str(run.snapshot_ref),"snapshot_digest":str(run.snapshot_digest)},"capture":deepcopy(dict(capture)),"text_rendition":{"encoding":"UTF-8","byte_length":len(data),"content_digest":digest_bytes(data),"attachment_path":path}}
+        if source_matches:
+            material_row["source_id"] = source_matches[0]
+        materials.append(material_row)
     if len(modes)>1: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-EPISTEMIC-001","REAL and VIRTUAL material may not be mixed")
     selected_material_pairs={(str(m.get("run_id")),str(m.get("capture_id"))) for m in rawm if isinstance(m,Mapping)}
     missing_run_materials=[]
@@ -135,6 +190,14 @@ def build_package(service, value:Mapping[str,Any])->Mapping[str,Any]:
                 missing_run_materials.append(f"{row['run_id']}:{cid}")
     if missing_run_materials:
         raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-REFERENCE-001","selected Run candidate has unresolved source captures: "+", ".join(sorted(missing_run_materials)))
+    selected_source_ids={str(obj["id"]) for obj in selected if obj.get("kind")=="source"}
+    material_source_ids={str(row.get("source_id")) for row in materials if isinstance(row.get("source_id"),str)}
+    missing_source_materials=sorted(selected_source_ids-material_source_ids)
+    if missing_source_materials:
+        raise LocalApplicationError(
+            "APPLICATION-RESEARCH-PACKAGE-REFERENCE-001",
+            "selected Sources have no bundled verified material: "+", ".join(missing_source_materials),
+        )
     requested=str_list(value.get("gap_ids"),"gap_ids",MAX_OBJECTS)
     if requested:
         by={str(x["gap_id"]):x for x in gaps}; missing=[x for x in requested if x not in by]

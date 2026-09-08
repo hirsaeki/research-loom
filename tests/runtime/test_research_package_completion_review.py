@@ -72,6 +72,95 @@ class ResearchPackageCompletionReviewTests(ResearchPackageAcceptanceSupport):
         finally:
             facade.close()
 
+
+    def test_selected_sources_require_bundled_material_without_run_selector(self):
+        facade, case = self._prepare_case()
+        try:
+            proposal = case["proposal"]
+            pending = facade.submit_action({
+                "action_type": "state.apply_candidate",
+                "payload": {"state_delta_proposal_id": proposal["proposal_id"]},
+                "actor_id": "HUMAN-RP2-SOURCE-BODY",
+            })
+            confirmed = facade.submit_confirmation({
+                "confirmation_request_id": pending["confirmation_request"]["confirmation_request_id"],
+                "actor_id": "HUMAN-RP2-SOURCE-BODY",
+            })
+            if confirmed["status"] == "HUMAN_DECISION_REQUIRED":
+                request = confirmed["decision_request"]
+                facade.resolve_human_decision({
+                    "request_id": request["request_id"],
+                    "request_digest": request["request_digest"],
+                    "disposition": "approve_exact",
+                    "actor_id": "HUMAN-RP2-SOURCE-BODY",
+                })
+            state = facade._application.state_repository.load_state_view(
+                facade.project_id,
+                facade._application.state_repository.load_active_lineage_ref(facade.project_id),
+            )
+            objects = [
+                action["payload"]["object"]["id"]
+                for action in proposal["proposed_actions"]
+                if isinstance(action.get("payload", {}).get("object"), dict)
+                and action["payload"]["object"].get("kind") in {"source", "evidence", "finding"}
+            ]
+            with self.assertRaises(LocalApplicationError) as missing_body:
+                facade.build_research_package({
+                    "snapshot_id": state.current_snapshot["id"],
+                    "rq_id": case["rq_id"],
+                    "object_ids": objects,
+                })
+            self.assertEqual(missing_body.exception.code, "APPLICATION-RESEARCH-PACKAGE-REFERENCE-001")
+
+            built = facade.build_research_package({
+                "snapshot_id": state.current_snapshot["id"],
+                "rq_id": case["rq_id"],
+                "object_ids": objects,
+                "materials": [{"run_id": case["run_id"], "capture_id": "CAP-1"}],
+            })
+            package = facade.show_research_package(built["package"]["package_id"])["package"]
+            source_ids = {
+                obj["id"] for obj in package["resolved_content"]["research_objects"]
+                if obj.get("kind") == "source"
+            }
+            self.assertEqual(
+                {row["source_id"] for row in package["resolved_content"]["materials"]},
+                source_ids,
+            )
+            self.assertEqual(
+                {ref["source_id"] for ref in package["content"]["source_refs"]},
+                source_ids,
+            )
+        finally:
+            facade.close()
+
+    def test_detached_verify_resolves_all_body_attachment_references(self):
+        facade, case = self._build()
+        try:
+            mutations = (
+                ("material-missing", lambda package: package["resolved_content"]["materials"][0]["text_rendition"].__setitem__("attachment_path", "attachments/materials/missing.txt")),
+                ("material-misbinding", lambda package: package["resolved_content"]["materials"][0]["text_rendition"].__setitem__("attachment_path", "attachments/profile/narrative-semantics.yaml")),
+                ("project-input", lambda package: package["resolved_content"]["working_material"]["project_inputs"][0]["content"].__setitem__("attachment_path", "attachments/inputs/missing.txt")),
+                ("narrative", lambda package: package["resolved_profiles"]["narrative_semantics"].__setitem__("contract_path", "attachments/profile/missing.yaml")),
+            )
+            for label, mutate in mutations:
+                with self.subTest(label=label):
+                    output = self.root / f"bad-body-ref-{label}"
+                    facade.export_research_package(case["package_id"], output)
+                    package_path = output / "research-package.json"
+                    package = json.loads(package_path.read_text(encoding="utf-8"))
+                    mutate(package)
+                    package["package_digest"] = digest_json(without_digest(package))
+                    package_path.write_text(
+                        json.dumps(package, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
+                        encoding="utf-8",
+                    )
+                    with self.assertRaises(LocalApplicationError) as error:
+                        verify_export_root(output)
+                    self.assertEqual(error.exception.code, "APPLICATION-RESEARCH-PACKAGE-REFERENCE-001")
+        finally:
+            facade.close()
+
     def test_build_rejects_corrupted_saved_material_before_packaging(self):
         facade, case = self._prepare_case()
         try:
@@ -88,6 +177,23 @@ class ResearchPackageCompletionReviewTests(ResearchPackageAcceptanceSupport):
             tampered = bytearray(original)
             tampered[0] ^= 1
             blob.write_bytes(bytes(tampered))
+            with self.assertRaises(LocalApplicationError):
+                facade.build_research_package(case["build_input"])
+        finally:
+            facade.close()
+
+    def test_build_rejects_missing_saved_material_before_packaging(self):
+        facade, case = self._prepare_case()
+        try:
+            artifact_id = case["capture"]["text_rendition"]["content_reference"]
+            artifact = next(
+                item
+                for item in facade._application.execution_store.artifacts_for(case["run_id"])
+                if item.artifact_id == artifact_id
+            )
+            value = str(artifact.digest).removeprefix("sha256:")
+            blob = facade._application.execution_store.blob_root / value[:2] / value
+            blob.unlink()
             with self.assertRaises(LocalApplicationError):
                 facade.build_research_package(case["build_input"])
         finally:
@@ -156,6 +262,25 @@ class ResearchPackageCompletionReviewTests(ResearchPackageAcceptanceSupport):
             package = facade.show_research_package(built["package"]["package_id"])["package"]
             self.assertEqual(package["source_epistemic_status"], "SYNTHETIC_TEST_ONLY")
             self.assertEqual(package["package_mode"], "preview")
+
+            derived = facade.capture_exhibit(exhibits.exhibit_payload(
+                rq_id="RQ-1",
+                title="Derived virtual exhibit",
+                source_run_ids=[],
+                source_object_ids=[],
+                source_artifact_refs=[],
+                derived_from_exhibit_ids=[exhibit["exhibit_id"]],
+            ))["exhibit"]
+            derived_built = facade.build_research_package({
+                "snapshot_id": state.current_snapshot["id"],
+                "rq_id": "RQ-1",
+                "exhibit_ids": [derived["exhibit_id"]],
+            })
+            derived_package = facade.show_research_package(
+                derived_built["package"]["package_id"]
+            )["package"]
+            self.assertEqual(derived_package["source_epistemic_status"], "SYNTHETIC_TEST_ONLY")
+            self.assertEqual(derived_package["package_mode"], "preview")
         finally:
             facade.close()
 

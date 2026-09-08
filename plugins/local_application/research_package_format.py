@@ -95,7 +95,48 @@ def validate_resolved_references(package:Mapping[str,Any])->None:
     declared_sources={str(ref.get("source_id")) for ref in source_refs if isinstance(ref,Mapping) and isinstance(ref.get("source_id"),str)}
     actual_sources={oid for oid,obj in by_id.items() if obj.get("kind")=="source"}
     if len(declared_sources)!=len(source_refs) or declared_sources!=actual_sources: missing.append("content.source_refs")
-    materials={(str(m.get("run_id")),str(m.get("capture",{}).get("capture_id"))) for m in package.get("resolved_content",{}).get("materials",[]) if isinstance(m,Mapping)}
+    manifest={str(a.get("path")):a for a in package.get("attachments",[]) if isinstance(a,Mapping) and isinstance(a.get("path"),str)}
+    def require_attachment(ref: Any, *, digest: Any = None, size: Any = None, label: str) -> None:
+        if not isinstance(ref,str) or ref not in manifest:
+            missing.append(label)
+            return
+        entry=manifest[ref]
+        if digest is not None and entry.get("content_digest") != digest:
+            missing.append(label)
+        if size is not None and int(entry.get("byte_length",-1)) != int(size):
+            missing.append(label)
+
+    resolved=package.get("resolved_content",{})
+    materials={(str(m.get("run_id")),str(m.get("capture",{}).get("capture_id"))) for m in resolved.get("materials",[]) if isinstance(m,Mapping)}
+    source_material_ids={str(m.get("source_id")) for m in resolved.get("materials",[]) if isinstance(m,Mapping) and isinstance(m.get("source_id"),str)}
+    if actual_sources-source_material_ids:
+        missing.append("resolved_content.materials.source_id")
+    for material in resolved.get("materials",[]):
+        if not isinstance(material,Mapping):
+            continue
+        source_id=material.get("source_id")
+        if isinstance(source_id,str):
+            source=by_id.get(source_id)
+            capture=material.get("capture",{})
+            original=capture.get("original",{}) if isinstance(capture,Mapping) else {}
+            if (
+                source is None
+                or source.get("kind") != "source"
+                or str(source.get("canonical_locator", "")) != str(capture.get("source_locator", ""))
+                or str(source.get("content_digest", "")) != str(original.get("digest", ""))
+            ):
+                missing.append(f"material.source_id:{source_id}")
+        text=material.get("text_rendition",{})
+        if isinstance(text,Mapping):
+            require_attachment(text.get("attachment_path"),digest=text.get("content_digest"),size=text.get("byte_length"),label=f"material:{material.get('run_id')}:{material.get('capture',{}).get('capture_id')}")
+    working=resolved.get("working_material",{})
+    for project_input in working.get("project_inputs",[]) if isinstance(working,Mapping) else []:
+        content_row=project_input.get("content",{}) if isinstance(project_input,Mapping) else {}
+        if isinstance(content_row,Mapping):
+            require_attachment(content_row.get("attachment_path"),digest=content_row.get("content_digest"),size=content_row.get("byte_length"),label="project_input.attachment_path")
+    narrative=package.get("resolved_profiles",{}).get("narrative_semantics",{})
+    if isinstance(narrative,Mapping):
+        require_attachment(narrative.get("contract_path"),digest=narrative.get("content_digest"),size=narrative.get("byte_length"),label="resolved_profiles.narrative_semantics.contract_path")
     for run in package.get("resolved_content",{}).get("working_material",{}).get("run_candidates",[]):
         if not isinstance(run,Mapping): continue
         outputs=run.get("handoff",{}).get("outputs",{}) if isinstance(run.get("handoff"),Mapping) else {}
