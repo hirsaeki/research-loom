@@ -123,6 +123,8 @@
         "gap_refs",
         "material_refs",
         "citation_requirements",
+        "exhibit_pins",
+        "gap_pins",
         "section_digest"
       ],
       "properties": {
@@ -270,6 +272,44 @@
         },
         "section_digest": {
           "$ref": "#/$defs/digest"
+        },
+        "exhibit_pins": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "exhibit_id",
+              "content_digest"
+            ],
+            "properties": {
+              "exhibit_id": {
+                "$ref": "#/$defs/id"
+              },
+              "content_digest": {
+                "$ref": "#/$defs/digest"
+              }
+            }
+          }
+        },
+        "gap_pins": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "gap_id",
+              "content_digest"
+            ],
+            "properties": {
+              "gap_id": {
+                "$ref": "#/$defs/id"
+              },
+              "content_digest": {
+                "$ref": "#/$defs/digest"
+              }
+            }
+          }
         }
       }
     },
