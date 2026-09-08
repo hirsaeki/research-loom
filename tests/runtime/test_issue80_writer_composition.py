@@ -608,6 +608,7 @@ class Issue80WriterCompositionTests(ResearchPackageAcceptanceSupport):
         write_mutated("missing-exhibit", lambda d: d.__setitem__("resolved_exhibits", []))
         write_mutated("missing-gap", lambda d: d.__setitem__("unresolved_gaps", []))
         write_mutated("exhibit-content", lambda d: d["resolved_exhibits"][0]["content"].__setitem__("value", "tampered exhibit"))
+        write_mutated("exhibit-representation", lambda d: d["resolved_exhibits"][0]["content"].__setitem__("representation", "html"))
         write_mutated("source-capture", lambda d: d["resolved_materials"][0]["capture"].__setitem__("source_locator", "https://example.test/wrong"))
 
         # Two known Source/material pairs: swapping only source_id must still fail.

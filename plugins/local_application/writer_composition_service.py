@@ -288,10 +288,12 @@ def _exhibit_content_digest(exhibit: Mapping[str, Any]) -> str:
             if not isinstance(value, (dict, list)):
                 raise TypeError
             data = rfc8785.dumps(value)
-        else:
+        elif representation in {"markdown", "text"}:
             if not isinstance(value, str):
                 raise TypeError
             data = value.encode("utf-8")
+        else:
+            raise TypeError
     except (TypeError, ValueError, UnicodeEncodeError) as exc:
         raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-INTEGRITY-001", "detached Exhibit content is invalid") from exc
     return "sha256:" + hashlib.sha256(data).hexdigest()
