@@ -39,6 +39,14 @@ class ResearchPackageBodyMetadataReviewTests(ResearchPackageAcceptanceSupport):
         )
 
     def test_020_body_metadata_missing_or_null_fails_closed(self):
+        facade, case = self._build()
+        try:
+            output = self.root / "body-metadata-missing-null"
+            facade.export_research_package(case["package_id"], output)
+        finally:
+            facade.close()
+        package_path = output / "research-package.json"
+        baseline = json.loads(package_path.read_text(encoding="utf-8"))
         cases = (
             ("material-digest-null", "material", "content_digest", "null"),
             ("material-digest-missing", "material", "content_digest", "missing"),
@@ -51,17 +59,29 @@ class ResearchPackageBodyMetadataReviewTests(ResearchPackageAcceptanceSupport):
         )
         for label, row_kind, field, mode in cases:
             with self.subTest(label=label):
-                def mutate(package, row_kind=row_kind, field=field, mode=mode):
-                    if row_kind == "material":
-                        row = package["resolved_content"]["materials"][0]["text_rendition"]
-                    else:
-                        row = package["resolved_content"]["working_material"]["project_inputs"][0]["content"]
-                    if mode == "null":
-                        row[field] = None
-                    else:
-                        row.pop(field, None)
-
-                self._verify_mutation_rejected(label, mutate)
+                package = json.loads(json.dumps(baseline))
+                if row_kind == "material":
+                    row = package["resolved_content"]["materials"][0]["text_rendition"]
+                else:
+                    row = package["resolved_content"]["working_material"]["project_inputs"][0]["content"]
+                if mode == "null":
+                    row[field] = None
+                else:
+                    row.pop(field, None)
+                package["package_digest"] = digest_json(without_digest(package))
+                package_path.write_text(
+                    json.dumps(package, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
+                    encoding="utf-8",
+                )
+                with self.assertRaises(LocalApplicationError) as error:
+                    verify_export_root(output)
+                self.assertIn(
+                    error.exception.code,
+                    {
+                        "APPLICATION-RESEARCH-PACKAGE-REFERENCE-001",
+                        "APPLICATION-RESEARCH-PACKAGE-SCHEMA-001",
+                    },
+                )
 
     def test_020_misbinding_cannot_skip_metadata_comparison(self):
         def mutate(package):
