@@ -54,6 +54,7 @@ class Issue80WriterCompositionTests(ResearchPackageAcceptanceSupport):
             self.assertEqual(comp["version"], 1)
             self.assertEqual(comp["source"]["research_package_digest"], case["digest"])
             self.assertEqual(comp["source"]["research_snapshot_id"], package["source_research_snapshot"]["snapshot_id"])
+            self.assertEqual(comp["source"]["lineage_ref"], package["source_research_snapshot"]["lineage_ref"])
             self.assertEqual(comp["validation"]["status"], "VALID_WITH_GAPS")
             self.assertTrue(any(x["section_id"] == "SEC-VALIDATE" for x in comp["validation"]["diagnostics"]))
             self.assertFalse(comp["research_state_mutation_performed"])
@@ -161,6 +162,85 @@ class Issue80WriterCompositionTests(ResearchPackageAcceptanceSupport):
             self.assertEqual(pkg["source_epistemic_status"], "SYNTHETIC_TEST_ONLY")
         finally: vf.close()
 
+    def test_review_fixes_reject_unsafe_id_and_preserve_nested_counter_target_scope(self):
+        facade, case = self._build()
+        try:
+            bad = self._proposal(case, composition_id="..")
+            with self.assertRaises(LocalApplicationError) as error:
+                facade.capture_writer_composition(case["package_id"], bad)
+            self.assertEqual(error.exception.code, "APPLICATION-WRITER-COMPOSITION-INPUT-001")
+
+            package = deepcopy(facade.show_research_package(case["package_id"])["package"])
+            package["content"]["finding_refs"] = ["FND-A", "FND-B"]
+            package["content"]["counter_review_refs"] = ["CR-B"]
+            package["resolved_content"]["research_objects"].extend([
+                {"id": "FND-A", "kind": "finding"},
+                {"id": "FND-B", "kind": "finding"},
+                {"id": "CR-B", "kind": "counter_review", "target": {"kind": "finding", "id": "FND-B"}},
+            ])
+            proposal = self._proposal(case)
+            proposal["sections"][0]["finding_refs"] = ["FND-A"]
+            sections, _ = facade._writer_composition_service()._validate_sections(proposal["sections"], package)
+            self.assertEqual(sections[0]["finding_refs"], ["FND-A"])
+            self.assertEqual(sections[0]["counter_review_refs"], [])
+        finally:
+            facade.close()
+
+    def test_review_fixes_series_lock_and_list_package_cache(self):
+        facade, case = self._build()
+        try:
+            service = facade._writer_composition_service()
+            with service._series_lock("COMP-LOCK"):
+                with self.assertRaises(LocalApplicationError) as error:
+                    with service._series_lock("COMP-LOCK"):
+                        pass
+            self.assertEqual(error.exception.code, "APPLICATION-WRITER-COMPOSITION-BUSY-001")
+
+            facade.capture_writer_composition(case["package_id"], self._proposal(case, composition_id="COMP-A"))
+            facade.capture_writer_composition(case["package_id"], self._proposal(case, composition_id="COMP-B"))
+            with patch.object(service, "_package", wraps=service._package) as package_load:
+                listed = service.list()
+            self.assertEqual(len(listed["compositions"]), 2)
+            self.assertEqual(package_load.call_count, 1)
+        finally:
+            facade.close()
+
+    def test_review_fixes_package_creation_lineage_is_stable_after_active_pointer_changes(self):
+        facade, case = self._build()
+        try:
+            package = facade.show_research_package(case["package_id"])["package"]
+            lineage = package["source_research_snapshot"]["lineage_ref"]
+            repository = facade._application.state_repository
+            with patch.object(repository, "load_active_lineage_ref", return_value="LIN-WRONG"):
+                composition = facade.capture_writer_composition(case["package_id"], self._proposal(case))["composition"]
+            self.assertEqual(composition["source"]["lineage_ref"], lineage)
+        finally:
+            facade.close()
+
+    def test_review_fixes_narrative_partial_order_checks_all_occurrences(self):
+        facade, case = self._build()
+        try:
+            proposal = self._proposal(case)
+            proposal["sections"][0].pop("next_section_id", None)
+            proposal["sections"][1].pop("previous_section_id", None)
+            proposal["sections"][1]["narrative_stage_refs"] = ["formation"]
+            proposal["sections"][1]["semantic_purpose_refs"] = ["expose_argument"]
+            late = deepcopy(proposal["sections"][0])
+            late.update({"section_id": "SEC-FRAME-LATE", "order": 3, "heading": "Late framing"})
+            proposal["sections"].append(late)
+            with self.assertRaises(LocalApplicationError) as error:
+                facade.capture_writer_composition(case["package_id"], proposal)
+            self.assertEqual(error.exception.code, "APPLICATION-WRITER-COMPOSITION-NARRATIVE-001")
+
+            same = self._proposal(case)
+            same["sections"] = [deepcopy(same["sections"][0])]
+            same["sections"][0].pop("next_section_id", None)
+            same["sections"][0]["narrative_stage_refs"] = ["framing", "formation"]
+            same["sections"][0]["semantic_purpose_refs"] = ["frame_problem", "expose_argument"]
+            facade.capture_writer_composition(case["package_id"], same)
+        finally:
+            facade.close()
+
     def test_public_cli_round_trip_capture_select_and_detached_section_input(self):
         facade, case = self._build(); facade.close()
         proposal_path = self.root / "composition-v1.json"
@@ -248,7 +328,7 @@ class Issue80WriterCompositionTests(ResearchPackageAcceptanceSupport):
             package["content"]["finding_refs"] = ["FND-X"]
             package["content"]["counter_review_refs"] = ["CR-X"]
             package["resolved_content"]["research_objects"].extend([
-                {"id":"FND-X","kind":"finding"}, {"id":"CR-X","kind":"counter_review","target_id":"FND-X"}
+                {"id":"FND-X","kind":"finding"}, {"id":"CR-X","kind":"counter_review","target":{"kind":"finding","id":"FND-X"}}
             ])
             proposal = self._proposal(case); proposal["sections"][0]["finding_refs"] = ["FND-X"]
             service = facade._writer_composition_service()

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 from copy import deepcopy
 from datetime import datetime, timezone
 import json
@@ -14,6 +15,7 @@ from jsonschema import Draft202012Validator, FormatChecker
 
 from core.runtime import canonical_digest
 from .facade import LocalApplicationError
+from .research_package_format import safe_component
 
 SCHEMA_VERSION = "0.1.0"
 MAX_COMPOSITIONS = 64
@@ -104,6 +106,9 @@ def _object_index(package: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
 
 def _linked_ids(value: Mapping[str, Any]) -> set[str]:
     ids: set[str] = set()
+    target = value.get("target")
+    if isinstance(target, Mapping) and isinstance(target.get("id"), str):
+        ids.add(str(target["id"]))
     for key, item in value.items():
         if key.endswith("_id") and isinstance(item, str):
             ids.add(item)
@@ -129,14 +134,52 @@ class WriterCompositionService:
         return self._package_service().show(package_id)["package"]
 
     def _series_root(self, composition_id: str) -> Path:
-        if not composition_id or any(ch not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._:-" for ch in composition_id):
+        try:
+            safe_component(composition_id, "composition_id")
+        except LocalApplicationError as exc:
+            raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-INPUT-001", "invalid composition_id") from exc
+        if len(composition_id) > 128:
             raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-INPUT-001", "invalid composition_id")
         return self.root / composition_id
+
+    @contextmanager
+    def _series_lock(self, composition_id: str):
+        safe_id = self._series_root(composition_id).name
+        self.root.mkdir(parents=True, exist_ok=True)
+        lock_path = self.root / f".{safe_id}.lock"
+        handle = lock_path.open("a+b")
+        try:
+            handle.seek(0, os.SEEK_END)
+            if handle.tell() == 0:
+                handle.write(b"\0")
+                handle.flush()
+            handle.seek(0)
+            try:
+                if os.name == "nt":
+                    import msvcrt
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+                else:
+                    import fcntl
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except (OSError, BlockingIOError) as exc:
+                raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-BUSY-001", "composition series is being updated") from exc
+            try:
+                yield
+            finally:
+                handle.seek(0)
+                if os.name == "nt":
+                    import msvcrt
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+                else:
+                    import fcntl
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+        finally:
+            handle.close()
 
     def _version_path(self, composition_id: str, version: int) -> Path:
         return self._series_root(composition_id) / "versions" / f"{version:04d}.json"
 
-    def _load_version(self, composition_id: str, version: int) -> Mapping[str, Any]:
+    def _load_version(self, composition_id: str, version: int, package_cache: dict[tuple[str, str], Mapping[str, Any]] | None = None) -> Mapping[str, Any]:
         path = self._version_path(composition_id, version)
         if not path.is_file():
             raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-404", "composition version does not exist")
@@ -146,7 +189,14 @@ class WriterCompositionService:
             raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-INTEGRITY-001", "saved composition version is unreadable") from exc
         if _digest_document(value, "composition_digest") != value.get("composition_digest"):
             raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-INTEGRITY-001", "saved composition digest mismatch")
-        package = self._package(str(value["source"]["research_package_id"]))
+        package_id = str(value["source"]["research_package_id"])
+        package_digest = str(value["source"]["research_package_digest"])
+        key = (package_id, package_digest)
+        package = package_cache.get(key) if package_cache is not None else None
+        if package is None:
+            package = self._package(package_id)
+            if package_cache is not None:
+                package_cache[key] = package
         self._validate_source_pin(value["source"], package)
         return value
 
@@ -164,7 +214,10 @@ class WriterCompositionService:
 
     def _source_pin(self, package: Mapping[str, Any], *, lineage_ref: str | None = None) -> dict[str, Any]:
         snapshot = package["source_research_snapshot"]
-        if lineage_ref is None:
+        package_lineage = snapshot.get("lineage_ref")
+        if isinstance(package_lineage, str) and package_lineage:
+            lineage_ref = package_lineage
+        elif lineage_ref is None:
             lineage_ref = str(self.facade._application.state_repository.load_active_lineage_ref(self.facade._project_id))
         return {
             "research_package_id": package["package_id"],
@@ -323,13 +376,16 @@ class WriterCompositionService:
                 if target is not None and target not in seen:
                     raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-REFERENCE-001", f"section {section['section_id']} has unknown {field}: {target}")
         # Preserve only declared Narrative partial order; unrelated stages may move freely.
-        stage_orders: dict[str, list[int]] = {x: [] for x in stages}
+        stage_occurrences: dict[str, list[tuple[int, str]]] = {x: [] for x in stages}
         for section in normalized:
-            for stage_id in section["narrative_stage_refs"]: stage_orders[stage_id].append(section["order"])
+            for stage_id in section["narrative_stage_refs"]:
+                stage_occurrences[stage_id].append((section["order"], section["section_id"]))
         for edge in edges:
             a, b = str(edge["from_stage"]), str(edge["to_stage"])
-            if stage_orders[a] and stage_orders[b] and min(stage_orders[b]) < min(stage_orders[a]):
-                raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-NARRATIVE-001", f"Narrative dependency order is violated: {a} -> {b}")
+            for a_order, a_section in stage_occurrences[a]:
+                for b_order, b_section in stage_occurrences[b]:
+                    if a_section != b_section and a_order > b_order:
+                        raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-NARRATIVE-001", f"Narrative dependency order is violated: {a} -> {b}")
         return normalized, diagnostics
 
     def capture(self, package_id: str, value: Mapping[str, Any]) -> Mapping[str, Any]:
@@ -340,72 +396,77 @@ class WriterCompositionService:
         if composition_id is None:
             composition_id = "COMP-" + uuid.uuid4().hex
         composition_id = _require_string(composition_id, "composition_id")
-        versions = self._versions(composition_id)
-        base_version = value.get("base_version")
-        base_digest = value.get("base_digest")
-        if versions:
-            latest = versions[-1]
-            if base_version != latest:
-                raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-STALE-001", "composition update is based on a stale version; automatic rebase is not supported")
-            base = self._load_version(composition_id, latest)
-            if base_digest != base["composition_digest"]:
-                raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-STALE-001", "composition update base digest mismatch")
-            if base["source"] != self._source_pin(package):
-                raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-PIN-001", "a composition series cannot be rebound to another Research Package")
-            version = latest + 1
-        else:
-            if base_version is not None or base_digest is not None:
-                raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-STALE-001", "initial composition must not declare a base version")
-            if self.root.exists() and sum(1 for item in self.root.iterdir() if item.is_dir()) >= MAX_COMPOSITIONS:
-                raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-BOUND-001", "composition series bound exceeded")
-            version = 1
+        self._series_root(composition_id)
         sections, diagnostics = self._validate_sections(value.get("sections"), package)
-        document = {
-            "schema_version": SCHEMA_VERSION,
-            "object_type": "writer_composition",
-            "composition_id": composition_id,
-            "version": version,
-            "source": self._source_pin(package),
-            "purpose": _require_string(value.get("purpose"), "purpose"),
-            "audience": [str(x) for x in value.get("audience", package.get("communication_brief", {}).get("audience", [])) if isinstance(x, str) and x],
-            "sections": sections,
-            "base_version": base_version,
-            "base_digest": base_digest,
-            "change_reason": str(value.get("change_reason") or ("initial composition" if version == 1 else "unspecified revision")),
-            "created_by": deepcopy(dict(value.get("created_by", {"type": "external_or_human"}))) if isinstance(value.get("created_by", {"type": "external_or_human"}), Mapping) else {"type": "external_or_human"},
-            "created_at": _now(),
-            "validation": {"status": "VALID_WITH_GAPS" if diagnostics else "VALID", "diagnostics": diagnostics},
-            "research_state_mutation_performed": False,
-            "evidence_verification_performed": False,
-            "finding_adoption_performed": False,
-            "composition_digest": "",
-        }
-        document["composition_digest"] = _digest_document(document, "composition_digest")
-        _validate_schema(document)
-        root = self._series_root(composition_id); versions_root = root / "versions"
-        if len(versions) >= MAX_VERSIONS:
-            raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-BOUND-001", "composition version bound exceeded")
-        versions_root.mkdir(parents=True, exist_ok=True)
-        path = self._version_path(composition_id, version)
-        if path.exists():
-            raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-IMMUTABLE-001", "composition version already exists")
-        tmp = path.with_suffix(".tmp")
-        try:
-            tmp.write_text(json.dumps(document, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
-            os.replace(tmp, path)
-        except OSError as exc:
-            tmp.unlink(missing_ok=True)
-            raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-WRITE-001", "composition persistence failed") from exc
+        with self._series_lock(composition_id):
+            versions = self._versions(composition_id)
+            base_version = value.get("base_version")
+            base_digest = value.get("base_digest")
+            if versions:
+                latest = versions[-1]
+                if base_version != latest:
+                    raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-STALE-001", "composition update is based on a stale version; automatic rebase is not supported")
+                base = self._load_version(composition_id, latest)
+                if base_digest != base["composition_digest"]:
+                    raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-STALE-001", "composition update base digest mismatch")
+                if base["source"] != self._source_pin(package):
+                    raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-PIN-001", "a composition series cannot be rebound to another Research Package")
+                version = latest + 1
+            else:
+                if base_version is not None or base_digest is not None:
+                    raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-STALE-001", "initial composition must not declare a base version")
+                if self.root.exists() and sum(1 for item in self.root.iterdir() if item.is_dir()) >= MAX_COMPOSITIONS:
+                    raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-BOUND-001", "composition series bound exceeded")
+                version = 1
+            source_pin = self._source_pin(package)
+            self._validate_source_pin(source_pin, package)
+            document = {
+                "schema_version": SCHEMA_VERSION,
+                "object_type": "writer_composition",
+                "composition_id": composition_id,
+                "version": version,
+                "source": source_pin,
+                "purpose": _require_string(value.get("purpose"), "purpose"),
+                "audience": [str(x) for x in value.get("audience", package.get("communication_brief", {}).get("audience", [])) if isinstance(x, str) and x],
+                "sections": sections,
+                "base_version": base_version,
+                "base_digest": base_digest,
+                "change_reason": str(value.get("change_reason") or ("initial composition" if version == 1 else "unspecified revision")),
+                "created_by": deepcopy(dict(value.get("created_by", {"type": "external_or_human"}))) if isinstance(value.get("created_by", {"type": "external_or_human"}), Mapping) else {"type": "external_or_human"},
+                "created_at": _now(),
+                "validation": {"status": "VALID_WITH_GAPS" if diagnostics else "VALID", "diagnostics": diagnostics},
+                "research_state_mutation_performed": False,
+                "evidence_verification_performed": False,
+                "finding_adoption_performed": False,
+                "composition_digest": "",
+            }
+            document["composition_digest"] = _digest_document(document, "composition_digest")
+            _validate_schema(document)
+            root = self._series_root(composition_id); versions_root = root / "versions"
+            if len(versions) >= MAX_VERSIONS:
+                raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-BOUND-001", "composition version bound exceeded")
+            versions_root.mkdir(parents=True, exist_ok=True)
+            path = self._version_path(composition_id, version)
+            if path.exists():
+                raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-IMMUTABLE-001", "composition version already exists")
+            tmp = path.with_name(path.name + f".{uuid.uuid4().hex}.tmp")
+            try:
+                tmp.write_text(json.dumps(document, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+                os.replace(tmp, path)
+            except OSError as exc:
+                tmp.unlink(missing_ok=True)
+                raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-WRITE-001", "composition persistence failed") from exc
         return {"status": "CAPTURED", "composition": deepcopy(document), "selection_changed": False}
 
     def list(self) -> Mapping[str, Any]:
         if not self.root.exists(): return {"status": "OK", "compositions": [], "truncated": False}
         roots = [x for x in sorted(self.root.iterdir()) if x.is_dir()][:MAX_COMPOSITIONS + 1]
         rows = []
+        package_cache: dict[tuple[str, str], Mapping[str, Any]] = {}
         for root in roots[:MAX_COMPOSITIONS]:
             versions = self._versions(root.name)
             if not versions: continue
-            latest = self._load_version(root.name, versions[-1])
+            latest = self._load_version(root.name, versions[-1], package_cache)
             selection = self._selection(root.name)
             rows.append({"composition_id": root.name, "latest_version": versions[-1], "latest_digest": latest["composition_digest"], "source": latest["source"], "selected": selection.get("selected") if selection else None})
         return {"status": "OK", "compositions": rows, "truncated": len(roots) > MAX_COMPOSITIONS}
@@ -452,18 +513,19 @@ class WriterCompositionService:
         except Exception as exc: raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-INTEGRITY-001", "composition selection history is unreadable") from exc
 
     def select(self, composition_id: str, version: int, digest: str) -> Mapping[str, Any]:
-        document = self._load_version(composition_id, version)
-        if digest != document["composition_digest"]:
-            raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-PIN-001", "selection must name the exact composition digest")
-        path = self._series_root(composition_id) / "selection.json"; previous = self._selection(composition_id)
-        history = list(previous.get("history", [])) if previous else []
-        if len(history) >= MAX_SELECTION_EVENTS:
-            raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-BOUND-001", "composition selection history bound exceeded")
-        event = {"version": version, "digest": digest, "selected_at": _now()}; history.append(event)
-        value = {"selected": event, "history": history}
-        tmp = path.with_suffix(".tmp")
-        try: tmp.write_text(json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2)+"\n", encoding="utf-8"); os.replace(tmp, path)
-        except OSError as exc: tmp.unlink(missing_ok=True); raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-WRITE-001", "composition selection persistence failed") from exc
+        with self._series_lock(composition_id):
+            document = self._load_version(composition_id, version)
+            if digest != document["composition_digest"]:
+                raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-PIN-001", "selection must name the exact composition digest")
+            path = self._series_root(composition_id) / "selection.json"; previous = self._selection(composition_id)
+            history = list(previous.get("history", [])) if previous else []
+            if len(history) >= MAX_SELECTION_EVENTS:
+                raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-BOUND-001", "composition selection history bound exceeded")
+            event = {"version": version, "digest": digest, "selected_at": _now()}; history.append(event)
+            value = {"selected": event, "history": history}
+            tmp = path.with_name(path.name + f".{uuid.uuid4().hex}.tmp")
+            try: tmp.write_text(json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2)+"\n", encoding="utf-8"); os.replace(tmp, path)
+            except OSError as exc: tmp.unlink(missing_ok=True); raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-WRITE-001", "composition selection persistence failed") from exc
         return {"status": "SELECTED", "composition_id": composition_id, "selection": event, "research_state_mutation_performed": False}
 
     def _resolve_material_text(self, package: Mapping[str, Any], material: Mapping[str, Any]) -> str:
