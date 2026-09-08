@@ -187,6 +187,19 @@ class WriterCompositionService:
         with self._file_lock(self.root / ".creation.lock", "composition series creation is being updated"):
             yield
 
+    @contextmanager
+    def _capture_lock(self, composition_id: str):
+        if self._versions(composition_id):
+            with self._series_lock(composition_id):
+                yield
+            return
+        with self._creation_lock():
+            if self._versions(composition_id):
+                with self._series_lock(composition_id):
+                    yield
+            else:
+                yield
+
     def _version_path(self, composition_id: str, version: int) -> Path:
         return self._series_root(composition_id) / "versions" / f"{version:04d}.json"
 
@@ -409,9 +422,7 @@ class WriterCompositionService:
         composition_id = _require_string(composition_id, "composition_id")
         self._series_root(composition_id)
         sections, diagnostics = self._validate_sections(value.get("sections"), package)
-        initial_versions = self._versions(composition_id)
-        lock_context = self._series_lock(composition_id) if initial_versions else self._creation_lock()
-        with lock_context:
+        with self._capture_lock(composition_id):
             versions = self._versions(composition_id)
             base_version = value.get("base_version")
             base_digest = value.get("base_digest")
