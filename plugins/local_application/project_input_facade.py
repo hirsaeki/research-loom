@@ -263,3 +263,28 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
 
     def export_research_package(self, package_id: str, output_dir: str | Path) -> Mapping[str, Any]:
         return self._research_package_service().export(package_id, output_dir)
+
+    def _writer_composition_service(self):
+        from .writer_composition_service import WriterCompositionService
+        return WriterCompositionService(self)
+
+    def capture_writer_composition(self, package_id: str, value: Mapping[str, Any]) -> Mapping[str, Any]:
+        return self._writer_composition_service().capture(package_id, value)
+
+    def list_writer_compositions(self) -> Mapping[str, Any]:
+        return self._writer_composition_service().list()
+
+    def show_writer_composition(self, composition_id: str, version: int) -> Mapping[str, Any]:
+        return self._writer_composition_service().show(composition_id, version)
+
+    def diff_writer_composition(self, composition_id: str, from_version: int, to_version: int) -> Mapping[str, Any]:
+        return self._writer_composition_service().diff(composition_id, from_version, to_version)
+
+    def export_writer_composition(self, composition_id: str, version: int, output: str | Path) -> Mapping[str, Any]:
+        return self._writer_composition_service().export(composition_id, version, output)
+
+    def select_writer_composition(self, composition_id: str, version: int, digest: str) -> Mapping[str, Any]:
+        return self._writer_composition_service().select(composition_id, version, digest)
+
+    def export_writer_section_input(self, composition_id: str, section_id: str, output: str | Path) -> Mapping[str, Any]:
+        return self._writer_composition_service().export_section_input(composition_id, section_id, output)
