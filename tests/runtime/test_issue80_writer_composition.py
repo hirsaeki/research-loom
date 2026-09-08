@@ -48,7 +48,7 @@ class Issue80WriterCompositionTests(ResearchPackageAcceptanceSupport):
             value["base_version"] = base["version"]; value["base_digest"] = base["composition_digest"]; value["change_reason"] = "Refine framing purpose."
         return value
 
-    def _build_complete_support_package(self, *, include_unrelated=False, include_recommendation=False):
+    def _build_complete_support_package(self, *, include_unrelated=False, include_recommendation=False, include_adverse=False):
         facade, case = self._prepare_case()
         unrelated_material = None
         if include_unrelated:
@@ -106,6 +106,71 @@ class Issue80WriterCompositionTests(ResearchPackageAcceptanceSupport):
             if isinstance(action.get("payload", {}).get("object"), dict)
             and action["payload"]["object"].get("kind") == "finding"
         )
+        counter_material = None
+        if include_adverse:
+            counter_run_id = facade.submit_action({
+                "action_type": "desktop_research.investigate",
+                "payload": {"question_id": case["rq_id"], "purpose": "Counter-evidence fixture for Writer preservation."},
+            })["run_id"]
+            facade.start_external_retrieval_attempt(counter_run_id, {
+                "attempt_id": "ATT-C", "strategy": "counter source",
+                "coverage_dimension_ids": ["COV-COUNTER"], "target_locator": "https://example.test/source-counter",
+            })
+            raw = self.workspace / "captures/raw/source-counter.html"
+            text = self.workspace / "captures/text/source-counter.txt"
+            raw.parent.mkdir(parents=True, exist_ok=True); text.parent.mkdir(parents=True, exist_ok=True)
+            raw.write_bytes(b"<html>counter source body</html>")
+            case["counter_text"] = "Counter Source B supplies a concrete adverse observation for the selected Finding."
+            text.write_text(case["counter_text"], encoding="utf-8")
+            facade.capture_external_source(counter_run_id, {
+                "capture_id": "CAP-C", "source_category": "other",
+                "exact_locator": "https://example.test/source-counter#section-2",
+                "acquired_at": "2026-09-07T02:00:00Z",
+                "original_file": "captures/raw/source-counter.html", "original_media_type": "text/html",
+                "text_rendition_file": "captures/text/source-counter.txt",
+            })
+            facade.complete_external_retrieval_attempt(counter_run_id, {
+                "attempt_id": "ATT-C", "outcome": "source_captured", "resulting_capture_id": "CAP-C",
+            })
+            shown_counter = facade.show_external_material(counter_run_id, "CAP-C")
+            captured = shown_counter["capture"]
+            source_id, evidence_id, review_id = "SRC-I80-COUNTER", "EVD-I80-COUNTER", "CR-I80"
+            counter_locator = "https://example.test/source-counter#counter-quote"
+            source = {
+                "schema_version": "0.1.0", "id": source_id, "kind": "source", "revision": 0,
+                "project_id": facade.project_id, "source_type": "external",
+                "canonical_locator": captured["source_locator"],
+                "content_digest": captured["original"]["digest"], "media_type": "text/html",
+            }
+            evidence = {
+                "schema_version": "0.1.0", "id": evidence_id, "kind": "evidence", "revision": 0,
+                "project_id": facade.project_id, "source_id": source_id, "locator": counter_locator,
+                "statement": "The counter source narrows the supported conclusion.",
+                "capture_digest": captured["original"]["digest"], "evidence_kind": "counterevidence",
+                "verification_status": "unverified", "evidence_mode": "empirical",
+                "limitations": ["Counter evidence is candidate material pending verification."],
+            }
+            review = {
+                "schema_version": "0.1.0", "id": review_id, "kind": "counter_review", "revision": 0,
+                "project_id": facade.project_id, "target": {"kind": "finding", "id": finding_id},
+                "issue": "Counter evidence narrows the candidate Finding's scope.", "severity": "major",
+                "evidence_ids": [evidence_id], "disposition": "open",
+            }
+            for suffix, obj in (("counter-source", source), ("counter-evidence", evidence), ("counter-review", review)):
+                state = facade._application.state_repository.load_state_view(
+                    facade.project_id, facade._application.state_repository.load_active_lineage_ref(facade.project_id)
+                )
+                receipt = facade._application.state_transition_service.apply(make_request(
+                    state, [TransitionAction(TransitionKind.CREATE_OBJECT, {"object": obj})], suffix=suffix
+                ))
+                self.assertIsInstance(receipt, CommitReceipt)
+            objects.extend([source_id, evidence_id, review_id])
+            counter_material = {"run_id": counter_run_id, "capture_id": "CAP-C"}
+            case.update({
+                "counter_run_id": counter_run_id, "counter_source_id": source_id,
+                "counter_evidence_id": evidence_id, "counter_review_id": review_id,
+                "counter_locator": counter_locator,
+            })
         if include_recommendation:
             state = facade._application.state_repository.load_state_view(
                 facade.project_id, facade._application.state_repository.load_active_lineage_ref(facade.project_id)
@@ -140,6 +205,8 @@ class Issue80WriterCompositionTests(ResearchPackageAcceptanceSupport):
         materials = [{"run_id": case["run_id"], "capture_id": "CAP-1"}]
         if unrelated_material is not None:
             materials.append(unrelated_material)
+        if counter_material is not None:
+            materials.append(counter_material)
         built = facade.build_research_package({
             "snapshot_id": state.current_snapshot["id"], "rq_id": case["rq_id"],
             "object_ids": objects, "run_ids": [case["run_id"]],
@@ -464,7 +531,7 @@ class Issue80WriterCompositionTests(ResearchPackageAcceptanceSupport):
             facade.close()
 
     def test_review_round5_material_source_closure_and_public_exact_consumer(self):
-        facade, case = self._build_complete_support_package(include_unrelated=True, include_recommendation=True)
+        facade, case = self._build_complete_support_package(include_unrelated=True, include_recommendation=True, include_adverse=True)
         expected_path = self.root / "round5-expected.json"
         checker_path = self.root / "round5-checker.py"
         try:
@@ -472,11 +539,25 @@ class Issue80WriterCompositionTests(ResearchPackageAcceptanceSupport):
             by_kind = {
                 obj["kind"]: obj for obj in package["resolved_content"]["research_objects"]
                 if obj.get("kind") in {"research_question", "source", "evidence", "finding", "recommendation"}
+                and obj.get("id") not in {case.get("counter_source_id"), case.get("counter_evidence_id")}
             }
+            objects_by_id = {obj["id"]: obj for obj in package["resolved_content"]["research_objects"]}
+            counter_review = objects_by_id[case["counter_review_id"]]
+            counter_evidence = objects_by_id[case["counter_evidence_id"]]
+            counter_source = objects_by_id[case["counter_source_id"]]
+            exhibit = next(
+                row for row in package["resolved_content"]["working_material"]["research_exhibits"]
+                if row["exhibit_id"] == case["exhibit_id"]
+            )
+            gap = next(row for row in package["resolved_content"]["unresolved_gaps"] if row["gap_id"] == "GAP-1")
+            profile_constraints = package["resolved_profiles"]["effective_constraints"]
+            finding_limitations = list(by_kind["finding"].get("limitations", []))
+            self.assertTrue(finding_limitations)
             proposal = self._proposal(case)
             proposal["sections"] = [deepcopy(proposal["sections"][0])]
             proposal["sections"][0].pop("next_section_id", None)
             proposal["sections"][0]["finding_refs"] = [by_kind["finding"]["id"]]
+            proposal["sections"][0]["counter_review_refs"] = [case["counter_review_id"]]
             proposal["sections"][0]["citation_requirements"] = [{
                 "source_ref": by_kind["source"]["id"], "locator_ref": by_kind["evidence"]["locator"],
             }]
@@ -504,9 +585,14 @@ class Issue80WriterCompositionTests(ResearchPackageAcceptanceSupport):
                 "section_id": "SEC-FRAME", "section_digest": v2["sections"][0]["section_digest"],
                 "finding_id": by_kind["finding"]["id"], "evidence_id": by_kind["evidence"]["id"], "source_id": by_kind["source"]["id"],
                 "locator": by_kind["evidence"]["locator"], "material_text": case["source_text"], "unrelated_text": case["unrelated_text"],
-                "exhibit_id": case["exhibit_id"], "exhibit_content": detached["resolved_exhibits"][0]["content"],
-                "gap": detached["unresolved_gaps"][0], "profile_constraints": detached["resolved_profile_constraints"],
+                "exhibit_id": case["exhibit_id"], "exhibit_content": deepcopy(exhibit["content"]),
+                "gap": deepcopy(gap), "profile_constraints": deepcopy(profile_constraints),
                 "candidate_only": bool(run_candidate.get("candidate_only")),
+                "counter_review_id": counter_review["id"], "counter_review_issue": counter_review["issue"],
+                "counter_evidence_id": counter_evidence["id"], "counter_evidence_statement": counter_evidence["statement"],
+                "counter_locator": counter_evidence["locator"], "counter_source_id": counter_source["id"],
+                "counter_source_locator": counter_source["canonical_locator"], "counter_material_text": case["counter_text"],
+                "finding_limitations": finding_limitations,
             }
             expected_path.write_text(json.dumps(expected, ensure_ascii=False), encoding="utf-8")
             checker_path.write_text(
@@ -530,6 +616,17 @@ class Issue80WriterCompositionTests(ResearchPackageAcceptanceSupport):
                 "assert doc['resolved_exhibits'][0]['content']==expected['exhibit_content']\n"
                 "assert doc['unresolved_gaps'][0]==expected['gap']\n"
                 "assert doc['resolved_profile_constraints']==expected['profile_constraints']\n"
+                "counter_review=objects[expected['counter_review_id']]\n"
+                "counter_evidence=objects[expected['counter_evidence_id']]\n"
+                "counter_source=objects[expected['counter_source_id']]\n"
+                "assert counter_review['issue']==expected['counter_review_issue']\n"
+                "assert counter_evidence['statement']==expected['counter_evidence_statement']\n"
+                "assert counter_evidence['locator']==expected['counter_locator']\n"
+                "assert counter_evidence['source_id']==expected['counter_source_id']\n"
+                "assert counter_source['canonical_locator']==expected['counter_source_locator']\n"
+                "counter_material=next(row for row in doc['resolved_materials'] if row.get('source_id')==expected['counter_source_id'])\n"
+                "assert counter_material['text_rendition']['content']==expected['counter_material_text']\n"
+                "assert objects[expected['finding_id']]['limitations']==expected['finding_limitations'] and expected['finding_limitations']\n"
                 "print(json.dumps({'status':'EXACT'}))\n",
                 encoding="utf-8",
             )
@@ -770,22 +867,38 @@ class Issue80WriterCompositionTests(ResearchPackageAcceptanceSupport):
         finally: facade.close()
 
     def test_ablation_preservation_validation_is_required(self):
-        facade, case = self._build()
+        facade, case = self._build_complete_support_package(include_adverse=True)
         try:
             package = facade.show_research_package(case["package_id"])["package"]
-            package = deepcopy(package)
-            package["content"]["finding_refs"] = ["FND-X"]
-            package["content"]["counter_review_refs"] = ["CR-X"]
-            package["resolved_content"]["research_objects"].extend([
-                {"id":"FND-X","kind":"finding"}, {"id":"CR-X","kind":"counter_review","target":{"kind":"finding","id":"FND-X"}}
-            ])
-            proposal = self._proposal(case); proposal["sections"][0]["finding_refs"] = ["FND-X"]
-            service = facade._writer_composition_service()
-            with self.assertRaises(LocalApplicationError) as e: service._validate_sections(proposal["sections"], package)
-            self.assertEqual(e.exception.code, "APPLICATION-WRITER-COMPOSITION-PRESERVATION-001")
-            package["resolved_profiles"]["effective_constraints"] = [x for x in package["resolved_profiles"]["effective_constraints"] if x["path"] != "narrative.preservation.required_content"]
-            sections, _ = service._validate_sections(proposal["sections"], package)
-            self.assertEqual(sections[0]["finding_refs"], ["FND-X"])
+            objects = {obj["id"]: obj for obj in package["resolved_content"]["research_objects"]}
+            finding = next(obj for obj in objects.values() if obj.get("kind") == "finding")
+            self.assertTrue(finding.get("limitations"))
+            self.assertEqual(objects[case["counter_review_id"]]["target"], {"kind": "finding", "id": finding["id"]})
+
+            dropped = self._proposal(case, composition_id="COMP-PRESERVATION-ABLATION")
+            dropped["sections"] = [deepcopy(dropped["sections"][0])]
+            dropped["sections"][0].pop("next_section_id", None)
+            dropped["sections"][0]["finding_refs"] = [finding["id"]]
+            dropped["sections"][0]["counter_review_refs"] = []
+            with self.assertRaises(LocalApplicationError) as error:
+                facade.capture_writer_composition(case["package_id"], dropped)
+            self.assertEqual(error.exception.code, "APPLICATION-WRITER-COMPOSITION-PRESERVATION-001")
+
+            original_narrative_defs = WriterCompositionService._narrative_defs
+            def without_counter_preservation(service, source_package):
+                stages, purposes, edges, preservation = original_narrative_defs(service, source_package)
+                return stages, purposes, edges, preservation - {"counter_findings"}
+
+            with patch.object(WriterCompositionService, "_narrative_defs", without_counter_preservation):
+                ablated = facade.capture_writer_composition(case["package_id"], dropped)["composition"]
+                facade.select_writer_composition(ablated["composition_id"], 1, ablated["composition_digest"] )
+                out = self.root / "preservation-ablation-section"
+                facade.export_writer_section_input(ablated["composition_id"], "SEC-FRAME", out)
+            detached = json.loads((out / "section-writer-input.json").read_text(encoding="utf-8"))
+            self.assertEqual(detached["section_contract"]["counter_review_refs"], [])
+            self.assertIn(case["counter_review_id"], detached["resolved_object_ids"])
+            detached_finding = next(obj for obj in detached["resolved_research_objects"] if obj.get("id") == finding["id"])
+            self.assertEqual(detached_finding["limitations"], finding["limitations"])
         finally: facade.close()
 
 
