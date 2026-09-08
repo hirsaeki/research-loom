@@ -74,3 +74,5 @@ jobs:
         run: uv run --frozen python -m unittest -v tests.runtime.test_issue91_review_fixes.Issue91ReviewFixTests
       - name: Run Issue 91 real Windows file I/O regressions
         run: uv run --frozen python -m unittest -v tests.runtime.test_issue91_review_fixes.Issue91WindowsRealIoTests
+      - name: Run Issue 77 Research Package Windows acceptance
+        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_research_package_*.py' -v

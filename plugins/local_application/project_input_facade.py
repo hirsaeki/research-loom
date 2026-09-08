@@ -248,3 +248,18 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                         + ", ".join(foreign_lineage),
                     )
         return super().submit_action(draft_input)
+    def _research_package_service(self):
+        from .research_package_service import ResearchPackageService
+        return ResearchPackageService(self)
+
+    def build_research_package(self, value: Mapping[str, Any]) -> Mapping[str, Any]:
+        return self._research_package_service().build(value)
+
+    def list_research_packages(self) -> Mapping[str, Any]:
+        return self._research_package_service().list()
+
+    def show_research_package(self, package_id: str) -> Mapping[str, Any]:
+        return self._research_package_service().show(package_id)
+
+    def export_research_package(self, package_id: str, output_dir: str | Path) -> Mapping[str, Any]:
+        return self._research_package_service().export(package_id, output_dir)

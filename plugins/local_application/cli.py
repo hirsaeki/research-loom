@@ -178,6 +178,27 @@ def build_parser() -> argparse.ArgumentParser:
     exhibit_show.add_argument("--exhibit-id", required=True)
     _add_output_json(exhibit_show)
 
+    research_package = sub.add_parser("research-package")
+    research_package_sub = research_package.add_subparsers(dest="research_package_command", required=True)
+    research_package_build = research_package_sub.add_parser("build")
+    _add_workspace(research_package_build)
+    _add_input_json(research_package_build)
+    research_package_list = research_package_sub.add_parser("list")
+    _add_workspace(research_package_list)
+    _add_output_json(research_package_list)
+    research_package_show = research_package_sub.add_parser("show")
+    _add_workspace(research_package_show)
+    research_package_show.add_argument("--package-id", required=True)
+    _add_output_json(research_package_show)
+    research_package_export = research_package_sub.add_parser("export")
+    _add_workspace(research_package_export)
+    research_package_export.add_argument("--package-id", required=True)
+    research_package_export.add_argument("--output", required=True)
+    _add_output_json(research_package_export)
+    research_package_verify = research_package_sub.add_parser("verify")
+    research_package_verify.add_argument("--input", required=True)
+    _add_output_json(research_package_verify)
+
     survey = sub.add_parser("survey")
     survey_sub = survey.add_subparsers(dest="survey_command", required=True)
 
@@ -315,6 +336,10 @@ def _run(args: argparse.Namespace) -> Mapping[str, Any]:
     if args.command == "doctor":
         return _doctor_with_optional_attention(args.workspace)
 
+    if args.command == "research-package" and args.research_package_command == "verify":
+        from plugins.local_application.research_package_service import verify_export_root
+        return verify_export_root(args.input)
+
     with LocalApplicationFacade.open_workspace(args.workspace) as facade:
         if args.command == "status":
             return facade.status()
@@ -326,6 +351,15 @@ def _run(args: argparse.Namespace) -> Mapping[str, Any]:
             return facade.show_run(args.run_id)
         if args.command == "run" and args.run_command == "replay":
             return facade.replay_completed_desktop_research_run(args.run_id)
+        if args.command == "research-package":
+            if args.research_package_command == "build":
+                return facade.build_research_package(_read_input(args.json_input))
+            if args.research_package_command == "list":
+                return facade.list_research_packages()
+            if args.research_package_command == "show":
+                return facade.show_research_package(args.package_id)
+            if args.research_package_command == "export":
+                return facade.export_research_package(args.package_id, args.output)
         if args.command == "exhibit":
             if args.exhibit_command == "capture":
                 return facade.capture_exhibit(_read_input(args.json_input))
