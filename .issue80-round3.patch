@@ -1,0 +1,54 @@
+diff --git a/plugins/local_application/writer_composition_service.py b/plugins/local_application/writer_composition_service.py
+index 9964b9e..4149e5d 100644
+--- a/plugins/local_application/writer_composition_service.py
++++ b/plugins/local_application/writer_composition_service.py
+@@ -187,6 +187,19 @@ class WriterCompositionService:
+         with self._file_lock(self.root / ".creation.lock", "composition series creation is being updated"):
+             yield
+ 
++    @contextmanager
++    def _capture_lock(self, composition_id: str):
++        if self._versions(composition_id):
++            with self._series_lock(composition_id):
++                yield
++            return
++        with self._creation_lock():
++            if self._versions(composition_id):
++                with self._series_lock(composition_id):
++                    yield
++            else:
++                yield
++
+     def _version_path(self, composition_id: str, version: int) -> Path:
+         return self._series_root(composition_id) / "versions" / f"{version:04d}.json"
+ 
+@@ -409,9 +422,7 @@ class WriterCompositionService:
+         composition_id = _require_string(composition_id, "composition_id")
+         self._series_root(composition_id)
+         sections, diagnostics = self._validate_sections(value.get("sections"), package)
+-        initial_versions = self._versions(composition_id)
+-        lock_context = self._series_lock(composition_id) if initial_versions else self._creation_lock()
+-        with lock_context:
++        with self._capture_lock(composition_id):
+             versions = self._versions(composition_id)
+             base_version = value.get("base_version")
+             base_digest = value.get("base_digest")
+diff --git a/tests/runtime/test_issue80_writer_composition.py b/tests/runtime/test_issue80_writer_composition.py
+index 5c96115..e1b39eb 100644
+--- a/tests/runtime/test_issue80_writer_composition.py
++++ b/tests/runtime/test_issue80_writer_composition.py
+@@ -197,6 +197,14 @@ class Issue80WriterCompositionTests(ResearchPackageAcceptanceSupport):
+                         pass
+             self.assertEqual(error.exception.code, "APPLICATION-WRITER-COMPOSITION-BUSY-001")
+ 
++            with (
++                patch.object(service, "_versions", side_effect=[[], [1], [1]]),
++                patch.object(service, "_series_lock", wraps=service._series_lock) as series_lock,
++            ):
++                with service._capture_lock("COMP-LOCK"):
++                    pass
++            self.assertEqual(series_lock.call_count, 1)
++
+             lock_files_before = sorted(path.name for path in service.root.glob(".*.lock"))
+             for index in range(8):
+                 with self.assertRaises(LocalApplicationError) as missing:
