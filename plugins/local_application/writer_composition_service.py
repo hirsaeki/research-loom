@@ -3,6 +3,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 from copy import deepcopy
 from datetime import datetime, timezone
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -15,7 +16,7 @@ from jsonschema import Draft202012Validator, FormatChecker
 
 from core.runtime import canonical_digest
 from .facade import LocalApplicationError
-from .research_package_format import safe_component
+from .research_package_format import _package_required_refs, safe_component
 
 SCHEMA_VERSION = "0.1.0"
 MAX_COMPOSITIONS = 64
@@ -90,7 +91,7 @@ def _package_ref_sets(package: Mapping[str, Any]) -> dict[str, set[str]]:
             if isinstance(x, Mapping) and x.get("limitation_id")
         },
         "contribution_refs": set(map(str, content.get("contribution_refs", []))),
-        "recommendation_refs": set(),
+        "recommendation_refs": {oid for oid, obj in _object_index(package).items() if obj.get("kind") == "recommendation"},
         "exhibit_refs": {str(x.get("exhibit_id")) for x in exhibits if isinstance(x, Mapping) and x.get("exhibit_id")},
         "gap_refs": {str(x.get("gap_id")) for x in gaps if isinstance(x, Mapping) and x.get("gap_id")},
         "material_refs": {f"{x.get('run_id')}:{x.get('capture', {}).get('capture_id')}" for x in package.get("resolved_content", {}).get("materials", []) if isinstance(x, Mapping) and x.get("run_id") and isinstance(x.get("capture"), Mapping) and x.get("capture", {}).get("capture_id")},
@@ -102,6 +103,144 @@ def _object_index(package: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
         str(x.get("id")): x for x in package.get("resolved_content", {}).get("research_objects", [])
         if isinstance(x, Mapping) and x.get("id")
     }
+
+
+def _package_epistemic(package: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "package_mode": str(package.get("package_mode")),
+        "source_epistemic_status": str(package.get("source_epistemic_status")),
+        "preview_only": bool(package.get("preview_only")),
+        "authoritative_research_freeze": bool(package.get("authoritative_research_freeze")),
+        "release_eligible": bool(package.get("release_eligible")),
+    }
+
+
+def _object_is_authoritative(obj: Mapping[str, Any]) -> bool:
+    state = obj.get("adoption_state")
+    if isinstance(state, str):
+        return state == "approved"
+    assessment = obj.get("assessment")
+    if isinstance(assessment, str):
+        return assessment not in {"proposed", "candidate"}
+    return True
+
+
+def _material_ref(material: Mapping[str, Any]) -> str | None:
+    capture = material.get("capture")
+    capture_id = capture.get("capture_id") if isinstance(capture, Mapping) else None
+    run_id = material.get("run_id")
+    if isinstance(run_id, str) and isinstance(capture_id, str):
+        return f"{run_id}:{capture_id}"
+    return None
+
+
+def _known_locators_for_source(package: Mapping[str, Any], source_id: str) -> set[str]:
+    result: set[str] = set()
+    source = _object_index(package).get(source_id)
+    if source is not None and isinstance(source.get("canonical_locator"), str):
+        result.add(str(source["canonical_locator"]))
+    for obj in _object_index(package).values():
+        if obj.get("kind") == "evidence" and obj.get("source_id") == source_id and isinstance(obj.get("locator"), str):
+            result.add(str(obj["locator"]))
+    for material in package.get("resolved_content", {}).get("materials", []):
+        if not isinstance(material, Mapping) or material.get("source_id") != source_id:
+            continue
+        capture = material.get("capture")
+        if not isinstance(capture, Mapping):
+            continue
+        for key in ("source_locator", "exact_locator"):
+            value = capture.get(key)
+            if isinstance(value, str) and value:
+                result.add(value)
+    return result
+
+
+def verify_section_input_root(root: str | Path) -> Mapping[str, Any]:
+    root = Path(root)
+    payload_path = root / "section-writer-input.json"
+    manifest_path = root / "manifest.json"
+    try:
+        payload_bytes = payload_path.read_bytes()
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        document = json.loads(payload_bytes.decode("utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-INTEGRITY-001", "detached section Writer input is unreadable") from exc
+    _validate_schema(document); _validate_schema(manifest)
+    if _digest_document(document, "section_input_digest") != document.get("section_input_digest"):
+        raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-INTEGRITY-001", "detached section input digest mismatch")
+    if _digest_document(manifest, "manifest_digest") != manifest.get("manifest_digest"):
+        raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-INTEGRITY-001", "detached section manifest digest mismatch")
+    files = manifest.get("files", [])
+    if len(files) != 1 or files[0].get("path") != "section-writer-input.json":
+        raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-INTEGRITY-001", "detached section manifest binding is invalid")
+    entry = files[0]
+    if entry.get("byte_length") != len(payload_bytes) or entry.get("content_digest") != "sha256:" + hashlib.sha256(payload_bytes).hexdigest():
+        raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-INTEGRITY-001", "detached section manifest content mismatch")
+    section = document["section_contract"]
+    if _digest_document(section, "section_digest") != section.get("section_digest"):
+        raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-INTEGRITY-001", "detached section contract digest mismatch")
+    objects = {str(row.get("id")): row for row in document["resolved_research_objects"] if isinstance(row, Mapping) and isinstance(row.get("id"), str)}
+    expected_ids = set(document.get("resolved_object_ids", []))
+    if expected_ids != set(objects):
+        raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-REFERENCE-001", "detached section research-object binding mismatch")
+    section_ref_ids = set()
+    for field in ("argument_refs", "finding_refs", "evidence_refs", "source_refs", "counter_review_refs", "qualifier_refs", "limitation_refs", "contribution_refs", "recommendation_refs"):
+        section_ref_ids.update(section.get(field, []))
+    if not section_ref_ids <= expected_ids:
+        raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-REFERENCE-001", "detached section references unresolved research objects")
+    for object_id, obj in objects.items():
+        for expected_kind, ref_id in _package_required_refs(obj):
+            target = objects.get(ref_id)
+            if target is None or target.get("kind") != expected_kind:
+                raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-REFERENCE-001", f"detached research-object closure is incomplete: {object_id}->{expected_kind}:{ref_id}")
+    if not any(obj.get("kind") == "research_question" for obj in objects.values()):
+        raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-REFERENCE-001", "detached section omits its Research Question")
+    materials = {row.get("material_ref"): row for row in document["resolved_materials"] if isinstance(row, Mapping)}
+    expected_materials = set(document.get("resolved_material_refs", []))
+    if expected_materials != set(materials):
+        raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-REFERENCE-001", "detached section material binding mismatch")
+    for ref, row in materials.items():
+        text = row.get("text_rendition")
+        if not isinstance(text, Mapping) or not isinstance(text.get("content"), str):
+            raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-INTEGRITY-001", f"detached material body is missing: {ref}")
+        data = text["content"].encode("utf-8")
+        if isinstance(text.get("byte_length"), bool) or not isinstance(text.get("byte_length"), int) or text["byte_length"] != len(data) or not isinstance(text.get("content_digest"), str) or text["content_digest"] != "sha256:" + hashlib.sha256(data).hexdigest():
+            raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-INTEGRITY-001", f"detached material body size/digest mismatch: {ref}")
+        if _material_ref(row) != ref:
+            raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-REFERENCE-001", f"detached material is misbound: {ref}")
+        source_id = row.get("source_id")
+        if source_id is not None and (source_id not in objects or objects[source_id].get("kind") != "source"):
+            raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-REFERENCE-001", f"detached material Source binding is invalid: {ref}")
+    direct_materials = set(section.get("material_refs", []))
+    if not direct_materials <= expected_materials:
+        raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-REFERENCE-001", "detached section references an unresolved material")
+    resolved_source_ids = {oid for oid, obj in objects.items() if obj.get("kind") == "source"}
+    material_source_ids = {str(row.get("source_id")) for row in materials.values() if isinstance(row.get("source_id"), str)}
+    if not resolved_source_ids <= material_source_ids:
+        raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-REFERENCE-001", "detached section omits a required Source body")
+    for citation in section.get("citation_requirements", []):
+        source_id = citation.get("source_ref")
+        if source_id not in resolved_source_ids:
+            raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-REFERENCE-001", "detached citation Source is unresolved")
+        locator = citation.get("locator_ref")
+        if locator is not None:
+            known = set()
+            source_obj = objects[source_id]
+            if isinstance(source_obj.get("canonical_locator"), str): known.add(source_obj["canonical_locator"])
+            for obj in objects.values():
+                if obj.get("kind") == "evidence" and obj.get("source_id") == source_id and isinstance(obj.get("locator"), str): known.add(obj["locator"])
+            for row in materials.values():
+                if row.get("source_id") == source_id and isinstance(row.get("capture"), Mapping):
+                    for key in ("source_locator", "exact_locator"):
+                        value = row["capture"].get(key)
+                        if isinstance(value, str) and value: known.add(value)
+            if locator not in known:
+                raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-REFERENCE-001", f"detached citation locator is unresolved: {locator}")
+    source = document["source"]
+    for key in ("composition_id", "composition_version", "composition_digest", "research_package_id", "research_package_digest", "project_id", "lineage_ref", "research_snapshot_id", "research_snapshot_digest", "effective_profile_set_ref", "effective_profile_set_digest", "package_mode", "source_epistemic_status", "preview_only", "authoritative_research_freeze", "release_eligible"):
+        if key not in source:
+            raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-INTEGRITY-001", f"detached source pin is incomplete: {key}")
+    return {"status": "VERIFIED", "section_id": section["section_id"], "section_input_digest": document["section_input_digest"]}
 
 
 def _linked_ids(value: Mapping[str, Any]) -> set[str]:
@@ -252,6 +391,7 @@ class WriterCompositionService:
             "research_snapshot_digest": snapshot["content_digest"],
             "effective_profile_set_ref": package["effective_profile_set"]["effective_profile_set_ref"],
             "effective_profile_set_digest": package["effective_profile_set"]["content_digest"],
+            **_package_epistemic(package),
         }
 
     def _validate_source_pin(self, pin: Mapping[str, Any], package: Mapping[str, Any]) -> None:
@@ -364,16 +504,23 @@ class WriterCompositionService:
                 source_id = _require_string(citation.get("source_ref"), "source_ref")
                 if source_id not in refs["source_refs"]:
                     raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-REFERENCE-001", f"section {sid} citation references an unavailable Source: {source_id}")
-                section["citation_requirements"].append({"source_ref": source_id, "locator_ref": citation.get("locator_ref")})
+                locator = citation.get("locator_ref")
+                if locator is not None and (not isinstance(locator, str) or locator not in _known_locators_for_source(package, source_id)):
+                    raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-REFERENCE-001", f"section {sid} citation references an unavailable locator for Source {source_id}: {locator}")
+                section["citation_requirements"].append({"source_ref": source_id, "locator_ref": locator})
             required_kinds = set()
             for stage_id in stage_refs:
                 required_kinds.update(map(str, stages[stage_id].get("requires", [])))
+            refs_by_kind = {
+                "argument": section["argument_refs"], "finding": section["finding_refs"],
+                "evidence": section["evidence_refs"], "source": section["source_refs"],
+                "counter_review": section["counter_review_refs"], "contribution": section["contribution_refs"],
+                "recommendation": section["recommendation_refs"],
+                "research_question": list(package.get("content", {}).get("research_question_refs", [])),
+            }
             available_by_kind = {
-                "argument": bool(section["argument_refs"]), "finding": bool(section["finding_refs"]),
-                "evidence": bool(section["evidence_refs"]), "source": bool(section["source_refs"]),
-                "counter_review": bool(section["counter_review_refs"]), "contribution": bool(section["contribution_refs"]),
-                "recommendation": bool(section["recommendation_refs"]),
-                "research_question": True,
+                kind: any((objects.get(ref_id) is not None and _object_is_authoritative(objects[ref_id])) for ref_id in ref_ids)
+                for kind, ref_ids in refs_by_kind.items()
             }
             unmet = sorted(kind for kind in required_kinds if not available_by_kind.get(kind, False))
             if unmet:
@@ -515,8 +662,26 @@ class WriterCompositionService:
             raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-EXPORT-001", "composition export must not write into managed workspace state")
         if path.exists(): raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-EXPORT-001", "composition export will not overwrite an existing path")
         if not path.parent.exists(): raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-EXPORT-001", "composition export parent must exist")
-        try: path.write_text(json.dumps(proposal, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
-        except OSError as exc: raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-WRITE-001", "composition export failed") from exc
+        payload = (json.dumps(proposal, ensure_ascii=False, sort_keys=True, indent=2) + "\n").encode("utf-8")
+        tmp = path.parent / f".{path.name}.{uuid.uuid4().hex}.tmp"
+        created = False
+        try:
+            with tmp.open("xb") as handle:
+                created = True
+                handle.write(payload)
+                handle.flush()
+                os.fsync(handle.fileno())
+            try:
+                os.link(tmp, path)
+            except FileExistsError as exc:
+                raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-EXPORT-001", "composition export will not overwrite an existing path") from exc
+            tmp.unlink()
+        except LocalApplicationError:
+            if created: tmp.unlink(missing_ok=True)
+            raise
+        except OSError as exc:
+            if created: tmp.unlink(missing_ok=True)
+            raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-WRITE-001", "composition export failed") from exc
         return {"status": "EXPORTED", "composition_id": composition_id, "version": version, "output": str(path), "content_digest": canonical_digest(proposal)}
 
     def diff(self, composition_id: str, from_version: int, to_version: int) -> Mapping[str, Any]:
@@ -583,20 +748,45 @@ class WriterCompositionService:
         unmet = [x for x in document["validation"]["diagnostics"] if x.get("section_id") == section_id and x.get("code") == "WRITER-COMPOSITION-NARRATIVE-UNMET"]
         if unmet: raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-NARRATIVE-UNMET", "selected section has unmet Narrative prerequisites")
         package = self._package(document["source"]["research_package_id"]); self._validate_source_pin(document["source"], package)
-        objects = _object_index(package); needed_ids = set()
+        objects = _object_index(package)
+        needed_ids = set()
         for field in ("argument_refs","finding_refs","evidence_refs","source_refs","counter_review_refs","qualifier_refs","limitation_refs","contribution_refs","recommendation_refs"):
             needed_ids.update(section[field])
-        selected_objects = [deepcopy(dict(objects[x])) for x in sorted(needed_ids) if x in objects]
+        needed_ids.update(str(x) for x in package.get("content", {}).get("research_question_refs", []) if isinstance(x, str))
+        pending = list(needed_ids)
+        while pending:
+            object_id = pending.pop()
+            obj = objects.get(object_id)
+            if obj is None:
+                raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-REFERENCE-001", f"section input object does not resolve in Research Package: {object_id}")
+            for _kind, ref_id in _package_required_refs(obj):
+                if ref_id not in needed_ids:
+                    needed_ids.add(ref_id); pending.append(ref_id)
+            for counter_id, counter in objects.items():
+                if counter.get("kind") == "counter_review" and object_id in _linked_ids(counter) and counter_id not in needed_ids:
+                    needed_ids.add(counter_id); pending.append(counter_id)
+            if len(needed_ids) > MAX_SECTION_REFS:
+                raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-BOUND-001", "section research-object closure exceeds supported bound")
+        selected_objects = [deepcopy(dict(objects[x])) for x in sorted(needed_ids)]
         exhibits_by_id = {str(x.get("exhibit_id")): x for x in package.get("resolved_content", {}).get("working_material", {}).get("research_exhibits", []) if isinstance(x, Mapping)}
         exhibits = [deepcopy(dict(exhibits_by_id[x])) for x in section["exhibit_refs"] if x in exhibits_by_id]
-        source_ids = set(section["source_refs"]); material_refs = set(section["material_refs"])
+        source_ids = {object_id for object_id in needed_ids if objects[object_id].get("kind") == "source"}; material_refs = set(section["material_refs"])
+        run_candidates = {str(row.get("run_id")): row for row in package.get("resolved_content", {}).get("working_material", {}).get("run_candidates", []) if isinstance(row, Mapping) and isinstance(row.get("run_id"), str)}
         materials = []
         for material in package.get("resolved_content", {}).get("materials", []):
             source_id = material.get("source_id")
-            capture_id = material.get("capture", {}).get("capture_id") if isinstance(material.get("capture"), Mapping) else None
-            material_ref = f"{material.get('run_id')}:{capture_id}" if capture_id else None
+            material_ref = _material_ref(material)
             if source_id in source_ids or material_ref in material_refs:
-                row = deepcopy(dict(material)); row["material_ref"] = material_ref; row["text_rendition"]["content"] = self._resolve_material_text(package, material); materials.append(row)
+                row = deepcopy(dict(material)); row["material_ref"] = material_ref; row["text_rendition"]["content"] = self._resolve_material_text(package, material)
+                run = run_candidates.get(str(row.get("run_id")))
+                row["candidate_only"] = bool(run.get("candidate_only")) if run else False
+                materials.append(row)
+        missing_source_bodies = sorted(source_ids - {str(row.get("source_id")) for row in materials if isinstance(row.get("source_id"), str)})
+        if missing_source_bodies:
+            raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-REFERENCE-001", "section input Source has no resolved material body: " + ", ".join(missing_source_bodies))
+        for citation in section["citation_requirements"]:
+            if citation["source_ref"] not in source_ids:
+                raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-REFERENCE-001", f"citation Source is not connected to the resolved section evidence: {citation['source_ref']}")
         gaps_by_id = {str(x.get("gap_id")): x for x in package.get("resolved_content", {}).get("unresolved_gaps", []) if isinstance(x, Mapping)}
         gaps = [deepcopy(dict(gaps_by_id[x])) for x in section["gap_refs"] if x in gaps_by_id]
         ordered = sorted(document["sections"], key=lambda x: (x["order"], x["section_id"])); pos = next(i for i,x in enumerate(ordered) if x["section_id"] == section_id)
@@ -607,6 +797,8 @@ class WriterCompositionService:
             "communication": {"purpose": document["purpose"], "audience": document["audience"], "core_message": package.get("communication_brief", {}).get("core_message"), "must_not_claim": list(dict.fromkeys(package.get("communication_brief", {}).get("must_not_claim", []) + package.get("project_constraints", {}).get("must_not_claim", [])))},
             "outline_context": {"sections": context, "target_index": pos, "previous": context[pos-1] if pos else None, "next": context[pos+1] if pos+1 < len(context) else None},
             "section_contract": deepcopy(section),
+            "resolved_object_ids": sorted(needed_ids),
+            "resolved_material_refs": sorted(row["material_ref"] for row in materials if isinstance(row.get("material_ref"), str)),
             "resolved_research_objects": selected_objects,
             "resolved_materials": materials,
             "resolved_exhibits": exhibits,
@@ -635,6 +827,7 @@ class WriterCompositionService:
         try:
             (staging / "section-writer-input.json").write_bytes(payload)
             (staging / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, sort_keys=True, indent=2)+"\n", encoding="utf-8")
+            verify_section_input_root(staging)
             os.replace(staging, out); shutil.rmtree(tmp, ignore_errors=True)
         except OSError as exc:
             shutil.rmtree(tmp, ignore_errors=True)

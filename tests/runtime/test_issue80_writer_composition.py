@@ -8,7 +8,7 @@ import subprocess
 import sys
 from unittest.mock import patch
 
-from plugins.local_application import LocalApplicationError
+from plugins.local_application import LocalApplicationError, verify_writer_section_input
 from plugins.local_application.writer_composition_service import WriterCompositionService
 from research_package_acceptance_support import ResearchPackageAcceptanceSupport
 import survey_virtual_runner_test_support as vr
@@ -44,6 +44,41 @@ class Issue80WriterCompositionTests(ResearchPackageAcceptanceSupport):
         if base is not None:
             value["base_version"] = base["version"]; value["base_digest"] = base["composition_digest"]; value["change_reason"] = "Refine framing purpose."
         return value
+
+    def _build_complete_support_package(self):
+        facade, case = self._prepare_case()
+        proposal = case["proposal"]
+        pending = facade.submit_action({
+            "action_type": "state.apply_candidate",
+            "payload": {"state_delta_proposal_id": proposal["proposal_id"]},
+            "actor_id": "HUMAN-I80-SUPPORT",
+        })
+        confirmed = facade.submit_confirmation({
+            "confirmation_request_id": pending["confirmation_request"]["confirmation_request_id"],
+            "actor_id": "HUMAN-I80-SUPPORT",
+        })
+        if confirmed["status"] == "HUMAN_DECISION_REQUIRED":
+            request = confirmed["decision_request"]
+            facade.resolve_human_decision({
+                "request_id": request["request_id"], "request_digest": request["request_digest"],
+                "disposition": "approve_exact", "actor_id": "HUMAN-I80-SUPPORT",
+            })
+        state = facade._application.state_repository.load_state_view(
+            facade.project_id, facade._application.state_repository.load_active_lineage_ref(facade.project_id)
+        )
+        objects = [
+            action["payload"]["object"]["id"] for action in proposal["proposed_actions"]
+            if isinstance(action.get("payload", {}).get("object"), dict)
+            and action["payload"]["object"].get("kind") in {"source", "evidence", "finding"}
+        ]
+        built = facade.build_research_package({
+            "snapshot_id": state.current_snapshot["id"], "rq_id": case["rq_id"],
+            "object_ids": objects, "run_ids": [case["run_id"]],
+            "materials": [{"run_id": case["run_id"], "capture_id": "CAP-1"}],
+            "exhibit_ids": [case["exhibit_id"]], "gap_ids": ["GAP-1"],
+        })
+        case["package_id"] = built["package"]["package_id"]
+        return facade, case
 
     def test_co1_capture_in_progress_composition_without_freeze(self):
         facade, case = self._build()
@@ -159,7 +194,15 @@ class Issue80WriterCompositionTests(ResearchPackageAcceptanceSupport):
             proposal = {"purpose":"Virtual composition fixture.","sections":[{"section_id":"SEC-V","order":1,"heading":"Virtual framing","reader_question":"What is synthetic?","purpose":"Keep origin explicit.","narrative_stage_refs":["framing"],"semantic_purpose_refs":["frame_problem"]}]}
             comp = vf.capture_writer_composition(pkg["package_id"], proposal)["composition"]
             self.assertEqual(comp["source"]["research_package_id"], pkg["package_id"])
-            self.assertEqual(pkg["source_epistemic_status"], "SYNTHETIC_TEST_ONLY")
+            self.assertEqual(comp["source"]["source_epistemic_status"], "SYNTHETIC_TEST_ONLY")
+            self.assertEqual(comp["source"]["package_mode"], "preview")
+            self.assertTrue(comp["source"]["preview_only"]); self.assertFalse(comp["source"]["release_eligible"])
+            vf.select_writer_composition(comp["composition_id"], 1, comp["composition_digest"])
+            out = self.root / "virtual-section-input"
+            vf.export_writer_section_input(comp["composition_id"], "SEC-V", out)
+            detached = json.loads((out / "section-writer-input.json").read_text(encoding="utf-8"))
+            self.assertEqual(detached["source"]["source_epistemic_status"], "SYNTHETIC_TEST_ONLY")
+            self.assertTrue(detached["source"]["preview_only"]); self.assertFalse(detached["source"]["release_eligible"])
         finally: vf.close()
 
     def test_review_fixes_reject_unsafe_id_and_preserve_nested_counter_target_scope(self):
@@ -290,6 +333,104 @@ class Issue80WriterCompositionTests(ResearchPackageAcceptanceSupport):
         detached = json.loads((output / "section-writer-input.json").read_text(encoding="utf-8"))
         self.assertEqual(detached["resolved_materials"][0]["text_rendition"]["content"], case["source_text"])
         self.assertEqual(detached["section_contract"]["section_digest"], v2["sections"][0]["section_digest"])
+        verified = subprocess.run(
+            [sys.executable, "-c", "import json,sys; from plugins.local_application import verify_writer_section_input; print(json.dumps(verify_writer_section_input(sys.argv[1])))", str(output)],
+            cwd=root, text=True, capture_output=True, check=False,
+        )
+        self.assertEqual(verified.returncode, 0, msg=verified.stderr)
+        self.assertEqual(json.loads(verified.stdout)["status"], "VERIFIED")
+
+    def test_review_round4_support_chain_rq_locator_and_candidate_readiness(self):
+        facade, case = self._build_complete_support_package()
+        try:
+            package = facade.show_research_package(case["package_id"])["package"]
+            by_kind = {obj["kind"]: obj for obj in package["resolved_content"]["research_objects"] if obj.get("kind") in {"research_question", "source", "evidence", "finding"}}
+            proposal = self._proposal(case)
+            proposal["sections"] = [deepcopy(proposal["sections"][0])]
+            proposal["sections"][0].pop("next_section_id", None)
+            proposal["sections"][0]["finding_refs"] = [by_kind["finding"]["id"]]
+            proposal["sections"][0]["material_refs"] = []
+            proposal["sections"][0]["exhibit_refs"] = []
+            proposal["sections"][0]["gap_refs"] = []
+            proposal["sections"][0]["citation_requirements"] = [{"source_ref": by_kind["source"]["id"], "locator_ref": by_kind["evidence"]["locator"]}]
+            comp = facade.capture_writer_composition(case["package_id"], proposal)["composition"]
+            facade.select_writer_composition(comp["composition_id"], 1, comp["composition_digest"])
+            out = self.root / "support-chain-section"
+            facade.export_writer_section_input(comp["composition_id"], "SEC-FRAME", out)
+            detached = json.loads((out / "section-writer-input.json").read_text(encoding="utf-8"))
+            resolved = {obj["id"]: obj for obj in detached["resolved_research_objects"]}
+            self.assertEqual(resolved[case["rq_id"]]["text"], by_kind["research_question"]["text"])
+            self.assertTrue({by_kind[k]["id"] for k in ("finding", "evidence", "source")} <= set(resolved))
+            self.assertEqual(detached["resolved_materials"][0]["text_rendition"]["content"], case["source_text"])
+            self.assertTrue(detached["resolved_materials"][0]["candidate_only"] in {True, False})
+            bad = deepcopy(proposal); bad["composition_id"] = "COMP-BAD-LOC"
+            bad["sections"][0]["citation_requirements"][0]["locator_ref"] = "https://example.test/not-real"
+            with self.assertRaises(LocalApplicationError) as error:
+                facade.capture_writer_composition(case["package_id"], bad)
+            self.assertEqual(error.exception.code, "APPLICATION-WRITER-COMPOSITION-REFERENCE-001")
+
+            candidate = deepcopy(proposal); candidate["composition_id"] = "COMP-CANDIDATE"
+            candidate["sections"][0]["narrative_stage_refs"] = ["validation"]
+            candidate["sections"][0]["semantic_purpose_refs"] = ["test_and_qualify"]
+            candidate["sections"][0]["citation_requirements"] = []
+            candidate_comp = facade.capture_writer_composition(case["package_id"], candidate)["composition"]
+            diag = next(d for d in candidate_comp["validation"]["diagnostics"] if d["section_id"] == "SEC-FRAME")
+            self.assertIn("finding", diag["unmet_requires"])
+        finally:
+            facade.close()
+
+    def test_review_round4_detached_validator_rejects_inner_tamper_after_outer_redigest(self):
+        facade, case = self._build()
+        try:
+            comp = facade.capture_writer_composition(case["package_id"], self._proposal(case))["composition"]
+            facade.select_writer_composition(comp["composition_id"], 1, comp["composition_digest"])
+            base = self.root / "detached-validator-base"
+            facade.export_writer_section_input(comp["composition_id"], "SEC-FRAME", base)
+        finally:
+            facade.close()
+        self.assertEqual(verify_writer_section_input(base)["status"], "VERIFIED")
+        from core.runtime import canonical_digest
+        import hashlib
+        mutations = {
+            "missing-content": lambda d: d["resolved_materials"][0]["text_rendition"].pop("content"),
+            "same-size": lambda d: d["resolved_materials"][0]["text_rendition"].__setitem__("content", "X" * len(d["resolved_materials"][0]["text_rendition"]["content"])),
+            "null-size": lambda d: d["resolved_materials"][0]["text_rendition"].__setitem__("byte_length", None),
+            "null-digest": lambda d: d["resolved_materials"][0]["text_rendition"].__setitem__("content_digest", None),
+            "misbinding": lambda d: d["resolved_materials"][0].__setitem__("material_ref", "RUN-OTHER:CAP-OTHER"),
+        }
+        for label, mutate in mutations.items():
+            with self.subTest(label=label):
+                out = self.root / f"detached-bad-{label}"; out.mkdir()
+                doc = json.loads((base / "section-writer-input.json").read_text(encoding="utf-8")); mutate(doc)
+                basis = deepcopy(doc); basis.pop("section_input_digest", None); doc["section_input_digest"] = canonical_digest(basis)
+                payload = (json.dumps(doc, ensure_ascii=False, sort_keys=True, indent=2) + "\n").encode()
+                (out / "section-writer-input.json").write_bytes(payload)
+                manifest = {"schema_version":"0.1.0","object_type":"section_writer_input_manifest","files":[{"path":"section-writer-input.json","byte_length":len(payload),"content_digest":"sha256:"+hashlib.sha256(payload).hexdigest()}]}
+                manifest["manifest_digest"] = canonical_digest(manifest)
+                (out / "manifest.json").write_text(json.dumps(manifest))
+                with self.assertRaises(LocalApplicationError): verify_writer_section_input(out)
+
+    def test_review_round4_whole_export_is_no_overwrite_and_atomic(self):
+        facade, case = self._build()
+        try:
+            comp = facade.capture_writer_composition(case["package_id"], self._proposal(case))["composition"]
+            normal = self.root / "whole-safe.json"
+            facade.export_writer_composition(comp["composition_id"], 1, normal)
+            self.assertTrue(normal.is_file())
+            sentinel = self.root / "whole-sentinel.json"
+            real_link = os.link
+            def race_link(src, dst):
+                Path(dst).write_text("sentinel", encoding="utf-8")
+                raise FileExistsError(dst)
+            with patch("plugins.local_application.writer_composition_service.os.link", side_effect=race_link):
+                with self.assertRaises(LocalApplicationError): facade.export_writer_composition(comp["composition_id"], 1, sentinel)
+            self.assertEqual(sentinel.read_text(encoding="utf-8"), "sentinel")
+            failed = self.root / "whole-failed.json"
+            with patch("plugins.local_application.writer_composition_service.os.fsync", side_effect=OSError("fixture")):
+                with self.assertRaises(LocalApplicationError): facade.export_writer_composition(comp["composition_id"], 1, failed)
+            self.assertFalse(failed.exists())
+        finally:
+            facade.close()
 
     def test_whole_proposal_export_can_be_edited_and_reimported_as_new_version(self):
         facade, case = self._build()
@@ -320,6 +461,16 @@ class Issue80WriterCompositionTests(ResearchPackageAcceptanceSupport):
             with patch("plugins.local_application.writer_composition_service.os.replace", side_effect=OSError("fixture")):
                 with self.assertRaises(LocalApplicationError): facade.export_writer_section_input(v1["composition_id"], "SEC-FRAME", failed)
             self.assertFalse(failed.exists())
+            with patch("plugins.local_application.writer_composition_service.MAX_SELECTION_EVENTS", 2):
+                facade.select_writer_composition(v1["composition_id"], 1, v1["composition_digest"])
+                with self.assertRaises(LocalApplicationError) as selection_bound:
+                    facade.select_writer_composition(v1["composition_id"], 1, v1["composition_digest"])
+                self.assertEqual(selection_bound.exception.code, "APPLICATION-WRITER-COMPOSITION-BOUND-001")
+            with patch("plugins.local_application.writer_composition_service.MAX_SECTION_INPUT_BYTES", 1):
+                with self.assertRaises(LocalApplicationError) as output_bound:
+                    facade.export_writer_section_input(v1["composition_id"], "SEC-FRAME", self.root / "too-large")
+                self.assertEqual(output_bound.exception.code, "APPLICATION-WRITER-COMPOSITION-BOUND-001")
+                self.assertFalse((self.root / "too-large").exists())
         finally: facade.close()
 
     def test_ablation_pin_validation_is_required(self):
