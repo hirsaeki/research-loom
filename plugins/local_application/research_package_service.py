@@ -89,23 +89,18 @@ class ResearchPackageService:
         for root in selected:
             path=root/"research-package.json"
             try:
-                metadata_size=path.stat().st_size
-                if metadata_size>MAX_OUTPUT_BYTES: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-BOUND-001","Research Package metadata exceeds output bound")
-                with path.open("rb") as handle:
-                    raw=handle.read(MAX_OUTPUT_BYTES+1)
+                size=path.stat().st_size
+                if size>MAX_OUTPUT_BYTES: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-BOUND-001","Research Package metadata exceeds output bound")
+                with path.open("rb") as handle: raw=handle.read(MAX_OUTPUT_BYTES+1)
                 if len(raw)>MAX_OUTPUT_BYTES: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-BOUND-001","Research Package metadata exceeds output bound")
-                if len(raw)!=metadata_size: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",f"saved Research Package metadata changed while reading: {root.name}")
+                if len(raw)!=size: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",f"saved Research Package metadata changed while reading: {root.name}")
                 value=json.loads(raw.decode("utf-8"))
-            except LocalApplicationError:
-                raise
-            except (OSError,UnicodeError,json.JSONDecodeError) as exc:
-                raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",f"invalid saved Research Package metadata: {root.name}") from exc
-            if not isinstance(value,Mapping): raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",f"invalid saved Research Package metadata: {root.name}")
-            try:
+                if not isinstance(value,Mapping): raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",f"invalid saved Research Package metadata: {root.name}")
                 validate_schema(value)
                 packages.append(self._summary(value))
-            except (LocalApplicationError,KeyError,TypeError,ValueError) as exc:
-                if isinstance(exc,LocalApplicationError) and exc.code!="APPLICATION-RESEARCH-PACKAGE-SCHEMA-001": raise
+            except LocalApplicationError:
+                raise
+            except (OSError,UnicodeError,json.JSONDecodeError,KeyError,TypeError) as exc:
                 raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",f"invalid saved Research Package metadata: {root.name}") from exc
         return {"status":"OK","project_id":self.project_id,"packages":packages,"truncated":len(roots)>MAX_PACKAGES}
     def show(self,pid): return {"status":"OK","package":self._load(pid)}
@@ -118,7 +113,19 @@ class ResearchPackageService:
         if out.resolve(strict=False).is_relative_to(managed): raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-EXPORT-001","export may not write inside managed workspace state")
         temp=Path(tempfile.mkdtemp(prefix=".rp-export-",dir=parent)); staging=temp/"payload"
         try:
-            shutil.copytree(self.root/pid,staging); result=verify_export_root(staging); os.replace(staging,out)
+            source=self.root/pid
+            staging.mkdir()
+            allowed=["research-package.json","research-package.md"]+[str(item["path"]) for item in p.get("attachments",[])]
+            source_root=source.resolve(strict=True)
+            for rel in allowed:
+                src_path=source/rel
+                if src_path.is_symlink():
+                    raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",f"unsafe Research Package export member: {rel}")
+                src=src_path.resolve(strict=True)
+                if not src.is_relative_to(source_root):
+                    raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",f"unsafe Research Package export member: {rel}")
+                dst=staging/rel; dst.parent.mkdir(parents=True,exist_ok=True); shutil.copyfile(src,dst)
+            result=verify_export_root(staging); os.replace(staging,out)
         except OSError as exc:
             shutil.rmtree(temp,ignore_errors=True)
             raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-WRITE-001","Research Package export failed") from exc

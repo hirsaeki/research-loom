@@ -51,6 +51,45 @@ def validate_schema(v:Mapping[str,Any])->None:
         e=errors[0]; where=".".join(map(str,e.absolute_path)) or "$"
         raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-SCHEMA-001",f"Research Package schema violation at {where}: {e.message}")
 
+def _package_required_refs(obj:Mapping[str,Any])->list[tuple[str,str]]:
+    kind=str(obj.get("kind","")); refs=[]
+    def add(k,values):
+        if isinstance(values,str) and values: refs.append((k,values))
+        elif isinstance(values,list): refs.extend((k,str(v)) for v in values if isinstance(v,str) and v)
+    if kind=="claim": add("evidence",obj.get("supporting_evidence_ids")); add("evidence",obj.get("challenging_evidence_ids"))
+    elif kind=="evidence": add("source",obj.get("source_id"))
+    elif kind=="analysis": add("evidence",obj.get("evidence_ids"))
+    elif kind=="finding": add("evidence",obj.get("evidence_ids")); add("analysis",obj.get("analysis_ids")); add("evidence",obj.get("counter_evidence_ids"))
+    elif kind=="counter_review":
+        target=obj.get("target")
+        if isinstance(target,Mapping) and target.get("kind") not in {None,"research_question"} and isinstance(target.get("id"),str): refs.append((str(target["kind"]),str(target["id"])))
+        add("evidence",obj.get("evidence_ids"))
+    elif kind=="argument": add("claim",obj.get("conclusion_claim_id")); add("claim",obj.get("premise_claim_ids")); add("finding",obj.get("finding_ids")); add("evidence",obj.get("evidence_ids")); add("counter_review",obj.get("counter_review_ids"))
+    elif kind in {"contribution","recommendation"}: add("finding",obj.get("finding_ids"))
+    return refs
+
+def validate_resolved_references(package:Mapping[str,Any])->None:
+    objects=package.get("resolved_content",{}).get("research_objects",[])
+    if not isinstance(objects,list): return
+    by_id={str(obj.get("id")):obj for obj in objects if isinstance(obj,Mapping) and isinstance(obj.get("id"),str)}
+    missing=[]
+    for obj in objects:
+        if not isinstance(obj,Mapping): continue
+        for expected,ref_id in _package_required_refs(obj):
+            target=by_id.get(ref_id)
+            if target is None or str(target.get("kind"))!=expected: missing.append(f"{obj.get('id')}->{expected}:{ref_id}")
+    declared=set(package.get("content",{}).get("source_refs",[]) or [])
+    actual={oid for oid,obj in by_id.items() if obj.get("kind")=="source"}
+    if declared!=actual: missing.append("content.source_refs")
+    materials={(str(m.get("run_id")),str(m.get("capture",{}).get("capture_id"))) for m in package.get("resolved_content",{}).get("materials",[]) if isinstance(m,Mapping)}
+    for run in package.get("resolved_content",{}).get("working_material",{}).get("run_candidates",[]):
+        if not isinstance(run,Mapping): continue
+        outputs=run.get("handoff",{}).get("outputs",{}) if isinstance(run.get("handoff"),Mapping) else {}
+        for capture in outputs.get("source_captures",[]) if isinstance(outputs.get("source_captures",[]),list) else []:
+            cid=capture.get("capture_id") if isinstance(capture,Mapping) else None
+            if isinstance(cid,str) and (str(run.get("run_id")),cid) not in materials: missing.append(f"{run.get('run_id')}->capture:{cid}")
+    if missing: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-REFERENCE-001","Research Package has unresolved required references: "+", ".join(sorted(set(missing))))
+
 def safe_component(v:str,field:str)->str:
     if not v or v in {".",".."} or "/" in v or "\\" in v: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INPUT-001",f"{field} is not a safe identifier")
     return v
@@ -115,7 +154,7 @@ def _bounded_file_digest(path:Path,maximum:int)->tuple[int,str]:
         raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",f"file changed while verifying: {path.name}")
     return size,"sha256:"+digest.hexdigest()
 
-def verify_export_root(root:str|Path,*,verify_package_digest:bool=True)->Mapping[str,Any]:
+def verify_export_root(root:str|Path)->Mapping[str,Any]:
     try: base=Path(root).expanduser().resolve(strict=True)
     except OSError as exc: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001","export root does not exist") from exc
     package_path=base/"research-package.json"
@@ -127,17 +166,15 @@ def verify_export_root(root:str|Path,*,verify_package_digest:bool=True)->Mapping
     try:
         with package_path.open("rb") as handle:
             package_raw=handle.read(MAX_OUTPUT_BYTES+1)
-        if len(package_raw)>MAX_OUTPUT_BYTES:
-            raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-BOUND-001","Research Package export exceeds output bound")
-        if len(package_raw)!=package_size:
-            raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001","file changed while verifying: research-package.json")
+        if len(package_raw)>MAX_OUTPUT_BYTES: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-BOUND-001","Research Package export exceeds output bound")
+        if len(package_raw)!=package_size: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001","research-package.json changed while verifying")
         package=json.loads(package_raw.decode("utf-8"))
-    except LocalApplicationError:
-        raise
+    except LocalApplicationError: raise
     except (OSError,UnicodeError,json.JSONDecodeError) as exc: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001","invalid research-package.json") from exc
     if not isinstance(package,Mapping): raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001","research-package.json must be an object")
     validate_schema(package)
-    if verify_package_digest and package.get("package_digest")!=digest_json(without_digest(package)): raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001","Research Package digest mismatch")
+    validate_resolved_references(package)
+    if package.get("package_digest")!=digest_json(without_digest(package)): raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001","Research Package digest mismatch")
     total=package_size; seen=set()
     for a in package.get("attachments",[]):
         rel=str(a["path"]); p=Path(rel)

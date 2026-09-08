@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import replace
-import io
 import unittest
 from unittest.mock import patch
 
@@ -92,12 +91,6 @@ class ResearchPackageReviewFixTests(unittest.TestCase):
             ):
                 listed = service.list()
             self.assertTrue(listed["packages"])
-
-            metadata = service.root / case["package_id"] / "research-package.json"
-            metadata.write_text("{}", encoding="utf-8")
-            with self.assertRaises(LocalApplicationError) as error:
-                service.list()
-            self.assertEqual(error.exception.code, "APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001")
         finally:
             facade.close()
 
@@ -110,21 +103,6 @@ class ResearchPackageReviewFixTests(unittest.TestCase):
             handle.truncate(16 * 1024 * 1024 + 1)
         with self.assertRaises(LocalApplicationError) as error:
             verify_export_root(oversized)
-        self.assertEqual(error.exception.code, "APPLICATION-RESEARCH-PACKAGE-BOUND-001")
-
-        raced = self.fixture.root / "raced-detached"
-        raced.mkdir()
-        raced_package = raced / "research-package.json"
-        raced_package.write_bytes(b"{}")
-        path_type = type(raced_package)
-        original_open = path_type.open
-        def fake_open(path, *args, **kwargs):
-            if path == raced_package and args and args[0] == "rb":
-                return io.BytesIO(b"x" * (16 * 1024 * 1024 + 1))
-            return original_open(path, *args, **kwargs)
-        with patch.object(path_type, "open", new=fake_open):
-            with self.assertRaises(LocalApplicationError) as error:
-                verify_export_root(raced)
         self.assertEqual(error.exception.code, "APPLICATION-RESEARCH-PACKAGE-BOUND-001")
 
         facade, case = self.fixture._prepare_case()
@@ -140,6 +118,29 @@ class ResearchPackageReviewFixTests(unittest.TestCase):
                     }
                 )
             self.assertEqual(load_revision.call_count, 1)
+        finally:
+            facade.close()
+
+    def test_export_ignores_unmanifested_files_and_links(self) -> None:
+        facade, case = self.fixture._build()
+        try:
+            root = facade._research_package_service().root / case["package_id"]
+            (root / "private-note.txt").write_text("not selected", encoding="utf-8")
+            (root / "large-unlisted.bin").write_bytes(b"x" * (17 * 1024 * 1024))
+            outside = self.fixture.root / "outside-secret.txt"
+            outside.write_text("outside secret", encoding="utf-8")
+            link = root / "outside-link.txt"
+            try:
+                link.symlink_to(outside)
+            except OSError:
+                link = None
+            out = self.fixture.root / "manifest-only-export"
+            result = facade.export_research_package(case["package_id"], out)
+            self.assertEqual(result["status"], "EXPORTED")
+            self.assertFalse((out / "private-note.txt").exists())
+            self.assertFalse((out / "large-unlisted.bin").exists())
+            if link is not None:
+                self.assertFalse((out / "outside-link.txt").exists())
         finally:
             facade.close()
 

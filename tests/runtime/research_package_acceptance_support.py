@@ -77,6 +77,8 @@ class ResearchPackageAcceptanceSupport(unittest.TestCase):
         rq_id = intake.adopt_rq(facade)
         state = facade._application.state_repository.load_state_view(facade.project_id, facade._application.state_repository.load_active_lineage_ref(facade.project_id))
         before = (state.current_snapshot["id"], state.current_snapshot["content_digest"])
+        input_path=self.workspace/"rp1-input.txt"; input_text="Pinned operator input for RP1 detached use."; input_path.write_text(input_text,encoding="utf-8")
+        project_input=facade.register_project_input({"file":str(input_path),"role":"other","expected_snapshot_id":state.current_snapshot["id"],"expected_snapshot_digest":state.current_snapshot["content_digest"],"provenance":{"supplied_by":"rp1-acceptance"}})["project_input"]
         run_id = facade.submit_action({"action_type":"desktop_research.investigate","payload":{"question_id":rq_id,"purpose":"RP1 fixed-source acceptance."}})["run_id"]
         facade.start_external_retrieval_attempt(run_id,{"attempt_id":"ATT-1","strategy":"support search","coverage_dimension_ids":["COV-SUPPORT"],"target_locator":"https://example.test/source-a"})
         raw=self.workspace/"captures/raw/source-a.html"; text=self.workspace/"captures/text/source-a.txt"; raw.parent.mkdir(parents=True); text.parent.mkdir(parents=True)
@@ -91,8 +93,8 @@ class ResearchPackageAcceptanceSupport(unittest.TestCase):
         proposal=deepcopy(collected["execution_result"]["state_delta_proposal"])
         exhibit=facade.capture_exhibit(exhibits.exhibit_payload(rq_id=rq_id,source_run_ids=[run_id],source_artifact_refs=[f"{run_id}.CAP-1.text"],source_object_ids=[]))["exhibit"]
         state2=facade._application.state_repository.load_state_view(facade.project_id, facade._application.state_repository.load_active_lineage_ref(facade.project_id))
-        build_input={"snapshot_id":state2.current_snapshot["id"],"rq_id":rq_id,"run_ids":[run_id],"exhibit_ids":[exhibit["exhibit_id"]],"materials":[{"run_id":run_id,"capture_id":"CAP-1"}],"gap_ids":["GAP-1"]}
-        return facade,{"rq_id":rq_id,"run_id":run_id,"capture":capture,"exhibit_id":exhibit["exhibit_id"],"source_text":exact,"before":before,"proposal":proposal,"build_input":build_input}
+        build_input={"snapshot_id":state2.current_snapshot["id"],"rq_id":rq_id,"run_ids":[run_id],"exhibit_ids":[exhibit["exhibit_id"]],"project_input_ids":[project_input["input_id"]],"materials":[{"run_id":run_id,"capture_id":"CAP-1"}],"gap_ids":["GAP-1"]}
+        return facade,{"rq_id":rq_id,"run_id":run_id,"capture":capture,"exhibit_id":exhibit["exhibit_id"],"project_input_id":project_input["input_id"],"project_input_text":input_text,"source_text":exact,"before":before,"proposal":proposal,"build_input":build_input}
 
     def _build(self):
         facade,case=self._prepare_case(); result=facade.build_research_package(case["build_input"]); case["package_id"]=result["package"]["package_id"]; case["digest"]=result["package"]["package_digest"]; return facade,case
