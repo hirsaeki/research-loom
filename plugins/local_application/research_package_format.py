@@ -111,11 +111,11 @@ def validate_resolved_references(package:Mapping[str,Any])->None:
             missing.append(label)
             return
         entry=manifest[ref]
-        if digest is not None and entry.get("content_digest") != digest:
+        if not isinstance(digest,str) or not digest or entry.get("content_digest") != digest:
             missing.append(label)
         entry_size=entry.get("byte_length")
-        if size is not None and (
-            isinstance(size,bool) or not isinstance(size,int)
+        if (
+            isinstance(size,bool) or not isinstance(size,int) or size < 0
             or isinstance(entry_size,bool) or not isinstance(entry_size,int)
             or entry_size != size
         ):
