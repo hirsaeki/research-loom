@@ -76,3 +76,5 @@ jobs:
         run: uv run --frozen python -m unittest -v tests.runtime.test_issue91_review_fixes.Issue91WindowsRealIoTests
       - name: Run Issue 77 Research Package Windows acceptance
         run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_research_package_*.py' -v
+      - name: Run Issue 80 Writer Composition Windows acceptance
+        run: uv run --frozen python -m unittest -v tests.runtime.test_issue80_writer_composition
