@@ -12,6 +12,8 @@ import tempfile
 import uuid
 from typing import Any, Mapping
 
+import rfc8785
+
 from jsonschema import Draft202012Validator, FormatChecker
 
 from core.runtime import canonical_digest
@@ -209,8 +211,38 @@ def verify_section_input_root(root: str | Path) -> Mapping[str, Any]:
         if _material_ref(row) != ref:
             raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-REFERENCE-001", f"detached material is misbound: {ref}")
         source_id = row.get("source_id")
-        if source_id is not None and (source_id not in objects or objects[source_id].get("kind") != "source"):
-            raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-REFERENCE-001", f"detached material Source binding is invalid: {ref}")
+        if source_id is not None:
+            if source_id not in objects or objects[source_id].get("kind") != "source":
+                raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-REFERENCE-001", f"detached material Source binding is invalid: {ref}")
+            capture = row.get("capture")
+            original = capture.get("original") if isinstance(capture, Mapping) else None
+            source_obj = objects[source_id]
+            if (
+                not isinstance(capture, Mapping) or not isinstance(original, Mapping)
+                or str(source_obj.get("canonical_locator", "")) != str(capture.get("source_locator", ""))
+                or str(source_obj.get("content_digest", "")) != str(original.get("digest", ""))
+            ):
+                raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-REFERENCE-001", f"detached material Source/capture binding mismatch: {ref}")
+    exhibits = {str(row.get("exhibit_id")): row for row in document["resolved_exhibits"] if isinstance(row, Mapping) and isinstance(row.get("exhibit_id"), str)}
+    if len(exhibits) != len(document["resolved_exhibits"]) or set(section.get("exhibit_refs", [])) != set(exhibits):
+        raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-REFERENCE-001", "detached Exhibit binding mismatch")
+    exhibit_pins = {str(row.get("exhibit_id")): str(row.get("content_digest")) for row in section.get("exhibit_pins", []) if isinstance(row, Mapping)}
+    if set(exhibit_pins) != set(exhibits):
+        raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-REFERENCE-001", "detached Exhibit pins are incomplete")
+    for exhibit_id, exhibit in exhibits.items():
+        actual = _exhibit_content_digest(exhibit)
+        if exhibit.get("content_digest") != actual or exhibit_pins[exhibit_id] != actual:
+            raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-INTEGRITY-001", f"detached Exhibit content mismatch: {exhibit_id}")
+    gaps = {str(row.get("gap_id")): row for row in document["unresolved_gaps"] if isinstance(row, Mapping) and isinstance(row.get("gap_id"), str)}
+    if len(gaps) != len(document["unresolved_gaps"]) or set(section.get("gap_refs", [])) != set(gaps):
+        raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-REFERENCE-001", "detached Gap binding mismatch")
+    gap_pins = {str(row.get("gap_id")): str(row.get("content_digest")) for row in section.get("gap_pins", []) if isinstance(row, Mapping)}
+    if set(gap_pins) != set(gaps):
+        raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-REFERENCE-001", "detached Gap pins are incomplete")
+    for gap_id, gap in gaps.items():
+        actual = canonical_digest(gap)
+        if gap_pins[gap_id] != actual:
+            raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-INTEGRITY-001", f"detached Gap content mismatch: {gap_id}")
     direct_materials = set(section.get("material_refs", []))
     if not direct_materials <= expected_materials:
         raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-REFERENCE-001", "detached section references an unresolved material")
@@ -242,6 +274,27 @@ def verify_section_input_root(root: str | Path) -> Mapping[str, Any]:
             raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-INTEGRITY-001", f"detached source pin is incomplete: {key}")
     return {"status": "VERIFIED", "section_id": section["section_id"], "section_input_digest": document["section_input_digest"]}
 
+
+
+
+def _exhibit_content_digest(exhibit: Mapping[str, Any]) -> str:
+    content = exhibit.get("content")
+    if not isinstance(content, Mapping):
+        raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-INTEGRITY-001", "detached Exhibit content is invalid")
+    representation = content.get("representation")
+    value = content.get("value")
+    try:
+        if representation == "json":
+            if not isinstance(value, (dict, list)):
+                raise TypeError
+            data = rfc8785.dumps(value)
+        else:
+            if not isinstance(value, str):
+                raise TypeError
+            data = value.encode("utf-8")
+    except (TypeError, ValueError, UnicodeEncodeError) as exc:
+        raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-INTEGRITY-001", "detached Exhibit content is invalid") from exc
+    return "sha256:" + hashlib.sha256(data).hexdigest()
 
 def _linked_ids(value: Mapping[str, Any]) -> set[str]:
     ids: set[str] = set()
@@ -538,6 +591,10 @@ class WriterCompositionService:
                 missing = sorted(required - set(section[field]))
                 if missing and affected:
                     raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-PRESERVATION-001", f"section {sid} drops required {field}: {', '.join(missing)}")
+            exhibits_by_id = {str(x.get("exhibit_id")): x for x in package.get("resolved_content", {}).get("working_material", {}).get("research_exhibits", []) if isinstance(x, Mapping) and isinstance(x.get("exhibit_id"), str)}
+            gaps_by_id = {str(x.get("gap_id")): x for x in package.get("resolved_content", {}).get("unresolved_gaps", []) if isinstance(x, Mapping) and isinstance(x.get("gap_id"), str)}
+            section["exhibit_pins"] = [{"exhibit_id": exhibit_id, "content_digest": str(exhibits_by_id[exhibit_id]["content_digest"])} for exhibit_id in section["exhibit_refs"]]
+            section["gap_pins"] = [{"gap_id": gap_id, "content_digest": canonical_digest(gaps_by_id[gap_id])} for gap_id in section["gap_refs"]]
             section["section_digest"] = _digest_document(section, "section_digest")
             normalized.append(section)
         # Parent/bridge refs must resolve inside the proposal.
@@ -753,6 +810,12 @@ class WriterCompositionService:
         for field in ("argument_refs","finding_refs","evidence_refs","source_refs","counter_review_refs","qualifier_refs","limitation_refs","contribution_refs","recommendation_refs"):
             needed_ids.update(section[field])
         needed_ids.update(str(x) for x in package.get("content", {}).get("research_question_refs", []) if isinstance(x, str))
+        package_materials = {_material_ref(row): row for row in package.get("resolved_content", {}).get("materials", []) if isinstance(row, Mapping) and _material_ref(row)}
+        for material_ref in section["material_refs"]:
+            material = package_materials.get(material_ref)
+            source_id = material.get("source_id") if isinstance(material, Mapping) else None
+            if isinstance(source_id, str):
+                needed_ids.add(source_id)
         for citation in section["citation_requirements"]:
             source_id = citation["source_ref"]
             needed_ids.add(source_id)
@@ -838,6 +901,9 @@ class WriterCompositionService:
             (staging / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, sort_keys=True, indent=2)+"\n", encoding="utf-8")
             verify_section_input_root(staging)
             os.replace(staging, out); shutil.rmtree(tmp, ignore_errors=True)
+        except LocalApplicationError:
+            shutil.rmtree(tmp, ignore_errors=True)
+            raise
         except OSError as exc:
             shutil.rmtree(tmp, ignore_errors=True)
             raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-WRITE-001", "section input export failed") from exc

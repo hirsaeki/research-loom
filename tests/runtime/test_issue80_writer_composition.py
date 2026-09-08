@@ -10,6 +10,9 @@ from unittest.mock import patch
 
 from plugins.local_application import LocalApplicationError, verify_writer_section_input
 from plugins.local_application.writer_composition_service import WriterCompositionService
+from core.runtime import TransitionAction, TransitionKind
+from core.runtime.transition_models import CommitReceipt
+from runtime_fixtures import decision, make_request
 from research_package_acceptance_support import ResearchPackageAcceptanceSupport
 import survey_virtual_runner_test_support as vr
 import test_external_desktop_research_intake as intake
@@ -45,8 +48,37 @@ class Issue80WriterCompositionTests(ResearchPackageAcceptanceSupport):
             value["base_version"] = base["version"]; value["base_digest"] = base["composition_digest"]; value["change_reason"] = "Refine framing purpose."
         return value
 
-    def _build_complete_support_package(self):
+    def _build_complete_support_package(self, *, include_unrelated=False, include_recommendation=False):
         facade, case = self._prepare_case()
+        unrelated_material = None
+        if include_unrelated:
+            run_id = facade.submit_action({
+                "action_type": "desktop_research.investigate",
+                "payload": {"question_id": case["rq_id"], "purpose": "Unrelated material exclusion fixture."},
+            })["run_id"]
+            facade.start_external_retrieval_attempt(run_id, {
+                "attempt_id": "ATT-U", "strategy": "unrelated source",
+                "coverage_dimension_ids": ["COV-SUPPORT"], "target_locator": "https://example.test/source-unrelated",
+            })
+            raw = self.workspace / "captures/raw/source-unrelated.html"
+            text = self.workspace / "captures/text/source-unrelated.txt"
+            raw.parent.mkdir(parents=True, exist_ok=True); text.parent.mkdir(parents=True, exist_ok=True)
+            raw.write_bytes(b"<html>unrelated source body</html>")
+            case["unrelated_text"] = "Unrelated material must not enter the selected Writer section."
+            text.write_text(case["unrelated_text"], encoding="utf-8")
+            facade.capture_external_source(run_id, {
+                "capture_id": "CAP-U", "source_category": "other",
+                "exact_locator": "https://example.test/source-unrelated#section-1",
+                "acquired_at": "2026-09-07T01:00:00Z",
+                "original_file": "captures/raw/source-unrelated.html", "original_media_type": "text/html",
+                "text_rendition_file": "captures/text/source-unrelated.txt",
+            })
+            facade.complete_external_retrieval_attempt(run_id, {
+                "attempt_id": "ATT-U", "outcome": "source_captured", "resulting_capture_id": "CAP-U",
+            })
+            unrelated_material = {"run_id": run_id, "capture_id": "CAP-U"}
+            case["unrelated_run_id"] = run_id
+
         proposal = case["proposal"]
         pending = facade.submit_action({
             "action_type": "state.apply_candidate",
@@ -63,19 +95,55 @@ class Issue80WriterCompositionTests(ResearchPackageAcceptanceSupport):
                 "request_id": request["request_id"], "request_digest": request["request_digest"],
                 "disposition": "approve_exact", "actor_id": "HUMAN-I80-SUPPORT",
             })
-        state = facade._application.state_repository.load_state_view(
-            facade.project_id, facade._application.state_repository.load_active_lineage_ref(facade.project_id)
-        )
+
         objects = [
             action["payload"]["object"]["id"] for action in proposal["proposed_actions"]
             if isinstance(action.get("payload", {}).get("object"), dict)
             and action["payload"]["object"].get("kind") in {"source", "evidence", "finding"}
         ]
+        finding_id = next(
+            action["payload"]["object"]["id"] for action in proposal["proposed_actions"]
+            if isinstance(action.get("payload", {}).get("object"), dict)
+            and action["payload"]["object"].get("kind") == "finding"
+        )
+        if include_recommendation:
+            state = facade._application.state_repository.load_state_view(
+                facade.project_id, facade._application.state_repository.load_active_lineage_ref(facade.project_id)
+            )
+            candidate = {
+                "schema_version": "0.1.0", "id": "REC-I80", "kind": "recommendation", "revision": 0,
+                "project_id": facade.project_id, "statement": "Carry the supported implication into the Writer plan.",
+                "finding_ids": [finding_id], "adoption_state": "candidate",
+            }
+            receipt = facade._application.state_transition_service.apply(make_request(
+                state, [TransitionAction(TransitionKind.CREATE_OBJECT, {"object": candidate})], suffix="rec-create"
+            ))
+            self.assertIsInstance(receipt, CommitReceipt)
+            state = facade._application.state_repository.load_state_view(
+                facade.project_id, facade._application.state_repository.load_active_lineage_ref(facade.project_id)
+            )
+            dec = decision("DEC-REC-I80", "research_adoption", "approve", "recommendation", "REC-I80")
+            adopted = {**candidate, "revision": 1, "adoption_state": "approved", "decision_ids": ["DEC-REC-I80"]}
+            receipt = facade._application.state_transition_service.apply(make_request(
+                state, [
+                    TransitionAction(TransitionKind.RECORD_DECISION, {"object": dec}),
+                    TransitionAction(TransitionKind.ADOPT_OBJECT, {"object": adopted}, decision_refs=("DEC-REC-I80",)),
+                ], suffix="rec-adopt"
+            ))
+            self.assertIsInstance(receipt, CommitReceipt)
+            objects.append("REC-I80")
+            case["recommendation_id"] = "REC-I80"
+
+        state = facade._application.state_repository.load_state_view(
+            facade.project_id, facade._application.state_repository.load_active_lineage_ref(facade.project_id)
+        )
+        materials = [{"run_id": case["run_id"], "capture_id": "CAP-1"}]
+        if unrelated_material is not None:
+            materials.append(unrelated_material)
         built = facade.build_research_package({
             "snapshot_id": state.current_snapshot["id"], "rq_id": case["rq_id"],
             "object_ids": objects, "run_ids": [case["run_id"]],
-            "materials": [{"run_id": case["run_id"], "capture_id": "CAP-1"}],
-            "exhibit_ids": [case["exhibit_id"]], "gap_ids": ["GAP-1"],
+            "materials": materials, "exhibit_ids": [case["exhibit_id"]], "gap_ids": ["GAP-1"],
         })
         case["package_id"] = built["package"]["package_id"]
         return facade, case
@@ -394,6 +462,203 @@ class Issue80WriterCompositionTests(ResearchPackageAcceptanceSupport):
             self.assertIn("finding", diag["unmet_requires"])
         finally:
             facade.close()
+
+    def test_review_round5_material_source_closure_and_public_exact_consumer(self):
+        facade, case = self._build_complete_support_package(include_unrelated=True, include_recommendation=True)
+        expected_path = self.root / "round5-expected.json"
+        checker_path = self.root / "round5-checker.py"
+        try:
+            package = facade.show_research_package(case["package_id"])["package"]
+            by_kind = {
+                obj["kind"]: obj for obj in package["resolved_content"]["research_objects"]
+                if obj.get("kind") in {"research_question", "source", "evidence", "finding", "recommendation"}
+            }
+            proposal = self._proposal(case)
+            proposal["sections"] = [deepcopy(proposal["sections"][0])]
+            proposal["sections"][0].pop("next_section_id", None)
+            proposal["sections"][0]["finding_refs"] = [by_kind["finding"]["id"]]
+            proposal["sections"][0]["citation_requirements"] = [{
+                "source_ref": by_kind["source"]["id"], "locator_ref": by_kind["evidence"]["locator"],
+            }]
+            v1 = facade.capture_writer_composition(case["package_id"], proposal)["composition"]
+            edit = deepcopy(proposal)
+            edit["composition_id"] = v1["composition_id"]
+            edit["base_version"] = 1
+            edit["base_digest"] = v1["composition_digest"]
+            edit["change_reason"] = "Round5 exact detached consumer revision."
+            edit["sections"][0]["purpose"] = "Refined framing for detached exact consumption."
+            v2 = facade.capture_writer_composition(case["package_id"], edit)["composition"]
+            facade.select_writer_composition(v2["composition_id"], 2, v2["composition_digest"])
+            out = self.root / "round5-public-section"
+            facade.export_writer_section_input(v2["composition_id"], "SEC-FRAME", out)
+            detached = json.loads((out / "section-writer-input.json").read_text(encoding="utf-8"))
+            linked = next(row for row in detached["resolved_materials"] if row.get("source_id") == by_kind["source"]["id"])
+            self.assertEqual(linked["text_rendition"]["content"], case["source_text"])
+            self.assertNotIn(case["unrelated_text"], json.dumps(detached, ensure_ascii=False))
+            run_candidate = next(
+                row for row in package["resolved_content"]["working_material"]["run_candidates"]
+                if row["run_id"] == case["run_id"]
+            )
+            expected = {
+                "rq_id": case["rq_id"], "rq_text": by_kind["research_question"]["text"],
+                "section_id": "SEC-FRAME", "section_digest": v2["sections"][0]["section_digest"],
+                "finding_id": by_kind["finding"]["id"], "evidence_id": by_kind["evidence"]["id"], "source_id": by_kind["source"]["id"],
+                "locator": by_kind["evidence"]["locator"], "material_text": case["source_text"], "unrelated_text": case["unrelated_text"],
+                "exhibit_id": case["exhibit_id"], "exhibit_content": detached["resolved_exhibits"][0]["content"],
+                "gap": detached["unresolved_gaps"][0], "profile_constraints": detached["resolved_profile_constraints"],
+                "candidate_only": bool(run_candidate.get("candidate_only")),
+            }
+            expected_path.write_text(json.dumps(expected, ensure_ascii=False), encoding="utf-8")
+            checker_path.write_text(
+                "import json,sys\n"
+                "from plugins.local_application import verify_writer_section_input\n"
+                "out,expected_path=sys.argv[1:3]\n"
+                "expected=json.load(open(expected_path,encoding='utf-8'))\n"
+                "doc=json.load(open(out+'/section-writer-input.json',encoding='utf-8'))\n"
+                "assert verify_writer_section_input(out)['status']=='VERIFIED'\n"
+                "objects={row['id']:row for row in doc['resolved_research_objects']}\n"
+                "assert objects[expected['rq_id']]['text']==expected['rq_text']\n"
+                "assert doc['section_contract']['section_id']==expected['section_id']\n"
+                "assert doc['section_contract']['section_digest']==expected['section_digest']\n"
+                "assert expected['finding_id'] in objects and expected['evidence_id'] in objects and expected['source_id'] in objects\n"
+                "assert any(c['locator_ref']==expected['locator'] for c in doc['section_contract']['citation_requirements'])\n"
+                "material=next(row for row in doc['resolved_materials'] if row.get('source_id')==expected['source_id'])\n"
+                "assert material['text_rendition']['content']==expected['material_text']\n"
+                "assert material['candidate_only']==expected['candidate_only']\n"
+                "assert expected['unrelated_text'] not in json.dumps(doc,ensure_ascii=False)\n"
+                "assert doc['resolved_exhibits'][0]['exhibit_id']==expected['exhibit_id']\n"
+                "assert doc['resolved_exhibits'][0]['content']==expected['exhibit_content']\n"
+                "assert doc['unresolved_gaps'][0]==expected['gap']\n"
+                "assert doc['resolved_profile_constraints']==expected['profile_constraints']\n"
+                "print(json.dumps({'status':'EXACT'}))\n",
+                encoding="utf-8",
+            )
+
+            implication = deepcopy(proposal)
+            implication["composition_id"] = "COMP-REC-READY"
+            implication["sections"][0]["narrative_stage_refs"] = ["implication"]
+            implication["sections"][0]["semantic_purpose_refs"] = ["present_implications"]
+            implication["sections"][0]["recommendation_refs"] = [case["recommendation_id"]]
+            implication["sections"][0]["finding_refs"] = [by_kind["finding"]["id"]]
+            rec_comp = facade.capture_writer_composition(case["package_id"], implication)["composition"]
+            self.assertFalse(any(
+                d.get("section_id") == "SEC-FRAME" and "recommendation" in d.get("unmet_requires", [])
+                for d in rec_comp["validation"]["diagnostics"]
+            ))
+            facade.select_writer_composition(rec_comp["composition_id"], 1, rec_comp["composition_digest"])
+            rec_out = self.root / "round5-recommendation"
+            facade.export_writer_section_input(rec_comp["composition_id"], "SEC-FRAME", rec_out)
+            rec_detached = json.loads((rec_out / "section-writer-input.json").read_text(encoding="utf-8"))
+            self.assertIn(case["recommendation_id"], rec_detached["resolved_object_ids"])
+        finally:
+            facade.close()
+        hidden = self.root / "round5-workspace-hidden"
+        self.workspace.rename(hidden)
+        root = Path(__file__).resolve().parents[2]
+        consumer_env = dict(os.environ)
+        consumer_env["PYTHONPATH"] = str(root) + os.pathsep + consumer_env.get("PYTHONPATH", "")
+        checked = subprocess.run(
+            [sys.executable, str(checker_path), str(out), str(expected_path)],
+            cwd=root, env=consumer_env, text=True, capture_output=True, check=False,
+        )
+        self.assertEqual(checked.returncode, 0, msg=checked.stderr)
+        self.assertEqual(json.loads(checked.stdout)["status"], "EXACT")
+
+    def test_review_round5_detached_exhibit_gap_and_source_capture_bindings(self):
+        facade, case = self._build_complete_support_package()
+        try:
+            package = facade.show_research_package(case["package_id"])["package"]
+            source = next(obj for obj in package["resolved_content"]["research_objects"] if obj.get("kind") == "source")
+            proposal = self._proposal(case)
+            proposal["sections"] = [deepcopy(proposal["sections"][0])]
+            proposal["sections"][0].pop("next_section_id", None)
+            # material-only selection must close over the saved Source automatically.
+            comp = facade.capture_writer_composition(case["package_id"], proposal)["composition"]
+            facade.select_writer_composition(comp["composition_id"], 1, comp["composition_digest"])
+            base = self.root / "round5-binding-base"
+            facade.export_writer_section_input(comp["composition_id"], "SEC-FRAME", base)
+            doc = json.loads((base / "section-writer-input.json").read_text(encoding="utf-8"))
+            self.assertIn(source["id"], doc["resolved_object_ids"])
+            explicit = deepcopy(proposal)
+            explicit["composition_id"] = "COMP-MATERIAL-SOURCE"
+            explicit["sections"][0]["source_refs"] = [source["id"]]
+            explicit_comp = facade.capture_writer_composition(case["package_id"], explicit)["composition"]
+            facade.select_writer_composition(explicit_comp["composition_id"], 1, explicit_comp["composition_digest"])
+            facade.export_writer_section_input(explicit_comp["composition_id"], "SEC-FRAME", self.root / "round5-explicit-source")
+        finally:
+            facade.close()
+        self.assertEqual(verify_writer_section_input(base)["status"], "VERIFIED")
+        from core.runtime import canonical_digest
+        import hashlib
+
+        def write_mutated(label, mutate):
+            out = self.root / f"round5-bad-{label}"
+            out.mkdir()
+            doc = json.loads((base / "section-writer-input.json").read_text(encoding="utf-8"))
+            mutate(doc)
+            basis = deepcopy(doc); basis.pop("section_input_digest", None); doc["section_input_digest"] = canonical_digest(basis)
+            payload = (json.dumps(doc, ensure_ascii=False, sort_keys=True, indent=2) + "\n").encode()
+            (out / "section-writer-input.json").write_bytes(payload)
+            manifest = {"schema_version":"0.1.0","object_type":"section_writer_input_manifest","files":[{"path":"section-writer-input.json","byte_length":len(payload),"content_digest":"sha256:"+hashlib.sha256(payload).hexdigest()}]}
+            manifest["manifest_digest"] = canonical_digest(manifest)
+            (out / "manifest.json").write_text(json.dumps(manifest))
+            with self.assertRaises(LocalApplicationError):
+                verify_writer_section_input(out)
+
+        write_mutated("missing-exhibit", lambda d: d.__setitem__("resolved_exhibits", []))
+        write_mutated("missing-gap", lambda d: d.__setitem__("unresolved_gaps", []))
+        write_mutated("exhibit-content", lambda d: d["resolved_exhibits"][0]["content"].__setitem__("value", "tampered exhibit"))
+        write_mutated("source-capture", lambda d: d["resolved_materials"][0]["capture"].__setitem__("source_locator", "https://example.test/wrong"))
+
+        # Two known Source/material pairs: swapping only source_id must still fail.
+        doc = json.loads((base / "section-writer-input.json").read_text(encoding="utf-8"))
+        first_source = next(row for row in doc["resolved_research_objects"] if row.get("kind") == "source")
+        first_material = doc["resolved_materials"][0]
+        second_source = deepcopy(first_source)
+        second_source["id"] = "SRC-SECOND"
+        second_source["canonical_locator"] = "https://example.test/source-second"
+        second_source["content_digest"] = "sha256:" + "2" * 64
+        second_material = deepcopy(first_material)
+        second_material["material_ref"] = "RUN-SECOND:CAP-SECOND"
+        second_material["run_id"] = "RUN-SECOND"
+        second_material["source_id"] = second_source["id"]
+        second_material["capture"]["capture_id"] = "CAP-SECOND"
+        second_material["capture"]["source_locator"] = second_source["canonical_locator"]
+        second_material["capture"]["original"]["digest"] = second_source["content_digest"]
+        doc["resolved_research_objects"].append(second_source)
+        doc["resolved_object_ids"].append(second_source["id"])
+        doc["resolved_materials"].append(second_material)
+        doc["resolved_material_refs"].append(second_material["material_ref"])
+
+        def write_doc(out, value):
+            out.mkdir()
+            basis = deepcopy(value); basis.pop("section_input_digest", None); value["section_input_digest"] = canonical_digest(basis)
+            payload = (json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2) + "\n").encode()
+            (out / "section-writer-input.json").write_bytes(payload)
+            manifest = {"schema_version":"0.1.0","object_type":"section_writer_input_manifest","files":[{"path":"section-writer-input.json","byte_length":len(payload),"content_digest":"sha256:"+hashlib.sha256(payload).hexdigest()}]}
+            manifest["manifest_digest"] = canonical_digest(manifest)
+            (out / "manifest.json").write_text(json.dumps(manifest))
+
+        two = self.root / "round5-two-pair"
+        write_doc(two, deepcopy(doc))
+        self.assertEqual(verify_writer_section_input(two)["status"], "VERIFIED")
+        swapped = deepcopy(doc)
+        swapped["resolved_materials"][0]["source_id"], swapped["resolved_materials"][1]["source_id"] = (
+            swapped["resolved_materials"][1]["source_id"], swapped["resolved_materials"][0]["source_id"]
+        )
+        bad = self.root / "round5-swapped"
+        write_doc(bad, swapped)
+        with self.assertRaises(LocalApplicationError):
+            verify_writer_section_input(bad)
+
+        # Production export must clean its own staging directory on verifier failure.
+        with self.__class__._reopen(self.workspace) as reopened:
+            before = set(self.root.glob(".section-input-*"))
+            with patch("plugins.local_application.writer_composition_service.verify_section_input_root", side_effect=LocalApplicationError("APPLICATION-WRITER-COMPOSITION-INTEGRITY-001", "fixture")):
+                with self.assertRaises(LocalApplicationError):
+                    reopened.export_writer_section_input(comp["composition_id"], "SEC-FRAME", self.root / "round5-verify-failure")
+            self.assertEqual(set(self.root.glob(".section-input-*")), before)
+            self.assertFalse((self.root / "round5-verify-failure").exists())
 
     def test_review_round4_detached_validator_rejects_inner_tamper_after_outer_redigest(self):
         facade, case = self._build()
