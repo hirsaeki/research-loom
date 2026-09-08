@@ -143,10 +143,8 @@ class WriterCompositionService:
         return self.root / composition_id
 
     @contextmanager
-    def _series_lock(self, composition_id: str):
-        safe_id = self._series_root(composition_id).name
+    def _file_lock(self, lock_path: Path, message: str):
         self.root.mkdir(parents=True, exist_ok=True)
-        lock_path = self.root / f".{safe_id}.lock"
         handle = lock_path.open("a+b")
         try:
             handle.seek(0, os.SEEK_END)
@@ -162,7 +160,7 @@ class WriterCompositionService:
                     import fcntl
                     fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
             except (OSError, BlockingIOError) as exc:
-                raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-BUSY-001", "composition series is being updated") from exc
+                raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-BUSY-001", message) from exc
             try:
                 yield
             finally:
@@ -175,6 +173,19 @@ class WriterCompositionService:
                     fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
         finally:
             handle.close()
+
+    @contextmanager
+    def _series_lock(self, composition_id: str):
+        safe_id = self._series_root(composition_id).name
+        if not self._versions(composition_id):
+            raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-404", "composition series does not exist")
+        with self._file_lock(self.root / f".{safe_id}.lock", "composition series is being updated"):
+            yield
+
+    @contextmanager
+    def _creation_lock(self):
+        with self._file_lock(self.root / ".creation.lock", "composition series creation is being updated"):
+            yield
 
     def _version_path(self, composition_id: str, version: int) -> Path:
         return self._series_root(composition_id) / "versions" / f"{version:04d}.json"
@@ -398,7 +409,9 @@ class WriterCompositionService:
         composition_id = _require_string(composition_id, "composition_id")
         self._series_root(composition_id)
         sections, diagnostics = self._validate_sections(value.get("sections"), package)
-        with self._series_lock(composition_id):
+        initial_versions = self._versions(composition_id)
+        lock_context = self._series_lock(composition_id) if initial_versions else self._creation_lock()
+        with lock_context:
             versions = self._versions(composition_id)
             base_version = value.get("base_version")
             base_digest = value.get("base_digest")
@@ -513,6 +526,8 @@ class WriterCompositionService:
         except Exception as exc: raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-INTEGRITY-001", "composition selection history is unreadable") from exc
 
     def select(self, composition_id: str, version: int, digest: str) -> Mapping[str, Any]:
+        if not self._versions(composition_id):
+            raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-404", "composition series does not exist")
         with self._series_lock(composition_id):
             document = self._load_version(composition_id, version)
             if digest != document["composition_digest"]:

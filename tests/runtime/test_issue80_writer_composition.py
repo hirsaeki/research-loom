@@ -190,17 +190,25 @@ class Issue80WriterCompositionTests(ResearchPackageAcceptanceSupport):
         facade, case = self._build()
         try:
             service = facade._writer_composition_service()
+            facade.capture_writer_composition(case["package_id"], self._proposal(case, composition_id="COMP-LOCK"))
             with service._series_lock("COMP-LOCK"):
                 with self.assertRaises(LocalApplicationError) as error:
                     with service._series_lock("COMP-LOCK"):
                         pass
             self.assertEqual(error.exception.code, "APPLICATION-WRITER-COMPOSITION-BUSY-001")
 
+            lock_files_before = sorted(path.name for path in service.root.glob(".*.lock"))
+            for index in range(8):
+                with self.assertRaises(LocalApplicationError) as missing:
+                    facade.select_writer_composition(f"COMP-MISSING-{index}", 1, "sha256:" + "0" * 64)
+                self.assertEqual(missing.exception.code, "APPLICATION-WRITER-COMPOSITION-404")
+            self.assertEqual(sorted(path.name for path in service.root.glob(".*.lock")), lock_files_before)
+
             facade.capture_writer_composition(case["package_id"], self._proposal(case, composition_id="COMP-A"))
             facade.capture_writer_composition(case["package_id"], self._proposal(case, composition_id="COMP-B"))
             with patch.object(service, "_package", wraps=service._package) as package_load:
                 listed = service.list()
-            self.assertEqual(len(listed["compositions"]), 2)
+            self.assertEqual(len(listed["compositions"]), 3)
             self.assertEqual(package_load.call_count, 1)
         finally:
             facade.close()
