@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from copy import deepcopy
 import json
+from types import SimpleNamespace
 
 from plugins.local_application import LocalApplicationError
-from plugins.local_application.research_package_format import digest_json, safe_component, verify_export_root, without_digest
+from plugins.local_application.research_package_builder import _collect_exhibit_modes
+from plugins.local_application.research_package_format import MAX_RUNS, digest_json, safe_component, verify_export_root, without_digest
 import survey_virtual_runner_test_support as vr
 import test_research_exhibits as exhibits
 from research_package_acceptance_support import ResearchPackageAcceptanceSupport
@@ -141,7 +143,10 @@ class ResearchPackageCompletionReviewTests(ResearchPackageAcceptanceSupport):
                 ("material-missing", lambda package: package["resolved_content"]["materials"][0]["text_rendition"].__setitem__("attachment_path", "attachments/materials/missing.txt")),
                 ("material-misbinding", lambda package: package["resolved_content"]["materials"][0]["text_rendition"].__setitem__("attachment_path", "attachments/profile/narrative-semantics.yaml")),
                 ("project-input", lambda package: package["resolved_content"]["working_material"]["project_inputs"][0]["content"].__setitem__("attachment_path", "attachments/inputs/missing.txt")),
-                ("narrative", lambda package: package["resolved_profiles"]["narrative_semantics"].__setitem__("contract_path", "attachments/profile/missing.yaml")),
+                ("narrative", lambda package: next(
+                    item for item in package["attachments"]
+                    if item["path"] == package["resolved_profiles"]["narrative_semantics"]["contract_path"]
+                ).__setitem__("content_digest", "sha256:" + "0" * 64)),
             )
             for label, mutate in mutations:
                 with self.subTest(label=label):
@@ -221,6 +226,57 @@ class ResearchPackageCompletionReviewTests(ResearchPackageAcceptanceSupport):
                 with self.assertRaises(LocalApplicationError) as error:
                     safe_component(value, "package_id")
                 self.assertEqual(error.exception.code, "APPLICATION-RESEARCH-PACKAGE-INPUT-001")
+
+    def test_exhibit_source_run_provenance_is_bounded_before_load(self):
+        class Store:
+            def load_run(self, _run_id):
+                raise AssertionError("source Run must not be loaded after bound failure")
+        service = SimpleNamespace(
+            project_id="PROJECT-1",
+            app=SimpleNamespace(execution_store=Store()),
+            facade=SimpleNamespace(),
+        )
+        state = SimpleNamespace(active_lineage_ref="LINEAGE-1")
+        exhibit = {
+            "exhibit_id": "EX-BIG",
+            "project_id": "PROJECT-1",
+            "captured_against": {"lineage_ref": "LINEAGE-1"},
+            "source_run_ids": [f"RUN-{index}" for index in range(MAX_RUNS + 1)],
+            "derived_from_exhibit_ids": [],
+        }
+        with self.assertRaises(LocalApplicationError) as error:
+            _collect_exhibit_modes(service, exhibit, state, set())
+        self.assertEqual(error.exception.code, "APPLICATION-RESEARCH-PACKAGE-BOUND-001")
+
+    def test_detached_verify_rejects_missing_or_malformed_body_rows(self):
+        facade, case = self._build()
+        try:
+            mutations = (
+                ("missing-text", lambda package: package["resolved_content"]["materials"][0].__setitem__("text_rendition", None)),
+                ("bad-capture", lambda package: package["resolved_content"]["materials"][0].__setitem__("capture", "bad")),
+                ("bad-byte-length", lambda package: package["resolved_content"]["materials"][0]["text_rendition"].__setitem__("byte_length", "not-an-int")),
+                ("missing-input-content", lambda package: package["resolved_content"]["working_material"]["project_inputs"][0].__setitem__("content", None)),
+            )
+            for label, mutate in mutations:
+                with self.subTest(label=label):
+                    output = self.root / f"bad-body-row-{label}"
+                    facade.export_research_package(case["package_id"], output)
+                    package_path = output / "research-package.json"
+                    package = json.loads(package_path.read_text(encoding="utf-8"))
+                    mutate(package)
+                    package["package_digest"] = digest_json(without_digest(package))
+                    package_path.write_text(
+                        json.dumps(package, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
+                        encoding="utf-8",
+                    )
+                    with self.assertRaises(LocalApplicationError) as error:
+                        verify_export_root(output)
+                    self.assertIn(error.exception.code, {
+                        "APPLICATION-RESEARCH-PACKAGE-REFERENCE-001",
+                        "APPLICATION-RESEARCH-PACKAGE-SCHEMA-001",
+                    })
+        finally:
+            facade.close()
 
     def test_virtual_exhibit_only_package_preserves_synthetic_origin(self):
         facade = self._virtual_facade()

@@ -81,7 +81,13 @@ def _collect_exhibit_modes(service, exhibit: Mapping[str, Any], state, visited: 
                 "APPLICATION-RESEARCH-PACKAGE-BINDING-001",
                 f"Research Exhibit provenance belongs to another project/lineage: {exhibit_id}",
             )
-        for source_run_id in current.get("source_run_ids", []) or []:
+        source_run_ids = current.get("source_run_ids", []) or []
+        if not isinstance(source_run_ids, list) or len(source_run_ids) > MAX_RUNS:
+            raise LocalApplicationError(
+                "APPLICATION-RESEARCH-PACKAGE-BOUND-001",
+                "Research Exhibit source Run provenance exceeds supported bound",
+            )
+        for source_run_id in source_run_ids:
             run = service.app.execution_store.load_run(str(source_run_id))
             if run is None or run.project_ref != service.project_id or run.lineage_ref != state.active_lineage_ref:
                 raise LocalApplicationError(
