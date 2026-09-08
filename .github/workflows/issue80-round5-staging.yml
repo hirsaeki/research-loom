@@ -1,0 +1,43 @@
+name: issue80-round5-staging
+on:
+  push:
+    branches: [tmp/issue80-round5]
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: true
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9
+      - name: Reconstruct and apply validated patch
+        shell: bash
+        run: |
+          cat .tmp/review-round5.part00 .tmp/review-round5.part01 .tmp/review-round5.part02 .tmp/review-round5.rest{00..11} > /tmp/review.patch.b64
+          echo '7fefc5384526f03bbef82bc86137fba118b580867f39f0b64c14d1121d4a47a5  /tmp/review.patch.b64' | sha256sum -c -
+          base64 -d /tmp/review.patch.b64 > /tmp/review.patch
+          echo '88f75a4e038a79b0069b3b488ffc605dc18511dd346264bf87fab970234b9c36  /tmp/review.patch' | sha256sum -c -
+          git apply --check /tmp/review.patch
+          git apply /tmp/review.patch
+      - name: Run Issue 80 acceptance
+        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue80_writer_composition.py' -v
+      - name: Run Writer contracts
+        run: uv run --frozen python -m unittest discover -s tests/contracts -p 'test_writer_publication_preview_contracts.py' -v
+      - name: Run Research Package review regressions
+        run: |
+          uv run --frozen python -m unittest tests.runtime.test_research_package_completion_review tests.runtime.test_research_package_review_fixes -v
+      - name: Check diff
+        run: git diff --check
+      - name: Commit validated production diff
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add core/packages/writer-publication/writer-composition.schema.json plugins/local_application/writer_composition_service.py tests/runtime/test_issue80_writer_composition.py
+          git commit -m 'Harden detached Writer section bindings'
+          git push origin HEAD:tmp/issue80-round5
