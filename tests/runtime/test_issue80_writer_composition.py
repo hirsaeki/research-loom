@@ -197,6 +197,14 @@ class Issue80WriterCompositionTests(ResearchPackageAcceptanceSupport):
                         pass
             self.assertEqual(error.exception.code, "APPLICATION-WRITER-COMPOSITION-BUSY-001")
 
+            with (
+                patch.object(service, "_versions", side_effect=[[], [1], [1]]),
+                patch.object(service, "_series_lock", wraps=service._series_lock) as series_lock,
+            ):
+                with service._capture_lock("COMP-LOCK"):
+                    pass
+            self.assertEqual(series_lock.call_count, 1)
+
             lock_files_before = sorted(path.name for path in service.root.glob(".*.lock"))
             for index in range(8):
                 with self.assertRaises(LocalApplicationError) as missing:
