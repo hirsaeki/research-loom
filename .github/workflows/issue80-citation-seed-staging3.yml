@@ -1,0 +1,44 @@
+name: issue80-citation-seed-staging3
+on:
+  push:
+    branches: [tmp/issue80-citation-seed]
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: true
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9
+      - name: Apply citation closure fix and regression
+        shell: python
+        run: |
+          from pathlib import Path
+          service = Path('plugins/local_application/writer_composition_service.py')
+          text = service.read_text()
+          old = '''        needed_ids.update(str(x) for x in package.get("content", {}).get("research_question_refs", []) if isinstance(x, str))\n        pending = list(needed_ids)\n'''
+          new = '''        needed_ids.update(str(x) for x in package.get("content", {}).get("research_question_refs", []) if isinstance(x, str))\n        for citation in section["citation_requirements"]:\n            source_id = citation["source_ref"]\n            needed_ids.add(source_id)\n            locator = citation.get("locator_ref")\n            if locator is not None:\n                needed_ids.update(\n                    object_id for object_id, obj in objects.items()\n                    if obj.get("kind") == "evidence" and obj.get("source_id") == source_id and obj.get("locator") == locator\n                )\n        pending = list(needed_ids)\n'''
+          assert old in text
+          service.write_text(text.replace(old, new, 1))
+          tests = Path('tests/runtime/test_issue80_writer_composition.py')
+          text = tests.read_text()
+          marker = '''            candidate = deepcopy(proposal); candidate["composition_id"] = "COMP-CANDIDATE"\n'''
+          addition = '''            citation_only = self._proposal(case)\n            citation_only["sections"] = [deepcopy(citation_only["sections"][0])]\n            citation_only["sections"][0].pop("next_section_id", None)\n            citation_only["sections"][0]["material_refs"] = []\n            citation_only["sections"][0]["exhibit_refs"] = []\n            citation_only["sections"][0]["gap_refs"] = []\n            citation_only["sections"][0]["citation_requirements"] = [{"source_ref": by_kind["source"]["id"], "locator_ref": by_kind["evidence"]["locator"]}]\n            citation_comp = facade.capture_writer_composition(case["package_id"], citation_only)["composition"]\n            facade.select_writer_composition(citation_comp["composition_id"], 1, citation_comp["composition_digest"])\n            citation_out = self.root / "citation-only-section"\n            facade.export_writer_section_input(citation_comp["composition_id"], "SEC-FRAME", citation_out)\n            citation_detached = json.loads((citation_out / "section-writer-input.json").read_text(encoding="utf-8"))\n            self.assertIn(by_kind["source"]["id"], citation_detached["resolved_object_ids"])\n            self.assertIn(by_kind["evidence"]["id"], citation_detached["resolved_object_ids"])\n            self.assertEqual(citation_detached["resolved_materials"][0]["text_rendition"]["content"], case["source_text"])\n\n''' + marker
+          assert marker in text
+          tests.write_text(text.replace(marker, addition, 1))
+      - name: Run focused acceptance
+        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue80_writer_composition.py' -v
+      - name: Check diff
+        run: git diff --check
+      - name: Commit validated fix
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add plugins/local_application/writer_composition_service.py tests/runtime/test_issue80_writer_composition.py
+          git commit -m 'Include citation-only Sources in Writer section closure'
+          git push origin HEAD:tmp/issue80-citation-seed
