@@ -24,6 +24,15 @@ jobs:
           echo '88f75a4e038a79b0069b3b488ffc605dc18511dd346264bf87fab970234b9c36  /tmp/review.patch' | sha256sum -c -
           git apply --check /tmp/review.patch
           git apply /tmp/review.patch
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('tests/runtime/test_issue80_writer_composition.py')
+          s = p.read_text()
+          old = '''        checked = subprocess.run(\n            [sys.executable, str(checker_path), str(out), str(expected_path)],\n            cwd=root, text=True, capture_output=True, check=False,\n        )\n'''
+          new = '''        consumer_env = dict(os.environ)\n        consumer_env["PYTHONPATH"] = str(root) + os.pathsep + consumer_env.get("PYTHONPATH", "")\n        checked = subprocess.run(\n            [sys.executable, str(checker_path), str(out), str(expected_path)],\n            cwd=root, env=consumer_env, text=True, capture_output=True, check=False,\n        )\n'''
+          assert old in s
+          p.write_text(s.replace(old, new, 1))
+          PY
       - name: Run Issue 80 acceptance
         run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue80_writer_composition.py' -v
       - name: Run Writer contracts
