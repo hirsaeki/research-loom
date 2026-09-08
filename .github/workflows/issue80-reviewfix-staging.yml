@@ -1,0 +1,31 @@
+name: issue80-reviewfix-staging
+
+on:
+  push:
+    branches:
+      - tmp/issue80-kody-round1
+    paths:
+      - .github/workflows/issue80-reviewfix-staging.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Apply Kody round 1 fixes
+        shell: bash
+        run: |
+          set -euo pipefail
+          base64 -d .issue80-reviewfix.patch.gz.b64 | gzip -d > /tmp/review.patch
+          git apply --check /tmp/review.patch
+          git apply /tmp/review.patch
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add core/packages/writer-publication/research-package.schema.json plugins/local_application/research_package_builder.py plugins/local_application/writer_composition_service.py tests/runtime/test_issue80_writer_composition.py
+          git commit -m "Apply Kody review fixes for Writer composition"
+          git push
