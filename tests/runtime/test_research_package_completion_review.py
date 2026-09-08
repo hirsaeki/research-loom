@@ -278,6 +278,25 @@ class ResearchPackageCompletionReviewTests(ResearchPackageAcceptanceSupport):
         finally:
             facade.close()
 
+    def test_legacy_010_reference_only_export_does_not_require_resolved_bodies(self):
+        facade, case = self._build()
+        try:
+            output = self.root / "legacy-010-reference-only"
+            facade.export_research_package(case["package_id"], output)
+        finally:
+            facade.close()
+        package_path = output / "research-package.json"
+        package = json.loads(package_path.read_text(encoding="utf-8"))
+        package["schema_version"] = "0.1.0"
+        package.pop("resolved_content", None)
+        package.pop("resolved_profiles", None)
+        package["package_digest"] = digest_json(without_digest(package))
+        package_path.write_text(
+            json.dumps(package, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        self.assertEqual(verify_export_root(output)["status"], "VERIFIED")
+
     def test_virtual_exhibit_only_package_preserves_synthetic_origin(self):
         facade = self._virtual_facade()
         try:

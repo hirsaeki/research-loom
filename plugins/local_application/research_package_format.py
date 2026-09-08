@@ -69,6 +69,8 @@ def _package_required_refs(obj:Mapping[str,Any])->list[tuple[str,str]]:
     return refs
 
 def validate_resolved_references(package:Mapping[str,Any])->None:
+    if package.get("schema_version") != SCHEMA_VERSION:
+        return
     resolved=package.get("resolved_content",{})
     if not isinstance(resolved,Mapping):
         raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-REFERENCE-001","Research Package resolved content is invalid")
