@@ -1,0 +1,32 @@
+name: issue80-round6-staging
+on:
+  push:
+    branches: [tmp/issue80-round6]
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: true
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9
+      - name: Apply review patch
+        run: |
+          git apply --check .tmp/issue80-round6.patch
+          git apply .tmp/issue80-round6.patch
+      - name: Run Issue 80 acceptance
+        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue80_writer_composition.py' -v
+      - name: Check diff
+        run: git diff --check
+      - name: Commit validated production diff
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add plugins/local_application/writer_composition_service.py tests/runtime/test_issue80_writer_composition.py
+          git commit -m 'Reject unsupported detached Exhibit representations'
+          git push origin HEAD:tmp/issue80-round6
