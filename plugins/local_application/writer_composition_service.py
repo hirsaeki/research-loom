@@ -753,6 +753,15 @@ class WriterCompositionService:
         for field in ("argument_refs","finding_refs","evidence_refs","source_refs","counter_review_refs","qualifier_refs","limitation_refs","contribution_refs","recommendation_refs"):
             needed_ids.update(section[field])
         needed_ids.update(str(x) for x in package.get("content", {}).get("research_question_refs", []) if isinstance(x, str))
+        for citation in section["citation_requirements"]:
+            source_id = citation["source_ref"]
+            needed_ids.add(source_id)
+            locator = citation.get("locator_ref")
+            if locator is not None:
+                needed_ids.update(
+                    object_id for object_id, obj in objects.items()
+                    if obj.get("kind") == "evidence" and obj.get("source_id") == source_id and obj.get("locator") == locator
+                )
         pending = list(needed_ids)
         while pending:
             object_id = pending.pop()

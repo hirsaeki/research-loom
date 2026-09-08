@@ -369,6 +369,22 @@ class Issue80WriterCompositionTests(ResearchPackageAcceptanceSupport):
                 facade.capture_writer_composition(case["package_id"], bad)
             self.assertEqual(error.exception.code, "APPLICATION-WRITER-COMPOSITION-REFERENCE-001")
 
+            citation_only = self._proposal(case)
+            citation_only["sections"] = [deepcopy(citation_only["sections"][0])]
+            citation_only["sections"][0].pop("next_section_id", None)
+            citation_only["sections"][0]["material_refs"] = []
+            citation_only["sections"][0]["exhibit_refs"] = []
+            citation_only["sections"][0]["gap_refs"] = []
+            citation_only["sections"][0]["citation_requirements"] = [{"source_ref": by_kind["source"]["id"], "locator_ref": by_kind["evidence"]["locator"]}]
+            citation_comp = facade.capture_writer_composition(case["package_id"], citation_only)["composition"]
+            facade.select_writer_composition(citation_comp["composition_id"], 1, citation_comp["composition_digest"])
+            citation_out = self.root / "citation-only-section"
+            facade.export_writer_section_input(citation_comp["composition_id"], "SEC-FRAME", citation_out)
+            citation_detached = json.loads((citation_out / "section-writer-input.json").read_text(encoding="utf-8"))
+            self.assertIn(by_kind["source"]["id"], citation_detached["resolved_object_ids"])
+            self.assertIn(by_kind["evidence"]["id"], citation_detached["resolved_object_ids"])
+            self.assertEqual(citation_detached["resolved_materials"][0]["text_rendition"]["content"], case["source_text"])
+
             candidate = deepcopy(proposal); candidate["composition_id"] = "COMP-CANDIDATE"
             candidate["sections"][0]["narrative_stage_refs"] = ["validation"]
             candidate["sections"][0]["semantic_purpose_refs"] = ["test_and_qualify"]
