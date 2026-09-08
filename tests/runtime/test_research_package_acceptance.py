@@ -30,7 +30,7 @@ class ResearchPackageAcceptanceTests(baseline.ResearchPackageAcceptanceTests):
             self.assertEqual(completed.returncode, 0, msg=completed.stderr or completed.stdout)
             return json.loads(completed.stdout)
 
-        built = run("research-package", "build", "--workspace", self.workspace, "--json-input", build_input)
+        built = run("research-package", "build", "--workspace", self.workspace, "--json", build_input)
         package_id = built["package"]["package_id"]
         shown = run("research-package", "show", "--workspace", self.workspace, "--package-id", package_id, "--json")
         self.assertEqual(

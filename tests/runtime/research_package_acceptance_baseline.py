@@ -81,6 +81,7 @@ class ResearchPackageAcceptanceTests(ResearchPackageAcceptanceSupport):
                 "rq_id":case["rq_id"],
                 "object_ids":candidate_objects,
                 "run_ids":[case["run_id"]],
+                "materials":[{"run_id":case["run_id"],"capture_id":"CAP-1"}],
             })
             package=facade.show_research_package(second["package"]["package_id"])["package"]
             resolved_objects={obj["id"]:obj for obj in package["resolved_content"]["research_objects"]}

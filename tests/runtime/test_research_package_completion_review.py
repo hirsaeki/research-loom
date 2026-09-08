@@ -4,6 +4,7 @@ from copy import deepcopy
 import json
 
 from plugins.local_application import LocalApplicationError
+from plugins.local_application.research_package_format import digest_json, safe_component, verify_export_root, without_digest
 import survey_virtual_runner_test_support as vr
 import test_research_exhibits as exhibits
 from research_package_acceptance_support import ResearchPackageAcceptanceSupport
@@ -63,7 +64,7 @@ class ResearchPackageCompletionReviewTests(ResearchPackageAcceptanceSupport):
             for object_id in objects:
                 self.assertEqual(resolved[object_id], expected[object_id])
             sources = {oid for oid in objects if expected[oid].get("kind") == "source"}
-            self.assertEqual(set(package["content"]["source_refs"]), sources)
+            self.assertEqual({ref["source_id"] for ref in package["content"]["source_refs"]}, sources)
             self.assertEqual(
                 package["resolved_content"]["materials"][0]["capture"]["capture_id"],
                 "CAP-1",
@@ -76,8 +77,8 @@ class ResearchPackageCompletionReviewTests(ResearchPackageAcceptanceSupport):
         try:
             rendition = (case["capture"].get("renditions") or [{}])[0]
             digest = str(rendition.get("digest", ""))
-            self.assertTrue(digest.startswith("sha256:"))
-            value = digest.split(":", 1)[1]
+            value = digest.removeprefix("sha256:")
+            self.assertEqual(len(value), 64)
             blob = facade._application.execution_store.blob_root / value[:2] / value
             original = blob.read_bytes()
             tampered = bytearray(original)
@@ -87,6 +88,29 @@ class ResearchPackageCompletionReviewTests(ResearchPackageAcceptanceSupport):
                 facade.build_research_package(case["build_input"])
         finally:
             facade.close()
+
+    def test_detached_verify_rejects_unresolved_content_refs(self):
+        facade, case = self._build()
+        try:
+            output = self.root / "dangling-content-ref"
+            facade.export_research_package(case["package_id"], output)
+        finally:
+            facade.close()
+        package_path = output / "research-package.json"
+        package = json.loads(package_path.read_text(encoding="utf-8"))
+        package["content"]["finding_refs"] = ["FND-MISSING"]
+        package["package_digest"] = digest_json(without_digest(package))
+        package_path.write_text(json.dumps(package, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+        with self.assertRaises(LocalApplicationError) as error:
+            verify_export_root(output)
+        self.assertEqual(error.exception.code, "APPLICATION-RESEARCH-PACKAGE-REFERENCE-001")
+
+    def test_windows_drive_and_ads_components_fail_closed(self):
+        for value in ("D:outside", "foo:bar"):
+            with self.subTest(value=value):
+                with self.assertRaises(LocalApplicationError) as error:
+                    safe_component(value, "package_id")
+                self.assertEqual(error.exception.code, "APPLICATION-RESEARCH-PACKAGE-INPUT-001")
 
     def test_virtual_exhibit_only_package_preserves_synthetic_origin(self):
         facade = self._virtual_facade()

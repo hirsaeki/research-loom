@@ -1,7 +1,7 @@
 from __future__ import annotations
 from copy import deepcopy
 import hashlib, json
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Any, Mapping
 from jsonschema import Draft202012Validator, FormatChecker
 import rfc8785
@@ -78,9 +78,23 @@ def validate_resolved_references(package:Mapping[str,Any])->None:
         for expected,ref_id in _package_required_refs(obj):
             target=by_id.get(ref_id)
             if target is None or str(target.get("kind"))!=expected: missing.append(f"{obj.get('id')}->{expected}:{ref_id}")
-    declared=set(package.get("content",{}).get("source_refs",[]) or [])
-    actual={oid for oid,obj in by_id.items() if obj.get("kind")=="source"}
-    if declared!=actual: missing.append("content.source_refs")
+    content=package.get("content",{})
+    ref_kinds={
+        "research_question_refs":"research_question",
+        "finding_refs":"finding",
+        "argument_refs":"argument",
+        "contribution_refs":"contribution",
+        "evidence_refs":"evidence",
+        "counter_review_refs":"counter_review",
+    }
+    for field,expected_kind in ref_kinds.items():
+        declared={str(ref_id) for ref_id in content.get(field,[]) or [] if isinstance(ref_id,str)}
+        actual={oid for oid,obj in by_id.items() if obj.get("kind")==expected_kind}
+        if declared!=actual: missing.append(f"content.{field}")
+    source_refs=content.get("source_refs",[]) or []
+    declared_sources={str(ref.get("source_id")) for ref in source_refs if isinstance(ref,Mapping) and isinstance(ref.get("source_id"),str)}
+    actual_sources={oid for oid,obj in by_id.items() if obj.get("kind")=="source"}
+    if len(declared_sources)!=len(source_refs) or declared_sources!=actual_sources: missing.append("content.source_refs")
     materials={(str(m.get("run_id")),str(m.get("capture",{}).get("capture_id"))) for m in package.get("resolved_content",{}).get("materials",[]) if isinstance(m,Mapping)}
     for run in package.get("resolved_content",{}).get("working_material",{}).get("run_candidates",[]):
         if not isinstance(run,Mapping): continue
@@ -91,7 +105,8 @@ def validate_resolved_references(package:Mapping[str,Any])->None:
     if missing: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-REFERENCE-001","Research Package has unresolved required references: "+", ".join(sorted(set(missing))))
 
 def safe_component(v:str,field:str)->str:
-    if not v or v in {".",".."} or "/" in v or "\\" in v: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INPUT-001",f"{field} is not a safe identifier")
+    windows=PureWindowsPath(v)
+    if not v or v in {".",".."} or "/" in v or "\\" in v or ":" in v or windows.drive or windows.root: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INPUT-001",f"{field} is not a safe identifier")
     return v
 
 def str_list(v:Any,field:str,maximum:int)->list[str]:

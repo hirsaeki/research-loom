@@ -75,8 +75,4 @@ jobs:
       - name: Run Issue 91 real Windows file I/O regressions
         run: uv run --frozen python -m unittest -v tests.runtime.test_issue91_review_fixes.Issue91WindowsRealIoTests
       - name: Run Issue 77 Research Package Windows acceptance
-        run: >-
-          uv run --frozen python -m unittest -v
-          tests.runtime.test_research_package_acceptance.ResearchPackageAcceptanceTests.test_rp1_public_cli_round_trip_is_detached_from_workspace
-          tests.runtime.test_research_package_acceptance.ResearchPackageAcceptanceTests.test_rp6_bounds_existing_target_and_write_failure_are_atomic
-          tests.runtime.test_research_package_review_fixes.ResearchPackageReviewFixTests.test_export_ignores_unmanifested_files_and_links
+        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_research_package_*.py' -v
