@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from copy import deepcopy
 import hashlib
-import itertools
 import json
 from pathlib import Path
 import re
@@ -23,6 +22,8 @@ STRENGTHENING_REGISTRY = ROOT / "profiles/contracts/invariant-strengthening-vali
 NARRATIVE_SEMANTICS = ROOT / "profiles/contracts/narrative-semantics.yaml"
 CORE_CONTRACTS = {"research_contract": "0.1.0", "invariant_contract": "0.1.0"}
 TYPE_RANK = {name: i for i, name in enumerate(("research", "organization", "narrative", "publication"))}
+MAX_PROFILE_MANIFESTS = 128
+MAX_PROFILE_RESOLUTION_STATES = 10_000
 _COMPARATOR = re.compile(r"^(>=|>|<=|<|=)(\d+\.\d+\.\d+)$")
 
 
@@ -246,7 +247,12 @@ def _load_candidates(paths: Iterable[str | Path]) -> list[dict[str, Any]]:
     candidates: list[dict[str, Any]] = []
     identities: dict[tuple[str, str, str], str] = {}
     profile_root = (ROOT / "profiles").resolve()
-    for raw_path in paths:
+    for index, raw_path in enumerate(paths):
+        if index >= MAX_PROFILE_MANIFESTS:
+            raise LocalWorkspaceError(
+                "PROFILE-CANDIDATE-LIMIT-001",
+                f"profile resolution accepts at most {MAX_PROFILE_MANIFESTS} manifest files",
+            )
         path = Path(raw_path).expanduser().resolve(strict=True)
         try:
             path.relative_to(profile_root)
@@ -332,27 +338,102 @@ def _assignment_valid(assignment, requests) -> bool:
     return all(visit(key) for key in graph)
 
 
+def _potential_resolution_keys(by_key, requests) -> set[tuple[str, str]]:
+    reachable = {_key(request) for request in requests}
+    frontier = list(reachable)
+    while frontier:
+        key = frontier.pop()
+        for candidate in by_key.get(key, []):
+            manifest = candidate["manifest"]
+            for relation in ("extends", "requires"):
+                for dependency in manifest.get(relation, []):
+                    dep_key = _key(dependency)
+                    if dep_key not in reachable:
+                        reachable.add(dep_key)
+                        frontier.append(dep_key)
+    return reachable
+
+
+def _partial_assignment_possible(assignment, requests, by_key) -> bool:
+    requirements: dict[tuple[str, str], list[str]] = {}
+    for request in requests:
+        requirements.setdefault(_key(request), []).append(str(request["version"]))
+
+    for candidate in assignment.values():
+        if candidate is None:
+            continue
+        manifest = candidate["manifest"]
+        compat = manifest["core_compatibility"]
+        if not _satisfies(CORE_CONTRACTS["research_contract"], str(compat["research_contract"])) or not _satisfies(
+            CORE_CONTRACTS["invariant_contract"], str(compat["invariant_contract"])
+        ):
+            return False
+        for relation in ("extends", "requires"):
+            for dependency in manifest.get(relation, []):
+                if relation == "extends" and dependency["profile_type"] != manifest["profile_type"]:
+                    return False
+                requirements.setdefault(_key(dependency), []).append(str(dependency["version"]))
+
+    for key, required_versions in requirements.items():
+        if key in assignment:
+            candidate = assignment[key]
+            if candidate is None:
+                return False
+            version = str(candidate["manifest"]["profile_version"])
+            if not all(_satisfies(version, requirement) for requirement in required_versions):
+                return False
+            continue
+        possible = by_key.get(key, [])
+        if not any(
+            all(_satisfies(str(candidate["manifest"]["profile_version"]), requirement) for requirement in required_versions)
+            for candidate in possible
+        ):
+            return False
+    return True
+
+
 def _resolve_selected(candidates, requests):
     by_key: dict[tuple[str, str], list[dict[str, Any]]] = {}
     for candidate in candidates:
         by_key.setdefault(_key(candidate["manifest"]), []).append(candidate)
-    keys = sorted(by_key, key=lambda key: (TYPE_RANK[key[0]], key[1]))
-    choices = [[None] + sorted(by_key[key], key=lambda candidate: _semver(candidate["manifest"]["profile_version"])) for key in keys]
-    valid = []
-    for combination in itertools.product(*choices):
-        assignment = dict(zip(keys, combination))
-        if _assignment_valid(assignment, requests):
-            valid.append(assignment)
-    if not valid:
+
+    keys = sorted(_potential_resolution_keys(by_key, requests), key=lambda key: (TYPE_RANK[key[0]], key[1]))
+    assignment: dict[tuple[str, str], dict[str, Any] | None] = {}
+    visited_states = 0
+
+    def search(index: int):
+        nonlocal visited_states
+        visited_states += 1
+        if visited_states > MAX_PROFILE_RESOLUTION_STATES:
+            raise LocalWorkspaceError(
+                "PROFILE-RESOLUTION-LIMIT-001",
+                "Profile dependency resolution exceeded the bounded search budget",
+            )
+        if index == len(keys):
+            return dict(assignment) if _assignment_valid(assignment, requests) else None
+
+        key = keys[index]
+        candidates_for_key = sorted(
+            by_key.get(key, []),
+            key=lambda candidate: _semver(candidate["manifest"]["profile_version"]),
+            reverse=True,
+        )
+        # Version choices are tried from highest to lowest and absence last. Because
+        # keys use the same ordering as the previous winner tuple, the first valid
+        # leaf is the same lexicographically maximal compatible resolution.
+        for candidate in [*candidates_for_key, None]:
+            assignment[key] = candidate
+            if _partial_assignment_possible(assignment, requests, by_key):
+                winner = search(index + 1)
+                if winner is not None:
+                    return winner
+        assignment.pop(key, None)
+        return None
+
+    winner = search(0)
+    if winner is None:
         raise LocalWorkspaceError("PROFILE-VERSION-001", "no compatible Profile resolution exists for the requested generation")
-    absent = (-1, -1, -1)
-    winner = max(
-        valid,
-        key=lambda assignment: tuple(
-            absent if assignment[key] is None else _semver(assignment[key]["manifest"]["profile_version"])
-            for key in keys
-        ),
-    )
+
     selected = {key: candidate for key, candidate in winner.items() if candidate is not None}
     output = []
     relation_rank = {"requested": 0, "extends": 1, "requires": 2}

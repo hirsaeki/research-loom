@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from contextlib import contextmanager
 from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
 import shutil
+import threading
+import time
 from typing import Any, Mapping
 import uuid
 
@@ -25,6 +28,7 @@ from plugins.local_application.workspace import (
     _assert_safe_workspace_root,
     _binding,
     _read_json,
+    _safe_locator,
     _schema_validate,
     _validate_profile_binding,
     _validate_project_semantics,
@@ -38,7 +42,61 @@ HISTORY_DIR = "profile-history"
 GENERATIONS_DIR = "generations"
 EVENTS_DIR = "events"
 PENDING_MARKER = "profile-advancement.pending.json"
+ADVANCEMENT_LOCK = "profile-advancement.lock"
+_LOCK_STATE = threading.local()
 _ADVANCEMENT_NOTE = "Profile generation advancement: direct Profile requests changed mechanically; other project semantics are unchanged."
+
+
+
+
+@contextmanager
+def _workspace_advancement_lock(root: Path):
+    key = str(root.resolve(strict=True))
+    held = getattr(_LOCK_STATE, "held", None)
+    if held is None:
+        held = set()
+        _LOCK_STATE.held = held
+    if key in held:
+        yield
+        return
+
+    internal = _safe_locator(root, INTERNAL_DIR)
+    if not internal.is_dir():
+        raise LocalWorkspaceError("WORKSPACE-MISSING-001", "workspace internal directory is missing")
+    lock_path = _safe_locator(root, f"{INTERNAL_DIR}/{ADVANCEMENT_LOCK}", require_exists=False)
+    with lock_path.open("a+b") as handle:
+        handle.seek(0, os.SEEK_END)
+        if handle.tell() == 0:
+            handle.write(b"\0")
+            handle.flush()
+        if os.name == "nt":
+            import msvcrt
+
+            while True:
+                try:
+                    handle.seek(0)
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+                    break
+                except OSError:
+                    time.sleep(0.05)
+        else:
+            import fcntl
+
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        held.add(key)
+        try:
+            yield
+        finally:
+            held.remove(key)
+            if os.name == "nt":
+                import msvcrt
+
+                handle.seek(0)
+                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
 
 def _now() -> str:
@@ -191,7 +249,7 @@ def _archive_generation(root: Path, *, config_text: str, effective_text: str, co
 
 def _remove_created(root: Path, paths: list[str]) -> None:
     for locator in reversed(paths):
-        target = root / locator
+        target = _safe_locator(root, locator, require_exists=False)
         if target.is_dir():
             shutil.rmtree(target, ignore_errors=True)
         elif target.exists():
@@ -217,8 +275,8 @@ def _state_rebind(root: Path, binding: Mapping[str, Any], *, expected_config: st
         )
 
 
-def recover_incomplete_profile_advancement(root: Path) -> None:
-    marker_path = root / INTERNAL_DIR / PENDING_MARKER
+def _recover_incomplete_profile_advancement_locked(root: Path) -> None:
+    marker_path = _safe_locator(root, f"{INTERNAL_DIR}/{PENDING_MARKER}", require_exists=False)
     if not marker_path.exists():
         return
     marker = _read_json(marker_path, code="PROFILE-ADVANCE-RECOVERY-001")
@@ -232,8 +290,22 @@ def recover_incomplete_profile_advancement(root: Path) -> None:
     old_effective = marker.get("old_effective_profile_set")
     if not isinstance(old_config, Mapping) or not isinstance(old_effective, Mapping):
         raise LocalWorkspaceError("PROFILE-ADVANCE-RECOVERY-001", "Profile advancement recovery marker lacks old generation")
+    event_locator = marker.get("event_locator")
+    if event_locator is not None and not isinstance(event_locator, str):
+        raise LocalWorkspaceError("PROFILE-ADVANCE-RECOVERY-001", "Profile advancement recovery event locator is malformed")
+    event_path = (
+        _safe_locator(root, event_locator, require_exists=False)
+        if isinstance(event_locator, str)
+        else None
+    )
+    created_history_paths = marker.get("created_history_paths", [])
+    if not isinstance(created_history_paths, list) or not all(isinstance(locator, str) for locator in created_history_paths):
+        raise LocalWorkspaceError("PROFILE-ADVANCE-RECOVERY-001", "Profile advancement recovery history locators are malformed")
+    for locator in created_history_paths:
+        _safe_locator(root, locator, require_exists=False)
+
     # Restore DB only when it reached the target binding. If it is already old, no DB write is needed.
-    state_path = root / str(old_binding["storage"]["research_state"])
+    state_path = _safe_locator(root, str(old_binding["storage"]["research_state"]))
     with SQLiteResearchStateRepository(state_path) as repository:
         lineage = repository.load_active_lineage_ref(str(old_binding["project_id"]))
         state = repository.load_state_view(str(old_binding["project_id"]), lineage)
@@ -260,13 +332,16 @@ def recover_incomplete_profile_advancement(root: Path) -> None:
     _write_text(root / PROJECT_CONFIG_NAME, str(marker["old_project_config_text"]))
     _write_text(root / EFFECTIVE_PROFILE_SET_NAME, str(marker["old_effective_profile_set_text"]))
     _write_json(root / INTERNAL_DIR / BINDING_NAME, old_binding)
-    event_locator = marker.get("event_locator")
-    if isinstance(event_locator, str):
-        event_path = root / event_locator
-        if event_path.exists():
-            event_path.unlink()
-    _remove_created(root, list(marker.get("created_history_paths", [])))
+    if event_path is not None and event_path.exists():
+        event_path.unlink()
+    _remove_created(root, created_history_paths)
     marker_path.unlink()
+
+
+def recover_incomplete_profile_advancement(root: Path) -> None:
+    root = _assert_safe_workspace_root(Path(root))
+    with _workspace_advancement_lock(root):
+        _recover_incomplete_profile_advancement_locked(root)
 
 
 def prepare_profile_generation(workspace: str | Path, request: Mapping[str, Any], output: str | Path) -> Mapping[str, Any]:
@@ -311,6 +386,11 @@ def prepare_profile_generation(workspace: str | Path, request: Mapping[str, Any]
 
 def advance_profile_generation(workspace: str | Path, request: Mapping[str, Any]) -> Mapping[str, Any]:
     root = _assert_safe_workspace_root(Path(workspace))
+    with _workspace_advancement_lock(root):
+        return _advance_profile_generation_locked(root, request)
+
+
+def _advance_profile_generation_locked(root: Path, request: Mapping[str, Any]) -> Mapping[str, Any]:
     target_config_file = request.get("project_config_file")
     target_eps_file = request.get("effective_profile_set_file")
     manifest_files = request.get("profile_manifest_files")

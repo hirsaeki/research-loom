@@ -9,6 +9,8 @@ from contextlib import redirect_stdout
 import subprocess
 import sys
 import tempfile
+import threading
+import time
 import unittest
 from unittest.mock import patch
 
@@ -118,6 +120,143 @@ class ProfileGenerationAdvancementTests(ResearchPackageAcceptanceSupport):
         self.assertEqual(_sha256(lf_path), _sha256(crlf_path))
         self.assertEqual(_sha256(lf_path), json.loads(OLD_EPS.read_text(encoding="utf-8"))["effective_profiles"][-1]["manifest_sha256"])
 
+
+
+    def test_kody_concurrent_advancement_is_serialized_across_the_full_rebind(self):
+        request, output, _ = self._resolve()
+        payload = {
+            "project_config_file": str(output / "project-config.json"),
+            "effective_profile_set_file": str(output / "effective-profile-set.json"),
+            "profile_manifest_files": request["profile_manifest_files"],
+            "origin": "kody-concurrency-regression",
+        }
+        from plugins.local_application import profile_advancement as advancement
+
+        real_rebind = advancement._state_rebind
+        first_entered = threading.Event()
+        release_first = threading.Event()
+        second_entered = threading.Event()
+        call_guard = threading.Lock()
+        calls = 0
+        results = []
+        errors = []
+
+        def blocking_rebind(*args, **kwargs):
+            nonlocal calls
+            with call_guard:
+                calls += 1
+                call_number = calls
+            if call_number == 1:
+                first_entered.set()
+                if not release_first.wait(5):
+                    raise AssertionError("first advancement was not released")
+            else:
+                second_entered.set()
+            return real_rebind(*args, **kwargs)
+
+        def run_advance():
+            try:
+                results.append(advancement.advance_profile_generation(self.workspace, payload))
+            except Exception as exc:  # surfaced below with the original exception
+                errors.append(exc)
+
+        with patch.object(advancement, "_state_rebind", side_effect=blocking_rebind):
+            first = threading.Thread(target=run_advance)
+            second = threading.Thread(target=run_advance)
+            first.start()
+            self.assertTrue(first_entered.wait(5))
+            second.start()
+            time.sleep(0.2)
+            self.assertFalse(second_entered.is_set(), "second advancement entered the rebind while the first held the workspace lock")
+            release_first.set()
+            first.join(5)
+            second.join(5)
+            self.assertFalse(first.is_alive())
+            self.assertFalse(second.is_alive())
+
+        self.assertEqual(errors, [])
+        self.assertCountEqual([item["result"] for item in results], ["ADVANCED", "NOOP"])
+        history = self._history()
+        self.assertEqual(len(history["events"]), 1)
+
+    def test_kody_recovery_rejects_workspace_escape_locators_before_deletion(self):
+        marker_path = Path(self.workspace) / ".research-loom" / "profile-advancement.pending.json"
+        binding = json.loads((Path(self.workspace) / ".research-loom" / "workspace-binding.json").read_text(encoding="utf-8"))
+        config_text = (Path(self.workspace) / "project-config.json").read_text(encoding="utf-8")
+        eps_text = (Path(self.workspace) / "effective-profile-set.json").read_text(encoding="utf-8")
+        config = json.loads(config_text)
+        eps = json.loads(eps_text)
+        base_marker = {
+            "schema_version": "0.1.0",
+            "old_binding": binding,
+            "new_binding": binding,
+            "old_project_config": config,
+            "old_effective_profile_set": eps,
+            "old_project_config_text": config_text,
+            "old_effective_profile_set_text": eps_text,
+            "new_project_config": config,
+            "new_effective_profile_set": eps,
+        }
+
+        outside_file = self.root / "outside-event.json"
+        outside_file.write_text("keep\n", encoding="utf-8")
+        marker = {**base_marker, "event_locator": "../outside-event.json", "created_history_paths": []}
+        marker_path.write_text(json.dumps(marker), encoding="utf-8")
+        code, rejected = _run_cli(["resume", "--workspace", self.workspace, "--json"])
+        self.assertEqual(code, 2, rejected)
+        self.assertEqual(rejected["issues"][0]["code"], "WORKSPACE-PATH-001")
+        self.assertEqual(outside_file.read_text(encoding="utf-8"), "keep\n")
+        marker_path.unlink()
+
+        outside_dir = self.root / "outside-history"
+        outside_dir.mkdir()
+        sentinel = outside_dir / "keep.txt"
+        sentinel.write_text("keep\n", encoding="utf-8")
+        marker = {**base_marker, "event_locator": None, "created_history_paths": ["../outside-history"]}
+        marker_path.write_text(json.dumps(marker), encoding="utf-8")
+        code, rejected = _run_cli(["resume", "--workspace", self.workspace, "--json"])
+        self.assertEqual(code, 2, rejected)
+        self.assertEqual(rejected["issues"][0]["code"], "WORKSPACE-PATH-001")
+        self.assertEqual(sentinel.read_text(encoding="utf-8"), "keep\n")
+        marker_path.unlink()
+
+    def test_kody_profile_resolver_bounds_inputs_and_prunes_incompatible_branches(self):
+        from plugins.local_application import profile_resolution as resolution
+
+        over_limit = self._resolve_request(manifests=[str(PUBLICATION)] * (resolution.MAX_PROFILE_MANIFESTS + 1))
+        over_limit_path = self.root / "over-limit.json"
+        over_limit_path.write_text(json.dumps(over_limit), encoding="utf-8")
+        code, rejected = _run_cli([
+            "profile", "resolve", "--workspace", self.workspace, "--output", self.root / "over-limit-out", "--json", over_limit_path
+        ])
+        self.assertEqual(code, 2, rejected)
+        self.assertEqual(rejected["issues"][0]["code"], "PROFILE-CANDIDATE-LIMIT-001")
+
+        def candidate(profile_id, version, *, requires=None):
+            return {
+                "manifest": {
+                    "profile_id": profile_id,
+                    "profile_type": "research",
+                    "profile_version": version,
+                    "core_compatibility": {"research_contract": "0.1.0", "invariant_contract": "0.1.0"},
+                    "requires": requires or [],
+                },
+                "manifest_sha256": hashlib.sha256(f"{profile_id}@{version}".encode()).hexdigest(),
+                "path": f"/{profile_id}-{version}.json",
+            }
+
+        candidates = [
+            candidate("fixture.requested", "2.0.0", requires=[{"profile_id":"fixture.dep","profile_type":"research","version":">=2.0.0 <3.0.0"}]),
+            candidate("fixture.requested", "1.0.0", requires=[{"profile_id":"fixture.dep","profile_type":"research","version":"1.0.0"}]),
+            candidate("fixture.dep", "1.0.0"),
+        ]
+        for index in range(40):
+            candidates.extend([candidate(f"fixture.unrelated-{index:02d}", "1.0.0"), candidate(f"fixture.unrelated-{index:02d}", "2.0.0")])
+        requests = [{"profile_id":"fixture.requested","profile_type":"research","version":">=1.0.0 <3.0.0"}]
+        effective, selected = resolution._resolve_selected(candidates, requests)
+        self.assertEqual({key for key in selected}, {("research", "fixture.requested"), ("research", "fixture.dep")})
+        self.assertEqual(selected[("research", "fixture.requested")]["manifest"]["profile_version"], "1.0.0")
+        self.assertEqual([item["profile_id"] for item in effective], ["fixture.dep", "fixture.requested"])
 
     def test_pa0_production_resolution_rejects_semantically_invalid_narrative_target(self):
         request = {
