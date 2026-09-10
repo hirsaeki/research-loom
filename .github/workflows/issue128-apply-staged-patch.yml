@@ -29,7 +29,7 @@ jobs:
         run: |
           git fetch origin main issue-128-profile-advancement
           git checkout -B issue-128-profile-advancement origin/main
-          git apply --index /tmp/issue128.patch
+          git apply --index --exclude='.github/workflows/contracts.yml' /tmp/issue128.patch
           git diff --cached --check
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
