@@ -18,7 +18,7 @@ from core.runtime import CommitReceipt, TransitionAction, TransitionKind
 from plugins.local_application import LocalApplicationFacade, LocalWorkspace
 from plugins.local_application.cli import main as cli_main
 from plugins.local_application.profile_advancement import _ADVANCEMENT_NOTE
-from plugins.local_application.profile_resolution import effective_profile_digest, resolve_effective_profile_set
+from plugins.local_application.profile_resolution import _sha256, effective_profile_digest, resolve_effective_profile_set
 from runtime_fixtures import make_request
 from research_package_acceptance_support import ResearchPackageAcceptanceSupport
 import test_external_desktop_research_intake as intake
@@ -107,6 +107,16 @@ class ProfileGenerationAdvancementTests(ResearchPackageAcceptanceSupport):
         code, result = _run_cli(["profile","history","--workspace",self.workspace,"--json"])
         self.assertEqual(code, 0, result)
         return result
+
+
+    def test_manifest_pin_is_checkout_line_ending_independent(self):
+        manifest = PUBLICATION.read_bytes().replace(b"\r\n", b"\n")
+        lf_path = self.root / "manifest-lf.json"
+        crlf_path = self.root / "manifest-crlf.json"
+        lf_path.write_bytes(manifest)
+        crlf_path.write_bytes(manifest.replace(b"\n", b"\r\n"))
+        self.assertEqual(_sha256(lf_path), _sha256(crlf_path))
+        self.assertEqual(_sha256(lf_path), json.loads(OLD_EPS.read_text(encoding="utf-8"))["effective_profiles"][-1]["manifest_sha256"])
 
 
     def test_pa0_production_resolution_rejects_semantically_invalid_narrative_target(self):

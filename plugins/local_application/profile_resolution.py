@@ -49,7 +49,9 @@ def _validate_schema(value: Mapping[str, Any], schema_path: Path, code: str) -> 
 
 
 def _sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    # Git may materialize canonical JSON manifests with CRLF on Windows.
+    # Profile identity pins describe repository content, not checkout line-ending policy.
+    return hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
 
 
 def _semver(text: str) -> tuple[int, int, int]:
