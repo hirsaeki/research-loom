@@ -1,0 +1,27 @@
+{
+  "schema_version": "0.1.0",
+  "profile_id": "fixture.generation-invalid-narrative",
+  "profile_type": "narrative",
+  "profile_version": "1.0.0",
+  "description": "Schema-valid fixture with an invalid Narrative product vocabulary member.",
+  "core_compatibility": {
+    "research_contract": "0.1.0",
+    "invariant_contract": "0.1.0"
+  },
+  "constraints": [
+    {
+      "id": "invalid-stage-product",
+      "path": "narrative.stages.definitions",
+      "merge_strategy": "union",
+      "value": [
+        {
+          "id": "invalid-stage",
+          "semantic_role": "framing",
+          "consumes": ["research_question"],
+          "requires": ["research_question"],
+          "produces": ["finding"]
+        }
+      ]
+    }
+  ]
+}

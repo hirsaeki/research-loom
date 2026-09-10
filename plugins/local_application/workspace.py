@@ -550,6 +550,8 @@ class LocalWorkspace:
         root = _assert_safe_workspace_root(Path(workspace))
         if not root.is_dir():
             raise LocalWorkspaceError("WORKSPACE-MISSING-001", "workspace directory does not exist")
+        from plugins.local_application.profile_advancement import recover_incomplete_profile_advancement
+        recover_incomplete_profile_advancement(root)
         internal = _safe_locator(root, INTERNAL_DIR)
         if (internal / INITIALIZING_MARKER).exists():
             raise LocalWorkspaceError("WORKSPACE-PARTIAL-001", "workspace initialization is incomplete")

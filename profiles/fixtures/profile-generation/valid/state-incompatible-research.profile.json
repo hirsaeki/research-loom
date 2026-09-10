@@ -1,0 +1,11 @@
+{
+  "schema_version": "0.1.0",
+  "profile_id": "fixture.generation-state-strict",
+  "profile_type": "research",
+  "profile_version": "1.0.0",
+  "description": "Synthetic Profile-generation rejection fixture requiring an additional Evidence field.",
+  "core_compatibility": {"research_contract":"0.1.0","invariant_contract":"0.1.0"},
+  "constraints": [
+    {"id":"GEN-STATE-001","path":"evidence.capture.required_fields","merge_strategy":"union","value":["generation_marker"],"rationale":"Fixture-only executable constraint used to prove existing authoritative state compatibility checks."}
+  ]
+}

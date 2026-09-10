@@ -24,6 +24,96 @@ if TYPE_CHECKING:
 
 
 class WriteMixin:
+    def rebind_current_configuration(
+        self: "SQLiteResearchStateRepository",
+        project_ref: str,
+        *,
+        expected_project_config_digest: str,
+        expected_effective_profile_set_digest: str,
+        project_config_ref: str,
+        project_config_digest: str,
+        project_config: Mapping[str, Any],
+        effective_profile_set_ref: str,
+        effective_profile_set_digest: str,
+        effective_constraints: Mapping[str, Any],
+    ) -> None:
+        """Atomically move only the current Project/Profile binding.
+
+        Historical Snapshots, objects, Decisions, commits, and inactive lineage
+        bindings are immutable and intentionally untouched.
+        """
+        try:
+            with self._write_transaction():
+                project = self._connection.execute(
+                    "SELECT * FROM project_state WHERE project_ref = ?",
+                    (project_ref,),
+                ).fetchone()
+                if project is None:
+                    raise AtomicCommitError(f"project {project_ref!r} does not resolve")
+                active = self._connection.execute(
+                    "SELECT active_lineage_ref FROM project_active_lineage WHERE project_ref = ?",
+                    (project_ref,),
+                ).fetchone()
+                if active is None:
+                    raise AtomicCommitError(f"project {project_ref!r} has no active lineage")
+                lineage_id = str(active["active_lineage_ref"])
+                lineage = self._connection.execute(
+                    "SELECT * FROM lineages WHERE lineage_id = ? AND project_ref = ?",
+                    (lineage_id, project_ref),
+                ).fetchone()
+                if lineage is None:
+                    raise AtomicCommitError("active lineage does not resolve")
+                for row in (project, lineage):
+                    if (
+                        str(row["project_config_digest"]) != expected_project_config_digest
+                        or str(row["effective_profile_set_digest"]) != expected_effective_profile_set_digest
+                    ):
+                        raise StaleHeadError(
+                            "current Project/Profile binding changed before atomic rebind"
+                        )
+                updated = self._connection.execute(
+                    """
+                    UPDATE project_state
+                    SET project_config_ref = ?, project_config_digest = ?,
+                        project_config_json = ?, effective_profile_set_ref = ?,
+                        effective_profile_set_digest = ?, effective_constraints_json = ?
+                    WHERE project_ref = ?
+                    """,
+                    (
+                        project_config_ref,
+                        project_config_digest,
+                        encode_json(project_config),
+                        effective_profile_set_ref,
+                        effective_profile_set_digest,
+                        encode_json(effective_constraints),
+                        project_ref,
+                    ),
+                )
+                if updated.rowcount != 1:
+                    raise AtomicCommitError("current project binding update failed")
+                updated = self._connection.execute(
+                    """
+                    UPDATE lineages
+                    SET project_config_ref = ?, project_config_digest = ?,
+                        effective_profile_set_ref = ?, effective_profile_set_digest = ?
+                    WHERE lineage_id = ? AND project_ref = ?
+                    """,
+                    (
+                        project_config_ref,
+                        project_config_digest,
+                        effective_profile_set_ref,
+                        effective_profile_set_digest,
+                        lineage_id,
+                        project_ref,
+                    ),
+                )
+                if updated.rowcount != 1:
+                    raise AtomicCommitError("active lineage binding update failed")
+        except (AtomicCommitError, StaleHeadError):
+            raise
+        except sqlite3.Error as exc:
+            raise AtomicCommitError("current Project/Profile binding rebind failed atomically") from exc
+
     def commit(
         self: "SQLiteResearchStateRepository",
         bundle: CommitBundle,
