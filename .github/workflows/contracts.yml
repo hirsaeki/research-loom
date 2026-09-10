@@ -47,6 +47,8 @@ jobs:
           cmp launcher.stderr direct.stderr
       - name: Run canonical contract tests
         run: uv run --frozen python -m unittest discover -s tests/contracts -p 'test_*.py' -v
+      - name: Run Issue 128 Profile generation advancement acceptance
+        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_profile_generation_advancement.py' -v
       - name: Run Research State runtime tests
         run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_*.py' -v
 
@@ -78,3 +80,23 @@ jobs:
         run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_research_package_*.py' -v
       - name: Run Issue 80 Writer Composition Windows acceptance
         run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue80_writer_composition.py' -v
+
+  issue128-windows:
+    name: issue128-windows
+    runs-on: windows-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+      - name: Sync locked Python environment
+        run: uv sync --frozen
+      - name: Smoke production Windows launcher
+        run: .\research-loom.cmd --help
+      - name: Run Issue 128 Profile generation advancement acceptance
+        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_profile_generation_advancement.py' -v
