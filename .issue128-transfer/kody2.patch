@@ -1,0 +1,358 @@
+diff --git a/plugins/local_application/facade.py b/plugins/local_application/facade.py
+index ec60ce2..4ea9234 100644
+--- a/plugins/local_application/facade.py
++++ b/plugins/local_application/facade.py
+@@ -137,15 +137,18 @@ class LocalApplicationFacade:
+         self._project_id = str(project_id)
+         self._workspace_root = Path(workspace_root) if workspace_root is not None else None
+         self._owns_application = owns_application
++        self._opened_workspace: OpenedLocalWorkspace | None = None
+ 
+     @classmethod
+     def from_opened_workspace(cls, opened: OpenedLocalWorkspace) -> "LocalApplicationFacade":
+-        return cls(
++        facade = cls(
+             opened.application,
+             opened.project_id,
+             workspace_root=opened.root,
+-            owns_application=True,
++            owns_application=False,
+         )
++        facade._opened_workspace = opened
++        return facade
+ 
+     @classmethod
+     def open_workspace(cls, workspace: str | Path) -> "LocalApplicationFacade":
+@@ -212,6 +215,11 @@ class LocalApplicationFacade:
+         return self._project_id
+ 
+     def close(self) -> None:
++        if self._opened_workspace is not None:
++            opened = self._opened_workspace
++            self._opened_workspace = None
++            opened.close()
++            return
+         if self._owns_application:
+             self._application.close()
+             self._owns_application = False
+diff --git a/plugins/local_application/profile_advancement.py b/plugins/local_application/profile_advancement.py
+index cd18adf..8330b8f 100644
+--- a/plugins/local_application/profile_advancement.py
++++ b/plugins/local_application/profile_advancement.py
+@@ -51,6 +51,8 @@ _ADVANCEMENT_NOTE = "Profile generation advancement: direct Profile requests cha
+ 
+ @contextmanager
+ def _workspace_advancement_lock(root: Path):
++    if not root.is_dir():
++        raise LocalWorkspaceError("WORKSPACE-MISSING-001", "workspace directory does not exist")
+     key = str(root.resolve(strict=True))
+     held = getattr(_LOCK_STATE, "held", None)
+     if held is None:
+diff --git a/plugins/local_application/profile_resolution.py b/plugins/local_application/profile_resolution.py
+index 1051ab4..c0b4ad0 100644
+--- a/plugins/local_application/profile_resolution.py
++++ b/plugins/local_application/profile_resolution.py
+@@ -338,70 +338,20 @@ def _assignment_valid(assignment, requests) -> bool:
+     return all(visit(key) for key in graph)
+ 
+ 
+-def _potential_resolution_keys(by_key, requests) -> set[tuple[str, str]]:
+-    reachable = {_key(request) for request in requests}
+-    frontier = list(reachable)
+-    while frontier:
+-        key = frontier.pop()
+-        for candidate in by_key.get(key, []):
+-            manifest = candidate["manifest"]
+-            for relation in ("extends", "requires"):
+-                for dependency in manifest.get(relation, []):
+-                    dep_key = _key(dependency)
+-                    if dep_key not in reachable:
+-                        reachable.add(dep_key)
+-                        frontier.append(dep_key)
+-    return reachable
+-
+-
+-def _partial_assignment_possible(assignment, requests, by_key) -> bool:
+-    requirements: dict[tuple[str, str], list[str]] = {}
+-    for request in requests:
+-        requirements.setdefault(_key(request), []).append(str(request["version"]))
+-
+-    for candidate in assignment.values():
+-        if candidate is None:
+-            continue
+-        manifest = candidate["manifest"]
+-        compat = manifest["core_compatibility"]
+-        if not _satisfies(CORE_CONTRACTS["research_contract"], str(compat["research_contract"])) or not _satisfies(
+-            CORE_CONTRACTS["invariant_contract"], str(compat["invariant_contract"])
+-        ):
+-            return False
+-        for relation in ("extends", "requires"):
+-            for dependency in manifest.get(relation, []):
+-                if relation == "extends" and dependency["profile_type"] != manifest["profile_type"]:
+-                    return False
+-                requirements.setdefault(_key(dependency), []).append(str(dependency["version"]))
+-
+-    for key, required_versions in requirements.items():
+-        if key in assignment:
+-            candidate = assignment[key]
+-            if candidate is None:
+-                return False
+-            version = str(candidate["manifest"]["profile_version"])
+-            if not all(_satisfies(version, requirement) for requirement in required_versions):
+-                return False
+-            continue
+-        possible = by_key.get(key, [])
+-        if not any(
+-            all(_satisfies(str(candidate["manifest"]["profile_version"]), requirement) for requirement in required_versions)
+-            for candidate in possible
+-        ):
+-            return False
+-    return True
+-
+-
+ def _resolve_selected(candidates, requests):
+     by_key: dict[tuple[str, str], list[dict[str, Any]]] = {}
+     for candidate in candidates:
+         by_key.setdefault(_key(candidate["manifest"]), []).append(candidate)
+ 
+-    keys = sorted(_potential_resolution_keys(by_key, requests), key=lambda key: (TYPE_RANK[key[0]], key[1]))
+-    assignment: dict[tuple[str, str], dict[str, Any] | None] = {}
++    initial_requirements: dict[tuple[str, str], list[str]] = {}
++    for request in requests:
++        initial_requirements.setdefault(_key(request), []).append(str(request["version"]))
+     visited_states = 0
+ 
+-    def search(index: int):
++    def search(
++        assignment: dict[tuple[str, str], dict[str, Any]],
++        requirements: dict[tuple[str, str], list[str]],
++    ):
+         nonlocal visited_states
+         visited_states += 1
+         if visited_states > MAX_PROFILE_RESOLUTION_STATES:
+@@ -409,28 +359,66 @@ def _resolve_selected(candidates, requests):
+                 "PROFILE-RESOLUTION-LIMIT-001",
+                 "Profile dependency resolution exceeded the bounded search budget",
+             )
+-        if index == len(keys):
++        for key, required_versions in requirements.items():
++            selected = assignment.get(key)
++            if selected is not None:
++                version = str(selected["manifest"]["profile_version"])
++                if not all(_satisfies(version, requirement) for requirement in required_versions):
++                    return None
++                continue
++            possible = by_key.get(key, [])
++            if not any(
++                all(_satisfies(str(candidate["manifest"]["profile_version"]), requirement) for requirement in required_versions)
++                for candidate in possible
++            ):
++                return None
++
++        unresolved = sorted(
++            (key for key in requirements if key not in assignment),
++            key=lambda key: (TYPE_RANK[key[0]], key[1]),
++        )
++        if not unresolved:
+             return dict(assignment) if _assignment_valid(assignment, requests) else None
+ 
+-        key = keys[index]
++        key = unresolved[0]
++        required_versions = requirements[key]
+         candidates_for_key = sorted(
+-            by_key.get(key, []),
++            (
++                candidate
++                for candidate in by_key.get(key, [])
++                if all(
++                    _satisfies(str(candidate["manifest"]["profile_version"]), requirement)
++                    for requirement in required_versions
++                )
++            ),
+             key=lambda candidate: _semver(candidate["manifest"]["profile_version"]),
+             reverse=True,
+         )
+-        # Version choices are tried from highest to lowest and absence last. Because
+-        # keys use the same ordering as the previous winner tuple, the first valid
+-        # leaf is the same lexicographically maximal compatible resolution.
+-        for candidate in [*candidates_for_key, None]:
+-            assignment[key] = candidate
+-            if _partial_assignment_possible(assignment, requests, by_key):
+-                winner = search(index + 1)
+-                if winner is not None:
+-                    return winner
+-        assignment.pop(key, None)
++        for candidate in candidates_for_key:
++            manifest = candidate["manifest"]
++            compat = manifest["core_compatibility"]
++            if not _satisfies(CORE_CONTRACTS["research_contract"], str(compat["research_contract"])) or not _satisfies(
++                CORE_CONTRACTS["invariant_contract"], str(compat["invariant_contract"])
++            ):
++                continue
++            next_requirements = {item: list(versions) for item, versions in requirements.items()}
++            invalid_relation = False
++            for relation in ("extends", "requires"):
++                for dependency in manifest.get(relation, []):
++                    if relation == "extends" and dependency["profile_type"] != manifest["profile_type"]:
++                        invalid_relation = True
++                        break
++                    next_requirements.setdefault(_key(dependency), []).append(str(dependency["version"]))
++                if invalid_relation:
++                    break
++            if invalid_relation:
++                continue
++            winner = search({**assignment, key: candidate}, next_requirements)
++            if winner is not None:
++                return winner
+         return None
+ 
+-    winner = search(0)
++    winner = search({}, initial_requirements)
+     if winner is None:
+         raise LocalWorkspaceError("PROFILE-VERSION-001", "no compatible Profile resolution exists for the requested generation")
+ 
+diff --git a/plugins/local_application/workspace.py b/plugins/local_application/workspace.py
+index ce641c9..fc2d27c 100644
+--- a/plugins/local_application/workspace.py
++++ b/plugins/local_application/workspace.py
+@@ -3,7 +3,7 @@ from __future__ import annotations
+ from collections import Counter
+ from contextlib import suppress
+ from copy import deepcopy
+-from dataclasses import dataclass
++from dataclasses import dataclass, field
+ import hashlib
+ import json
+ import os
+@@ -63,13 +63,20 @@ class OpenedLocalWorkspace:
+     project_config: Mapping[str, Any]
+     effective_profile_set: Mapping[str, Any]
+     application: LocalResearchApplication
++    _workspace_lock: object | None = field(default=None, repr=False)
+ 
+     @property
+     def project_id(self) -> str:
+         return str(self.binding["project_id"])
+ 
+     def close(self) -> None:
+-        self.application.close()
++        lock = self._workspace_lock
++        self._workspace_lock = None
++        try:
++            self.application.close()
++        finally:
++            if lock is not None:
++                lock.__exit__(None, None, None)
+ 
+     def __enter__(self) -> "OpenedLocalWorkspace":
+         return self
+@@ -551,8 +558,15 @@ class LocalWorkspace:
+         if not root.is_dir():
+             raise LocalWorkspaceError("WORKSPACE-MISSING-001", "workspace directory does not exist")
+         from plugins.local_application.profile_advancement import _workspace_advancement_lock
+-        with _workspace_advancement_lock(root):
+-            return cls._open_locked(root)
++        lock = _workspace_advancement_lock(root)
++        lock.__enter__()
++        try:
++            opened = cls._open_locked(root)
++            opened._workspace_lock = lock
++            return opened
++        except BaseException:
++            lock.__exit__(None, None, None)
++            raise
+ 
+     @classmethod
+     def _open_locked(cls, root: Path) -> OpenedLocalWorkspace:
+diff --git a/tests/runtime/test_profile_generation_advancement.py b/tests/runtime/test_profile_generation_advancement.py
+index 6b7a06f..94553d9 100644
+--- a/tests/runtime/test_profile_generation_advancement.py
++++ b/tests/runtime/test_profile_generation_advancement.py
+@@ -179,6 +179,51 @@ class ProfileGenerationAdvancementTests(ResearchPackageAcceptanceSupport):
+         history = self._history()
+         self.assertEqual(len(history["events"]), 1)
+ 
++    def test_kody_open_workspace_holds_generation_lock_until_close(self):
++        request, output, _ = self._resolve()
++        payload = {
++            "project_config_file": str(output / "project-config.json"),
++            "effective_profile_set_file": str(output / "effective-profile-set.json"),
++            "profile_manifest_files": request["profile_manifest_files"],
++            "origin": "kody-open-lifetime-regression",
++        }
++        from plugins.local_application import profile_advancement as advancement
++
++        opened = LocalApplicationFacade.open_workspace(self.workspace)
++        started = threading.Event()
++        finished = threading.Event()
++        results = []
++        errors = []
++
++        def run_advance():
++            started.set()
++            try:
++                results.append(advancement.advance_profile_generation(self.workspace, payload))
++            except Exception as exc:  # surfaced below with the original exception
++                errors.append(exc)
++            finally:
++                finished.set()
++
++        thread = threading.Thread(target=run_advance)
++        thread.start()
++        self.assertTrue(started.wait(5))
++        time.sleep(0.2)
++        self.assertFalse(finished.is_set(), "advancement passed an already-open Workspace lifetime lock")
++        opened.close()
++        thread.join(5)
++        self.assertFalse(thread.is_alive())
++        self.assertEqual(errors, [])
++        self.assertEqual([item["result"] for item in results], ["ADVANCED"])
++
++    def test_kody_profile_commands_keep_missing_workspace_error_contract(self):
++        missing = self.root / "missing-workspace"
++        code, rejected = _run_cli(["profile", "history", "--workspace", missing, "--json"])
++        self.assertEqual(code, 2, rejected)
++        self.assertEqual(rejected["issues"][0]["code"], "WORKSPACE-MISSING-001")
++        code, rejected = _run_cli(["profile", "advance", "--workspace", missing, "--json"], "{}")
++        self.assertEqual(code, 2, rejected)
++        self.assertEqual(rejected["issues"][0]["code"], "WORKSPACE-MISSING-001")
++
+     def test_kody_recovery_rejects_workspace_escape_locators_before_deletion(self):
+         marker_path = Path(self.workspace) / ".research-loom" / "profile-advancement.pending.json"
+         binding = json.loads((Path(self.workspace) / ".research-loom" / "workspace-binding.json").read_text(encoding="utf-8"))
+@@ -258,6 +303,35 @@ class ProfileGenerationAdvancementTests(ResearchPackageAcceptanceSupport):
+         self.assertEqual(selected[("research", "fixture.requested")]["manifest"]["profile_version"], "1.0.0")
+         self.assertEqual([item["profile_id"] for item in effective], ["fixture.dep", "fixture.requested"])
+ 
++        # Only dependencies introduced by the actually selected requested version
++        # belong in the search state. Pre-expanding dependencies from every candidate
++        # version turns these 15 independent alternatives into a needless 2^15 search.
++        candidates = []
++        for major in range(1, 16):
++            dep_id = f"fixture.dynamic-dep-{major:02d}"
++            candidates.append(
++                candidate(
++                    "fixture.dynamic-requested",
++                    f"{major}.0.0",
++                    requires=[{"profile_id": dep_id, "profile_type": "research", "version": "1.0.0"}],
++                )
++            )
++            candidates.append(candidate(dep_id, "1.0.0"))
++        requests = [
++            {
++                "profile_id": "fixture.dynamic-requested",
++                "profile_type": "research",
++                "version": ">=1.0.0 <16.0.0",
++            }
++        ]
++        effective, selected = resolution._resolve_selected(candidates, requests)
++        self.assertEqual(
++            set(selected),
++            {("research", "fixture.dynamic-requested"), ("research", "fixture.dynamic-dep-15")},
++        )
++        self.assertEqual(selected[("research", "fixture.dynamic-requested")]["manifest"]["profile_version"], "15.0.0")
++        self.assertEqual([item["profile_id"] for item in effective], ["fixture.dynamic-dep-15", "fixture.dynamic-requested"])
++
+     def test_pa0_production_resolution_rejects_semantically_invalid_narrative_target(self):
+         request = {
+             "profile_manifest_files": [
