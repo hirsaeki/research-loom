@@ -5,18 +5,18 @@ on:
     branches: [issue-128-profile-advancement-staging]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  apply:
+  materialize:
     if: github.actor == 'hirsaeki'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
         with:
-          persist-credentials: true
+          persist-credentials: false
           fetch-depth: 0
-      - name: Apply validated Issue 128 patch
+      - name: Materialize validated Issue 128 patch without pushing
         shell: bash
         run: |
           cat .issue128-transfer/part-*.patch > /tmp/issue128.patch
@@ -25,7 +25,13 @@ jobs:
           rm -rf .issue128-transfer
           rm .github/workflows/issue128-transfer.yml
           git add -A
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git config user.name 'sandbox-transfer'
+          git config user.email 'sandbox-transfer@invalid'
           git commit -m 'Materialize Issue 128 implementation tree'
-          git push origin HEAD:issue-128-profile-advancement-staging
+          git bundle create /tmp/issue128-materialized.bundle --all
+      - name: Upload materialized git bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: issue128-materialized-bundle
+          path: /tmp/issue128-materialized.bundle
+          if-no-files-found: error
