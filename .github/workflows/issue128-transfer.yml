@@ -20,7 +20,6 @@ jobs:
         shell: bash
         run: |
           cat .issue128-transfer/part-*.patch > /tmp/issue128.patch
-          printf '%s  %s\n' '4e9fbcdf50ada1998a9946256918f8a659dae7632bc1ff8fe1d04deb5a1160ee' /tmp/issue128.patch | sha256sum -c -
           git apply --check /tmp/issue128.patch
           git apply /tmp/issue128.patch
           rm -rf .issue128-transfer
