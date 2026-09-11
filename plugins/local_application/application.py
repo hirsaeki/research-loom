@@ -4,6 +4,7 @@ from copy import deepcopy
 from datetime import datetime, timezone
 import json
 from pathlib import Path
+import re
 from typing import Any, Mapping
 import uuid
 
@@ -263,7 +264,11 @@ class EffectiveResearchAttentionProvider:
         self._profile_history_root = Path(profile_history_root) if profile_history_root is not None else None
 
     @staticmethod
-    def _event_successor(event: Mapping[str, Any], *, project_id: str, source_config_digest: str) -> str | None:
+    def _is_canonical_config_digest(value: object) -> bool:
+        return isinstance(value, str) and re.fullmatch(r"sha256:[0-9a-f]{64}", value) is not None
+
+    @classmethod
+    def _event_successor(cls, event: Mapping[str, Any], *, project_id: str, source_config_digest: str) -> str | None:
         if event.get("event_type") != "project_profile_generation_advanced":
             return None
         if str(event.get("project_id") or "") != project_id:
@@ -274,7 +279,7 @@ class EffectiveResearchAttentionProvider:
             raise ValueError("Profile advancement event binding is malformed")
         old_digest = old_binding.get("project_config_digest")
         new_digest = new_binding.get("project_config_digest")
-        if not isinstance(old_digest, str) or not isinstance(new_digest, str):
+        if not cls._is_canonical_config_digest(old_digest) or not cls._is_canonical_config_digest(new_digest):
             raise ValueError("Profile advancement event digest is malformed")
         if old_digest != source_config_digest:
             return None
@@ -295,13 +300,17 @@ class EffectiveResearchAttentionProvider:
         if not events_root.is_dir():
             return False
 
+        if not self._is_canonical_config_digest(source_config_digest) or not self._is_canonical_config_digest(target_config_digest):
+            return False
+
         # Pre-merge Issue #128 builds wrote flat PGA-*.json events. Parse that
         # bounded legacy set once so already-probed workspaces remain reopenable.
-        legacy_paths = sorted(events_root.glob("PGA-*.json"))
-        if len(legacy_paths) > self._PROFILE_HISTORY_EVENT_READ_LIMIT:
-            return False
         legacy_by_source: dict[str, set[str]] = {}
-        for path in legacy_paths:
+        events_read = 0
+        for path in events_root.glob("PGA-*.json"):
+            events_read += 1
+            if events_read > self._PROFILE_HISTORY_EVENT_READ_LIMIT:
+                return False
             try:
                 event = json.loads(path.read_text(encoding="utf-8"))
             except (OSError, ValueError, json.JSONDecodeError):
@@ -318,23 +327,23 @@ class EffectiveResearchAttentionProvider:
                 return False
             old_digest = old_binding.get("project_config_digest")
             new_digest = new_binding.get("project_config_digest")
-            if not isinstance(old_digest, str) or not isinstance(new_digest, str):
+            if not self._is_canonical_config_digest(old_digest) or not self._is_canonical_config_digest(new_digest):
                 return False
             legacy_by_source.setdefault(old_digest, set()).add(new_digest)
 
         pending = [source_config_digest]
         visited = {source_config_digest}
-        events_read = len(legacy_paths)
         while pending:
             current = pending.pop()
+            if not self._is_canonical_config_digest(current):
+                return False
             successors = set(legacy_by_source.get(current, ()))
             source_dir = events_root / "by-source" / current.removeprefix("sha256:")
             if source_dir.is_dir():
-                indexed_paths = sorted(source_dir.glob("PGA-*.json"))
-                events_read += len(indexed_paths)
-                if events_read > self._PROFILE_HISTORY_EVENT_READ_LIMIT:
-                    return False
-                for path in indexed_paths:
+                for path in source_dir.glob("PGA-*.json"):
+                    events_read += 1
+                    if events_read > self._PROFILE_HISTORY_EVENT_READ_LIMIT:
+                        return False
                     try:
                         event = json.loads(path.read_text(encoding="utf-8"))
                     except (OSError, ValueError, json.JSONDecodeError):
