@@ -1,0 +1,28 @@
+name: issue128-lockfix-materialize
+
+on:
+  push:
+    branches: [issue-128-lockfix-materialized]
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    if: github.actor == 'hirsaeki'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: true
+          fetch-depth: 0
+      - name: Materialize re-entrant Workspace lock fix
+        shell: bash
+        run: |
+          git apply --check .issue128-lockfix.patch
+          git apply .issue128-lockfix.patch
+          git add plugins/local_application/profile_advancement.py tests/runtime/test_profile_generation_advancement.py
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Materialize re-entrant Workspace lock fix'
+          git push origin HEAD:issue-128-lockfix-materialized
