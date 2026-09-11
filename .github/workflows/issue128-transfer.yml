@@ -17,25 +17,25 @@ jobs:
         with:
           persist-credentials: false
           path: transfer
-      - name: Checkout PR head
+      - name: Checkout materialized PR tree
         uses: actions/checkout@v5
         with:
-          ref: issue-128-profile-advancement
+          ref: issue-128-review2-materialized
           persist-credentials: true
           fetch-depth: 0
           path: work
-      - name: Materialize sandbox follow-up tree
+      - name: Materialize sandbox Kody follow-up tree
         shell: bash
         run: |
           cd work
           git apply --check ../transfer/.issue128-transfer/followup.patch
           git apply ../transfer/.issue128-transfer/followup.patch
           git diff --check
-          expected='tests/runtime/test_profile_generation_advancement.py'
+          expected=$'plugins/local_application/application.py\ntests/runtime/test_profile_generation_advancement_attention.py'
           actual="$(git diff --name-only)"
           [[ "$actual" == "$expected" ]]
           git add -A
           git config user.name 'sandbox-transfer'
           git config user.email 'sandbox-transfer@invalid'
-          git commit -m 'Materialize Issue 128 Windows CI fix tree'
+          git commit -m 'Materialize Issue 128 Kody follow-up tree'
           git push origin HEAD:issue-128-review2-materialized
