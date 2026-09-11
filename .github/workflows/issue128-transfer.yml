@@ -5,33 +5,38 @@ on:
     branches: [issue-128-profile-advancement-staging]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  materialize:
+  materialize-review2:
     if: github.actor == 'hirsaeki'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - name: Checkout transfer payload
+        uses: actions/checkout@v5
         with:
           persist-credentials: false
+          path: transfer
+      - name: Checkout PR head
+        uses: actions/checkout@v5
+        with:
+          ref: issue-128-profile-advancement
+          persist-credentials: true
           fetch-depth: 0
-      - name: Materialize validated Issue 128 patch without pushing
+          path: work
+      - name: Materialize sandbox review fix
         shell: bash
         run: |
-          cat .issue128-transfer/part-*.patch > /tmp/issue128.patch
-          git apply --check /tmp/issue128.patch
-          git apply /tmp/issue128.patch
-          rm -rf .issue128-transfer
-          rm .github/workflows/issue128-transfer.yml
-          git add -A
+          cd work
+          git apply --check ../transfer/.issue128-transfer/kody2.patch
+          git apply ../transfer/.issue128-transfer/kody2.patch
+          git diff --check
+          git add plugins/local_application/facade.py \
+                  plugins/local_application/profile_advancement.py \
+                  plugins/local_application/profile_resolution.py \
+                  plugins/local_application/workspace.py \
+                  tests/runtime/test_profile_generation_advancement.py
           git config user.name 'sandbox-transfer'
           git config user.email 'sandbox-transfer@invalid'
-          git commit -m 'Materialize Issue 128 implementation tree'
-          git bundle create /tmp/issue128-materialized.bundle --all
-      - name: Upload materialized git bundle
-        uses: actions/upload-artifact@v4
-        with:
-          name: issue128-materialized-bundle
-          path: /tmp/issue128-materialized.bundle
-          if-no-files-found: error
+          git commit -m 'Materialize Kody follow-up fix tree'
+          git push origin HEAD:issue-128-review2-materialized
