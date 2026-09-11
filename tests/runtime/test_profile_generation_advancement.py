@@ -285,7 +285,7 @@ class ProfileGenerationAdvancementTests(ResearchPackageAcceptanceSupport):
         handle = FailingHandle()
         with patch.object(Path, "open", return_value=handle):
             with self.assertRaisesRegex(OSError, "injected lock initialization failure"):
-                with advancement._workspace_advancement_lock(Path(self.workspace)):
+                with advancement._workspace_advancement_lock(Path(self.workspace).resolve()):
                     self.fail("lock acquisition unexpectedly succeeded")
         self.assertTrue(handle.closed)
 
