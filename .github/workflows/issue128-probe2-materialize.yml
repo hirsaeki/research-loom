@@ -19,8 +19,9 @@ jobs:
       - name: Materialize Probe2 regression fix
         shell: bash
         run: |
-          git apply --check .probe2-fix.patch
-          git apply .probe2-fix.patch
+          cat .probe2-fix-parts/part-* > /tmp/probe2-fix.patch
+          git apply --check /tmp/probe2-fix.patch
+          git apply /tmp/probe2-fix.patch
           git add docs/architecture/profile-generation-advancement.md
           git add profiles/fixtures/valid/research-strict-1.2.0.profile.json
           git add tests/runtime/test_profile_generation_advancement.py

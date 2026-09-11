@@ -1,0 +1,41 @@
+               constraint["value"] = ["captured_hash", "locator", "source_id"]
++            for provenance in constraint.get("provenance", []):
++                if provenance.get("profile_id") == "fixture.research-strict":
++                    provenance["manifest_sha256"] = old_digest
++        for invariant in historical["core_invariants"]:
++            for provenance in invariant.get("provenance", []):
++                if provenance.get("profile_id") == "fixture.research-strict":
++                    provenance["manifest_sha256"] = old_digest
++
++        with tempfile.TemporaryDirectory() as temp:
++            root = Path(temp)
++            cfg = root / "config.json"
++            eps = root / "effective.json"
++            cfg.write_text(json.dumps(config), encoding="utf-8")
++            eps.write_text(json.dumps(historical), encoding="utf-8")
++            opened = LocalWorkspace.init(root / "workspace", project_config_file=cfg, effective_profile_set_file=eps)
++            workspace = opened.root
++            opened.close()
++
++            request = self._resolve_request()
++            request_path = root / "resolve.json"
++            request_path.write_text(json.dumps(request), encoding="utf-8")
++            output = root / "resolved"
++            code, resolved = _run_cli(["profile", "resolve", "--workspace", workspace, "--output", output, "--json", request_path])
++            self.assertEqual(code, 0, resolved)
++            target = json.loads((output / "effective-profile-set.json").read_text(encoding="utf-8"))
++            strict = next(item for item in target["effective_profiles"] if item["profile_id"] == "fixture.research-strict")
++            self.assertEqual(strict["profile_version"], "1.2.0")
++            self.assertNotEqual(strict["manifest_sha256"], old_digest)
++
++            payload = {
++                "project_config_file": str(output / "project-config.json"),
++                "effective_profile_set_file": str(output / "effective-profile-set.json"),
++                "profile_manifest_files": request["profile_manifest_files"],
++                "origin": "probe2-historical-research-strict-regression",
++            }
++            advance_path = root / "advance.json"
++            advance_path.write_text(json.dumps(payload), encoding="utf-8")
++            code, advanced = _run_cli(["profile", "advance", "--workspace", workspace, "--json", advance_path])
++            self.assertEqual(code, 0, advanced)
++            self.assertEqual(advanced["result"

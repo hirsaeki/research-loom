@@ -1,0 +1,28 @@
+diff --git a/docs/architecture/profile-generation-advancement.md b/docs/architecture/profile-generation-advancement.md
+index 25267f2..439fb05 100644
+--- a/docs/architecture/profile-generation-advancement.md
++++ b/docs/architecture/profile-generation-advancement.md
+@@ -25,6 +25,8 @@ Because the Profile ID changes from `fixture.narrative` to `fixture.generic-narr
+ 
+ The production resolver consumes an explicit finite set of canonical Profile manifest files under `profiles/`, resolves direct and transitive version requirements, composes the Effective Profile Set, validates canonical Narrative semantics/Core strengthening, and pins every selected manifest by exact SHA-256. An advancement re-runs that resolution and accepts the proposed EPS only when the exact document is reproduced.
+ 
++Probe2 also pins the pre-PR82 bytes of `fixture.research-strict@1.1.0`, where `evidence.capture.required_fields` used `captured_hash`. The repository later changed that same `1.1.0` fixture to `capture_digest`; Issue #128 deliberately rejects treating those changed bytes as the same historical identity. The Probe2 target therefore supplies `profiles/fixtures/valid/research-strict-1.2.0.profile.json`, which carries the `capture_digest` semantics under a new Profile version. `fixture.organization@2.0.0` already requires `fixture.research-strict >=1.1.0 <2.0.0`, so production resolution selects `1.2.0` transitively without adding a new direct Project Config request.
++
+ ## Legacy publication-writer responsibility mapping
+ 
+ `research-profile/` remains a migration source. Issue #128 only maps the responsibilities needed to understand the A2 transition; it does not migrate the full Human-approved source pack.
+@@ -51,7 +53,7 @@ Example `profile-resolve.json` for the Probe2-style technical smoke:
+   "profile_manifest_files": [
+     "profiles/fixtures/valid/publication.profile.json",
+     "profiles/fixtures/valid/organization.profile.json",
+-    "profiles/fixtures/valid/research-strict.profile.json",
++    "profiles/fixtures/valid/research-strict-1.2.0.profile.json",
+     "profiles/fixtures/valid/research-base.profile.json",
+     "profiles/fixtures/narrative/valid/generic-narrative.profile.json"
+   ],
+@@ -92,7 +94,7 @@ Apply the generated pair explicitly:
+   "profile_manifest_files": [
+     "profiles/fixtures/valid/publication.profile.json",
+     "profiles/fixtures/valid/organization.profile.json",
+-    "profiles/fixtures/valid/research-strict.profile.json",
++    "profiles/fixtures/valid/

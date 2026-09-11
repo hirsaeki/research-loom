@@ -1,0 +1,40 @@
+research-strict-1.2.0.profile.json",
+     "profiles/fixtures/valid/research-base.profile.json",
+     "profiles/fixtures/narrative/valid/generic-narrative.profile.json"
+   ],
+diff --git a/profiles/fixtures/valid/research-strict-1.2.0.profile.json b/profiles/fixtures/valid/research-strict-1.2.0.profile.json
+new file mode 100644
+index 0000000..157117b
+--- /dev/null
++++ b/profiles/fixtures/valid/research-strict-1.2.0.profile.json
+@@ -0,0 +1,20 @@
++{
++  "schema_version": "0.1.0",
++  "profile_id": "fixture.research-strict",
++  "profile_type": "research",
++  "profile_version": "1.2.0",
++  "description": "Synthetic same-type inheritance fixture with capture_digest evidence field.",
++  "core_compatibility": {"research_contract": ">=0.1.0 <0.2.0", "invariant_contract": ">=0.1.0 <0.2.0"},
++  "extends": [{"profile_id": "fixture.research-base", "profile_type": "research", "version": ">=1.0.0 <2.0.0"}],
++  "constraints": [
++    {"id": "FIX-RES-002", "path": "evidence.capture.required_fields", "merge_strategy": "union", "value": ["capture_digest"], "rationale": "Adds one synthetic capture field without replacement."},
++    {"id": "FIX-RES-003", "path": "evidence.capture.locator_precision", "merge_strategy": "must_equal", "value": "exact", "rationale": "Synthetic strengthening tied to Core traceability for fixture coverage."}
++  ],
++  "core_invariant_strengthenings": [{
++    "invariant_id": "CORE-TRACE-001",
++    "effect": "strengthen",
++    "constraint_ids": ["FIX-RES-003"],
++    "validator_binding": {"validator_id": "core.trace.evidence-source", "validator_version": "0.1.0", "form_id": "exact-locator"},
++    "rationale": "The fixture preserves source+locator traceability and adds the registered exact-locator strengthening form."
++  }]
++}
+diff --git a/tests/runtime/test_profile_generation_advancement.py b/tests/runtime/test_profile_generation_advancement.py
+index 94553d9..83a8c12 100644
+--- a/tests/runtime/test_profile_generation_advancement.py
++++ b/tests/runtime/test_profile_generation_advancement.py
+@@ -34,6 +34,7 @@ GENERIC_NARRATIVE = ROOT / "profiles/fixtures/narrative/valid/generic-narrative.
+ PUBLICATION = ROOT / "profiles/fixtures/valid/publication.profile.json"
+ ORGANIZATION = ROOT / "profiles/fixtures/valid/organization.profile.json"
+ RESEARCH_STRICT = ROOT / "profiles/fixtures/valid/research-strict.profile.json"
++RESEARCH_STRICT_NEXT = ROOT / "profiles/fixtures/valid/research-strict-1.2.0.profile.json"
+ RESEARCH_BASE = ROOT / "profiles/fixtures/valid/research

@@ -1,0 +1,19 @@
+], "ADVANCED")
++
+     def test_pa0_production_resolution_rejects_semantically_invalid_narrative_target(self):
+         request = {
+             "profile_manifest_files": [
+-                str(PUBLICATION), str(ORGANIZATION), str(RESEARCH_STRICT), str(RESEARCH_BASE), str(INVALID_NARRATIVE)
++                str(PUBLICATION), str(ORGANIZATION), str(RESEARCH_STRICT_NEXT), str(RESEARCH_BASE), str(INVALID_NARRATIVE)
+             ],
+             "request_replacements": [
+                 {
+@@ -653,7 +716,7 @@ class ProfileGenerationAdvancementTests(ResearchPackageAcceptanceSupport):
+             ))
+             self.assertIsInstance(result, CommitReceipt)
+ 
+-        state_manifests = [str(STATE_PUBLICATION),str(STATE_RESEARCH),str(ORGANIZATION),str(RESEARCH_STRICT),str(RESEARCH_BASE),str(GENERIC_NARRATIVE)]
++        state_manifests = [str(STATE_PUBLICATION),str(STATE_RESEARCH),str(ORGANIZATION),str(RESEARCH_STRICT_NEXT),str(RESEARCH_BASE),str(GENERIC_NARRATIVE)]
+         state_request = self._resolve_request(
+             manifests=state_manifests,
+             extra_replacements=[{
