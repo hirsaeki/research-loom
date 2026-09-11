@@ -1,0 +1,184 @@
++                        raise LocalWorkspaceError("PROFILE-NARRATIVE-VALUE-001", f"Narrative stage identity/role is invalid at {path}")
++                    if not _unique_strings(item["consumes"], set(vocabularies["research_input_kind"])) or not _unique_strings(item["requires"], set(vocabularies["research_input_kind"])) or not _unique_strings(item["produces"], set(vocabularies["narrative_product"])):
++                        raise LocalWorkspaceError("PROFILE-NARRATIVE-VALUE-001", f"Narrative stage vocabulary is invalid at {path}")
++                    normalized = (item["semantic_role"], tuple(sorted(item["consumes"])), tuple(sorted(item["requires"])), tuple(sorted(item["produces"])))
++                    prior = stages.get(item["id"])
++                    if prior is not None and prior != normalized:
++                        raise LocalWorkspaceError("PROFILE-NARRATIVE-IDENTITY-001", f"Narrative stage identity conflicts: {item['id']}")
++                    stages[item["id"]] = normalized
++            elif shape == "dependency_set":
++                for item in value:
++                    if not isinstance(item, Mapping) or set(item) != {"from_stage", "to_stage", "relation"} or not isinstance(item["from_stage"], str) or not item["from_stage"] or not isinstance(item["to_stage"], str) or not item["to_stage"] or item["from_stage"] == item["to_stage"] or item["relation"] not in vocabularies["dependency_relation"]:
++                        raise LocalWorkspaceError("PROFILE-NARRATIVE-VALUE-001", f"Narrative dependency is malformed at {path}")
++                    edge = (item["from_stage"], item["to_stage"])
++                    prior = dependencies.get(edge)
++                    if prior is not None and prior != item["relation"]:
++                        raise LocalWorkspaceError("PROFILE-NARRATIVE-IDENTITY-001", f"Narrative dependency identity conflicts: {edge}")
++                    dependencies[edge] = item["relation"]
++            elif shape == "section_purpose_set":
++                for item in value:
++                    if not isinstance(item, Mapping) or set(item) != {"id", "purpose_role", "stage_ids"} or not isinstance(item["id"], str) or not item["id"] or item["purpose_role"] not in vocabularies["section_purpose_role"] or not isinstance(item["stage_ids"], list) or not item["stage_ids"] or len(item["stage_ids"]) != len(set(item["stage_ids"])) or any(not isinstance(stage_id, str) or not stage_id for stage_id in item["stage_ids"]):
++                        raise LocalWorkspaceError("PROFILE-NARRATIVE-VALUE-001", f"Narrative section purpose is malformed at {path}")
++                    normalized = (item["purpose_role"], tuple(sorted(item["stage_ids"])))
++                    prior = purposes.get(item["id"])
++                    if prior is not None and prior != normalized:
++                        raise LocalWorkspaceError("PROFILE-NARRATIVE-IDENTITY-001", f"Narrative section purpose identity conflicts: {item['id']}")
++                    purposes[item["id"]] = normalized
++
++    for source, target in dependencies:
++        if source not in stages or target not in stages:
++            raise LocalWorkspaceError("PROFILE-NARRATIVE-REF-001", "Narrative dependency references an undeclared stage")
++    for _purpose_id, (_role, stage_ids) in purposes.items():
++        if any(stage_id not in stages for stage_id in stage_ids):
++            raise LocalWorkspaceError("PROFILE-NARRATIVE-REF-001", "Narrative section purpose references an undeclared stage")
++    graph = {stage_id: [] for stage_id in stages}
++    for source, target in dependencies:
++        graph[source].append(target)
++    visiting: set[str] = set()
++    done: set[str] = set()
++
++    def visit(stage_id: str) -> None:
++        if stage_id in visiting:
++            raise LocalWorkspaceError("NARRATIVE-DEPENDENCY-CYCLE-001", "Narrative dependency graph contains a cycle")
++        if stage_id in done:
++            return
++        visiting.add(stage_id)
++        for target in graph[stage_id]:
++            visit(target)
++        visiting.remove(stage_id)
++        done.add(stage_id)
++
++    for stage_id in graph:
++        visit(stage_id)
++
++
++def _compose_constraints(selected: list[Mapping[str, Any]]) -> list[dict[str, Any]]:
++    groups: dict[str, list[tuple[Mapping[str, Any], Mapping[str, Any]]]] = {}
++    for candidate in selected:
++        for declaration in candidate["manifest"].get("constraints", ()):
++            if str(declaration["path"]).startswith("core."):
++                raise LocalWorkspaceError("PROFILE-CORE-INVARIANT-001", "Profile constraint cannot use reserved core.* path")
++            groups.setdefault(str(declaration["path"]), []).append((candidate, declaration))
++
++    result: list[dict[str, Any]] = []
++    for path in sorted(groups):
++        declarations = groups[path]
++        strategies = {str(declaration["merge_strategy"]) for _, declaration in declarations}
++        if len(strategies) != 1:
++            raise LocalWorkspaceError("PROFILE-COMP-STRATEGY-001", f"constraint path {path} has incompatible merge strategies")
++        strategy = next(iter(strategies))
++        values = [declaration["value"] for _, declaration in declarations]
++        if strategy == "union":
++            value = _set_like(member for members in values for member in members)
++            resolution = "single" if len(values) == 1 else "union"
++        elif strategy == "intersection":
++            encoded_sets = [{_canonical_bytes(member) for member in members} for members in values]
++            common = set.intersection(*encoded_sets) if encoded_sets else set()
++            value = [json.loads(encoded.decode("utf-8")) for encoded in sorted(common)]
++            resolution = "single" if len(values) == 1 else "intersection"
++        elif strategy == "must_equal":
++            if any(value != values[0] for value in values[1:]):
++                raise LocalWorkspaceError("PROFILE-COMP-CONFLICT-001", f"must_equal conflict at {path}")
++            value = deepcopy(values[0])
++            resolution = "single" if len(values) == 1 else "identical"
++        elif strategy == "max":
++            value = max(values)
++            resolution = "single" if len(values) == 1 else "max"
++        elif strategy == "min":
++            value = min(values)
++            resolution = "single" if len(values) == 1 else "min"
++        elif strategy == "replace":
++            if any(value != values[0] for value in values[1:]):
++                raise LocalWorkspaceError("PROFILE-COMP-REPLACE-001", f"non-identical replace declarations at {path} require explicit descendant precedence")
++            value = deepcopy(values[0])
++            resolution = "single" if len(values) == 1 else "identical"
++        else:
++            raise LocalWorkspaceError("PROFILE-COMP-STRATEGY-001", f"unsupported merge strategy {strategy}")
++        provenance = [{**_pin(candidate), "constraint_id": declaration["id"]} for candidate, declaration in declarations]
++        provenance.sort(key=_constraint_source_key)
++        result.append({
++            "path": path,
++            "merge_strategy": strategy,
++            "value": value,
++            "resolution": resolution,
++            "provenance": provenance,
++        })
++    return result
++
++
++def _load_yaml(path: Path) -> Mapping[str, Any]:
++    value = yaml.safe_load(path.read_text(encoding="utf-8"))
++    if not isinstance(value, Mapping):
++        raise LocalWorkspaceError("PROFILE-CONTRACT-001", f"canonical YAML contract is invalid: {path}")
++    return value
++
++
++def _strengthening_form(registry: Mapping[str, Any], strengthening: Mapping[str, Any]) -> Mapping[str, Any] | None:
++    invariant = registry["invariants"].get(strengthening["invariant_id"])
++    if not isinstance(invariant, Mapping) or invariant.get("strengthening_policy") != "registered_forms":
++        return None
++    binding = strengthening["validator_binding"]
++    for validator in invariant.get("validators", ()):
++        if validator.get("validator_id") != binding["validator_id"] or validator.get("validator_version") != binding["validator_version"]:
++            continue
++        for form in validator.get("approved_forms", ()):
++            if form.get("form_id") == binding["form_id"]:
++                return form
++    return None
++
++
++def _compose_core_invariants(selected: list[Mapping[str, Any]]) -> list[dict[str, Any]]:
++    catalog = _load_yaml(INVARIANT_CATALOG)
++    registry = _load_yaml(STRENGTHENING_REGISTRY)
++    strengthenings: dict[str, list[dict[str, Any]]] = {}
++    for candidate in selected:
++        manifest = candidate["manifest"]
++        constraints = {str(item["id"]): item for item in manifest.get("constraints", ())}
++        for strengthening in manifest.get("core_invariant_strengthenings", ()):
++            form = _strengthening_form(registry, strengthening)
++            if form is None:
++                raise LocalWorkspaceError("PROFILE-CORE-STRENGTHENING-001", "Profile strengthening does not resolve to a registered validator form")
++            referenced = []
++            for constraint_id in strengthening["constraint_ids"]:
++                constraint = constraints.get(str(constraint_id))
++                if constraint is None:
++                    raise LocalWorkspaceError("PROFILE-MANIFEST-REF-001", "Profile strengthening references an unknown constraint")
++                referenced.append(constraint)
++            for required in form.get("required_constraints", ()):
++                match = next((constraint for constraint in referenced if constraint["path"] == required["path"] and constraint["merge_strategy"] == required["merge_strategy"]), None)
++                if match is None:
++                    raise LocalWorkspaceError("PROFILE-CORE-STRENGTHENING-001", "Profile strengthening does not satisfy registered required constraints")
++                schema = required.get("value_schema") or {}
++                if "const" in schema and match["value"] != schema["const"]:
++                    raise LocalWorkspaceError("PROFILE-CORE-STRENGTHENING-001", "Profile strengthening value does not satisfy registered form")
++            source = {
++                **_pin(candidate),
++                "constraint_ids": list(strengthening["constraint_ids"]),
++                "validator_binding": deepcopy(dict(strengthening["validator_binding"])),
++            }
++            strengthenings.setdefault(str(strengthening["invariant_id"]), []).append(source)
++
++    result = []
++    for item in catalog["invariants"]:
++        invariant_id = str(item["id"])
++        provenance = strengthenings.get(invariant_id, [])
++        provenance.sort(key=lambda source: (
++            _TYPE_RANK[source["profile_type"]], source["profile_id"], _semver(source["profile_version"]), source["manifest_sha256"],
++            source["validator_binding"]["validator_id"], source["validator_binding"]["validator_version"], source["validator_binding"]["form_id"],
++        ))
++        result.append({"invariant_id": invariant_id, "status": "strengthened" if provenance else "preserved", "provenance": provenance})
++    return result
++
++
++def _apply_request_replacements(config: Mapping[str, Any], replacements: list[Mapping[str, Any]]) -> dict[str, Any]:
++    target = deepcopy(dict(config))
++    if not replacements:
++        return target
++    seen_from: set[tuple[str, str, str]] = set()
++    for replacement in replacements:
++        source = replacement.get("from")
++        destination = replacement.get("to")
++        if not isinstance(source, Mapping) or not isinstance(destination, Mapping):
++            raise LocalWorkspaceError("PROFILE-REQUEST-EVOLUTION-001", "each request replacement requires from/to Profile requirements")
++        source_tuple = (str(source.get("profile_type")), str(source.get("profile_id")), str(source.get("version")))
++        if source_tuple in seen_from:

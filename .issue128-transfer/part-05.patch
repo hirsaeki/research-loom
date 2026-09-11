@@ -1,0 +1,244 @@
++                prior = self._connection.execute(
++                    """
++                    SELECT event_id FROM profile_binding_history
++                    WHERE project_ref = ? AND lineage_ref = ?
++                      AND new_project_config_digest = ?
++                      AND new_effective_profile_set_digest = ?
++                    """,
++                    (project_ref, lineage_ref, new_project_config_digest, new_effective_profile_set_digest),
++                ).fetchone()
++                if prior is not None:
++                    raise AtomicCommitError("duplicate Profile binding history transition")
++
++                self._connection.execute(
++                    """
++                    INSERT INTO profile_binding_history(
++                        event_id, project_ref, lineage_ref, applied_at, origin,
++                        old_project_config_digest, new_project_config_digest,
++                        old_effective_profile_set_digest, new_effective_profile_set_digest,
++                        old_project_config_json, new_project_config_json,
++                        old_effective_profile_set_json, new_effective_profile_set_json
++                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
++                    """,
++                    (
++                        event_id, project_ref, lineage_ref, applied_at, origin,
++                        old_project_config_digest, new_project_config_digest,
++                        old_effective_profile_set_digest, new_effective_profile_set_digest,
++                        encode_json(old_project_config), encode_json(new_project_config),
++                        encode_json(old_effective_profile_set), encode_json(new_effective_profile_set),
++                    ),
++                )
++                self._connection.execute(
++                    """
++                    UPDATE project_state SET
++                        project_config_digest = ?, project_config_json = ?,
++                        effective_profile_set_digest = ?, effective_constraints_json = ?
++                    WHERE project_ref = ?
++                    """,
++                    (
++                        new_project_config_digest, encode_json(new_project_config),
++                        new_effective_profile_set_digest, encode_json(new_effective_constraints),
++                        project_ref,
++                    ),
++                )
++                self._connection.execute(
++                    """
++                    UPDATE lineages SET
++                        project_config_digest = ?, effective_profile_set_digest = ?
++                    WHERE lineage_id = ? AND project_ref = ?
++                    """,
++                    (new_project_config_digest, new_effective_profile_set_digest, lineage_ref, project_ref),
++                )
++        except (AtomicCommitError, StaleHeadError):
++            raise
++        except sqlite3.Error as exc:
++            raise AtomicCommitError("Project/Profile binding advancement failed atomically") from exc
++
++    def list_profile_binding_history(
++        self: "SQLiteResearchStateRepository",
++        project_ref: str,
++    ) -> tuple[Mapping[str, Any], ...]:
++        rows = self._connection.execute(
++            """
++            SELECT * FROM profile_binding_history
++            WHERE project_ref = ?
++            ORDER BY applied_at, event_id
++            """,
++            (project_ref,),
++        ).fetchall()
++        result = []
++        for row in rows:
++            result.append({
++                "event_id": str(row["event_id"]),
++                "project_ref": str(row["project_ref"]),
++                "lineage_ref": str(row["lineage_ref"]),
++                "applied_at": str(row["applied_at"]),
++                "origin": str(row["origin"]),
++                "old_project_config_digest": str(row["old_project_config_digest"]),
++                "new_project_config_digest": str(row["new_project_config_digest"]),
++                "old_effective_profile_set_digest": str(row["old_effective_profile_set_digest"]),
++                "new_effective_profile_set_digest": str(row["new_effective_profile_set_digest"]),
++                "old_project_config": decode_json(str(row["old_project_config_json"])),
++                "new_project_config": decode_json(str(row["new_project_config_json"])),
++                "old_effective_profile_set": decode_json(str(row["old_effective_profile_set_json"])),
++                "new_effective_profile_set": decode_json(str(row["new_effective_profile_set_json"])),
++            })
++        return tuple(result)
++
+     def _insert_new_lineage(
+         self: "SQLiteResearchStateRepository",
+         project_ref: str,
++diff --git a/plugins/sqlite_state_store/migrations/0002_profile_binding_history.sql b/plugins/sqlite_state_store/migrations/0002_profile_binding_history.sql
++new file mode 100644
++index 0000000..e75c42e
++--- /dev/null
+++++ b/plugins/sqlite_state_store/migrations/0002_profile_binding_history.sql
++@@ -0,0 +1,30 @@
+++CREATE TABLE profile_binding_history (
+++    event_id TEXT PRIMARY KEY,
+++    project_ref TEXT NOT NULL,
+++    lineage_ref TEXT NOT NULL,
+++    applied_at TEXT NOT NULL,
+++    origin TEXT NOT NULL,
+++    old_project_config_digest TEXT NOT NULL,
+++    new_project_config_digest TEXT NOT NULL,
+++    old_effective_profile_set_digest TEXT NOT NULL,
+++    new_effective_profile_set_digest TEXT NOT NULL,
+++    old_project_config_json TEXT NOT NULL,
+++    new_project_config_json TEXT NOT NULL,
+++    old_effective_profile_set_json TEXT NOT NULL,
+++    new_effective_profile_set_json TEXT NOT NULL,
+++    FOREIGN KEY (project_ref) REFERENCES project_state(project_ref),
+++    FOREIGN KEY (lineage_ref) REFERENCES lineages(lineage_id)
+++);
+++
+++CREATE UNIQUE INDEX profile_binding_history_transition
+++    ON profile_binding_history(
+++        project_ref,
+++        lineage_ref,
+++        old_project_config_digest,
+++        new_project_config_digest,
+++        old_effective_profile_set_digest,
+++        new_effective_profile_set_digest
+++    );
+++
+++CREATE INDEX profile_binding_history_project_time
+++    ON profile_binding_history(project_ref, applied_at, event_id);
++diff --git a/tests/runtime/test_issue128_profile_generation_advancement.py b/tests/runtime/test_issue128_profile_generation_advancement.py
++new file mode 100644
++index 0000000..e28d3d5
++--- /dev/null
+++++ b/tests/runtime/test_issue128_profile_generation_advancement.py
++@@ -0,0 +1,398 @@
+++from __future__ import annotations
+++
+++from copy import deepcopy
+++import hashlib
+++import json
+++from pathlib import Path
+++import subprocess
+++import sys
+++import tempfile
+++import unittest
+++from unittest.mock import patch
+++
+++import rfc8785
+++
+++from core.runtime import canonical_digest
+++from plugins.local_application import LocalApplicationError, LocalApplicationFacade, LocalWorkspace
+++from plugins.local_application.cli import main as cli_main
+++from plugins.local_application.profile_resolution import resolve_profile_generation
+++from plugins.local_application.workspace import LocalWorkspaceError
+++from plugins.sqlite_state_store import SQLiteResearchStateRepository
+++import test_external_desktop_research_intake as intake
+++from research_package_acceptance_support import ResearchPackageAcceptanceSupport
+++
+++ROOT = Path(__file__).resolve().parents[2]
+++GENERIC_NARRATIVE = ROOT / "profiles/fixtures/narrative/valid/generic-narrative.profile.json"
+++OLD_NARRATIVE = ROOT / "profiles/fixtures/valid/narrative.profile.json"
+++BASE_MANIFESTS = [
+++    ROOT / "profiles/fixtures/valid/research-base.profile.json",
+++    ROOT / "profiles/fixtures/valid/research-strict.profile.json",
+++    ROOT / "profiles/fixtures/valid/organization.profile.json",
+++    ROOT / "profiles/fixtures/valid/publication.profile.json",
+++]
+++FIVE_PATHS = {
+++    "narrative.stages.definitions",
+++    "narrative.dependencies.required",
+++    "narrative.section_purposes.definitions",
+++    "narrative.preservation.required_content",
+++    "narrative.connections.preserve",
+++}
+++
+++
+++def _refresh_config(config: dict) -> dict:
+++    payload = deepcopy(config)
+++    payload.pop("configuration_digest", None)
+++    config["configuration_digest"] = "sha256:" + hashlib.sha256(rfc8785.dumps(payload)).hexdigest()
+++    return config
+++
+++
+++def _target_payload(config: dict, manifests: list[Path] | None = None, replacements: list[dict] | None = None) -> dict:
+++    return {
+++        "project_config": deepcopy(config),
+++        "profile_manifest_paths": [str(path) for path in (manifests or [*BASE_MANIFESTS, GENERIC_NARRATIVE])],
+++        "request_replacements": deepcopy(replacements or [{
+++            "from": {"profile_type": "narrative", "profile_id": "fixture.narrative", "version": "1.0.0"},
+++            "to": {"profile_type": "narrative", "profile_id": "fixture.generic-narrative", "version": "1.0.0"},
+++        }]),
+++    }
+++
+++
+++class Issue128ProfileGenerationAdvancementTests(ResearchPackageAcceptanceSupport):
+++    def _write_structured_workspace_inputs(self):
+++        config = intake.bootstrap_config()
+++        effective = json.loads(intake.PROFILE_FIXTURE.read_text(encoding="utf-8"))
+++        cfg = self.root / "project-config-input.json"
+++        eps = self.root / "profiles-input.json"
+++        cfg.write_text(json.dumps(config), encoding="utf-8")
+++        eps.write_text(json.dumps(effective), encoding="utf-8")
+++        return cfg, eps
+++
+++    def _resolve_target(self) -> dict:
+++        config = json.loads((self.workspace / "project-config.json").read_text(encoding="utf-8"))
+++        return resolve_profile_generation(_target_payload(config))
+++
+++    def test_pa0_target_generation_and_legacy_mapping(self):
+++        resolution = self._resolve_target()
+++        constraints = {item["path"] for item in resolution["effective_profile_set"]["effective_constraints"]}
+++        self.assertTrue(FIVE_PATHS <= constraints)
+++        source_request = resolution["source_project_config"]["profile_requests"]["narrative"][0]
+++        target_request = resolution["project_config"]["profile_requests"]["narrative"][0]
+++        self.assertEqual(source_request["profile_id"], "fixture.narrative")
+++        self.assertEqual(target_request["profile_id"], "fixture.generic-narrative")
+++        self.assertNotEqual(resolution["source_project_config"]["configuration_digest"], resolution["project_config_digest"])
+++        doc = (ROOT / "docs/architecture/profile-generation-advancement.md").read_text(encoding="utf-8")
+++        self.assertIn("04_PHASE_SPECIFIC_WRITING_RULES.md", doc)
+++        self.assertIn("06_CONTENT_AND_NARRATIVE_GUARDS.md", doc)
+++        self.assertIn("unconverged", doc.lower())
+++
+++    def test_pa1_pa2_pa3_pa4_same_workspace_recovery(self):
+++        facade, case = self._prepare_case()
+++        try:
+++            before_state = facade._application.state_repository.load_state_view(
+++                facade.project_id,
+++                facade._application.state_repository.load_active_lineage_ref(facade.project_id),
+++            )
+++            before_snapshot = (
+++                before_state.current_snapshot["id"], before_state.current_snapshot["revision"], before_state.current_snapshot["content_digest"]
+++            )
+++            before_objects = deepcopy(before_state.objects)
+++            before_decisions = deepcopy(before_state.decisions)
+++            before_run = facade.show_run(case["run_id"])
+++            before_exhibit = facade.show_exhibit(case["exhibit_id"])
+++            with self.assertRaises(LocalApplicationError) as error:
+++                facade.build_research_package(case["build_input"])
+++            self.assertEqual(error.exception.code, "APPLICATION-RESEARCH-PACKAGE-PROFILE-001")
+++        finally:
+++            facade.close()
+++
+++        resolution = self._resolve_target()
+++        result = LocalApplicationFacade.advance_profile_generation(
+++            self.workspace, {"resolution": resolution, "origin": "issue-128-acceptance"}
+++        )
+++        self.assertEqual(result["status"], "ADVANCED")

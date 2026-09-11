@@ -1,0 +1,255 @@
++        if operator == "<=" and not value <= right:
++            return False
++        if operator == "<" and not value < right:
++            return False
++        if operator == "=" and not value == right:
++            return False
++    return True
++
++
++def _key(value: Mapping[str, Any]) -> tuple[str, str]:
++    return str(value["profile_type"]), str(value["profile_id"])
++
++
++def _key_version(value: Mapping[str, Any]) -> tuple[str, str, str]:
++    return str(value["profile_type"]), str(value["profile_id"]), str(value["profile_version"])
++
++
++def _pin(candidate: Mapping[str, Any]) -> dict[str, str]:
++    manifest = candidate["manifest"]
++    return {
++        "profile_id": str(manifest["profile_id"]),
++        "profile_type": str(manifest["profile_type"]),
++        "profile_version": str(manifest["profile_version"]),
++        "manifest_sha256": str(candidate["manifest_sha256"]),
++    }
++
++
++def _canonical_bytes(value: Any) -> bytes:
++    return rfc8785.dumps(value)
++
++
++def _set_like(values: Iterable[Any]) -> list[Any]:
++    canonical: dict[bytes, Any] = {}
++    for value in values:
++        encoded = _canonical_bytes(value)
++        canonical.setdefault(encoded, json.loads(encoded.decode("utf-8")))
++    return [canonical[key] for key in sorted(canonical)]
++
++
++def _manifest_candidate(path: str | Path) -> dict[str, Any]:
++    profile_path = Path(path)
++    try:
++        raw = profile_path.read_bytes()
++        manifest = json.loads(raw.decode("utf-8"))
++    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
++        raise LocalWorkspaceError("PROFILE-MANIFEST-001", f"cannot read Profile manifest: {profile_path}") from exc
++    if not isinstance(manifest, dict):
++        raise LocalWorkspaceError("PROFILE-MANIFEST-001", f"Profile manifest must be an object: {profile_path}")
++    _schema_validate(manifest, PROFILE_MANIFEST_SCHEMA, "PROFILE-MANIFEST-SCHEMA-001")
++    constraint_ids = [str(item["id"]) for item in manifest.get("constraints", ())]
++    if len(constraint_ids) != len(set(constraint_ids)):
++        raise LocalWorkspaceError("PROFILE-MANIFEST-IDENTITY-001", "Profile manifest repeats a constraint id")
++    resource_paths = [str(item["path"]) for item in manifest.get("resources", ())]
++    if len(resource_paths) != len(set(resource_paths)):
++        raise LocalWorkspaceError("PROFILE-MANIFEST-IDENTITY-001", "Profile manifest repeats a resource path")
++    return {
++        "manifest": manifest,
++        "manifest_sha256": hashlib.sha256(raw).hexdigest(),
++        "path": str(profile_path),
++    }
++
++
++def _core_compatible(manifest: Mapping[str, Any], core_contracts: Mapping[str, str]) -> bool:
++    compatibility = manifest["core_compatibility"]
++    return _satisfies(core_contracts["research_contract"], str(compatibility["research_contract"])) and _satisfies(
++        core_contracts["invariant_contract"], str(compatibility["invariant_contract"])
++    )
++
++
++def _assignment_valid(
++    assignment: Mapping[tuple[str, str], Mapping[str, Any] | None],
++    requests: list[Mapping[str, Any]],
++    core_contracts: Mapping[str, str],
++) -> bool:
++    selected = {key: value for key, value in assignment.items() if value is not None}
++    requested_keys = {_key(item) for item in requests}
++    for request in requests:
++        candidate = selected.get(_key(request))
++        if candidate is None or not _satisfies(str(candidate["manifest"]["profile_version"]), str(request["version"])):
++            return False
++
++    reachable = set(requested_keys)
++    frontier = list(requested_keys)
++    while frontier:
++        key = frontier.pop()
++        candidate = selected.get(key)
++        if candidate is None:
++            return False
++        manifest = candidate["manifest"]
++        if not _core_compatible(manifest, core_contracts):
++            return False
++        for relation in ("extends", "requires"):
++            for dependency in manifest.get(relation, ()):
++                dependency_key = _key(dependency)
++                if relation == "extends" and dependency["profile_type"] != manifest["profile_type"]:
++                    return False
++                target = selected.get(dependency_key)
++                if target is None or not _satisfies(str(target["manifest"]["profile_version"]), str(dependency["version"])):
++                    return False
++                if dependency_key not in reachable:
++                    reachable.add(dependency_key)
++                    frontier.append(dependency_key)
++    if set(selected) != reachable:
++        return False
++
++    graph = {key: [] for key in selected}
++    for key, candidate in selected.items():
++        for relation in ("extends", "requires"):
++            for dependency in candidate["manifest"].get(relation, ()):
++                graph[key].append(_key(dependency))
++    visiting: set[tuple[str, str]] = set()
++    done: set[tuple[str, str]] = set()
++
++    def visit(key: tuple[str, str]) -> bool:
++        if key in visiting:
++            return False
++        if key in done:
++            return True
++        visiting.add(key)
++        if any(not visit(dependency) for dependency in graph[key]):
++            return False
++        visiting.remove(key)
++        done.add(key)
++        return True
++
++    return all(visit(key) for key in graph)
++
++
++def _selection_key(source: Mapping[str, Any]) -> tuple[Any, ...]:
++    relation_rank = {"requested": 0, "extends": 1, "requires": 2}
++    introduced = source.get("introduced_by") or {
++        "profile_type": "research",
++        "profile_id": "",
++        "profile_version": "0.0.0",
++        "manifest_sha256": "",
++    }
++    return (
++        relation_rank[str(source["relation"])],
++        _TYPE_RANK[str(introduced["profile_type"])],
++        str(introduced["profile_id"]),
++        _semver(str(introduced["profile_version"])),
++        str(introduced["manifest_sha256"]),
++        str(source["required_version"]),
++    )
++
++
++def _resolve_candidates(candidates: list[Mapping[str, Any]], requests: list[Mapping[str, Any]], core_contracts: Mapping[str, str]) -> list[dict[str, Any]]:
++    identities: dict[tuple[str, str, str], str] = {}
++    by_key: dict[tuple[str, str], list[Mapping[str, Any]]] = {}
++    for candidate in candidates:
++        key_version = _key_version(candidate["manifest"])
++        prior = identities.get(key_version)
++        if prior is not None and prior != candidate["manifest_sha256"]:
++            raise LocalWorkspaceError("PROFILE-CANDIDATE-IDENTITY-001", "same Profile id/version maps to different manifest content")
++        identities[key_version] = str(candidate["manifest_sha256"])
++        by_key.setdefault(_key(candidate["manifest"]), []).append(candidate)
++
++    keys = sorted(by_key, key=lambda key: (_TYPE_RANK[key[0]], key[1]))
++    choices = [[None] + sorted(by_key[key], key=lambda item: _semver(str(item["manifest"]["profile_version"]))) for key in keys]
++    solutions = []
++    for combination in itertools.product(*choices):
++        assignment = dict(zip(keys, combination))
++        if _assignment_valid(assignment, requests, core_contracts):
++            solutions.append(assignment)
++    if not solutions:
++        raise LocalWorkspaceError("PROFILE-VERSION-001", "no dependency-closed Profile assignment satisfies the direct requests")
++
++    absent = (-1, -1, -1)
++    winner = max(
++        solutions,
++        key=lambda assignment: tuple(
++            absent if assignment[key] is None else _semver(str(assignment[key]["manifest"]["profile_version"]))
++            for key in keys
++        ),
++    )
++    selected = {key: candidate for key, candidate in winner.items() if candidate is not None}
++    effective: list[dict[str, Any]] = []
++    for key in sorted(selected, key=lambda item: (_TYPE_RANK[item[0]], item[1])):
++        candidate = selected[key]
++        sources: list[dict[str, Any]] = []
++        for request in requests:
++            if _key(request) == key:
++                sources.append({"relation": "requested", "required_version": request["version"]})
++        for introducing in selected.values():
++            for relation in ("extends", "requires"):
++                for dependency in introducing["manifest"].get(relation, ()):
++                    if _key(dependency) == key:
++                        sources.append({
++                            "relation": relation,
++                            "introduced_by": _pin(introducing),
++                            "required_version": dependency["version"],
++                        })
++        sources.sort(key=_selection_key)
++        effective.append({**_pin(candidate), "selection_provenance": sources})
++    return effective
++
++
++def _selected_candidates(candidates: list[Mapping[str, Any]], effective: list[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
++    pins = {(item["profile_type"], item["profile_id"], item["profile_version"], item["manifest_sha256"]) for item in effective}
++    return [candidate for candidate in candidates if (
++        candidate["manifest"]["profile_type"], candidate["manifest"]["profile_id"], candidate["manifest"]["profile_version"], candidate["manifest_sha256"]
++    ) in pins]
++
++
++def _constraint_source_key(source: Mapping[str, Any]) -> tuple[Any, ...]:
++    return (
++        _TYPE_RANK[str(source["profile_type"])],
++        str(source["profile_id"]),
++        _semver(str(source["profile_version"])),
++        str(source["manifest_sha256"]),
++        str(source["constraint_id"]),
++    )
++
++
++def _unique_strings(value: Any, allowed: set[str]) -> bool:
++    return (
++        isinstance(value, list)
++        and len(value) == len(set(value))
++        and all(isinstance(item, str) and item in allowed for item in value)
++    )
++
++
++def _validate_narrative_semantics(selected: list[Mapping[str, Any]]) -> None:
++    catalog = _load_yaml(NARRATIVE_SEMANTICS)
++    specs = {str(item["path"]): item for item in catalog["constraint_paths"]}
++    vocabularies = catalog["vocabularies"]
++    stages: dict[str, tuple[Any, ...]] = {}
++    purposes: dict[str, tuple[Any, ...]] = {}
++    dependencies: dict[tuple[str, str], str] = {}
++
++    for candidate in selected:
++        manifest = candidate["manifest"]
++        for constraint in manifest.get("constraints", ()):
++            path = str(constraint["path"])
++            if not path.startswith("narrative."):
++                continue
++            if manifest["profile_type"] != "narrative":
++                raise LocalWorkspaceError("PROFILE-NARRATIVE-OWNER-001", "narrative.* constraints are owned by Narrative Profiles")
++            spec = specs.get(path)
++            if spec is None:
++                raise LocalWorkspaceError("PROFILE-NARRATIVE-PATH-001", f"Narrative constraint path is not canonical: {path}")
++            if constraint["merge_strategy"] != spec["merge_strategy"]:
++                raise LocalWorkspaceError("PROFILE-NARRATIVE-MERGE-001", f"Narrative merge strategy is invalid at {path}")
++            value = constraint["value"]
++            if not isinstance(value, list):
++                raise LocalWorkspaceError("PROFILE-NARRATIVE-VALUE-001", f"Narrative value must be an array at {path}")
++            shape = spec["value_shape"]
++            if shape == "enum_set":
++                if not _unique_strings(value, set(vocabularies[spec["vocabulary"]])):
++                    raise LocalWorkspaceError("PROFILE-NARRATIVE-VALUE-001", f"Narrative vocabulary value is invalid at {path}")
++            elif shape == "stage_set":
++                for item in value:
++                    if not isinstance(item, Mapping) or set(item) != {"id", "semantic_role", "consumes", "requires", "produces"}:
++                        raise LocalWorkspaceError("PROFILE-NARRATIVE-VALUE-001", f"Narrative stage is malformed at {path}")
++                    if not isinstance(item["id"], str) or not item["id"] or item["semantic_role"] not in vocabularies["semantic_role"]:

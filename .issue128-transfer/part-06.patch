@@ -1,0 +1,181 @@
++        history = LocalApplicationFacade.profile_binding_history(self.workspace)
++        self.assertEqual(len(history["history"]), 1)
++        event = history["history"][0]
++        self.assertEqual(event["old_project_config"], resolution["source_project_config"])
++        self.assertEqual(event["new_project_config"], resolution["project_config"])
++        self.assertEqual(event["new_effective_profile_set"], resolution["effective_profile_set"])
++
++        reopened = LocalApplicationFacade.open_workspace(self.workspace)
++        try:
++            state = reopened._application.state_repository.load_state_view(
++                reopened.project_id,
++                reopened._application.state_repository.load_active_lineage_ref(reopened.project_id),
++            )
++            after_snapshot = (
++                state.current_snapshot["id"], state.current_snapshot["revision"], state.current_snapshot["content_digest"]
++            )
++            self.assertEqual(after_snapshot, before_snapshot)
++            self.assertEqual(state.objects, before_objects)
++            self.assertEqual(state.decisions, before_decisions)
++            self.assertEqual(reopened.show_run(case["run_id"]), before_run)
++            self.assertEqual(reopened.show_exhibit(case["exhibit_id"]), before_exhibit)
++
++            built = reopened.build_research_package(case["build_input"])
++            package_id = built["package"]["package_id"]
++            shown = reopened.show_research_package(package_id)["package"]
++            self.assertEqual(shown["project_config_digest"], resolution["project_config_digest"])
++            self.assertEqual(shown["effective_profile_set"]["content_digest"], resolution["effective_profile_set_digest"])
++            paths = {item["path"] for item in shown["resolved_profiles"]["effective_constraints"]}
++            self.assertTrue(FIVE_PATHS <= paths)
++            export_root = self.root / "detached"
++            reopened.export_research_package(package_id, export_root)
++            from plugins.local_application.research_package_service import verify_export_root
++            verified = verify_export_root(export_root)
++            self.assertEqual(verified["status"], "VERIFIED")
++            code = (
++                "import json,sys; from pathlib import Path; "
++                "p=json.loads((Path(sys.argv[1])/'research-package.json').read_text()); "
++                "paths={x['path'] for x in p['resolved_profiles']['effective_constraints']}; "
++                f"required={FIVE_PATHS!r}; "
++                "assert required <= paths; "
++                f"assert p['project_config_digest']=={resolution['project_config_digest']!r}; "
++                f"assert p['effective_profile_set']['content_digest']=={resolution['effective_profile_set_digest']!r}; "
++                "assert p['resolved_content']['working_material']['research_exhibits']; "
++                "texts=[]; "
++                "[(texts.append(q.read_text(encoding='utf-8'))) for q in Path(sys.argv[1]).rglob('*') if q.is_file() and q.suffix in {'.txt','.md','.json'}]; "
++                f"assert {case['source_text']!r} in '\\n'.join(texts); "
++                "print(p['package_id'],p['package_digest'])"
++            )
++            completed = subprocess.run([sys.executable, "-c", code, str(export_root)], text=True, capture_output=True)
++            self.assertEqual(completed.returncode, 0, completed.stderr)
++            state_after_package = reopened._application.state_repository.load_state_view(
++                reopened.project_id,
++                reopened._application.state_repository.load_active_lineage_ref(reopened.project_id),
++            )
++            self.assertEqual(
++                (state_after_package.current_snapshot["id"], state_after_package.current_snapshot["revision"], state_after_package.current_snapshot["content_digest"]),
++                before_snapshot,
++            )
++        finally:
++            reopened.close()
++
++    def test_pa5_rejects_bad_digest_request_mismatch_and_invalid_narrative_semantics(self):
++        resolution = self._resolve_target()
++        bad_digest = deepcopy(resolution)
++        bad_digest["effective_profile_set_digest"] = "sha256:" + "0" * 64
++        with self.assertRaises(LocalApplicationError) as error:
++            LocalApplicationFacade.advance_profile_generation(self.workspace, {"resolution": bad_digest})
++        self.assertEqual(error.exception.code, "WORKSPACE-PROFILE-EVOLUTION-DIGEST-001")
++
++        mismatch = deepcopy(resolution)
++        mismatch["effective_profile_set"]["requested_profiles"][0]["version"] = "9.9.9"
++        mismatch["effective_profile_set_digest"] = canonical_digest(mismatch["effective_profile_set"])
++        with self.assertRaises(LocalApplicationError) as error:
++            LocalApplicationFacade.advance_profile_generation(self.workspace, {"resolution": mismatch})
++        self.assertEqual(error.exception.code, "WORKSPACE-PROFILE-EVOLUTION-PROVENANCE-001")
++
++        invalid = json.loads(GENERIC_NARRATIVE.read_text(encoding="utf-8"))
++        invalid["profile_id"] = "fixture.invalid-narrative"
++        invalid["profile_version"] = "2.0.0"
++        invalid["constraints"][0]["value"][0]["semantic_role"] = "not-a-canonical-role"
++        invalid_path = self.root / "invalid-narrative.profile.json"
++        invalid_path.write_text(json.dumps(invalid), encoding="utf-8")
++        config = json.loads((self.workspace / "project-config.json").read_text(encoding="utf-8"))
++        payload = _target_payload(config, manifests=[*BASE_MANIFESTS, invalid_path], replacements=[{
++            "from": {"profile_type": "narrative", "profile_id": "fixture.narrative", "version": "1.0.0"},
++            "to": {"profile_type": "narrative", "profile_id": "fixture.invalid-narrative", "version": "2.0.0"},
++        }])
++        with self.assertRaises(LocalWorkspaceError) as error:
++            resolve_profile_generation(payload)
++        self.assertEqual(error.exception.code, "PROFILE-NARRATIVE-VALUE-001")
++        self.assertEqual(LocalApplicationFacade.profile_binding_history(self.workspace)["history"], [])
++
++    def test_pa5_rejects_tamper_and_out_of_scope_project_change(self):
++        resolution = self._resolve_target()
++        tampered = deepcopy(resolution)
++        tampered["project_config"]["project"]["title"] = "unauthorized semantic change"
++        _refresh_config(tampered["project_config"])
++        tampered["project_config_digest"] = tampered["project_config"]["configuration_digest"]
++        with self.assertRaises(LocalApplicationError) as error:
++            LocalApplicationFacade.advance_profile_generation(self.workspace, {"resolution": tampered})
++        self.assertEqual(error.exception.code, "WORKSPACE-PROFILE-EVOLUTION-PROVENANCE-001")
++        opened = LocalApplicationFacade.open_workspace(self.workspace)
++        try:
++            state = opened._application.state_repository.load_state_view(
++                opened.project_id, opened._application.state_repository.load_active_lineage_ref(opened.project_id)
++            )
++            self.assertEqual(state.project_config_digest, resolution["source_project_config"]["configuration_digest"])
++        finally:
++            opened.close()
++        self.assertEqual(LocalApplicationFacade.profile_binding_history(self.workspace)["history"], [])
++
++    def test_pa5_rejects_same_id_version_content_substitution(self):
++        first = self._resolve_target()
++        LocalApplicationFacade.advance_profile_generation(self.workspace, {"resolution": first})
++        mutated_path = self.root / "generic-mutated.profile.json"
++        mutated = json.loads(GENERIC_NARRATIVE.read_text(encoding="utf-8"))
++        mutated["description"] = "same identity/version but different bytes"
++        mutated_path.write_text(json.dumps(mutated), encoding="utf-8")
++        current = json.loads((self.workspace / "project-config.json").read_text(encoding="utf-8"))
++        second = resolve_profile_generation({
++            "project_config": current,
++            "profile_manifest_paths": [str(path) for path in [*BASE_MANIFESTS, mutated_path]],
++            "request_replacements": [],
++        })
++        with self.assertRaises(LocalApplicationError) as error:
++            LocalApplicationFacade.advance_profile_generation(self.workspace, {"resolution": second})
++        self.assertEqual(error.exception.code, "WORKSPACE-PROFILE-EVOLUTION-IDENTITY-001")
++        self.assertEqual(len(LocalApplicationFacade.profile_binding_history(self.workspace)["history"]), 1)
++
++    def test_pa5_rejects_core_strengthening_weakening(self):
++        current = self._resolve_target()
++        LocalApplicationFacade.advance_profile_generation(self.workspace, {"resolution": current})
++        publication = json.loads((ROOT / "profiles/fixtures/valid/publication.profile.json").read_text(encoding="utf-8"))
++        publication["profile_id"] = "fixture.publication-unstrengthened"
++        publication["profile_version"] = "2.0.0"
++        publication.pop("requires", None)
++        path = self.root / "publication-unstrengthened.profile.json"
++        path.write_text(json.dumps(publication), encoding="utf-8")
++        config = json.loads((self.workspace / "project-config.json").read_text(encoding="utf-8"))
++        target = resolve_profile_generation({
++            "project_config": config,
++            "profile_manifest_paths": [str(GENERIC_NARRATIVE), str(path)],
++            "request_replacements": [{
++                "from": {"profile_type": "publication", "profile_id": "fixture.publication", "version": "1.0.0"},
++                "to": {"profile_type": "publication", "profile_id": "fixture.publication-unstrengthened", "version": "2.0.0"},
++            }],
++        })
++        with self.assertRaises(LocalApplicationError) as error:
++            LocalApplicationFacade.advance_profile_generation(self.workspace, {"resolution": target})
++        self.assertEqual(error.exception.code, "WORKSPACE-PROFILE-EVOLUTION-CORE-001")
++
++
++    def test_pa5_rejects_target_incompatible_with_authoritative_evidence(self):
++        facade, case = self._prepare_case()
++        try:
++            pending = facade.submit_action({
++                "action_type": "state.apply_candidate",
++                "payload": {"state_delta_proposal_id": case["proposal"]["proposal_id"]},
++                "actor_id": "HUMAN-I128",
++            })
++            succeeded = facade.submit_confirmation({
++                "confirmation_request_id": pending["confirmation_request"]["confirmation_request_id"],
++                "actor_id": "HUMAN-I128",
++            })
++            self.assertEqual(succeeded["status"], "SUCCEEDED")
++        finally:
++            facade.close()
++
++        strict = json.loads((ROOT / "profiles/fixtures/valid/research-strict.profile.json").read_text(encoding="utf-8"))
++        strict["profile_version"] = "1.2.0"
++        strict["constraints"][0]["value"] = ["capture_digest", "operator_verified"]
++        strict_path = self.root / "research-strict-1.2-incompatible.profile.json"
++        strict_path.write_text(json.dumps(strict), encoding="utf-8")
++        config = json.loads((self.workspace / "project-config.json").read_text(encoding="utf-8"))
++        target = resolve_profile_generation(_target_payload(
++            config,
++            manifests=[ROOT / "profiles/fixtures/valid/research-base.profile.json", ROOT / "profiles/fixtures/valid/research-strict.profile.json", strict_path, ROOT / "profiles/fixtures/valid/organization.profile.json", ROOT / "profiles/fixtures/valid/publication.profile.json", GENERIC_NARRATIVE],
++        ))
++        with self.assertRaises(LocalApplicationError) as error:
++            LocalApplicationFacade.advance_profile_generation(self.workspace, {"resolution": target})
++        self.assertEqual(error.exception.code, "WORKSPACE-PROFILE-EVOLUTION-CONSTRAINT-001")

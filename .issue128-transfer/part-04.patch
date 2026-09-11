@@ -1,0 +1,211 @@
++            reproduced = resolve_profile_generation({
++                "project_config": source_config,
++                "profile_manifest_paths": manifest_paths,
++                "request_replacements": replacements,
++            })
++            if dict(reproduced["project_config"]) != dict(target_config) or dict(reproduced["effective_profile_set"]) != dict(target_effective):
++                raise LocalWorkspaceError("WORKSPACE-PROFILE-EVOLUTION-PROVENANCE-001", "target Project/Profile generation does not reproduce from declared canonical Profile manifests")
++            target_config_digest = str(target_config["configuration_digest"])
++            target_profile_digest = canonical_digest(target_effective)
++            if str(resolution.get("project_config_digest")) != target_config_digest or str(resolution.get("effective_profile_set_digest")) != target_profile_digest:
++                raise LocalWorkspaceError("WORKSPACE-PROFILE-EVOLUTION-DIGEST-001", "resolved target digest does not match target content")
++            if str(target_config["project"]["project_id"]) != opened.project_id:
++                raise LocalWorkspaceError("WORKSPACE-PROFILE-EVOLUTION-PROJECT-001", "Profile generation advancement cannot change project identity")
++            _schema_validate(target_config, PROJECT_CONFIG_SCHEMA, "WORKSPACE-PROJECT-CONFIG-SCHEMA-001")
++            _schema_validate(target_effective, EFFECTIVE_PROFILE_SET_SCHEMA, "WORKSPACE-PROFILE-SET-SCHEMA-001")
++            _validate_project_semantics(target_config)
++            _validate_profile_binding(target_config, target_effective)
++            _validate_profile_identity_evolution(opened.effective_profile_set, target_effective)
++            _validate_no_core_strengthening_weakening(opened.effective_profile_set, target_effective)
++
++            repository = opened.application.state_repository
++            active_lineage = repository.load_active_lineage_ref(opened.project_id)
++            state = repository.load_state_view(opened.project_id, active_lineage)
++            _validate_authoritative_state_against_constraints(state, target_effective)
++
++            old_config_digest = str(opened.binding["project_config"]["digest"])
++            old_profile_digest = str(opened.binding["effective_profile_set"]["digest"])
++            if old_config_digest == target_config_digest and old_profile_digest == target_profile_digest:
++                return {
++                    "status": "NOOP",
++                    "project_id": opened.project_id,
++                    "active_lineage": active_lineage,
++                    "project_config_digest": old_config_digest,
++                    "effective_profile_set_digest": old_profile_digest,
++                }
++
++            new_binding = deepcopy(dict(opened.binding))
++            new_binding["project_config"] = {"locator": PROJECT_CONFIG_NAME, "digest": target_config_digest}
++            new_binding["effective_profile_set"] = {"locator": EFFECTIVE_PROFILE_SET_NAME, "digest": target_profile_digest}
++            recovery = {
++                "project_id": opened.project_id,
++                "old_project_config": deepcopy(dict(opened.project_config)),
++                "new_project_config": deepcopy(dict(target_config)),
++                "old_effective_profile_set": deepcopy(dict(opened.effective_profile_set)),
++                "new_effective_profile_set": deepcopy(dict(target_effective)),
++                "old_binding": deepcopy(dict(opened.binding)),
++                "new_binding": deepcopy(new_binding),
++            }
++            _atomic_json_write(marker, recovery)
++            _atomic_json_write(root / PROJECT_CONFIG_NAME, target_config)
++            _atomic_json_write(root / EFFECTIVE_PROFILE_SET_NAME, target_effective)
++            _atomic_json_write(root / INTERNAL_DIR / BINDING_NAME, new_binding)
++
++            event_id = opened.application.ids.new("PBE-")
++            applied_at = opened.application.clock.now()
++            repository.advance_project_profile_binding(
++                project_ref=opened.project_id,
++                lineage_ref=active_lineage,
++                old_project_config_digest=old_config_digest,
++                new_project_config_digest=target_config_digest,
++                new_project_config=target_config,
++                old_effective_profile_set_digest=old_profile_digest,
++                new_effective_profile_set_digest=target_profile_digest,
++                old_project_config=opened.project_config,
++                old_effective_profile_set=opened.effective_profile_set,
++                new_effective_profile_set=target_effective,
++                new_effective_constraints=_effective_constraints_map(target_effective),
++                event_id=event_id,
++                applied_at=applied_at,
++                origin=origin,
++            )
++            marker.unlink()
++            return {
++                "status": "ADVANCED",
++                "event_id": event_id,
++                "project_id": opened.project_id,
++                "active_lineage": active_lineage,
++                "old_project_config_digest": old_config_digest,
++                "new_project_config_digest": target_config_digest,
++                "old_effective_profile_set_digest": old_profile_digest,
++                "new_effective_profile_set_digest": target_profile_digest,
++                "applied_at": applied_at,
++                "origin": origin,
++            }
++        except Exception:
++            opened.close()
++            with suppress(Exception):
++                _recover_profile_advancement(root)
++            raise
++        finally:
++            with suppress(Exception):
++                opened.close()
++
++    @classmethod
++    def profile_binding_history(cls, workspace: str | Path) -> Mapping[str, Any]:
++        opened = cls.open(workspace)
++        try:
++            rows = opened.application.state_repository.list_profile_binding_history(opened.project_id)
++            checked = []
++            for row in rows:
++                old_config = row["old_project_config"]
++                new_config = row["new_project_config"]
++                old_effective = row["old_effective_profile_set"]
++                new_effective = row["new_effective_profile_set"]
++                for config, expected in ((old_config, row["old_project_config_digest"]), (new_config, row["new_project_config_digest"])):
++                    _schema_validate(config, PROJECT_CONFIG_SCHEMA, "WORKSPACE-PROJECT-CONFIG-SCHEMA-001")
++                    _validate_project_semantics(config)
++                    if _project_configuration_digest(config) != expected:
++                        raise LocalWorkspaceError("WORKSPACE-PROFILE-HISTORY-001", "historical Project Config digest mismatch")
++                for effective, expected in ((old_effective, row["old_effective_profile_set_digest"]), (new_effective, row["new_effective_profile_set_digest"])):
++                    _schema_validate(effective, EFFECTIVE_PROFILE_SET_SCHEMA, "WORKSPACE-PROFILE-SET-SCHEMA-001")
++                    if canonical_digest(effective) != expected:
++                        raise LocalWorkspaceError("WORKSPACE-PROFILE-HISTORY-001", "historical Effective Profile Set digest mismatch")
++                _validate_profile_binding(old_config, old_effective)
++                _validate_profile_binding(new_config, new_effective)
++                checked.append(deepcopy(dict(row)))
++            return {
++                "status": "OK",
++                "project_id": opened.project_id,
++                "current": {
++                    "project_config_digest": opened.binding["project_config"]["digest"],
++                    "effective_profile_set_digest": opened.binding["effective_profile_set"]["digest"],
++                },
++                "history": checked,
++            }
++        finally:
++            opened.close()
++
+     @classmethod
+     def open(cls, workspace: str | Path) -> OpenedLocalWorkspace:
+         root = _assert_safe_workspace_root(Path(workspace))
+         if not root.is_dir():
+             raise LocalWorkspaceError("WORKSPACE-MISSING-001", "workspace directory does not exist")
+         internal = _safe_locator(root, INTERNAL_DIR)
++        _recover_profile_advancement(root)
+         if (internal / INITIALIZING_MARKER).exists():
+             raise LocalWorkspaceError("WORKSPACE-PARTIAL-001", "workspace initialization is incomplete")
+         binding_path = _safe_locator(root, f"{INTERNAL_DIR}/{BINDING_NAME}")
+diff --git a/plugins/sqlite_state_store/_write.py b/plugins/sqlite_state_store/_write.py
+index f98d5a6..9cd9360 100644
+--- a/plugins/sqlite_state_store/_write.py
++++ b/plugins/sqlite_state_store/_write.py
+@@ -17,7 +17,7 @@ from core.runtime.transition_models import (
+     canonical_json,
+ )
+ 
+-from ._support import encode_json, object_key, receipt_from_json, verify_embedded_content_digest
++from ._support import decode_json, encode_json, object_key, receipt_from_json, verify_embedded_content_digest
+ 
+ if TYPE_CHECKING:
+     from .adapter import SQLiteResearchStateRepository
+@@ -462,6 +462,149 @@ class WriteMixin:
+             ),
+         )
+ 
++
++    def advance_project_profile_binding(
++        self: "SQLiteResearchStateRepository",
++        *,
++        project_ref: str,
++        lineage_ref: str,
++        old_project_config_digest: str,
++        new_project_config_digest: str,
++        new_project_config: Mapping[str, Any],
++        old_effective_profile_set_digest: str,
++        new_effective_profile_set_digest: str,
++        old_project_config: Mapping[str, Any],
++        old_effective_profile_set: Mapping[str, Any],
++        new_effective_profile_set: Mapping[str, Any],
++        new_effective_constraints: Mapping[str, Any],
++        event_id: str,
++        applied_at: str,
++        origin: str,
++    ) -> None:
++        """Atomically rebind only the current Project/Profile generation.
++
++        Research objects, snapshots, decisions, and non-active historical lineages are
++        not revised. The history row is committed in the same SQLite transaction as
++        the current project/active-lineage pin update.
++        """
++        try:
++            with self._write_transaction():
++                project = self._connection.execute(
++                    "SELECT * FROM project_state WHERE project_ref = ?",
++                    (project_ref,),
++                ).fetchone()
++                if project is None:
++                    raise AtomicCommitError(f"unknown project {project_ref!r}")
++                if (
++                    str(project["project_config_digest"]) != old_project_config_digest
++                    or str(project["effective_profile_set_digest"]) != old_effective_profile_set_digest
++                ):
++                    raise StaleHeadError("Project/Profile binding changed before advancement")
++                active = self._connection.execute(
++                    "SELECT active_lineage_ref FROM project_active_lineage WHERE project_ref = ?",
++                    (project_ref,),
++                ).fetchone()
++                if active is None or str(active["active_lineage_ref"]) != lineage_ref:
++                    raise StaleHeadError("active Research Lineage changed before advancement")
++                lineage = self._connection.execute(
++                    "SELECT * FROM lineages WHERE lineage_id = ? AND project_ref = ?",
++                    (lineage_ref, project_ref),
++                ).fetchone()
++                if lineage is None:
++                    raise AtomicCommitError("active Research Lineage does not resolve")
++                if (
++                    str(lineage["project_config_digest"]) != old_project_config_digest
++                    or str(lineage["effective_profile_set_digest"]) != old_effective_profile_set_digest
++                ):
++                    raise StaleHeadError("active Research Lineage binding changed before advancement")
++

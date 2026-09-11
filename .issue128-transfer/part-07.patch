@@ -1,0 +1,118 @@
++        self.assertEqual(LocalApplicationFacade.profile_binding_history(self.workspace)["history"], [])
++
++    def test_public_cli_resolve_advance_and_history(self):
++        import io
++        from contextlib import redirect_stdout
++        from unittest.mock import patch as mock_patch
++        config = json.loads((self.workspace / "project-config.json").read_text(encoding="utf-8"))
++        resolve_input = self.root / "resolve-input.json"
++        resolve_input.write_text(json.dumps(_target_payload(config)), encoding="utf-8")
++        stream = io.StringIO()
++        with redirect_stdout(stream):
++            code = cli_main(["profile", "resolve", "--json", str(resolve_input)])
++        self.assertEqual(code, 0)
++        resolved = json.loads(stream.getvalue())
++        advance_input = self.root / "advance-input.json"
++        advance_input.write_text(json.dumps({"resolution": resolved, "origin": "cli-acceptance"}), encoding="utf-8")
++        stream = io.StringIO()
++        with redirect_stdout(stream):
++            code = cli_main(["profile", "advance", "--workspace", str(self.workspace), "--json", str(advance_input)])
++        self.assertEqual(code, 0)
++        self.assertEqual(json.loads(stream.getvalue())["status"], "ADVANCED")
++        stream = io.StringIO()
++        with redirect_stdout(stream):
++            code = cli_main(["profile", "history", "--workspace", str(self.workspace), "--json"])
++        self.assertEqual(code, 0)
++        history = json.loads(stream.getvalue())
++        self.assertEqual(len(history["history"]), 1)
++        self.assertEqual(history["history"][0]["origin"], "cli-acceptance")
++
++    def test_pa6_write_failure_recovers_old_binding_and_reapply_is_noop(self):
++        resolution = self._resolve_target()
++        from plugins.local_application import workspace as workspace_module
++        original = workspace_module._atomic_json_write
++        calls = {"count": 0}
++        def fail_once(path, value):
++            calls["count"] += 1
++            if calls["count"] == 3:
++                raise OSError("fixture write failure")
++            return original(path, value)
++        with patch("plugins.local_application.workspace._atomic_json_write", side_effect=fail_once):
++            with self.assertRaises(OSError):
++                LocalWorkspace.advance_profile_generation(self.workspace, resolution)
++        reopened = LocalApplicationFacade.open_workspace(self.workspace)
++        try:
++            state = reopened._application.state_repository.load_state_view(
++                reopened.project_id, reopened._application.state_repository.load_active_lineage_ref(reopened.project_id)
++            )
++            self.assertEqual(state.project_config_digest, resolution["source_project_config"]["configuration_digest"])
++            self.assertEqual(state.effective_profile_set_digest, canonical_digest(json.loads(intake.PROFILE_FIXTURE.read_text(encoding="utf-8"))))
++        finally:
++            reopened.close()
++        self.assertEqual(LocalApplicationFacade.profile_binding_history(self.workspace)["history"], [])
++        advanced = LocalApplicationFacade.advance_profile_generation(self.workspace, {"resolution": resolution})
++        self.assertEqual(advanced["status"], "ADVANCED")
++        history_before = LocalApplicationFacade.profile_binding_history(self.workspace)["history"]
++        noop_resolution = resolve_profile_generation({
++            "project_config": resolution["project_config"],
++            "profile_manifest_paths": resolution["profile_manifest_paths"],
++            "request_replacements": [],
++        })
++        noop = LocalApplicationFacade.advance_profile_generation(self.workspace, {"resolution": noop_resolution})
++        self.assertEqual(noop["status"], "NOOP")
++        self.assertEqual(LocalApplicationFacade.profile_binding_history(self.workspace)["history"], history_before)
++
++    def test_eps_only_advancement_when_direct_requests_are_unchanged(self):
++        old_manifest = json.loads((ROOT / "profiles/fixtures/valid/research-strict.profile.json").read_text(encoding="utf-8"))
++        new_manifest = deepcopy(old_manifest)
++        new_manifest["profile_version"] = "1.2.0"
++        new_manifest["constraints"][0]["value"] = ["capture_digest", "operator_verified"]
++        old_path = self.root / "research-strict-1.1.profile.json"
++        new_path = self.root / "research-strict-1.2.profile.json"
++        old_path.write_text(json.dumps(old_manifest), encoding="utf-8")
++        new_path.write_text(json.dumps(new_manifest), encoding="utf-8")
++        config = intake.bootstrap_config()
++        config["profile_requests"]["narrative"] = [{"profile_type":"narrative","profile_id":"fixture.generic-narrative","version":"1.0.0"}]
++        _refresh_config(config)
++        manifests_old = [ROOT / "profiles/fixtures/valid/research-base.profile.json", old_path, ROOT / "profiles/fixtures/valid/organization.profile.json", ROOT / "profiles/fixtures/valid/publication.profile.json", GENERIC_NARRATIVE]
++        old_resolution = resolve_profile_generation({"project_config": config, "profile_manifest_paths":[str(p) for p in manifests_old], "request_replacements":[]})
++        workspace = self.root / "eps-only"
++        cfg_path=self.root/"eps-only-project.json"; eps_path=self.root/"eps-only-eps.json"
++        cfg_path.write_text(json.dumps(config),encoding="utf-8"); eps_path.write_text(json.dumps(old_resolution["effective_profile_set"]),encoding="utf-8")
++        opened=LocalWorkspace.init(workspace,cfg_path,eps_path); opened.close()
++        manifests_new=[ROOT / "profiles/fixtures/valid/research-base.profile.json",old_path,new_path,ROOT / "profiles/fixtures/valid/organization.profile.json",ROOT / "profiles/fixtures/valid/publication.profile.json",GENERIC_NARRATIVE]
++        target=resolve_profile_generation({"project_config":config,"profile_manifest_paths":[str(p) for p in manifests_new],"request_replacements":[]})
++        self.assertEqual(target["project_config_digest"],config["configuration_digest"])
++        result=LocalApplicationFacade.advance_profile_generation(workspace,{"resolution":target})
++        self.assertEqual(result["old_project_config_digest"],result["new_project_config_digest"])
++        self.assertNotEqual(result["old_effective_profile_set_digest"],result["new_effective_profile_set_digest"])
++
++    def test_ablation_history_guard_detects_missing_history(self):
++        resolution = self._resolve_target()
++        original = SQLiteResearchStateRepository.advance_project_profile_binding
++        def without_history(repository, **kwargs):
++            original(repository, **kwargs)
++            repository._connection.execute("DELETE FROM profile_binding_history WHERE event_id = ?", (kwargs["event_id"],))
++        with patch.object(SQLiteResearchStateRepository, "advance_project_profile_binding", without_history):
++            LocalApplicationFacade.advance_profile_generation(self.workspace, {"resolution": resolution})
++        self.assertEqual(LocalApplicationFacade.profile_binding_history(self.workspace)["history"], [])
++        # The acceptance condition detects the ablation: a committed generation change without history is invalid.
++        with self.assertRaises(AssertionError):
++            self.assertEqual(len(LocalApplicationFacade.profile_binding_history(self.workspace)["history"]), 1)
++
++
++if __name__ == "__main__":
++    unittest.main()
++diff --git a/tests/runtime/test_sqlite_state_repository.py b/tests/runtime/test_sqlite_state_repository.py
++index 98d1a57..75af9cc 100644
++--- a/tests/runtime/test_sqlite_state_repository.py
+++++ b/tests/runtime/test_sqlite_state_repository.py
++@@ -136,7 +136,7 @@ class SQLiteRepositorySpecificTests(unittest.TestCase):
++         )
++         repository = self.repo(seed)
++         first = repository.load_state_view("PRJ-1", "LIN-1")
++-        self.assertEqual(repository.schema_version, 1)
+++        self.assertEqual(repository.schema_version, 2)
++         self.assertEqual(repository.integrity_issues(), ())
++         repository.close()
++         self.repositories.remove(repository)

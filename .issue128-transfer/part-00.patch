@@ -1,0 +1,219 @@
+diff --git a/.github/workflows/contracts.yml b/.github/workflows/contracts.yml
+index 7c3cffd..83b3987 100644
+--- a/.github/workflows/contracts.yml
++++ b/.github/workflows/contracts.yml
+@@ -49,6 +49,8 @@ jobs:
+         run: uv run --frozen python -m unittest discover -s tests/contracts -p 'test_*.py' -v
+       - name: Run Research State runtime tests
+         run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_*.py' -v
++      - name: Run Issue 128 Profile generation advancement acceptance
++        run: uv run --frozen python -m unittest -v tests.runtime.test_issue128_profile_generation_advancement
+ 
+ 
+   issue91-windows:
+@@ -78,3 +80,5 @@ jobs:
+         run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_research_package_*.py' -v
+       - name: Run Issue 80 Writer Composition Windows acceptance
+         run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue80_writer_composition.py' -v
++      - name: Run Issue 128 Profile generation advancement Windows acceptance
++        run: uv run --frozen python -m unittest -v tests.runtime.test_issue128_profile_generation_advancement
+diff --git a/docs/architecture/profile-generation-advancement.md b/docs/architecture/profile-generation-advancement.md
+new file mode 100644
+index 0000000..6ea5ba0
+--- /dev/null
++++ b/docs/architecture/profile-generation-advancement.md
+@@ -0,0 +1,53 @@
++# Existing Workspace Profile generation advancement
++
++Issue #128 adds one explicit evolution path for an existing local Workspace whose current Project/Profile binding belongs to an older converged Profile generation.
++
++The operation does not change Research Questions, Evidence, Findings, Decisions, Snapshots, captured source material, Exhibits, or historical Run pins. It changes only the current Project/Profile binding used by subsequent work. Historical Project Config and Effective Profile Set documents remain preserved in append-only binding history.
++
++## PA0 target for the Composition Smoke
++
++The Probe2 fixture Project Config directly requests `fixture.narrative@1.0.0`. That legacy fixture contains only `narrative.semantic_stages`. The current canonical A2 semantics are already represented by `profiles/fixtures/narrative/valid/generic-narrative.profile.json` as `fixture.generic-narrative@1.0.0`.
++
++Because the Profile identity changes, this smoke cannot use EPS-only advancement. The target generation mechanically replaces only the Narrative direct request:
++
++```text
++fixture.narrative@1.0.0
++  -> fixture.generic-narrative@1.0.0
++```
++
++The production Profile resolver then composes that request with the existing Publication dependency chain and produces an Effective Profile Set that includes:
++
++- `narrative.stages.definitions`
++- `narrative.dependencies.required`
++- `narrative.section_purposes.definitions`
++- `narrative.preservation.required_content`
++- `narrative.connections.preserve`
++
++The Project Config request change and resulting Effective Profile Set are advanced atomically as one current binding. The old Project Config and EPS remain historical.
++
++When a future generation keeps the direct Profile requests unchanged and only resolution selects a newer compatible dependency/version, the same operation can advance EPS alone and the Project Config digest stays unchanged.
++
++## Legacy publication-writer responsibility mapping
++
++The legacy Human-approved source pack remains a migration source; the generic Narrative fixture is not declared a complete MISCO migration.
++
++| Legacy source | Converged responsibility relevant to A2 | Status for this Issue |
++|---|---|---|
++| `03_RHETORICAL_PATTERN_LIBRARY.md` | Writer exposition/rhetorical choice constrained by Narrative semantic purposes | Partially converged; concrete conditional rhetorical patterns remain **unconverged** runtime Writer work |
++| `04_PHASE_SPECIFIC_WRITING_RULES.md` | Narrative stage/purpose semantics plus Writer section transformation rules | A2 semantic ordering/purpose is converged; detailed phase-specific Writer transformations remain **unconverged** |
++| `06_CONTENT_AND_NARRATIVE_GUARDS.md` | Narrative preservation, authoritative connection preservation, prohibition on inventing research meaning | Converged for the A2 Narrative paths; project-specific literal chapter placement is intentionally not canonicalized |
++| `07_FORMAL_RENDERING_RULES.md` | Publication rendering/template/layout | **Unconverged** production Publication runtime; not moved into Narrative |
++| `08_EDITORIAL_QA_CHECKLIST.md` | Writer/Publication QA and release checks | **Unconverged** production Writer/Publication runtime responsibility |
++| `10_SKILL_ASSEMBLY_SPEC.md` | Writer/Publication orchestration and skill assembly | **Unconverged** runtime integration; not required to unblock A2 |
++
++The unresolved items above are follow-up convergence work. Issue #128 does not silently drop them and does not broaden the Profile advancement change into a Writer/Publication migration.
++
++## Public operator flow
++
++1. Build a target generation from a complete current Project Config plus canonical Profile manifest paths using `research-loom profile resolve`.
++2. If identity/version evolution is needed, supply an explicit `request_replacements` entry. The resolver mechanically updates only `profile_requests`, its configuration digest, and derivation provenance.
++3. Apply the exact resolver result with `research-loom profile advance --workspace ...`.
++4. Reopen through `status` / `resume`, and inspect `research-loom profile history`.
++5. Resume the same Research Package selection. The Package builder continues to fail closed when the five Narrative paths are absent; it never injects repository defaults.
++
++`profile advance` rejects non-reproducible target documents, same-id/version content substitution, Core strengthening weakening, incompatible executable constraints, and Project Config changes outside the resolver's narrow Profile-generation transformation.
+diff --git a/plugins/local_application/cli.py b/plugins/local_application/cli.py
+index 970392a..9a04164 100644
+--- a/plugins/local_application/cli.py
++++ b/plugins/local_application/cli.py
+@@ -114,6 +114,17 @@ def build_parser() -> argparse.ArgumentParser:
+     init.add_argument("--effective-profile-set", required=True)
+     _add_output_json(init)
+ 
++    profile = sub.add_parser("profile")
++    profile_sub = profile.add_subparsers(dest="profile_command", required=True)
++    profile_resolve = profile_sub.add_parser("resolve")
++    _add_input_json(profile_resolve)
++    profile_advance = profile_sub.add_parser("advance")
++    _add_workspace(profile_advance)
++    _add_input_json(profile_advance)
++    profile_history = profile_sub.add_parser("history")
++    _add_workspace(profile_history)
++    _add_output_json(profile_history)
++
+     status = sub.add_parser("status")
+     _add_workspace(status)
+     _add_output_json(status)
+@@ -375,6 +386,14 @@ def _run(args: argparse.Namespace) -> Mapping[str, Any]:
+     if args.command == "doctor":
+         return _doctor_with_optional_attention(args.workspace)
+ 
++    if args.command == "profile":
++        if args.profile_command == "resolve":
++            return LocalApplicationFacade.resolve_profile_generation(_read_input(args.json_input))
++        if args.profile_command == "advance":
++            return LocalApplicationFacade.advance_profile_generation(args.workspace, _read_input(args.json_input))
++        if args.profile_command == "history":
++            return LocalApplicationFacade.profile_binding_history(args.workspace)
++
+     if args.command == "research-package" and args.research_package_command == "verify":
+         from plugins.local_application.research_package_service import verify_export_root
+         return verify_export_root(args.input)
+diff --git a/plugins/local_application/facade.py b/plugins/local_application/facade.py
+index bbaa8ee..92115a4 100644
+--- a/plugins/local_application/facade.py
++++ b/plugins/local_application/facade.py
+@@ -151,6 +151,37 @@ class LocalApplicationFacade:
+     def open_workspace(cls, workspace: str | Path) -> "LocalApplicationFacade":
+         return cls.from_opened_workspace(LocalWorkspace.open(workspace))
+ 
++    @classmethod
++    def resolve_profile_generation(cls, payload: Mapping[str, Any]) -> Mapping[str, Any]:
++        from plugins.local_application.profile_resolution import resolve_profile_generation
++        return resolve_profile_generation(payload)
++
++    @classmethod
++    def advance_profile_generation(
++        cls,
++        workspace: str | Path,
++        payload: Mapping[str, Any],
++    ) -> Mapping[str, Any]:
++        resolution = payload.get("resolution", payload)
++        if not isinstance(resolution, Mapping):
++            raise LocalApplicationError("APPLICATION-PROFILE-EVOLUTION-INPUT-001", "resolution must be an object")
++        origin = str(payload.get("origin", "operator")) if isinstance(payload, Mapping) else "operator"
++        try:
++            return LocalWorkspace.advance_profile_generation(workspace, resolution, origin=origin)
++        except Exception as exc:
++            if hasattr(exc, "code") and hasattr(exc, "message"):
++                raise LocalApplicationError(str(exc.code), str(exc.message)) from exc
++            raise
++
++    @classmethod
++    def profile_binding_history(cls, workspace: str | Path) -> Mapping[str, Any]:
++        try:
++            return LocalWorkspace.profile_binding_history(workspace)
++        except Exception as exc:
++            if hasattr(exc, "code") and hasattr(exc, "message"):
++                raise LocalApplicationError(str(exc.code), str(exc.message)) from exc
++            raise
++
+     @classmethod
+     def initialize_workspace(
+         cls,
+diff --git a/plugins/local_application/profile_resolution.py b/plugins/local_application/profile_resolution.py
+new file mode 100644
+index 0000000..5e5d37b
+--- /dev/null
++++ b/plugins/local_application/profile_resolution.py
+@@ -0,0 +1,563 @@
++from __future__ import annotations
++
++from collections import Counter
++from copy import deepcopy
++import hashlib
++import itertools
++import json
++from pathlib import Path
++import re
++from typing import Any, Iterable, Mapping
++
++from jsonschema import Draft202012Validator, FormatChecker
++import rfc8785
++import yaml
++
++from core.runtime import canonical_digest
++from plugins.local_application.workspace import (
++    EFFECTIVE_PROFILE_SET_SCHEMA,
++    PROJECT_CONFIG_SCHEMA,
++    ROOT,
++    LocalWorkspaceError,
++    _flatten_profile_requests,
++    _project_configuration_digest,
++    _schema,
++    _schema_validate,
++    _validate_profile_binding,
++    _validate_project_semantics,
++)
++
++PROFILE_MANIFEST_SCHEMA = ROOT / "profiles/contracts/profile-manifest.schema.json"
++INVARIANT_CATALOG = ROOT / "core/validators/non-overridable-invariants.yaml"
++STRENGTHENING_REGISTRY = ROOT / "profiles/contracts/invariant-strengthening-validators.yaml"
++NARRATIVE_SEMANTICS = ROOT / "profiles/contracts/narrative-semantics.yaml"
++
++_TYPE_RANK = {name: index for index, name in enumerate(("research", "organization", "narrative", "publication"))}
++_COMPARATOR = re.compile(r"^(>=|>|<=|<|=)(\d+\.\d+\.\d+)$")
++
++
++def _semver(text: str) -> tuple[int, int, int]:
++    return tuple(int(part) for part in text.split("."))  # type: ignore[return-value]
++
++
++def _satisfies(version: str, requirement: str) -> bool:
++    value = _semver(version)
++    if re.fullmatch(r"\d+\.\d+\.\d+", requirement):
++        return value == _semver(requirement)
++    for token in requirement.split():
++        match = _COMPARATOR.fullmatch(token)
++        if match is None:
++            raise LocalWorkspaceError("PROFILE-VERSION-001", f"unsupported Profile version range: {requirement}")
++        operator, right_text = match.groups()
++        right = _semver(right_text)
++        if operator == ">=" and not value >= right:
++            return False
++        if operator == ">" and not value > right:
++            return False

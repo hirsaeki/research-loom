@@ -1,0 +1,214 @@
++            raise LocalWorkspaceError("PROFILE-REQUEST-EVOLUTION-001", "duplicate source Profile request replacement")
++        seen_from.add(source_tuple)
++        if source.get("profile_type") != destination.get("profile_type"):
++            raise LocalWorkspaceError("PROFILE-REQUEST-EVOLUTION-001", "Profile generation replacement may not change profile_type")
++        category = str(source["profile_type"])
++        entries = target["profile_requests"][category]
++        matches = [index for index, item in enumerate(entries) if (item["profile_type"], item["profile_id"], item["version"]) == source_tuple]
++        if len(matches) != 1:
++            raise LocalWorkspaceError("PROFILE-REQUEST-EVOLUTION-001", "source Profile request does not resolve exactly once")
++        entries[matches[0]] = deepcopy(dict(destination))
++    old_digest = str(config["configuration_digest"])
++    provenance = target["provenance"]
++    derived = list(provenance.get("derived_from_configuration_digests", ()))
++    if old_digest not in derived:
++        derived.append(old_digest)
++    provenance["derived_from_configuration_digests"] = derived
++    notes = list(provenance.get("notes", ()))
++    note = "Profile generation request evolution performed by research-loom profile resolve."
++    if note not in notes:
++        notes.append(note)
++    provenance["notes"] = notes
++    target["configuration_digest"] = _project_configuration_digest(target)
++    _schema_validate(target, PROJECT_CONFIG_SCHEMA, "WORKSPACE-PROJECT-CONFIG-SCHEMA-001")
++    _validate_project_semantics(target)
++    return target
++
++
++def resolve_profile_generation(payload: Mapping[str, Any]) -> dict[str, Any]:
++    project_config = payload.get("project_config")
++    manifest_paths = payload.get("profile_manifest_paths")
++    replacements = payload.get("request_replacements", [])
++    if not isinstance(project_config, Mapping):
++        raise LocalWorkspaceError("PROFILE-RESOLVE-INPUT-001", "project_config must be a complete Project Config document")
++    if not isinstance(manifest_paths, list) or not manifest_paths or any(not isinstance(path, str) or not path for path in manifest_paths):
++        raise LocalWorkspaceError("PROFILE-RESOLVE-INPUT-001", "profile_manifest_paths must be a non-empty array of paths")
++    if not isinstance(replacements, list) or any(not isinstance(item, Mapping) for item in replacements):
++        raise LocalWorkspaceError("PROFILE-RESOLVE-INPUT-001", "request_replacements must be an array")
++
++    _schema_validate(project_config, PROJECT_CONFIG_SCHEMA, "WORKSPACE-PROJECT-CONFIG-SCHEMA-001")
++    _validate_project_semantics(project_config)
++    target_config = _apply_request_replacements(project_config, list(replacements))
++    candidates = [_manifest_candidate(path) for path in manifest_paths]
++    requests = _flatten_profile_requests(target_config)
++    core_contracts = {"research_contract": "0.1.0", "invariant_contract": "0.1.0"}
++    effective_profiles = _resolve_candidates(candidates, requests, core_contracts)
++    selected = _selected_candidates(candidates, effective_profiles)
++    _validate_narrative_semantics(selected)
++    effective = {
++        "schema_version": "0.1.0",
++        "core_contracts": core_contracts,
++        "candidate_universe": sorted((_pin(candidate) for candidate in candidates), key=lambda pin: (_TYPE_RANK[pin["profile_type"]], pin["profile_id"], _semver(pin["profile_version"]), pin["manifest_sha256"])),
++        "requested_profiles": sorted((deepcopy(dict(item)) for item in requests), key=lambda item: (_TYPE_RANK[item["profile_type"]], item["profile_id"], item["version"])),
++        "effective_profiles": effective_profiles,
++        "effective_constraints": _compose_constraints(selected),
++        "core_invariants": _compose_core_invariants(selected),
++    }
++    _schema_validate(effective, EFFECTIVE_PROFILE_SET_SCHEMA, "WORKSPACE-PROFILE-SET-SCHEMA-001")
++    _validate_profile_binding(target_config, effective)
++    return {
++        "status": "RESOLVED",
++        "source_project_config": deepcopy(dict(project_config)),
++        "project_config": target_config,
++        "effective_profile_set": effective,
++        "project_config_digest": str(target_config["configuration_digest"]),
++        "effective_profile_set_digest": canonical_digest(effective),
++        "profile_manifest_paths": list(manifest_paths),
++        "request_replacements": deepcopy(list(replacements)),
++    }
++diff --git a/plugins/local_application/workspace.py b/plugins/local_application/workspace.py
++index 7c224c7..c59c269 100644
++--- a/plugins/local_application/workspace.py
+++++ b/plugins/local_application/workspace.py
++@@ -35,6 +35,7 @@ WORKSPACE_VERSION = "0.1.0"
++ BINDING_NAME = "workspace-binding.json"
++ INTERNAL_DIR = ".research-loom"
++ INITIALIZING_MARKER = ".initializing"
+++PROFILE_ADVANCE_RECOVERY = "profile-advance-recovery.json"
++ PROJECT_CONFIG_NAME = "project-config.json"
++ EFFECTIVE_PROFILE_SET_NAME = "effective-profile-set.json"
++ 
++@@ -209,6 +210,106 @@ def _validate_inputs(config: Mapping[str, Any], effective: Mapping[str, Any]) ->
++     return str(config["configuration_digest"]), canonical_digest(effective)
++ 
++ 
+++
+++
+++def _effective_constraints_map(effective: Mapping[str, Any]) -> dict[str, Any]:
+++    return {str(item["path"]): deepcopy(dict(item)) for item in effective.get("effective_constraints", ())}
+++
+++
+++def _strengthening_bindings(effective: Mapping[str, Any]) -> dict[str, set[tuple[str, str, str]]]:
+++    result: dict[str, set[tuple[str, str, str]]] = {}
+++    for invariant in effective.get("core_invariants", ()):
+++        if invariant.get("status") != "strengthened":
+++            continue
+++        bindings = set()
+++        for source in invariant.get("provenance", ()):
+++            binding = source.get("validator_binding") or {}
+++            bindings.add((str(binding.get("validator_id")), str(binding.get("validator_version")), str(binding.get("form_id"))))
+++        result[str(invariant["invariant_id"])] = bindings
+++    return result
+++
+++
+++def _validate_no_core_strengthening_weakening(old: Mapping[str, Any], new: Mapping[str, Any]) -> None:
+++    old_bindings = _strengthening_bindings(old)
+++    new_bindings = _strengthening_bindings(new)
+++    for invariant_id, required in old_bindings.items():
+++        if invariant_id not in new_bindings or not required <= new_bindings[invariant_id]:
+++            raise LocalWorkspaceError(
+++                "WORKSPACE-PROFILE-EVOLUTION-CORE-001",
+++                f"target Profile generation weakens an existing Core strengthening: {invariant_id}",
+++            )
+++
+++
+++def _validate_profile_identity_evolution(old: Mapping[str, Any], new: Mapping[str, Any]) -> None:
+++    old_pins = {(item["profile_type"], item["profile_id"], item["profile_version"]): item["manifest_sha256"] for item in old.get("effective_profiles", ())}
+++    for item in new.get("effective_profiles", ()):
+++        key = (item["profile_type"], item["profile_id"], item["profile_version"])
+++        old_digest = old_pins.get(key)
+++        if old_digest is not None and old_digest != item["manifest_sha256"]:
+++            raise LocalWorkspaceError(
+++                "WORKSPACE-PROFILE-EVOLUTION-IDENTITY-001",
+++                "same Profile id/version cannot change immutable manifest content during generation advancement",
+++            )
+++
+++
+++def _validate_authoritative_state_against_constraints(state: StateView, effective: Mapping[str, Any]) -> None:
+++    constraints = _effective_constraints_map(effective)
+++    required = constraints.get("evidence.capture.required_fields")
+++    if not isinstance(required, Mapping):
+++        return
+++    fields = required.get("value", ())
+++    if not isinstance(fields, list) or any(not isinstance(field, str) for field in fields):
+++        raise LocalWorkspaceError(
+++            "WORKSPACE-PROFILE-EVOLUTION-CONSTRAINT-001",
+++            "target executable evidence.capture.required_fields constraint is malformed",
+++        )
+++    for obj in state.objects:
+++        if obj.get("kind") != "evidence":
+++            continue
+++        missing = [field for field in fields if field not in obj]
+++        if missing:
+++            raise LocalWorkspaceError(
+++                "WORKSPACE-PROFILE-EVOLUTION-CONSTRAINT-001",
+++                f"target Profile generation is incompatible with authoritative Evidence {obj.get('id')}: missing {', '.join(missing)}",
+++            )
+++
+++
+++def _recover_profile_advancement(root: Path) -> None:
+++    internal = root / INTERNAL_DIR
+++    marker = internal / PROFILE_ADVANCE_RECOVERY
+++    if not marker.exists():
+++        return
+++    recovery = _read_json(marker, code="WORKSPACE-PROFILE-RECOVERY-001")
+++    state_path = internal / "research-state.sqlite3"
+++    try:
+++        connection = sqlite3.connect(f"file:{state_path}?mode=ro", uri=True)
+++        connection.row_factory = sqlite3.Row
+++        try:
+++            row = connection.execute(
+++                "SELECT project_config_digest,effective_profile_set_digest FROM project_state WHERE project_ref=?",
+++                (str(recovery["project_id"]),),
+++            ).fetchone()
+++        finally:
+++            connection.close()
+++    except sqlite3.Error as exc:
+++        raise LocalWorkspaceError("WORKSPACE-PROFILE-RECOVERY-001", "cannot inspect Research State during Profile advancement recovery") from exc
+++    if row is None:
+++        raise LocalWorkspaceError("WORKSPACE-PROFILE-RECOVERY-001", "Profile advancement recovery project does not resolve")
+++    current = (str(row["project_config_digest"]), str(row["effective_profile_set_digest"]))
+++    old_pair = (str(recovery["old_binding"]["project_config"]["digest"]), str(recovery["old_binding"]["effective_profile_set"]["digest"]))
+++    new_pair = (str(recovery["new_binding"]["project_config"]["digest"]), str(recovery["new_binding"]["effective_profile_set"]["digest"]))
+++    if current == old_pair:
+++        chosen = "old"
+++    elif current == new_pair:
+++        chosen = "new"
+++    else:
+++        raise LocalWorkspaceError("WORKSPACE-PROFILE-RECOVERY-001", "Research State matches neither side of interrupted Profile advancement")
+++    _atomic_json_write(root / PROJECT_CONFIG_NAME, recovery[f"{chosen}_project_config"])
+++    _atomic_json_write(root / EFFECTIVE_PROFILE_SET_NAME, recovery[f"{chosen}_effective_profile_set"])
+++    _atomic_json_write(internal / BINDING_NAME, recovery[f"{chosen}_binding"] )
+++    marker.unlink()
+++
+++
++ def _assert_safe_workspace_root(root: Path) -> Path:
++     root = root.expanduser()
++     if root.is_symlink():
++@@ -545,12 +646,164 @@ class LocalWorkspace:
++                         root.rmdir()
++             raise
++ 
+++    @classmethod
+++    def advance_profile_generation(
+++        cls,
+++        workspace: str | Path,
+++        resolution: Mapping[str, Any],
+++        *,
+++        origin: str = "operator",
+++    ) -> Mapping[str, Any]:
+++        from plugins.local_application.profile_resolution import resolve_profile_generation
+++
+++        opened = cls.open(workspace)
+++        root = opened.root
+++        marker = root / INTERNAL_DIR / PROFILE_ADVANCE_RECOVERY
+++        try:
+++            source_config = resolution.get("source_project_config")
+++            target_config = resolution.get("project_config")
+++            target_effective = resolution.get("effective_profile_set")
+++            manifest_paths = resolution.get("profile_manifest_paths")
+++            replacements = resolution.get("request_replacements", [])
+++            if not isinstance(source_config, Mapping) or not isinstance(target_config, Mapping) or not isinstance(target_effective, Mapping):
+++                raise LocalWorkspaceError("WORKSPACE-PROFILE-EVOLUTION-INPUT-001", "resolution must contain source/target Project Config and Effective Profile Set documents")
+++            if dict(source_config) != dict(opened.project_config):
+++                raise LocalWorkspaceError("WORKSPACE-PROFILE-EVOLUTION-STALE-001", "resolved source Project Config is not the current Workspace Project Config")
