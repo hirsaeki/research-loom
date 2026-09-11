@@ -216,6 +216,50 @@ class ProfileGenerationAdvancementTests(ResearchPackageAcceptanceSupport):
         self.assertEqual(errors, [])
         self.assertEqual([item["result"] for item in results], ["ADVANCED"])
 
+    def test_kody_reentrant_workspace_lock_is_reference_counted(self):
+        request, output, _ = self._resolve()
+        payload = {
+            "project_config_file": str(output / "project-config.json"),
+            "effective_profile_set_file": str(output / "effective-profile-set.json"),
+            "profile_manifest_files": request["profile_manifest_files"],
+            "origin": "kody-reentrant-lock-regression",
+        }
+        from plugins.local_application import profile_advancement as advancement
+
+        outer = LocalWorkspace.open(self.workspace)
+        inner = LocalWorkspace.open(self.workspace)
+        started = threading.Event()
+        finished = threading.Event()
+        results = []
+        errors = []
+
+        def run_advance():
+            started.set()
+            try:
+                results.append(advancement.advance_profile_generation(self.workspace, payload))
+            except Exception as exc:  # surfaced below with the original exception
+                errors.append(exc)
+            finally:
+                finished.set()
+
+        thread = threading.Thread(target=run_advance)
+        thread.start()
+        self.assertTrue(started.wait(5))
+        time.sleep(0.2)
+        self.assertFalse(finished.is_set(), "advancement passed two open Workspace leases")
+
+        # Close out of acquisition order. The inner handle is still live, so the
+        # shared OS lock must stay held until its final lease is released.
+        outer.close()
+        time.sleep(0.2)
+        self.assertFalse(finished.is_set(), "closing one re-entrant handle released the shared Workspace lock")
+
+        inner.close()
+        thread.join(5)
+        self.assertFalse(thread.is_alive())
+        self.assertEqual(errors, [])
+        self.assertEqual([item["result"] for item in results], ["ADVANCED"])
+
     def test_kody_profile_commands_keep_missing_workspace_error_contract(self):
         missing = self.root / "missing-workspace"
         code, rejected = _run_cli(["profile", "history", "--workspace", missing, "--json"])

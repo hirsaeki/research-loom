@@ -54,51 +54,62 @@ def _workspace_advancement_lock(root: Path):
     if not root.is_dir():
         raise LocalWorkspaceError("WORKSPACE-MISSING-001", "workspace directory does not exist")
     key = str(root.resolve(strict=True))
-    held = getattr(_LOCK_STATE, "held", None)
-    if held is None:
-        held = set()
-        _LOCK_STATE.held = held
-    if key in held:
-        yield
-        return
-
-    internal = _safe_locator(root, INTERNAL_DIR)
-    if not internal.is_dir():
-        raise LocalWorkspaceError("WORKSPACE-MISSING-001", "workspace internal directory is missing")
-    lock_path = _safe_locator(root, f"{INTERNAL_DIR}/{ADVANCEMENT_LOCK}", require_exists=False)
-    with lock_path.open("a+b") as handle:
+    leases = getattr(_LOCK_STATE, "leases", None)
+    if leases is None:
+        leases = {}
+        _LOCK_STATE.leases = leases
+    lease = leases.get(key)
+    if lease is None:
+        internal = _safe_locator(root, INTERNAL_DIR)
+        if not internal.is_dir():
+            raise LocalWorkspaceError("WORKSPACE-MISSING-001", "workspace internal directory is missing")
+        lock_path = _safe_locator(root, f"{INTERNAL_DIR}/{ADVANCEMENT_LOCK}", require_exists=False)
+        handle = lock_path.open("a+b")
         handle.seek(0, os.SEEK_END)
         if handle.tell() == 0:
             handle.write(b"\0")
             handle.flush()
-        if os.name == "nt":
-            import msvcrt
-
-            while True:
-                try:
-                    handle.seek(0)
-                    msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
-                    break
-                except OSError:
-                    time.sleep(0.05)
-        else:
-            import fcntl
-
-            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
-        held.add(key)
         try:
-            yield
-        finally:
-            held.remove(key)
             if os.name == "nt":
                 import msvcrt
 
-                handle.seek(0)
-                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+                while True:
+                    try:
+                        handle.seek(0)
+                        msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+                        break
+                    except OSError:
+                        time.sleep(0.05)
             else:
                 import fcntl
 
-                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        except BaseException:
+            handle.close()
+            raise
+        lease = {"handle": handle, "count": 0}
+        leases[key] = lease
+
+    lease["count"] += 1
+    try:
+        yield
+    finally:
+        lease["count"] -= 1
+        if lease["count"] == 0:
+            leases.pop(key, None)
+            handle = lease["handle"]
+            try:
+                if os.name == "nt":
+                    import msvcrt
+
+                    handle.seek(0)
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+                else:
+                    import fcntl
+
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            finally:
+                handle.close()
 
 
 def _now() -> str:
