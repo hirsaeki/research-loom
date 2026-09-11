@@ -1,0 +1,32 @@
+name: issue128-transfer
+
+on:
+  push:
+    branches: [issue-128-profile-advancement-staging]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor == 'hirsaeki'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: true
+          fetch-depth: 0
+      - name: Apply validated Issue 128 patch
+        shell: bash
+        run: |
+          cat .issue128-transfer/part-*.patch > /tmp/issue128.patch
+          printf '%s  %s\n' '4e9fbcdf50ada1998a9946256918f8a659dae7632bc1ff8fe1d04deb5a1160ee' /tmp/issue128.patch | sha256sum -c -
+          git apply --check /tmp/issue128.patch
+          git apply /tmp/issue128.patch
+          rm -rf .issue128-transfer
+          rm .github/workflows/issue128-transfer.yml
+          git add -A
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Materialize Issue 128 implementation tree'
+          git push origin HEAD:issue-128-profile-advancement-staging
