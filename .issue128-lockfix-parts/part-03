@@ -1,0 +1,2 @@
+"missing-workspace"
+         code, rejected = _run_cli(["profile", "history", "--workspace", missing, "--json"])

@@ -1,0 +1,59 @@
+       fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+-        held.add(key)
+         try:
+-            yield
+-        finally:
+-            held.remove(key)
+             if os.name == "nt":
+                 import msvcrt
+ 
+-                handle.seek(0)
+-                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
++                while True:
++                    try:
++                        handle.seek(0)
++                        msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
++                        break
++                    except OSError:
++                        time.sleep(0.05)
+             else:
+                 import fcntl
+ 
+-                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
++                fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
++        except BaseException:
++            handle.close()
++            raise
++        lease = {"handle": handle, "count": 0}
++        leases[key] = lease
++
++    lease["count"] += 1
++    try:
++        yield
++    finally:
++        lease["count"] -= 1
++        if lease["count"] == 0:
++            leases.pop(key, None)
++            handle = lease["handle"]
++            try:
++                if os.name == "nt":
++                    import msvcrt
++
++                    handle.seek(0)
++                    msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
++                else:
++                    import fcntl
++
++                    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
++            finally:
++                handle.close()
+ 
+ 
+ def _now() -> str:
+diff --git a/tests/runtime/test_profile_generation_advancement.py b/tests/runtime/test_profile_generation_advancement.py
+index 83a8c12..5e47706 100644
+--- a/tests/runtime/test_profile_generation_advancement.py
++++ b/tests/runtime/test_profile_generation_advancement.py
+@@ -216,6 +216,50 @@ class ProfileGenerationAdvancementTests(ResearchPackageAcceptanceSupport):
+         self.assertEqual(errors, [])
+         self.assertEqual([item["result"] for item in results

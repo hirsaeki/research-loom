@@ -19,8 +19,10 @@ jobs:
       - name: Materialize re-entrant Workspace lock fix
         shell: bash
         run: |
-          git apply --check .issue128-lockfix.patch
-          git apply .issue128-lockfix.patch
+          cat .issue128-lockfix-parts/part-* > /tmp/issue128-lockfix.patch
+          printf '%s  %s\n' '6d75b6bffe0a5c619413cc6fae78f06211e620e53d9066d135f46c3f3a6b8aa3' /tmp/issue128-lockfix.patch | sha256sum -c -
+          git apply --check /tmp/issue128-lockfix.patch
+          git apply /tmp/issue128-lockfix.patch
           git add plugins/local_application/profile_advancement.py tests/runtime/test_profile_generation_advancement.py
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
