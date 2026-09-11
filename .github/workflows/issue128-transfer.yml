@@ -8,7 +8,7 @@ permissions:
   contents: write
 
 jobs:
-  materialize-review2:
+  materialize-followup:
     if: github.actor == 'hirsaeki'
     runs-on: ubuntu-latest
     steps:
@@ -17,26 +17,36 @@ jobs:
         with:
           persist-credentials: false
           path: transfer
+      - name: Stop until follow-up patch exists
+        id: payload
+        shell: bash
+        run: |
+          if [[ -f transfer/.issue128-transfer/followup.patch ]]; then
+            echo 'ready=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'ready=false' >> "$GITHUB_OUTPUT"
+          fi
       - name: Checkout PR head
+        if: steps.payload.outputs.ready == 'true'
         uses: actions/checkout@v5
         with:
           ref: issue-128-profile-advancement
           persist-credentials: true
           fetch-depth: 0
           path: work
-      - name: Materialize sandbox review fix
+      - name: Materialize sandbox follow-up tree
+        if: steps.payload.outputs.ready == 'true'
         shell: bash
         run: |
           cd work
-          git apply --check ../transfer/.issue128-transfer/kody2.patch
-          git apply ../transfer/.issue128-transfer/kody2.patch
+          git apply --check ../transfer/.issue128-transfer/followup.patch
+          git apply ../transfer/.issue128-transfer/followup.patch
           git diff --check
-          git add plugins/local_application/facade.py \
-                  plugins/local_application/profile_advancement.py \
-                  plugins/local_application/profile_resolution.py \
-                  plugins/local_application/workspace.py \
-                  tests/runtime/test_profile_generation_advancement.py
+          expected=$'plugins/local_application/application.py\nplugins/local_application/profile_advancement.py\ntests/runtime/test_profile_generation_advancement.py\ntests/runtime/test_profile_generation_advancement_attention.py'
+          actual="$(git diff --name-only | sort)"
+          [[ "$actual" == "$(printf '%s\n' "$expected" | sort)" ]]
+          git add -A
           git config user.name 'sandbox-transfer'
           git config user.email 'sandbox-transfer@invalid'
-          git commit -m 'Materialize Kody follow-up fix tree'
+          git commit -m 'Materialize Issue 128 follow-up tree'
           git push origin HEAD:issue-128-review2-materialized
