@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import Counter
 from contextlib import suppress
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import hashlib
 import json
 import os
@@ -63,13 +63,20 @@ class OpenedLocalWorkspace:
     project_config: Mapping[str, Any]
     effective_profile_set: Mapping[str, Any]
     application: LocalResearchApplication
+    _workspace_lock: object | None = field(default=None, repr=False)
 
     @property
     def project_id(self) -> str:
         return str(self.binding["project_id"])
 
     def close(self) -> None:
-        self.application.close()
+        lock = self._workspace_lock
+        self._workspace_lock = None
+        try:
+            self.application.close()
+        finally:
+            if lock is not None:
+                lock.__exit__(None, None, None)
 
     def __enter__(self) -> "OpenedLocalWorkspace":
         return self
@@ -551,8 +558,15 @@ class LocalWorkspace:
         if not root.is_dir():
             raise LocalWorkspaceError("WORKSPACE-MISSING-001", "workspace directory does not exist")
         from plugins.local_application.profile_advancement import _workspace_advancement_lock
-        with _workspace_advancement_lock(root):
-            return cls._open_locked(root)
+        lock = _workspace_advancement_lock(root)
+        lock.__enter__()
+        try:
+            opened = cls._open_locked(root)
+            opened._workspace_lock = lock
+            return opened
+        except BaseException:
+            lock.__exit__(None, None, None)
+            raise
 
     @classmethod
     def _open_locked(cls, root: Path) -> OpenedLocalWorkspace:

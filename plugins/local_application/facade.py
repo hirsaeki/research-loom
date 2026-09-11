@@ -137,15 +137,18 @@ class LocalApplicationFacade:
         self._project_id = str(project_id)
         self._workspace_root = Path(workspace_root) if workspace_root is not None else None
         self._owns_application = owns_application
+        self._opened_workspace: OpenedLocalWorkspace | None = None
 
     @classmethod
     def from_opened_workspace(cls, opened: OpenedLocalWorkspace) -> "LocalApplicationFacade":
-        return cls(
+        facade = cls(
             opened.application,
             opened.project_id,
             workspace_root=opened.root,
-            owns_application=True,
+            owns_application=False,
         )
+        facade._opened_workspace = opened
+        return facade
 
     @classmethod
     def open_workspace(cls, workspace: str | Path) -> "LocalApplicationFacade":
@@ -212,6 +215,11 @@ class LocalApplicationFacade:
         return self._project_id
 
     def close(self) -> None:
+        if self._opened_workspace is not None:
+            opened = self._opened_workspace
+            self._opened_workspace = None
+            opened.close()
+            return
         if self._owns_application:
             self._application.close()
             self._owns_application = False

@@ -51,6 +51,8 @@ _ADVANCEMENT_NOTE = "Profile generation advancement: direct Profile requests cha
 
 @contextmanager
 def _workspace_advancement_lock(root: Path):
+    if not root.is_dir():
+        raise LocalWorkspaceError("WORKSPACE-MISSING-001", "workspace directory does not exist")
     key = str(root.resolve(strict=True))
     held = getattr(_LOCK_STATE, "held", None)
     if held is None:

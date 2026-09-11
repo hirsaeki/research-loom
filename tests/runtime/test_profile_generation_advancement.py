@@ -179,6 +179,51 @@ class ProfileGenerationAdvancementTests(ResearchPackageAcceptanceSupport):
         history = self._history()
         self.assertEqual(len(history["events"]), 1)
 
+    def test_kody_open_workspace_holds_generation_lock_until_close(self):
+        request, output, _ = self._resolve()
+        payload = {
+            "project_config_file": str(output / "project-config.json"),
+            "effective_profile_set_file": str(output / "effective-profile-set.json"),
+            "profile_manifest_files": request["profile_manifest_files"],
+            "origin": "kody-open-lifetime-regression",
+        }
+        from plugins.local_application import profile_advancement as advancement
+
+        opened = LocalApplicationFacade.open_workspace(self.workspace)
+        started = threading.Event()
+        finished = threading.Event()
+        results = []
+        errors = []
+
+        def run_advance():
+            started.set()
+            try:
+                results.append(advancement.advance_profile_generation(self.workspace, payload))
+            except Exception as exc:  # surfaced below with the original exception
+                errors.append(exc)
+            finally:
+                finished.set()
+
+        thread = threading.Thread(target=run_advance)
+        thread.start()
+        self.assertTrue(started.wait(5))
+        time.sleep(0.2)
+        self.assertFalse(finished.is_set(), "advancement passed an already-open Workspace lifetime lock")
+        opened.close()
+        thread.join(5)
+        self.assertFalse(thread.is_alive())
+        self.assertEqual(errors, [])
+        self.assertEqual([item["result"] for item in results], ["ADVANCED"])
+
+    def test_kody_profile_commands_keep_missing_workspace_error_contract(self):
+        missing = self.root / "missing-workspace"
+        code, rejected = _run_cli(["profile", "history", "--workspace", missing, "--json"])
+        self.assertEqual(code, 2, rejected)
+        self.assertEqual(rejected["issues"][0]["code"], "WORKSPACE-MISSING-001")
+        code, rejected = _run_cli(["profile", "advance", "--workspace", missing, "--json"], "{}")
+        self.assertEqual(code, 2, rejected)
+        self.assertEqual(rejected["issues"][0]["code"], "WORKSPACE-MISSING-001")
+
     def test_kody_recovery_rejects_workspace_escape_locators_before_deletion(self):
         marker_path = Path(self.workspace) / ".research-loom" / "profile-advancement.pending.json"
         binding = json.loads((Path(self.workspace) / ".research-loom" / "workspace-binding.json").read_text(encoding="utf-8"))
@@ -257,6 +302,35 @@ class ProfileGenerationAdvancementTests(ResearchPackageAcceptanceSupport):
         self.assertEqual({key for key in selected}, {("research", "fixture.requested"), ("research", "fixture.dep")})
         self.assertEqual(selected[("research", "fixture.requested")]["manifest"]["profile_version"], "1.0.0")
         self.assertEqual([item["profile_id"] for item in effective], ["fixture.dep", "fixture.requested"])
+
+        # Only dependencies introduced by the actually selected requested version
+        # belong in the search state. Pre-expanding dependencies from every candidate
+        # version turns these 15 independent alternatives into a needless 2^15 search.
+        candidates = []
+        for major in range(1, 16):
+            dep_id = f"fixture.dynamic-dep-{major:02d}"
+            candidates.append(
+                candidate(
+                    "fixture.dynamic-requested",
+                    f"{major}.0.0",
+                    requires=[{"profile_id": dep_id, "profile_type": "research", "version": "1.0.0"}],
+                )
+            )
+            candidates.append(candidate(dep_id, "1.0.0"))
+        requests = [
+            {
+                "profile_id": "fixture.dynamic-requested",
+                "profile_type": "research",
+                "version": ">=1.0.0 <16.0.0",
+            }
+        ]
+        effective, selected = resolution._resolve_selected(candidates, requests)
+        self.assertEqual(
+            set(selected),
+            {("research", "fixture.dynamic-requested"), ("research", "fixture.dynamic-dep-15")},
+        )
+        self.assertEqual(selected[("research", "fixture.dynamic-requested")]["manifest"]["profile_version"], "15.0.0")
+        self.assertEqual([item["profile_id"] for item in effective], ["fixture.dynamic-dep-15", "fixture.dynamic-requested"])
 
     def test_pa0_production_resolution_rejects_semantically_invalid_narrative_target(self):
         request = {

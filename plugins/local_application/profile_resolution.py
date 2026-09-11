@@ -338,70 +338,20 @@ def _assignment_valid(assignment, requests) -> bool:
     return all(visit(key) for key in graph)
 
 
-def _potential_resolution_keys(by_key, requests) -> set[tuple[str, str]]:
-    reachable = {_key(request) for request in requests}
-    frontier = list(reachable)
-    while frontier:
-        key = frontier.pop()
-        for candidate in by_key.get(key, []):
-            manifest = candidate["manifest"]
-            for relation in ("extends", "requires"):
-                for dependency in manifest.get(relation, []):
-                    dep_key = _key(dependency)
-                    if dep_key not in reachable:
-                        reachable.add(dep_key)
-                        frontier.append(dep_key)
-    return reachable
-
-
-def _partial_assignment_possible(assignment, requests, by_key) -> bool:
-    requirements: dict[tuple[str, str], list[str]] = {}
-    for request in requests:
-        requirements.setdefault(_key(request), []).append(str(request["version"]))
-
-    for candidate in assignment.values():
-        if candidate is None:
-            continue
-        manifest = candidate["manifest"]
-        compat = manifest["core_compatibility"]
-        if not _satisfies(CORE_CONTRACTS["research_contract"], str(compat["research_contract"])) or not _satisfies(
-            CORE_CONTRACTS["invariant_contract"], str(compat["invariant_contract"])
-        ):
-            return False
-        for relation in ("extends", "requires"):
-            for dependency in manifest.get(relation, []):
-                if relation == "extends" and dependency["profile_type"] != manifest["profile_type"]:
-                    return False
-                requirements.setdefault(_key(dependency), []).append(str(dependency["version"]))
-
-    for key, required_versions in requirements.items():
-        if key in assignment:
-            candidate = assignment[key]
-            if candidate is None:
-                return False
-            version = str(candidate["manifest"]["profile_version"])
-            if not all(_satisfies(version, requirement) for requirement in required_versions):
-                return False
-            continue
-        possible = by_key.get(key, [])
-        if not any(
-            all(_satisfies(str(candidate["manifest"]["profile_version"]), requirement) for requirement in required_versions)
-            for candidate in possible
-        ):
-            return False
-    return True
-
-
 def _resolve_selected(candidates, requests):
     by_key: dict[tuple[str, str], list[dict[str, Any]]] = {}
     for candidate in candidates:
         by_key.setdefault(_key(candidate["manifest"]), []).append(candidate)
 
-    keys = sorted(_potential_resolution_keys(by_key, requests), key=lambda key: (TYPE_RANK[key[0]], key[1]))
-    assignment: dict[tuple[str, str], dict[str, Any] | None] = {}
+    initial_requirements: dict[tuple[str, str], list[str]] = {}
+    for request in requests:
+        initial_requirements.setdefault(_key(request), []).append(str(request["version"]))
     visited_states = 0
 
-    def search(index: int):
+    def search(
+        assignment: dict[tuple[str, str], dict[str, Any]],
+        requirements: dict[tuple[str, str], list[str]],
+    ):
         nonlocal visited_states
         visited_states += 1
         if visited_states > MAX_PROFILE_RESOLUTION_STATES:
@@ -409,28 +359,66 @@ def _resolve_selected(candidates, requests):
                 "PROFILE-RESOLUTION-LIMIT-001",
                 "Profile dependency resolution exceeded the bounded search budget",
             )
-        if index == len(keys):
+        for key, required_versions in requirements.items():
+            selected = assignment.get(key)
+            if selected is not None:
+                version = str(selected["manifest"]["profile_version"])
+                if not all(_satisfies(version, requirement) for requirement in required_versions):
+                    return None
+                continue
+            possible = by_key.get(key, [])
+            if not any(
+                all(_satisfies(str(candidate["manifest"]["profile_version"]), requirement) for requirement in required_versions)
+                for candidate in possible
+            ):
+                return None
+
+        unresolved = sorted(
+            (key for key in requirements if key not in assignment),
+            key=lambda key: (TYPE_RANK[key[0]], key[1]),
+        )
+        if not unresolved:
             return dict(assignment) if _assignment_valid(assignment, requests) else None
 
-        key = keys[index]
+        key = unresolved[0]
+        required_versions = requirements[key]
         candidates_for_key = sorted(
-            by_key.get(key, []),
+            (
+                candidate
+                for candidate in by_key.get(key, [])
+                if all(
+                    _satisfies(str(candidate["manifest"]["profile_version"]), requirement)
+                    for requirement in required_versions
+                )
+            ),
             key=lambda candidate: _semver(candidate["manifest"]["profile_version"]),
             reverse=True,
         )
-        # Version choices are tried from highest to lowest and absence last. Because
-        # keys use the same ordering as the previous winner tuple, the first valid
-        # leaf is the same lexicographically maximal compatible resolution.
-        for candidate in [*candidates_for_key, None]:
-            assignment[key] = candidate
-            if _partial_assignment_possible(assignment, requests, by_key):
-                winner = search(index + 1)
-                if winner is not None:
-                    return winner
-        assignment.pop(key, None)
+        for candidate in candidates_for_key:
+            manifest = candidate["manifest"]
+            compat = manifest["core_compatibility"]
+            if not _satisfies(CORE_CONTRACTS["research_contract"], str(compat["research_contract"])) or not _satisfies(
+                CORE_CONTRACTS["invariant_contract"], str(compat["invariant_contract"])
+            ):
+                continue
+            next_requirements = {item: list(versions) for item, versions in requirements.items()}
+            invalid_relation = False
+            for relation in ("extends", "requires"):
+                for dependency in manifest.get(relation, []):
+                    if relation == "extends" and dependency["profile_type"] != manifest["profile_type"]:
+                        invalid_relation = True
+                        break
+                    next_requirements.setdefault(_key(dependency), []).append(str(dependency["version"]))
+                if invalid_relation:
+                    break
+            if invalid_relation:
+                continue
+            winner = search({**assignment, key: candidate}, next_requirements)
+            if winner is not None:
+                return winner
         return None
 
-    winner = search(0)
+    winner = search({}, initial_requirements)
     if winner is None:
         raise LocalWorkspaceError("PROFILE-VERSION-001", "no compatible Profile resolution exists for the requested generation")
 
