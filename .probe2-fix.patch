@@ -1,0 +1,412 @@
+diff --git a/docs/architecture/profile-generation-advancement.md b/docs/architecture/profile-generation-advancement.md
+index 25267f2..439fb05 100644
+--- a/docs/architecture/profile-generation-advancement.md
++++ b/docs/architecture/profile-generation-advancement.md
+@@ -25,6 +25,8 @@ Because the Profile ID changes from `fixture.narrative` to `fixture.generic-narr
+ 
+ The production resolver consumes an explicit finite set of canonical Profile manifest files under `profiles/`, resolves direct and transitive version requirements, composes the Effective Profile Set, validates canonical Narrative semantics/Core strengthening, and pins every selected manifest by exact SHA-256. An advancement re-runs that resolution and accepts the proposed EPS only when the exact document is reproduced.
+ 
++Probe2 also pins the pre-PR82 bytes of `fixture.research-strict@1.1.0`, where `evidence.capture.required_fields` used `captured_hash`. The repository later changed that same `1.1.0` fixture to `capture_digest`; Issue #128 deliberately rejects treating those changed bytes as the same historical identity. The Probe2 target therefore supplies `profiles/fixtures/valid/research-strict-1.2.0.profile.json`, which carries the `capture_digest` semantics under a new Profile version. `fixture.organization@2.0.0` already requires `fixture.research-strict >=1.1.0 <2.0.0`, so production resolution selects `1.2.0` transitively without adding a new direct Project Config request.
++
+ ## Legacy publication-writer responsibility mapping
+ 
+ `research-profile/` remains a migration source. Issue #128 only maps the responsibilities needed to understand the A2 transition; it does not migrate the full Human-approved source pack.
+@@ -51,7 +53,7 @@ Example `profile-resolve.json` for the Probe2-style technical smoke:
+   "profile_manifest_files": [
+     "profiles/fixtures/valid/publication.profile.json",
+     "profiles/fixtures/valid/organization.profile.json",
+-    "profiles/fixtures/valid/research-strict.profile.json",
++    "profiles/fixtures/valid/research-strict-1.2.0.profile.json",
+     "profiles/fixtures/valid/research-base.profile.json",
+     "profiles/fixtures/narrative/valid/generic-narrative.profile.json"
+   ],
+@@ -92,7 +94,7 @@ Apply the generated pair explicitly:
+   "profile_manifest_files": [
+     "profiles/fixtures/valid/publication.profile.json",
+     "profiles/fixtures/valid/organization.profile.json",
+-    "profiles/fixtures/valid/research-strict.profile.json",
++    "profiles/fixtures/valid/research-strict-1.2.0.profile.json",
+     "profiles/fixtures/valid/research-base.profile.json",
+     "profiles/fixtures/narrative/valid/generic-narrative.profile.json"
+   ],
+diff --git a/profiles/fixtures/valid/research-strict-1.2.0.profile.json b/profiles/fixtures/valid/research-strict-1.2.0.profile.json
+new file mode 100644
+index 0000000..157117b
+--- /dev/null
++++ b/profiles/fixtures/valid/research-strict-1.2.0.profile.json
+@@ -0,0 +1,20 @@
++{
++  "schema_version": "0.1.0",
++  "profile_id": "fixture.research-strict",
++  "profile_type": "research",
++  "profile_version": "1.2.0",
++  "description": "Synthetic same-type inheritance fixture with capture_digest evidence field.",
++  "core_compatibility": {"research_contract": ">=0.1.0 <0.2.0", "invariant_contract": ">=0.1.0 <0.2.0"},
++  "extends": [{"profile_id": "fixture.research-base", "profile_type": "research", "version": ">=1.0.0 <2.0.0"}],
++  "constraints": [
++    {"id": "FIX-RES-002", "path": "evidence.capture.required_fields", "merge_strategy": "union", "value": ["capture_digest"], "rationale": "Adds one synthetic capture field without replacement."},
++    {"id": "FIX-RES-003", "path": "evidence.capture.locator_precision", "merge_strategy": "must_equal", "value": "exact", "rationale": "Synthetic strengthening tied to Core traceability for fixture coverage."}
++  ],
++  "core_invariant_strengthenings": [{
++    "invariant_id": "CORE-TRACE-001",
++    "effect": "strengthen",
++    "constraint_ids": ["FIX-RES-003"],
++    "validator_binding": {"validator_id": "core.trace.evidence-source", "validator_version": "0.1.0", "form_id": "exact-locator"},
++    "rationale": "The fixture preserves source+locator traceability and adds the registered exact-locator strengthening form."
++  }]
++}
+diff --git a/tests/runtime/test_profile_generation_advancement.py b/tests/runtime/test_profile_generation_advancement.py
+index 94553d9..83a8c12 100644
+--- a/tests/runtime/test_profile_generation_advancement.py
++++ b/tests/runtime/test_profile_generation_advancement.py
+@@ -34,6 +34,7 @@ GENERIC_NARRATIVE = ROOT / "profiles/fixtures/narrative/valid/generic-narrative.
+ PUBLICATION = ROOT / "profiles/fixtures/valid/publication.profile.json"
+ ORGANIZATION = ROOT / "profiles/fixtures/valid/organization.profile.json"
+ RESEARCH_STRICT = ROOT / "profiles/fixtures/valid/research-strict.profile.json"
++RESEARCH_STRICT_NEXT = ROOT / "profiles/fixtures/valid/research-strict-1.2.0.profile.json"
+ RESEARCH_BASE = ROOT / "profiles/fixtures/valid/research-base.profile.json"
+ STATE_PUBLICATION = ROOT / "profiles/fixtures/profile-generation/valid/state-incompatible-publication.profile.json"
+ STATE_RESEARCH = ROOT / "profiles/fixtures/profile-generation/valid/state-incompatible-research.profile.json"
+@@ -73,7 +74,7 @@ class ProfileGenerationAdvancementTests(ResearchPackageAcceptanceSupport):
+         return cfg, eps
+ 
+     def _normal_manifest_files(self):
+-        return [str(PUBLICATION), str(ORGANIZATION), str(RESEARCH_STRICT), str(RESEARCH_BASE), str(GENERIC_NARRATIVE)]
++        return [str(PUBLICATION), str(ORGANIZATION), str(RESEARCH_STRICT_NEXT), str(RESEARCH_BASE), str(GENERIC_NARRATIVE)]
+ 
+     def _resolve_request(self, *, extra_replacements=None, manifests=None):
+        replacements = [
+            {
+                "from": {"profile_id":"fixture.narrative","profile_type":"narrative","version":"1.0.0"},
+                "to": {"profile_id":"fixture.generic-narrative","profile_type":"narrative","version":"1.0.0"},
+            }
+        ]
+        replacements.extend(extra_replacements or [])
+        return {"profile_manifest_files": manifests or self._normal_manifest_files(), "request_replacements": replacements}
+
+    def _resolve(self, request=None, name="resolved"):
+        request = request or self._resolve_request()
+        request_path = self.root / f"{name}-request.json"
+        request_path.write_text(json.dumps(request), encoding="utf-8")
+        output = self.root / name
+        code, result = _run_cli(["profile","resolve","--workspace",self.workspace,"--output",output,"--json",request_path])
+        self.assertEqual(code, 0, result)
+        return request, output, result
+
+    def _advance(self, request, output):
+        payload = {
+            "project_config_file": str(output / "project-config.json"),
+            "effective_profile_set_file": str(output / "effective-profile-set.json"),
+            "profile_manifest_files": request["profile_manifest_files"],
+            "origin": "issue-128-acceptance",
+        }
+        path = self.root / "advance.json"
+        path.write_text(json.dumps(payload), encoding="utf-8")
+        return _run_cli(["profile","advance","--workspace",self.workspace,"--json",path])
+
+    def _history(self):
+        code, result = _run_cli(["profile","history","--workspace",self.workspace,"--json"])
+        self.assertEqual(code, 0, result)
+        return result
+
+
+    def test_manifest_pin_is_checkout_line_ending_independent(self):
+        manifest = PUBLICATION.read_bytes().replace(b"\r\n", b"\n")
+        lf_path = self.root / "manifest-lf.json"
+        crlf_path = self.root / "manifest-crlf.json"
+        lf_path.write_bytes(manifest)
+        crlf_path.write_bytes(manifest.replace(b"\n", b"\r\n"))
+        self.assertEqual(_sha256(lf_path), _sha256(crlf_path))
+        self.assertEqual(_sha256(lf_path), json.loads(OLD_EPS.read_text(encoding="utf-8"))["effective_profiles"][-1]["manifest_sha256"])
+
+
+
+    def test_kody_concurrent_advancement_is_serialized_across_the_full_rebind(self):
+        request, output, _ = self._resolve()
+        payload = {
+            "project_config_file": str(output / "project-config.json"),
+            "effective_profile_set_file": str(output / "effective-profile-set.json"),
+            "profile_manifest_files": request["profile_manifest_files"],
+            "origin": "kody-concurrency-regression",
+        }
+        from plugins.local_application import profile_advancement as advancement
+
+        real_rebind = advancement._state_rebind
+        first_entered = threading.Event()
+        release_first = threading.Event()
+        second_entered = threading.Event()
+        call_guard = threading.Lock()
+        calls = 0
+        results = []
+        errors = []
+
+        def blocking_rebind(*args, **kwargs):
+            nonlocal calls
+            with call_guard:
+                calls += 1
+                call_number = calls
+            if call_number == 1:
+                first_entered.set()
+                if not release_first.wait(5):
+                    raise AssertionError("first advancement was not released")
+            else:
+                second_entered.set()
+            return real_rebind(*args, **kwargs)
+
+        def run_advance():
+            try:
+                results.append(advancement.advance_profile_generation(self.workspace, payload))
+            except Exception as exc:  # surfaced below with the original exception
+                errors.append(exc)
+
+        with patch.object(advancement, "_state_rebind", side_effect=blocking_rebind):
+            first = threading.Thread(target=run_advance)
+            second = threading.Thread(target=run_advance)
+            first.start()
+            self.assertTrue(first_entered.wait(5))
+            second.start()
+            time.sleep(0.2)
+            self.assertFalse(second_entered.is_set(), "second advancement entered the rebind while the first held the workspace lock")
+            release_first.set()
+            first.join(5)
+            second.join(5)
+            self.assertFalse(first.is_alive())
+            self.assertFalse(second.is_alive())
+
+        self.assertEqual(errors, [])
+        self.assertCountEqual([item["result"] for item in results], ["ADVANCED", "NOOP"])
+        history = self._history()
+        self.assertEqual(len(history["events"]), 1)
+
+    def test_kody_open_workspace_holds_generation_lock_until_close(self):
+        request, output, _ = self._resolve()
+        payload = {
+            "project_config_file": str(output / "project-config.json"),
+            "effective_profile_set_file": str(output / "effective-profile-set.json"),
+            "profile_manifest_files": request["profile_manifest_files"],
+            "origin": "kody-open-lifetime-regression",
+        }
+        from plugins.local_application import profile_advancement as advancement
+
+        opened = LocalApplicationFacade.open_workspace(self.workspace)
+        started = threading.Event()
+        finished = threading.Event()
+        results = []
+        errors = []
+
+        def run_advance():
+            started.set()
+            try:
+                results.append(advancement.advance_profile_generation(self.workspace, payload))
+            except Exception as exc:  # surfaced below with the original exception
+                errors.append(exc)
+            finally:
+                finished.set()
+
+        thread = threading.Thread(target=run_advance)
+        thread.start()
+        self.assertTrue(started.wait(5))
+        time.sleep(0.2)
+        self.assertFalse(finished.is_set(), "advancement passed an open Facade workspace lock")
+        opened.close()
+        thread.join(5)
+        self.assertFalse(thread.is_alive())
+        self.assertEqual(errors, [])
+        self.assertEqual([item["result"] for item in results], ["ADVANCED"])
+
+    def test_kody_profile_commands_keep_missing_workspace_error_contract(self):
+        missing = self.root / "missing-workspace"
+        code, rejected = _run_cli(["profile", "history", "--workspace", missing, "--json"])
+        self.assertEqual(code, 2, rejected)
+        self.assertEqual(rejected["issues"][0]["code"], "WORKSPACE-MISSING-001")
+        code, rejected = _run_cli(["profile", "advance", "--workspace", missing, "--json"], "{}")
+        self.assertEqual(code, 2, rejected)
+        self.assertEqual(rejected["issues"][0]["code"], "WORKSPACE-MISSING-001")
+
+    def test_kody_recovery_rejects_workspace_escape_locators_before_deletion(self):
+        marker_path = Path(self.workspace) / ".research-loom" / "profile-advancement.pending.json"
+        binding = json.loads((Path(self.workspace) / ".research-loom" / "workspace-binding.json").read_text(encoding="utf-8"))
+        config_text = (Path(self.workspace) / "project-config.json").read_text(encoding="utf-8")
+        eps_text = (Path(self.workspace) / "effective-profile-set.json").read_text(encoding="utf-8")
+        config = json.loads(config_text)
+        eps = json.loads(eps_text)
+        base_marker = {
+            "schema_version": "0.1.0",
+            "old_binding": binding,
+            "new_binding": binding,
+            "old_project_config": config,
+            "old_effective_profile_set": eps,
+            "old_project_config_text": config_text,
+            "old_effective_profile_set_text": eps_text,
+            "new_project_config": config,
+            "new_effective_profile_set": eps,
+        }
+
+        outside_file = self.root / "outside-event.json"
+        outside_file.write_text("keep\n", encoding="utf-8")
+        marker = {**base_marker, "event_locator": "../outside-event.json", "created_history_paths": []}
+        marker_path.write_text(json.dumps(marker), encoding="utf-8")
+        code, rejected = _run_cli(["resume", "--workspace", self.workspace, "--json"])
+        self.assertEqual(code, 2, rejected)
+        self.assertEqual(rejected["issues"][0]["code"], "WORKSPACE-PATH-001")
+        self.assertEqual(outside_file.read_text(encoding="utf-8"), "keep\n")
+        marker_path.unlink()
+
+        outside_dir = self.root / "outside-history"
+        outside_dir.mkdir()
+        sentinel = outside_dir / "keep.txt"
+        sentinel.write_text("keep\n", encoding="utf-8")
+        marker = {**base_marker, "event_locator": None, "created_history_paths": ["../outside-history"]}
+        marker_path.write_text(json.dumps(marker), encoding="utf-8")
+        code, rejected = _run_cli(["resume", "--workspace", self.workspace, "--json"])
+        self.assertEqual(code, 2, rejected)
+        self.assertEqual(rejected["issues"][0]["code"], "WORKSPACE-PATH-001")
+        self.assertEqual(sentinel.read_text(encoding="utf-8"), "keep\n")
+        marker_path.unlink()
+
+    def test_kody_profile_resolver_bounds_inputs_and_prunes_incompatible_branches(self):
+        from plugins.local_application import profile_resolution as resolution
+
+        over_limit = self._resolve_request(manifests=[str(PUBLICATION)] * (resolution.MAX_PROFILE_MANIFESTS + 1))
+        over_limit_path = self.root / "over-limit.json"
+        over_limit_path.write_text(json.dumps(over_limit), encoding="utf-8")
+        code, rejected = _run_cli([
+            "profile", "resolve", "--workspace", self.workspace, "--output", self.root / "over-limit-out", "--json", over_limit_path
+        ])
+        self.assertEqual(code, 2, rejected)
+        self.assertEqual(rejected["issues"][0]["code"], "PROFILE-CANDIDATE-LIMIT-001")
+
+        def candidate(profile_id, version, *, requires=None):
+            return {
+                "manifest": {
+                    "profile_id": profile_id,
+                    "profile_type": "research",
+                    "profile_version": version,
+                    "core_compatibility": {"research_contract": "0.1.0", "invariant_contract": "0.1.0"},
+                    "requires": requires or [],
+                },
+                "manifest_sha256": hashlib.sha256(f"{profile_id}@{version}".encode()).hexdigest(),
+                "path": f"/{profile_id}-{version}.json",
+            }
+
+        candidates = [
+            candidate("fixture.requested", "2.0.0", requires=[{"profile_id":"fixture.dep","profile_type":"research","version":">=2.0.0 <3.0.0"}]),
+            candidate("fixture.requested", "1.0.0", requires=[{"profile_id":"fixture.dep","profile_type":"research","version":"1.0.0"}]),
+            candidate("fixture.dep", "1.0.0"),
+        ]
+        for index in range(40):
+            candidates.extend([candidate(f"fixture.unrelated-{index:02d}", "1.0.0"), candidate(f"fixture.unrelated-{index:02d}", "2.0.0")])
+        requests = [{"profile_id":"fixture.requested","profile_type":"research","version":">=1.0.0 <3.0.0"}]
+        effective, selected = resolution._resolve_selected(candidates, requests)
+        self.assertEqual({key for key in selected}, {("research", "fixture.requested"), ("research", "fixture.dep")})
+        self.assertEqual(selected[("research", "fixture.requested")]["manifest"]["profile_version"], "1.0.0")
+        self.assertEqual([item["profile_id"] for item in effective], ["fixture.dep", "fixture.requested"])
+
+        # Only dependencies introduced by the actually selected requested version
+        # belong in the search state. Pre-expanding dependencies from every candidate
+        # version turns these 15 independent alternatives into a needless 2^15 search.
+        candidates = []
+        for major in range(1, 16):
+            dep_id = f"fixture.dynamic-dep-{major:02d}"
+            candidates.append(
+                candidate(
+                    "fixture.dynamic-requested",
+                    f"{major}.0.0",
+                    requires=[{"profile_id": dep_id, "profile_type": "research", "version": "1.0.0"}],
+                )
+            )
+            candidates.append(candidate(dep_id, "1.0.0"))
+        requests = [
+            {
+                "profile_id": "fixture.dynamic-requested",
+                "profile_type": "research",
+                "version": ">=1.0.0 <16.0.0",
+            }
+        ]
+        effective, selected = resolution._resolve_selected(candidates, requests)
+        self.assertEqual(
+            set(selected),
+            {("research", "fixture.dynamic-requested"), ("research", "fixture.dynamic-dep-15")},
+        )
+        self.assertEqual(selected[("research", "fixture.dynamic-requested")]["manifest"]["profile_version"], "15.0.0")
+        self.assertEqual([item["profile_id"] for item in effective], ["fixture.dynamic-dep-15", "fixture.dynamic-requested"])
+
+
+    def test_probe2_historical_research_strict_pin_advances_to_versioned_target(self):
+        # Probe2 predates PR #82, where fixture.research-strict@1.1.0 still
+        # required captured_hash. The repository later changed those bytes to
+        # capture_digest without changing the Profile version. Issue #128 must
+        # not accept that same-id/version substitution; the migration instead
+        # advances the transitive dependency to explicit 1.2.0.
+        config = intake.bootstrap_config()
+        historical = json.loads(OLD_EPS.read_text(encoding="utf-8"))
+        old_digest = "1d7bbbe2d43ac8e54da1cb1cb940dcf0be977543d97a8fb218a453969e50069d"
+        for collection in (historical["candidate_universe"], historical["effective_profiles"]):
+            for item in collection:
+                if item["profile_id"] == "fixture.research-strict":
+                    item["manifest_sha256"] = old_digest
+                for provenance in item.get("selection_provenance", []):
+                    introduced = provenance.get("introduced_by")
+                    if isinstance(introduced, dict) and introduced.get("profile_id") == "fixture.research-strict":
+                        introduced["manifest_sha256"] = old_digest
+        for constraint in historical["effective_constraints"]:
+            if constraint["path"] == "evidence.capture.required_fields":
+                constraint["value"] = ["captured_hash", "locator", "source_id"]
+            for provenance in constraint.get("provenance", []):
+                if provenance.get("profile_id") == "fixture.research-strict":
+                    provenance["manifest_sha256"] = old_digest
+        for invariant in historical["core_invariants"]:
+            for provenance in invariant.get("provenance", []):
+                if provenance.get("profile_id") == "fixture.research-strict":
+                    provenance["manifest_sha256"] = old_digest
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            cfg = root / "config.json"
+            eps = root / "effective.json"
+            cfg.write_text(json.dumps(config), encoding="utf-8")
+            eps.write_text(json.dumps(historical), encoding="utf-8")
+            opened = LocalWorkspace.init(root / "workspace", project_config_file=cfg, effective_profile_set_file=eps)
+            workspace = opened.root
+            opened.close()
+
+            request = self._resolve_request()
+            request_path = root / "resolve.json"
+            request_path.write_text(json.dumps(request), encoding="utf-8")
+            output = root / "resolved"
+            code, resolved = _run_cli(["profile", "resolve", "--workspace", workspace, "--output", output, "--json", request_path])
+            self.assertEqual(code, 0, resolved)
+            target = json.loads((output / "effective-profile-set.json").read_text(encoding="utf-8"))
+            strict = next(item for item in target["effective_profiles"] if item["profile_id"] == "fixture.research-strict")
+            self.assertEqual(strict["profile_version"], "1.2.0")
+            self.assertNotEqual(strict["manifest_sha256"], old_digest)
+
+            payload = {
+                "project_config_file": str(output / "project-config.json"),
+                "effective_profile_set_file": str(output / "effective-profile-set.json"),
+                "profile_manifest_files": request["profile_manifest_files"],
+                "origin": "probe2-historical-research-strict-regression",
+            }
+            advance_path = root / "advance.json"
+            advance_path.write_text(json.dumps(payload), encoding="utf-8")
+            code, advanced = _run_cli(["profile", "advance", "--workspace", workspace, "--json", advance_path])
+            self.assertEqual(code, 0, advanced)
+            self.assertEqual(advanced["result"], "ADVANCED")
+
+    def test_pa0_production_resolution_rejects_semantically_invalid_narrative_target(self):
+        request = {
+            "profile_manifest_files": [
+-                str(PUBLICATION), str(ORGANIZATION), str(RESEARCH_STRICT), str(RESEARCH_BASE), str(INVALID_NARRATIVE)
++                str(PUBLICATION), str(ORGANIZATION), str(RESEARCH_STRICT_NEXT), str(RESEARCH_BASE), str(INVALID_NARRATIVE)
+             ],
+             "request_replacements": [
+                 {
+@@ -653,7 +716,7 @@ class ProfileGenerationAdvancementTests(ResearchPackageAcceptanceSupport):
+             ))
+             self.assertIsInstance(result, CommitReceipt)
+ 
+-        state_manifests = [str(STATE_PUBLICATION),str(STATE_RESEARCH),str(ORGANIZATION),str(RESEARCH_STRICT),str(RESEARCH_BASE),str(GENERIC_NARRATIVE)]
++        state_manifests = [str(STATE_PUBLICATION),str(STATE_RESEARCH),str(ORGANIZATION),str(RESEARCH_STRICT_NEXT),str(RESEARCH_BASE),str(GENERIC_NARRATIVE)]
+        state_request = self._resolve_request(
+            manifests=state_manifests,
+            extra_replacements=[{

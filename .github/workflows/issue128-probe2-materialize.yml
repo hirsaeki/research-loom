@@ -1,0 +1,30 @@
+name: issue128-probe2-materialize
+
+on:
+  push:
+    branches: [issue-128-probe2-fix-materialized]
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    if: github.actor == 'hirsaeki'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: true
+          fetch-depth: 0
+      - name: Materialize Probe2 regression fix
+        shell: bash
+        run: |
+          git apply --check .probe2-fix.patch
+          git apply .probe2-fix.patch
+          git add docs/architecture/profile-generation-advancement.md
+          git add profiles/fixtures/valid/research-strict-1.2.0.profile.json
+          git add tests/runtime/test_profile_generation_advancement.py
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Materialize Probe2 historical Profile fix'
+          git push origin HEAD:issue-128-probe2-fix-materialized
