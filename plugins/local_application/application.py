@@ -256,11 +256,29 @@ class ResearchQuestionProposeHandler:
 class EffectiveResearchAttentionProvider:
     """Resolve complete effective guidance without changing Project Config or Research State."""
 
-    _PROFILE_HISTORY_EVENT_LIMIT = 256
+    _PROFILE_HISTORY_EVENT_READ_LIMIT = 10_000
 
     def __init__(self, store: LocalAttentionStore, *, profile_history_root: Path | None = None) -> None:
         self._store = store
         self._profile_history_root = Path(profile_history_root) if profile_history_root is not None else None
+
+    @staticmethod
+    def _event_successor(event: Mapping[str, Any], *, project_id: str, source_config_digest: str) -> str | None:
+        if event.get("event_type") != "project_profile_generation_advanced":
+            return None
+        if str(event.get("project_id") or "") != project_id:
+            return None
+        old_binding = event.get("old_binding")
+        new_binding = event.get("new_binding")
+        if not isinstance(old_binding, Mapping) or not isinstance(new_binding, Mapping):
+            raise ValueError("Profile advancement event binding is malformed")
+        old_digest = old_binding.get("project_config_digest")
+        new_digest = new_binding.get("project_config_digest")
+        if not isinstance(old_digest, str) or not isinstance(new_digest, str):
+            raise ValueError("Profile advancement event digest is malformed")
+        if old_digest != source_config_digest:
+            return None
+        return new_digest
 
     def _profile_generation_connects(
         self,
@@ -277,11 +295,13 @@ class EffectiveResearchAttentionProvider:
         if not events_root.is_dir():
             return False
 
-        paths = sorted(events_root.glob("*.json"))
-        if len(paths) > self._PROFILE_HISTORY_EVENT_LIMIT:
+        # Pre-merge Issue #128 builds wrote flat PGA-*.json events. Parse that
+        # bounded legacy set once so already-probed workspaces remain reopenable.
+        legacy_paths = sorted(events_root.glob("PGA-*.json"))
+        if len(legacy_paths) > self._PROFILE_HISTORY_EVENT_READ_LIMIT:
             return False
-        edges: dict[str, set[str]] = {}
-        for path in paths:
+        legacy_by_source: dict[str, set[str]] = {}
+        for path in legacy_paths:
             try:
                 event = json.loads(path.read_text(encoding="utf-8"))
             except (OSError, ValueError, json.JSONDecodeError):
@@ -300,13 +320,39 @@ class EffectiveResearchAttentionProvider:
             new_digest = new_binding.get("project_config_digest")
             if not isinstance(old_digest, str) or not isinstance(new_digest, str):
                 return False
-            edges.setdefault(old_digest, set()).add(new_digest)
+            legacy_by_source.setdefault(old_digest, set()).add(new_digest)
 
         pending = [source_config_digest]
         visited = {source_config_digest}
+        events_read = len(legacy_paths)
         while pending:
             current = pending.pop()
-            for successor in edges.get(current, ()):
+            successors = set(legacy_by_source.get(current, ()))
+            source_dir = events_root / "by-source" / current.removeprefix("sha256:")
+            if source_dir.is_dir():
+                indexed_paths = sorted(source_dir.glob("PGA-*.json"))
+                events_read += len(indexed_paths)
+                if events_read > self._PROFILE_HISTORY_EVENT_READ_LIMIT:
+                    return False
+                for path in indexed_paths:
+                    try:
+                        event = json.loads(path.read_text(encoding="utf-8"))
+                    except (OSError, ValueError, json.JSONDecodeError):
+                        return False
+                    if not isinstance(event, Mapping):
+                        return False
+                    try:
+                        successor = self._event_successor(
+                            event,
+                            project_id=project_id,
+                            source_config_digest=current,
+                        )
+                    except ValueError:
+                        return False
+                    if successor is not None:
+                        successors.add(successor)
+
+            for successor in successors:
                 if successor == target_config_digest:
                     return True
                 if successor not in visited:

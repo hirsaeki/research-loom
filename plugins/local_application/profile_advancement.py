@@ -65,11 +65,11 @@ def _workspace_advancement_lock(root: Path):
             raise LocalWorkspaceError("WORKSPACE-MISSING-001", "workspace internal directory is missing")
         lock_path = _safe_locator(root, f"{INTERNAL_DIR}/{ADVANCEMENT_LOCK}", require_exists=False)
         handle = lock_path.open("a+b")
-        handle.seek(0, os.SEEK_END)
-        if handle.tell() == 0:
-            handle.write(b"\0")
-            handle.flush()
         try:
+            handle.seek(0, os.SEEK_END)
+            if handle.tell() == 0:
+                handle.write(b"\0")
+                handle.flush()
             if os.name == "nt":
                 import msvcrt
 
@@ -459,7 +459,10 @@ def _advance_profile_generation_locked(root: Path, request: Mapping[str, Any]) -
 
     target_binding = _binding(str(old_binding["project_id"]), new_config_digest, new_profile_digest, initialized_at=str(old_binding["initialized_at"]))
     event_id = "PGA-" + uuid.uuid4().hex
-    event_locator = f"{INTERNAL_DIR}/{HISTORY_DIR}/{EVENTS_DIR}/{event_id}.json"
+    event_locator = (
+        f"{INTERNAL_DIR}/{HISTORY_DIR}/{EVENTS_DIR}/by-source/"
+        f"{old_config_digest.removeprefix('sha256:')}/{event_id}.json"
+    )
     old_config_text = (root / PROJECT_CONFIG_NAME).read_text(encoding="utf-8")
     old_eps_text = (root / EFFECTIVE_PROFILE_SET_NAME).read_text(encoding="utf-8")
     target_config_text = target_config_path.read_text(encoding="utf-8")
@@ -591,6 +594,10 @@ def profile_history(workspace: str | Path) -> Mapping[str, Any]:
     events = []
     events_root = history_root / EVENTS_DIR
     if events_root.exists():
-        for path in sorted(events_root.glob("*.json")):
+        paths = list(events_root.glob("PGA-*.json"))
+        indexed_root = events_root / "by-source"
+        if indexed_root.is_dir():
+            paths.extend(indexed_root.glob("*/PGA-*.json"))
+        for path in sorted(paths):
             events.append(_read_json(path, code="PROFILE-HISTORY-001"))
     return {"status": "OK", "current": current, "generations": generations, "events": events}

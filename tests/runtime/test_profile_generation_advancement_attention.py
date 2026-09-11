@@ -132,7 +132,12 @@ class ProfileAdvancementAttentionTests(ResearchPackageAcceptanceSupport):
         # Ablation: the old active map is accepted only because the append-only
         # advancement event proves the bounded old->new Project Config transition.
         events_root = self.workspace / ".research-loom" / "profile-history" / "events"
-        event_path = next(events_root.glob("*.json"))
+        event_path = next(events_root.rglob("PGA-*.json"))
+        legacy_event = events_root / event_path.name
+        event_path.replace(legacy_event)
+        code, legacy_resume = _run_cli(["resume", "--workspace", self.workspace, "--json"])
+        self.assertEqual(code, 0, legacy_resume)
+        event_path = legacy_event
         hidden_event = event_path.with_suffix(".ablation")
         event_path.replace(hidden_event)
         try:
@@ -143,3 +148,53 @@ class ProfileAdvancementAttentionTests(ResearchPackageAcceptanceSupport):
             hidden_event.replace(event_path)
         code, resumed_again = _run_cli(["resume", "--workspace", self.workspace, "--json"])
         self.assertEqual(code, 0, resumed_again)
+
+    def test_active_attention_accepts_profile_chain_longer_than_256_events(self):
+        with LocalApplicationFacade.open_workspace(self.workspace) as facade:
+            attention_map = facade.submit_action({
+                "action_type": "research_attention.propose",
+                "payload": {"additions": [{"statement": "Preserve long-running operator focus."}]},
+                "actor_id": "HUMAN-ATT-LONG",
+            })["data"]["attention_map"]
+            pending = facade.submit_action({
+                "action_type": "research_attention.activate_candidate",
+                "payload": {"attention_map_id": attention_map["map_id"]},
+                "actor_id": "HUMAN-ATT-LONG",
+            })
+            confirmed = facade.submit_confirmation({
+                "confirmation_request_id": pending["confirmation_request"]["confirmation_request_id"],
+                "actor_id": "HUMAN-ATT-LONG",
+            })
+            self.assertEqual(confirmed["status"], "SUCCEEDED")
+            source_digest = attention_map["project_config"]["digest"]
+
+        request, output = self._resolve()
+        code, advanced = self._advance(request, output)
+        self.assertEqual(code, 0, advanced)
+        target_digest = advanced["new_project_config_digest"]
+
+        events_root = self.workspace / ".research-loom" / "profile-history" / "events"
+        original_path = next(events_root.rglob("PGA-*.json"))
+        template = json.loads(original_path.read_text(encoding="utf-8"))
+        original_path.unlink()
+
+        previous = source_digest
+        for index in range(300):
+            successor = target_digest if index == 299 else f"sha256:{index + 1:064x}"
+            event = deepcopy(template)
+            event["event_id"] = f"PGA-LONG-{index:04d}"
+            event["old_binding"]["project_config_digest"] = previous
+            event["new_binding"]["project_config_digest"] = successor
+            source_dir = events_root / "by-source" / previous.removeprefix("sha256:")
+            source_dir.mkdir(parents=True, exist_ok=True)
+            (source_dir / f"PGA-LONG-{index:04d}.json").write_text(
+                json.dumps(event, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n",
+                encoding="utf-8",
+            )
+            previous = successor
+
+        code, resumed = _run_cli(["resume", "--workspace", self.workspace, "--json"])
+        self.assertEqual(code, 0, resumed)
+        with LocalApplicationFacade.open_workspace(self.workspace) as facade:
+            status = facade.submit_action({"action_type": "research_attention.status", "payload": {}})
+            self.assertEqual(status["data"]["active_map"]["map_id"], attention_map["map_id"])
