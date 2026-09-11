@@ -2,9 +2,12 @@ from __future__ import annotations
 
 from copy import deepcopy
 import json
+from pathlib import Path
+from unittest import mock
 
 from core.conversation import ConversationRuntimeError
 from plugins.local_application import LocalApplicationFacade
+from plugins.local_application.application import EffectiveResearchAttentionProvider
 from research_package_acceptance_support import ResearchPackageAcceptanceSupport
 import test_external_desktop_research_intake as intake
 from test_profile_generation_advancement import (
@@ -148,6 +151,102 @@ class ProfileAdvancementAttentionTests(ResearchPackageAcceptanceSupport):
             hidden_event.replace(event_path)
         code, resumed_again = _run_cli(["resume", "--workspace", self.workspace, "--json"])
         self.assertEqual(code, 0, resumed_again)
+
+    def test_active_attention_rejects_noncanonical_history_digest_before_path_traversal(self):
+        with LocalApplicationFacade.open_workspace(self.workspace) as facade:
+            attention_map = facade.submit_action({
+                "action_type": "research_attention.propose",
+                "payload": {"additions": [{"statement": "Reject forged profile-history links."}]},
+                "actor_id": "HUMAN-ATT-FORGED",
+            })["data"]["attention_map"]
+            pending = facade.submit_action({
+                "action_type": "research_attention.activate_candidate",
+                "payload": {"attention_map_id": attention_map["map_id"]},
+                "actor_id": "HUMAN-ATT-FORGED",
+            })
+            confirmed = facade.submit_confirmation({
+                "confirmation_request_id": pending["confirmation_request"]["confirmation_request_id"],
+                "actor_id": "HUMAN-ATT-FORGED",
+            })
+            self.assertEqual(confirmed["status"], "SUCCEEDED")
+
+        request, output = self._resolve()
+        code, advanced = self._advance(request, output)
+        self.assertEqual(code, 0, advanced)
+        target_digest = advanced["new_project_config_digest"]
+
+        events_root = self.workspace / ".research-loom" / "profile-history" / "events"
+        event_path = next(events_root.rglob("PGA-*.json"))
+        event = json.loads(event_path.read_text(encoding="utf-8"))
+        malicious_digest = "sha256:../../../outside-history"
+        event["new_binding"]["project_config_digest"] = malicious_digest
+        event_path.write_text(
+            json.dumps(event, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n",
+            encoding="utf-8",
+        )
+
+        forged_dir = self.workspace / ".research-loom" / "outside-history"
+        forged_dir.mkdir(parents=True, exist_ok=True)
+        forged = deepcopy(event)
+        forged["event_id"] = "PGA-FORGED-ESCAPE"
+        forged["old_binding"]["project_config_digest"] = malicious_digest
+        forged["new_binding"]["project_config_digest"] = target_digest
+        (forged_dir / "PGA-FORGED-ESCAPE.json").write_text(
+            json.dumps(forged, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n",
+            encoding="utf-8",
+        )
+
+        code, stale = _run_cli(["resume", "--workspace", self.workspace, "--json"])
+        self.assertEqual(code, 2, stale)
+        self.assertEqual(stale["issues"][0]["code"], "ATTENTION-STALE-001")
+
+    def test_profile_history_index_stops_glob_at_read_limit(self):
+        history_root = self.root / "bounded-profile-history"
+        events_root = history_root / "events"
+        source_digest = "sha256:" + "1" * 64
+        successor_digest = "sha256:" + "2" * 64
+        target_digest = "sha256:" + "f" * 64
+        source_dir = events_root / "by-source" / source_digest.removeprefix("sha256:")
+        source_dir.mkdir(parents=True, exist_ok=True)
+        event_path = source_dir / "PGA-BOUND.json"
+        event_path.write_text(
+            json.dumps({
+                "event_type": "project_profile_generation_advanced",
+                "project_id": "PRJ-BOUND",
+                "old_binding": {"project_config_digest": source_digest},
+                "new_binding": {"project_config_digest": successor_digest},
+            }, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        provider = EffectiveResearchAttentionProvider(None, profile_history_root=history_root)
+        real_glob = Path.glob
+        observed = {"indexed_yields": 0}
+
+        def bounded_glob(path: Path, pattern: str):
+            if path == events_root and pattern == "PGA-*.json":
+                return iter(())
+            if path == source_dir and pattern == "PGA-*.json":
+                def iterator():
+                    for _ in range(4):
+                        observed["indexed_yields"] += 1
+                        yield event_path
+                    raise AssertionError("bounded history traversal consumed beyond limit + 1")
+                return iterator()
+            return real_glob(path, pattern)
+
+        with mock.patch.object(
+            EffectiveResearchAttentionProvider,
+            "_PROFILE_HISTORY_EVENT_READ_LIMIT",
+            3,
+        ), mock.patch.object(Path, "glob", new=bounded_glob):
+            connected = provider._profile_generation_connects(
+                project_id="PRJ-BOUND",
+                source_config_digest=source_digest,
+                target_config_digest=target_digest,
+            )
+
+        self.assertFalse(connected)
+        self.assertEqual(observed["indexed_yields"], 4)
 
     def test_active_attention_accepts_profile_chain_longer_than_256_events(self):
         with LocalApplicationFacade.open_workspace(self.workspace) as facade:
