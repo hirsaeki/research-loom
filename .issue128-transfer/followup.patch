@@ -1,0 +1,253 @@
+diff --git a/plugins/local_application/application.py b/plugins/local_application/application.py
+index 48a618b..f2f9ff3 100644
+--- a/plugins/local_application/application.py
++++ b/plugins/local_application/application.py
+@@ -256,12 +256,30 @@ class ResearchQuestionProposeHandler:
+ class EffectiveResearchAttentionProvider:
+     """Resolve complete effective guidance without changing Project Config or Research State."""
+ 
+-    _PROFILE_HISTORY_EVENT_LIMIT = 256
++    _PROFILE_HISTORY_EVENT_READ_LIMIT = 10_000
+ 
+     def __init__(self, store: LocalAttentionStore, *, profile_history_root: Path | None = None) -> None:
+         self._store = store
+         self._profile_history_root = Path(profile_history_root) if profile_history_root is not None else None
+ 
++    @staticmethod
++    def _event_successor(event: Mapping[str, Any], *, project_id: str, source_config_digest: str) -> str | None:
++        if event.get("event_type") != "project_profile_generation_advanced":
++            return None
++        if str(event.get("project_id") or "") != project_id:
++            return None
++        old_binding = event.get("old_binding")
++        new_binding = event.get("new_binding")
++        if not isinstance(old_binding, Mapping) or not isinstance(new_binding, Mapping):
++            raise ValueError("Profile advancement event binding is malformed")
++        old_digest = old_binding.get("project_config_digest")
++        new_digest = new_binding.get("project_config_digest")
++        if not isinstance(old_digest, str) or not isinstance(new_digest, str):
++            raise ValueError("Profile advancement event digest is malformed")
++        if old_digest != source_config_digest:
++            return None
++        return new_digest
++
+     def _profile_generation_connects(
+         self,
+         *,
+@@ -277,11 +295,13 @@ class EffectiveResearchAttentionProvider:
+         if not events_root.is_dir():
+             return False
+ 
+-        paths = sorted(events_root.glob("*.json"))
+-        if len(paths) > self._PROFILE_HISTORY_EVENT_LIMIT:
++        # Pre-merge Issue #128 builds wrote flat PGA-*.json events. Parse that
++        # bounded legacy set once so already-probed workspaces remain reopenable.
++        legacy_paths = sorted(events_root.glob("PGA-*.json"))
++        if len(legacy_paths) > self._PROFILE_HISTORY_EVENT_READ_LIMIT:
+             return False
+-        edges: dict[str, set[str]] = {}
+-        for path in paths:
++        legacy_by_source: dict[str, set[str]] = {}
++        for path in legacy_paths:
+             try:
+                 event = json.loads(path.read_text(encoding="utf-8"))
+             except (OSError, ValueError, json.JSONDecodeError):
+@@ -300,13 +320,39 @@ class EffectiveResearchAttentionProvider:
+             new_digest = new_binding.get("project_config_digest")
+             if not isinstance(old_digest, str) or not isinstance(new_digest, str):
+                 return False
+-            edges.setdefault(old_digest, set()).add(new_digest)
++            legacy_by_source.setdefault(old_digest, set()).add(new_digest)
+ 
+         pending = [source_config_digest]
+         visited = {source_config_digest}
++        events_read = len(legacy_paths)
+         while pending:
+             current = pending.pop()
+-            for successor in edges.get(current, ()):
++            successors = set(legacy_by_source.get(current, ()))
++            source_dir = events_root / "by-source" / current.removeprefix("sha256:")
++            if source_dir.is_dir():
++                indexed_paths = sorted(source_dir.glob("PGA-*.json"))
++                events_read += len(indexed_paths)
++                if events_read > self._PROFILE_HISTORY_EVENT_READ_LIMIT:
++                    return False
++                for path in indexed_paths:
++                    try:
++                        event = json.loads(path.read_text(encoding="utf-8"))
++                    except (OSError, ValueError, json.JSONDecodeError):
++                        return False
++                    if not isinstance(event, Mapping):
++                        return False
++                    try:
++                        successor = self._event_successor(
++                            event,
++                            project_id=project_id,
++                            source_config_digest=current,
++                        )
++                    except ValueError:
++                        return False
++                    if successor is not None:
++                        successors.add(successor)
++
++            for successor in successors:
+                 if successor == target_config_digest:
+                     return True
+                 if successor not in visited:
+diff --git a/plugins/local_application/profile_advancement.py b/plugins/local_application/profile_advancement.py
+index d0e2d1d..81957a5 100644
+--- a/plugins/local_application/profile_advancement.py
++++ b/plugins/local_application/profile_advancement.py
+@@ -65,11 +65,11 @@ def _workspace_advancement_lock(root: Path):
+             raise LocalWorkspaceError("WORKSPACE-MISSING-001", "workspace internal directory is missing")
+         lock_path = _safe_locator(root, f"{INTERNAL_DIR}/{ADVANCEMENT_LOCK}", require_exists=False)
+         handle = lock_path.open("a+b")
+-        handle.seek(0, os.SEEK_END)
+-        if handle.tell() == 0:
+-            handle.write(b"\0")
+-            handle.flush()
+         try:
++            handle.seek(0, os.SEEK_END)
++            if handle.tell() == 0:
++                handle.write(b"\0")
++                handle.flush()
+             if os.name == "nt":
+                 import msvcrt
+ 
+@@ -459,7 +459,10 @@ def _advance_profile_generation_locked(root: Path, request: Mapping[str, Any]) -
+ 
+     target_binding = _binding(str(old_binding["project_id"]), new_config_digest, new_profile_digest, initialized_at=str(old_binding["initialized_at"]))
+     event_id = "PGA-" + uuid.uuid4().hex
+-    event_locator = f"{INTERNAL_DIR}/{HISTORY_DIR}/{EVENTS_DIR}/{event_id}.json"
++    event_locator = (
++        f"{INTERNAL_DIR}/{HISTORY_DIR}/{EVENTS_DIR}/by-source/"
++        f"{old_config_digest.removeprefix('sha256:')}/{event_id}.json"
++    )
+     old_config_text = (root / PROJECT_CONFIG_NAME).read_text(encoding="utf-8")
+     old_eps_text = (root / EFFECTIVE_PROFILE_SET_NAME).read_text(encoding="utf-8")
+     target_config_text = target_config_path.read_text(encoding="utf-8")
+@@ -591,6 +594,10 @@ def profile_history(workspace: str | Path) -> Mapping[str, Any]:
+     events = []
+     events_root = history_root / EVENTS_DIR
+     if events_root.exists():
+-        for path in sorted(events_root.glob("*.json")):
++        paths = list(events_root.glob("PGA-*.json"))
++        indexed_root = events_root / "by-source"
++        if indexed_root.is_dir():
++            paths.extend(indexed_root.glob("*/PGA-*.json"))
++        for path in sorted(paths):
+             events.append(_read_json(path, code="PROFILE-HISTORY-001"))
+     return {"status": "OK", "current": current, "generations": generations, "events": events}
+diff --git a/tests/runtime/test_profile_generation_advancement.py b/tests/runtime/test_profile_generation_advancement.py
+index 5e47706..3e966f0 100644
+--- a/tests/runtime/test_profile_generation_advancement.py
++++ b/tests/runtime/test_profile_generation_advancement.py
+@@ -260,6 +260,35 @@ class ProfileGenerationAdvancementTests(ResearchPackageAcceptanceSupport):
+         self.assertEqual(errors, [])
+         self.assertEqual([item["result"] for item in results], ["ADVANCED"])
+ 
++    def test_kody_workspace_lock_closes_handle_when_initialization_fails(self):
++        from plugins.local_application import profile_advancement as advancement
++
++        class FailingHandle:
++            def __init__(self):
++                self.closed = False
++
++            def seek(self, *_args):
++                return 0
++
++            def tell(self):
++                return 0
++
++            def write(self, payload):
++                return len(payload)
++
++            def flush(self):
++                raise OSError("injected lock initialization failure")
++
++            def close(self):
++                self.closed = True
++
++        handle = FailingHandle()
++        with patch.object(Path, "open", return_value=handle):
++            with self.assertRaisesRegex(OSError, "injected lock initialization failure"):
++                with advancement._workspace_advancement_lock(Path(self.workspace)):
++                    self.fail("lock acquisition unexpectedly succeeded")
++        self.assertTrue(handle.closed)
++
+     def test_kody_profile_commands_keep_missing_workspace_error_contract(self):
+         missing = self.root / "missing-workspace"
+         code, rejected = _run_cli(["profile", "history", "--workspace", missing, "--json"])
+         self.assertEqual(code, 2, rejected)
+diff --git a/tests/runtime/test_profile_generation_advancement_attention.py b/tests/runtime/test_profile_generation_advancement_attention.py
+index c3e8257..5583295 100644
+--- a/tests/runtime/test_profile_generation_advancement_attention.py
++++ b/tests/runtime/test_profile_generation_advancement_attention.py
+@@ -132,7 +132,12 @@ class ProfileAdvancementAttentionTests(ResearchPackageAcceptanceSupport):
+         # Ablation: the old active map is accepted only because the append-only
+         # advancement event proves the bounded old->new Project Config transition.
+         events_root = self.workspace / ".research-loom" / "profile-history" / "events"
+-        event_path = next(events_root.glob("*.json"))
++        event_path = next(events_root.rglob("PGA-*.json"))
++        legacy_event = events_root / event_path.name
++        event_path.replace(legacy_event)
++        code, legacy_resume = _run_cli(["resume", "--workspace", self.workspace, "--json"])
++        self.assertEqual(code, 0, legacy_resume)
++        event_path = legacy_event
+         hidden_event = event_path.with_suffix(".ablation")
+         event_path.replace(hidden_event)
+         try:
+@@ -143,3 +148,53 @@ class ProfileAdvancementAttentionTests(ResearchPackageAcceptanceSupport):
+             hidden_event.replace(event_path)
+         code, resumed_again = _run_cli(["resume", "--workspace", self.workspace, "--json"])
+         self.assertEqual(code, 0, resumed_again)
++
++    def test_active_attention_accepts_profile_chain_longer_than_256_events(self):
++        with LocalApplicationFacade.open_workspace(self.workspace) as facade:
++            attention_map = facade.submit_action({
++                "action_type": "research_attention.propose",
++                "payload": {"additions": [{"statement": "Preserve long-running operator focus."}]},
++                "actor_id": "HUMAN-ATT-LONG",
++            })["data"]["attention_map"]
++            pending = facade.submit_action({
++                "action_type": "research_attention.activate_candidate",
++                "payload": {"attention_map_id": attention_map["map_id"]},
++                "actor_id": "HUMAN-ATT-LONG",
++            })
++            confirmed = facade.submit_confirmation({
++                "confirmation_request_id": pending["confirmation_request"]["confirmation_request_id"],
++                "actor_id": "HUMAN-ATT-LONG",
++            })
++            self.assertEqual(confirmed["status"], "SUCCEEDED")
++            source_digest = attention_map["project_config"]["digest"]
++
++        request, output = self._resolve()
++        code, advanced = self._advance(request, output)
++        self.assertEqual(code, 0, advanced)
++        target_digest = advanced["new_project_config_digest"]
++
++        events_root = self.workspace / ".research-loom" / "profile-history" / "events"
++        original_path = next(events_root.rglob("PGA-*.json"))
++        template = json.loads(original_path.read_text(encoding="utf-8"))
++        original_path.unlink()
++
++        previous = source_digest
++        for index in range(300):
++            successor = target_digest if index == 299 else f"sha256:{index + 1:064x}"
++            event = deepcopy(template)
++            event["event_id"] = f"PGA-LONG-{index:04d}"
++            event["old_binding"]["project_config_digest"] = previous
++            event["new_binding"]["project_config_digest"] = successor
++            source_dir = events_root / "by-source" / previous.removeprefix("sha256:")
++            source_dir.mkdir(parents=True, exist_ok=True)
++            (source_dir / f"PGA-LONG-{index:04d}.json").write_text(
++                json.dumps(event, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n",
++                encoding="utf-8",
++            )
++            previous = successor
++
++        code, resumed = _run_cli(["resume", "--workspace", self.workspace, "--json"])
++        self.assertEqual(code, 0, resumed)
++        with LocalApplicationFacade.open_workspace(self.workspace) as facade:
++            status = facade.submit_action({"action_type": "research_attention.status", "payload": {}})
++            self.assertEqual(status["data"]["active_map"]["map_id"], attention_map["map_id"])
