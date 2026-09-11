@@ -133,6 +133,13 @@ The current root Project Config, Effective Profile Set, workspace binding, and a
 
 Historical run/package/artifact records are never rewritten to the new generation.
 
+An already-active Research Attention Map is treated the same way: its immutable
+Project Config pin and activation record are not rewritten or reissued. Effective
+Attention may continue across the bounded Profile advancement only when the
+append-only advancement events connect that historical Project Config digest to
+the current digest. An unactivated candidate remains bound to its original
+Project Config and is still rejected as stale after advancement.
+
 ## Composition Smoke continuation
 
 After a successful Probe2 advancement, resume A2 on the **same Workspace** and with the **same RQ/material/Exhibit selection**:

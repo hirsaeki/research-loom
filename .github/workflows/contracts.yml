@@ -48,7 +48,7 @@ jobs:
       - name: Run canonical contract tests
         run: uv run --frozen python -m unittest discover -s tests/contracts -p 'test_*.py' -v
       - name: Run Issue 128 Profile generation advancement acceptance
-        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_profile_generation_advancement.py' -v
+        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_profile_generation_advancement*.py' -v
       - name: Run Research State runtime tests
         run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_*.py' -v
 
@@ -99,4 +99,4 @@ jobs:
       - name: Smoke production Windows launcher
         run: .\research-loom.cmd --help
       - name: Run Issue 128 Profile generation advancement acceptance
-        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_profile_generation_advancement.py' -v
+        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_profile_generation_advancement*.py' -v

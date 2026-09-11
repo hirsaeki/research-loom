@@ -256,8 +256,63 @@ class ResearchQuestionProposeHandler:
 class EffectiveResearchAttentionProvider:
     """Resolve complete effective guidance without changing Project Config or Research State."""
 
-    def __init__(self, store: LocalAttentionStore) -> None:
+    _PROFILE_HISTORY_EVENT_LIMIT = 256
+
+    def __init__(self, store: LocalAttentionStore, *, profile_history_root: Path | None = None) -> None:
         self._store = store
+        self._profile_history_root = Path(profile_history_root) if profile_history_root is not None else None
+
+    def _profile_generation_connects(
+        self,
+        *,
+        project_id: str,
+        source_config_digest: str,
+        target_config_digest: str,
+    ) -> bool:
+        if source_config_digest == target_config_digest:
+            return True
+        if self._profile_history_root is None:
+            return False
+        events_root = self._profile_history_root / "events"
+        if not events_root.is_dir():
+            return False
+
+        paths = sorted(events_root.glob("*.json"))
+        if len(paths) > self._PROFILE_HISTORY_EVENT_LIMIT:
+            return False
+        edges: dict[str, set[str]] = {}
+        for path in paths:
+            try:
+                event = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError, json.JSONDecodeError):
+                return False
+            if not isinstance(event, Mapping):
+                return False
+            if event.get("event_type") != "project_profile_generation_advanced":
+                continue
+            if str(event.get("project_id") or "") != project_id:
+                continue
+            old_binding = event.get("old_binding")
+            new_binding = event.get("new_binding")
+            if not isinstance(old_binding, Mapping) or not isinstance(new_binding, Mapping):
+                return False
+            old_digest = old_binding.get("project_config_digest")
+            new_digest = new_binding.get("project_config_digest")
+            if not isinstance(old_digest, str) or not isinstance(new_digest, str):
+                return False
+            edges.setdefault(old_digest, set()).add(new_digest)
+
+        pending = [source_config_digest]
+        visited = {source_config_digest}
+        while pending:
+            current = pending.pop()
+            for successor in edges.get(current, ()):
+                if successor == target_config_digest:
+                    return True
+                if successor not in visited:
+                    visited.add(successor)
+                    pending.append(successor)
+        return False
 
     def active(self, state) -> Mapping[str, Any] | None:
         try:
@@ -267,11 +322,16 @@ class EffectiveResearchAttentionProvider:
         if active is None:
             return None
         document = active["map"]
-        if (
-            document["project_id"] != state.project_ref
-            or document["project_config"]["ref"] != state.project_config_ref
-            or document["project_config"]["digest"] != state.project_config_digest
-        ):
+        project_matches = (
+            document["project_id"] == state.project_ref
+            and document["project_config"]["ref"] == state.project_config_ref
+        )
+        config_matches = self._profile_generation_connects(
+            project_id=state.project_ref,
+            source_config_digest=str(document["project_config"]["digest"]),
+            target_config_digest=str(state.project_config_digest),
+        )
+        if not project_matches or not config_matches:
             raise ConversationRuntimeError(
                 "ATTENTION-STALE-001", "active Attention Map is bound to a different Project Config"
             )
@@ -780,7 +840,10 @@ class LocalResearchApplication:
         # PR30 guidance storage is additive and lazy. Merely opening an older workspace
         # or reading baseline status must not create or migrate this optional DB.
         self.attention_store = LocalAttentionStore(self.root / ATTENTION_STORE_NAME)
-        self.effective_attention = EffectiveResearchAttentionProvider(self.attention_store)
+        self.effective_attention = EffectiveResearchAttentionProvider(
+            self.attention_store,
+            profile_history_root=self.root / "profile-history",
+        )
 
         self.execution_store = LocalExecutionStore(self.root / "execution")
         catalog = {}
