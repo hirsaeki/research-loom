@@ -34,6 +34,7 @@ GENERIC_NARRATIVE = ROOT / "profiles/fixtures/narrative/valid/generic-narrative.
 PUBLICATION = ROOT / "profiles/fixtures/valid/publication.profile.json"
 ORGANIZATION = ROOT / "profiles/fixtures/valid/organization.profile.json"
 RESEARCH_STRICT = ROOT / "profiles/fixtures/valid/research-strict.profile.json"
+RESEARCH_STRICT_NEXT = ROOT / "profiles/fixtures/valid/research-strict-1.2.0.profile.json"
 RESEARCH_BASE = ROOT / "profiles/fixtures/valid/research-base.profile.json"
 STATE_PUBLICATION = ROOT / "profiles/fixtures/profile-generation/valid/state-incompatible-publication.profile.json"
 STATE_RESEARCH = ROOT / "profiles/fixtures/profile-generation/valid/state-incompatible-research.profile.json"
@@ -73,7 +74,7 @@ class ProfileGenerationAdvancementTests(ResearchPackageAcceptanceSupport):
         return cfg, eps
 
     def _normal_manifest_files(self):
-        return [str(PUBLICATION), str(ORGANIZATION), str(RESEARCH_STRICT), str(RESEARCH_BASE), str(GENERIC_NARRATIVE)]
+        return [str(PUBLICATION), str(ORGANIZATION), str(RESEARCH_STRICT_NEXT), str(RESEARCH_BASE), str(GENERIC_NARRATIVE)]
 
     def _resolve_request(self, *, extra_replacements=None, manifests=None):
         replacements = [
@@ -332,10 +333,72 @@ class ProfileGenerationAdvancementTests(ResearchPackageAcceptanceSupport):
         self.assertEqual(selected[("research", "fixture.dynamic-requested")]["manifest"]["profile_version"], "15.0.0")
         self.assertEqual([item["profile_id"] for item in effective], ["fixture.dynamic-dep-15", "fixture.dynamic-requested"])
 
+
+    def test_probe2_historical_research_strict_pin_advances_to_versioned_target(self):
+        # Probe2 predates PR #82, where fixture.research-strict@1.1.0 still
+        # required captured_hash. The repository later changed those bytes to
+        # capture_digest without changing the Profile version. Issue #128 must
+        # not accept that same-id/version substitution; the migration instead
+        # advances the transitive dependency to explicit 1.2.0.
+        config = intake.bootstrap_config()
+        historical = json.loads(OLD_EPS.read_text(encoding="utf-8"))
+        old_digest = "1d7bbbe2d43ac8e54da1cb1cb940dcf0be977543d97a8fb218a453969e50069d"
+        for collection in (historical["candidate_universe"], historical["effective_profiles"]):
+            for item in collection:
+                if item["profile_id"] == "fixture.research-strict":
+                    item["manifest_sha256"] = old_digest
+                for provenance in item.get("selection_provenance", []):
+                    introduced = provenance.get("introduced_by")
+                    if isinstance(introduced, dict) and introduced.get("profile_id") == "fixture.research-strict":
+                        introduced["manifest_sha256"] = old_digest
+        for constraint in historical["effective_constraints"]:
+            if constraint["path"] == "evidence.capture.required_fields":
+                constraint["value"] = ["captured_hash", "locator", "source_id"]
+            for provenance in constraint.get("provenance", []):
+                if provenance.get("profile_id") == "fixture.research-strict":
+                    provenance["manifest_sha256"] = old_digest
+        for invariant in historical["core_invariants"]:
+            for provenance in invariant.get("provenance", []):
+                if provenance.get("profile_id") == "fixture.research-strict":
+                    provenance["manifest_sha256"] = old_digest
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            cfg = root / "config.json"
+            eps = root / "effective.json"
+            cfg.write_text(json.dumps(config), encoding="utf-8")
+            eps.write_text(json.dumps(historical), encoding="utf-8")
+            opened = LocalWorkspace.init(root / "workspace", project_config_file=cfg, effective_profile_set_file=eps)
+            workspace = opened.root
+            opened.close()
+
+            request = self._resolve_request()
+            request_path = root / "resolve.json"
+            request_path.write_text(json.dumps(request), encoding="utf-8")
+            output = root / "resolved"
+            code, resolved = _run_cli(["profile", "resolve", "--workspace", workspace, "--output", output, "--json", request_path])
+            self.assertEqual(code, 0, resolved)
+            target = json.loads((output / "effective-profile-set.json").read_text(encoding="utf-8"))
+            strict = next(item for item in target["effective_profiles"] if item["profile_id"] == "fixture.research-strict")
+            self.assertEqual(strict["profile_version"], "1.2.0")
+            self.assertNotEqual(strict["manifest_sha256"], old_digest)
+
+            payload = {
+                "project_config_file": str(output / "project-config.json"),
+                "effective_profile_set_file": str(output / "effective-profile-set.json"),
+                "profile_manifest_files": request["profile_manifest_files"],
+                "origin": "probe2-historical-research-strict-regression",
+            }
+            advance_path = root / "advance.json"
+            advance_path.write_text(json.dumps(payload), encoding="utf-8")
+            code, advanced = _run_cli(["profile", "advance", "--workspace", workspace, "--json", advance_path])
+            self.assertEqual(code, 0, advanced)
+            self.assertEqual(advanced["result"], "ADVANCED")
+
     def test_pa0_production_resolution_rejects_semantically_invalid_narrative_target(self):
         request = {
             "profile_manifest_files": [
-                str(PUBLICATION), str(ORGANIZATION), str(RESEARCH_STRICT), str(RESEARCH_BASE), str(INVALID_NARRATIVE)
+                str(PUBLICATION), str(ORGANIZATION), str(RESEARCH_STRICT_NEXT), str(RESEARCH_BASE), str(INVALID_NARRATIVE)
             ],
             "request_replacements": [
                 {
@@ -653,7 +716,7 @@ class ProfileGenerationAdvancementTests(ResearchPackageAcceptanceSupport):
             ))
             self.assertIsInstance(result, CommitReceipt)
 
-        state_manifests = [str(STATE_PUBLICATION),str(STATE_RESEARCH),str(ORGANIZATION),str(RESEARCH_STRICT),str(RESEARCH_BASE),str(GENERIC_NARRATIVE)]
+        state_manifests = [str(STATE_PUBLICATION),str(STATE_RESEARCH),str(ORGANIZATION),str(RESEARCH_STRICT_NEXT),str(RESEARCH_BASE),str(GENERIC_NARRATIVE)]
         state_request = self._resolve_request(
             manifests=state_manifests,
             extra_replacements=[{
