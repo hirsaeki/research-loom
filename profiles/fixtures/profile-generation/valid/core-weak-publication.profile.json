@@ -1,0 +1,11 @@
+{
+  "schema_version": "0.1.0",
+  "profile_id": "fixture.generation-core-weak-publication",
+  "profile_type": "publication",
+  "profile_version": "1.0.0",
+  "description": "Synthetic Profile-generation rejection fixture that omits the legacy chain carrying a Core strengthening.",
+  "core_compatibility": {"research_contract":"0.1.0","invariant_contract":"0.1.0"},
+  "constraints": [
+    {"id":"GEN-WEAK-PUB-001","path":"publication.outputs.formats","merge_strategy":"union","value":["fixture-format"],"rationale":"Fixture-only publication constraint."}
+  ]
+}

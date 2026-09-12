@@ -1,0 +1,15 @@
+{
+  "schema_version": "0.1.0",
+  "profile_id": "fixture.generation-state-publication",
+  "profile_type": "publication",
+  "profile_version": "1.0.0",
+  "description": "Synthetic Profile-generation rejection fixture retaining the normal organization chain while adding a stricter research dependency.",
+  "core_compatibility": {"research_contract":"0.1.0","invariant_contract":"0.1.0"},
+  "requires": [
+    {"profile_id":"fixture.organization","profile_type":"organization","version":"2.0.0"},
+    {"profile_id":"fixture.generation-state-strict","profile_type":"research","version":"1.0.0"}
+  ],
+  "constraints": [
+    {"id":"GEN-PUB-001","path":"publication.outputs.formats","merge_strategy":"union","value":["fixture-format"],"rationale":"Keep the synthetic publication output compatible with the legacy smoke fixture."}
+  ]
+}

@@ -126,6 +126,19 @@ def build_parser() -> argparse.ArgumentParser:
     _add_workspace(doctor)
     _add_output_json(doctor)
 
+    profile = sub.add_parser("profile")
+    profile_sub = profile.add_subparsers(dest="profile_command", required=True)
+    profile_resolve = profile_sub.add_parser("resolve")
+    _add_workspace(profile_resolve)
+    profile_resolve.add_argument("--output", required=True)
+    _add_input_json(profile_resolve)
+    profile_advance = profile_sub.add_parser("advance")
+    _add_workspace(profile_advance)
+    _add_input_json(profile_advance)
+    profile_history = profile_sub.add_parser("history")
+    _add_workspace(profile_history)
+    _add_output_json(profile_history)
+
     actions = sub.add_parser("actions")
     _add_workspace(actions)
     _add_output_json(actions)
@@ -378,6 +391,18 @@ def _run(args: argparse.Namespace) -> Mapping[str, Any]:
     if args.command == "research-package" and args.research_package_command == "verify":
         from plugins.local_application.research_package_service import verify_export_root
         return verify_export_root(args.input)
+
+    if args.command == "profile":
+        if args.profile_command == "resolve":
+            return LocalApplicationFacade.resolve_profile_generation(
+                args.workspace, _read_input(args.json_input), args.output
+            )
+        if args.profile_command == "advance":
+            return LocalApplicationFacade.advance_profile_generation(
+                args.workspace, _read_input(args.json_input)
+            )
+        if args.profile_command == "history":
+            return LocalApplicationFacade.profile_generation_history(args.workspace)
 
     with LocalApplicationFacade.open_workspace(args.workspace) as facade:
         if args.command == "status":

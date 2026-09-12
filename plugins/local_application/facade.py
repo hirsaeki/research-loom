@@ -137,15 +137,18 @@ class LocalApplicationFacade:
         self._project_id = str(project_id)
         self._workspace_root = Path(workspace_root) if workspace_root is not None else None
         self._owns_application = owns_application
+        self._opened_workspace: OpenedLocalWorkspace | None = None
 
     @classmethod
     def from_opened_workspace(cls, opened: OpenedLocalWorkspace) -> "LocalApplicationFacade":
-        return cls(
+        facade = cls(
             opened.application,
             opened.project_id,
             workspace_root=opened.root,
-            owns_application=True,
+            owns_application=False,
         )
+        facade._opened_workspace = opened
+        return facade
 
     @classmethod
     def open_workspace(cls, workspace: str | Path) -> "LocalApplicationFacade":
@@ -183,11 +186,40 @@ class LocalApplicationFacade:
     def doctor_workspace(cls, workspace: str | Path) -> Mapping[str, Any]:
         return LocalWorkspace.doctor(workspace)
 
+    @classmethod
+    def resolve_profile_generation(
+        cls,
+        workspace: str | Path,
+        request: Mapping[str, Any],
+        output: str | Path,
+    ) -> Mapping[str, Any]:
+        from plugins.local_application.profile_advancement import prepare_profile_generation
+        return prepare_profile_generation(workspace, request, output)
+
+    @classmethod
+    def advance_profile_generation(
+        cls,
+        workspace: str | Path,
+        request: Mapping[str, Any],
+    ) -> Mapping[str, Any]:
+        from plugins.local_application.profile_advancement import advance_profile_generation
+        return advance_profile_generation(workspace, request)
+
+    @classmethod
+    def profile_generation_history(cls, workspace: str | Path) -> Mapping[str, Any]:
+        from plugins.local_application.profile_advancement import profile_history
+        return profile_history(workspace)
+
     @property
     def project_id(self) -> str:
         return self._project_id
 
     def close(self) -> None:
+        if self._opened_workspace is not None:
+            opened = self._opened_workspace
+            self._opened_workspace = None
+            opened.close()
+            return
         if self._owns_application:
             self._application.close()
             self._owns_application = False
