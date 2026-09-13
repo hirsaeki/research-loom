@@ -193,6 +193,13 @@ class Issue134ArgumentProposalTests(unittest.TestCase):
                     "actor_id": "HUMAN-ARG",
                 })
                 self.assertEqual(failed["status"], "FAILED")
+                self.assertEqual(
+                    failed["issues"],
+                    [{
+                        "code": "CONV-AUDIT-001",
+                        "message": "StateDeltaProposal is stale or bound to another state",
+                    }],
+                )
                 after = facade._application.state_repository.load_state_view(
                     "PRJ-1", "LIN-1"
                 ).current_snapshot
