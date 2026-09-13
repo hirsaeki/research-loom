@@ -80,6 +80,8 @@ jobs:
         run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_research_package_*.py' -v
       - name: Run Issue 80 Writer Composition Windows acceptance
         run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue80_writer_composition.py' -v
+      - name: Run Issue 134 Argument proposal and Writer recovery acceptance
+        run: uv run --frozen python -m unittest -v tests.runtime.test_issue134_argument_proposal tests.runtime.test_issue134_writer_composition
 
   issue128-windows:
     name: issue128-windows

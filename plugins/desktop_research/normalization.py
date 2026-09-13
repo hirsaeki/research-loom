@@ -282,7 +282,7 @@ class DesktopResearchNormalizer:
                     "evidence_ids": [str(ref) for ref in support],
                     "counter_evidence_ids": [str(ref) for ref in counter],
                     "boundary_conditions": list(item["boundary_conditions"]),
-                    "limitations": list(item["limitations"]), "adoption_state": "candidate",
+                    "limitations": list(item["limitations"]), "adoption_state": "approved",
                 })
 
         provenance = {
