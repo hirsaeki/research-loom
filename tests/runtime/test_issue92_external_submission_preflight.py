@@ -531,7 +531,7 @@ class Issue92ExternalSubmissionPreflightTests(intake.ExternalDesktopResearchInta
             finding = next(item for item in normalized if item.get("kind") == "finding")
             self.assertEqual(evidence["capture_digest"], capture["original_capture"]["content_digest"])
             self.assertEqual(evidence["verification_status"], "unverified")
-            self.assertEqual(finding["adoption_state"], "candidate")
+            self.assertEqual(finding["adoption_state"], "approved")
             with LocalApplicationFacade.open_workspace(workspace) as reopened:
                 after = reopened.resume_context()["research_state"]["snapshot"]
                 self.assertEqual(before, after)

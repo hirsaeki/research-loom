@@ -304,7 +304,7 @@ class DesktopResearchProductionTests(unittest.TestCase):
         kinds=[a.payload["object"]["kind"] for a in result.state_delta_proposal.proposed_actions]
         self.assertIn("source",kinds); self.assertIn("evidence",kinds); self.assertIn("finding",kinds)
         finding=next(a.payload["object"] for a in result.state_delta_proposal.proposed_actions if a.payload["object"]["kind"]=="finding")
-        self.assertNotIn("confidence",finding); self.assertEqual(finding["adoption_state"],"candidate")
+        self.assertNotIn("confidence",finding); self.assertEqual(finding["adoption_state"],"approved")
 
     def test_stale_state_keeps_trace_but_returns_no_proposal_and_no_rebase(self):
         flow=self.flow(run_id="RUN-DR-STALE"); handoff,extension=flow.build_golden()

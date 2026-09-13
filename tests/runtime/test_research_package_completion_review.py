@@ -39,12 +39,16 @@ class ResearchPackageCompletionReviewTests(ResearchPackageAcceptanceSupport):
                 facade._application.state_repository.load_active_lineage_ref(facade.project_id),
             )
             objects = []
-            expected = {}
             for action in proposal["proposed_actions"]:
                 obj = action.get("payload", {}).get("object")
                 if isinstance(obj, dict) and isinstance(obj.get("id"), str):
                     objects.append(obj["id"])
-                    expected[obj["id"]] = deepcopy(obj)
+            authoritative = {
+                obj["id"]: obj
+                for obj in state.effective_objects()
+                if obj.get("id") in objects
+            }
+            expected = {object_id: deepcopy(authoritative[object_id]) for object_id in objects}
             finding_id = next(oid for oid in objects if expected[oid].get("kind") == "finding")
             with self.assertRaises(LocalApplicationError) as incomplete:
                 facade.build_research_package({
