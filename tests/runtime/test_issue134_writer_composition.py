@@ -127,7 +127,8 @@ class Issue134WriterCompositionRecoveryTests(ResearchPackageAcceptanceSupport):
                 "lineage_ref": reopened.active_lineage_ref,
                 "object_ids": [source["id"], evidence["id"], finding["id"], argument_id],
             }
-            package = facade.build_research_package(build_input)["package"]
+            built = facade.build_research_package(build_input)["package"]
+            package = facade.show_research_package(built["package_id"])["package"]
             self.assertEqual(package["content"]["finding_refs"], [finding["id"]])
             self.assertEqual(package["content"]["argument_refs"], [argument_id])
 

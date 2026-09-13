@@ -296,7 +296,7 @@ class DesktopResearchProfileProvenanceTests(unittest.TestCase):
         finally:
             tampered.close()
 
-    def test_public_external_intake_stores_profile_complete_candidate_without_extra_decision_gate(self):
+    def test_public_external_intake_uses_existing_finding_decision_gate(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             config_path, profile_path = write_workspace_inputs(root)
@@ -418,7 +418,15 @@ class DesktopResearchProfileProvenanceTests(unittest.TestCase):
                     ],
                     "actor_id": "HUMAN-89",
                 })
-                self.assertEqual(confirmed["status"], "SUCCEEDED")
+                self.assertEqual(confirmed["status"], "HUMAN_DECISION_REQUIRED")
+                decision_request = confirmed["decision_request"]
+                resolved = facade.resolve_human_decision({
+                    "request_id": decision_request["request_id"],
+                    "request_digest": decision_request["request_digest"],
+                    "disposition": "approve_exact",
+                    "actor_id": "HUMAN-89",
+                })
+                self.assertEqual(resolved["status"], "RESOLVED")
                 self.assertNotEqual(facade.status()["snapshot"], before)
 
                 status = facade.submit_action({

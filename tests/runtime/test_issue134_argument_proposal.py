@@ -5,7 +5,7 @@ import unittest
 from unittest.mock import patch
 
 from core.conversation import ConversationRuntimeError
-from plugins.local_application import LocalApplicationFacade, LocalResearchApplication
+from plugins.local_application import LocalApplicationError, LocalApplicationFacade, LocalResearchApplication
 from runtime_fixtures import evidence, finding, project, rq, seed_state, source
 from test_survey_production import NullResolver
 
@@ -127,6 +127,20 @@ class Issue134ArgumentProposalTests(unittest.TestCase):
             finally:
                 facade.close()
 
+    def test_arg3_bounds_support_references_before_state_scan(self):
+        with tempfile.TemporaryDirectory() as temp:
+            facade = self.make_facade(temp)
+            try:
+                oversized = self.proposal_input(
+                    finding_ids=[],
+                    evidence_ids=[f"EVD-{index}" for index in range(257)],
+                )
+                with self.assertRaises(LocalApplicationError) as raised:
+                    facade.submit_action(oversized)
+                self.assertEqual(raised.exception.code, "APPLICATION-PAYLOAD-001")
+            finally:
+                facade.close()
+
     def test_ablation_disabling_support_guard_allows_invalid_argument_candidate(self):
         with tempfile.TemporaryDirectory() as temp:
             facade = self.make_facade(temp)
@@ -163,13 +177,26 @@ class Issue134ArgumentProposalTests(unittest.TestCase):
                     "actor_id": "HUMAN-ARG",
                 })
                 self.assertEqual(committed["status"], "SUCCEEDED")
-                with self.assertRaises(ConversationRuntimeError) as raised:
-                    facade.submit_action({
-                        "action_type": "state.apply_candidate",
-                        "payload": {"state_delta_proposal_id": stale_id},
-                        "actor_id": "HUMAN-ARG",
-                    })
-                self.assertEqual(raised.exception.code, "DECISION-STALE-001")
+                head = facade._application.state_repository.load_state_view(
+                    "PRJ-1", "LIN-1"
+                ).current_snapshot
+                stale_pending = facade.submit_action({
+                    "action_type": "state.apply_candidate",
+                    "payload": {"state_delta_proposal_id": stale_id},
+                    "actor_id": "HUMAN-ARG",
+                })
+                self.assertEqual(stale_pending["status"], "CONFIRMATION_REQUIRED")
+                failed = facade.submit_confirmation({
+                    "confirmation_request_id": stale_pending["confirmation_request"][
+                        "confirmation_request_id"
+                    ],
+                    "actor_id": "HUMAN-ARG",
+                })
+                self.assertEqual(failed["status"], "FAILED")
+                after = facade._application.state_repository.load_state_view(
+                    "PRJ-1", "LIN-1"
+                ).current_snapshot
+                self.assertEqual(after, head)
             finally:
                 facade.close()
 

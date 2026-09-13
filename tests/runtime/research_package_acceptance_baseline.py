@@ -69,12 +69,12 @@ class ResearchPackageAcceptanceTests(ResearchPackageAcceptanceSupport):
                 facade._application.state_repository.load_active_lineage_ref(facade.project_id),
             )
             candidate_objects=[]
-            expected={}
             for action in proposal["proposed_actions"]:
                 obj=action.get("payload",{}).get("object")
                 if isinstance(obj,dict) and obj.get("kind") in {"source","evidence","finding"}:
                     candidate_objects.append(obj["id"])
-                    expected[obj["id"]]=deepcopy(obj)
+            authoritative={obj["id"]:obj for obj in state.effective_objects() if obj.get("id") in candidate_objects}
+            expected={object_id:deepcopy(authoritative[object_id]) for object_id in candidate_objects}
             self.assertTrue(candidate_objects)
             second=facade.build_research_package({
                 "snapshot_id":state.current_snapshot["id"],

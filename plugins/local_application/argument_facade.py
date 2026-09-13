@@ -12,6 +12,7 @@ from .project_input_facade import LocalApplicationFacade as _BaseLocalApplicatio
 _ACTION_REGISTRATION_LOCK = RLock()
 _ACTION_TYPE = "research.argument.propose"
 _PAYLOAD_CONTRACT = "research-argument-proposal@0.1.0"
+_MAX_SUPPORT_IDS = 256
 _LIST_ID_FIELDS = (
     "question_ids",
     "premise_claim_ids",
@@ -56,6 +57,8 @@ def research_argument_proposal_payload(payload: Mapping[str, Any]) -> dict[str, 
         if len(set(value)) != len(value):
             raise ValueError(f"{field} must not contain duplicate IDs")
         normalized[field] = list(value)
+    if sum(len(normalized[field]) for field in _LIST_ID_FIELDS) > _MAX_SUPPORT_IDS:
+        raise ValueError(f"Argument support references may contain at most {_MAX_SUPPORT_IDS} IDs in total")
     for field in ("conclusion_claim_id", "qualifier", "rationale"):
         if field not in normalized:
             continue
@@ -71,18 +74,14 @@ def research_argument_proposal_payload(payload: Mapping[str, Any]) -> dict[str, 
     return normalized
 
 
-def _current_authoritative_argument_support(state: Any, kind: str, object_id: str) -> bool:
-    item = next(
-        (
-            candidate
-            for candidate in state.effective_objects()
-            if candidate.get("kind") == kind
-            and candidate.get("id") == object_id
-            and candidate.get("project_id") == state.project_ref
-        ),
-        None,
-    )
-    if item is None:
+def _current_authoritative_argument_support(
+    effective: Mapping[tuple[str, str], Mapping[str, Any]],
+    project_ref: str,
+    kind: str,
+    object_id: str,
+) -> bool:
+    item = effective.get((kind, object_id))
+    if item is None or item.get("project_id") != project_ref:
         return False
     if kind in {"research_question", "finding"}:
         return item.get("adoption_state") in {"approved", "revised"}
@@ -98,16 +97,22 @@ class ResearchArgumentProposeHandler:
 
     def execute(self, payload: Mapping[str, Any], *, state: Any, actor: Any, proposal: Mapping[str, Any]) -> HarnessServiceResult:
         del actor
+        effective = {
+            (str(item.get("kind")), str(item.get("id"))): item
+            for item in state.effective_objects()
+        }
         for field, kind in _ALLOWED_SUPPORT.items():
             for object_id in payload.get(field, ()):  # type: ignore[arg-type]
-                if not _current_authoritative_argument_support(state, kind, str(object_id)):
+                if not _current_authoritative_argument_support(
+                    effective, state.project_ref, kind, str(object_id)
+                ):
                     raise ConversationRuntimeError(
                         "ARGUMENT-SUPPORT-001",
                         f"{field} must resolve to current authoritative {kind} objects: {object_id}",
                     )
         conclusion_claim_id = payload.get("conclusion_claim_id")
         if conclusion_claim_id is not None and not _current_authoritative_argument_support(
-            state, "claim", str(conclusion_claim_id)
+            effective, state.project_ref, "claim", str(conclusion_claim_id)
         ):
             raise ConversationRuntimeError(
                 "ARGUMENT-SUPPORT-001",
