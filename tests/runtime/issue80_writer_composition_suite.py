@@ -1,0 +1,906 @@
+from __future__ import annotations
+
+from copy import deepcopy
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+from unittest.mock import patch
+
+from plugins.local_application import LocalApplicationError, verify_writer_section_input
+from plugins.local_application.writer_composition_service import WriterCompositionService
+from core.runtime import TransitionAction, TransitionKind
+from core.runtime.transition_models import CommitReceipt
+from runtime_fixtures import decision, make_request
+from research_package_acceptance_support import ResearchPackageAcceptanceSupport
+import survey_virtual_runner_test_support as vr
+import test_external_desktop_research_intake as intake
+
+
+class Issue80WriterCompositionTests(ResearchPackageAcceptanceSupport):
+    def _proposal(self, case, *, composition_id=None, base=None):
+        value = {
+            "purpose": "Plan a compact evidence-linked report.",
+            "audience": ["reviewer"],
+            "sections": [
+                {
+                    "section_id": "SEC-FRAME", "order": 1, "heading": "Framing",
+                    "reader_question": "What is being investigated?", "purpose": "Frame the research question and available material.",
+                    "narrative_stage_refs": ["framing"], "semantic_purpose_refs": ["frame_problem"],
+                    "messages": ["State the question and bounded evidence context."],
+                    "material_refs": [f"{case['run_id']}:CAP-1"], "exhibit_refs": [case["exhibit_id"]], "gap_refs": ["GAP-1"],
+                    "opening_intent": "State the question.", "closing_intent": "Hand off to validation.",
+                    "next_section_id": "SEC-VALIDATE", "prohibited_claims": ["Do not treat candidate material as adopted Finding."],
+                },
+                {
+                    "section_id": "SEC-VALIDATE", "order": 2, "heading": "Validation plan",
+                    "reader_question": "How will the claim be tested?", "purpose": "Keep validation explicitly incomplete.",
+                    "narrative_stage_refs": ["validation"], "semantic_purpose_refs": ["test_and_qualify"],
+                    "messages": ["Preserve unresolved requirements instead of inventing findings."],
+                    "previous_section_id": "SEC-FRAME", "detailed": False,
+                },
+            ],
+            "created_by": {"type": "human_or_external_llm", "instruction": "Use supplied package only."},
+        }
+        if composition_id is not None: value["composition_id"] = composition_id
+        if base is not None:
+            value["base_version"] = base["version"]; value["base_digest"] = base["composition_digest"]; value["change_reason"] = "Refine framing purpose."
+        return value
+
+    def _build_complete_support_package(self, *, include_unrelated=False, include_recommendation=False, include_adverse=False):
+        facade, case = self._prepare_case()
+        unrelated_material = None
+        if include_unrelated:
+            run_id = facade.submit_action({
+                "action_type": "desktop_research.investigate",
+                "payload": {"question_id": case["rq_id"], "purpose": "Unrelated material exclusion fixture."},
+            })["run_id"]
+            facade.start_external_retrieval_attempt(run_id, {
+                "attempt_id": "ATT-U", "strategy": "unrelated source",
+                "coverage_dimension_ids": ["COV-SUPPORT"], "target_locator": "https://example.test/source-unrelated",
+            })
+            raw = self.workspace / "captures/raw/source-unrelated.html"
+            text = self.workspace / "captures/text/source-unrelated.txt"
+            raw.parent.mkdir(parents=True, exist_ok=True); text.parent.mkdir(parents=True, exist_ok=True)
+            raw.write_bytes(b"<html>unrelated source body</html>")
+            case["unrelated_text"] = "Unrelated material must not enter the selected Writer section."
+            text.write_text(case["unrelated_text"], encoding="utf-8")
+            facade.capture_external_source(run_id, {
+                "capture_id": "CAP-U", "source_category": "other",
+                "exact_locator": "https://example.test/source-unrelated#section-1",
+                "acquired_at": "2026-09-07T01:00:00Z",
+                "original_file": "captures/raw/source-unrelated.html", "original_media_type": "text/html",
+                "text_rendition_file": "captures/text/source-unrelated.txt",
+            })
+            facade.complete_external_retrieval_attempt(run_id, {
+                "attempt_id": "ATT-U", "outcome": "source_captured", "resulting_capture_id": "CAP-U",
+            })
+            unrelated_material = {"run_id": run_id, "capture_id": "CAP-U"}
+            case["unrelated_run_id"] = run_id
+
+        proposal = case["proposal"]
+        pending = facade.submit_action({
+            "action_type": "state.apply_candidate",
+            "payload": {"state_delta_proposal_id": proposal["proposal_id"]},
+            "actor_id": "HUMAN-I80-SUPPORT",
+        })
+        confirmed = facade.submit_confirmation({
+            "confirmation_request_id": pending["confirmation_request"]["confirmation_request_id"],
+            "actor_id": "HUMAN-I80-SUPPORT",
+        })
+        if confirmed["status"] == "HUMAN_DECISION_REQUIRED":
+            request = confirmed["decision_request"]
+            facade.resolve_human_decision({
+                "request_id": request["request_id"], "request_digest": request["request_digest"],
+                "disposition": "approve_exact", "actor_id": "HUMAN-I80-SUPPORT",
+            })
+
+        objects = [
+            action["payload"]["object"]["id"] for action in proposal["proposed_actions"]
+            if isinstance(action.get("payload", {}).get("object"), dict)
+            and action["payload"]["object"].get("kind") in {"source", "evidence", "finding"}
+        ]
+        finding_id = next(
+            action["payload"]["object"]["id"] for action in proposal["proposed_actions"]
+            if isinstance(action.get("payload", {}).get("object"), dict)
+            and action["payload"]["object"].get("kind") == "finding"
+        )
+        counter_material = None
+        if include_adverse:
+            counter_run_id = facade.submit_action({
+                "action_type": "desktop_research.investigate",
+                "payload": {"question_id": case["rq_id"], "purpose": "Counter-evidence fixture for Writer preservation."},
+            })["run_id"]
+            facade.start_external_retrieval_attempt(counter_run_id, {
+                "attempt_id": "ATT-C", "strategy": "counter source",
+                "coverage_dimension_ids": ["COV-COUNTER"], "target_locator": "https://example.test/source-counter",
+            })
+            raw = self.workspace / "captures/raw/source-counter.html"
+            text = self.workspace / "captures/text/source-counter.txt"
+            raw.parent.mkdir(parents=True, exist_ok=True); text.parent.mkdir(parents=True, exist_ok=True)
+            raw.write_bytes(b"<html>counter source body</html>")
+            case["counter_text"] = "Counter Source B supplies a concrete adverse observation for the selected Finding."
+            text.write_text(case["counter_text"], encoding="utf-8")
+            facade.capture_external_source(counter_run_id, {
+                "capture_id": "CAP-C", "source_category": "other",
+                "exact_locator": "https://example.test/source-counter#section-2",
+                "acquired_at": "2026-09-07T02:00:00Z",
+                "original_file": "captures/raw/source-counter.html", "original_media_type": "text/html",
+                "text_rendition_file": "captures/text/source-counter.txt",
+            })
+            facade.complete_external_retrieval_attempt(counter_run_id, {
+                "attempt_id": "ATT-C", "outcome": "source_captured", "resulting_capture_id": "CAP-C",
+            })
+            shown_counter = facade.show_external_material(counter_run_id, "CAP-C")
+            captured = shown_counter["capture"]
+            source_id, evidence_id, review_id = "SRC-I80-COUNTER", "EVD-I80-COUNTER", "CR-I80"
+            counter_locator = "https://example.test/source-counter#counter-quote"
+            source = {
+                "schema_version": "0.1.0", "id": source_id, "kind": "source", "revision": 0,
+                "project_id": facade.project_id, "source_type": "external",
+                "canonical_locator": captured["source_locator"],
+                "content_digest": captured["original"]["digest"], "media_type": "text/html",
+            }
+            evidence = {
+                "schema_version": "0.1.0", "id": evidence_id, "kind": "evidence", "revision": 0,
+                "project_id": facade.project_id, "source_id": source_id, "locator": counter_locator,
+                "statement": "The counter source narrows the supported conclusion.",
+                "capture_digest": captured["original"]["digest"], "evidence_kind": "counterevidence",
+                "verification_status": "unverified", "evidence_mode": "empirical",
+                "limitations": ["Counter evidence is candidate material pending verification."],
+            }
+            review = {
+                "schema_version": "0.1.0", "id": review_id, "kind": "counter_review", "revision": 0,
+                "project_id": facade.project_id, "target": {"kind": "finding", "id": finding_id},
+                "issue": "Counter evidence narrows the candidate Finding's scope.", "severity": "major",
+                "evidence_ids": [evidence_id], "disposition": "open",
+            }
+            for suffix, obj in (("counter-source", source), ("counter-evidence", evidence), ("counter-review", review)):
+                state = facade._application.state_repository.load_state_view(
+                    facade.project_id, facade._application.state_repository.load_active_lineage_ref(facade.project_id)
+                )
+                receipt = facade._application.state_transition_service.apply(make_request(
+                    state, [TransitionAction(TransitionKind.CREATE_OBJECT, {"object": obj})], suffix=suffix
+                ))
+                self.assertIsInstance(receipt, CommitReceipt)
+            objects.extend([source_id, evidence_id, review_id])
+            counter_material = {"run_id": counter_run_id, "capture_id": "CAP-C"}
+            case.update({
+                "counter_run_id": counter_run_id, "counter_source_id": source_id,
+                "counter_evidence_id": evidence_id, "counter_review_id": review_id,
+                "counter_locator": counter_locator,
+            })
+        if include_recommendation:
+            state = facade._application.state_repository.load_state_view(
+                facade.project_id, facade._application.state_repository.load_active_lineage_ref(facade.project_id)
+            )
+            candidate = {
+                "schema_version": "0.1.0", "id": "REC-I80", "kind": "recommendation", "revision": 0,
+                "project_id": facade.project_id, "statement": "Carry the supported implication into the Writer plan.",
+                "finding_ids": [finding_id], "adoption_state": "candidate",
+            }
+            receipt = facade._application.state_transition_service.apply(make_request(
+                state, [TransitionAction(TransitionKind.CREATE_OBJECT, {"object": candidate})], suffix="rec-create"
+            ))
+            self.assertIsInstance(receipt, CommitReceipt)
+            state = facade._application.state_repository.load_state_view(
+                facade.project_id, facade._application.state_repository.load_active_lineage_ref(facade.project_id)
+            )
+            dec = decision("DEC-REC-I80", "research_adoption", "approve", "recommendation", "REC-I80")
+            adopted = {**candidate, "revision": 1, "adoption_state": "approved", "decision_ids": ["DEC-REC-I80"]}
+            receipt = facade._application.state_transition_service.apply(make_request(
+                state, [
+                    TransitionAction(TransitionKind.RECORD_DECISION, {"object": dec}),
+                    TransitionAction(TransitionKind.ADOPT_OBJECT, {"object": adopted}, decision_refs=("DEC-REC-I80",)),
+                ], suffix="rec-adopt"
+            ))
+            self.assertIsInstance(receipt, CommitReceipt)
+            objects.append("REC-I80")
+            case["recommendation_id"] = "REC-I80"
+
+        state = facade._application.state_repository.load_state_view(
+            facade.project_id, facade._application.state_repository.load_active_lineage_ref(facade.project_id)
+        )
+        materials = [{"run_id": case["run_id"], "capture_id": "CAP-1"}]
+        if unrelated_material is not None:
+            materials.append(unrelated_material)
+        if counter_material is not None:
+            materials.append(counter_material)
+        built = facade.build_research_package({
+            "snapshot_id": state.current_snapshot["id"], "rq_id": case["rq_id"],
+            "object_ids": objects, "run_ids": [case["run_id"]],
+            "materials": materials, "exhibit_ids": [case["exhibit_id"]], "gap_ids": ["GAP-1"],
+        })
+        case["package_id"] = built["package"]["package_id"]
+        return facade, case
+
+    def test_co1_capture_in_progress_composition_without_freeze(self):
+        facade, case = self._build()
+        try:
+            package = facade.show_research_package(case["package_id"])["package"]
+            result = facade.capture_writer_composition(case["package_id"], self._proposal(case))
+            comp = result["composition"]
+            self.assertEqual(comp["version"], 1)
+            self.assertEqual(comp["source"]["research_package_digest"], case["digest"])
+            self.assertEqual(comp["source"]["research_snapshot_id"], package["source_research_snapshot"]["snapshot_id"])
+            self.assertEqual(comp["source"]["lineage_ref"], package["source_research_snapshot"]["lineage_ref"])
+            self.assertEqual(comp["validation"]["status"], "VALID_WITH_GAPS")
+            self.assertTrue(any(x["section_id"] == "SEC-VALIDATE" for x in comp["validation"]["diagnostics"]))
+            self.assertFalse(comp["research_state_mutation_performed"])
+            shown = facade.show_writer_composition(comp["composition_id"], 1)["composition"]
+            self.assertEqual(shown["composition_digest"], comp["composition_digest"])
+        finally: facade.close()
+
+    def test_co2_revision_diff_selection_and_reopen_preserve_old_pins(self):
+        facade, case = self._build()
+        try:
+            v1 = facade.capture_writer_composition(case["package_id"], self._proposal(case))["composition"]
+            selected1 = facade.select_writer_composition(v1["composition_id"], 1, v1["composition_digest"])
+            old_snapshot_id = v1["source"]["research_snapshot_id"]
+            intake.adopt_rq(facade)
+            current = facade._application.state_repository.load_state_view(facade.project_id, facade._application.state_repository.load_active_lineage_ref(facade.project_id))
+            self.assertNotEqual(current.current_snapshot["id"], old_snapshot_id)
+            proposal2 = self._proposal(case, composition_id=v1["composition_id"], base=v1)
+            proposal2["sections"][0]["purpose"] = "Refine the framing while preserving supplied material."
+            v2 = facade.capture_writer_composition(case["package_id"], proposal2)["composition"]
+            shown = facade.show_writer_composition(v1["composition_id"], 2)
+            self.assertEqual(shown["selection"]["selected"]["version"], 1)
+            diff = facade.diff_writer_composition(v1["composition_id"], 1, 2)
+            self.assertEqual(diff["section_changes"], [{"section_id": "SEC-FRAME", "change": "modified", "fields": ["purpose"]}])
+            facade.select_writer_composition(v1["composition_id"], 2, v2["composition_digest"])
+            old_source = deepcopy(v1["source"])
+        finally: facade.close()
+        with self.__class__._reopen(self.workspace) as reopened:
+            self.assertEqual(reopened.show_writer_composition(v1["composition_id"], 1)["composition"]["source"], old_source)
+            self.assertEqual(reopened.show_writer_composition(v1["composition_id"], 2)["selection"]["selected"]["version"], 2)
+
+    @staticmethod
+    def _reopen(workspace):
+        from plugins.local_application import LocalApplicationFacade
+        return LocalApplicationFacade.open_workspace(workspace)
+
+    def test_co3_selected_section_input_is_detached_and_exact(self):
+        facade, case = self._build()
+        try:
+            v1 = facade.capture_writer_composition(case["package_id"], self._proposal(case))["composition"]
+            facade.select_writer_composition(v1["composition_id"], 1, v1["composition_digest"])
+            out = self.root / "section-input"
+            facade.export_writer_section_input(v1["composition_id"], "SEC-FRAME", out)
+        finally: facade.close()
+        moved = self.root / "workspace-hidden"; self.workspace.rename(moved)
+        data = json.loads((out / "section-writer-input.json").read_text(encoding="utf-8"))
+        self.assertEqual(data["section_contract"]["section_id"], "SEC-FRAME")
+        self.assertEqual(data["resolved_materials"][0]["text_rendition"]["content"], case["source_text"])
+        self.assertEqual(data["resolved_exhibits"][0]["exhibit_id"], case["exhibit_id"])
+        self.assertEqual(data["unresolved_gaps"][0]["gap_id"], "GAP-1")
+        self.assertFalse(data["authority_boundary"]["evidence_verification_performed"])
+        manifest = json.loads((out / "manifest.json").read_text())
+        self.assertEqual(manifest["files"][0]["byte_length"], (out / "section-writer-input.json").stat().st_size)
+
+    def test_co4_invalid_reference_pin_and_stale_revision_fail_closed(self):
+        facade, case = self._build()
+        try:
+            bad = self._proposal(case); bad["sections"][0]["material_refs"] = ["RUN-FOREIGN:CAP-X"]
+            with self.assertRaises(LocalApplicationError) as e: facade.capture_writer_composition(case["package_id"], bad)
+            self.assertEqual(e.exception.code, "APPLICATION-WRITER-COMPOSITION-REFERENCE-001")
+            v1 = facade.capture_writer_composition(case["package_id"], self._proposal(case))["composition"]
+            p2 = self._proposal(case, composition_id=v1["composition_id"], base=v1)
+            v2 = facade.capture_writer_composition(case["package_id"], p2)["composition"]
+            stale = self._proposal(case, composition_id=v1["composition_id"], base=v1)
+            with self.assertRaises(LocalApplicationError) as e: facade.capture_writer_composition(case["package_id"], stale)
+            self.assertEqual(e.exception.code, "APPLICATION-WRITER-COMPOSITION-STALE-001")
+            with self.assertRaises(LocalApplicationError): facade.select_writer_composition(v1["composition_id"], 2, "sha256:" + "0"*64)
+            self.assertEqual(facade.show_writer_composition(v1["composition_id"], 1)["composition"]["composition_digest"], v1["composition_digest"])
+            self.assertEqual(facade.show_writer_composition(v1["composition_id"], 2)["composition"]["composition_digest"], v2["composition_digest"])
+            facade.select_writer_composition(v1["composition_id"], 2, v2["composition_digest"])
+            package = facade.show_research_package(case["package_id"])["package"]
+            rel = package["resolved_content"]["materials"][0]["text_rendition"]["attachment_path"]
+            material_path = facade._research_package_service().root / case["package_id"] / rel
+            original = material_path.read_bytes(); tampered = bytearray(original); tampered[0] ^= 1; material_path.write_bytes(bytes(tampered))
+            with self.assertRaises(LocalApplicationError):
+                facade.export_writer_section_input(v1["composition_id"], "SEC-FRAME", self.root / "tampered-section")
+            self.assertFalse((self.root / "tampered-section").exists())
+            material_path.write_bytes(original)
+            facade.export_writer_section_input(v1["composition_id"], "SEC-FRAME", self.root / "corrected-section")
+            self.assertTrue((self.root / "corrected-section" / "section-writer-input.json").is_file())
+        finally: facade.close()
+
+    def test_co5_narrative_partial_order_unmet_and_virtual_origin(self):
+        facade, case = self._build()
+        try:
+            p = self._proposal(case)
+            p["sections"][0]["narrative_stage_refs"] = ["framing", "formation"]
+            p["sections"][0]["semantic_purpose_refs"] = ["frame_problem", "expose_argument"]
+            comp = facade.capture_writer_composition(case["package_id"], p)["composition"]
+            self.assertTrue(any("argument" in d.get("unmet_requires", []) for d in comp["validation"]["diagnostics"]))
+            bad = self._proposal(case); bad["sections"][0]["narrative_stage_refs"] = ["unknown-stage"]
+            with self.assertRaises(LocalApplicationError): facade.capture_writer_composition(case["package_id"], bad)
+        finally: facade.close()
+        vf = self._virtual_facade()
+        try:
+            vf.capture_survey_design(vr.design_payload()); captured = vf.capture_survey_instrument(vr.instrument_payload())
+            q = vf.show_survey_instrument(captured["instrument_id"], captured["version"])["instrument"]["questionnaire"]
+            result = vf.submit_action({"action_type":"virtual_runner.survey.execute","payload":vr.execution_payload(scenario="STANDARD",instrument_version=q["version"],instrument_digest=q["content_digest"]),"actor_id":"HUMAN-I80"})
+            (self.root / "virtual-workspace" / "effective-profile-set.json").write_text((self.root/"profiles-input.json").read_text(), encoding="utf-8")
+            state = vf._application.state_repository.load_state_view(vf.project_id, vf._application.state_repository.load_active_lineage_ref(vf.project_id))
+            built = vf.build_research_package({"snapshot_id":state.current_snapshot["id"],"rq_id":"RQ-1","run_ids":[result["run_id"]]})
+            pkg = vf.show_research_package(built["package"]["package_id"])["package"]
+            proposal = {"purpose":"Virtual composition fixture.","sections":[{"section_id":"SEC-V","order":1,"heading":"Virtual framing","reader_question":"What is synthetic?","purpose":"Keep origin explicit.","narrative_stage_refs":["framing"],"semantic_purpose_refs":["frame_problem"]}]}
+            comp = vf.capture_writer_composition(pkg["package_id"], proposal)["composition"]
+            self.assertEqual(comp["source"]["research_package_id"], pkg["package_id"])
+            self.assertEqual(comp["source"]["source_epistemic_status"], "SYNTHETIC_TEST_ONLY")
+            self.assertEqual(comp["source"]["package_mode"], "preview")
+            self.assertTrue(comp["source"]["preview_only"]); self.assertFalse(comp["source"]["release_eligible"])
+            vf.select_writer_composition(comp["composition_id"], 1, comp["composition_digest"])
+            out = self.root / "virtual-section-input"
+            vf.export_writer_section_input(comp["composition_id"], "SEC-V", out)
+            detached = json.loads((out / "section-writer-input.json").read_text(encoding="utf-8"))
+            self.assertEqual(detached["source"]["source_epistemic_status"], "SYNTHETIC_TEST_ONLY")
+            self.assertTrue(detached["source"]["preview_only"]); self.assertFalse(detached["source"]["release_eligible"])
+        finally: vf.close()
+
+    def test_review_fixes_reject_unsafe_id_and_preserve_nested_counter_target_scope(self):
+        facade, case = self._build()
+        try:
+            bad = self._proposal(case, composition_id="..")
+            with self.assertRaises(LocalApplicationError) as error:
+                facade.capture_writer_composition(case["package_id"], bad)
+            self.assertEqual(error.exception.code, "APPLICATION-WRITER-COMPOSITION-INPUT-001")
+
+            package = deepcopy(facade.show_research_package(case["package_id"])["package"])
+            package["content"]["finding_refs"] = ["FND-A", "FND-B"]
+            package["content"]["counter_review_refs"] = ["CR-B"]
+            package["resolved_content"]["research_objects"].extend([
+                {"id": "FND-A", "kind": "finding"},
+                {"id": "FND-B", "kind": "finding"},
+                {"id": "CR-B", "kind": "counter_review", "target": {"kind": "finding", "id": "FND-B"}},
+            ])
+            proposal = self._proposal(case)
+            proposal["sections"][0]["finding_refs"] = ["FND-A"]
+            sections, _ = facade._writer_composition_service()._validate_sections(proposal["sections"], package)
+            self.assertEqual(sections[0]["finding_refs"], ["FND-A"])
+            self.assertEqual(sections[0]["counter_review_refs"], [])
+        finally:
+            facade.close()
+
+    def test_review_fixes_series_lock_and_list_package_cache(self):
+        facade, case = self._build()
+        try:
+            service = facade._writer_composition_service()
+            facade.capture_writer_composition(case["package_id"], self._proposal(case, composition_id="COMP-LOCK"))
+            with service._series_lock("COMP-LOCK"):
+                with self.assertRaises(LocalApplicationError) as error:
+                    with service._series_lock("COMP-LOCK"):
+                        pass
+            self.assertEqual(error.exception.code, "APPLICATION-WRITER-COMPOSITION-BUSY-001")
+
+            with (
+                patch.object(service, "_versions", side_effect=[[], [1], [1]]),
+                patch.object(service, "_series_lock", wraps=service._series_lock) as series_lock,
+            ):
+                with service._capture_lock("COMP-LOCK"):
+                    pass
+            self.assertEqual(series_lock.call_count, 1)
+
+            lock_files_before = sorted(path.name for path in service.root.glob(".*.lock"))
+            for index in range(8):
+                with self.assertRaises(LocalApplicationError) as missing:
+                    facade.select_writer_composition(f"COMP-MISSING-{index}", 1, "sha256:" + "0" * 64)
+                self.assertEqual(missing.exception.code, "APPLICATION-WRITER-COMPOSITION-404")
+            self.assertEqual(sorted(path.name for path in service.root.glob(".*.lock")), lock_files_before)
+
+            facade.capture_writer_composition(case["package_id"], self._proposal(case, composition_id="COMP-A"))
+            facade.capture_writer_composition(case["package_id"], self._proposal(case, composition_id="COMP-B"))
+            with patch.object(service, "_package", wraps=service._package) as package_load:
+                listed = service.list()
+            self.assertEqual(len(listed["compositions"]), 3)
+            self.assertEqual(package_load.call_count, 1)
+        finally:
+            facade.close()
+
+    def test_review_fixes_package_creation_lineage_is_stable_after_active_pointer_changes(self):
+        facade, case = self._build()
+        try:
+            package = facade.show_research_package(case["package_id"])["package"]
+            lineage = package["source_research_snapshot"]["lineage_ref"]
+            repository = facade._application.state_repository
+            with patch.object(repository, "load_active_lineage_ref", return_value="LIN-WRONG"):
+                composition = facade.capture_writer_composition(case["package_id"], self._proposal(case))["composition"]
+            self.assertEqual(composition["source"]["lineage_ref"], lineage)
+        finally:
+            facade.close()
+
+    def test_review_fixes_narrative_partial_order_checks_all_occurrences(self):
+        facade, case = self._build()
+        try:
+            proposal = self._proposal(case)
+            proposal["sections"][0].pop("next_section_id", None)
+            proposal["sections"][1].pop("previous_section_id", None)
+            proposal["sections"][1]["narrative_stage_refs"] = ["formation"]
+            proposal["sections"][1]["semantic_purpose_refs"] = ["expose_argument"]
+            late = deepcopy(proposal["sections"][0])
+            late.update({"section_id": "SEC-FRAME-LATE", "order": 3, "heading": "Late framing"})
+            proposal["sections"].append(late)
+            with self.assertRaises(LocalApplicationError) as error:
+                facade.capture_writer_composition(case["package_id"], proposal)
+            self.assertEqual(error.exception.code, "APPLICATION-WRITER-COMPOSITION-NARRATIVE-001")
+
+            same = self._proposal(case)
+            same["sections"] = [deepcopy(same["sections"][0])]
+            same["sections"][0].pop("next_section_id", None)
+            same["sections"][0]["narrative_stage_refs"] = ["framing", "formation"]
+            same["sections"][0]["semantic_purpose_refs"] = ["frame_problem", "expose_argument"]
+            facade.capture_writer_composition(case["package_id"], same)
+        finally:
+            facade.close()
+
+    def test_public_cli_round_trip_capture_select_and_detached_section_input(self):
+        facade, case = self._build(); facade.close()
+        proposal_path = self.root / "composition-v1.json"
+        proposal_path.write_text(json.dumps(self._proposal(case)), encoding="utf-8")
+        root = Path(__file__).resolve().parents[2]
+        launcher = [sys.executable, str(root / "research-loom")] if os.name != "nt" else ["cmd.exe", "/d", "/s", "/c", str(root / "research-loom.cmd")]
+        def run(*args):
+            completed = subprocess.run([*launcher, *map(str, args)], cwd=root, text=True, capture_output=True, check=False)
+            self.assertEqual(completed.returncode, 0, msg=completed.stderr or completed.stdout)
+            return json.loads(completed.stdout)
+        captured = run("writer-composition", "capture", "--workspace", self.workspace, "--package-id", case["package_id"], "--json", proposal_path)
+        v1 = captured["composition"]
+        listed = run("writer-composition", "list", "--workspace", self.workspace, "--json")
+        self.assertEqual(listed["compositions"][0]["latest_version"], 1)
+        shown = run("writer-composition", "show", "--workspace", self.workspace, "--composition-id", v1["composition_id"], "--version", 1, "--json")
+        self.assertEqual(shown["composition"]["composition_digest"], v1["composition_digest"])
+        edit_path = self.root / "composition-v2.json"
+        run("writer-composition", "export", "--workspace", self.workspace, "--composition-id", v1["composition_id"], "--version", 1, "--output", edit_path, "--json")
+        edit = json.loads(edit_path.read_text(encoding="utf-8"))
+        edit["sections"][0]["purpose"] = "CLI-edited framing purpose."
+        edit["change_reason"] = "CLI wall-discussion revision."
+        edit_path.write_text(json.dumps(edit), encoding="utf-8")
+        captured2 = run("writer-composition", "capture", "--workspace", self.workspace, "--package-id", case["package_id"], "--json", edit_path)
+        v2 = captured2["composition"]
+        diff = run("writer-composition", "diff", "--workspace", self.workspace, "--composition-id", v1["composition_id"], "--from-version", 1, "--to-version", 2, "--json")
+        self.assertEqual(diff["section_changes"], [{"section_id":"SEC-FRAME","change":"modified","fields":["purpose"]}])
+        run("writer-composition", "select", "--workspace", self.workspace, "--composition-id", v1["composition_id"], "--version", 2, "--digest", v2["composition_digest"], "--json")
+        output = self.root / "cli-section-input"
+        run("writer-composition", "section-input", "--workspace", self.workspace, "--composition-id", v1["composition_id"], "--section-id", "SEC-FRAME", "--output", output, "--json")
+        self.workspace.rename(self.root / "workspace-hidden-cli")
+        detached = json.loads((output / "section-writer-input.json").read_text(encoding="utf-8"))
+        self.assertEqual(detached["resolved_materials"][0]["text_rendition"]["content"], case["source_text"])
+        self.assertEqual(detached["section_contract"]["section_digest"], v2["sections"][0]["section_digest"])
+        verified = subprocess.run(
+            [sys.executable, "-c", "import json,sys; from plugins.local_application import verify_writer_section_input; print(json.dumps(verify_writer_section_input(sys.argv[1])))", str(output)],
+            cwd=root, text=True, capture_output=True, check=False,
+        )
+        self.assertEqual(verified.returncode, 0, msg=verified.stderr)
+        self.assertEqual(json.loads(verified.stdout)["status"], "VERIFIED")
+
+    def test_review_round4_support_chain_rq_locator_and_candidate_readiness(self):
+        facade, case = self._build_complete_support_package()
+        try:
+            package = facade.show_research_package(case["package_id"])["package"]
+            by_kind = {obj["kind"]: obj for obj in package["resolved_content"]["research_objects"] if obj.get("kind") in {"research_question", "source", "evidence", "finding"}}
+            proposal = self._proposal(case)
+            proposal["sections"] = [deepcopy(proposal["sections"][0])]
+            proposal["sections"][0].pop("next_section_id", None)
+            proposal["sections"][0]["finding_refs"] = [by_kind["finding"]["id"]]
+            proposal["sections"][0]["material_refs"] = []
+            proposal["sections"][0]["exhibit_refs"] = []
+            proposal["sections"][0]["gap_refs"] = []
+            proposal["sections"][0]["citation_requirements"] = [{"source_ref": by_kind["source"]["id"], "locator_ref": by_kind["evidence"]["locator"]}]
+            comp = facade.capture_writer_composition(case["package_id"], proposal)["composition"]
+            facade.select_writer_composition(comp["composition_id"], 1, comp["composition_digest"])
+            out = self.root / "support-chain-section"
+            facade.export_writer_section_input(comp["composition_id"], "SEC-FRAME", out)
+            detached = json.loads((out / "section-writer-input.json").read_text(encoding="utf-8"))
+            resolved = {obj["id"]: obj for obj in detached["resolved_research_objects"]}
+            self.assertEqual(resolved[case["rq_id"]]["text"], by_kind["research_question"]["text"])
+            self.assertTrue({by_kind[k]["id"] for k in ("finding", "evidence", "source")} <= set(resolved))
+            self.assertEqual(detached["resolved_materials"][0]["text_rendition"]["content"], case["source_text"])
+            self.assertTrue(detached["resolved_materials"][0]["candidate_only"] in {True, False})
+            bad = deepcopy(proposal); bad["composition_id"] = "COMP-BAD-LOC"
+            bad["sections"][0]["citation_requirements"][0]["locator_ref"] = "https://example.test/not-real"
+            with self.assertRaises(LocalApplicationError) as error:
+                facade.capture_writer_composition(case["package_id"], bad)
+            self.assertEqual(error.exception.code, "APPLICATION-WRITER-COMPOSITION-REFERENCE-001")
+
+            citation_only = self._proposal(case)
+            citation_only["sections"] = [deepcopy(citation_only["sections"][0])]
+            citation_only["sections"][0].pop("next_section_id", None)
+            citation_only["sections"][0]["material_refs"] = []
+            citation_only["sections"][0]["exhibit_refs"] = []
+            citation_only["sections"][0]["gap_refs"] = []
+            citation_only["sections"][0]["citation_requirements"] = [{"source_ref": by_kind["source"]["id"], "locator_ref": by_kind["evidence"]["locator"]}]
+            citation_comp = facade.capture_writer_composition(case["package_id"], citation_only)["composition"]
+            facade.select_writer_composition(citation_comp["composition_id"], 1, citation_comp["composition_digest"])
+            citation_out = self.root / "citation-only-section"
+            facade.export_writer_section_input(citation_comp["composition_id"], "SEC-FRAME", citation_out)
+            citation_detached = json.loads((citation_out / "section-writer-input.json").read_text(encoding="utf-8"))
+            self.assertIn(by_kind["source"]["id"], citation_detached["resolved_object_ids"])
+            self.assertIn(by_kind["evidence"]["id"], citation_detached["resolved_object_ids"])
+            self.assertEqual(citation_detached["resolved_materials"][0]["text_rendition"]["content"], case["source_text"])
+
+            candidate = deepcopy(proposal); candidate["composition_id"] = "COMP-CANDIDATE"
+            candidate["sections"][0]["narrative_stage_refs"] = ["validation"]
+            candidate["sections"][0]["semantic_purpose_refs"] = ["test_and_qualify"]
+            candidate["sections"][0]["citation_requirements"] = []
+            candidate_comp = facade.capture_writer_composition(case["package_id"], candidate)["composition"]
+            diag = next(d for d in candidate_comp["validation"]["diagnostics"] if d["section_id"] == "SEC-FRAME")
+            self.assertIn("finding", diag["unmet_requires"])
+        finally:
+            facade.close()
+
+    def test_review_round5_material_source_closure_and_public_exact_consumer(self):
+        facade, case = self._build_complete_support_package(include_unrelated=True, include_recommendation=True, include_adverse=True)
+        expected_path = self.root / "round5-expected.json"
+        checker_path = self.root / "round5-checker.py"
+        try:
+            package = facade.show_research_package(case["package_id"])["package"]
+            by_kind = {
+                obj["kind"]: obj for obj in package["resolved_content"]["research_objects"]
+                if obj.get("kind") in {"research_question", "source", "evidence", "finding", "recommendation"}
+                and obj.get("id") not in {case.get("counter_source_id"), case.get("counter_evidence_id")}
+            }
+            objects_by_id = {obj["id"]: obj for obj in package["resolved_content"]["research_objects"]}
+            counter_review = objects_by_id[case["counter_review_id"]]
+            counter_evidence = objects_by_id[case["counter_evidence_id"]]
+            counter_source = objects_by_id[case["counter_source_id"]]
+            exhibit = next(
+                row for row in package["resolved_content"]["working_material"]["research_exhibits"]
+                if row["exhibit_id"] == case["exhibit_id"]
+            )
+            gap = next(row for row in package["resolved_content"]["unresolved_gaps"] if row["gap_id"] == "GAP-1")
+            profile_constraints = package["resolved_profiles"]["effective_constraints"]
+            finding_limitations = list(by_kind["finding"].get("limitations", []))
+            self.assertTrue(finding_limitations)
+            proposal = self._proposal(case)
+            proposal["sections"] = [deepcopy(proposal["sections"][0])]
+            proposal["sections"][0].pop("next_section_id", None)
+            proposal["sections"][0]["finding_refs"] = [by_kind["finding"]["id"]]
+            proposal["sections"][0]["counter_review_refs"] = [case["counter_review_id"]]
+            proposal["sections"][0]["citation_requirements"] = [{
+                "source_ref": by_kind["source"]["id"], "locator_ref": by_kind["evidence"]["locator"],
+            }]
+            v1 = facade.capture_writer_composition(case["package_id"], proposal)["composition"]
+            edit = deepcopy(proposal)
+            edit["composition_id"] = v1["composition_id"]
+            edit["base_version"] = 1
+            edit["base_digest"] = v1["composition_digest"]
+            edit["change_reason"] = "Round5 exact detached consumer revision."
+            edit["sections"][0]["purpose"] = "Refined framing for detached exact consumption."
+            v2 = facade.capture_writer_composition(case["package_id"], edit)["composition"]
+            facade.select_writer_composition(v2["composition_id"], 2, v2["composition_digest"])
+            out = self.root / "round5-public-section"
+            facade.export_writer_section_input(v2["composition_id"], "SEC-FRAME", out)
+            detached = json.loads((out / "section-writer-input.json").read_text(encoding="utf-8"))
+            linked = next(row for row in detached["resolved_materials"] if row.get("source_id") == by_kind["source"]["id"])
+            self.assertEqual(linked["text_rendition"]["content"], case["source_text"])
+            self.assertNotIn(case["unrelated_text"], json.dumps(detached, ensure_ascii=False))
+            run_candidate = next(
+                row for row in package["resolved_content"]["working_material"]["run_candidates"]
+                if row["run_id"] == case["run_id"]
+            )
+            expected = {
+                "rq_id": case["rq_id"], "rq_text": by_kind["research_question"]["text"],
+                "section_id": "SEC-FRAME", "section_digest": v2["sections"][0]["section_digest"],
+                "finding_id": by_kind["finding"]["id"], "evidence_id": by_kind["evidence"]["id"], "source_id": by_kind["source"]["id"],
+                "locator": by_kind["evidence"]["locator"], "material_text": case["source_text"], "unrelated_text": case["unrelated_text"],
+                "exhibit_id": case["exhibit_id"], "exhibit_content": deepcopy(exhibit["content"]),
+                "gap": deepcopy(gap), "profile_constraints": deepcopy(profile_constraints),
+                "candidate_only": bool(run_candidate.get("candidate_only")),
+                "counter_review_id": counter_review["id"], "counter_review_issue": counter_review["issue"],
+                "counter_evidence_id": counter_evidence["id"], "counter_evidence_statement": counter_evidence["statement"],
+                "counter_locator": counter_evidence["locator"], "counter_source_id": counter_source["id"],
+                "counter_source_locator": counter_source["canonical_locator"], "counter_material_text": case["counter_text"],
+                "finding_limitations": finding_limitations,
+            }
+            expected_path.write_text(json.dumps(expected, ensure_ascii=False), encoding="utf-8")
+            checker_path.write_text(
+                "import json,sys\n"
+                "from plugins.local_application import verify_writer_section_input\n"
+                "out,expected_path=sys.argv[1:3]\n"
+                "expected=json.load(open(expected_path,encoding='utf-8'))\n"
+                "doc=json.load(open(out+'/section-writer-input.json',encoding='utf-8'))\n"
+                "assert verify_writer_section_input(out)['status']=='VERIFIED'\n"
+                "objects={row['id']:row for row in doc['resolved_research_objects']}\n"
+                "assert objects[expected['rq_id']]['text']==expected['rq_text']\n"
+                "assert doc['section_contract']['section_id']==expected['section_id']\n"
+                "assert doc['section_contract']['section_digest']==expected['section_digest']\n"
+                "assert expected['finding_id'] in objects and expected['evidence_id'] in objects and expected['source_id'] in objects\n"
+                "assert any(c['locator_ref']==expected['locator'] for c in doc['section_contract']['citation_requirements'])\n"
+                "material=next(row for row in doc['resolved_materials'] if row.get('source_id')==expected['source_id'])\n"
+                "assert material['text_rendition']['content']==expected['material_text']\n"
+                "assert material['candidate_only']==expected['candidate_only']\n"
+                "assert expected['unrelated_text'] not in json.dumps(doc,ensure_ascii=False)\n"
+                "assert doc['resolved_exhibits'][0]['exhibit_id']==expected['exhibit_id']\n"
+                "assert doc['resolved_exhibits'][0]['content']==expected['exhibit_content']\n"
+                "assert doc['unresolved_gaps'][0]==expected['gap']\n"
+                "assert doc['resolved_profile_constraints']==expected['profile_constraints']\n"
+                "counter_review=objects[expected['counter_review_id']]\n"
+                "counter_evidence=objects[expected['counter_evidence_id']]\n"
+                "counter_source=objects[expected['counter_source_id']]\n"
+                "assert counter_review['issue']==expected['counter_review_issue']\n"
+                "assert counter_evidence['statement']==expected['counter_evidence_statement']\n"
+                "assert counter_evidence['locator']==expected['counter_locator']\n"
+                "assert counter_evidence['source_id']==expected['counter_source_id']\n"
+                "assert counter_source['canonical_locator']==expected['counter_source_locator']\n"
+                "counter_material=next(row for row in doc['resolved_materials'] if row.get('source_id')==expected['counter_source_id'])\n"
+                "assert counter_material['text_rendition']['content']==expected['counter_material_text']\n"
+                "assert objects[expected['finding_id']]['limitations']==expected['finding_limitations'] and expected['finding_limitations']\n"
+                "print(json.dumps({'status':'EXACT'}))\n",
+                encoding="utf-8",
+            )
+
+            implication = deepcopy(proposal)
+            implication["composition_id"] = "COMP-REC-READY"
+            implication["sections"][0]["narrative_stage_refs"] = ["implication"]
+            implication["sections"][0]["semantic_purpose_refs"] = ["present_implications"]
+            implication["sections"][0]["recommendation_refs"] = [case["recommendation_id"]]
+            implication["sections"][0]["finding_refs"] = [by_kind["finding"]["id"]]
+            rec_comp = facade.capture_writer_composition(case["package_id"], implication)["composition"]
+            self.assertFalse(any(
+                d.get("section_id") == "SEC-FRAME" and "recommendation" in d.get("unmet_requires", [])
+                for d in rec_comp["validation"]["diagnostics"]
+            ))
+            facade.select_writer_composition(rec_comp["composition_id"], 1, rec_comp["composition_digest"])
+            rec_out = self.root / "round5-recommendation"
+            facade.export_writer_section_input(rec_comp["composition_id"], "SEC-FRAME", rec_out)
+            rec_detached = json.loads((rec_out / "section-writer-input.json").read_text(encoding="utf-8"))
+            self.assertIn(case["recommendation_id"], rec_detached["resolved_object_ids"])
+        finally:
+            facade.close()
+        hidden = self.root / "round5-workspace-hidden"
+        self.workspace.rename(hidden)
+        root = Path(__file__).resolve().parents[2]
+        consumer_env = dict(os.environ)
+        consumer_env["PYTHONPATH"] = str(root) + os.pathsep + consumer_env.get("PYTHONPATH", "")
+        checked = subprocess.run(
+            [sys.executable, str(checker_path), str(out), str(expected_path)],
+            cwd=root, env=consumer_env, text=True, capture_output=True, check=False,
+        )
+        self.assertEqual(checked.returncode, 0, msg=checked.stderr)
+        self.assertEqual(json.loads(checked.stdout)["status"], "EXACT")
+
+    def test_review_round5_detached_exhibit_gap_and_source_capture_bindings(self):
+        facade, case = self._build_complete_support_package()
+        try:
+            package = facade.show_research_package(case["package_id"])["package"]
+            source = next(obj for obj in package["resolved_content"]["research_objects"] if obj.get("kind") == "source")
+            proposal = self._proposal(case)
+            proposal["sections"] = [deepcopy(proposal["sections"][0])]
+            proposal["sections"][0].pop("next_section_id", None)
+            # material-only selection must close over the saved Source automatically.
+            comp = facade.capture_writer_composition(case["package_id"], proposal)["composition"]
+            facade.select_writer_composition(comp["composition_id"], 1, comp["composition_digest"])
+            base = self.root / "round5-binding-base"
+            facade.export_writer_section_input(comp["composition_id"], "SEC-FRAME", base)
+            doc = json.loads((base / "section-writer-input.json").read_text(encoding="utf-8"))
+            self.assertIn(source["id"], doc["resolved_object_ids"])
+            explicit = deepcopy(proposal)
+            explicit["composition_id"] = "COMP-MATERIAL-SOURCE"
+            explicit["sections"][0]["source_refs"] = [source["id"]]
+            explicit_comp = facade.capture_writer_composition(case["package_id"], explicit)["composition"]
+            facade.select_writer_composition(explicit_comp["composition_id"], 1, explicit_comp["composition_digest"])
+            facade.export_writer_section_input(explicit_comp["composition_id"], "SEC-FRAME", self.root / "round5-explicit-source")
+        finally:
+            facade.close()
+        self.assertEqual(verify_writer_section_input(base)["status"], "VERIFIED")
+        from core.runtime import canonical_digest
+        import hashlib
+
+        def write_mutated(label, mutate):
+            out = self.root / f"round5-bad-{label}"
+            out.mkdir()
+            doc = json.loads((base / "section-writer-input.json").read_text(encoding="utf-8"))
+            mutate(doc)
+            basis = deepcopy(doc); basis.pop("section_input_digest", None); doc["section_input_digest"] = canonical_digest(basis)
+            payload = (json.dumps(doc, ensure_ascii=False, sort_keys=True, indent=2) + "\n").encode()
+            (out / "section-writer-input.json").write_bytes(payload)
+            manifest = {"schema_version":"0.1.0","object_type":"section_writer_input_manifest","files":[{"path":"section-writer-input.json","byte_length":len(payload),"content_digest":"sha256:"+hashlib.sha256(payload).hexdigest()}]}
+            manifest["manifest_digest"] = canonical_digest(manifest)
+            (out / "manifest.json").write_text(json.dumps(manifest))
+            with self.assertRaises(LocalApplicationError):
+                verify_writer_section_input(out)
+
+        write_mutated("missing-exhibit", lambda d: d.__setitem__("resolved_exhibits", []))
+        write_mutated("missing-gap", lambda d: d.__setitem__("unresolved_gaps", []))
+        write_mutated("exhibit-content", lambda d: d["resolved_exhibits"][0]["content"].__setitem__("value", "tampered exhibit"))
+        write_mutated("exhibit-representation", lambda d: d["resolved_exhibits"][0]["content"].__setitem__("representation", "html"))
+        write_mutated("source-capture", lambda d: d["resolved_materials"][0]["capture"].__setitem__("source_locator", "https://example.test/wrong"))
+
+        # Two known Source/material pairs: swapping only source_id must still fail.
+        doc = json.loads((base / "section-writer-input.json").read_text(encoding="utf-8"))
+        first_source = next(row for row in doc["resolved_research_objects"] if row.get("kind") == "source")
+        first_material = doc["resolved_materials"][0]
+        second_source = deepcopy(first_source)
+        second_source["id"] = "SRC-SECOND"
+        second_source["canonical_locator"] = "https://example.test/source-second"
+        second_source["content_digest"] = "sha256:" + "2" * 64
+        second_material = deepcopy(first_material)
+        second_material["material_ref"] = "RUN-SECOND:CAP-SECOND"
+        second_material["run_id"] = "RUN-SECOND"
+        second_material["source_id"] = second_source["id"]
+        second_material["capture"]["capture_id"] = "CAP-SECOND"
+        second_material["capture"]["source_locator"] = second_source["canonical_locator"]
+        second_material["capture"]["original"]["digest"] = second_source["content_digest"]
+        doc["resolved_research_objects"].append(second_source)
+        doc["resolved_object_ids"].append(second_source["id"])
+        doc["resolved_materials"].append(second_material)
+        doc["resolved_material_refs"].append(second_material["material_ref"])
+
+        def write_doc(out, value):
+            out.mkdir()
+            basis = deepcopy(value); basis.pop("section_input_digest", None); value["section_input_digest"] = canonical_digest(basis)
+            payload = (json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2) + "\n").encode()
+            (out / "section-writer-input.json").write_bytes(payload)
+            manifest = {"schema_version":"0.1.0","object_type":"section_writer_input_manifest","files":[{"path":"section-writer-input.json","byte_length":len(payload),"content_digest":"sha256:"+hashlib.sha256(payload).hexdigest()}]}
+            manifest["manifest_digest"] = canonical_digest(manifest)
+            (out / "manifest.json").write_text(json.dumps(manifest))
+
+        two = self.root / "round5-two-pair"
+        write_doc(two, deepcopy(doc))
+        self.assertEqual(verify_writer_section_input(two)["status"], "VERIFIED")
+        swapped = deepcopy(doc)
+        swapped["resolved_materials"][0]["source_id"], swapped["resolved_materials"][1]["source_id"] = (
+            swapped["resolved_materials"][1]["source_id"], swapped["resolved_materials"][0]["source_id"]
+        )
+        bad = self.root / "round5-swapped"
+        write_doc(bad, swapped)
+        with self.assertRaises(LocalApplicationError):
+            verify_writer_section_input(bad)
+
+        # Production export must clean its own staging directory on verifier failure.
+        with self.__class__._reopen(self.workspace) as reopened:
+            before = set(self.root.glob(".section-input-*"))
+            with patch("plugins.local_application.writer_composition_service.verify_section_input_root", side_effect=LocalApplicationError("APPLICATION-WRITER-COMPOSITION-INTEGRITY-001", "fixture")):
+                with self.assertRaises(LocalApplicationError):
+                    reopened.export_writer_section_input(comp["composition_id"], "SEC-FRAME", self.root / "round5-verify-failure")
+            self.assertEqual(set(self.root.glob(".section-input-*")), before)
+            self.assertFalse((self.root / "round5-verify-failure").exists())
+
+    def test_review_round4_detached_validator_rejects_inner_tamper_after_outer_redigest(self):
+        facade, case = self._build()
+        try:
+            comp = facade.capture_writer_composition(case["package_id"], self._proposal(case))["composition"]
+            facade.select_writer_composition(comp["composition_id"], 1, comp["composition_digest"])
+            base = self.root / "detached-validator-base"
+            facade.export_writer_section_input(comp["composition_id"], "SEC-FRAME", base)
+        finally:
+            facade.close()
+        self.assertEqual(verify_writer_section_input(base)["status"], "VERIFIED")
+        from core.runtime import canonical_digest
+        import hashlib
+        mutations = {
+            "missing-content": lambda d: d["resolved_materials"][0]["text_rendition"].pop("content"),
+            "same-size": lambda d: d["resolved_materials"][0]["text_rendition"].__setitem__("content", "X" * len(d["resolved_materials"][0]["text_rendition"]["content"])),
+            "null-size": lambda d: d["resolved_materials"][0]["text_rendition"].__setitem__("byte_length", None),
+            "null-digest": lambda d: d["resolved_materials"][0]["text_rendition"].__setitem__("content_digest", None),
+            "misbinding": lambda d: d["resolved_materials"][0].__setitem__("material_ref", "RUN-OTHER:CAP-OTHER"),
+        }
+        for label, mutate in mutations.items():
+            with self.subTest(label=label):
+                out = self.root / f"detached-bad-{label}"; out.mkdir()
+                doc = json.loads((base / "section-writer-input.json").read_text(encoding="utf-8")); mutate(doc)
+                basis = deepcopy(doc); basis.pop("section_input_digest", None); doc["section_input_digest"] = canonical_digest(basis)
+                payload = (json.dumps(doc, ensure_ascii=False, sort_keys=True, indent=2) + "\n").encode()
+                (out / "section-writer-input.json").write_bytes(payload)
+                manifest = {"schema_version":"0.1.0","object_type":"section_writer_input_manifest","files":[{"path":"section-writer-input.json","byte_length":len(payload),"content_digest":"sha256:"+hashlib.sha256(payload).hexdigest()}]}
+                manifest["manifest_digest"] = canonical_digest(manifest)
+                (out / "manifest.json").write_text(json.dumps(manifest))
+                with self.assertRaises(LocalApplicationError): verify_writer_section_input(out)
+
+    def test_review_round4_whole_export_is_no_overwrite_and_atomic(self):
+        facade, case = self._build()
+        try:
+            comp = facade.capture_writer_composition(case["package_id"], self._proposal(case))["composition"]
+            normal = self.root / "whole-safe.json"
+            facade.export_writer_composition(comp["composition_id"], 1, normal)
+            self.assertTrue(normal.is_file())
+            sentinel = self.root / "whole-sentinel.json"
+            real_link = os.link
+            def race_link(src, dst):
+                Path(dst).write_text("sentinel", encoding="utf-8")
+                raise FileExistsError(dst)
+            with patch("plugins.local_application.writer_composition_service.os.link", side_effect=race_link):
+                with self.assertRaises(LocalApplicationError): facade.export_writer_composition(comp["composition_id"], 1, sentinel)
+            self.assertEqual(sentinel.read_text(encoding="utf-8"), "sentinel")
+            failed = self.root / "whole-failed.json"
+            with patch("plugins.local_application.writer_composition_service.os.fsync", side_effect=OSError("fixture")):
+                with self.assertRaises(LocalApplicationError): facade.export_writer_composition(comp["composition_id"], 1, failed)
+            self.assertFalse(failed.exists())
+        finally:
+            facade.close()
+
+    def test_whole_proposal_export_can_be_edited_and_reimported_as_new_version(self):
+        facade, case = self._build()
+        try:
+            v1 = facade.capture_writer_composition(case["package_id"], self._proposal(case))["composition"]
+            exported = self.root / "composition-edit.json"
+            facade.export_writer_composition(v1["composition_id"], 1, exported)
+            proposal = json.loads(exported.read_text(encoding="utf-8"))
+            original_second = deepcopy(proposal["sections"][1])
+            proposal["sections"][0]["purpose"] = "Edited whole-proposal framing purpose."
+            proposal["change_reason"] = "Wall-discussion revision."
+            v2 = facade.capture_writer_composition(case["package_id"], proposal)["composition"]
+            self.assertEqual(v2["version"], 2)
+            self.assertEqual(v2["sections"][1], original_second)
+            diff = facade.diff_writer_composition(v1["composition_id"], 1, 2)
+            self.assertEqual(diff["section_changes"], [{"section_id":"SEC-FRAME","change":"modified","fields":["purpose"]}])
+        finally: facade.close()
+
+    def test_co6_output_safety_and_write_failure_are_atomic(self):
+        facade, case = self._build()
+        try:
+            v1 = facade.capture_writer_composition(case["package_id"], self._proposal(case))["composition"]
+            facade.select_writer_composition(v1["composition_id"], 1, v1["composition_digest"])
+            existing = self.root / "existing"; existing.mkdir(); (existing/"keep").write_text("keep")
+            with self.assertRaises(LocalApplicationError): facade.export_writer_section_input(v1["composition_id"], "SEC-FRAME", existing)
+            self.assertEqual((existing/"keep").read_text(), "keep")
+            failed = self.root / "failed"
+            with patch("plugins.local_application.writer_composition_service.os.replace", side_effect=OSError("fixture")):
+                with self.assertRaises(LocalApplicationError): facade.export_writer_section_input(v1["composition_id"], "SEC-FRAME", failed)
+            self.assertFalse(failed.exists())
+            with patch("plugins.local_application.writer_composition_service.MAX_SELECTION_EVENTS", 2):
+                facade.select_writer_composition(v1["composition_id"], 1, v1["composition_digest"])
+                with self.assertRaises(LocalApplicationError) as selection_bound:
+                    facade.select_writer_composition(v1["composition_id"], 1, v1["composition_digest"])
+                self.assertEqual(selection_bound.exception.code, "APPLICATION-WRITER-COMPOSITION-BOUND-001")
+            with patch("plugins.local_application.writer_composition_service.MAX_SECTION_INPUT_BYTES", 1):
+                with self.assertRaises(LocalApplicationError) as output_bound:
+                    facade.export_writer_section_input(v1["composition_id"], "SEC-FRAME", self.root / "too-large")
+                self.assertEqual(output_bound.exception.code, "APPLICATION-WRITER-COMPOSITION-BOUND-001")
+                self.assertFalse((self.root / "too-large").exists())
+        finally: facade.close()
+
+    def test_ablation_pin_validation_is_required(self):
+        facade, case = self._build()
+        try:
+            v1 = facade.capture_writer_composition(case["package_id"], self._proposal(case))["composition"]
+            path = facade._writer_composition_service()._version_path(v1["composition_id"], 1)
+            tampered = json.loads(path.read_text()); tampered["source"]["research_snapshot_digest"] = "sha256:" + "0"*64
+            from core.runtime import canonical_digest
+            basis = deepcopy(tampered); basis.pop("composition_digest", None); tampered["composition_digest"] = canonical_digest(basis)
+            path.write_text(json.dumps(tampered, sort_keys=True))
+            with self.assertRaises(LocalApplicationError): facade.show_writer_composition(v1["composition_id"], 1)
+            with patch.object(WriterCompositionService, "_validate_source_pin", return_value=None):
+                self.assertEqual(facade.show_writer_composition(v1["composition_id"], 1)["composition"]["source"]["research_snapshot_digest"], "sha256:" + "0"*64)
+        finally: facade.close()
+
+    def test_ablation_preservation_validation_is_required(self):
+        facade, case = self._build_complete_support_package(include_adverse=True)
+        try:
+            package = facade.show_research_package(case["package_id"])["package"]
+            objects = {obj["id"]: obj for obj in package["resolved_content"]["research_objects"]}
+            finding = next(obj for obj in objects.values() if obj.get("kind") == "finding")
+            self.assertTrue(finding.get("limitations"))
+            self.assertEqual(objects[case["counter_review_id"]]["target"], {"kind": "finding", "id": finding["id"]})
+
+            dropped = self._proposal(case, composition_id="COMP-PRESERVATION-ABLATION")
+            dropped["sections"] = [deepcopy(dropped["sections"][0])]
+            dropped["sections"][0].pop("next_section_id", None)
+            dropped["sections"][0]["finding_refs"] = [finding["id"]]
+            dropped["sections"][0]["counter_review_refs"] = []
+            with self.assertRaises(LocalApplicationError) as error:
+                facade.capture_writer_composition(case["package_id"], dropped)
+            self.assertEqual(error.exception.code, "APPLICATION-WRITER-COMPOSITION-PRESERVATION-001")
+
+            original_narrative_defs = WriterCompositionService._narrative_defs
+            def without_counter_preservation(service, source_package):
+                stages, purposes, edges, preservation = original_narrative_defs(service, source_package)
+                return stages, purposes, edges, preservation - {"counter_findings"}
+
+            with patch.object(WriterCompositionService, "_narrative_defs", without_counter_preservation):
+                ablated = facade.capture_writer_composition(case["package_id"], dropped)["composition"]
+                facade.select_writer_composition(ablated["composition_id"], 1, ablated["composition_digest"] )
+                out = self.root / "preservation-ablation-section"
+                facade.export_writer_section_input(ablated["composition_id"], "SEC-FRAME", out)
+            detached = json.loads((out / "section-writer-input.json").read_text(encoding="utf-8"))
+            self.assertEqual(detached["section_contract"]["counter_review_refs"], [])
+            self.assertIn(case["counter_review_id"], detached["resolved_object_ids"])
+            detached_finding = next(obj for obj in detached["resolved_research_objects"] if obj.get("id") == finding["id"])
+            self.assertEqual(detached_finding["limitations"], finding["limitations"])
+        finally: facade.close()
+
+
+if __name__ == "__main__":
+    import unittest; unittest.main()
