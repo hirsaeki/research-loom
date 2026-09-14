@@ -19,6 +19,7 @@ from .external_desktop_facade import (
 from .facade import LocalApplicationError
 from .material_inventory_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
 from .material_content_facade import ExternalMaterialContentService
+from .material_recovery_facade import HistoricalMaterialRecoveryService
 
 
 _LARGE_ORIGINAL_PREFIX = "external-original://sha256/"
@@ -35,6 +36,24 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
             self._application.execution_store, self._project_id, self._workspace_root
         )
         return service.show(run_id, capture_id, max_text_bytes=max_text_bytes)
+
+    def diagnose_external_material(
+        self, run_id: str, capture_id: str
+    ) -> Mapping[str, Any]:
+        service = HistoricalMaterialRecoveryService(
+            self._application.execution_store, self._project_id, self._workspace_root
+        )
+        return service.diagnose(run_id, capture_id)
+
+    def recover_external_material(
+        self, run_id: str, capture_id: str, *, kind: str, source_file
+    ) -> Mapping[str, Any]:
+        service = HistoricalMaterialRecoveryService(
+            self._application.execution_store, self._project_id, self._workspace_root
+        )
+        return service.recover(
+            run_id, capture_id, kind=kind, source_file=source_file
+        )
 
     def export_external_material(
         self, run_id: str, capture_id: str, *, kind: str, output_file
