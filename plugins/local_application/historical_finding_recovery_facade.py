@@ -241,10 +241,7 @@ def _recover(application, project_id: str, run_id: str) -> Mapping[str, Any]:
     # Preserve #142 exact-run recovery semantics byte-for-byte in behavior.  The
     # compatibility path is considered only when no exact persisted candidate
     # exists for the requested Run.
-    try:
-        exact_matches = proposal_matches(application.conversation_store, run_id)
-    except RecoveryFailure:
-        exact_matches = (object(),)
+    exact_matches = proposal_matches(application.conversation_store, run_id)
     if exact_matches:
         recovered = dict(_base._recover_legacy_candidate(application, project_id, run_id))
         recovered["producer_run_id"] = run_id
