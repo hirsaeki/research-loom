@@ -39,50 +39,35 @@ class DiagnosedArtifactReadMixin(VerifiedArtifactReadMixin):
             diagnosis = cached.pop(artifact_id, None)
         return dict(diagnosis) if isinstance(diagnosis, Mapping) else None
 
-    def _load_verified_blob(
+    def _verify_blob_path(
         self,
-        locator: str,
+        path,
         expected_digest: str,
         expected_size: int,
-    ) -> bytes:
-        target = self._locator_path(locator, expected_digest)
-        if not target.exists():
-            raise FileNotFoundError(target)
-        try:
-            content = target.read_bytes()
-        except FileNotFoundError:
-            raise
-        except OSError as exc:
-            raise _diagnosed_integrity_error(
-                "content-addressed blob could not be read",
-                {
-                    "status": "content_unreadable",
-                    "expected_digest": expected_digest,
-                    "expected_size": expected_size,
-                    "actual_digest": None,
-                    "actual_size": None,
-                },
-            ) from exc
-        actual_digest = "sha256:" + hashlib.sha256(content).hexdigest()
-        actual_size = len(content)
-        if actual_digest != expected_digest or actual_size != expected_size:
-            if actual_digest != expected_digest and actual_size != expected_size:
-                status = "digest_and_size_mismatch"
-            elif actual_digest != expected_digest:
-                status = "digest_mismatch"
-            else:
-                status = "size_mismatch"
-            raise _diagnosed_integrity_error(
-                "content-addressed blob failed digest/size verification",
-                {
-                    "status": status,
-                    "expected_digest": expected_digest,
-                    "expected_size": expected_size,
-                    "actual_digest": actual_digest,
-                    "actual_size": actual_size,
-                },
-            )
-        return content
+        *,
+        content: bytes | None = None,
+    ) -> None:
+        data = path.read_bytes() if content is None else content
+        actual_digest = "sha256:" + hashlib.sha256(data).hexdigest()
+        actual_size = len(data)
+        if actual_digest == expected_digest and actual_size == expected_size:
+            return
+        if actual_digest != expected_digest and actual_size != expected_size:
+            status = "digest_and_size_mismatch"
+        elif actual_digest != expected_digest:
+            status = "digest_mismatch"
+        else:
+            status = "size_mismatch"
+        raise _diagnosed_integrity_error(
+            "content-addressed blob failed digest/size verification",
+            {
+                "status": status,
+                "expected_digest": expected_digest,
+                "expected_size": expected_size,
+                "actual_digest": actual_digest,
+                "actual_size": actual_size,
+            },
+        )
 
     def load_artifact_verified_once(self, artifact_id: str):
         try:
