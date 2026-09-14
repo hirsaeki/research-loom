@@ -5,15 +5,16 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 import errno
 import hashlib
+import http.client
 import ipaddress
 import os
 from pathlib import Path
 import socket
+import ssl
 from threading import RLock
 import tempfile
 import time
 from typing import Any, Callable, Mapping
-from urllib import request
 from urllib.parse import urljoin, urlparse
 import uuid
 
@@ -116,7 +117,7 @@ def _historical_equivalent(
     return expected_digest == actual_digest and expected_size == actual_size
 
 
-def _validate_public_https_locator(locator: str) -> None:
+def _resolve_public_https_locator(locator: str):
     try:
         parsed = urlparse(locator)
         port = parsed.port or 443
@@ -134,7 +135,7 @@ def _validate_public_https_locator(locator: str) -> None:
             "historical locator must be a public HTTPS URL"
         )
     try:
-        addresses = socket.getaddrinfo(
+        resolved = socket.getaddrinfo(
             parsed.hostname,
             port,
             type=socket.SOCK_STREAM,
@@ -143,11 +144,13 @@ def _validate_public_https_locator(locator: str) -> None:
         raise MaterialReacquisitionRetrievalError(
             "historical locator hostname could not be resolved"
         ) from exc
-    if not addresses:
+    if not resolved:
         raise MaterialReacquisitionRetrievalError(
             "historical locator hostname resolved to no addresses"
         )
-    for entry in addresses:
+
+    addresses: list[str] = []
+    for entry in resolved:
         raw_address = str(entry[4][0]).split("%", 1)[0]
         try:
             address = ipaddress.ip_address(raw_address)
@@ -159,55 +162,141 @@ def _validate_public_https_locator(locator: str) -> None:
             raise MaterialReacquisitionRetrievalError(
                 "historical locator resolves to a non-public address"
             )
+        normalized = str(address)
+        if normalized not in addresses:
+            addresses.append(normalized)
+    return parsed, tuple(addresses)
 
 
-class _PublicHttpsRedirectHandler(request.HTTPRedirectHandler):
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
-        resolved = urljoin(req.full_url, str(newurl))
-        _validate_public_https_locator(resolved)
-        return super().redirect_request(req, fp, code, msg, headers, resolved)
+class _PinnedHTTPSConnection(http.client.HTTPSConnection):
+    """HTTPS connection pinned to one pre-validated IP while preserving TLS hostname checks."""
+
+    def __init__(
+        self,
+        hostname: str,
+        connect_address: str,
+        port: int,
+        *,
+        timeout: float,
+    ) -> None:
+        self._connect_address = connect_address
+        super().__init__(
+            hostname,
+            port=port,
+            timeout=timeout,
+            context=ssl.create_default_context(),
+        )
+
+    def connect(self) -> None:
+        self.sock = socket.create_connection(
+            (self._connect_address, self.port),
+            self.timeout,
+            self.source_address,
+        )
+        if self._tunnel_host:
+            self._tunnel()
+        self.sock = self._context.wrap_socket(self.sock, server_hostname=self.host)
+
+
+def _request_target(parsed) -> str:
+    target = parsed.path or "/"
+    if parsed.query:
+        target += "?" + parsed.query
+    return target
+
+
+def _host_header(hostname: str, port: int) -> str:
+    host = f"[{hostname}]" if ":" in hostname else hostname
+    return host if port == 443 else f"{host}:{port}"
 
 
 def _retrieve_exact_locator(locator: str, *, max_bytes: int) -> RetrievedMaterial:
-    _validate_public_https_locator(locator)
-    req = request.Request(
-        locator,
-        headers={"User-Agent": "Research-Loom historical-material-reacquisition/0.1"},
-        method="GET",
-    )
-    opener = request.build_opener(_PublicHttpsRedirectHandler())
-    try:
-        with opener.open(req, timeout=30) as response:
-            declared = response.headers.get("Content-Length")
-            if declared is not None:
-                try:
-                    if int(declared) > max_bytes:
-                        raise MaterialReacquisitionRetrievalError(
-                            "reacquired response exceeds bounded material intake limit"
-                        )
-                except ValueError:
-                    pass
-            content = response.read(max_bytes + 1)
-            if len(content) > max_bytes:
-                raise MaterialReacquisitionRetrievalError(
-                    "reacquired response exceeds bounded material intake limit"
-                )
-            media_type = response.headers.get_content_type() or "application/octet-stream"
-            status = getattr(response, "status", None)
-            final_locator = str(response.geturl() or locator)
-            _validate_public_https_locator(final_locator)
-    except MaterialReacquisitionRetrievalError:
-        raise
-    except Exception as exc:
-        raise MaterialReacquisitionRetrievalError(str(exc) or type(exc).__name__) from exc
-    return RetrievedMaterial(
-        content=content,
-        media_type=media_type,
-        final_locator=final_locator,
-        provider="urllib.request",
-        status_code=int(status) if status is not None else None,
-    )
+    current_locator = locator
+    redirect_statuses = {301, 302, 303, 307, 308}
+    for _redirect_count in range(6):
+        parsed, addresses = _resolve_public_https_locator(current_locator)
+        hostname = str(parsed.hostname)
+        port = parsed.port or 443
+        last_error: Exception | None = None
+        redirect_locator: str | None = None
 
+        for address in addresses:
+            connection = _PinnedHTTPSConnection(
+                hostname,
+                address,
+                port,
+                timeout=30,
+            )
+            try:
+                connection.request(
+                    "GET",
+                    _request_target(parsed),
+                    headers={
+                        "Host": _host_header(hostname, port),
+                        "User-Agent": "Research-Loom historical-material-reacquisition/0.1",
+                        "Connection": "close",
+                    },
+                )
+                response = connection.getresponse()
+                status = int(response.status)
+                if status in redirect_statuses:
+                    location = response.getheader("Location")
+                    if not location:
+                        raise MaterialReacquisitionRetrievalError(
+                            "historical locator redirect omitted Location"
+                        )
+                    redirect_locator = urljoin(current_locator, str(location))
+                    break
+                if status < 200 or status >= 300:
+                    raise MaterialReacquisitionRetrievalError(
+                        f"historical locator returned HTTP {status}"
+                    )
+
+                declared = response.headers.get("Content-Length")
+                if declared is not None:
+                    try:
+                        if int(declared) > max_bytes:
+                            raise MaterialReacquisitionRetrievalError(
+                                "reacquired response exceeds bounded material intake limit"
+                            )
+                    except ValueError:
+                        pass
+                content = response.read(max_bytes + 1)
+                if len(content) > max_bytes:
+                    raise MaterialReacquisitionRetrievalError(
+                        "reacquired response exceeds bounded material intake limit"
+                    )
+                media_type = (
+                    response.headers.get_content_type()
+                    if hasattr(response.headers, "get_content_type")
+                    else "application/octet-stream"
+                )
+                return RetrievedMaterial(
+                    content=content,
+                    media_type=media_type or "application/octet-stream",
+                    final_locator=current_locator,
+                    provider="http.client.pinned-https",
+                    status_code=status,
+                )
+            except MaterialReacquisitionRetrievalError:
+                raise
+            except Exception as exc:
+                last_error = exc
+            finally:
+                connection.close()
+
+        if redirect_locator is not None:
+            current_locator = redirect_locator
+            continue
+        if last_error is not None:
+            raise MaterialReacquisitionRetrievalError(
+                str(last_error) or type(last_error).__name__
+            ) from last_error
+        raise MaterialReacquisitionRetrievalError(
+            "historical locator could not be retrieved from approved addresses"
+        )
+
+    raise MaterialReacquisitionRetrievalError("historical locator exceeded redirect limit")
 
 def _transition(store, run: CapabilityRunRecord, status: RunStatus, reason: str, *, failure=None):
     events = store.events_for(run.run_id)

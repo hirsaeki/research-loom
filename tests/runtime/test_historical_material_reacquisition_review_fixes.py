@@ -3,14 +3,13 @@ from __future__ import annotations
 from dataclasses import replace
 from threading import Event, Thread
 from unittest.mock import patch
-from urllib import request
 
 from plugins.local_application import LocalApplicationFacade
 from plugins.local_application.material_reacquisition_facade import (
     HistoricalMaterialReacquisitionService,
     MaterialReacquisitionRetrievalError,
     RetrievedMaterial,
-    _PublicHttpsRedirectHandler,
+    _PinnedHTTPSConnection,
     _retrieve_exact_locator,
 )
 from plugins.local_execution_store import child_runs_for_parent
@@ -153,36 +152,140 @@ class HistoricalMaterialReacquisitionReviewFixTests(ResearchPackageAcceptanceSup
             if facade is not None:
                 facade.close()
 
-    def test_builtin_retrieval_rejects_non_public_targets_and_redirects(self):
-        with patch(
-            "plugins.local_application.material_reacquisition_facade.request.build_opener"
-        ) as opener:
-            with self.assertRaisesRegex(
-                MaterialReacquisitionRetrievalError, "public HTTPS"
-            ):
-                _retrieve_exact_locator("file:///etc/passwd", max_bytes=1024)
-            opener.assert_not_called()
+    def test_builtin_retrieval_rejects_non_public_targets_and_pins_approved_dns(self):
+        with self.assertRaisesRegex(
+            MaterialReacquisitionRetrievalError, "public HTTPS"
+        ):
+            _retrieve_exact_locator("file:///etc/passwd", max_bytes=1024)
 
         with patch(
             "plugins.local_application.material_reacquisition_facade.socket.getaddrinfo",
             return_value=[(2, 1, 6, "", ("127.0.0.1", 443))],
-        ), patch(
-            "plugins.local_application.material_reacquisition_facade.request.build_opener"
-        ) as opener:
+        ), patch.object(_PinnedHTTPSConnection, "connect") as connect:
             with self.assertRaisesRegex(MaterialReacquisitionRetrievalError, "non-public"):
                 _retrieve_exact_locator("https://internal.example/secret", max_bytes=1024)
-            opener.assert_not_called()
+            connect.assert_not_called()
 
-        handler = _PublicHttpsRedirectHandler()
-        with self.assertRaisesRegex(MaterialReacquisitionRetrievalError, "non-public"):
-            handler.redirect_request(
-                request.Request("https://public.example/start"),
-                None,
-                302,
-                "Found",
-                {},
-                "https://127.0.0.1/metadata",
+        captured = {}
+
+        class FakeHeaders(dict):
+            def get_content_type(self):
+                return "text/plain"
+
+        class FakeResponse:
+            status = 200
+            headers = FakeHeaders({"Content-Length": "2"})
+
+            @staticmethod
+            def read(_limit):
+                return b"ok"
+
+            @staticmethod
+            def getheader(_name):
+                return None
+
+        class FakePinnedConnection:
+            def __init__(self, hostname, connect_address, port, *, timeout):
+                captured.update(
+                    hostname=hostname,
+                    connect_address=connect_address,
+                    port=port,
+                    timeout=timeout,
+                )
+
+            def request(self, method, target, *, headers):
+                captured.update(method=method, target=target, host=headers["Host"])
+
+            @staticmethod
+            def getresponse():
+                return FakeResponse()
+
+            @staticmethod
+            def close():
+                return None
+
+        with patch(
+            "plugins.local_application.material_reacquisition_facade.socket.getaddrinfo",
+            side_effect=[
+                [(2, 1, 6, "", ("8.8.8.8", 443))],
+                [(2, 1, 6, "", ("127.0.0.1", 443))],
+            ],
+        ) as resolver, patch(
+            "plugins.local_application.material_reacquisition_facade._PinnedHTTPSConnection",
+            FakePinnedConnection,
+        ):
+            result = _retrieve_exact_locator(
+                "https://public.example/source?q=1", max_bytes=1024
             )
+
+        self.assertEqual(result.content, b"ok")
+        self.assertEqual(resolver.call_count, 1)
+        self.assertEqual(captured["hostname"], "public.example")
+        self.assertEqual(captured["connect_address"], "8.8.8.8")
+        self.assertEqual(captured["host"], "public.example")
+        self.assertEqual(captured["target"], "/source?q=1")
+
+        class RedirectResponse:
+            status = 302
+            headers = FakeHeaders()
+
+            @staticmethod
+            def getheader(name):
+                return "https://redirected.example/metadata" if name == "Location" else None
+
+        class RedirectConnection(FakePinnedConnection):
+            @staticmethod
+            def getresponse():
+                return RedirectResponse()
+
+        with patch(
+            "plugins.local_application.material_reacquisition_facade.socket.getaddrinfo",
+            side_effect=[
+                [(2, 1, 6, "", ("8.8.8.8", 443))],
+                [(2, 1, 6, "", ("127.0.0.1", 443))],
+            ],
+        ) as resolver, patch(
+            "plugins.local_application.material_reacquisition_facade._PinnedHTTPSConnection",
+            RedirectConnection,
+        ):
+            with self.assertRaisesRegex(MaterialReacquisitionRetrievalError, "non-public"):
+                _retrieve_exact_locator("https://public.example/start", max_bytes=1024)
+        self.assertEqual(resolver.call_count, 2)
+
+    def test_pinned_https_connection_uses_approved_ip_and_original_tls_name(self):
+        raw_socket = object()
+        wrapped_socket = object()
+
+        class FakeContext:
+            def wrap_socket(self, sock, *, server_hostname):
+                self.sock = sock
+                self.server_hostname = server_hostname
+                return wrapped_socket
+
+        context = FakeContext()
+        with patch(
+            "plugins.local_application.material_reacquisition_facade.ssl.create_default_context",
+            return_value=context,
+        ), patch(
+            "plugins.local_application.material_reacquisition_facade.socket.create_connection",
+            return_value=raw_socket,
+        ) as create_connection:
+            connection = _PinnedHTTPSConnection(
+                "public.example",
+                "8.8.8.8",
+                443,
+                timeout=30,
+            )
+            connection.connect()
+
+        create_connection.assert_called_once_with(
+            ("8.8.8.8", 443),
+            30,
+            None,
+        )
+        self.assertIs(context.sock, raw_socket)
+        self.assertEqual(context.server_hostname, "public.example")
+        self.assertIs(connection.sock, wrapped_socket)
 
     def test_oversized_historical_material_fails_before_network(self):
         facade, case = self._prepare_case()
