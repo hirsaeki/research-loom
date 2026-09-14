@@ -31,6 +31,7 @@ def find_state_delta_proposals_by_provenance_run_id(
             isinstance(provenance, dict)
             and provenance.get("run_id") == run_id
             and "legacy_recovery" not in provenance
+            and "historical_recovery" not in provenance
         ):
             result.append(payload)
     return tuple(result)
