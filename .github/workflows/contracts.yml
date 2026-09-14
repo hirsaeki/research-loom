@@ -87,7 +87,7 @@ jobs:
       - name: Run Issue 148 historical G1 result recovery acceptance
         run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_historical_result_recovery.py' -v
       - name: Run Issue 127 historical material recovery acceptance
-        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_historical_material_recovery.py' -v
+        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_historical_material_recovery*.py' -v
 
   issue128-windows:
     name: issue128-windows
