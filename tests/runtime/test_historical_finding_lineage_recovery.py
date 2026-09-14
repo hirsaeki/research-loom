@@ -70,7 +70,7 @@ class HistoricalFindingLineageRecoveryTests(ResearchPackageAcceptanceSupport):
             "actor_id": "HUMAN-HCL",
         })["run_id"]
         facade.start_external_retrieval_attempt(child_run_id, {
-            "attempt_id": "ATT-CHILD-1",
+            "attempt_id": "ATT-1",
             "strategy": "support search",
             "coverage_dimension_ids": ["COV-SUPPORT"],
             "target_locator": "https://example.test/source-a",
@@ -92,17 +92,17 @@ class HistoricalFindingLineageRecoveryTests(ResearchPackageAcceptanceSupport):
             "text_rendition_file": "captures/text/source-a.txt",
         })["capture"]
         facade.complete_external_retrieval_attempt(child_run_id, {
-            "attempt_id": "ATT-CHILD-1",
+            "attempt_id": "ATT-1",
             "outcome": "source_captured",
             "resulting_capture_id": "CAP-1",
         })
         facade.start_external_retrieval_attempt(child_run_id, {
-            "attempt_id": "ATT-CHILD-2",
+            "attempt_id": "ATT-2",
             "strategy": "counter search",
             "coverage_dimension_ids": ["COV-COUNTER"],
         })
         facade.complete_external_retrieval_attempt(child_run_id, {
-            "attempt_id": "ATT-CHILD-2",
+            "attempt_id": "ATT-2",
             "outcome": "no_relevant_source",
         })
         handoff, extension = intake.golden_submission(
@@ -173,7 +173,7 @@ class HistoricalFindingLineageRecoveryTests(ResearchPackageAcceptanceSupport):
         finally:
             facade.close()
 
-    def test_hcl1_run_show_classifies_integrity_stale_and_shape_failures(self):
+    def test_hcl1_run_show_classifies_integrity_and_stale_failures(self):
         facade, case = self._prepare_case()
         try:
             legacy = self._legacyize(facade, case["proposal"])
@@ -199,6 +199,7 @@ class HistoricalFindingLineageRecoveryTests(ResearchPackageAcceptanceSupport):
         finally:
             facade.close()
 
+    def test_hcl1_run_show_classifies_unrecognized_shape(self):
         facade, case = self._prepare_case()
         try:
             diagnosis = facade.show_run(case["run_id"])["finding_recovery"]

@@ -234,15 +234,33 @@ def _diagnose(application, project_id: str, run_id: str) -> Mapping[str, Any]:
 
 
 def _recover(application, project_id: str, run_id: str) -> Mapping[str, Any]:
-    requested_run, producer_run, _historical, relation = _resolve_candidate(
-        application, project_id, run_id
+    # Preserve #142 exact-run recovery semantics byte-for-byte in behavior.  The
+    # compatibility path is considered only when no exact persisted candidate
+    # exists for the requested Run.
+    try:
+        exact_matches = proposal_matches(application.conversation_store, run_id)
+    except RecoveryFailure:
+        exact_matches = (object(),)
+    if exact_matches:
+        recovered = dict(_base._recover_legacy_candidate(application, project_id, run_id))
+        recovered["producer_run_id"] = run_id
+        recovered["producer_relation"] = "exact_run"
+        return recovered
+
+    requested_run = _eligible_completed_desktop_run(application, project_id, run_id)
+    producer_run, historical = resolve_replay_child(application, requested_run)
+    producer_run = _eligible_completed_desktop_run(
+        application, project_id, producer_run.run_id
+    )
+    _inspect_historical_candidate(
+        application, project_id, requested_run, producer_run, historical
     )
     recovered = dict(
         _base._recover_legacy_candidate(application, project_id, producer_run.run_id)
     )
     recovered["run_id"] = requested_run.run_id
     recovered["producer_run_id"] = producer_run.run_id
-    recovered["producer_relation"] = relation
+    recovered["producer_relation"] = "replay_child"
     return recovered
 
 
