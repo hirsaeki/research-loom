@@ -1,7 +1,7 @@
 """Production local execution trace, artifact, resource, and auxiliary stores."""
 
 from .retention import LocalExecutionStore as _RetentionLocalExecutionStore
-from .verified_artifact_read import VerifiedArtifactReadMixin
+from .diagnosed_artifact_read import DiagnosedArtifactReadMixin
 from .atomic import LocalOperationalTraceStore
 from .context_extensions import LocalCapabilityContextExtensionStore
 from .inspection import artifact_metadata_for, diagnostics_for
@@ -18,7 +18,7 @@ from .store import (
 )
 
 
-class LocalExecutionStore(VerifiedArtifactReadMixin, _RetentionLocalExecutionStore):
+class LocalExecutionStore(DiagnosedArtifactReadMixin, _RetentionLocalExecutionStore):
     """Production store with single-read and bounded verified artifact reads."""
 
 

@@ -21,10 +21,12 @@ class RecoveryFailure(LocalApplicationError):
         *,
         stage: str,
         failure_class: str,
+        details: Mapping[str, Any] | None = None,
     ) -> None:
         super().__init__(code, message)
         self.stage = stage
         self.failure_class = failure_class
+        self.details = dict(details or {})
 
 
 def proposal_matches(store, run_id: str) -> tuple[Mapping[str, object], ...]:
