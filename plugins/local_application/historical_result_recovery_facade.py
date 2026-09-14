@@ -222,7 +222,7 @@ def _classification(application, project_id: str, run_id: str) -> Mapping[str, A
             "normalized_proposal_digest": proposal["proposal_digest"],
             "research_state_mutation_performed": False,
         }
-        if historical_lineage_status is Not None:
+        if historical_lineage_status is not None:
             result["historical_candidate_lineage_status"] = historical_lineage_status
             result["historical_candidate_count"] = historical_candidate_count
         return result
