@@ -154,4 +154,233 @@ class FindingCandidateRecoveryTests(ResearchPackageAcceptanceSupport):
                 facade.project_id,
                 facade._application.state_repository.load_active_lineage_ref(facade.project_id),
             )
-            finding = next(obj for obj in state.effective_objects() if obj.get("kind") == "finding")²È="24€€‘ÕÁ±¥…Ñ•l‰ÁÉ½Á½Í…±}‘¥•ÍĞ‰t€ô…¹½¹¥…±}‘¥•ÍĞ¡‘ÕÁ±¥…Ñ”¤(€€€€€€€€€€€ÍÑ½É”€ô™……‘”¹}…ÁÁ±¥…Ñ¥½¸¹½¹Ù•ÉÍ…Ñ¥½¹}ÍÑ½É”(€€€€€€€€€€€ÍÑ½É”¹ÍÑ½É•}ÍÑ…Ñ•}‘•±Ñ…}ÁÉ½Á½Í…°¡‘ÕÁ±¥…Ñ•l‰ÁÉ½Á½Í…±}¥‰t°‘ÕÁ±¥…Ñ”¤((€€€€€€€€€€€É•½Ù•É•€ô™……‘”¹É•½Ù•É}±•…å}‘•Í­Ñ½Á}É•Í•…É¡}™¥¹‘¥¹}…¹‘¥‘…Ñ” (€€€€€€€€€€€€€€€…Í•l‰ÉÕ¹}¥‰t(€€€€€€€€€€€€¤(€€€€€€€€€€€Í•±˜¹…ÍÍ•ÉÑÅÕ…°¡É•½Ù•É•‘l‰É½ÕÑ”‰t°€‰…¹½¹¥…±}É•ÍÕ±Ñ}É•µ…Ñ•É¥…±¥é…Ñ¥½¸ˆ¤(€€€€€€€€€€€ÁÉ½Á½Í…°€ôÍÑ½É”¹±½…‘}ÍÑ…Ñ•}‘•±Ñ…}ÁÉ½Á½Í…° (€€€€€€€€€€€€€€€É•½Ù•É•‘l‰ÍÑ…Ñ•}‘•±Ñ…}ÁÉ½Á½Í…±}¥‰t(€€€€€€€€€€€€¤(€€€€€€€€€€€ÁÉ½Ù•¹…¹”€ôÁÉ½Á½Í…±l‰ÁÉ½Ù•¹…¹”‰ul‰¡¥ÍÑ½É¥…±}É•½Ù•Éä‰t(€€€€€€€€€€€Í•±˜¹…ÍÍ•ÉÑÅÕ…°¡ÁÉ½Ù•¹…¹•l‰É•½Ù•Éå}Í½ÕÉ”‰t°€‰…¹½¹¥…±}É•ÍÕ±Ğˆ¤(€€€€€€€€€€€Í•±˜¹…ÍÍ•ÉÑÅÕ…° (€€€€€€€€€€€€€€€ÁÉ½Ù•¹…¹•l‰¡¥ÍÑ½É¥…±}…¹‘¥‘…Ñ•}±¥¹•…•}ÍÑ…ÑÕÌ‰t°€‰…µ‰¥Õ½ÕÌˆ(€€€€€€€€€€€€¤(€€€€€€€€€€€Í•±˜¹…ÍÍ•ÉÑÅÕ…°¡ÁÉ½Ù•¹…¹•l‰¡¥ÍÑ½É¥…±}…¹‘¥‘…Ñ•}½Õ¹Ğ‰t°€‰µÕ±Ñ¥Á±”ˆ¤(€€€€€€€€€€€Í•±˜¹…ÍÍ•ÉÑÅÕ…° (€€€€€€€€€€€€€€€ÍÑ½É”¹±½…‘}ÍÑ…Ñ•}‘•±Ñ…}ÁÉ½Á½Í…°¡±•…ål‰ÁÉ½Á½Í…±}¥‰t¤°±•…ä(€€€€€€€€€€€€¤(€€€€€€€€€€€Í•±˜¹…ÍÍ•ÉÑÅÕ…° (€€€€€€€€€€€€€€€ÍÑ½É”¹±½…‘}ÍÑ…Ñ•}‘•±Ñ…}ÁÉ½Á½Í…°¡‘ÕÁ±¥…Ñ•l‰ÁÉ½Á½Í…±}¥‰t¤°‘ÕÁ±¥…Ñ”(€€€€€€€€€€€€¤(€€€€€€€™¥¹…±±äè(€€€€€€€€€€€™……‘”¹±½Í” ¤((€€€‘•˜Ñ•ÍÑ}™ÈÑ}½ÉÉÕÁÑ}Õ¹É•½¹¥é•‘}…¹‘}µ¥ÍÍ¥¹}…¹‘¥‘…Ñ•Í}™…¥±}±½Í•¡Í•±˜¤è(€€€€€€€™……‘”°…Í”€ôÍ•±˜¹}ÁÉ•Á…É•}…Í” ¤(€€€€€€€ÑÉäè(€€€€€€€€€€€±•…ä€ôÍ•±˜¹}±•…å¥é”¡™……‘”°…Í•l‰ÁÉ½Á½Í…°‰t¤(€€€€€€€€€€€‘ˆ€ô™……‘”¹}…ÁÁ±¥…Ñ¥½¸¹½¹Ù•ÉÍ…Ñ¥½¹}ÍÑ½É”¹}‘ˆ(€€€€€€€€€€€‰É½­•¸€ô‘••Á½Áä¡±•…ä¤(€€€€€€€€€€€‰É½­•¹l‰É…Ñ¥½¹…±”‰t€ô€‰Ñ…µÁ•É•ˆ(€€€€€€€€€€€‘ˆ¹•á•ÕÑ” (€€€€€€€€€€€€€€€€‰UAQÍÑ…Ñ•}‘•±Ñ…}ÁÉ½Á½Í…±ÌMPÁ…å±½…‘}©Í½¸ôü]!IÁÉ½Á½Í…±}¥ôüˆ°(€€€€€€€€€€€€€€€€¡™……‘”¹}…ÁÁ±¥…Ñ¥½¸¹½¹Ù•ÉÍ…Ñ¥½¹}ÍÑ½É”¹}©Í½¸¡‰É½­•¸¤°‰É½­•¹l‰ÁÉ½Á½Í…±}¥‰t¤°(€€€€€€€€€€€€¤(€€€€€€€€€€€İ¥Ñ Í•±˜¹…ÍÍ•ÉÑI…¥Í•Ì¡1½…±ÁÁ±¥…Ñ¥½¹ÉÉ½È¤…Ì…Õ¡Ğè(€€€€€€€€€€€€€€€™……‘”¹É•½Ù•É}±•…å}‘•Í­Ñ½Á}É•Í•…É¡}™¥¹‘¥¹}…¹‘¥‘…Ñ”¡…Í•l‰ÉÕ¹}¥‰t¤(€€€€€€€€€€€Í•±˜¹…ÍÍ•ÉÑÅÕ…°¡…Õ¡Ğ¹•á•ÁÑ¥½¸¹½‘”°€‰AA1%Q%=8µ%9%9µI=YIdµ%9QI%Qd´ÀÀÄˆ¤((€€€€€€€€€€€‘ˆ¹•á•ÕÑ” ‰1QI=4ÍÑ…Ñ•}‘•±Ñ…}ÁÉ½Á½Í…±Ì]!IÁÉ½Á½Í…±}¥ôüˆ°€¡±•…ål‰ÁÉ½Á½Í…±}¥‰t°¤¤(€€€€€€€€€€€É•µ…Ñ•É¥…±¥é•€ô™……‘”¹É•½Ù•É}±•…å}‘•Í­Ñ½Á}É•Í•…É¡}™¥¹‘¥¹}…¹‘¥‘…Ñ” (€€€€€€€€€€€€€€€…Í•l‰ÉÕ¹}¥‰t(€€€€€€€€€€€€¤(€€€€€€€€€€€Í•±˜¹…ÍÍ•ÉÑÅÕ…° (€€€€€€€€€€€€€€€É•µ…Ñ•É¥…±¥é•‘l‰É½ÕÑ”‰t°€‰…¹½¹¥…±}É•ÍÕ±Ñ}É•µ…Ñ•É¥…±¥é…Ñ¥½¸ˆ(€€€€€€€€€€€€¤(€€€€€€€™¥¹…±±äè(€€€€€€€€€€€™……‘”¹±½Í” ¤((€€€‘•˜Ñ•ÍÑ}™ÈÕ}É•½Ù•É•‘}™¥¹‘¥¹}½¹Ñ¥¹Õ•Í}Ñ¡É½Õ¡}…ÉÕµ•¹Ñ}Á…­…•}…¹‘}Í•}œÅ|ÀÔ¡Í•±˜¤è(€€€€€€€™……‘”°…Í”€ôÍ•±˜¹}ÁÉ•Á…É•}…Í” ¤(€€€€€€€ÑÉäè(€€€€€€€€€€€Í•±˜¹}±•…å¥é”¡™……‘”°…Í•l‰ÁÉ½Á½Í…°‰t¤(€€€€€€€€€€€É•½Ù•É•€ô™……‘”¹É•½Ù•É}±•…å}‘•Í­Ñ½Á}É•Í•…É¡}™¥¹‘¥¹}…¹‘¥‘…Ñ”¡…Í•l‰ÉÕ¹}¥‰t¤(€€€€€€€€€€€Á•¹‘¥¹œ€ô™……‘”¹ÍÕ‰µ¥Ñ}…Ñ¥½¸¡ì(€€€€€€€€€€€€€€€€‰…Ñ¥½¹}ÑåÁ”ˆè€‰ÍÑ…Ñ”¹…ÁÁ±å}…¹‘¥‘…Ñ”ˆ°(€€€€€€€€€€€€€€€€‰Á…å±½…ˆèì‰ÍÑ…Ñ•}‘•±Ñ…}ÁÉ½Á½Í…±}¥ˆèÉ•½Ù•É•‘l‰ÍÑ…Ñ•}‘•±Ñ…}ÁÉ½Á½Í…±}¥‰uô°(€€€€€€€€€€€€€€€€‰…Ñ½É}¥ˆè€‰!U58µHÔˆ°(€€€€€€€€€€€ô¤(€€€€€€€€€€€½¹™¥Éµ•€ô™……‘”¹ÍÕ‰µ¥Ñ}½¹™¥Éµ…Ñ¥½¸¡ì(€€€€€€€€€€€€€€€€‰½¹™¥Éµ…Ñ¥½¹}É•ÅÕ•ÍÑ}¥ˆèÁ•¹‘¥¹l‰½¹™¥Éµ…Ñ¥½¹}É•ÅÕ•ÍĞ‰ul‰½¹™¥Éµ…Ñ¥½¹}É•ÅÕ•ÍÑ}¥‰t°(€€€€€€€€€€€€€€€€‰…Ñ½É}¥ˆè€‰!U58µHÔˆ°(€€€€€€€€€€€ô¤(€€€€€€€€€€€É•ÅÕ•ÍĞ€ô½¹™¥Éµ•‘l‰‘•¥Í¥½¹}É•ÅÕ•ÍĞ‰t(€€€€€€€€€€€™……‘”¹É•Í½±Ù•}¡Õµ…¹}‘•¥Í¥½¸¡ì(€€€€€€€€€€€€€€€€‰É•ÅÕ•ÍÑ}¥ˆèÉ•ÅÕ•ÍÑl‰É•ÅÕ•ÍÑ}¥‰t°(€€€€€€€€€€€€€€€€‰É•ÅÕ•ÍÑ}‘¥•ÍĞˆèÉ•ÅÕ•ÍÑl‰É•ÅÕ•ÍÑ}‘¥•ÍĞ‰t°(€€€€€€€€€€€€€€€€‰‘¥ÍÁ½Í¥Ñ¥½¸ˆè€‰…ÁÁÉ½Ù•}•á…Ğˆ°(€€€€€€€€€€€€€€€€‰…Ñ½É}¥ˆè€‰!U58µHÔˆ°(€€€€€€€€€€€ô¤(€€€€€€€€€€€ÍÑ…Ñ”€ô™……‘”¹}…ÁÁ±¥…Ñ¥½¸¹ÍÑ…Ñ•}É•Á½Í¥Ñ½Éä¹±½…‘}ÍÑ…Ñ•}Ù¥•Ü (€€€€€€€€€€€€€€€™……‘”¹ÁÉ½©•Ñ}¥°(€€€€€€€€€€€€€€€™……‘”¹}…ÁÁ±¥…Ñ¥½¸¹ÍÑ…Ñ•}É•Á½Í¥Ñ½Éä¹±½…‘}…Ñ¥Ù•}±¥¹•…•}É•˜¡™……‘”¹ÁÉ½©•Ñ}¥¤°(€€€€€€€€€€€€¤(€€€€€€€€€€€™¥¹‘¥¹œ€ô¹•áĞ¡½‰¨™½È½‰¨¥¸ÍÑ…Ñ”¹•™™•Ñ¥Ù•}½‰©•ÑÌ ¤¥˜½‰¨¹•Ğ ‰­¥¹ˆ¤€ôô€‰™¥¹‘¥¹œˆ¤(€€€€€€€€€€€•Ù¥‘•¹”€ô¹•áĞ¡½‰¨™½È½‰¨¥¸ÍÑ…Ñ”¹•™™•Ñ¥Ù•}½‰©•ÑÌ ¤¥˜½‰¨¹•Ğ ‰­¥¹ˆ¤€ôô€‰•Ù¥‘•¹”ˆ¤(€€€€€€€€€€€Í½ÕÉ”€ô¹•áĞ¡½‰¨™½È½‰¨¥¸ÍÑ…Ñ”¹•™™•Ñ¥Ù•}½‰©•ÑÌ ¤¥˜½‰¨¹•Ğ ‰­¥¹ˆ¤€ôô€‰Í½ÕÉ”ˆ¤(€€€€€€€€€€€ÁÉ½Á½Í•€ô™……‘”¹ÍÕ‰µ¥Ñ}…Ñ¥½¸¡ì(€€€€€€€€€€€€€€€€‰…Ñ¥½¹}ÑåÁ”ˆè€‰É•Í•…É ¹…ÉÕµ•¹Ğ¹ÁÉ½Á½Í”ˆ°(€€€€€€€€€€€€€€€€‰Á…å±½…ˆèì(€€€€€€€€€€€€€€€€€€€€‰½¹±ÕÍ¥½¸ˆè€‰Q¡”É•½Ù•É•¥¹‘¥¹œÍÕÁÁ½ÉÑÌÑ¡”‰½Õ¹‘•Ù…±¥‘…Ñ¥½¸½¹±ÕÍ¥½¸¸ˆ°(€€€€€€€€€€€€€€€€€€€€‰İ…ÉÉ…¹Ğˆè€‰Q¡”…ÁÁÉ½Ù•¥¹‘¥¹œ…¹Ù¥‘•¹”É•Í½±Ù”¥¸Ñ¡”•á…ĞÕÉÉ•¹ĞM¹…ÁÍ¡½Ğ¸ˆ°(€€€€€€€€€€€€€€€€€€€€‰ÅÕ•ÍÑ¥½¹}¥‘Ìˆèm…Í•l‰ÉÅ}¥‰ut°(€€€€€€€€€€€€€€€€€€€€‰™¥¹‘¥¹}¥‘Ìˆèm™¥¹‘¥¹l‰¥‰ut°(€€€€€€€€€€€€€€€€€€€€‰•Ù¥‘•¹•}¥‘Ìˆèm•Ù¥‘•¹•l‰¥‰ut°(€€€€€€€€€€€€€€€€€€€€‰ÅÕ…±¥™¥•Èˆè€‰]¥Ñ¡¥¸Ñ¡”…ÁÑÕÉ•Í½ÕÉ”Í½Á”¸ˆ°(€€€€€€€€€€€€€€€ô°(€€€€€€€€€€€€€€€€‰…Ñ½É}¥ˆè€‰!U58µHÔˆ°(€€€€€€€€€€€ô¤(€€€€€€€€€€€…É}Á•¹‘¥¹œ€ô™……‘”¹ÍÕ‰µ¥Ñ}…Ñ¥½¸¡ì(€€€€€€€€€€€€€€€€‰…Ñ¥½¹}ÑåÁ”ˆè€‰ÍÑ…Ñ”¹…ÁÁ±å}…¹‘¥‘…Ñ”ˆ°(€€€€€€€€€€€€€€€€‰Á…å±½…ˆèì‰ÍÑ…Ñ•}‘•±Ñ…}ÁÉ½Á½Í…±}¥ˆèÁÉ½Á½Í•‘l‰‘…Ñ„‰ul‰ÍÑ…Ñ•}‘•±Ñ…}ÁÉ½Á½Í…±}¥‰uô°(€€€€€€€€€€€€€€€€‰…Ñ½É}¥ˆè€‰!U58µHÔˆ°(€€€€€€€€€€€ô¤(€€€€€€€€€€€½µµ¥ÑÑ•€ô™……‘”¹ÍÕ‰µ¥Ñ}½¹™¥Éµ…Ñ¥½¸¡ì(€€€€€€€€€€€€€€€€‰½¹™¥Éµ…Ñ¥½¹}É•ÅÕ•ÍÑ}¥ˆè…É}Á•¹‘¥¹l‰½¹™¥Éµ…Ñ¥½¹}É•ÅÕ•ÍĞ‰ul‰½¹™¥Éµ…Ñ¥½¹}É•ÅÕ•ÍÑ}¥‰t°(€€€€€€€€€€€€€€€€‰…Ñ½É}¥ˆè€‰!U58µHÔˆ°(€€€€€€€€€€€ô¤(€€€€€€€€€€€Í•±˜¹…ÍÍ•ÉÑÅÕ…°¡½µµ¥ÑÑ•‘l‰ÍÑ…ÑÕÌ‰t°€‰MUˆ¤(€€€€€€€€€€€…ÉÕµ•¹Ñ}¥€ôÁÉ½Á½Í•‘l‰‘…Ñ„‰ul‰…ÉÕµ•¹Ñ}…¹‘¥‘…Ñ”‰ul‰¥‰t(€€€€€€€€€€€ÕÉÉ•¹Ğ€ô™……‘”¹}…ÁÁ±¥…Ñ¥½¸¹ÍÑ…Ñ•}É•Á½Í¥Ñ½Éä¹±½…‘}ÍÑ…Ñ•}Ù¥•Ü (€€€€€€€€€€€€€€€™……‘”¹ÁÉ½©•Ñ}¥°(€€€€€€€€€€€€€€€™……‘”¹}…ÁÁ±¥…Ñ¥½¸¹ÍÑ…Ñ•}É•Á½Í¥Ñ½Éä¹±½…‘}…Ñ¥Ù•}±¥¹•…•}É•˜¡™……‘”¹ÁÉ½©•Ñ}¥¤°(€€€€€€€€€€€€¤(€€€€€€€€€€€‰Õ¥±Ğ€ô™……‘”¹‰Õ¥±‘}É•Í•…É¡}Á…­…”¡ì(€€€€€€€€€€€€€€€€¨©…Í•l‰‰Õ¥±‘}¥¹ÁÕĞ‰t°(€€€€€€€€€€€€€€€€‰Í¹…ÁÍ¡½Ñ}¥ˆèÕÉÉ•¹Ğ¹ÕÉÉ•¹Ñ}Í¹…ÁÍ¡½Ñl‰¥‰t°(€€€€€€€€€€€€€€€€‰Í¹…ÁÍ¡½Ñ}‘¥•ÍĞˆèÕÉÉ•¹Ğ¹ÕÉÉ•¹Ñ}Í¹…ÁÍ¡½Ñl‰½¹Ñ•¹Ñ}‘¥•ÍĞ‰t°(€€€€€€€€€€€€€€€€‰±¥¹•…•}É•˜ˆèÕÉÉ•¹Ğ¹…Ñ¥Ù•}±¥¹•…•}É•˜°(€€€€€€€€€€€€€€€€‰½‰©•Ñ}¥‘ÌˆèmÍ½ÕÉ•l‰¥‰t°•Ù¥‘•¹•l‰¥‰t°™¥¹‘¥¹l‰¥‰t°…ÉÕµ•¹Ñ}¥‘t°(€€€€€€€€€€€ô¥l‰Á…­…”‰t(€€€€€€€€€€€½µÁ½Í¥Ñ¥½¸€ô™……‘”¹…ÁÑÕÉ•}İÉ¥Ñ•É}½µÁ½Í¥Ñ¥½¸ (€€€€€€€€€€€€€€€‰Õ¥±Ñl‰Á…­…•}¥‰t°(€€€€€€€€€€€€€€€¥ÍÍÕ”ÄÌÑ}İÉ¥Ñ•È¹%ÍÍÕ”ÄÌÑ]É¥Ñ•É½µÁ½Í¥Ñ¥½¹I•½Ù•ÉåQ•ÍÑÌ¹}ÁÉ½Á½Í…° (€€€€€€€€€€€€€€€€€€€…Í”°…ÉÕµ•¹Ñ}¥°™¥¹‘¥¹l‰¥‰t°•Ù¥‘•¹•l‰¥‰t(€€€€€€€€€€€€€€€€¤°(€€€€€€€€€€€€¥l‰½µÁ½Í¥Ñ¥½¸‰t(€€€€€€€€€€€Í•±˜¹…ÍÍ•ÉÑ…±Í”¡…¹ä (€€€€€€€€€€€€€€€¥Ñ•´¹•Ğ ‰Í•Ñ¥½¹}¥ˆ¤€ôô€‰MµÄ´ÀÔˆ(€€€€€€€€€€€€€€€…¹¥Ñ•´¹•Ğ ‰½‘”ˆ¤€ôô€‰]I%QHµ=5A=M%Q%=8µ9IIQ%YµU95Pˆ(€€€€€€€€€€€€€€€™½È¥Ñ•´¥¸½µÁ½Í¥Ñ¥½¹l‰Ù…±¥‘…Ñ¥½¸‰ul‰‘¥…¹½ÍÑ¥Ì‰t(€€€€€€€€€€€€¤¤(€€€€€€€€€€€™……‘”¹Í•±•Ñ}İÉ¥Ñ•É}½µÁ½Í¥Ñ¥½¸ (€€€€€€€€€€€€€€€½µÁ½Í¥Ñ¥½¹l‰½µÁ½Í¥Ñ¥½¹}¥‰t°€Ä°½µÁ½Í¥Ñ¥½¹l‰½µÁ½Í¥Ñ¥½¹}‘¥•ÍĞ‰t(€€€€€€€€€€€€¤(€€€€€€€€€€€½ÕÑÁÕĞ€ôÍ•±˜¹É½½Ğ€¼€‰™ÈÔµÍ•ŒµœÄ´ÀÔˆ(€€€€€€€€€€€™……‘”¹•áÁ½ÉÑ}İÉ¥Ñ•É}Í•Ñ¥½¹}¥¹ÁÕĞ (€€€€€€€€€€€€€€€½µÁ½Í¥Ñ¥½¹l‰½µÁ½Í¥Ñ¥½¹}¥‰t°€‰MµÄ´ÀÔˆ°½ÕÑÁÕĞ(€€€€€€€€€€€€¤(€€€€€€€€€€€‘•Ñ…¡•€ô©Í½¸¹±½…‘Ì ¡½ÕÑÁÕĞ€¼€‰Í•Ñ¥½¸µİÉ¥Ñ•Èµ¥¹ÁÕĞ¹©Í½¸ˆ¤¹É•…‘}Ñ•áĞ¡•¹½‘¥¹œô‰ÕÑ˜´àˆ¤¤(€€€€€€€€€€€Í•±˜¹…ÍÍ•ÉÑ%¸¡…ÉÕµ•¹Ñ}¥°‘•Ñ…¡•‘l‰É•Í½±Ù•‘}½‰©•Ñ}¥‘Ì‰t¤(€€€€€€€€€€€Í•±˜¹…ÍÍ•ÉÑ%¸¡™¥¹‘¥¹l‰¥‰t°‘•Ñ…¡•‘l‰É•Í½±Ù•‘}½‰©•Ñ}¥‘Ì‰t¤(€€€€€€€™¥¹…±±äè(€€€€€€€€€€€™……‘”¹±½Í” ¤((€€€‘•˜Ñ•ÍÑ}™ÈÙ}ÕÉÉ•¹Ñ}…ÁÁÉ½Ù•‘}Í¡…Á•}¥Í}¹½Ñ}É•İÉ¥ÑÑ•¸¡Í•±˜¤è(€€€€€€€™……‘”°…Í”€ôÍ•±˜¹}ÁÉ•Á…É•}…Í” ¤(€€€€€€€ÑÉäè(€€€€€€€€€€€İ¥Ñ Í•±˜¹…ÍÍ•ÉÑI…¥Í•Ì¡1½…±ÁÁ±¥…Ñ¥½¹ÉÉ½È¤…Ì…Õ¡Ğè(€€€€€€€€€€€€€€€™……‘”¹É•½Ù•É}±•…å}‘•Í­Ñ½Á}É•Í•…É¡}™¥¹‘¥¹}…¹‘¥‘…Ñ”¡…Í•l‰ÉÕ¹}¥‰t¤(€€€€€€€€€€€Í•±˜¹…ÍÍ•ÉÑÅÕ…°¡…Õ¡Ğ¹•á•ÁÑ¥½¸¹½‘”°€‰AA1%Q%=8µ%9%9µI=YIdµM!A´ÀÀÄˆ¤(€€€€€€€™¥¹…±±äè(€€€€€€€€€€€™……‘”¹±½Í” ¤(
+            finding = next(obj for obj in state.effective_objects() if obj.get("kind") == "finding")
+            self.assertEqual(finding["adoption_state"], "approved")
+            public = facade.submit_action({
+                "action_type": "research.status",
+                "payload": {"kinds": ["finding"]},
+                "actor_id": "HUMAN-FCR3",
+            })
+            public_finding = next(
+                obj for obj in public["data"]["objects"] if obj.get("kind") == "finding"
+            )
+            self.assertEqual(public_finding["adoption_state"], "approved")
+        finally:
+            facade.close()
+
+    def test_fcr4_stale_candidate_is_rejected_and_ablation_shows_guard_is_necessary(self):
+        facade, case = self._prepare_case()
+        try:
+            self._legacyize(facade, case["proposal"])
+            self._advance_head(facade)
+            with self.assertRaises(LocalApplicationError) as caught:
+                facade.recover_legacy_desktop_research_finding_candidate(case["run_id"])
+            self.assertEqual(caught.exception.code, "APPLICATION-FINDING-RECOVERY-STALE-001")
+
+            # Ablation: disabling only the exact-current-Snapshot eligibility guard
+            # lets the same stale historical proposal enter recovery. Restoring the
+            # guard above is therefore necessary, not decorative.
+            with patch("plugins.local_application.finding_recovery_facade._require_exact_current_snapshot"):
+                ablated = facade.recover_legacy_desktop_research_finding_candidate(case["run_id"])
+            self.assertEqual(ablated["status"], "RECOVERED")
+        finally:
+            facade.close()
+
+    def test_fcr4_mismatched_candidate_provenance_fails_closed(self):
+        facade, case = self._prepare_case()
+        try:
+            legacy = self._legacyize(facade, case["proposal"])
+            tampered = deepcopy(legacy)
+            tampered["provenance"]["implementation_version"] = "tampered-version"
+            tampered.pop("proposal_digest", None)
+            tampered["proposal_digest"] = canonical_digest(tampered)
+            facade._application.conversation_store._db.execute(
+                "UPDATE state_delta_proposals SET payload_json=? WHERE proposal_id=?",
+                (facade._application.conversation_store._json(tampered), tampered["proposal_id"]),
+            )
+            with self.assertRaises(LocalApplicationError) as caught:
+                facade.recover_legacy_desktop_research_finding_candidate(case["run_id"])
+            self.assertEqual(
+                caught.exception.code, "APPLICATION-FINDING-RECOVERY-PROVENANCE-001"
+            )
+        finally:
+            facade.close()
+
+    def test_fcr4_corrupt_handoff_fails_closed(self):
+        facade, case = self._prepare_case()
+        try:
+            self._legacyize(facade, case["proposal"])
+            run = facade._application.execution_store.load_run(case["run_id"])
+            db = facade._application.execution_store._connection
+            row = db.execute(
+                "SELECT payload_json FROM execution_documents "
+                "WHERE document_type='handoff' AND identity=?",
+                (run.handoff_ref,),
+            ).fetchone()
+            handoff = json.loads(str(row["payload_json"]))
+            handoff["project_id"] = "PRJ-TAMPERED"
+            db.execute(
+                "UPDATE execution_documents SET payload_json=? "
+                "WHERE document_type='handoff' AND identity=?",
+                (json.dumps(handoff, sort_keys=True, separators=(",", ":")), run.handoff_ref),
+            )
+            with self.assertRaises(LocalApplicationError) as caught:
+                facade.recover_legacy_desktop_research_finding_candidate(case["run_id"])
+            self.assertEqual(
+                caught.exception.code, "APPLICATION-FINDING-RECOVERY-INTEGRITY-001"
+            )
+        finally:
+            facade.close()
+
+    def test_fcr4_ambiguous_run_derived_candidates_use_canonical_result(self):
+        facade, case = self._prepare_case()
+        try:
+            legacy = self._legacyize(facade, case["proposal"])
+            duplicate = deepcopy(legacy)
+            duplicate["proposal_id"] = "SDP-LEGACY-DUPLICATE"
+            duplicate.pop("proposal_digest", None)
+            duplicate["proposal_digest"] = canonical_digest(duplicate)
+            store = facade._application.conversation_store
+            store.store_state_delta_proposal(duplicate["proposal_id"], duplicate)
+
+            recovered = facade.recover_legacy_desktop_research_finding_candidate(
+                case["run_id"]
+            )
+            self.assertEqual(recovered["route"], "canonical_result_rematerialization")
+            proposal = store.load_state_delta_proposal(
+                recovered["state_delta_proposal_id"]
+            )
+            provenance = proposal["provenance"]["historical_recovery"]
+            self.assertEqual(provenance["recovery_source"], "canonical_result")
+            self.assertEqual(
+                provenance["historical_candidate_lineage_status"], "ambiguous"
+            )
+            self.assertEqual(provenance["historical_candidate_count"], "multiple")
+            self.assertEqual(
+                store.load_state_delta_proposal(legacy["proposal_id"]), legacy
+            )
+            self.assertEqual(
+                store.load_state_delta_proposal(duplicate["proposal_id"]), duplicate
+            )
+        finally:
+            facade.close()
+
+    def test_fcr4_corrupt_unrecognized_and_missing_candidates_fail_closed(self):
+        facade, case = self._prepare_case()
+        try:
+            legacy = self._legacyize(facade, case["proposal"])
+            db = facade._application.conversation_store._db
+            broken = deepcopy(legacy)
+            broken["rationale"] = "tampered"
+            db.execute(
+                "UPDATE state_delta_proposals SET payload_json=? WHERE proposal_id=?",
+                (facade._application.conversation_store._json(broken), broken["proposal_id"]),
+            )
+            with self.assertRaises(LocalApplicationError) as caught:
+                facade.recover_legacy_desktop_research_finding_candidate(case["run_id"])
+            self.assertEqual(caught.exception.code, "APPLICATION-FINDING-RECOVERY-INTEGRITY-001")
+
+            db.execute("DELETE FROM state_delta_proposals WHERE proposal_id=?", (legacy["proposal_id"],))
+            rematerialized = facade.recover_legacy_desktop_research_finding_candidate(
+                case["run_id"]
+            )
+            self.assertEqual(
+                rematerialized["route"], "canonical_result_rematerialization"
+            )
+        finally:
+            facade.close()
+
+    def test_fcr5_recovered_finding_continues_through_argument_package_and_sec_g1_05(self):
+        facade, case = self._prepare_case()
+        try:
+            self._legacyize(facade, case["proposal"])
+            recovered = facade.recover_legacy_desktop_research_finding_candidate(case["run_id"])
+            pending = facade.submit_action({
+                "action_type": "state.apply_candidate",
+                "payload": {"state_delta_proposal_id": recovered["state_delta_proposal_id"]},
+                "actor_id": "HUMAN-FCR5",
+            })
+            confirmed = facade.submit_confirmation({
+                "confirmation_request_id": pending["confirmation_request"]["confirmation_request_id"],
+                "actor_id": "HUMAN-FCR5",
+            })
+            request = confirmed["decision_request"]
+            facade.resolve_human_decision({
+                "request_id": request["request_id"],
+                "request_digest": request["request_digest"],
+                "disposition": "approve_exact",
+                "actor_id": "HUMAN-FCR5",
+            })
+            state = facade._application.state_repository.load_state_view(
+                facade.project_id,
+                facade._application.state_repository.load_active_lineage_ref(facade.project_id),
+            )
+            finding = next(obj for obj in state.effective_objects() if obj.get("kind") == "finding")
+            evidence = next(obj for obj in state.effective_objects() if obj.get("kind") == "evidence")
+            source = next(obj for obj in state.effective_objects() if obj.get("kind") == "source")
+            proposed = facade.submit_action({
+                "action_type": "research.argument.propose",
+                "payload": {
+                    "conclusion": "The recovered Finding supports the bounded validation conclusion.",
+                    "warrant": "The approved Finding and Evidence resolve in the exact current Snapshot.",
+                    "question_ids": [case["rq_id"]],
+                    "finding_ids": [finding["id"]],
+                    "evidence_ids": [evidence["id"]],
+                    "qualifier": "Within the captured source scope.",
+                },
+                "actor_id": "HUMAN-FCR5",
+            })
+            arg_pending = facade.submit_action({
+                "action_type": "state.apply_candidate",
+                "payload": {"state_delta_proposal_id": proposed["data"]["state_delta_proposal_id"]},
+                "actor_id": "HUMAN-FCR5",
+            })
+            committed = facade.submit_confirmation({
+                "confirmation_request_id": arg_pending["confirmation_request"]["confirmation_request_id"],
+                "actor_id": "HUMAN-FCR5",
+            })
+            self.assertEqual(committed["status"], "SUCCEEDED")
+            argument_id = proposed["data"]["argument_candidate"]["id"]
+            current = facade._application.state_repository.load_state_view(
+                facade.project_id,
+                facade._application.state_repository.load_active_lineage_ref(facade.project_id),
+            )
+            built = facade.build_research_package({
+                **case["build_input"],
+                "snapshot_id": current.current_snapshot["id"],
+                "snapshot_digest": current.current_snapshot["content_digest"],
+                "lineage_ref": current.active_lineage_ref,
+                "object_ids": [source["id"], evidence["id"], finding["id"], argument_id],
+            })["package"]
+            composition = facade.capture_writer_composition(
+                built["package_id"],
+                issue134_writer.Issue134WriterCompositionRecoveryTests._proposal(
+                    case, argument_id, finding["id"], evidence["id"]
+                ),
+            )["composition"]
+            self.assertFalse(any(
+                item.get("section_id") == "SEC-G1-05"
+                and item.get("code") == "WRITER-COMPOSITION-NARRATIVE-UNMET"
+                for item in composition["validation"]["diagnostics"]
+            ))
+            facade.select_writer_composition(
+                composition["composition_id"], 1, composition["composition_digest"]
+            )
+            output = self.root / "fcr5-sec-g1-05"
+            facade.export_writer_section_input(
+                composition["composition_id"], "SEC-G1-05", output
+            )
+            detached = json.loads((output / "section-writer-input.json").read_text(encoding="utf-8"))
+            self.assertIn(argument_id, detached["resolved_object_ids"])
+            self.assertIn(finding["id"], detached["resolved_object_ids"])
+        finally:
+            facade.close()
+
+    def test_fcr6_current_approved_shape_is_not_rewritten(self):
+        facade, case = self._prepare_case()
+        try:
+            with self.assertRaises(LocalApplicationError) as caught:
+                facade.recover_legacy_desktop_research_finding_candidate(case["run_id"])
+            self.assertEqual(caught.exception.code, "APPLICATION-FINDING-RECOVERY-SHAPE-001")
+        finally:
+            facade.close()
