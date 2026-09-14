@@ -9,7 +9,10 @@ from core.conversation import ActionDefinition, ConversationRuntimeError, Harnes
 from core.execution import RunStatus
 from core.runtime import canonical_digest
 from core.runtime.ports import StaleHeadError
-from plugins.local_conversation_store import find_state_delta_proposals_by_provenance_run_id
+from plugins.local_conversation_store import (
+    find_state_delta_proposals_by_provenance_run_id,
+    persist_state_delta_proposal_idempotently,
+)
 from plugins.local_execution_store import canonical_handoff_for
 from plugins.sqlite_state_store.exhibit_guard import guard_research_state_head
 
@@ -125,8 +128,19 @@ def _validate_run_documents(execution_store, run) -> None:
             "APPLICATION-FINDING-RECOVERY-INTEGRITY-001",
             "persisted Run execution documents are incomplete",
         )
+    if not all(isinstance(item, Mapping) for item in (invocation, context, descriptor)):
+        raise LocalApplicationError(
+            "APPLICATION-FINDING-RECOVERY-INTEGRITY-001",
+            "persisted Run execution documents have an invalid shape",
+        )
+    pins = context.get("pins")
+    if not isinstance(pins, Mapping):
+        raise LocalApplicationError(
+            "APPLICATION-FINDING-RECOVERY-INTEGRITY-001",
+            "persisted context pack pins have an invalid shape",
+        )
     capability = invocation.get("capability")
-    snapshot = context.get("pins", {}).get("research_snapshot")
+    snapshot = pins.get("research_snapshot")
     if (
         invocation.get("run_id") != run.run_id
         or invocation.get("invocation_id") != run.invocation_id
@@ -312,12 +326,6 @@ def _recover_legacy_candidate(application, project_id: str, run_id: str) -> Mapp
     recovered.pop("proposal_digest", None)
     recovered["proposal_digest"] = _proposal_digest(recovered)
 
-    prior = store.load_state_delta_proposal(recovered["proposal_id"])
-    if prior is not None and prior != recovered:
-        raise LocalApplicationError(
-            "APPLICATION-FINDING-RECOVERY-INTEGRITY-001",
-            "recovery candidate identity collides with different persisted content",
-        )
     try:
         with guard_research_state_head(
             repository,
@@ -326,7 +334,9 @@ def _recover_legacy_candidate(application, project_id: str, run_id: str) -> Mapp
             snapshot_ref=snapshot_id,
             snapshot_digest=snapshot_digest,
         ):
-            store.store_state_delta_proposal(recovered["proposal_id"], recovered)
+            idempotent_reuse = persist_state_delta_proposal_idempotently(
+                store, recovered["proposal_id"], recovered
+            )
     except StaleHeadError as exc:
         raise LocalApplicationError(
             "APPLICATION-FINDING-RECOVERY-STALE-001",
@@ -349,7 +359,7 @@ def _recover_legacy_candidate(application, project_id: str, run_id: str) -> Mapp
         "lineage_ref": lineage_ref,
         "snapshot_id": snapshot_id,
         "snapshot_digest": snapshot_digest,
-        "idempotent_reuse": prior is not None,
+        "idempotent_reuse": idempotent_reuse,
         "research_state_mutation_performed": False,
     }
 
