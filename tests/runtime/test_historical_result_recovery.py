@@ -11,9 +11,17 @@ import test_issue134_writer_composition as issue134_writer
 
 
 class HistoricalResultRecoveryTests(ResearchPackageAcceptanceSupport):
+    @staticmethod
+    def _remove_producer_candidate(facade, case):
+        facade._application.conversation_store._db.execute(
+            "DELETE FROM state_delta_proposals WHERE proposal_id=?",
+            (case["proposal"]["proposal_id"],),
+        )
+
     def test_hgr1_hgr2_complete_result_rematerializes_candidate_only(self):
         facade, case = self._prepare_case()
         try:
+            self._remove_producer_candidate(facade, case)
             before = facade._application.state_repository.load_state_view(
                 facade.project_id,
                 facade._application.state_repository.load_active_lineage_ref(facade.project_id),
@@ -85,6 +93,7 @@ class HistoricalResultRecoveryTests(ResearchPackageAcceptanceSupport):
     def test_hgr4_unreadable_capture_requires_material_recovery(self):
         facade, case = self._prepare_case()
         try:
+            self._remove_producer_candidate(facade, case)
             with patch.object(
                 facade._application.execution_store,
                 "load_artifact_verified_once",
@@ -101,6 +110,7 @@ class HistoricalResultRecoveryTests(ResearchPackageAcceptanceSupport):
     def test_hgr5_ablation_result_binding_guard_blocks_mismatched_extension(self):
         facade, case = self._prepare_case()
         try:
+            self._remove_producer_candidate(facade, case)
             store = facade._application.execution_store
             extension = deepcopy(result_extensions_for_run(store, case["run_id"])[0])
             extension["handoff_binding"]["run_id"] = "RUN-WRONG"
@@ -125,6 +135,7 @@ class HistoricalResultRecoveryTests(ResearchPackageAcceptanceSupport):
     def test_hgr8_rematerialization_reaches_same_sec_g1_05(self):
         facade, case = self._prepare_case()
         try:
+            self._remove_producer_candidate(facade, case)
             recovered = facade.recover_legacy_desktop_research_finding_candidate(case["run_id"])
             pending = facade.submit_action({
                 "action_type": "state.apply_candidate",
@@ -208,3 +219,35 @@ class HistoricalResultRecoveryTests(ResearchPackageAcceptanceSupport):
             self.assertIn(finding["id"], detached["resolved_object_ids"])
         finally:
             facade.close()
+
+    def test_review_corrupt_result_extension_shape_fails_closed(self):
+        facade, case = self._prepare_case()
+        try:
+            self._remove_producer_candidate(facade, case)
+            with patch(
+                "plugins.local_application.historical_result_recovery_facade.result_extensions_for_run",
+                return_value=("corrupt-extension",),
+            ):
+                diagnosis = facade.show_run(case["run_id"])["finding_recovery"]
+            self.assertEqual(diagnosis["recovery_class"], "not_recoverable")
+            self.assertEqual(
+                diagnosis["recovery_failure_class"], "canonical_result_incomplete"
+            )
+        finally:
+            facade.close()
+
+    def test_review_corrupt_replay_action_shape_fails_closed(self):
+        helper = attempt_lifecycle.ExternalDesktopResearchAttemptLifecycleTests(methodName="runTest")
+        app, facade, run_id = helper._completed_historical_run_with_open_attempt(
+            self.root / "review-corrupt-replay-action"
+        )
+        try:
+            with patch.object(
+                facade._application.conversation_store,
+                "load_proposal",
+                return_value={"action": None},
+            ):
+                diagnosis = facade.show_run(run_id)["finding_recovery"]
+            self.assertEqual(diagnosis["recovery_class"], "not_recoverable")
+        finally:
+            app.close()

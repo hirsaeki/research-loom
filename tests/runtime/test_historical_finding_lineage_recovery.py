@@ -162,6 +162,10 @@ class HistoricalFindingLineageRecoveryTests(ResearchPackageAcceptanceSupport):
             self.assertEqual(diagnosis["status"], "NOT_RECOVERABLE")
             self.assertEqual(diagnosis["stage"], "producer_candidate_lookup")
             self.assertEqual(diagnosis["failure_class"], "producer_candidate_not_found")
+            self.assertEqual(diagnosis["recovery_class"], "proposal_rematerializable")
+            self.assertEqual(
+                diagnosis["recovery_route"], "canonical_result_rematerialization"
+            )
             after = facade._application.state_repository.load_state_view(
                 facade.project_id,
                 facade._application.state_repository.load_active_lineage_ref(facade.project_id),

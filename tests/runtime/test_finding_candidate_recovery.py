@@ -265,9 +265,12 @@ class FindingCandidateRecoveryTests(ResearchPackageAcceptanceSupport):
             self.assertEqual(caught.exception.code, "APPLICATION-FINDING-RECOVERY-INTEGRITY-001")
 
             db.execute("DELETE FROM state_delta_proposals WHERE proposal_id=?", (legacy["proposal_id"],))
-            with self.assertRaises(LocalApplicationError) as missing:
-                facade.recover_legacy_desktop_research_finding_candidate(case["run_id"])
-            self.assertEqual(missing.exception.code, "APPLICATION-FINDING-RECOVERY-CANDIDATE-001")
+            rematerialized = facade.recover_legacy_desktop_research_finding_candidate(
+                case["run_id"]
+            )
+            self.assertEqual(
+                rematerialized["route"], "canonical_result_rematerialization"
+            )
         finally:
             facade.close()
 

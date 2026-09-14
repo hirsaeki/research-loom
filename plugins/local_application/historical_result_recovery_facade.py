@@ -68,6 +68,13 @@ def _canonical_result(application, project_id: str, run_id: str):
             stage="canonical_result",
             failure_class="canonical_result_incomplete",
         )
+    if not isinstance(extensions[0], Mapping):
+        raise RecoveryFailure(
+            "APPLICATION-HISTORICAL-RECOVERY-RESULT-001",
+            "canonical historical Desktop Research result has an invalid document shape",
+            stage="canonical_result",
+            failure_class="canonical_result_incomplete",
+        )
     extension = deepcopy(dict(extensions[0]))
     try:
         for detail in extension.get("source_capture_details", ()):
@@ -133,9 +140,10 @@ def _replay_eligible(application, run_id: str) -> bool:
         )
     except Exception:
         return False
+    action = proposal.get("action") if isinstance(proposal, Mapping) else None
     return (
-        isinstance(proposal, Mapping)
-        and proposal.get("action", {}).get("action_type") == "desktop_research.investigate"
+        isinstance(action, Mapping)
+        and action.get("action_type") == "desktop_research.investigate"
     )
 
 
@@ -170,11 +178,11 @@ def _classification(application, project_id: str, run_id: str) -> Mapping[str, A
             "research_state_mutation_performed": False,
         }
     except RecoveryFailure as exc:
-        if exc.failure_class not in {
-            "producer_candidate_not_found",
-            "candidate_shape_not_recoverable",
-            "multiple_producer_candidates",
-        }:
+        # #148 may rematerialize only when the historical proposal is genuinely
+        # absent.  If #142/#147 found an existing-but-invalid/ambiguous producer
+        # candidate or replay relation, preserve that established fail-closed
+        # diagnosis rather than bypassing it with canonical-result recovery.
+        if exc.failure_class != "producer_candidate_not_found":
             return _failure_classification(run_id, "not_recoverable", exc)
 
     try:
@@ -287,12 +295,20 @@ def _rematerialize(application, project_id: str, run_id: str) -> Mapping[str, An
 
 
 def _recover(application, project_id: str, run_id: str) -> Mapping[str, Any]:
+    # Preserve #142/#147 direct recovery behavior whenever a persisted producer
+    # candidate/replay relation exists.  Canonical-result rematerialization is a
+    # fallback only for the historical "proposal missing" case introduced by
+    # #148, never an escape hatch around an invalid existing candidate.
+    try:
+        return _base._recover(application, project_id, run_id)
+    except RecoveryFailure as exc:
+        if exc.failure_class != "producer_candidate_not_found":
+            raise
+
     classification = _classification(application, project_id, run_id)
     route = classification.get("route")
     if route == "canonical_result_rematerialization":
         return _rematerialize(application, project_id, run_id)
-    if route == "persisted_candidate_recovery":
-        return _base._recover(application, project_id, run_id)
     raise RecoveryFailure(
         str(classification.get("code") or "APPLICATION-HISTORICAL-RECOVERY-001"),
         str(classification.get("message") or "historical Desktop Research result is not recoverable"),
