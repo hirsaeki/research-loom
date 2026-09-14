@@ -229,7 +229,18 @@ class HistoricalMaterialRecoveryService:
             result = self._store.restore_missing_artifact_from_file(
                 artifact.artifact_id, source_path
             )
-            if result.get("status") == "RESTORED":
+        except LocalApplicationError:
+            raise
+        except Exception as exc:
+            raise LocalApplicationError(
+                "APPLICATION-MATERIAL-RECOVERY-001",
+                "historical external material could not be restored from identical bytes",
+            ) from exc
+
+        diagnostic_recorded = False
+        diagnostic_warning = None
+        if result.get("status") == "RESTORED":
+            try:
                 self._store.store_diagnostic(
                     run_id,
                     "historical_material_recovery",
@@ -244,14 +255,15 @@ class HistoricalMaterialRecoveryService:
                         "verified_size": artifact.size,
                     },
                 )
-        except LocalApplicationError:
-            raise
-        except Exception as exc:
-            raise LocalApplicationError(
-                "APPLICATION-MATERIAL-RECOVERY-001",
-                "historical external material could not be restored from identical bytes",
-            ) from exc
-        return {
+            except Exception:
+                diagnostic_warning = {
+                    "code": "APPLICATION-MATERIAL-RECOVERY-DIAGNOSTIC-001",
+                    "message": "material bytes were restored and verified but the recovery diagnostic could not be persisted",
+                }
+            else:
+                diagnostic_recorded = True
+
+        response = {
             "status": result["status"],
             "project_id": self._project_id,
             "run_id": run.run_id,
@@ -263,4 +275,8 @@ class HistoricalMaterialRecoveryService:
             "verification_status": "verified",
             "historical_metadata_rewritten": False,
             "research_state_mutation_performed": False,
+            "diagnostic_recorded": diagnostic_recorded,
         }
+        if diagnostic_warning is not None:
+            response["diagnostic_warning"] = diagnostic_warning
+        return response
