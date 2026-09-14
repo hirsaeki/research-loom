@@ -5,6 +5,7 @@ import json
 from unittest.mock import patch
 
 from plugins.local_execution_store import result_extensions_for_run
+from plugins.local_application.finding_recovery_lineage import RecoveryFailure
 from research_package_acceptance_support import ResearchPackageAcceptanceSupport
 import test_external_desktop_research_attempt_lifecycle as attempt_lifecycle
 import test_issue134_writer_composition as issue134_writer
@@ -251,3 +252,78 @@ class HistoricalResultRecoveryTests(ResearchPackageAcceptanceSupport):
             self.assertEqual(diagnosis["recovery_class"], "not_recoverable")
         finally:
             app.close()
+
+    def test_review_corrupt_capture_detail_shape_is_not_material_recovery(self):
+        facade, case = self._prepare_case()
+        try:
+            self._remove_producer_candidate(facade, case)
+            extension = deepcopy(
+                result_extensions_for_run(
+                    facade._application.execution_store, case["run_id"]
+                )[0]
+            )
+            extension["source_capture_details"] = None
+            with patch(
+                "plugins.local_application.historical_result_recovery_facade.result_extensions_for_run",
+                return_value=(extension,),
+            ):
+                diagnosis = facade.show_run(case["run_id"])["finding_recovery"]
+            self.assertEqual(diagnosis["recovery_class"], "not_recoverable")
+            self.assertEqual(
+                diagnosis["recovery_failure_class"], "canonical_result_incomplete"
+            )
+        finally:
+            facade.close()
+
+    def test_review_corrupt_replay_payload_shape_fails_closed(self):
+        helper = attempt_lifecycle.ExternalDesktopResearchAttemptLifecycleTests(methodName="runTest")
+        app, facade, run_id = helper._completed_historical_run_with_open_attempt(
+            self.root / "review-corrupt-replay-payload"
+        )
+        try:
+            with patch.object(
+                facade._application.conversation_store,
+                "load_proposal",
+                return_value={
+                    "action": {
+                        "action_type": "desktop_research.investigate",
+                        "payload": None,
+                    }
+                },
+            ):
+                diagnosis = facade.show_run(run_id)["finding_recovery"]
+            self.assertEqual(diagnosis["recovery_class"], "not_recoverable")
+        finally:
+            app.close()
+
+    def test_review_concurrent_rematerialization_reuses_new_persisted_candidate(self):
+        facade, case = self._prepare_case()
+        try:
+            missing = RecoveryFailure(
+                "APPLICATION-FINDING-RECOVERY-CANDIDATE-001",
+                "no persisted producer candidate",
+                stage="producer_candidate_lookup",
+                failure_class="producer_candidate_not_found",
+            )
+            recovered = {
+                "status": "RECOVERED",
+                "state_delta_proposal_id": "SDP-CONCURRENT",
+                "research_state_mutation_performed": False,
+            }
+            with patch(
+                "plugins.local_application.historical_result_recovery_facade._base._recover",
+                side_effect=[missing, recovered],
+            ) as base_recover, patch(
+                "plugins.local_application.historical_result_recovery_facade._classification",
+                return_value={
+                    "recovery_class": "proposal_rematerializable",
+                    "route": "persisted_candidate_recovery",
+                },
+            ):
+                result = facade.recover_legacy_desktop_research_finding_candidate(
+                    case["run_id"]
+                )
+            self.assertEqual(result, recovered)
+            self.assertEqual(base_recover.call_count, 2)
+        finally:
+            facade.close()

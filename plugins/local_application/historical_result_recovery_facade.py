@@ -76,8 +76,25 @@ def _canonical_result(application, project_id: str, run_id: str):
             failure_class="canonical_result_incomplete",
         )
     extension = deepcopy(dict(extensions[0]))
+    details = extension.get("source_capture_details")
+    if not isinstance(details, list) or any(
+        not isinstance(detail, Mapping)
+        or not all(
+            isinstance(detail.get(key), Mapping)
+            and isinstance(detail[key].get("content_reference"), str)
+            and bool(detail[key]["content_reference"])
+            for key in ("original_capture", "text_rendition")
+        )
+        for detail in details
+    ):
+        raise RecoveryFailure(
+            "APPLICATION-HISTORICAL-RECOVERY-RESULT-001",
+            "canonical historical Desktop Research result has an invalid document shape",
+            stage="canonical_result",
+            failure_class="canonical_result_incomplete",
+        )
     try:
-        for detail in extension.get("source_capture_details", ()):
+        for detail in details:
             for key in ("original_capture", "text_rendition"):
                 application.execution_store.load_artifact_verified_once(
                     str(detail[key]["content_reference"])
@@ -141,9 +158,11 @@ def _replay_eligible(application, run_id: str) -> bool:
     except Exception:
         return False
     action = proposal.get("action") if isinstance(proposal, Mapping) else None
+    payload = action.get("payload") if isinstance(action, Mapping) else None
     return (
         isinstance(action, Mapping)
         and action.get("action_type") == "desktop_research.investigate"
+        and isinstance(payload, Mapping)
     )
 
 
@@ -309,6 +328,8 @@ def _recover(application, project_id: str, run_id: str) -> Mapping[str, Any]:
     route = classification.get("route")
     if route == "canonical_result_rematerialization":
         return _rematerialize(application, project_id, run_id)
+    if route == "persisted_candidate_recovery":
+        return _base._recover(application, project_id, run_id)
     raise RecoveryFailure(
         str(classification.get("code") or "APPLICATION-HISTORICAL-RECOVERY-001"),
         str(classification.get("message") or "historical Desktop Research result is not recoverable"),
