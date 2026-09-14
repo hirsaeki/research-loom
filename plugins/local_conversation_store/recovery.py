@@ -16,12 +16,6 @@ def find_state_delta_proposals_by_provenance_run_id(
     if not isinstance(run_id, str) or not run_id or limit <= 0:
         raise ValueError("run_id and positive limit are required")
     with store._lock:
-        store._db.execute(
-            "CREATE INDEX IF NOT EXISTS state_delta_proposals_provenance_run_id "
-            "ON state_delta_proposals("
-            "json_extract(payload_json, '$.provenance.run_id')"
-            ") WHERE json_valid(payload_json)"
-        )
         rows = store._db.execute(
             "SELECT payload_json FROM state_delta_proposals "
             "WHERE json_valid(payload_json) "

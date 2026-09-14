@@ -81,20 +81,61 @@ class FindingCandidateRecoveryReviewFixTests(ResearchPackageAcceptanceSupport):
             first.close()
             second.close()
 
+    def test_recovery_identity_collision_is_reported_as_integrity_error(self):
+        facade, case = self._prepare_case()
+        try:
+            self._legacyize(facade, case["proposal"])
+            recovered = facade.recover_legacy_desktop_research_finding_candidate(
+                case["run_id"]
+            )
+            store = facade._application.conversation_store
+            store._db.execute(
+                "UPDATE state_delta_proposals SET payload_json=? WHERE proposal_id=?",
+                (
+                    store._json(
+                        {
+                            "proposal_id": recovered["state_delta_proposal_id"],
+                            "tampered": True,
+                        }
+                    ),
+                    recovered["state_delta_proposal_id"],
+                ),
+            )
+            with self.assertRaises(LocalApplicationError) as caught:
+                facade.recover_legacy_desktop_research_finding_candidate(case["run_id"])
+            self.assertEqual(
+                caught.exception.code, "APPLICATION-FINDING-RECOVERY-INTEGRITY-001"
+            )
+        finally:
+            facade.close()
+
     def test_run_lookup_uses_provenance_index_and_remains_bounded(self):
         path = self.root / "recovery-index.sqlite3"
         store = LocalConversationStore(path)
         try:
+            index = store._db.execute(
+                "SELECT name FROM sqlite_master WHERE type='index' AND name=?",
+                ("state_delta_proposals_provenance_run_id",),
+            ).fetchone()
+            self.assertIsNotNone(index)
             for idx in range(5):
                 payload = {
                     "proposal_id": f"SDP-{idx}",
                     "provenance": {"run_id": "RUN-TARGET" if idx < 2 else f"RUN-{idx}"},
                 }
                 store.store_state_delta_proposal(payload["proposal_id"], payload)
-            matches = find_state_delta_proposals_by_provenance_run_id(
-                store, "RUN-TARGET", limit=3
-            )
+            statements = []
+            store._db.set_trace_callback(statements.append)
+            try:
+                matches = find_state_delta_proposals_by_provenance_run_id(
+                    store, "RUN-TARGET", limit=3
+                )
+            finally:
+                store._db.set_trace_callback(None)
             self.assertEqual(len(matches), 2)
+            self.assertFalse(
+                any(statement.lstrip().upper().startswith("CREATE INDEX") for statement in statements)
+            )
             plan = store._db.execute(
                 "EXPLAIN QUERY PLAN SELECT payload_json FROM state_delta_proposals "
                 "WHERE json_valid(payload_json) "

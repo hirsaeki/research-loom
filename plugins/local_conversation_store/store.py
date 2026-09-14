@@ -152,6 +152,12 @@ class LocalConversationStore:
                 "CREATE INDEX IF NOT EXISTS confirmation_requests_project_pending "
                 "ON confirmation_requests(project_id,status,request_id)"
             )
+            self._db.execute(
+                "CREATE INDEX IF NOT EXISTS state_delta_proposals_provenance_run_id "
+                "ON state_delta_proposals("
+                "json_extract(payload_json, '$.provenance.run_id')"
+                ") WHERE json_valid(payload_json)"
+            )
         except LocalConversationStoreError:
             if self._db is not None:
                 self._db.close()
