@@ -109,19 +109,19 @@ class FindingCandidateRecoveryReviewFixTests(ResearchPackageAcceptanceSupport):
         finally:
             facade.close()
 
-    def test_run_lookup_uses_provenance_index_and_remains_bounded(self):
-        path = self.root / "recovery-index.sqlite3"
+    def test_run_lookup_remains_bounded_without_recovery_index_or_ddl(self):
+        path = self.root / "recovery-lookup.sqlite3"
         store = LocalConversationStore(path)
         try:
             index = store._db.execute(
                 "SELECT name FROM sqlite_master WHERE type='index' AND name=?",
                 ("state_delta_proposals_provenance_run_id",),
             ).fetchone()
-            self.assertIsNotNone(index)
+            self.assertIsNone(index)
             for idx in range(5):
                 payload = {
                     "proposal_id": f"SDP-{idx}",
-                    "provenance": {"run_id": "RUN-TARGET" if idx < 2 else f"RUN-{idx}"},
+                    "provenance": {"run_id": "RUN-TARGET" if idx < 4 else "RUN-OTHER"},
                 }
                 store.store_state_delta_proposal(payload["proposal_id"], payload)
             statements = []
@@ -132,22 +132,20 @@ class FindingCandidateRecoveryReviewFixTests(ResearchPackageAcceptanceSupport):
                 )
             finally:
                 store._db.set_trace_callback(None)
-            self.assertEqual(len(matches), 2)
-            self.assertFalse(
-                any(statement.lstrip().upper().startswith("CREATE INDEX") for statement in statements)
-            )
-            plan = store._db.execute(
-                "EXPLAIN QUERY PLAN SELECT payload_json FROM state_delta_proposals "
-                "WHERE json_valid(payload_json) "
-                "AND json_extract(payload_json, '$.provenance.run_id')=? "
-                "ORDER BY proposal_id LIMIT ?",
-                ("RUN-TARGET", 3),
-            ).fetchall()
+            self.assertEqual(len(matches), 3)
             self.assertTrue(
+                all(item["provenance"]["run_id"] == "RUN-TARGET" for item in matches)
+            )
+            self.assertFalse(
                 any(
-                    "state_delta_proposals_provenance_run_id" in str(row["detail"])
-                    for row in plan
+                    statement.lstrip().upper().startswith("CREATE INDEX")
+                    for statement in statements
                 )
             )
+            index_after_lookup = store._db.execute(
+                "SELECT name FROM sqlite_master WHERE type='index' AND name=?",
+                ("state_delta_proposals_provenance_run_id",),
+            ).fetchone()
+            self.assertIsNone(index_after_lookup)
         finally:
             store.close()
