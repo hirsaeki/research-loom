@@ -97,19 +97,42 @@ def _canonical_result(application, project_id: str, run_id: str):
             stage="canonical_result",
             failure_class="canonical_result_incomplete",
         )
-    try:
-        for detail in details:
-            for key in ("original_capture", "text_rendition"):
-                application.execution_store.load_artifact_verified_once(
-                    str(detail[key]["content_reference"])
-                )
-    except Exception as exc:
-        raise RecoveryFailure(
-            "APPLICATION-HISTORICAL-RECOVERY-MATERIAL-001",
-            "required historical captured material cannot be verified through the public material boundary",
-            stage="material_verification",
-            failure_class="material_recovery_required",
-        ) from exc
+    for detail in details:
+        capture_id = str(detail.get("capture_id") or "")
+        for key in ("original_capture", "text_rendition"):
+            artifact_id = str(detail[key]["content_reference"])
+            try:
+                application.execution_store.load_artifact_verified_once(artifact_id)
+            except Exception as exc:
+                try:
+                    diagnosis = application.execution_store.diagnose_artifact_content(artifact_id)
+                except Exception:
+                    diagnosis = {
+                        "artifact_id": artifact_id,
+                        "status": "diagnosis_unavailable",
+                        "expected_digest": detail[key].get("content_digest"),
+                        "expected_size": detail[key].get("byte_length"),
+                        "actual_digest": None,
+                        "actual_size": None,
+                    }
+                raise RecoveryFailure(
+                    "APPLICATION-HISTORICAL-RECOVERY-MATERIAL-001",
+                    "required historical captured material cannot be verified through the public material boundary",
+                    stage="material_verification",
+                    failure_class="material_recovery_required",
+                    details={
+                        "capture_id": capture_id or None,
+                        "artifact_kind": (
+                            "original" if key == "original_capture" else "rendition"
+                        ),
+                        "artifact_id": artifact_id,
+                        "verification_status": diagnosis.get("status"),
+                        "expected_digest": diagnosis.get("expected_digest"),
+                        "expected_size": diagnosis.get("expected_size"),
+                        "actual_digest": diagnosis.get("actual_digest"),
+                        "actual_size": diagnosis.get("actual_size"),
+                    },
+                ) from exc
 
     normalizer = DesktopResearchNormalizer(
         application.execution_store,
@@ -244,7 +267,7 @@ def _classification(application, project_id: str, run_id: str) -> Mapping[str, A
 def _failure_classification(
     run_id: str, recovery_class: str, exc: RecoveryFailure
 ) -> Mapping[str, Any]:
-    return {
+    result = {
         "recovery_class": recovery_class,
         "stage": exc.stage,
         "failure_class": exc.failure_class,
@@ -253,6 +276,9 @@ def _failure_classification(
         "requested_run_id": run_id,
         "research_state_mutation_performed": False,
     }
+    if exc.details:
+        result["failure_details"] = deepcopy(exc.details)
+    return result
 
 
 def _rematerialize(
@@ -430,6 +456,10 @@ class LocalApplicationFacade(_base.LocalApplicationFacade):
             enriched["recovery_failure_class"] = classification.get("failure_class")
             enriched["recovery_code"] = classification.get("code")
             enriched["recovery_message"] = classification.get("message")
+            if "failure_details" in classification:
+                enriched["recovery_failure_details"] = deepcopy(
+                    classification["failure_details"]
+                )
         result["finding_recovery"] = enriched
         return result
 
