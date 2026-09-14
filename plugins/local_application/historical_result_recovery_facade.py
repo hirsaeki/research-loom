@@ -222,7 +222,7 @@ def _classification(application, project_id: str, run_id: str) -> Mapping[str, A
             "normalized_proposal_digest": proposal["proposal_digest"],
             "research_state_mutation_performed": False,
         }
-        if historical_lineage_status is not None:
+        if historical_lineage_status is Not None:
             result["historical_candidate_lineage_status"] = historical_lineage_status
             result["historical_candidate_count"] = historical_candidate_count
         return result
@@ -336,9 +336,28 @@ def _rematerialize(
 
 
 def _recover(application, project_id: str, run_id: str) -> Mapping[str, Any]:
+    # Keep the exact persisted-candidate path first. Only absence/ambiguity in
+    # legacy proposal discovery may fall through to independently verified
+    # canonical-result recovery; candidate corruption and binding failures stay
+    # fail-closed on the existing path.
+    try:
+        return _base._recover(application, project_id, run_id)
+    except RecoveryFailure as exc:
+        if exc.failure_class not in _CANONICAL_FALLBACK_FAILURES:
+            raise
+    except LocalApplicationError as exc:
+        # #142 reports exact-run candidate cardinality through the public
+        # LocalApplicationError contract. Reclassify only that lookup failure;
+        # _classification will distinguish ambiguity/missing from unreadable or
+        # otherwise corrupt lineage before allowing canonical fallback.
+        if exc.code != "APPLICATION-FINDING-RECOVERY-CANDIDATE-001":
+            raise
+
     classification = _classification(application, project_id, run_id)
     route = classification.get("route")
     if route == "persisted_candidate_recovery":
+        # A concurrent writer may have materialized the candidate after the
+        # first lookup. Reuse the existing persisted-candidate path.
         return _base._recover(application, project_id, run_id)
     if route == "canonical_result_rematerialization":
         return _rematerialize(
