@@ -7,7 +7,7 @@ from .context_extensions import LocalCapabilityContextExtensionStore
 from .inspection import artifact_metadata_for, diagnostics_for
 from .intake import bind_controlled_import_root, read_controlled_file
 from .material_inventory import external_capture_artifact_metadata_for_project
-from .status import pending_runs_for_project, recent_runs_for_project
+from .status import child_runs_for_parent, pending_runs_for_project, recent_runs_for_project
 from .store import (
     LocalExecutionStoreConfig,
     LocalExecutionStoreError,
@@ -38,6 +38,7 @@ __all__ = [
     "artifact_metadata_for",
     "bind_controlled_import_root",
     "canonical_handoff_for",
+    "child_runs_for_parent",
     "diagnostics_for",
     "external_capture_artifact_metadata_for_project",
     "pending_runs_for_project",

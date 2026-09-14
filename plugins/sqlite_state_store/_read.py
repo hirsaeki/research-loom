@@ -39,6 +39,52 @@ class ReadMixin:
         return str(row["active_lineage_ref"])
 
     @repository_read
+    def load_current_snapshot_binding(
+        self: "SQLiteResearchStateRepository",
+        project_ref: str,
+    ) -> tuple[str, str, str]:
+        row = self._connection.execute(
+            """
+            SELECT active.active_lineage_ref,
+                   lineage.head_snapshot_ref,
+                   lineage.head_snapshot_digest,
+                   snapshot.content_digest AS snapshot_content_digest,
+                   object_revision.content_digest AS object_content_digest
+            FROM project_active_lineage AS active
+            JOIN lineages AS lineage
+              ON lineage.lineage_id = active.active_lineage_ref
+             AND lineage.project_ref = active.project_ref
+            JOIN snapshots AS snapshot
+              ON snapshot.snapshot_ref = lineage.head_snapshot_ref
+             AND snapshot.project_ref = active.project_ref
+            JOIN object_revisions AS object_revision
+              ON object_revision.kind = 'snapshot'
+             AND object_revision.object_id = snapshot.snapshot_ref
+             AND object_revision.revision = snapshot.revision
+             AND object_revision.project_ref = active.project_ref
+            WHERE active.project_ref = ?
+            """,
+            (project_ref,),
+        ).fetchone()
+        if row is None:
+            raise RepositoryError(
+                f"project {project_ref!r} has no resolvable active Snapshot binding"
+            )
+        digest = str(row["head_snapshot_digest"])
+        if (
+            str(row["snapshot_content_digest"]) != digest
+            or str(row["object_content_digest"]) != digest
+        ):
+            raise RepositoryError(
+                "lineage HEAD digest does not match stored Snapshot metadata"
+            )
+        return (
+            str(row["active_lineage_ref"]),
+            str(row["head_snapshot_ref"]),
+            digest,
+        )
+
+    @repository_read
     def load_state_view(
         self: "SQLiteResearchStateRepository",
         project_ref: str,
