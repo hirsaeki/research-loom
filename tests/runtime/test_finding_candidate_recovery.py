@@ -232,7 +232,7 @@ class FindingCandidateRecoveryTests(ResearchPackageAcceptanceSupport):
         finally:
             facade.close()
 
-    def test_fcr4_ambiguous_run_derived_candidates_fail_closed(self):
+    def test_fcr4_ambiguous_run_derived_candidates_use_canonical_result(self):
         facade, case = self._prepare_case()
         try:
             legacy = self._legacyize(facade, case["proposal"])
@@ -240,12 +240,28 @@ class FindingCandidateRecoveryTests(ResearchPackageAcceptanceSupport):
             duplicate["proposal_id"] = "SDP-LEGACY-DUPLICATE"
             duplicate.pop("proposal_digest", None)
             duplicate["proposal_digest"] = canonical_digest(duplicate)
-            facade._application.conversation_store.store_state_delta_proposal(
-                duplicate["proposal_id"], duplicate
+            store = facade._application.conversation_store
+            store.store_state_delta_proposal(duplicate["proposal_id"], duplicate)
+
+            recovered = facade.recover_legacy_desktop_research_finding_candidate(
+                case["run_id"]
             )
-            with self.assertRaises(LocalApplicationError) as caught:
-                facade.recover_legacy_desktop_research_finding_candidate(case["run_id"])
-            self.assertEqual(caught.exception.code, "APPLICATION-FINDING-RECOVERY-CANDIDATE-001")
+            self.assertEqual(recovered["route"], "canonical_result_rematerialization")
+            proposal = store.load_state_delta_proposal(
+                recovered["state_delta_proposal_id"]
+            )
+            provenance = proposal["provenance"]["historical_recovery"]
+            self.assertEqual(provenance["recovery_source"], "canonical_result")
+            self.assertEqual(
+                provenance["historical_candidate_lineage_status"], "ambiguous"
+            )
+            self.assertEqual(provenance["historical_candidate_count"], "multiple")
+            self.assertEqual(
+                store.load_state_delta_proposal(legacy["proposal_id"]), legacy
+            )
+            self.assertEqual(
+                store.load_state_delta_proposal(duplicate["proposal_id"]), duplicate
+            )
         finally:
             facade.close()
 

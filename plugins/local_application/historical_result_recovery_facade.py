@@ -15,11 +15,15 @@ from plugins.sqlite_state_store.exhibit_guard import guard_research_state_head
 
 from . import finding_recovery_facade as _recovery_base
 from . import historical_finding_recovery_facade as _base
-from .facade import _jsonable
+from .facade import LocalApplicationError, _jsonable
 from .finding_recovery_lineage import RecoveryFailure
 
 
 _REMATERIALIZATION_VERSION = "historical-desktop-result-rematerialization@0.1.0"
+_CANONICAL_FALLBACK_FAILURES = {
+    "producer_candidate_not_found": ("missing", 0),
+    "multiple_producer_candidates": ("ambiguous", "multiple"),
+}
 
 
 def _recovery_proposal_id(run_id: str, source_digest: str) -> str:
@@ -182,6 +186,8 @@ def _classification(application, project_id: str, run_id: str) -> Mapping[str, A
     except RecoveryFailure as exc:
         return _failure_classification(run_id, "not_recoverable", exc)
 
+    historical_lineage_status = None
+    historical_candidate_count = None
     try:
         requested, producer, historical, relation = _base._resolve_candidate(
             application, project_id, run_id
@@ -197,18 +203,16 @@ def _classification(application, project_id: str, run_id: str) -> Mapping[str, A
             "research_state_mutation_performed": False,
         }
     except RecoveryFailure as exc:
-        # #148 may rematerialize only when the historical proposal is genuinely
-        # absent.  If #142/#147 found an existing-but-invalid/ambiguous producer
-        # candidate or replay relation, preserve that established fail-closed
-        # diagnosis rather than bypassing it with canonical-result recovery.
-        if exc.failure_class != "producer_candidate_not_found":
+        fallback = _CANONICAL_FALLBACK_FAILURES.get(exc.failure_class)
+        if fallback is None:
             return _failure_classification(run_id, "not_recoverable", exc)
+        historical_lineage_status, historical_candidate_count = fallback
 
     try:
         run, handoff, extension, proposal, _context = _canonical_result(
             application, project_id, run_id
         )
-        return {
+        result = {
             "recovery_class": "proposal_rematerializable",
             "route": "canonical_result_rematerialization",
             "requested_run_id": run.run_id,
@@ -218,6 +222,10 @@ def _classification(application, project_id: str, run_id: str) -> Mapping[str, A
             "normalized_proposal_digest": proposal["proposal_digest"],
             "research_state_mutation_performed": False,
         }
+        if historical_lineage_status is not None:
+            result["historical_candidate_lineage_status"] = historical_lineage_status
+            result["historical_candidate_count"] = historical_candidate_count
+        return result
     except RecoveryFailure as exc:
         if exc.failure_class == "material_recovery_required":
             return _failure_classification(run_id, "material_recovery_required", exc)
@@ -247,7 +255,14 @@ def _failure_classification(
     }
 
 
-def _rematerialize(application, project_id: str, run_id: str) -> Mapping[str, Any]:
+def _rematerialize(
+    application,
+    project_id: str,
+    run_id: str,
+    *,
+    historical_candidate_lineage_status: str | None = None,
+    historical_candidate_count: int | str | None = None,
+) -> Mapping[str, Any]:
     run, handoff, extension, normalized, context = _canonical_result(
         application, project_id, run_id
     )
@@ -255,9 +270,10 @@ def _rematerialize(application, project_id: str, run_id: str) -> Mapping[str, An
     normalized_digest = str(recovered["proposal_digest"])
     recovered["proposal_id"] = _recovery_proposal_id(run_id, normalized_digest)
     provenance = deepcopy(dict(recovered["provenance"]))
-    provenance["historical_recovery"] = {
+    historical_recovery = {
         "contract": _REMATERIALIZATION_VERSION,
         "classification": "historical_canonical_result_rematerialization",
+        "recovery_source": "canonical_result",
         "source_run_id": run.run_id,
         "source_handoff_id": handoff["handoff_id"],
         "source_handoff_digest": handoff["handoff_digest"],
@@ -266,6 +282,12 @@ def _rematerialize(application, project_id: str, run_id: str) -> Mapping[str, An
         "verified_context_pack_digest": run.context_pack_digest,
         "verified_descriptor_digest": run.descriptor_digest,
     }
+    if historical_candidate_lineage_status is not None:
+        historical_recovery["historical_candidate_lineage_status"] = (
+            historical_candidate_lineage_status
+        )
+        historical_recovery["historical_candidate_count"] = historical_candidate_count
+    provenance["historical_recovery"] = historical_recovery
     recovered["provenance"] = provenance
     recovered.pop("proposal_digest", None)
     recovered["proposal_digest"] = canonical_digest(recovered)
@@ -314,28 +336,46 @@ def _rematerialize(application, project_id: str, run_id: str) -> Mapping[str, An
 
 
 def _recover(application, project_id: str, run_id: str) -> Mapping[str, Any]:
-    # Preserve #142/#147 direct recovery behavior whenever a persisted producer
-    # candidate/replay relation exists.  Canonical-result rematerialization is a
-    # fallback only for the historical "proposal missing" case introduced by
-    # #148, never an escape hatch around an invalid existing candidate.
+    # Keep the exact persisted-candidate path first. Only absence/ambiguity in
+    # legacy proposal discovery may fall through to independently verified
+    # canonical-result recovery; candidate corruption and binding failures stay
+    # fail-closed on the existing path.
     try:
         return _base._recover(application, project_id, run_id)
     except RecoveryFailure as exc:
-        if exc.failure_class != "producer_candidate_not_found":
+        if exc.failure_class not in _CANONICAL_FALLBACK_FAILURES:
+            raise
+    except LocalApplicationError as exc:
+        # #142 reports exact-run candidate cardinality through the public
+        # LocalApplicationError contract. Reclassify only that lookup failure;
+        # _classification will distinguish ambiguity/missing from unreadable or
+        # otherwise corrupt lineage before allowing canonical fallback.
+        if exc.code != "APPLICATION-FINDING-RECOVERY-CANDIDATE-001":
             raise
 
     classification = _classification(application, project_id, run_id)
     route = classification.get("route")
-    if route == "canonical_result_rematerialization":
-        return _rematerialize(application, project_id, run_id)
     if route == "persisted_candidate_recovery":
+        # A concurrent writer may have materialized the candidate after the
+        # first lookup. Reuse the existing persisted-candidate path.
         return _base._recover(application, project_id, run_id)
-    raise RecoveryFailure(
+    if route == "canonical_result_rematerialization":
+        return _rematerialize(
+            application,
+            project_id,
+            run_id,
+            historical_candidate_lineage_status=classification.get(
+                "historical_candidate_lineage_status"
+            ),
+            historical_candidate_count=classification.get(
+                "historical_candidate_count"
+            ),
+        )
+    raise LocalApplicationError(
         str(classification.get("code") or "APPLICATION-HISTORICAL-RECOVERY-001"),
-        str(classification.get("message") or "historical Desktop Research result is not recoverable"),
-        stage=str(classification.get("stage") or "recovery_classification"),
-        failure_class=str(
-            classification.get("failure_class") or classification.get("recovery_class")
+        str(
+            classification.get("message")
+            or "historical Desktop Research result is not recoverable"
         ),
     )
 
@@ -380,6 +420,8 @@ class LocalApplicationFacade(_base.LocalApplicationFacade):
             "source_handoff_digest",
             "source_extension_digest",
             "normalized_proposal_digest",
+            "historical_candidate_lineage_status",
+            "historical_candidate_count",
         ):
             if key in classification:
                 enriched[key] = classification[key]
