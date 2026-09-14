@@ -47,34 +47,6 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
         )
         return super().submit_action(draft_input)
 
-    def show_run(self, run_id: str) -> Mapping[str, Any]:
-        result = deepcopy(dict(super().show_run(run_id)))
-        recovery = result.get("finding_recovery")
-        if not isinstance(recovery, Mapping):
-            return result
-        details = recovery.get("recovery_failure_details")
-        if (
-            recovery.get("recovery_failure_class") == "material_recovery_required"
-            and isinstance(details, Mapping)
-        ):
-            enriched = deepcopy(dict(recovery))
-            failure_details = deepcopy(dict(details))
-            failure_details["available_actions"] = [
-                {
-                    "action_type": "desktop_research.material.recover",
-                    "when": "operator has exact retained bytes",
-                    "caller_fields": ["run_id", "capture_id", "kind", "source_file"],
-                },
-                {
-                    "action_type": "desktop_research.material.reacquire",
-                    "when": "exact retained bytes are unavailable and the historical exact locator should be retrieved",
-                    "caller_fields": ["historical_run_id", "capture_id", "kind"],
-                },
-            ]
-            enriched["recovery_failure_details"] = failure_details
-            result["finding_recovery"] = enriched
-        return result
-
     def show_external_material(
         self, run_id: str, capture_id: str, *, max_text_bytes: int = 64 * 1024
     ) -> Mapping[str, Any]:
