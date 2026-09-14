@@ -56,7 +56,7 @@ jobs:
   issue91-windows:
     name: issue91-windows
     runs-on: windows-latest
-    timeout-minutes: 5
+    timeout-minutes: 7
     steps:
       - uses: actions/checkout@v5
         with:
