@@ -15,7 +15,7 @@ from plugins.sqlite_state_store.exhibit_guard import guard_research_state_head
 
 from . import finding_recovery_facade as _recovery_base
 from . import historical_finding_recovery_facade as _base
-from .facade import _jsonable
+from .facade import LocalApplicationError, _jsonable
 from .finding_recovery_lineage import RecoveryFailure
 
 
@@ -336,17 +336,10 @@ def _rematerialize(
 
 
 def _recover(application, project_id: str, run_id: str) -> Mapping[str, Any]:
-    # Preserve #142/#147 direct recovery behavior whenever a persisted producer
-    # candidate/replay relation exists. Canonical-result rematerialization is a
-    # fallback only when lineage is missing or ambiguous and therefore unused.
-    try:
-        return _base._recover(application, project_id, run_id)
-    except RecoveryFailure as exc:
-        if exc.failure_class not in _CANONICAL_FALLBACK_FAILURES:
-            raise
-
     classification = _classification(application, project_id, run_id)
     route = classification.get("route")
+    if route == "persisted_candidate_recovery":
+        return _base._recover(application, project_id, run_id)
     if route == "canonical_result_rematerialization":
         return _rematerialize(
             application,
@@ -359,14 +352,11 @@ def _recover(application, project_id: str, run_id: str) -> Mapping[str, Any]:
                 "historical_candidate_count"
             ),
         )
-    if route == "persisted_candidate_recovery":
-        return _base._recover(application, project_id, run_id)
-    raise RecoveryFailure(
+    raise LocalApplicationError(
         str(classification.get("code") or "APPLICATION-HISTORICAL-RECOVERY-001"),
-        str(classification.get("message") or "historical Desktop Research result is not recoverable"),
-        stage=str(classification.get("stage") or "recovery_classification"),
-        failure_class=str(
-            classification.get("failure_class") or classification.get("recovery_class")
+        str(
+            classification.get("message")
+            or "historical Desktop Research result is not recoverable"
         ),
     )
 

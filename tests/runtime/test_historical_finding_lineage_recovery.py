@@ -244,7 +244,7 @@ class HistoricalFindingLineageRecoveryTests(ResearchPackageAcceptanceSupport):
         finally:
             facade.close()
 
-    def test_hcl3_ambiguous_replay_child_candidates_fail_closed(self):
+    def test_hcl3_ambiguous_replay_child_candidates_use_parent_canonical_result(self):
         facade, case = self._prepare_replay_child_case()
         try:
             store = facade._application.conversation_store
@@ -256,12 +256,29 @@ class HistoricalFindingLineageRecoveryTests(ResearchPackageAcceptanceSupport):
             store.store_state_delta_proposal(duplicate["proposal_id"], duplicate)
             diagnosis = facade.show_run(case["parent_run_id"])["finding_recovery"]
             self.assertEqual(diagnosis["failure_class"], "multiple_producer_candidates")
-            with self.assertRaises(LocalApplicationError) as caught:
-                facade.recover_legacy_desktop_research_finding_candidate(
-                    case["parent_run_id"]
-                )
+            self.assertEqual(diagnosis["recovery_class"], "proposal_rematerializable")
             self.assertEqual(
-                caught.exception.code, "APPLICATION-FINDING-RECOVERY-CANDIDATE-001"
+                diagnosis["recovery_route"], "canonical_result_rematerialization"
+            )
+            recovered = facade.recover_legacy_desktop_research_finding_candidate(
+                case["parent_run_id"]
+            )
+            self.assertEqual(recovered["route"], "canonical_result_rematerialization")
+            proposal = store.load_state_delta_proposal(
+                recovered["state_delta_proposal_id"]
+            )
+            provenance = proposal["provenance"]["historical_recovery"]
+            self.assertEqual(provenance["recovery_source"], "canonical_result")
+            self.assertEqual(
+                provenance["historical_candidate_lineage_status"], "ambiguous"
+            )
+            self.assertEqual(provenance["historical_candidate_count"], "multiple")
+            self.assertEqual(
+                store.load_state_delta_proposal(case["child_proposal"]["proposal_id"]),
+                legacy,
+            )
+            self.assertEqual(
+                store.load_state_delta_proposal(duplicate["proposal_id"]), duplicate
             )
         finally:
             facade.close()

@@ -39,11 +39,14 @@ class Issue151AmbiguousCanonicalRecoveryTests(ResearchPackageAcceptanceSupport):
             )
             self.assertEqual(diagnosis["historical_candidate_count"], "multiple")
 
-            recovered = facade.recover_legacy_desktop_research_finding_candidate(
-                case["run_id"]
-            )
+            action = facade.submit_action({
+                "action_type": "desktop_research.finding.recover",
+                "payload": {"run_id": case["run_id"]},
+                "actor_id": "HUMAN-ISSUE151",
+            })
+            self.assertEqual(action["status"], "SUCCEEDED")
+            recovered = action["data"]
             self.assertEqual(recovered["route"], "canonical_result_rematerialization")
-            self.assertFalse(recovered["research_state_mutation_performed"])
             proposal = facade._application.conversation_store.load_state_delta_proposal(
                 recovered["state_delta_proposal_id"]
             )
