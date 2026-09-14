@@ -84,6 +84,8 @@ jobs:
         run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue134_*.py' -v
       - name: Run Issue 145 historical Finding lineage recovery acceptance
         run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_*finding*recovery*.py' -v
+      - name: Run Issue 148 historical G1 result recovery acceptance
+        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_historical_result_recovery.py' -v
 
   issue128-windows:
     name: issue128-windows

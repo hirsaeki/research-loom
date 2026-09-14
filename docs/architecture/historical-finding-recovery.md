@@ -14,3 +14,16 @@ The exact producer relation remains the primary path. If no exact persisted cand
 No relation is inferred from filenames, object order, guessed IDs, statement/RQ similarity, or the operator's desired RQ. Zero or multiple plausible producer candidates, corrupt data, stale state binding, incompatible Handoff/provenance, an unverifiable replay relationship, or an unrecognized pre-#139 candidate shape all fail closed.
 
 Once a producer is uniquely resolved, the implementation delegates to the existing #142 recovery for that exact producer candidate. The historical proposal stays immutable; recovery remains candidate-only and the existing `state.apply_candidate -> Confirmation -> Human Decision` flow remains the only authoritative Finding transition.
+
+## Canonical-result recovery decision
+
+Issue #148 adds a broader recovery decision without turning historical recovery into a generic proposal browser or prose-to-Finding path. `run show` keeps the #145 compatibility diagnosis above and additionally exposes a bounded `recovery_class`:
+
+- `proposal_rematerializable`: either the existing #142/#145 persisted-candidate path is usable, or the requested Run itself retains one complete, verified canonical Handoff/result extension whose Source/Evidence/Finding closure can be normalized again;
+- `replay_required`: the canonical result is incomplete and persisted retrieval history still contains unresolved work eligible for the existing completed-Run replay path;
+- `material_recovery_required`: canonical structured output exists but a required persisted capture cannot pass the verified artifact read boundary;
+- `not_recoverable`: trusted persisted structured provenance is insufficient or inconsistent.
+
+Canonical-result rematerialization reuses `DesktopResearchNormalizer`; it does not synthesize semantics from Handoff prose, Package text, Exhibit text, Composition content, or current web content. The source Run, Handoff, result extension, execution pins, capture bytes, exact current project/lineage/Snapshot binding, and normalizer validation must all verify. A new candidate-only `StateDeltaProposal` receives a fresh deterministic recovery identity plus explicit recovery provenance. The historical Run/Handoff/result are not rewritten, and Research State remains unchanged until the ordinary `state.apply_candidate -> Confirmation -> Human Decision` authority flow.
+
+The legacy `status`, `failure_class`, and producer fields remain the #145 diagnosis for compatibility. Operators choosing the broader #148 branch use `recovery_class` and `recovery_route`; an old proposal-shape failure can therefore coexist with `recovery_class=proposal_rematerializable` when the canonical historical result itself is sufficient.
