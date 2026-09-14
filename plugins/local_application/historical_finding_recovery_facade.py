@@ -58,11 +58,7 @@ def _eligible_completed_desktop_run(application, project_id: str, run_id: str):
 
 def _current_binding(application, project_id: str) -> tuple[str, str, str]:
     try:
-        repository = application.state_repository
-        lineage_ref = repository.load_active_lineage_ref(project_id)
-        state = repository.load_state_view(project_id, lineage_ref)
-        snapshot = state.current_snapshot
-        return lineage_ref, str(snapshot["id"]), str(snapshot["content_digest"])
+        return application.state_repository.load_current_snapshot_binding(project_id)
     except Exception as exc:
         raise RecoveryFailure(
             "APPLICATION-FINDING-RECOVERY-STALE-001",
@@ -109,6 +105,14 @@ def _inspect_historical_candidate(
         snapshot_id=snapshot_id,
         snapshot_digest=snapshot_digest,
     )
+    declared_id = historical.get("proposal_id")
+    if not isinstance(declared_id, str) or not declared_id:
+        raise RecoveryFailure(
+            "APPLICATION-FINDING-RECOVERY-INTEGRITY-001",
+            "persisted candidate identity is invalid",
+            stage="candidate_integrity",
+            failure_class="candidate_integrity_failure",
+        )
     declared_digest = historical.get("proposal_digest")
     if not isinstance(declared_digest, str) or declared_digest != _base._proposal_digest(historical):
         raise RecoveryFailure(

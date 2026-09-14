@@ -83,7 +83,7 @@ jobs:
       - name: Run Issue 134 Argument proposal and Writer recovery acceptance
         run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue134_*.py' -v
       - name: Run Issue 145 historical Finding lineage recovery acceptance
-        run: uv run --frozen python -m unittest -v tests.runtime.test_finding_candidate_recovery tests.runtime.test_finding_candidate_recovery_review_fixes tests.runtime.test_historical_finding_lineage_recovery
+        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_*finding*recovery*.py' -v
 
   issue128-windows:
     name: issue128-windows
