@@ -11,21 +11,47 @@ from . import material_reacquisition_facade as _base
 
 
 _PYPDF_VERSION = "6.16.2"
+_PYPDF_BOUND_EXIT = 86
 _INSTALL_LOCK = RLock()
 _INSTALLED = False
 _BASE_GENERATOR = _base._regenerate_text_rendition
+_BASE_MATCHES_TARGET = _base.HistoricalMaterialReacquisitionService._matches_target
 
 
-_PYPDF_SCRIPT = r"""
+_PYPDF_SCRIPT = rf"""
 import sys
 from pypdf import PdfReader
 
 source = sys.argv[1]
-text = "\n\n".join(page.extract_text() or "" for page in PdfReader(source).pages) + "\n"
-# The historical Probe2 G1 material was written with Path.write_text on Windows,
-# so text-mode newline translation serialized logical LF as CRLF bytes.
-sys.stdout.buffer.write(text.replace("\n", "\r\n").encode("utf-8"))
+max_bytes = int(sys.argv[2])
+written = 0
+output = sys.stdout.buffer
+
+
+def emit(chunk):
+    global written
+    if written + len(chunk) > max_bytes:
+        raise SystemExit({_PYPDF_BOUND_EXIT})
+    output.write(chunk)
+    written += len(chunk)
+
+
+reader = PdfReader(source)
+for index, page in enumerate(reader.pages):
+    if index:
+        emit(b"\r\n\r\n")
+    page_text = page.extract_text() or ""
+    emit(page_text.replace("\n", "\r\n").encode("utf-8"))
+emit(b"\r\n")
 """.strip()
+
+
+def _matches_current_target(child: Any, capture_id: str, kind: str) -> bool:
+    return (
+        child.capability_version == _base._CAPABILITY_VERSION
+        and child.implementation_version == _base._IMPLEMENTATION_VERSION
+        and _BASE_MATCHES_TARGET(child, capture_id, kind)
+    )
 
 
 def _run_historical_pypdf(
@@ -57,6 +83,7 @@ def _run_historical_pypdf(
                     "-c",
                     _PYPDF_SCRIPT,
                     str(source),
+                    str(max_bytes),
                 ],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.DEVNULL,
@@ -119,7 +146,7 @@ def _run_historical_pypdf(
             raise _base.MaterialReacquisitionRetrievalError(
                 "historical pypdf rendition output could not be read"
             ) from read_errors[0]
-        if len(content) > max_bytes:
+        if len(content) > max_bytes or returncode == _PYPDF_BOUND_EXIT:
             raise _base.MaterialReacquisitionRetrievalError(
                 "regenerated rendition exceeds bounded material intake limit"
             )
@@ -166,6 +193,8 @@ def _regenerate_text_rendition(
             max_bytes=max_bytes,
         )
     except _base.MaterialReacquisitionRetrievalError as pypdf_error:
+        if "exceeds bounded material intake limit" in str(pypdf_error):
+            raise
         try:
             return _BASE_GENERATOR(
                 original_content,
@@ -187,9 +216,14 @@ def _install_provider() -> None:
         _base._regenerate_text_rendition = _regenerate_text_rendition
         _base._IMPLEMENTATION_VERSION = "0.2.1"
         _base._CAPABILITY_VERSION = "0.2.1"
+        _base.HistoricalMaterialReacquisitionService._matches_target = staticmethod(
+            _matches_current_target
+        )
         _INSTALLED = True
 
 
-def ensure_material_reacquisition_action(application: Any, project_id: str, workspace_root: Path | None) -> None:
+def ensure_material_reacquisition_action(
+    application: Any, project_id: str, workspace_root: Path | None
+) -> None:
     _install_provider()
     _base.ensure_material_reacquisition_action(application, project_id, workspace_root)
