@@ -174,7 +174,6 @@ def _regenerate_text_rendition(
             raise MaterialReacquisitionRetrievalError(
                 "pdftotext rendition regeneration failed"
             ) from exc
-
         if process.stdout is None:
             process.kill()
             process.wait()
@@ -236,15 +235,15 @@ def _regenerate_text_rendition(
             raise MaterialReacquisitionRetrievalError(
                 "pdftotext rendition regeneration failed"
             )
-        rendered = bytes(content)
+        content = bytes(content)
         try:
-            rendered.decode("utf-8")
+            content.decode("utf-8")
         except UnicodeDecodeError as exc:
             raise MaterialReacquisitionRetrievalError(
                 "regenerated rendition is not valid UTF-8"
             ) from exc
     return RetrievedMaterial(
-        rendered,
+        content,
         "text/plain",
         exact_locator,
         "pdftotext",
@@ -890,17 +889,107 @@ class HistoricalMaterialReacquisitionService:
                     }
 
                 self._record_result(child.run_id, payload)
-                child = _transition(self._store, child, RunStatus.COMPLETED, f"historical material reacquisition completed: {payload['status']}")
-                return {#**payload, "reacquisition_run_id": child.run_id, "idempotent_reuse": False}
+                child = _transition(
+                    self._store,
+                    child,
+                    RunStatus.COMPLETED,
+                    f"historical material reacquisition completed: {payload['status']}",
+                )
+                return {
+                    **payload,
+                    "reacquisition_run_id": child.run_id,
+                    "idempotent_reuse": False,
+                }
             except Exception as exc:
-                issue = ExecutionIssue("MATERIAL_REACQUISITION_FAILED", str(exc) or type(exc).__name__, True)
-                failure_payload = {"contract": _PAYLOAD_CONTRACT, "status": "REACQUISITION_FAILED", "historical_run_id": historical_run_id, "historical_capture_id": capture_id, "historical_artifact_id": artifact.artifact_id, "kind": kind, "historical_acquired_at": historical_acquired_at, "reacquired_at": reacquired_at, "requested_exact_locator": exact_locator, "failure_reason": issue.message, "historical_metadata_rewritten": False, "research_state_mutation_performed": False}
+                issue = ExecutionIssue(
+                    "MATERIAL_REACQUISITION_FAILED",
+                    str(exc) or type(exc).__name__,
+                    True,
+                )
+                failure_payload = {
+                    "contract": _PAYLOAD_CONTRACT,
+                    "status": "REACQUISITION_FAILED",
+                    "historical_run_id": historical_run_id,
+                    "historical_capture_id": capture_id,
+                    "historical_artifact_id": artifact.artifact_id,
+                    "kind": kind,
+                    "historical_acquired_at": historical_acquired_at,
+                    "reacquired_at": reacquired_at,
+                    "requested_exact_locator": exact_locator,
+                    "failure_reason": issue.message,
+                    "historical_metadata_rewritten": False,
+                    "research_state_mutation_performed": False,
+                }
                 self._record_result(child.run_id, failure_payload)
-                child = _transition(self._store, child, RunStatus.FAILED, "historical material reacquisition failed", failure=issue)
-                return {**failure_payload, "reacquisition_run_id": child.run_id, "idempotent_reuse": False}
+                child = _transition(
+                    self._store,
+                    child,
+                    RunStatus.FAILED,
+                    "historical material reacquisition failed",
+                    failure=issue,
+                )
+                return {
+                    **failure_payload,
+                    "reacquisition_run_id": child.run_id,
+                    "idempotent_reuse": False,
+                }
 
 
-        # unreachable
+
+class HistoricalMaterialReacquisitionHandler:
+    def __init__(self, application, project_id: str, workspace_root: Path | None) -> None:
+        self._service = HistoricalMaterialReacquisitionService(
+            application.execution_store, project_id, workspace_root
+        )
+
+    def execute(self, payload: Mapping[str, Any], *, state: Any, actor: Any, proposal: Mapping[str, Any]):
+        del state, actor, proposal
+        result = self._service.reacquire(
+            str(payload["historical_run_id"]),
+            str(payload["capture_id"]),
+            kind=str(payload["kind"]),
+        )
+        return HarnessServiceResult(
+            result_reference=str(result.get("reacquisition_run_id") or result["artifact_id"]),
+            data=result,
+            research_state_mutation_performed=False,
+        )
 
 
-        
+def ensure_material_reacquisition_action(application, project_id: str, workspace_root: Path | None) -> None:
+    coordinator = application.coordinator
+    action_registry = coordinator._actions
+    service_registry = coordinator._services
+    with _ACTION_REGISTRATION_LOCK:
+        existing = {definition.action_type: definition for definition in coordinator.action_definitions()}
+        definition = existing.get(_ACTION_TYPE)
+        if definition is None:
+            action_registry.register(
+                ActionDefinition(
+                    _ACTION_TYPE,
+                    _PAYLOAD_CONTRACT,
+                    "read_only",
+                    "harness_service",
+                    False,
+                    human_decision_required=False,
+                    service_id=_ACTION_TYPE,
+                    payload_validator=material_reacquisition_payload,
+                )
+            )
+        elif (
+            definition.payload_contract != _PAYLOAD_CONTRACT
+            or definition.effect != "read_only"
+            or definition.route_kind != "harness_service"
+            or definition.confirmation_required
+            or definition.service_id != _ACTION_TYPE
+        ):
+            raise RuntimeError("desktop_research.material.reacquire action registration conflict")
+        try:
+            service_registry.resolve(_ACTION_TYPE)
+        except ConversationRuntimeError as exc:
+            if exc.code != "CONV-ROUTE-001":
+                raise
+            service_registry.register(
+                _ACTION_TYPE,
+                HistoricalMaterialReacquisitionHandler(application, project_id, workspace_root),
+            )
