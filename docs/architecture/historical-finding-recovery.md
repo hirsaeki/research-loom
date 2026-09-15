@@ -27,3 +27,29 @@ Issue #148 adds a broader recovery decision without turning historical recovery 
 Canonical-result rematerialization reuses `DesktopResearchNormalizer`; it does not synthesize semantics from Handoff prose, Package text, Exhibit text, Composition content, or current web content. The source Run, Handoff, result extension, execution pins, capture bytes, exact current project/lineage/Snapshot binding, and normalizer validation must all verify. A new candidate-only `StateDeltaProposal` receives a fresh deterministic recovery identity plus explicit recovery provenance. The historical Run/Handoff/result are not rewritten, and Research State remains unchanged until the ordinary `state.apply_candidate -> Confirmation -> Human Decision` authority flow.
 
 The legacy `status`, `failure_class`, and producer fields remain the #145 diagnosis for compatibility. Operators choosing the broader #148 branch use `recovery_class` and `recovery_route`; an old proposal-shape failure can therefore coexist with `recovery_class=proposal_rematerializable` when the canonical historical result itself is sufficient.
+
+## Divergent material continuation
+
+Issue #171 keeps `NEW_MATERIAL_VERSION` outside historical recovery. A successful
+`desktop_research.material.reacquire` result whose regenerated rendition differs
+from the historical bytes may be continued through
+`desktop_research.material.continue_new_version` by supplying only the persisted
+reacquisition Run ID.
+
+The continuation verifies the reacquisition result, the persisted divergent
+artifact, its historical provenance, and the exact historical original used as
+the paired material. It then creates a new normal REAL `desktop-research/investigate` Run, captures a new source pair, replays the persisted retrieval
+attempt facts without network retrieval, and submits the candidate research
+content through the ordinary external Desktop Research assembler and validator.
+Citation containment is therefore checked against the new rendition bytes; a
+changed version that no longer contains the cited material fails closed rather
+than rematerializing the historical result.
+
+This branch never restores or rewrites the missing historical artifact and never
+satisfies historical Finding recovery. Its output remains candidate-only and the
+ordinary Confirmation / Human Decision path remains the only Research State
+authority. `run show` exposes the new Run's parent reacquisition, historical
+Run/capture, material digest/size, exact locator, and historical/reacquired
+timestamps without exposing managed storage locations. Repeating a completed
+continuation reuses the one existing child result; conflicting prior children
+fail closed.
