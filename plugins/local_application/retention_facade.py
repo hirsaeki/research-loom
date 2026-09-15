@@ -20,6 +20,7 @@ from .facade import LocalApplicationError
 from .material_inventory_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
 from .material_content_facade import ExternalMaterialContentService
 from .material_recovery_facade import ensure_material_recovery_action
+from .material_reacquisition_facade import ensure_material_reacquisition_action
 
 
 _LARGE_ORIGINAL_PREFIX = "external-original://sha256/"
@@ -32,10 +33,16 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
         ensure_material_recovery_action(
             self._application, self._project_id, self._workspace_root
         )
+        ensure_material_reacquisition_action(
+            self._application, self._project_id, self._workspace_root
+        )
         return super().list_actions()
 
     def submit_action(self, draft_input: Mapping[str, Any]) -> Mapping[str, Any]:
         ensure_material_recovery_action(
+            self._application, self._project_id, self._workspace_root
+        )
+        ensure_material_reacquisition_action(
             self._application, self._project_id, self._workspace_root
         )
         return super().submit_action(draft_input)
