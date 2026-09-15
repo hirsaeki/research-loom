@@ -3,8 +3,7 @@ from __future__ import annotations
 from contextlib import redirect_stdout
 import io
 import json
-from pathlib import Path
-from types import SimpleNamespace
+import subprocess
 from unittest.mock import patch
 
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade
@@ -563,18 +562,37 @@ class HistoricalMaterialReacquisitionTests(ResearchPackageAcceptanceSupport):
     def test_pdf_rendition_generator_is_bounded_and_does_not_use_shell(self):
         rendered = b"deterministic utf-8 rendition\n"
 
-        def fake_run(command, **kwargs):
+        class FakeProcess:
+            def __init__(self, content):
+                self.stdout = io.BytesIO(content)
+                self.killed = False
+                self.returncode = 0
+
+            def wait(self, timeout=None):
+                return self.returncode
+
+            def kill(self):
+                self.killed = True
+                self.returncode = -9
+
+        created = []
+
+        def fake_popen(command, **kwargs):
             self.assertEqual(command[1:3], ["-enc", "UTF-8"])
+            self.assertEqual(command[-1], "-")
             self.assertNotIn("shell", kwargs)
-            Path(command[-1]).write_bytes(rendered)
-            return SimpleNamespace(returncode=0, stderr="")
+            self.assertIs(kwargs["stdout"], subprocess.PIPE)
+            self.assertIs(kwargs["stderr"], subprocess.DEVNULL)
+            process = FakeProcess(rendered)
+            created.append(process)
+            return process
 
         with patch(
             "plugins.local_application.material_reacquisition_facade.shutil.which",
             return_value="pdftotext",
         ), patch(
-            "plugins.local_application.material_reacquisition_facade.subprocess.run",
-            side_effect=fake_run,
+            "plugins.local_application.material_reacquisition_facade.subprocess.Popen",
+            side_effect=fake_popen,
         ):
             result = _regenerate_text_rendition(
                 b"%PDF-1.7 fixture",
@@ -585,6 +603,7 @@ class HistoricalMaterialReacquisitionTests(ResearchPackageAcceptanceSupport):
         self.assertEqual(result.content, rendered)
         self.assertEqual(result.media_type, "text/plain")
         self.assertEqual(result.provider, "pdftotext")
+        self.assertFalse(created[0].killed)
 
     def test_read_diagnosis_guides_recover_or_reacquire_without_network(self):
         facade, case = self._prepare_case()
