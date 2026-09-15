@@ -13,21 +13,34 @@ def diagnostics_for(
     run_id: str,
     *,
     limit: int,
+    kind: str | None = None,
 ) -> tuple[Mapping[str, Any], ...]:
     """Read a bounded Run-scoped set of persisted execution diagnostics."""
     if limit <= 0:
         raise ValueError("diagnostic query limit must be positive")
     with store._lock:
-        rows = store._connection.execute(
-            """
-            SELECT kind, payload_json
-            FROM diagnostics
-            WHERE run_id=?
-            ORDER BY diagnostic_id
-            LIMIT ?
-            """,
-            (str(run_id), int(limit)),
-        ).fetchall()
+        if kind is None:
+            rows = store._connection.execute(
+                """
+                SELECT kind, payload_json
+                FROM diagnostics
+                WHERE run_id=?
+                ORDER BY diagnostic_id
+                LIMIT ?
+                """,
+                (str(run_id), int(limit)),
+            ).fetchall()
+        else:
+            rows = store._connection.execute(
+                """
+                SELECT kind, payload_json
+                FROM diagnostics
+                WHERE run_id=? AND kind=?
+                ORDER BY diagnostic_id
+                LIMIT ?
+                """,
+                (str(run_id), str(kind), int(limit)),
+            ).fetchall()
 
     diagnostics: list[Mapping[str, Any]] = []
     for row in rows:

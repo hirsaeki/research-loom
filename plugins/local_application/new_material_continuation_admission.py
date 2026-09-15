@@ -62,8 +62,9 @@ def _find_reacquisition_result(application, project_id: str, reacquisition_run_i
 
     records = [
         item["payload"]
-        for item in diagnostics_for(store, reacquisition_run_id, limit=4)
-        if item.get("kind") == _MRA_RESULT_DIAGNOSTIC
+        for item in diagnostics_for(
+            store, reacquisition_run_id, limit=2, kind=_MRA_RESULT_DIAGNOSTIC
+        )
     ]
     if len(records) != 1:
         raise LocalApplicationError(
@@ -164,8 +165,9 @@ def _find_reacquisition_result(application, project_id: str, reacquisition_run_i
 def _continuation_claim(store, reacquisition_run_id: str) -> dict[str, Any] | None:
     records = [
         item.get("payload")
-        for item in diagnostics_for(store, reacquisition_run_id, limit=8)
-        if item.get("kind") == _CONTINUATION_CLAIM_DIAGNOSTIC
+        for item in diagnostics_for(
+            store, reacquisition_run_id, limit=2, kind=_CONTINUATION_CLAIM_DIAGNOSTIC
+        )
     ]
     if not records:
         return None
@@ -192,8 +194,9 @@ def _continuation_claim(store, reacquisition_run_id: str) -> dict[str, Any] | No
 def _continuation_binding(store, reacquisition_run_id: str) -> dict[str, Any] | None:
     records = [
         item.get("payload")
-        for item in diagnostics_for(store, reacquisition_run_id, limit=8)
-        if item.get("kind") == _CONTINUATION_BINDING_DIAGNOSTIC
+        for item in diagnostics_for(
+            store, reacquisition_run_id, limit=2, kind=_CONTINUATION_BINDING_DIAGNOSTIC
+        )
     ]
     if not records:
         return None
@@ -253,8 +256,9 @@ def _validate_continuation_binding(
         )
     own = [
         item.get("payload")
-        for item in diagnostics_for(store, new_run_id, limit=4)
-        if item.get("kind") == _CONTINUATION_BINDING_DIAGNOSTIC
+        for item in diagnostics_for(
+            store, new_run_id, limit=2, kind=_CONTINUATION_BINDING_DIAGNOSTIC
+        )
     ]
     if len(own) != 1 or own[0] != dict(binding):
         raise LocalApplicationError(

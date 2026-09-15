@@ -125,10 +125,12 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
             nmv_records = [
                 item.get("payload")
                 for item in diagnostics_for(
-                    self._application.execution_store, run_id, limit=4
+                    self._application.execution_store,
+                    run_id,
+                    kind=_MRA_RESULT_DIAGNOSTIC,
+                    limit=2,
                 )
-                if item.get("kind") == _MRA_RESULT_DIAGNOSTIC
-                and isinstance(item.get("payload"), Mapping)
+                if isinstance(item.get("payload"), Mapping)
                 and item["payload"].get("status") == "NEW_MATERIAL_VERSION"
             ]
             if len(nmv_records) != 1:
@@ -152,7 +154,19 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                     self._application.execution_store, run_id
                 )
                 if binding is None:
-                    status, new_run_id = "available", None
+                    claim = admission._continuation_claim(
+                        self._application.execution_store, run_id
+                    )
+                    if claim is None:
+                        status, new_run_id = "available", None
+                    else:
+                        result["new_material_continuation"] = {
+                            "status": "blocked",
+                            "reacquisition_run_id": run_id,
+                            "failure_code": "APPLICATION-NEW-MATERIAL-CONTINUATION-IDEMPOTENCY-001",
+                            "historical_recovery_satisfied": False,
+                        }
+                        return result
                 else:
                     bound = admission._validate_continuation_binding(
                         self._application, self._project_id, binding, mra, historical
@@ -184,9 +198,11 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
             own_bindings = [
                 item.get("payload")
                 for item in diagnostics_for(
-                    self._application.execution_store, run.run_id, limit=4
+                    self._application.execution_store,
+                    run.run_id,
+                    kind=admission._CONTINUATION_BINDING_DIAGNOSTIC,
+                    limit=2,
                 )
-                if item.get("kind") == admission._CONTINUATION_BINDING_DIAGNOSTIC
             ]
             if len(own_bindings) == 1 and isinstance(own_bindings[0], Mapping):
                 binding = own_bindings[0]

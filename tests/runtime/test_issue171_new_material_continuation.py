@@ -75,7 +75,6 @@ class Issue171NewMaterialContinuationTests(ResearchPackageAcceptanceSupport):
             state_before = self._snapshot(facade)
             rendition, reacquired = self._make_new_version(facade, case)
             reacq_run_id = reacquired["reacquisition_run_id"]
-
             result = facade.submit_action(
                 {
                     "action_type": "desktop_research.material.continue_new_version",
@@ -119,7 +118,7 @@ class Issue171NewMaterialContinuationTests(ResearchPackageAcceptanceSupport):
             self.assertFalse(reacq_shown["new_material_continuation"]["historical_recovery_satisfied"])
             new_shown = facade.show_run(data["new_run_id"])
             self.assertEqual(new_shown["run"]["status"], "COMPLETED")
-            self.assertIsNotNone(new_shown["run"]["handoff"]["handoff_ref"])
+            self.assertIsNotNone(new_shown["run"]["handoff"]["ref"])
             summary = new_shown["desktop_research"]["retrieval_attempt_summary"]
             self.assertEqual(summary["total"], 2)
             self.assertEqual(summary["source_captured"], 1)
@@ -305,6 +304,34 @@ class Issue171NewMaterialContinuationTests(ResearchPackageAcceptanceSupport):
                 "does not contain the bound new material capture",
                 rejected["issues"][0]["message"],
             )
+        finally:
+            facade.close()
+
+    def test_continuation_binding_is_not_hidden_by_unrelated_diagnostics(self):
+        facade, case = self._prepare_case()
+        try:
+            _rendition, reacquired = self._make_new_version(facade, case)
+            run_id = reacquired["reacquisition_run_id"]
+            store = facade._application.execution_store
+            for index in range(12):
+                store.store_diagnostic(run_id, f"fixture.noise.{index}", {"index": index})
+
+            first = facade.submit_action(
+                {
+                    "action_type": "desktop_research.material.continue_new_version",
+                    "payload": {"reacquisition_run_id": run_id},
+                }
+            )["data"]
+            self.assertEqual(first["status"], "COMPLETED")
+
+            repeated = facade.submit_action(
+                {
+                    "action_type": "desktop_research.material.continue_new_version",
+                    "payload": {"reacquisition_run_id": run_id},
+                }
+            )["data"]
+            self.assertTrue(repeated["idempotent_reuse"])
+            self.assertEqual(repeated["new_run_id"], first["new_run_id"])
         finally:
             facade.close()
 
