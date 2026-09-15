@@ -15,6 +15,8 @@ from .material_reacquisition_facade import (
     _RESULT_DIAGNOSTIC as _MRA_RESULT_DIAGNOSTIC,
 )
 
+_CONTINUATION_BINDING_DIAGNOSTIC = "desktop_research.new_material_continuation.binding"
+
 def _new_id(old: str, reacquisition_run_id: str) -> str:
     digest = hashlib.sha256(f"{reacquisition_run_id}\0{old}".encode("utf-8")).hexdigest()[:24]
     return f"NMV-{digest}"
@@ -156,6 +158,96 @@ def _find_reacquisition_result(application, project_id: str, reacquisition_run_i
             "verified historical original required for the new rendition is unavailable",
         ) from exc
     return run, result, artifact, historical, original, capture
+
+
+def _continuation_binding(store, reacquisition_run_id: str) -> dict[str, Any] | None:
+    records = [
+        item.get("payload")
+        for item in diagnostics_for(store, reacquisition_run_id, limit=8)
+        if item.get("kind") == _CONTINUATION_BINDING_DIAGNOSTIC
+    ]
+    if not records:
+        return None
+    if len(records) != 1 or not isinstance(records[0], Mapping):
+        raise LocalApplicationError(
+            "APPLICATION-NEW-MATERIAL-CONTINUATION-IDEMPOTENCY-001",
+            "new-material continuation binding is ambiguous or corrupt",
+        )
+    binding = deepcopy(dict(records[0]))
+    if (
+        binding.get("relation") != "new_material_version_continuation"
+        or binding.get("reacquisition_run_id") != reacquisition_run_id
+        or not isinstance(binding.get("new_run_id"), str)
+        or not binding["new_run_id"]
+    ):
+        raise LocalApplicationError(
+            "APPLICATION-NEW-MATERIAL-CONTINUATION-IDEMPOTENCY-001",
+            "new-material continuation binding is invalid",
+        )
+    return binding
+
+
+def _validate_continuation_binding(
+    application,
+    project_id: str,
+    binding: Mapping[str, Any],
+    result: Mapping[str, Any],
+    historical,
+) -> Any:
+    store = application.execution_store
+    new_run_id = str(binding.get("new_run_id") or "")
+    new_run = store.load_run(new_run_id)
+    expected = {
+        "relation": "new_material_version_continuation",
+        "reacquisition_run_id": str(binding.get("reacquisition_run_id") or ""),
+        "historical_run_id": historical.run_id,
+        "historical_capture_id": str(result["historical_capture_id"]),
+        "new_material_artifact_id": str(result["new_artifact_id"]),
+        "new_run_id": new_run_id,
+    }
+    if any(binding.get(key) != value for key, value in expected.items()):
+        raise LocalApplicationError(
+            "APPLICATION-NEW-MATERIAL-CONTINUATION-IDEMPOTENCY-001",
+            "new-material continuation binding no longer matches its admitted material",
+        )
+    if (
+        new_run is None
+        or new_run.project_ref != project_id
+        or new_run.capability_id != "desktop-research"
+        or new_run.function_id != "investigate"
+        or new_run.execution_mode != "real"
+        or new_run.parent_run_id is not None
+    ):
+        raise LocalApplicationError(
+            "APPLICATION-NEW-MATERIAL-CONTINUATION-IDEMPOTENCY-001",
+            "bound continuation Run is missing or has incompatible execution identity",
+        )
+    own = [
+        item.get("payload")
+        for item in diagnostics_for(store, new_run_id, limit=4)
+        if item.get("kind") == _CONTINUATION_BINDING_DIAGNOSTIC
+    ]
+    if len(own) != 1 or own[0] != dict(binding):
+        raise LocalApplicationError(
+            "APPLICATION-NEW-MATERIAL-CONTINUATION-IDEMPOTENCY-001",
+            "continuation Run does not carry the same immutable reacquisition binding",
+        )
+    if new_run.status is RunStatus.COMPLETED:
+        target = [
+            item
+            for item in store.artifacts_for(new_run_id)
+            if item.role == "desktop_research.text_rendition"
+            and item.provenance.get("relation") == "new_material_version_continuation"
+            and item.provenance.get("reacquisition_run_id") == binding["reacquisition_run_id"]
+            and item.provenance.get("historical_capture_id") == result["historical_capture_id"]
+            and item.provenance.get("reacquired_artifact_id") == result["new_artifact_id"]
+        ]
+        if len(target) != 1:
+            raise LocalApplicationError(
+                "APPLICATION-NEW-MATERIAL-CONTINUATION-IDEMPOTENCY-001",
+                "completed continuation Run does not contain the bound new material capture",
+            )
+    return new_run
 
 
 def _historical_canonical_result(application, historical_run_id: str):

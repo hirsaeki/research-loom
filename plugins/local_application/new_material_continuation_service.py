@@ -7,7 +7,6 @@ from typing import Any, Mapping
 from core.execution import RunStatus
 from plugins.desktop_research import DesktopResearchAttemptRecorder, DesktopResearchCaptureService
 from plugins.desktop_research.attempts import reconstruct_attempts
-from plugins.local_execution_store import child_runs_for_parent
 
 from .facade import LocalApplicationError
 from .material_content_facade import _artifact_pair_for_capture
@@ -157,29 +156,26 @@ class NewMaterialContinuationService:
                 )
             )
             store = self._application.execution_store
-            children = [
-                child
-                for child in child_runs_for_parent(store, reacquisition_run_id, limit=10)
-                if child.capability_id == "desktop-research"
-                and child.function_id == "investigate"
-            ]
-            if children:
-                if len(children) == 1 and children[0].status is RunStatus.COMPLETED:
-                    child = children[0]
+            binding = admission._continuation_binding(store, reacquisition_run_id)
+            if binding is not None:
+                bound = admission._validate_continuation_binding(
+                    self._application, self._project_id, binding, result, historical
+                )
+                if bound.status is RunStatus.COMPLETED:
                     return {
                         "status": "COMPLETED",
                         "reacquisition_run_id": reacquisition_run_id,
                         "historical_run_id": historical.run_id,
-                        "new_run_id": child.run_id,
-                        "new_handoff_id": child.handoff_ref,
-                        "new_handoff_digest": child.handoff_digest,
+                        "new_run_id": bound.run_id,
+                        "new_handoff_id": bound.handoff_ref,
+                        "new_handoff_digest": bound.handoff_digest,
                         "candidate_only": True,
                         "idempotent_reuse": True,
                         "research_state_mutation_performed": False,
                     }
                 raise LocalApplicationError(
                     "APPLICATION-NEW-MATERIAL-CONTINUATION-IDEMPOTENCY-001",
-                    "a prior new-material continuation exists but is not a single completed reusable result",
+                    "a bound prior new-material continuation is not a completed reusable result",
                 )
 
             historical_handoff, historical_extension = admission._historical_canonical_result(
@@ -188,7 +184,10 @@ class NewMaterialContinuationService:
             historical_payload = admission._historical_action_payload(
                 self._application, historical.run_id
             )
-            historical_payload["parent_run_id"] = reacquisition_run_id
+            # This is a new execution fact, not an Execution Core retry. Historical
+            # action payloads may themselves have been retries, so do not inherit
+            # their parent binding. The reacquisition relation is persisted below.
+            historical_payload.pop("parent_run_id", None)
             facade = _BaseLocalApplicationFacade(
                 self._application,
                 self._project_id,
@@ -212,8 +211,26 @@ class NewMaterialContinuationService:
                     "new Desktop Research execution could not be prepared",
                 )
             new_run, _context_extension = facade._desktop_external_run(new_run_id)
-
+            binding = {
+                "relation": "new_material_version_continuation",
+                "reacquisition_run_id": reacquisition_run_id,
+                "historical_run_id": historical.run_id,
+                "historical_capture_id": str(result["historical_capture_id"]),
+                "new_material_artifact_id": new_artifact.reference_id,
+                "new_run_id": new_run_id,
+            }
             try:
+                # Persist the exact purpose/binding on both sides before consuming
+                # the new material. A partial prior attempt then fails closed rather
+                # than being mistaken for an unrelated Desktop Research Run.
+                store.store_diagnostic(
+                    reacquisition_run_id,
+                    admission._CONTINUATION_BINDING_DIAGNOSTIC,
+                    binding,
+                )
+                store.store_diagnostic(
+                    new_run_id, admission._CONTINUATION_BINDING_DIAGNOSTIC, binding
+                )
                 capture_map = self._capture_new_material_version(
                     new_run,
                     historical,

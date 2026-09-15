@@ -100,7 +100,7 @@ class Issue171NewMaterialContinuationTests(ResearchPackageAcceptanceSupport):
             )
             new_run = store.load_run(data["new_run_id"])
             self.assertEqual(new_run.status.value, "COMPLETED")
-            self.assertEqual(new_run.parent_run_id, reacq_run_id)
+            self.assertIsNone(new_run.parent_run_id)
             artifacts = store.artifacts_for(data["new_run_id"])
             self.assertEqual(
                 {item.role for item in artifacts},
@@ -156,16 +156,16 @@ class Issue171NewMaterialContinuationTests(ResearchPackageAcceptanceSupport):
                 "UPDATE execution_artifacts SET role=? WHERE artifact_id=?",
                 ("desktop_research.reacquired_original", artifact_id),
             )
-            with self.assertRaises(LocalApplicationError) as caught:
-                facade.submit_action(
-                    {
-                        "action_type": "desktop_research.material.continue_new_version",
-                        "payload": {"reacquisition_run_id": run_id},
-                    }
-                )
-            self.assertEqual(
-                caught.exception.code,
-                "APPLICATION-NEW-MATERIAL-CONTINUATION-MATERIAL-001",
+            rejected = facade.submit_action(
+                {
+                    "action_type": "desktop_research.material.continue_new_version",
+                    "payload": {"reacquisition_run_id": run_id},
+                }
+            )
+            self.assertEqual(rejected["status"], "FAILED")
+            self.assertIn(
+                "persisted new material does not match",
+                rejected["issues"][0]["message"],
             )
 
             # Bounded test-local ablation: removing only the class/binding guard
@@ -197,16 +197,16 @@ class Issue171NewMaterialContinuationTests(ResearchPackageAcceptanceSupport):
                 item for item in store.artifacts_for(run_id) if item.artifact_id == artifact_id
             )
             store._locator_path(metadata.storage_locator, metadata.digest).unlink()
-            with self.assertRaises(LocalApplicationError) as caught:
-                facade.submit_action(
-                    {
-                        "action_type": "desktop_research.material.continue_new_version",
-                        "payload": {"reacquisition_run_id": run_id},
-                    }
-                )
-            self.assertEqual(
-                caught.exception.code,
-                "APPLICATION-NEW-MATERIAL-CONTINUATION-MATERIAL-001",
+            rejected = facade.submit_action(
+                {
+                    "action_type": "desktop_research.material.continue_new_version",
+                    "payload": {"reacquisition_run_id": run_id},
+                }
+            )
+            self.assertEqual(rejected["status"], "FAILED")
+            self.assertIn(
+                "persisted new material cannot be verified",
+                rejected["issues"][0]["message"],
             )
             shown = facade.show_run(run_id)
             self.assertEqual(shown["new_material_continuation"]["status"], "blocked")
@@ -231,18 +231,18 @@ class Issue171NewMaterialContinuationTests(ResearchPackageAcceptanceSupport):
                 case,
                 changed_bytes=b"A genuinely different material version without the cited supporting text.\n",
             )
-            with self.assertRaises(LocalApplicationError) as caught:
-                facade.submit_action(
-                    {
-                        "action_type": "desktop_research.material.continue_new_version",
-                        "payload": {
-                            "reacquisition_run_id": reacquired["reacquisition_run_id"]
-                        },
-                    }
-                )
-            self.assertEqual(
-                caught.exception.code,
-                "APPLICATION-NEW-MATERIAL-CONTINUATION-RESULT-001",
+            rejected = facade.submit_action(
+                {
+                    "action_type": "desktop_research.material.continue_new_version",
+                    "payload": {
+                        "reacquisition_run_id": reacquired["reacquisition_run_id"]
+                    },
+                }
+            )
+            self.assertEqual(rejected["status"], "FAILED")
+            self.assertIn(
+                "new canonical Desktop Research result did not complete",
+                rejected["issues"][0]["message"],
             )
             reacq_shown = facade.show_run(reacquired["reacquisition_run_id"])
             child_id = reacq_shown["new_material_continuation"]["new_run_id"]
@@ -255,18 +255,55 @@ class Issue171NewMaterialContinuationTests(ResearchPackageAcceptanceSupport):
                 )["status"],
                 "content_missing",
             )
-            with self.assertRaises(LocalApplicationError) as repeated:
-                facade.submit_action(
-                    {
-                        "action_type": "desktop_research.material.continue_new_version",
-                        "payload": {
-                            "reacquisition_run_id": reacquired["reacquisition_run_id"]
-                        },
-                    }
-                )
-            self.assertEqual(
-                repeated.exception.code,
-                "APPLICATION-NEW-MATERIAL-CONTINUATION-IDEMPOTENCY-001",
+            repeated = facade.submit_action(
+                {
+                    "action_type": "desktop_research.material.continue_new_version",
+                    "payload": {
+                        "reacquisition_run_id": reacquired["reacquisition_run_id"]
+                    },
+                }
+            )
+            self.assertEqual(repeated["status"], "FAILED")
+            self.assertIn(
+                "bound prior new-material continuation",
+                repeated["issues"][0]["message"],
+            )
+        finally:
+            facade.close()
+
+    def test_unrelated_completed_desktop_run_cannot_be_reused_as_continuation(self):
+        facade, case = self._prepare_case()
+        try:
+            _rendition, reacquired = self._make_new_version(facade, case)
+            run_id = reacquired["reacquisition_run_id"]
+            binding = {
+                "relation": "new_material_version_continuation",
+                "reacquisition_run_id": run_id,
+                "historical_run_id": case["run_id"],
+                "historical_capture_id": "CAP-1",
+                "new_material_artifact_id": reacquired["new_artifact_id"],
+                "new_run_id": case["run_id"],
+            }
+            store = facade._application.execution_store
+            from plugins.local_application import new_material_continuation_admission as admission
+
+            store.store_diagnostic(
+                run_id, admission._CONTINUATION_BINDING_DIAGNOSTIC, binding
+            )
+            store.store_diagnostic(
+                case["run_id"], admission._CONTINUATION_BINDING_DIAGNOSTIC, binding
+            )
+
+            rejected = facade.submit_action(
+                {
+                    "action_type": "desktop_research.material.continue_new_version",
+                    "payload": {"reacquisition_run_id": run_id},
+                }
+            )
+            self.assertEqual(rejected["status"], "FAILED")
+            self.assertIn(
+                "does not contain the bound new material capture",
+                rejected["issues"][0]["message"],
             )
         finally:
             facade.close()

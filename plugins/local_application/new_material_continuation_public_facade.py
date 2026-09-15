@@ -5,7 +5,7 @@ from threading import RLock
 from typing import Any, Mapping
 
 from core.conversation import ActionDefinition, ConversationRuntimeError, HarnessServiceResult
-from plugins.local_execution_store import child_runs_for_parent, diagnostics_for
+from plugins.local_execution_store import diagnostics_for
 
 from .facade import LocalApplicationError
 from .material_reacquisition_facade import (
@@ -13,6 +13,7 @@ from .material_reacquisition_facade import (
     _RESULT_DIAGNOSTIC as _MRA_RESULT_DIAGNOSTIC,
 )
 from .material_reacquisition_public_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
+from . import new_material_continuation_admission as admission
 from .new_material_continuation_admission import _find_reacquisition_result
 from .new_material_continuation_service import NewMaterialContinuationService
 
@@ -146,20 +147,25 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                     "historical_recovery_satisfied": False,
                 }
                 return result
-            children = [
-                child
-                for child in child_runs_for_parent(
-                    self._application.execution_store, run_id, limit=10
+            try:
+                binding = admission._continuation_binding(
+                    self._application.execution_store, run_id
                 )
-                if child.capability_id == "desktop-research"
-                and child.function_id == "investigate"
-            ]
-            if not children:
-                status, new_run_id = "available", None
-            elif len(children) == 1:
-                status, new_run_id = children[0].status.value.lower(), children[0].run_id
-            else:
-                status, new_run_id = "conflict", None
+                if binding is None:
+                    status, new_run_id = "available", None
+                else:
+                    bound = admission._validate_continuation_binding(
+                        self._application, self._project_id, binding, mra, historical
+                    )
+                    status, new_run_id = bound.status.value.lower(), bound.run_id
+            except LocalApplicationError as exc:
+                result["new_material_continuation"] = {
+                    "status": "conflict",
+                    "reacquisition_run_id": run_id,
+                    "failure_code": exc.code,
+                    "historical_recovery_satisfied": False,
+                }
+                return result
             result["new_material_continuation"] = {
                 "status": status,
                 "reacquisition_run_id": run_id,
@@ -174,20 +180,31 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                 "new_run_id": new_run_id,
                 "historical_recovery_satisfied": False,
             }
-        elif run.parent_run_id:
-            parent = self._application.execution_store.load_run(run.parent_run_id)
-            if parent is not None and parent.capability_id == _MRA_CAPABILITY_ID:
+        else:
+            own_bindings = [
+                item.get("payload")
+                for item in diagnostics_for(
+                    self._application.execution_store, run.run_id, limit=4
+                )
+                if item.get("kind") == admission._CONTINUATION_BINDING_DIAGNOSTIC
+            ]
+            if len(own_bindings) == 1 and isinstance(own_bindings[0], Mapping):
+                binding = own_bindings[0]
+                reacquisition_run_id = str(binding.get("reacquisition_run_id") or "")
                 try:
                     _parent, mra, artifact, historical, _original, _capture = (
                         _find_reacquisition_result(
-                            self._application, self._project_id, parent.run_id
+                            self._application, self._project_id, reacquisition_run_id
                         )
+                    )
+                    admission._validate_continuation_binding(
+                        self._application, self._project_id, binding, mra, historical
                     )
                 except LocalApplicationError:
                     return result
                 result["new_material_continuation"] = {
                     "status": run.status.value.lower(),
-                    "reacquisition_run_id": parent.run_id,
+                    "reacquisition_run_id": reacquisition_run_id,
                     "historical_run_id": historical.run_id,
                     "historical_capture_id": mra["historical_capture_id"],
                     "new_material_artifact_id": artifact.reference_id,
