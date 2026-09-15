@@ -49,6 +49,8 @@ jobs:
         run: uv run --frozen python -m unittest discover -s tests/contracts -p 'test_*.py' -v
       - name: Run Issue 128 Profile generation advancement acceptance
         run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_profile_generation_advancement*.py' -v
+      - name: Run Issue 171 new material continuation acceptance
+        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue171_new_material_continuation.py' -v
       - name: Run Research State runtime tests
         run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_*.py' -v
 
@@ -89,7 +91,7 @@ jobs:
       - name: Run Issue 127 historical material recovery acceptance
         run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_historical_material_recovery*.py' -v
       - name: Run Issue 171 new material continuation acceptance
-        run: uv run --frozen python -m unittest -v tests.runtime.test_issue171_new_material_continuation
+        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue171_new_material_continuation.py' -v
 
   issue128-windows:
     name: issue128-windows
