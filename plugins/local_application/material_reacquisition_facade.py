@@ -9,9 +9,11 @@ import http.client
 import ipaddress
 import os
 from pathlib import Path
+import shutil
 import socket
 import ssl
-from threading import RLock
+import subprocess
+from threading import RLock, Thread
 import tempfile
 import time
 from typing import Any, Callable, Mapping
@@ -33,13 +35,17 @@ from .material_recovery_facade import _canonical_artifact_binding_for_capture
 
 
 _ACTION_TYPE = "desktop_research.material.reacquire"
-_PAYLOAD_CONTRACT = "desktop-research-material-reacquisition@0.1.0"
+_PAYLOAD_CONTRACT = "desktop-research-material-reacquisition@0.2.0"
 _ACTION_REGISTRATION_LOCK = RLock()
 _IMPLEMENTATION_ID = "plugin.local-application.material-reacquisition"
-_IMPLEMENTATION_VERSION = "0.1.0"
+_IMPLEMENTATION_VERSION = "0.2.0"
 _CAPABILITY_ID = "desktop-research-material-reacquisition"
+_CAPABILITY_VERSION = "0.2.0"
 _RESULT_DIAGNOSTIC = "historical_material_reacquisition"
-_NEW_MATERIAL_ROLE = "desktop_research.reacquired_original"
+_NEW_MATERIAL_ROLES = {
+    "original": "desktop_research.reacquired_original",
+    "rendition": "desktop_research.reacquired_rendition",
+}
 
 
 @dataclass(frozen=True)
@@ -65,8 +71,8 @@ def material_recovery_action_guidance() -> list[dict[str, Any]]:
         {
             "action_type": _ACTION_TYPE,
             "when": (
-                "exact retained bytes are unavailable and the historical exact "
-                "locator should be retrieved"
+                "exact retained bytes are unavailable; reacquire the historical "
+                "original or regenerate a rendition candidate under exact identity checks"
             ),
             "caller_fields": ["historical_run_id", "capture_id", "kind"],
         },
@@ -86,12 +92,12 @@ def material_reacquisition_payload(payload: Mapping[str, Any]) -> dict[str, str]
         raise ValueError("historical_run_id must be a non-empty string")
     if not isinstance(capture_id, str) or not capture_id:
         raise ValueError("capture_id must be a non-empty string")
-    if kind != "original":
-        raise ValueError("historical material reacquisition currently supports kind=original only")
+    if not isinstance(kind, str) or kind not in {"original", "rendition"}:
+        raise ValueError("kind must be original or rendition")
     return {
         "historical_run_id": run_id,
         "capture_id": capture_id,
-        "kind": "original",
+        "kind": kind,
     }
 
 
@@ -115,6 +121,134 @@ def _historical_equivalent(
 ) -> bool:
     """The sole classification guard between historical restoration and new material."""
     return expected_digest == actual_digest and expected_size == actual_size
+
+
+def _regenerate_text_rendition(
+    original_content: bytes,
+    original_media_type: str,
+    exact_locator: str,
+    *,
+    max_bytes: int,
+) -> RetrievedMaterial:
+    """Produce a bounded current rendition candidate; identity is decided only by digest/size."""
+    media_type = str(original_media_type).split(";", 1)[0].strip().lower()
+    if media_type == "text/plain":
+        try:
+            original_content.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise MaterialReacquisitionRetrievalError(
+                "verified text/plain original is not valid UTF-8"
+            ) from exc
+        if len(original_content) > max_bytes:
+            raise MaterialReacquisitionRetrievalError(
+                "regenerated rendition exceeds bounded material intake limit"
+            )
+        return RetrievedMaterial(
+            original_content,
+            "text/plain",
+            exact_locator,
+            "verified-original-utf8",
+            None,
+        )
+
+    if media_type != "application/pdf":
+        raise MaterialReacquisitionRetrievalError(
+            f"no trusted rendition generator is available for media type {original_media_type!r}"
+        )
+
+    tool = shutil.which("pdftotext")
+    if not tool:
+        raise MaterialReacquisitionRetrievalError(
+            "PDF rendition regeneration requires pdftotext to be available"
+        )
+    with tempfile.TemporaryDirectory(prefix="research-loom-rendition-") as temporary:
+        source = Path(temporary) / "source.pdf"
+        source.write_bytes(original_content)
+        try:
+            process = subprocess.Popen(
+                [tool, "-enc", "UTF-8", str(source), "-"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+            )
+        except OSError as exc:
+            raise MaterialReacquisitionRetrievalError(
+                "pdftotext rendition regeneration failed"
+            ) from exc
+        if process.stdout is None:
+            process.kill()
+            process.wait()
+            raise MaterialReacquisitionRetrievalError(
+                "pdftotext rendition regeneration did not expose bounded output"
+            )
+
+        content = bytearray()
+        read_errors: list[Exception] = []
+
+        def stop_process() -> None:
+            try:
+                process.kill()
+            except OSError:
+                pass
+
+        def read_output() -> None:
+            try:
+                while len(content) <= max_bytes:
+                    remaining = max_bytes + 1 - len(content)
+                    chunk = process.stdout.read(min(64 * 1024, remaining))
+                    if not chunk:
+                        break
+                    content.extend(chunk)
+                    if len(content) > max_bytes:
+                        stop_process()
+                        break
+            except Exception as exc:  # pragma: no cover - defensive I/O seam
+                read_errors.append(exc)
+                stop_process()
+
+        reader = Thread(target=read_output, daemon=True)
+        reader.start()
+        try:
+            returncode = process.wait(timeout=30)
+        except subprocess.TimeoutExpired as exc:
+            stop_process()
+            process.wait()
+            reader.join(timeout=1)
+            raise MaterialReacquisitionRetrievalError(
+                "pdftotext rendition regeneration timed out"
+            ) from exc
+        reader.join(timeout=1)
+        if reader.is_alive():
+            stop_process()
+            process.wait()
+            raise MaterialReacquisitionRetrievalError(
+                "pdftotext rendition output did not terminate cleanly"
+            )
+        if read_errors:
+            raise MaterialReacquisitionRetrievalError(
+                "pdftotext rendition output could not be read"
+            ) from read_errors[0]
+        if len(content) > max_bytes:
+            raise MaterialReacquisitionRetrievalError(
+                "regenerated rendition exceeds bounded material intake limit"
+            )
+        if returncode != 0:
+            raise MaterialReacquisitionRetrievalError(
+                "pdftotext rendition regeneration failed"
+            )
+        content = bytes(content)
+        try:
+            content.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise MaterialReacquisitionRetrievalError(
+                "regenerated rendition is not valid UTF-8"
+            ) from exc
+    return RetrievedMaterial(
+        content,
+        "text/plain",
+        exact_locator,
+        "pdftotext",
+        None,
+    )
 
 
 def _resolve_public_https_locator(locator: str):
@@ -457,8 +591,8 @@ class HistoricalMaterialReacquisitionService:
             invocation_id=f"INV-MRA-{token}",
             invocation_digest=invocation_digest,
             capability_id=_CAPABILITY_ID,
-            capability_version="0.1.0",
-            descriptor_digest=_identity_digest(_CAPABILITY_ID, "0.1.0"),
+            capability_version=_CAPABILITY_VERSION,
+            descriptor_digest=_identity_digest(_CAPABILITY_ID, _CAPABILITY_VERSION),
             implementation_id=_IMPLEMENTATION_ID,
             implementation_version=_IMPLEMENTATION_VERSION,
             function_id="reacquire",
@@ -522,10 +656,10 @@ class HistoricalMaterialReacquisitionService:
                 pass
 
     def reacquire(self, historical_run_id: str, capture_id: str, *, kind: str):
-        if kind != "original":
+        if kind not in {"original", "rendition"}:
             raise LocalApplicationError(
                 "APPLICATION-MATERIAL-REACQUISITION-INPUT-001",
-                "historical material reacquisition currently supports original captures only",
+                "historical material reacquisition kind must be original or rendition",
             )
         if self._workspace_root is None:
             raise LocalApplicationError(
@@ -609,18 +743,57 @@ class HistoricalMaterialReacquisitionService:
                     raise MaterialReacquisitionRetrievalError(
                         "historical material exceeds bounded reacquisition size limit"
                     )
-                if self._retriever is None:
-                    retrieved = _retrieve_exact_locator(exact_locator, max_bytes=max_bytes)
+                if kind == "original":
+                    if self._retriever is None:
+                        retrieved = _retrieve_exact_locator(exact_locator, max_bytes=max_bytes)
+                    else:
+                        retrieved = self._retriever(exact_locator)
+                    reacquisition_mode = "network_exact_locator"
+                    derivation_source = None
                 else:
-                    retrieved = self._retriever(exact_locator)
+                    original_diagnosis = self._store.diagnose_artifact_content(
+                        original.artifact_id
+                    )
+                    if original_diagnosis.get("status") != "verified":
+                        raise MaterialReacquisitionRetrievalError(
+                            "historical rendition regeneration requires the historical original to be verified first"
+                        )
+                    if int(original.size) > max_bytes:
+                        raise MaterialReacquisitionRetrievalError(
+                            "historical original exceeds bounded rendition regeneration limit"
+                        )
+                    original_payload = self._store.load_artifact(original.artifact_id)
+                    retrieved = _regenerate_text_rendition(
+                        original_payload.content,
+                        original.media_type,
+                        exact_locator,
+                        max_bytes=max_bytes,
+                    )
+                    reacquisition_mode = "regenerated_from_verified_historical_original"
+                    derivation_source = {
+                        "artifact_id": original.artifact_id,
+                        "digest": original.digest,
+                        "size": original.size,
+                    }
                 if not isinstance(retrieved, RetrievedMaterial):
                     raise MaterialReacquisitionRetrievalError(
-                        "retriever returned invalid material"
+                        "reacquisition provider returned invalid material"
                     )
                 if len(retrieved.content) > max_bytes:
                     raise MaterialReacquisitionRetrievalError(
                         "reacquired response exceeds bounded material intake limit"
                     )
+                if kind == "rendition":
+                    if str(retrieved.media_type).split(";", 1)[0].strip().lower() != "text/plain":
+                        raise MaterialReacquisitionRetrievalError(
+                            "rendition provider must return text/plain"
+                        )
+                    try:
+                        retrieved.content.decode("utf-8")
+                    except UnicodeDecodeError as exc:
+                        raise MaterialReacquisitionRetrievalError(
+                            "rendition provider must return valid UTF-8"
+                        ) from exc
                 actual_digest = _sha256(retrieved.content)
                 actual_size = len(retrieved.content)
 
@@ -636,6 +809,8 @@ class HistoricalMaterialReacquisitionService:
                     "final_locator": retrieved.final_locator,
                     "provider": retrieved.provider,
                     "http_status": retrieved.status_code,
+                    "reacquisition_mode": reacquisition_mode,
+                    "derivation_source": derivation_source,
                     "expected_digest": artifact.digest,
                     "expected_size": artifact.size,
                     "actual_digest": actual_digest,
@@ -657,35 +832,58 @@ class HistoricalMaterialReacquisitionService:
                         "historical_restore_status": restored["status"],
                     }
                 else:
-                    new_capture_id = f"CAP-MRA-{uuid.uuid4().hex}"
+                    version_token = uuid.uuid4().hex
+                    if kind == "original":
+                        new_capture_id = f"CAP-MRA-{version_token}"
+                        artifact_id = f"{child.run_id}.{new_capture_id}.original"
+                        relation = "reacquired_version_of_historical_capture"
+                        rendition_role = "original"
+                        parent_refs = (artifact.artifact_id,)
+                        version_fields = {"new_capture_id": new_capture_id}
+                        provenance_capture_id = new_capture_id
+                        media_type = retrieved.media_type or original.media_type
+                    else:
+                        new_rendition_version_id = f"REN-MRA-{version_token}"
+                        artifact_id = f"{child.run_id}.{new_rendition_version_id}.text"
+                        relation = "regenerated_version_of_historical_rendition"
+                        rendition_role = "text"
+                        parent_refs = (original.artifact_id, artifact.artifact_id)
+                        version_fields = {
+                            "new_rendition_version_id": new_rendition_version_id
+                        }
+                        provenance_capture_id = capture_id
+                        media_type = "text/plain"
                     new_artifact = self._store.put_bytes(
                         child,
-                        role=_NEW_MATERIAL_ROLE,
-                        media_type=retrieved.media_type or original.media_type,
+                        role=_NEW_MATERIAL_ROLES[kind],
+                        media_type=media_type,
                         content=retrieved.content,
-                        artifact_id=f"{child.run_id}.{new_capture_id}.original",
+                        artifact_id=artifact_id,
                         provenance={
-                            "capture_id": new_capture_id,
+                            "capture_id": provenance_capture_id,
                             "source_category": capture["source_category"],
                             "exact_locator": exact_locator,
                             "acquired_at": reacquired_at,
-                            "rendition_role": "original",
-                            "relation": "reacquired_version_of_historical_capture",
+                            "rendition_role": rendition_role,
+                            "relation": relation,
                             "historical_run_id": historical_run_id,
                             "historical_capture_id": capture_id,
                             "historical_artifact_id": artifact.artifact_id,
                             "historical_acquired_at": historical_acquired_at,
                             "provider": retrieved.provider,
+                            "reacquisition_mode": reacquisition_mode,
+                            "derivation_source": derivation_source,
                             "requested_exact_locator": exact_locator,
                             "final_locator": retrieved.final_locator,
                         },
-                        parent_artifact_refs=(artifact.artifact_id,),
+                        parent_artifact_refs=parent_refs,
                     )
                     payload = {
                         **common,
                         "status": "NEW_MATERIAL_VERSION",
-                        "new_capture_id": new_capture_id,
+                        **version_fields,
                         "new_artifact_id": new_artifact.artifact_id,
+                        "new_material_kind": kind,
                         "old_material_restored": False,
                         "requires_new_canonical_research_result": True,
                     }
