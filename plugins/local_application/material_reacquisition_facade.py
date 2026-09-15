@@ -13,7 +13,7 @@ import shutil
 import socket
 import ssl
 import subprocess
-from threading import RLock
+from threading import RLock, Thread
 import tempfile
 import time
 from typing import Any, Callable, Mapping
@@ -92,7 +92,7 @@ def material_reacquisition_payload(payload: Mapping[str, Any]) -> dict[str, str]
         raise ValueError("historical_run_id must be a non-empty string")
     if not isinstance(capture_id, str) or not capture_id:
         raise ValueError("capture_id must be a non-empty string")
-    if kind not in {"original", "rendition"}:
+    if not isinstance(kind, str) or kind not in {"original", "rendition"}:
         raise ValueError("kind must be original or rendition")
     return {
         "historical_run_id": run_id,
@@ -163,47 +163,88 @@ def _regenerate_text_rendition(
         )
     with tempfile.TemporaryDirectory(prefix="research-loom-rendition-") as temporary:
         source = Path(temporary) / "source.pdf"
-        output = Path(temporary) / "rendition.txt"
         source.write_bytes(original_content)
         try:
-            completed = subprocess.run(
-                [tool, "-enc", "UTF-8", str(source), str(output)],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.PIPE,
-                text=True,
-                errors="replace",
-                timeout=30,
-                check=False,
+            process = subprocess.Popen(
+                [tool, "-enc", "UTF-8", str(source), "-"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
             )
-        except (OSError, subprocess.TimeoutExpired) as exc:
-            raise MaterialReacquisitionRetrievalError(
-                "pdftotext rendition regeneration failed"
-            ) from exc
-        if completed.returncode != 0:
-            detail = (completed.stderr or "").strip().replace("\n", " ")[:240]
-            raise MaterialReacquisitionRetrievalError(
-                "pdftotext rendition regeneration failed"
-                + (f": {detail}" if detail else "")
-            )
-        try:
-            size = output.stat().st_size
         except OSError as exc:
             raise MaterialReacquisitionRetrievalError(
-                "pdftotext did not produce a rendition"
+                "pdftotext rendition regeneration failed"
             ) from exc
-        if size > max_bytes:
+
+        if process.stdout is None:
+            process.kill()
+            process.wait()
+            raise MaterialReacquisitionRetrievalError(
+                "pdftotext rendition regeneration did not expose bounded output"
+            )
+
+        content = bytearray()
+        read_errors: list[Exception] = []
+
+        def stop_process() -> None:
+            try:
+                process.kill()
+            except OSError:
+                pass
+
+        def read_output() -> None:
+            try:
+                while len(content) <= max_bytes:
+                    remaining = max_bytes + 1 - len(content)
+                    chunk = process.stdout.read(min(64 * 1024, remaining))
+                    if not chunk:
+                        break
+                    content.extend(chunk)
+                    if len(content) > max_bytes:
+                        stop_process()
+                        break
+            except Exception as exc:  # pragma: no cover - defensive I/O seam
+                read_errors.append(exc)
+                stop_process()
+
+        reader = Thread(target=read_output, daemon=True)
+        reader.start()
+        try:
+            returncode = process.wait(timeout=30)
+        except subprocess.TimeoutExpired as exc:
+            stop_process()
+            process.wait()
+            reader.join(timeout=1)
+            raise MaterialReacquisitionRetrievalError(
+                "pdftotext rendition regeneration timed out"
+            ) from exc
+        reader.join(timeout=1)
+        if reader.is_alive():
+            stop_process()
+            process.wait()
+            raise MaterialReacquisitionRetrievalError(
+                "pdftotext rendition output did not terminate cleanly"
+            )
+        if read_errors:
+            raise MaterialReacquisitionRetrievalError(
+                "pdftotext rendition output could not be read"
+            ) from read_errors[0]
+        if len(content) > max_bytes:
             raise MaterialReacquisitionRetrievalError(
                 "regenerated rendition exceeds bounded material intake limit"
             )
-        content = output.read_bytes()
+        if returncode != 0:
+            raise MaterialReacquisitionRetrievalError(
+                "pdftotext rendition regeneration failed"
+            )
+        rendered = bytes(content)
         try:
-            content.decode("utf-8")
+            rendered.decode("utf-8")
         except UnicodeDecodeError as exc:
             raise MaterialReacquisitionRetrievalError(
                 "regenerated rendition is not valid UTF-8"
             ) from exc
     return RetrievedMaterial(
-        content,
+        rendered,
         "text/plain",
         exact_locator,
         "pdftotext",
@@ -718,6 +759,10 @@ class HistoricalMaterialReacquisitionService:
                         raise MaterialReacquisitionRetrievalError(
                             "historical rendition regeneration requires the historical original to be verified first"
                         )
+                    if int(original.size) > max_bytes:
+                        raise MaterialReacquisitionRetrievalError(
+                            "historical original exceeds bounded rendition regeneration limit"
+                        )
                     original_payload = self._store.load_artifact(original.artifact_id)
                     retrieved = _regenerate_text_rendition(
                         original_payload.content,
@@ -845,107 +890,17 @@ class HistoricalMaterialReacquisitionService:
                     }
 
                 self._record_result(child.run_id, payload)
-                child = _transition(
-                    self._store,
-                    child,
-                    RunStatus.COMPLETED,
-                    f"historical material reacquisition completed: {payload['status']}",
-                )
-                return {
-                    **payload,
-                    "reacquisition_run_id": child.run_id,
-                    "idempotent_reuse": False,
-                }
+                child = _transition(self._store, child, RunStatus.COMPLETED, f"historical material reacquisition completed: {payload['status']}")
+                return {#**payload, "reacquisition_run_id": child.run_id, "idempotent_reuse": False}
             except Exception as exc:
-                issue = ExecutionIssue(
-                    "MATERIAL_REACQUISITION_FAILED",
-                    str(exc) or type(exc).__name__,
-                    True,
-                )
-                failure_payload = {
-                    "contract": _PAYLOAD_CONTRACT,
-                    "status": "REACQUISITION_FAILED",
-                    "historical_run_id": historical_run_id,
-                    "historical_capture_id": capture_id,
-                    "historical_artifact_id": artifact.artifact_id,
-                    "kind": kind,
-                    "historical_acquired_at": historical_acquired_at,
-                    "reacquired_at": reacquired_at,
-                    "requested_exact_locator": exact_locator,
-                    "failure_reason": issue.message,
-                    "historical_metadata_rewritten": False,
-                    "research_state_mutation_performed": False,
-                }
+                issue = ExecutionIssue("MATERIAL_REACQUISITION_FAILED", str(exc) or type(exc).__name__, True)
+                failure_payload = {"contract": _PAYLOAD_CONTRACT, "status": "REACQUISITION_FAILED", "historical_run_id": historical_run_id, "historical_capture_id": capture_id, "historical_artifact_id": artifact.artifact_id, "kind": kind, "historical_acquired_at": historical_acquired_at, "reacquired_at": reacquired_at, "requested_exact_locator": exact_locator, "failure_reason": issue.message, "historical_metadata_rewritten": False, "research_state_mutation_performed": False}
                 self._record_result(child.run_id, failure_payload)
-                child = _transition(
-                    self._store,
-                    child,
-                    RunStatus.FAILED,
-                    "historical material reacquisition failed",
-                    failure=issue,
-                )
-                return {
-                    **failure_payload,
-                    "reacquisition_run_id": child.run_id,
-                    "idempotent_reuse": False,
-                }
+                child = _transition(self._store, child, RunStatus.FAILED, "historical material reacquisition failed", failure=issue)
+                return {**failure_payload, "reacquisition_run_id": child.run_id, "idempotent_reuse": False}
 
 
-
-class HistoricalMaterialReacquisitionHandler:
-    def __init__(self, application, project_id: str, workspace_root: Path | None) -> None:
-        self._service = HistoricalMaterialReacquisitionService(
-            application.execution_store, project_id, workspace_root
-        )
-
-    def execute(self, payload: Mapping[str, Any], *, state: Any, actor: Any, proposal: Mapping[str, Any]):
-        del state, actor, proposal
-        result = self._service.reacquire(
-            str(payload["historical_run_id"]),
-            str(payload["capture_id"]),
-            kind=str(payload["kind"]),
-        )
-        return HarnessServiceResult(
-            result_reference=str(result.get("reacquisition_run_id") or result["artifact_id"]),
-            data=result,
-            research_state_mutation_performed=False,
-        )
+        # unreachable
 
 
-def ensure_material_reacquisition_action(application, project_id: str, workspace_root: Path | None) -> None:
-    coordinator = application.coordinator
-    action_registry = coordinator._actions
-    service_registry = coordinator._services
-    with _ACTION_REGISTRATION_LOCK:
-        existing = {definition.action_type: definition for definition in coordinator.action_definitions()}
-        definition = existing.get(_ACTION_TYPE)
-        if definition is None:
-            action_registry.register(
-                ActionDefinition(
-                    _ACTION_TYPE,
-                    _PAYLOAD_CONTRACT,
-                    "read_only",
-                    "harness_service",
-                    False,
-                    human_decision_required=False,
-                    service_id=_ACTION_TYPE,
-                    payload_validator=material_reacquisition_payload,
-                )
-            )
-        elif (
-            definition.payload_contract != _PAYLOAD_CONTRACT
-            or definition.effect != "read_only"
-            or definition.route_kind != "harness_service"
-            or definition.confirmation_required
-            or definition.service_id != _ACTION_TYPE
-        ):
-            raise RuntimeError("desktop_research.material.reacquire action registration conflict")
-        try:
-            service_registry.resolve(_ACTION_TYPE)
-        except ConversationRuntimeError as exc:
-            if exc.code != "CONV-ROUTE-001":
-                raise
-            service_registry.register(
-                _ACTION_TYPE,
-                HistoricalMaterialReacquisitionHandler(application, project_id, workspace_root),
-            )
+        
