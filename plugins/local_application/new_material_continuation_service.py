@@ -184,6 +184,49 @@ class NewMaterialContinuationService:
             historical_payload = admission._historical_action_payload(
                 self._application, historical.run_id
             )
+            claim = {
+                "relation": "new_material_version_continuation_claim",
+                "reacquisition_run_id": reacquisition_run_id,
+                "historical_run_id": historical.run_id,
+                "historical_capture_id": str(result["historical_capture_id"]),
+                "new_material_artifact_id": new_artifact.reference_id,
+            }
+            try:
+                claimed = store.claim_diagnostic_once(
+                    reacquisition_run_id,
+                    admission._CONTINUATION_CLAIM_DIAGNOSTIC,
+                    claim,
+                )
+            except Exception as exc:
+                raise LocalApplicationError(
+                    "APPLICATION-NEW-MATERIAL-CONTINUATION-IDEMPOTENCY-001",
+                    "new-material continuation claim is conflicting or corrupt",
+                ) from exc
+            if not claimed:
+                # A concurrent process may have completed between the initial
+                # binding read and the atomic claim. Reuse only an exact verified
+                # binding; otherwise leave the prior claim fail-closed.
+                binding = admission._continuation_binding(store, reacquisition_run_id)
+                if binding is not None:
+                    bound = admission._validate_continuation_binding(
+                        self._application, self._project_id, binding, result, historical
+                    )
+                    if bound.status is RunStatus.COMPLETED:
+                        return {
+                            "status": "COMPLETED",
+                            "reacquisition_run_id": reacquisition_run_id,
+                            "historical_run_id": historical.run_id,
+                            "new_run_id": bound.run_id,
+                            "new_handoff_id": bound.handoff_ref,
+                            "new_handoff_digest": bound.handoff_digest,
+                            "candidate_only": True,
+                            "idempotent_reuse": True,
+                            "research_state_mutation_performed": False,
+                        }
+                raise LocalApplicationError(
+                    "APPLICATION-NEW-MATERIAL-CONTINUATION-IDEMPOTENCY-001",
+                    "a prior new-material continuation claim exists without a completed reusable result",
+                )
             # This is a new execution fact, not an Execution Core retry. Historical
             # action payloads may themselves have been retries, so do not inherit
             # their parent binding. The reacquisition relation is persisted below.

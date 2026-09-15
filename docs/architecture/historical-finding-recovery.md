@@ -48,8 +48,9 @@ than rematerializing the historical result.
 This branch never restores or rewrites the missing historical artifact and never
 satisfies historical Finding recovery. Its output remains candidate-only and the
 ordinary Confirmation / Human Decision path remains the only Research State
-authority. `run show` exposes the new Run's parent reacquisition, historical
-Run/capture, material digest/size, exact locator, and historical/reacquired
-timestamps without exposing managed storage locations. Repeating a completed
-continuation reuses the one existing child result; conflicting prior children
-fail closed.
+authority. `run show` exposes the new Run's explicit reacquisition binding/provenance,
+historical Run/capture, material digest/size, exact locator, and
+historical/reacquired timestamps without exposing managed storage locations.
+The new Run is a root execution; `parent_run_id` is not used for continuation
+lineage. Repeating a completed continuation reuses the one existing bound
+result; conflicting or incomplete prior claims fail closed.

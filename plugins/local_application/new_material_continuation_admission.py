@@ -16,6 +16,7 @@ from .material_reacquisition_facade import (
 )
 
 _CONTINUATION_BINDING_DIAGNOSTIC = "desktop_research.new_material_continuation.binding"
+_CONTINUATION_CLAIM_DIAGNOSTIC = "desktop_research.new_material_continuation.claim"
 
 def _new_id(old: str, reacquisition_run_id: str) -> str:
     digest = hashlib.sha256(f"{reacquisition_run_id}\0{old}".encode("utf-8")).hexdigest()[:24]
@@ -118,10 +119,10 @@ def _find_reacquisition_result(application, project_id: str, reacquisition_run_i
     historical_artifact_id = str(result.get("historical_artifact_id") or "")
     if (
         run.parent_run_id != historical_run_id
-        or artifact.provenance.get("historical_run_id") != historical_run_id
-        or artifact.provenance.get("historical_capture_id") != capture_id
-        or artifact.provenance.get("historical_artifact_id") != historical_artifact_id
-        or artifact.provenance.get("relation")
+        or metadata.provenance.get("historical_run_id") != historical_run_id
+        or metadata.provenance.get("historical_capture_id") != capture_id
+        or metadata.provenance.get("historical_artifact_id") != historical_artifact_id
+        or metadata.provenance.get("relation")
         != "regenerated_version_of_historical_rendition"
     ):
         raise LocalApplicationError(
@@ -140,11 +141,11 @@ def _find_reacquisition_result(application, project_id: str, reacquisition_run_i
         or derivation.get("artifact_id") != original.artifact_id
         or derivation.get("digest") != original.digest
         or derivation.get("size") != original.size
-        or artifact.provenance.get("derivation_source") != derivation
-        or artifact.provenance.get("exact_locator")
+        or metadata.provenance.get("derivation_source") != derivation
+        or metadata.provenance.get("exact_locator")
         != result.get("requested_exact_locator")
-        or artifact.provenance.get("acquired_at") != result.get("reacquired_at")
-        or artifact.provenance.get("provider") != result.get("provider")
+        or metadata.provenance.get("acquired_at") != result.get("reacquired_at")
+        or metadata.provenance.get("provider") != result.get("provider")
     ):
         raise LocalApplicationError(
             "APPLICATION-NEW-MATERIAL-CONTINUATION-PROVENANCE-001",
@@ -158,6 +159,34 @@ def _find_reacquisition_result(application, project_id: str, reacquisition_run_i
             "verified historical original required for the new rendition is unavailable",
         ) from exc
     return run, result, artifact, historical, original, capture
+
+
+def _continuation_claim(store, reacquisition_run_id: str) -> dict[str, Any] | None:
+    records = [
+        item.get("payload")
+        for item in diagnostics_for(store, reacquisition_run_id, limit=8)
+        if item.get("kind") == _CONTINUATION_CLAIM_DIAGNOSTIC
+    ]
+    if not records:
+        return None
+    if len(records) != 1 or not isinstance(records[0], Mapping):
+        raise LocalApplicationError(
+            "APPLICATION-NEW-MATERIAL-CONTINUATION-IDEMPOTENCY-001",
+            "new-material continuation claim is ambiguous or corrupt",
+        )
+    claim = deepcopy(dict(records[0]))
+    if (
+        claim.get("relation") != "new_material_version_continuation_claim"
+        or claim.get("reacquisition_run_id") != reacquisition_run_id
+        or not isinstance(claim.get("historical_run_id"), str)
+        or not isinstance(claim.get("historical_capture_id"), str)
+        or not isinstance(claim.get("new_material_artifact_id"), str)
+    ):
+        raise LocalApplicationError(
+            "APPLICATION-NEW-MATERIAL-CONTINUATION-IDEMPOTENCY-001",
+            "new-material continuation claim is invalid",
+        )
+    return claim
 
 
 def _continuation_binding(store, reacquisition_run_id: str) -> dict[str, Any] | None:
