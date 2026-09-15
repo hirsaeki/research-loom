@@ -1,0 +1,195 @@
+from __future__ import annotations
+
+import shutil
+import subprocess
+from pathlib import Path
+from threading import RLock, Thread
+import tempfile
+from typing import Any
+
+from . import material_reacquisition_facade as _base
+
+
+_PYPDF_VERSION = "6.16.2"
+_INSTALL_LOCK = RLock()
+_INSTALLED = False
+_BASE_GENERATOR = _base._regenerate_text_rendition
+
+
+_PYPDF_SCRIPT = r"""
+import sys
+from pypdf import PdfReader
+
+source = sys.argv[1]
+text = "\n\n".join(page.extract_text() or "" for page in PdfReader(source).pages) + "\n"
+# The historical Probe2 G1 material was written with Path.write_text on Windows,
+# so text-mode newline translation serialized logical LF as CRLF bytes.
+sys.stdout.buffer.write(text.replace("\n", "\r\n").encode("utf-8"))
+""".strip()
+
+
+def _run_historical_pypdf(
+    original_content: bytes,
+    exact_locator: str,
+    *,
+    max_bytes: int,
+) -> _base.RetrievedMaterial:
+    uv = shutil.which("uv")
+    if not uv:
+        raise _base.MaterialReacquisitionRetrievalError(
+            "historical pypdf rendition regeneration requires uv to be available"
+        )
+
+    with tempfile.TemporaryDirectory(prefix="research-loom-pypdf-rendition-") as temporary:
+        source = Path(temporary) / "source.pdf"
+        source.write_bytes(original_content)
+        try:
+            process = subprocess.Popen(
+                [
+                    uv,
+                    "run",
+                    "--quiet",
+                    "--isolated",
+                    "--no-project",
+                    "--with",
+                    f"pypdf=={_PYPDF_VERSION}",
+                    "python",
+                    "-c",
+                    _PYPDF_SCRIPT,
+                    str(source),
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+            )
+        except OSError as exc:
+            raise _base.MaterialReacquisitionRetrievalError(
+                "historical pypdf rendition regeneration could not start"
+            ) from exc
+
+        if process.stdout is None:
+            process.kill()
+            process.wait()
+            raise _base.MaterialReacquisitionRetrievalError(
+                "historical pypdf rendition regeneration did not expose bounded output"
+            )
+
+        content = bytearray()
+        read_errors: list[Exception] = []
+
+        def stop_process() -> None:
+            try:
+                process.kill()
+            except OSError:
+                pass
+
+        def read_output() -> None:
+            try:
+                while len(content) <= max_bytes:
+                    remaining = max_bytes + 1 - len(content)
+                    chunk = process.stdout.read(min(64 * 1024, remaining))
+                    if not chunk:
+                        break
+                    content.extend(chunk)
+                    if len(content) > max_bytes:
+                        stop_process()
+                        break
+            except Exception as exc:  # pragma: no cover - defensive I/O seam
+                read_errors.append(exc)
+                stop_process()
+
+        reader = Thread(target=read_output, daemon=True)
+        reader.start()
+        try:
+            returncode = process.wait(timeout=60)
+        except subprocess.TimeoutExpired as exc:
+            stop_process()
+            process.wait()
+            reader.join(timeout=1)
+            raise _base.MaterialReacquisitionRetrievalError(
+                "historical pypdf rendition regeneration timed out"
+            ) from exc
+        reader.join(timeout=1)
+        if reader.is_alive():
+            stop_process()
+            process.wait()
+            raise _base.MaterialReacquisitionRetrievalError(
+                "historical pypdf rendition output did not terminate cleanly"
+            )
+        if read_errors:
+            raise _base.MaterialReacquisitionRetrievalError(
+                "historical pypdf rendition output could not be read"
+            ) from read_errors[0]
+        if len(content) > max_bytes:
+            raise _base.MaterialReacquisitionRetrievalError(
+                "regenerated rendition exceeds bounded material intake limit"
+            )
+        if returncode != 0:
+            raise _base.MaterialReacquisitionRetrievalError(
+                "historical pypdf rendition regeneration failed"
+            )
+        rendered = bytes(content)
+        try:
+            rendered.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise _base.MaterialReacquisitionRetrievalError(
+                "regenerated rendition is not valid UTF-8"
+            ) from exc
+        return _base.RetrievedMaterial(
+            rendered,
+            "text/plain",
+            exact_locator,
+            f"uv-pypdf/{_PYPDF_VERSION};newline=crlf",
+            None,
+        )
+
+
+def _regenerate_text_rendition(
+    original_content: bytes,
+    original_media_type: str,
+    exact_locator: str,
+    *,
+    max_bytes: int,
+) -> _base.RetrievedMaterial:
+    media_type = str(original_media_type).split(";", 1)[0].strip().lower()
+    if media_type != "application/pdf":
+        return _BASE_GENERATOR(
+            original_content,
+            original_media_type,
+            exact_locator,
+            max_bytes=max_bytes,
+        )
+
+    try:
+        return _run_historical_pypdf(
+            original_content,
+            exact_locator,
+            max_bytes=max_bytes,
+        )
+    except _base.MaterialReacquisitionRetrievalError as pypdf_error:
+        try:
+            return _BASE_GENERATOR(
+                original_content,
+                original_media_type,
+                exact_locator,
+                max_bytes=max_bytes,
+            )
+        except _base.MaterialReacquisitionRetrievalError as fallback_error:
+            raise _base.MaterialReacquisitionRetrievalError(
+                f"historical pypdf provider failed: {pypdf_error}; fallback failed: {fallback_error}"
+            ) from pypdf_error
+
+
+def _install_provider() -> None:
+    global _INSTALLED
+    with _INSTALL_LOCK:
+        if _INSTALLED:
+            return
+        _base._regenerate_text_rendition = _regenerate_text_rendition
+        _base._IMPLEMENTATION_VERSION = "0.2.1"
+        _base._CAPABILITY_VERSION = "0.2.1"
+        _INSTALLED = True
+
+
+def ensure_material_reacquisition_action(application: Any, project_id: str, workspace_root: Path | None) -> None:
+    _install_provider()
+    _base.ensure_material_reacquisition_action(application, project_id, workspace_root)
