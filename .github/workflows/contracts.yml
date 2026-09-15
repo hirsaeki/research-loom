@@ -49,8 +49,6 @@ jobs:
         run: uv run --frozen python -m unittest discover -s tests/contracts -p 'test_*.py' -v
       - name: Run Issue 128 Profile generation advancement acceptance
         run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_profile_generation_advancement*.py' -v
-      - name: Run Issue 171 new material continuation acceptance
-        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue171_new_material_continuation.py' -v
       - name: Run Research State runtime tests
         run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_*.py' -v
 
@@ -58,7 +56,7 @@ jobs:
   issue91-windows:
     name: issue91-windows
     runs-on: windows-latest
-    timeout-minutes: 7
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v5
         with:
