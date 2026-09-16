@@ -127,6 +127,7 @@ class ResearchPackageService:
         managed=(self.workspace/".research-loom").resolve(strict=False); out=parent/out.name
         if out.resolve(strict=False).is_relative_to(managed): raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-EXPORT-001","export may not write inside managed workspace state")
         temp=Path(tempfile.mkdtemp(prefix=".rp-export-",dir=parent)); staging=temp/"payload"
+        committed=False
         try:
             source=self.root/pid
             staging.mkdir()
@@ -140,10 +141,11 @@ class ResearchPackageService:
                 if not src.is_relative_to(source_root):
                     raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",f"unsafe Research Package export member: {rel}")
                 dst=staging/rel; dst.parent.mkdir(parents=True,exist_ok=True); shutil.copyfile(src,dst)
-            result=verify_export_root(staging); os.replace(staging,out)
+            result=verify_export_root(staging); os.replace(staging,out); committed=True
             _normalize_windows_export_acl(out)
         except OSError as exc:
-            shutil.rmtree(out,ignore_errors=True)
+            if committed:
+                shutil.rmtree(out,ignore_errors=True)
             shutil.rmtree(temp,ignore_errors=True)
             raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-WRITE-001","Research Package export failed") from exc
         except Exception:

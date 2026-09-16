@@ -45,7 +45,7 @@ class Issue133WindowsAclTests(ResearchPackageAcceptanceSupport):
                 continue
             if line.startswith(rendered_path):
                 stripped = line[len(rendered_path):].strip()
-            entries.append(stripped)
+            entries.append(stripped.replace("(I)", ""))
         return entries
 
     def _assert_fresh_process_reads_package(self, output: Path) -> None:
@@ -109,6 +109,28 @@ class Issue133WindowsAclTests(ResearchPackageAcceptanceSupport):
                     facade.export_research_package(case["package_id"], output)
             self.assertEqual(error.exception.code, "APPLICATION-RESEARCH-PACKAGE-WRITE-001")
             self.assertFalse(output.exists())
+        finally:
+            facade.close()
+
+    def test_acl3_replace_race_does_not_delete_competing_output(self):
+        facade, case = self._build()
+        output = self.root / "issue133-replace-race"
+        marker = output / "foreign.txt"
+
+        def competing_replace(_src, dst):
+            Path(dst).mkdir()
+            marker.write_text("foreign-output", encoding="utf-8")
+            raise OSError("fixture replace collision")
+
+        try:
+            with patch(
+                "plugins.local_application.research_package_service.os.replace",
+                side_effect=competing_replace,
+            ):
+                with self.assertRaises(LocalApplicationError) as error:
+                    facade.export_research_package(case["package_id"], output)
+            self.assertEqual(error.exception.code, "APPLICATION-RESEARCH-PACKAGE-WRITE-001")
+            self.assertEqual(marker.read_text(encoding="utf-8"), "foreign-output")
         finally:
             facade.close()
 
