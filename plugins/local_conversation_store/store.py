@@ -400,6 +400,24 @@ class LocalConversationStore:
             ).fetchone()
         return dict(row) if row else None
 
+    def run_correlations_for_conversation(self, conversation_id, *, limit):
+        """Return a bounded newest-first set of Runs created in one conversation."""
+        if not isinstance(conversation_id, str) or not conversation_id or limit <= 0:
+            raise ValueError("conversation_id and positive limit are required")
+        with self._lock:
+            rows = self._db.execute(
+                """
+                SELECT c.run_id,c.proposal_id,c.input_id
+                FROM run_correlations c
+                JOIN proposals p ON p.proposal_id=c.proposal_id
+                WHERE p.conversation_id=?
+                ORDER BY p.rowid DESC
+                LIMIT ?
+                """,
+                (conversation_id, int(limit)),
+            ).fetchall()
+        return tuple(dict(row) for row in rows)
+
     def store_state_delta_proposal(self, proposal_id, payload):
         serialized = self._json(payload)
         with self._lock:

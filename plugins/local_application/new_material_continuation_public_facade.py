@@ -154,24 +154,37 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                     self._application.execution_store, run_id
                 )
                 if binding is None:
-                    claim = admission._continuation_claim(
-                        self._application.execution_store, run_id
-                    )
-                    if claim is None:
-                        status, new_run_id = "available", None
-                    else:
-                        result["new_material_continuation"] = {
-                            "status": "blocked",
-                            "reacquisition_run_id": run_id,
-                            "failure_code": "APPLICATION-NEW-MATERIAL-CONTINUATION-IDEMPOTENCY-001",
-                            "historical_recovery_satisfied": False,
-                        }
-                        return result
+                    status, new_run_id = "available", None
                 else:
                     bound = admission._validate_continuation_binding(
-                        self._application, self._project_id, binding, mra, historical
+                        self._application,
+                        self._project_id,
+                        binding,
+                        mra,
+                        historical,
+                        require_mirror=False,
+                        require_completed_capture=False,
                     )
-                    status, new_run_id = bound.status.value.lower(), bound.run_id
+                    mirror_complete = admission._continuation_mirror_complete(
+                        self._application.execution_store, binding
+                    )
+                    if bound.status.value == "COMPLETED" and mirror_complete:
+                        status = (
+                            "completed"
+                            if admission._completed_continuation_is_reusable(
+                                self._application,
+                                self._project_id,
+                                binding,
+                                mra,
+                                historical,
+                            )
+                            else "retryable"
+                        )
+                    elif not mirror_complete:
+                        status = "interrupted"
+                    else:
+                        status = bound.status.value.lower()
+                    new_run_id = bound.run_id
             except LocalApplicationError as exc:
                 result["new_material_continuation"] = {
                     "status": "conflict",

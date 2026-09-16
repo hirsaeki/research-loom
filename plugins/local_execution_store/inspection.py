@@ -58,6 +58,39 @@ def diagnostics_for(
     return tuple(diagnostics)
 
 
+def latest_diagnostic_for(
+    store,
+    run_id: str,
+    *,
+    kind: str,
+) -> Mapping[str, Any] | None:
+    """Read the newest persisted diagnostic of one kind for a Run."""
+    with store._lock:
+        row = store._connection.execute(
+            """
+            SELECT kind, payload_json
+            FROM diagnostics
+            WHERE run_id=? AND kind=?
+            ORDER BY diagnostic_id DESC
+            LIMIT 1
+            """,
+            (str(run_id), str(kind)),
+        ).fetchone()
+    if row is None:
+        return None
+    try:
+        payload = json.loads(str(row["payload_json"]))
+    except json.JSONDecodeError as exc:
+        raise LocalExecutionStoreIntegrityError(
+            "persisted execution diagnostic is invalid JSON"
+        ) from exc
+    if not isinstance(payload, Mapping):
+        raise LocalExecutionStoreIntegrityError(
+            "persisted execution diagnostic payload must be an object"
+        )
+    return {"kind": str(row["kind"]), "payload": dict(payload)}
+
+
 def artifact_metadata_for(
     store,
     run_id: str,
