@@ -35,6 +35,19 @@ class Issue133WindowsAclTests(ResearchPackageAcceptanceSupport):
 
         return restricted
 
+    @staticmethod
+    def _acl_entries(path: Path, stdout: str) -> list[str]:
+        entries: list[str] = []
+        rendered_path = str(path)
+        for line in stdout.splitlines():
+            stripped = line.strip()
+            if not stripped or stripped.startswith("Successfully processed"):
+                continue
+            if line.startswith(rendered_path):
+                stripped = line[len(rendered_path):].strip()
+            entries.append(stripped)
+        return entries
+
     def _assert_fresh_process_reads_package(self, output: Path) -> None:
         script = (
             "from pathlib import Path; import sys; "
@@ -68,8 +81,10 @@ class Issue133WindowsAclTests(ResearchPackageAcceptanceSupport):
             facade.close()
 
         final_acl = self._icacls(output).stdout
-        self.assertIn("(I)", ordinary_acl)
-        self.assertIn("(I)", final_acl)
+        self.assertEqual(
+            self._acl_entries(output, final_acl),
+            self._acl_entries(ordinary, ordinary_acl),
+        )
         self._assert_fresh_process_reads_package(output)
         verified = verify_export_root(output)
         self.assertEqual(verified["status"], "VERIFIED")
@@ -100,6 +115,9 @@ class Issue133WindowsAclTests(ResearchPackageAcceptanceSupport):
     def test_ablation_old_rename_behavior_retains_restrictive_staging_acl(self):
         facade, case = self._build()
         output = self.root / "issue133-ablation"
+        ordinary = self.root / "ordinary-ablation-child"
+        ordinary.mkdir()
+        ordinary_acl = self._icacls(ordinary).stdout
         real_mkdtemp = __import__("tempfile").mkdtemp
         try:
             with patch(
@@ -114,9 +132,17 @@ class Issue133WindowsAclTests(ResearchPackageAcceptanceSupport):
             facade.close()
 
         ablated_acl = self._icacls(output).stdout
-        self.assertNotIn("(I)", ablated_acl)
+        self.assertNotEqual(
+            self._acl_entries(output, ablated_acl),
+            self._acl_entries(ordinary, ordinary_acl),
+        )
         self.assertEqual(verify_export_root(output)["status"], "VERIFIED")
-        print(json.dumps({"ISSUE133_ABLATION": {"final_acl": ablated_acl}}, sort_keys=True))
+        print(json.dumps({
+            "ISSUE133_ABLATION": {
+                "ordinary_acl": ordinary_acl,
+                "final_acl": ablated_acl,
+            }
+        }, sort_keys=True))
 
 
 if __name__ == "__main__":
