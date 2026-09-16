@@ -87,12 +87,15 @@ This does not make their internal payload layouts wrong. It means the Parent tre
 
 The tree model does not require internal homogenization.
 
-Valid durable leaves/children include:
+Valid durable leaves/children of the Parent Durable Store Root include:
 
 1. **inline canonical payload** — bounded JSON/text persisted inside the owning SQLite/registry record;
 2. **managed artifact payload** — opaque/large/non-reproducible bytes stored inside a child managed file/CAS boundary with stable identity plus digest/size;
-3. **immutable managed file/package payload** — deterministic managed files below a child root with integrity metadata;
-4. **export projection** — derived external output, not part of the durable tree and not authority;
+3. **immutable managed file/package payload** — deterministic managed files below a child root with integrity metadata.
+
+Non-durable workspace-adjacent classes are explicitly outside the Parent tree:
+
+4. **export projection** — derived external output, never a durable child or authority;
 5. **intake / scratch** — caller/operator/tool input, disposable after successful managed persistence.
 
 Do not move large binary payloads into SQLite merely for uniformity, and do not force bounded canonical JSON/text into CAS merely for visual symmetry.
