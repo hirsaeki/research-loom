@@ -39,7 +39,7 @@ class SurveyDatasetVerifiedReuseTests(SurveyVirtualRunnerTestBase):
             "content_digest": questionnaire["content_digest"],
         }
 
-    def test_same_run_reuses_first_capture_survives_race_and_supports_downstream_retry(self):
+    def test_verified_reuse_preserves_metadata_rejects_wrong_bindings_and_survives_race(self):
         with tempfile.TemporaryDirectory() as temp:
             app = make_virtual_app(temp)
             facade = LocalApplicationFacade(app, "PRJ-1")
@@ -92,42 +92,7 @@ class SurveyDatasetVerifiedReuseTests(SurveyVirtualRunnerTestBase):
                 self.assertEqual(response_again["ingested_at"], first_response["ingested_at"])
                 self.assertEqual(response_again["registry_digest"], first_response["registry_digest"])
 
-                spec = facade.capture_survey_analysis_spec(
-                    {
-                        "dataset_id": reused["dataset_id"],
-                        "dataset_digest": reused["content_digest"],
-                        "analysis_items": llm_payload(questionnaire)["analysis_items"],
-                    }
-                )
-                aggregate = facade.run_survey_aggregation(
-                    {
-                        "analysis_spec_id": spec["analysis_spec_id"],
-                        "analysis_spec_digest": spec["content_digest"],
-                        "dataset_id": reused["dataset_id"],
-                        "dataset_digest": reused["content_digest"],
-                    }
-                )
-                self.assertEqual(aggregate["dataset_ref"]["id"], dataset_id)
-                self.assertEqual(aggregate["epistemic_status"], "SYNTHETIC_TEST_ONLY")
-                self.assertEqual(state_signature(app), before_state)
-            finally:
-                app.close()
-
-    def test_reuse_guards_preserve_immutability_and_reject_wrong_bindings(self):
-        with tempfile.TemporaryDirectory() as temp:
-            app = make_virtual_app(temp)
-            facade = LocalApplicationFacade(app, "PRJ-1")
-            try:
-                questionnaire, first = self._completed_llm_run(facade)
-                run_id = first["run_id"]
-                dataset_id = first["response_dataset"]["dataset_id"]
-                instrument_ref = self._instrument_ref(questionnaire)
-                store = facade._survey_response_store()
-                stored = store.load_dataset("PRJ-1", dataset_id)
-                self.assertIsNotNone(stored)
-
                 # Ablation: without verified reuse, the old recreate path still conflicts.
-                time.sleep(0.002)
                 with patch.object(store, "load_dataset", return_value=None):
                     with patch.object(facade, "_survey_response_store", return_value=store):
                         with self.assertRaises(LocalApplicationError) as immutable:
@@ -154,22 +119,28 @@ class SurveyDatasetVerifiedReuseTests(SurveyVirtualRunnerTestBase):
                     def load_responses(self, project_id, response_keys):
                         return store.load_responses(project_id, response_keys)
 
-                mutations = []
-                wrong_artifact = deepcopy(stored)
+                wrong_artifact = deepcopy(first_dataset)
                 wrong_artifact["source_provenance"]["response_artifact_digest"] = "sha256:" + "0" * 64
-                mutations.append(wrong_artifact)
-                wrong_origin = deepcopy(stored)
+                wrong_origin = deepcopy(first_dataset)
                 wrong_origin["response_origin"] = "real"
-                mutations.append(wrong_origin)
-                wrong_producer = deepcopy(stored)
+                wrong_producer = deepcopy(first_dataset)
                 wrong_producer["source_run_ids"] = ["RUN-FOREIGN"]
-                mutations.append(wrong_producer)
 
-                for mutated in mutations:
-                    with self.subTest(origin=mutated["response_origin"], source_run_ids=mutated["source_run_ids"]):
-                        with patch.object(facade, "_survey_response_store", return_value=ResponseStoreProxy(mutated)):
+                for mutated in (wrong_artifact, wrong_origin, wrong_producer):
+                    with self.subTest(
+                        origin=mutated["response_origin"],
+                        source_run_ids=mutated["source_run_ids"],
+                    ):
+                        with patch.object(
+                            facade,
+                            "_survey_response_store",
+                            return_value=ResponseStoreProxy(mutated),
+                        ):
                             with self.assertRaises(LocalApplicationError) as caught:
-                                facade.capture_virtual_run_response_dataset(run_id, instrument_ref=instrument_ref)
+                                facade.capture_virtual_run_response_dataset(
+                                    run_id,
+                                    instrument_ref=instrument_ref,
+                                )
                         self.assertEqual(caught.exception.code, "APPLICATION-SURVEY-RESPONSE-REUSE-001")
 
                 class RawMismatchProxy(ResponseStoreProxy):
@@ -179,17 +150,25 @@ class SurveyDatasetVerifiedReuseTests(SurveyVirtualRunnerTestBase):
                         values[first_key]["raw_input"]["answers"]["role"] = "tampered-answer"
                         return values
 
-                with patch.object(facade, "_survey_response_store", return_value=RawMismatchProxy(stored)):
+                with patch.object(
+                    facade,
+                    "_survey_response_store",
+                    return_value=RawMismatchProxy(first_dataset),
+                ):
                     with self.assertRaises(LocalApplicationError) as answer_error:
-                        facade.capture_virtual_run_response_dataset(run_id, instrument_ref=instrument_ref)
+                        facade.capture_virtual_run_response_dataset(
+                            run_id,
+                            instrument_ref=instrument_ref,
+                        )
                 self.assertEqual(answer_error.exception.code, "APPLICATION-SURVEY-RESPONSE-REUSE-001")
 
-                # Test-local guard ablation: accepting a Dataset before producer/artifact
-                # verification would make the deliberately wrong binding reusable.
-                wrong = deepcopy(wrong_artifact)
-                with patch.object(facade, "_survey_response_store", return_value=ResponseStoreProxy(wrong)):
-                    with self.assertRaises(LocalApplicationError):
-                        facade.capture_virtual_run_response_dataset(run_id, instrument_ref=instrument_ref)
+                # Guard ablation: bypassing producer/artifact verification would
+                # accept the deliberately wrong immutable Dataset binding.
+                with patch.object(
+                    facade,
+                    "_survey_response_store",
+                    return_value=ResponseStoreProxy(wrong_artifact),
+                ):
                     with patch.object(
                         facade,
                         "_verified_virtual_dataset_reuse",
@@ -198,12 +177,36 @@ class SurveyDatasetVerifiedReuseTests(SurveyVirtualRunnerTestBase):
                             status="ALREADY_CAPTURED",
                         ),
                     ):
-                        accepted = facade.capture_virtual_run_response_dataset(run_id, instrument_ref=instrument_ref)
+                        accepted = facade.capture_virtual_run_response_dataset(
+                            run_id,
+                            instrument_ref=instrument_ref,
+                        )
                 self.assertEqual(accepted["status"], "ALREADY_CAPTURED")
                 self.assertEqual(
                     accepted["source_provenance"]["response_artifact_digest"],
                     "sha256:" + "0" * 64,
                 )
+
+                # Downstream aggregation can retry from the immutable Dataset
+                # without re-running Virtual Respondents.
+                spec = facade.capture_survey_analysis_spec(
+                    {
+                        "dataset_id": reused["dataset_id"],
+                        "dataset_digest": reused["content_digest"],
+                        "analysis_items": llm_payload(questionnaire)["analysis_items"],
+                    }
+                )
+                aggregate = facade.run_survey_aggregation(
+                    {
+                        "analysis_spec_id": spec["analysis_spec_id"],
+                        "analysis_spec_digest": spec["content_digest"],
+                        "dataset_id": reused["dataset_id"],
+                        "dataset_digest": reused["content_digest"],
+                    }
+                )
+                self.assertEqual(aggregate["dataset_ref"]["id"], dataset_id)
+                self.assertEqual(aggregate["epistemic_status"], "SYNTHETIC_TEST_ONLY")
+                self.assertEqual(state_signature(app), before_state)
             finally:
                 app.close()
 
