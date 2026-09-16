@@ -76,7 +76,7 @@ def _candidate(state, actions, proposal_id):
 
 
 class PendingStateChangingGuardTests(unittest.TestCase):
-    def test_pending_decision_blocks_confirmed_decision_free_state_apply(self):
+    def test_pending_decision_does_not_block_unrelated_decision_free_state_apply(self):
         seed = seed_state(
             objects=[project(), rq(state="approved")],
             mode="real",
@@ -124,7 +124,7 @@ class PendingStateChangingGuardTests(unittest.TestCase):
                     "revision": 0,
                     "project_id": "PRJ-1",
                     "question_id": "RQ-1",
-                    "statement": "A decision-free candidate that must still wait",
+                    "statement": "A decision-free candidate unrelated to the pending Decision",
                     "assessment": "proposed",
                 }
                 second = _candidate(
@@ -151,6 +151,79 @@ class PendingStateChangingGuardTests(unittest.TestCase):
                     "IN-B", "COMMITTABLE_ACTION", "apply second"
                 ))
                 self.assertEqual(second_confirmation.status, "CONFIRMATION_REQUIRED")
+                committed = app.coordinator.process_input(_input(
+                    "IN-BC",
+                    "CONFIRMATION",
+                    "yes",
+                    target={"target_type": "confirmation_request", "target_id": "CONFREQ-B"},
+                ))
+                self.assertEqual(committed.status, "SUCCEEDED")
+                after = app.state_repository.load_state_view("PRJ-1", "LIN-1")
+                self.assertNotEqual(
+                    after.current_snapshot["content_digest"],
+                    before.current_snapshot["content_digest"],
+                )
+                self.assertIsNotNone(after.latest_object("claim", "CLM-SECOND"))
+                self.assertEqual(
+                    [item["request_id"] for item in app.human_decisions.pending("PRJ-1")],
+                    [request_id],
+                )
+            finally:
+                app.close()
+
+    def test_pending_decision_blocks_only_the_exact_bound_candidate_reapply(self):
+        seed = seed_state(
+            objects=[project(), rq(state="approved")],
+            mode="real",
+            snapshot_id="SNP-PENDING-EXACT-0",
+        )
+        mapping = {
+            "apply guarded": ActionDraft(
+                "state.apply_candidate",
+                {"state_delta_proposal_id": "SDP-GUARDED"},
+            ),
+        }
+        ids = [
+            "PROP-A", "CONFREQ-A", "CONFREC-A", "ACTREC-A", "CONVTRACE-A",
+            "PROP-B", "CONFREQ-B", "CONFREC-B", "ACTREC-B", "CONVTRACE-B",
+        ]
+        with tempfile.TemporaryDirectory() as temp:
+            app = LocalResearchApplication(
+                temp,
+                resolver=MappingResolver(mapping),
+                effective_profile_set_provider=_profile_provider,
+                seed_state=seed,
+                clock=CLOCK,
+                id_provider=SequenceIdProvider(ids),
+            )
+            try:
+                current = app.state_repository.load_state_view("PRJ-1", "LIN-1")
+                revised = deepcopy(dict(current.latest_object("research_question", "RQ-1")))
+                revised["revision"] += 1
+                revised["text"] = "Material revision requiring Human Decision"
+                guarded = _candidate(
+                    current,
+                    [TransitionAction(TransitionKind.REVISE_OBJECT, {"object": revised})],
+                    "SDP-GUARDED",
+                )
+                app.conversation_store.store_state_delta_proposal("SDP-GUARDED", guarded)
+
+                first = app.coordinator.process_input(_input(
+                    "IN-A", "COMMITTABLE_ACTION", "apply guarded"
+                ))
+                self.assertEqual(first.status, "CONFIRMATION_REQUIRED")
+                gated = app.coordinator.process_input(_input(
+                    "IN-AC",
+                    "CONFIRMATION",
+                    "yes",
+                    target={"target_type": "confirmation_request", "target_id": "CONFREQ-A"},
+                ))
+                request_id = gated.data["decision_request"]["request_id"]
+
+                second = app.coordinator.process_input(_input(
+                    "IN-B", "COMMITTABLE_ACTION", "apply guarded"
+                ))
+                self.assertEqual(second.status, "CONFIRMATION_REQUIRED")
                 blocked = app.coordinator.process_input(_input(
                     "IN-BC",
                     "CONFIRMATION",
@@ -162,12 +235,11 @@ class PendingStateChangingGuardTests(unittest.TestCase):
                     blocked.data["pending_human_decision_request_ids"],
                     [request_id],
                 )
-                after = app.state_repository.load_state_view("PRJ-1", "LIN-1")
+                unchanged = app.state_repository.load_state_view("PRJ-1", "LIN-1")
                 self.assertEqual(
-                    after.current_snapshot["content_digest"],
-                    before.current_snapshot["content_digest"],
+                    unchanged.current_snapshot["content_digest"],
+                    current.current_snapshot["content_digest"],
                 )
-                self.assertIsNone(after.latest_object("claim", "CLM-SECOND"))
             finally:
                 app.close()
 
