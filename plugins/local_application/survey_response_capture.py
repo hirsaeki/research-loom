@@ -23,7 +23,116 @@ def _issue(code: str, message: str, *, response_id: str | None = None) -> dict[s
     return value
 
 
+def _canonical_raw(value: Any) -> str:
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
 class SurveyResponseCaptureMixin:
+    @staticmethod
+    def _dataset_capture_result(dataset: Mapping[str, Any], *, status: str) -> Mapping[str, Any]:
+        return {
+            "status": status,
+            "project_id": str(dataset["project_id"]),
+            "dataset_id": str(dataset["dataset_id"]),
+            "content_digest": str(dataset["content_digest"]),
+            "registry_digest": str(dataset["registry_digest"]),
+            "instrument_ref": deepcopy(dataset["instrument_ref"]),
+            "response_origin": str(dataset["response_origin"]),
+            "epistemic_status": str(dataset["epistemic_status"]),
+            "response_count": int(dataset["response_count"]),
+            "accepted_count": int(dataset["accepted_count"]),
+            "rejected_count": int(dataset["rejected_count"]),
+            "created_at": str(dataset["created_at"]),
+            "validation_summary": deepcopy(dataset["validation_summary"]),
+            "source_run_ids": deepcopy(dataset["source_run_ids"]),
+            "source_provenance": deepcopy(dataset["source_provenance"]),
+            "captured_against": deepcopy(dataset["captured_against"]),
+            "research_state_mutation_performed": False,
+        }
+
+    def _verified_virtual_dataset_reuse(
+        self,
+        dataset: Mapping[str, Any],
+        *,
+        run_id: str,
+        instrument_ref: Mapping[str, Any],
+        expected_provenance: Mapping[str, Any],
+        raw_inputs: list[Any],
+    ) -> Mapping[str, Any]:
+        expected_dataset_id = f"SRD-{run_id}"
+        if (
+            str(dataset.get("project_id")) != self._project_id
+            or str(dataset.get("dataset_id")) != expected_dataset_id
+            or dataset.get("instrument_ref") != dict(instrument_ref)
+            or dataset.get("response_origin") != "synthetic"
+            or dataset.get("epistemic_status") != "SYNTHETIC_TEST_ONLY"
+            or dataset.get("source_run_ids") != [run_id]
+            or dataset.get("capture_origin") != "survey_virtual_runner"
+            or dataset.get("source_provenance") != expected_provenance
+            or int(dataset.get("response_count", -1)) != len(raw_inputs)
+        ):
+            raise LocalApplicationError(
+                "APPLICATION-SURVEY-RESPONSE-REUSE-001",
+                "existing SurveyResponseDataset does not match the requested Virtual Runner identity",
+            )
+
+        refs = list(dataset["accepted_response_refs"]) + list(dataset["rejected_response_refs"])
+        response_keys = [
+            (str(ref["identity_namespace"]), str(ref["response_id"]))
+            for ref in refs
+        ]
+        try:
+            loaded = self._survey_response_store().load_responses(
+                self._project_id,
+                response_keys,
+            )
+        except LocalSurveyResponseStoreError as exc:
+            raise LocalApplicationError(exc.code, exc.message) from exc
+        if len(loaded) != len(response_keys):
+            raise LocalApplicationError(
+                "APPLICATION-SURVEY-RESPONSE-REUSE-001",
+                "existing SurveyResponseDataset response set is incomplete",
+            )
+
+        stored_raw_inputs = [deepcopy(item["raw_input"]) for item in loaded.values()]
+        stored_raw_inputs.extend(
+            deepcopy(item["raw_input"])
+            for item in dataset["rejected_inputs"]
+            if not item.get("canonical_response_ref")
+        )
+        if sorted(_canonical_raw(item) for item in stored_raw_inputs) != sorted(
+            _canonical_raw(item) for item in raw_inputs
+        ):
+            raise LocalApplicationError(
+                "APPLICATION-SURVEY-RESPONSE-REUSE-001",
+                "existing SurveyResponseDataset raw response content does not match the producer artifact",
+            )
+
+        for ref in refs:
+            key = (str(ref["identity_namespace"]), str(ref["response_id"]))
+            stored = loaded[key]["response"]
+            if (
+                str(stored["content_digest"]) != str(ref["content_digest"])
+                or stored["instrument_ref"] != dict(instrument_ref)
+                or stored["response_origin"] != "synthetic"
+                or stored["epistemic_status"] != "SYNTHETIC_TEST_ONLY"
+                or stored.get("source_run_id") != run_id
+                or any(
+                    stored.get("source_provenance", {}).get(key) != expected_provenance[key]
+                    for key in (
+                        "response_artifact_id",
+                        "response_artifact_digest",
+                        "scenario_class",
+                        "generator_backend",
+                    )
+                )
+            ):
+                raise LocalApplicationError(
+                    "APPLICATION-SURVEY-RESPONSE-REUSE-001",
+                    "existing SurveyResponseDataset canonical response binding does not match the producer artifact",
+                )
+        return self._dataset_capture_result(dataset, status="ALREADY_CAPTURED")
+
     def _capture_dataset(
         self,
         input_value: Mapping[str, Any],
@@ -224,22 +333,10 @@ class SurveyResponseCaptureMixin:
                 "APPLICATION-SURVEY-STATE-MUTATION-001",
                 "Survey response capture mutated authoritative Research State",
             )
-        return {
-            "status": "CAPTURED" if created else "ALREADY_CAPTURED",
-            "project_id": self._project_id,
-            "dataset_id": dataset["dataset_id"],
-            "content_digest": dataset["content_digest"],
-            "instrument_ref": instrument_ref,
-            "response_origin": origin,
-            "epistemic_status": epistemic,
-            "response_count": dataset["response_count"],
-            "accepted_count": dataset["accepted_count"],
-            "rejected_count": dataset["rejected_count"],
-            "validation_summary": deepcopy(dataset["validation_summary"]),
-            "source_run_ids": source_run_ids,
-            "captured_against": deepcopy(dataset["captured_against"]),
-            "research_state_mutation_performed": False,
-        }
+        return self._dataset_capture_result(
+            dataset,
+            status="CAPTURED" if created else "ALREADY_CAPTURED",
+        )
 
     def capture_survey_response_dataset(
         self,
@@ -279,6 +376,11 @@ class SurveyResponseCaptureMixin:
                 "APPLICATION-SURVEY-RESPONSE-RUN-001",
                 "Survey response Dataset can only be captured from a completed virtual Run",
             )
+        _, resolved_instrument_ref = self._resolve_instrument({
+            "instrument_id": str(instrument_ref["id"]),
+            "instrument_version": str(instrument_ref["version"]),
+            "instrument_digest": str(instrument_ref["content_digest"]),
+        })
         artifact_id = f"ART-VR-RESP-{run_id}"
         artifacts = {
             item.artifact_id: item
@@ -291,7 +393,7 @@ class SurveyResponseCaptureMixin:
                 "Virtual Runner response artifact is missing or has the wrong role",
             )
         provenance = dict(metadata.provenance)
-        if provenance.get("instrument_digest") != instrument_ref.get("content_digest"):
+        if provenance.get("instrument_digest") != resolved_instrument_ref["content_digest"]:
             raise LocalApplicationError(
                 "APPLICATION-SURVEY-RESPONSE-INSTRUMENT-001",
                 "Virtual Runner response artifact Instrument digest does not match the pinned Instrument",
@@ -315,25 +417,44 @@ class SurveyResponseCaptureMixin:
                 "APPLICATION-SURVEY-RESPONSE-RUN-001",
                 "Virtual Runner response artifact does not satisfy the PR41 response batch boundary",
             )
+        raw_inputs = [virtual_record_to_raw(item) for item in batch["responses"]]
+        expected_provenance = {
+            "producer": (
+                "survey_virtual_runner.llm@1.0.0"
+                if provenance.get("generator_backend") == "llm"
+                else "survey_virtual_runner.structural@0.1.0"
+            ),
+            "response_artifact_id": artifact_id,
+            "response_artifact_digest": metadata.digest,
+            "scenario_class": batch.get("scenario_class"),
+            "generator_backend": provenance.get("generator_backend", "structural"),
+        }
+        dataset_id = f"SRD-{run_id}"
+        try:
+            existing = self._survey_response_store().load_dataset(
+                self._project_id,
+                dataset_id,
+            )
+        except LocalSurveyResponseStoreError as exc:
+            raise LocalApplicationError(exc.code, exc.message) from exc
+        if existing is not None:
+            return self._verified_virtual_dataset_reuse(
+                existing,
+                run_id=run_id,
+                instrument_ref=resolved_instrument_ref,
+                expected_provenance=expected_provenance,
+                raw_inputs=raw_inputs,
+            )
+
         payload = {
-            "instrument_id": str(instrument_ref["id"]),
-            "instrument_version": str(instrument_ref["version"]),
-            "instrument_digest": str(instrument_ref["content_digest"]),
+            "instrument_id": resolved_instrument_ref["id"],
+            "instrument_version": resolved_instrument_ref["version"],
+            "instrument_digest": resolved_instrument_ref["content_digest"],
             "response_origin": "synthetic",
             "epistemic_status": "SYNTHETIC_TEST_ONLY",
-            "responses": [virtual_record_to_raw(item) for item in batch["responses"]],
+            "responses": raw_inputs,
             "source_run_id": run_id,
-            "source_provenance": {
-                "producer": (
-                    "survey_virtual_runner.llm@1.0.0"
-                    if provenance.get("generator_backend") == "llm"
-                    else "survey_virtual_runner.structural@0.1.0"
-                ),
-                "response_artifact_id": artifact_id,
-                "response_artifact_digest": metadata.digest,
-                "scenario_class": batch.get("scenario_class"),
-                "generator_backend": provenance.get("generator_backend", "structural"),
-            },
+            "source_provenance": expected_provenance,
             "capture_origin": "survey_virtual_runner",
         }
         return self._capture_dataset(payload, enforce_unique_participant=True)
