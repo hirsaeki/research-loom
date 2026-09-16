@@ -38,6 +38,47 @@ class LocalExecutionStoreConcurrencySecurityTests(unittest.TestCase):
         )
         return store, run
 
+    def test_diagnostic_claim_is_atomic_across_connections(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "execution-store"
+            config = LocalExecutionStoreConfig()
+            seed, run = self._seed_run(root, config, "RUN-CLAIM")
+            seed.close()
+            first = LocalExecutionStore(root, config=config)
+            second = LocalExecutionStore(root, config=config)
+            barrier = Barrier(3)
+            guard = Lock()
+            outcomes: list[tuple[str, object]] = []
+            payload = {"relation": "new_material_version_continuation_claim"}
+
+            def worker(store) -> None:
+                barrier.wait()
+                try:
+                    value = store.claim_diagnostic_once(
+                        run.run_id,
+                        "desktop_research.new_material_continuation.claim",
+                        payload,
+                    )
+                    outcome = ("ok", value)
+                except Exception as exc:  # captured for exact post-join assertion
+                    outcome = ("error", exc)
+                with guard:
+                    outcomes.append(outcome)
+
+            threads = (Thread(target=worker, args=(first,)), Thread(target=worker, args=(second,)))
+            try:
+                for thread in threads:
+                    thread.start()
+                barrier.wait()
+                for thread in threads:
+                    thread.join(timeout=10)
+                self.assertTrue(all(not thread.is_alive() for thread in threads))
+                self.assertEqual(sorted(value for kind, value in outcomes if kind == "ok"), [False, True])
+                self.assertEqual([value for kind, value in outcomes if kind == "error"], [])
+            finally:
+                first.close()
+                second.close()
+
     def test_run_output_quota_is_atomic_across_connections(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary) / "execution-store"

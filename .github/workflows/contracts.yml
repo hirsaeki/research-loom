@@ -56,7 +56,7 @@ jobs:
   issue91-windows:
     name: issue91-windows
     runs-on: windows-latest
-    timeout-minutes: 7
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v5
         with:
@@ -88,6 +88,8 @@ jobs:
         run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_historical_result_recovery.py' -v
       - name: Run Issue 127 historical material recovery acceptance
         run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_historical_material_recovery*.py' -v
+      - name: Run Issue 171 new material continuation acceptance
+        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue171_new_material_continuation.py' -v
 
   issue128-windows:
     name: issue128-windows

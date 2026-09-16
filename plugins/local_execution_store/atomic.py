@@ -14,6 +14,7 @@ from .store import (
     LocalExecutionStore as _BaseExecutionStore,
     LocalExecutionStoreError,
     LocalExecutionStoreIntegrityError,
+    _canonical_json,
 )
 
 
@@ -36,6 +37,52 @@ class LocalExecutionStore(_BaseExecutionStore):
         """Keep production blob creation inside the same DB writer serialization."""
         with self._write_transaction():
             return super().register_input_bytes(*args, **kwargs)
+
+    def claim_diagnostic_once(
+        self,
+        run_id: str,
+        kind: str,
+        payload: Mapping[str, Any],
+    ) -> bool:
+        """Atomically claim one exact Run-scoped diagnostic identity.
+
+        Returns True for the writer that created the claim and False when the
+        same claim already exists. A conflicting or duplicated persisted claim
+        fails closed. BEGIN IMMEDIATE serializes this across store connections
+        and processes without adding a new persistence concept or schema.
+        """
+        payload_json = _canonical_json(dict(payload))
+        with self._write_transaction():
+            exists = self._connection.execute(
+                "SELECT 1 FROM runs WHERE run_id = ?",
+                (run_id,),
+            ).fetchone()
+            if exists is None:
+                raise ValueError(f"unknown Run {run_id}")
+            rows = self._connection.execute(
+                """
+                SELECT payload_json
+                FROM diagnostics
+                WHERE run_id = ? AND kind = ?
+                ORDER BY diagnostic_id ASC
+                LIMIT 2
+                """,
+                (run_id, str(kind)),
+            ).fetchall()
+            if rows:
+                if len(rows) != 1 or str(rows[0]["payload_json"]) != payload_json:
+                    raise LocalExecutionStoreIntegrityError(
+                        "immutable diagnostic claim collision"
+                    )
+                return False
+            self._connection.execute(
+                """
+                INSERT INTO diagnostics(run_id, kind, payload_json)
+                VALUES (?, ?, ?)
+                """,
+                (run_id, str(kind), payload_json),
+            )
+            return True
 
     @contextmanager
     def require_run_status(
