@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextvars import ContextVar
 from html.parser import HTMLParser
 from threading import RLock
 from typing import Any, Mapping
@@ -10,6 +11,10 @@ from . import new_material_continuation_service as _base
 _INSTALL_LOCK = RLock()
 _INSTALLED = False
 _BASE_CAPTURE = _base.NewMaterialContinuationService._capture_new_material_version
+_BASE_RENDER = _base._render_reacquired_html_rendition
+_TEXT_RENDITION_LIMIT: ContextVar[int | None] = ContextVar(
+    "new_material_continuation_text_rendition_limit", default=None
+)
 
 
 class _SafeG1HtmlTextParser(HTMLParser):
@@ -56,6 +61,23 @@ def _capture_budget_for_run(self, new_run) -> Mapping[str, Any]:
     return budget
 
 
+def _render_with_pinned_text_budget(
+    original_content: bytes,
+    media_type: str | None,
+    *,
+    max_bytes: int,
+) -> bytes:
+    pinned_limit = _TEXT_RENDITION_LIMIT.get()
+    effective_limit = (
+        max_bytes if pinned_limit is None else min(max_bytes, pinned_limit)
+    )
+    return _BASE_RENDER(
+        original_content,
+        media_type,
+        max_bytes=effective_limit,
+    )
+
+
 def _capture_with_pinned_html_budget(
     self,
     new_run,
@@ -92,11 +114,19 @@ def _capture_with_pinned_html_budget(
                 "APPLICATION-NEW-MATERIAL-CONTINUATION-MATERIAL-001",
                 "reacquired original exceeds the pinned capture budget",
             )
-        _base._render_reacquired_html_rendition(
-            new_artifact.content,
-            new_artifact.media_type,
-            max_bytes=text_limit,
-        )
+        token = _TEXT_RENDITION_LIMIT.set(text_limit)
+        try:
+            return _BASE_CAPTURE(
+                self,
+                new_run,
+                historical,
+                historical_extension,
+                result,
+                new_artifact,
+                reacquisition_run_id,
+            )
+        finally:
+            _TEXT_RENDITION_LIMIT.reset(token)
     return _BASE_CAPTURE(
         self,
         new_run,
@@ -114,6 +144,7 @@ def install_new_material_continuation_html_hardening() -> None:
         if _INSTALLED:
             return
         _base._G1HtmlTextParser = _SafeG1HtmlTextParser
+        _base._render_reacquired_html_rendition = _render_with_pinned_text_budget
         _base.NewMaterialContinuationService._capture_new_material_version = (
             _capture_with_pinned_html_budget
         )
