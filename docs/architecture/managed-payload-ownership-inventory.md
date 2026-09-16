@@ -1,70 +1,66 @@
-# Managed payload ownership boundary
+# Durable payload ownership and portable store tree
 
-Issue #163 records one repository-wide persistence rule without introducing a universal storage framework.
+Issue #163 audits current production persistence against one repository-wide rule:
 
-## Contract
+> Every durable Loom payload must belong to one Loom-managed Parent Durable Store Root tree, and Loom must be able to resolve and verify that payload from durable metadata plus that tree without depending on an original intake path, scratch file, caller-owned temporary file, ordinary export projection, or former host absolute path.
 
-A durable Loom object must not require an unmanaged workspace path, scratch/intake file, caller-owned temporary file, or ordinary export projection in order to be used, verified, or reproduced.
+This is a storage-ownership and portability rule, not a request for one universal database, one universal CAS, or one storage technology for every domain.
 
-Use the smallest natural storage class for the payload:
+## Target model
 
-1. **inline canonical payload** — bounded structured JSON/text stored by the owning durable registry;
-2. **managed artifact payload** — opaque, large, binary, or non-reproducible bytes stored inside a Loom-managed artifact/blob boundary and referenced by stable identity plus digest;
-3. **export projection** — a disposable filesystem rendering derived from managed state/content, never authority by location alone;
-4. **intake / scratch** — caller/tool/operator input used only during capture/import and never authority merely because it exists under a workspace.
-
-Persistence and research authority are independent:
+The workspace durable state should form one tree rather than a forest of unrelated durable roots:
 
 ```text
-durable != authoritative
+Parent Durable Store Root
+├─ parent/workspace storage metadata
+├─ durable child / leaf
+│  ├─ metadata / index / SQLite
+│  └─ required managed payload bytes, when not inline
+├─ durable child / leaf
+└─ ...
 ```
 
-Persisting an Exhibit, Dataset, Aggregate, Composition, Research Package, capture, or rendered working artifact never verifies Evidence, adopts a Finding/Recommendation, answers an RQ, or commits Research State. Existing Human Decision / State Transition boundaries remain authoritative.
-
-For a gate that depends on non-reproducible payload, bytes must already be managed and integrity-bound before the candidate reaches the gate:
+For a non-inline payload, the required resolution chain is:
 
 ```text
-generation / acquisition
-  -> intake / scratch
-  -> managed persistence
-  -> stable identity + digest
-  -> proposal / release candidate
-  -> authority gate
+Parent Durable Store Root
+  -> parent metadata / declared child location
+  -> child durable store
+  -> stable object/artifact identity + domain metadata
+  -> store-relative locator or deterministic digest/ID-derived location
+  -> verified payload bytes
 ```
 
-A gate must not promote an arbitrary filesystem path into durable authority.
+For an inline canonical payload, the final steps collapse into the durable record itself.
 
-Legacy truthfulness is equally important: when managed backing bytes cannot be proven, report the payload as unavailable. Do not reconstruct identity from filenames, neighboring files, URLs, or semantic similarity.
+A path being below `.research-loom` is useful but is not sufficient on its own. The Parent durability unit, natural child boundary, resolution chain, and integrity behavior must be explicit enough that the data can be preserved and reopened correctly.
 
-## Payload-resolution invariant
-
-Being somewhere below `.research-loom` is not sufficient by itself. A durable object must have a stable lookup chain from durable workspace/object metadata to the content required to use or verify it.
-
-For file-backed payloads, the target model is:
-
-```text
-workspace durable metadata
-  -> registered store identity + root-relative locator
-  -> durable object metadata / stable object identity
-  -> managed relative locator or deterministic digest/ID-derived location
-  -> verified bytes
-```
-
-The physical host path is operational configuration, not content identity or research provenance. A store may derive a content path from a verified digest/ID instead of storing the literal path in every row; what matters is that the store root is durably registered and the payload can be resolved without an arbitrary external path.
-
-This preserves the original SQLite/files responsibility split without forcing storage uniformity:
-
-- SQLite/registries own structured identity, relations, history, indexes, pins, digests, and store/object metadata;
-- managed files/CAS own bytes that should not be embedded into SQLite merely for uniformity;
-- export/publish files remain projections rather than authority.
-
-A deterministic code convention alone is weaker than a workspace persistence contract. In particular, if a later-added durable store exists only because application code knows a hard-coded `.research-loom/...` path, workspace metadata cannot distinguish that store from an unknown/unmanaged path or comprehensively diagnose its disappearance.
-
-## Workspace storage-root audit
+## Current Parent candidate and concrete tree violation
 
 Audit baseline: `main@9dfe3e978c45b5bfe34ae66ce8595eb52efe9006`.
 
-The current `workspace-binding.json` `storage` map registers these roots:
+The current implementation already has a natural dedicated Parent candidate:
+
+```text
+<workspace>/.research-loom/
+```
+
+Most Loom-owned durable stores live below it. That makes a migration to the target model substantially smaller than inventing a new storage framework.
+
+However, two workspace-owned documents required by `LocalWorkspace.open()` are currently persisted outside that Parent candidate:
+
+```text
+<workspace>/project-config.json
+<workspace>/effective-profile-set.json
+```
+
+`workspace-binding.json` points to them, `open()` reads and digest-validates them, Profile advancement rewrites them, and Writer/Virtual Runner paths consume the effective Profile Set. Therefore they are durable workspace dependencies, not disposable intake files.
+
+If `.research-loom/` is the Parent Durable Store Root, these two files are a **confirmed tree-membership violation**. #193 owns the structural correction. Their original caller-supplied input files remain intake; the persisted workspace-owned copies are durable.
+
+## Parent discovery is also incomplete
+
+The current `.research-loom/workspace-binding.json` `storage` map registers only:
 
 - `research_state`;
 - `conversation`;
@@ -73,9 +69,10 @@ The current `workspace-binding.json` `storage` map registers these roots:
 - `context_extensions`;
 - `operational_trace`.
 
-Later production stores are instead located by application constants/conventions and are not represented in that durable workspace storage map:
+Other current production durable children/leaves already live below `.research-loom/` but are found only from application conventions, including:
 
 - `attention.sqlite3`;
+- `profile-history/`;
 - `research-exhibits.sqlite3`;
 - `survey-registry.sqlite3`;
 - `survey-response-registry.sqlite3`;
@@ -84,73 +81,143 @@ Later production stores are instead located by application constants/conventions
 - `writer-compositions/`;
 - `research-packages/`.
 
-This is a concrete workspace-level ownership/discoverability gap, tracked by #193. It does **not** mean those domain stores need to be merged into one database or rewritten internally.
+This does not make their internal payload layouts wrong. It means the Parent tree is only partly self-describing: a whole-Parent durability/doctor operation cannot determine every initialized durable child from parent metadata, and disappearance of some lazy stores can be confused with “never initialized”. #193 owns this Parent-to-child discovery/missing-state gap.
+
+## Storage classes remain intentionally heterogeneous
+
+The tree model does not require internal homogenization.
+
+Valid durable leaves/children include:
+
+1. **inline canonical payload** — bounded JSON/text persisted inside the owning SQLite/registry record;
+2. **managed artifact payload** — opaque/large/non-reproducible bytes stored inside a child managed file/CAS boundary with stable identity plus digest/size;
+3. **immutable managed file/package payload** — deterministic managed files below a child root with integrity metadata;
+4. **export projection** — derived external output, not part of the durable tree and not authority;
+5. **intake / scratch** — caller/operator/tool input, disposable after successful managed persistence.
+
+Do not move large binary payloads into SQLite merely for uniformity, and do not force bounded canonical JSON/text into CAS merely for visual symmetry.
+
+## Durable, portable, and authoritative are different dimensions
+
+```text
+durable != authoritative
+portable != authoritative
+imported != adopted
+```
+
+Persisting, moving, backing up, restoring, or importing an Exhibit, Dataset, Aggregate, Composition, Research Package, capture, or other payload does not verify Evidence, adopt a Finding/Recommendation, answer an RQ, or commit Research State. Existing Human Decision / State Transition semantics remain the authority boundary.
+
+For an authority/release gate that depends on non-reproducible payload, managed persistence must occur before the gate:
+
+```text
+generation / acquisition
+  -> intake / scratch
+  -> managed durable tree
+  -> stable identity + digest
+  -> proposal / release candidate
+  -> authority gate
+```
+
+A gate must never turn an arbitrary filesystem path into durable authority.
 
 ## Current-production inventory
 
-| Object / production path | Durable owner / metadata | Payload resolution chain | Workspace-root registration | Integrity binding | Authority relation | Disposition |
-|---|---|---|---|---|---|---|
-| Research State object revisions / Snapshots | registered Research State SQLite store | registered `research_state` root -> object/revision or Snapshot key -> canonical JSON row | **registered** in `workspace-binding.json` | canonical object/member/Snapshot digests and revision pins | State is authoritative only through existing Human Decision / State Transition semantics. | **conforming** |
-| Research Exhibit | `LocalResearchExhibitStore`; immutable document and index metadata are inline in SQLite | `exhibit_id` -> SQLite `document_json`; no external body is required | **not registered**; store file is found by `.research-loom/research-exhibits.sqlite3` convention | Exhibit/content digest, project/RQ/Snapshot binding | Durable working analysis only; explicitly not Evidence/Finding/Recommendation authority. | Object payload is sound; **workspace store-root registration gap (#193)** |
-| Desktop Research original capture / UTF-8 rendition | execution SQLite artifact metadata + execution/material managed blob store | registered execution root -> `artifact_id` -> `storage_locator` + digest/size -> root-relative managed blob -> verified bytes | **registered** through `execution_root` / `execution` | artifact identity, digest, size, Run/capture pairing, parent provenance, exact locator | Capture durability is candidate provenance only; Evidence/Finding adoption remains separate. | **conforming for managed captures** |
-| Legacy / missing historical material backing | execution/material diagnostics and recovery surfaces | historical metadata resolves expected artifact identity/digest, but backing blob is absent/unprovable | execution store is registered, but required legacy payload is unavailable | managed binding cannot be proven | Must stay historical/unavailable; must not be fabricated or silently treated as current managed content. | **legacy-unavailable**; #127/#157/#158, durability #160 |
-| Project Input | `LocalProjectInputStore` SQLite metadata + managed blob tree | `input_id` -> `content_digest` + byte length -> digest-derived blob path under Project Input root -> verified bytes; `source_path` is provenance only | **not registered**; root is derived as `.research-loom/project-inputs` in code | SHA-256, byte length, project/role/lineage/Snapshot binding | Durable project working input; does not adopt Research State. | Object-to-bytes chain is sound; **workspace store-root registration gap (#193)** |
-| Survey Instrument / design | `LocalSurveyStore` SQLite registry | project + questionnaire/design identity/version -> inline `document_json` | **not registered**; DB path comes from `.research-loom/survey-registry.sqlite3` convention | content digests, immutable revision/identity pins | Instrument is authoritative for response semantics, but persistence itself does not create Evidence/Finding authority. | Inline payload is sound; **workspace store-root registration gap (#193)** |
-| Survey canonical response / Dataset, including rejected input | `LocalSurveyResponseStore` SQLite registry | response/Dataset identity -> inline canonical/raw/entry JSON rows | **not registered**; DB path comes from `.research-loom/survey-response-registry.sqlite3` convention | Instrument pins, raw/canonical digests, dataset content/registry identity | Explicit origin/epistemic status; no Research State mutation. | Inline payload is sound; **workspace store-root registration gap (#193)** |
-| Survey AnalysisSpec / AggregateResult | `LocalSurveyAnalysisStore` SQLite registry | AnalysisSpec/Aggregate identity -> inline `document_json` | **not registered**; DB path comes from `.research-loom/survey-analysis-registry.sqlite3` convention | deterministic content digests plus Dataset/Instrument/AnalysisSpec pins | Durable analytical result only; aggregation cannot promote results to Evidence/Finding authority. | Inline payload is sound; **workspace store-root registration gap (#193)** |
-| Writer Composition versions / selection history | immutable JSON files in the Writer managed root; no SQLite object registry | `composition_id` + version -> deterministic `writer-compositions/<id>/versions/<version>.json`; selection -> sibling `selection.json`; source Research Package pin is verified on load | **not registered**; root is hard-coded as `.research-loom/writer-compositions` | composition/section/package digests and immutable source pins | Exposition planning only; no Evidence verification or Finding/Recommendation adoption. | Managed/deterministic, but resolution begins from a code path convention; **workspace store-root registration gap (#193)** |
-| Detached one-section Writer input | Writer composition service export | self-contained export directory -> manifest -> exact section input | projection; intentionally outside managed state | manifest/output digests and source pins | Export does not mutate Research State; it is not authority. | **conforming projection** |
-| Research Package 0.2.0 managed package | immutable managed package directory; package JSON carries attachment metadata | `package_id` -> deterministic `research-packages/<package_id>` root -> `research-package.json` -> relative attachment paths + digest/size -> verified package files | **not registered**; root is hard-coded as `.research-loom/research-packages` | package digest, attachment digests/sizes, exact Snapshot/Run/Exhibit/Input/material pins | Read-only in-progress package; candidate Handoff content remains candidate-only and release ineligible unless separately authorized. | Internal package locator chain is sound after root resolution; **workspace store-root registration gap (#193)** |
-| Research Package export | `ResearchPackageService.export` | verified managed package -> staging -> external output copy | projection; not a managed source root | package/manifest/attachment verification | Export is not a release or Research authority transition. | **conforming projection** |
-| Publication preview artifacts described by PR18 contracts | preview/convergence contract only | no production durable release payload store | N/A | N/A in production | Preview is diagnostic and explicitly not Publication Release. | **not implemented** |
-| Final Publication candidate/release/rendered payload | none in current production code | no production final DOCX/PDF/release-payload store exists to resolve | N/A | N/A | Do not invent a storage defect or generic artifact layer for a future runtime. | **not implemented** |
+| Durable family / path | Parent membership | Natural child / leaf | Metadata -> payload resolution | Parent discovery | Independent child portability | Integrity / authority | Disposition |
+|---|---|---|---|---|---|---|---|
+| Workspace binding | inside `.research-loom` | Parent metadata leaf: `workspace-binding.json` | binding document directly carries workspace/project/storage locators and pins | n/a: this is the Parent metadata | not required | binding shape/version validated; no Research authority by itself | **conforming Parent metadata, but currently incomplete inventory** |
+| Persisted Project Config | **outside `.research-loom`** at workspace root | durable JSON leaf required by workspace open/profile advancement | binding locator -> root-level JSON -> digest validation | binding does identify it, but outside Parent | not required | digest-bound; configuration persistence is not Research adoption | **structural violation -> #193** |
+| Persisted Effective Profile Set | **outside `.research-loom`** at workspace root | durable JSON leaf required by workspace open and downstream Profile/Writer use | binding locator -> root-level JSON -> digest validation | binding does identify it, but outside Parent | not required | digest-bound; Profile persistence does not itself adopt Research conclusions | **structural violation -> #193** |
+| Research State revisions / Snapshots | inside Parent | SQLite leaf `research-state.sqlite3` | registered `research_state` -> object/revision or Snapshot key -> inline canonical record | **registered** | not required | canonical object/member/Snapshot digests and revision pins; authority only through State Transition/Human Decision | **conforming** |
+| Conversation store | inside Parent | SQLite leaf `conversation.db` | registered leaf -> durable conversation records | **registered** | not required | schema/integrity checks; conversational persistence is not Research authority | **conforming** |
+| Human Decision store | inside Parent | SQLite leaf `decision.db` | registered leaf -> durable decision records | **registered** | not required | decision semantics remain explicit authority input | **conforming** |
+| Research Attention | inside Parent | SQLite leaf `attention.sqlite3` | domain identity -> inline durable attention records | **not registered; code convention** | not required | durable planning/control state; separate from Research object adoption | **Parent discovery gap -> #193** |
+| Profile advancement history | inside Parent | managed `profile-history/` subtree | Profile advancement metadata/events/generation records under deterministic child root | **not registered; code convention** | not required | historical profile advancement facts; authority semantics unchanged | **Parent discovery gap -> #193** |
+| Execution / external material / renditions | inside Parent under `execution/` | multi-file child root: `execution.db` + `blobs/sha256/...` + committed execution-side SQLite leaves; staging transient | `artifact_id` / resource identity -> SQLite metadata -> `storage_locator` + digest/size -> store-local managed blob -> verified bytes | `execution_root` and core execution leaves **registered** | **required use case**: copied child root should be openable read-only for #165 | digest/size/binding verification; capture durability is candidate provenance, not Evidence/Finding adoption | **current shape matches target; independent portability contract tracked by #160** |
+| Legacy execution metadata with missing backing content | inside execution child metadata, required bytes unavailable | same execution child | metadata resolves expected identity/digest but backing bytes are missing/unprovable | execution child registered | unavailable source must remain unavailable | metadata presence never implies content health; no fabricated recovery | **legacy-unavailable; #127/#157/#158, durability #160** |
+| Research Exhibit | inside Parent | inline SQLite leaf `research-exhibits.sqlite3` | `exhibit_id` -> SQLite immutable `document_json`; source refs are provenance, not backing content | **not registered; code convention** | no current independent-portability requirement | Exhibit/content digest + project/RQ/Snapshot binding; not Evidence/Finding/Recommendation authority | **payload layout conforming; Parent discovery gap -> #193** |
+| Project Input | inside Parent | multi-file child root `project-inputs/` with SQLite metadata + digest-derived `blobs/` | `input_id` -> metadata `content_digest` + length -> child-root digest path -> verified bytes; original `source_path` provenance only | **not registered; code convention** | no current independent-portability requirement | SHA-256/length/project/role/lineage/Snapshot binding; does not adopt Research State | **payload layout conforming; Parent discovery gap -> #193** |
+| Survey Design / Instrument | inside Parent | inline SQLite leaf `survey-registry.sqlite3` | project + design/questionnaire identity/version -> inline `document_json` | **not registered; code convention** | not required | immutable identity/version/content digests; persistence does not create Evidence/Finding authority | **payload layout conforming; Parent discovery gap -> #193** |
+| Survey canonical Response / Dataset / rejected input | inside Parent | inline SQLite leaf `survey-response-registry.sqlite3` | response/Dataset identity -> inline canonical/raw/entry JSON rows | **not registered; code convention** | not required | Instrument/raw/canonical/Dataset digests and origin/epistemic status; no Research State mutation | **payload layout conforming; Parent discovery gap -> #193** |
+| Survey AnalysisSpec / AggregateResult | inside Parent | inline SQLite leaf `survey-analysis-registry.sqlite3` | spec/result identity -> inline canonical `document_json` rows | **not registered; code convention** | not required | deterministic content digests and Dataset/Instrument/Spec pins; analytical durability is not research adoption | **payload layout conforming; Parent discovery gap -> #193** |
+| Writer Composition versions / selection history | inside Parent | managed file child root `writer-compositions/` | `composition_id` + version -> deterministic managed JSON version; source Research Package ID/digest is resolved and revalidated from sibling Package child | **not registered; code convention** | not required; Writer child may depend on sibling durable Package child when whole Parent is preserved | composition/section/package digests and immutable source pins; exposition planning only | **whole-Parent model is suitable; Parent discovery gap -> #193** |
+| Detached one-section Writer input | outside Parent intentionally | export projection | self-contained exported manifest/section payload | n/a | external handoff only | manifest/output digests and source pins; no Research State mutation | **conforming projection, not a durable-tree dependency** |
+| Research Package managed package | inside Parent | managed file child root `research-packages/`; one immutable package directory per `package_id` | `package_id` -> deterministic child path -> `research-package.json` -> relative attachment paths + digest/size -> verified package files | **not registered; code convention** | not currently required independently; package export is the external projection | package + attachment digests/sizes and exact source pins; preview/candidate content remains non-authoritative | **payload layout conforming; Parent discovery gap -> #193** |
+| Research Package export | outside Parent intentionally | export projection | verified managed package -> staging -> detached output | n/a | projection already self-contained for handoff | verification preserves package bytes/digests; export is not Publication Release | **conforming projection** |
+| Publication preview contract | no production durable payload store | not implemented durable child | no production durable release payload to resolve | n/a | n/a | Preview is diagnostic, not release authority | **not implemented** |
+| Final Publication candidate/release/rendered payload | no production implementation | not implemented | none | n/a | n/a | do not invent release/storage semantics before implementation exists | **not implemented** |
 
-`attention.sqlite3` is also a production durable store located by convention and omitted from the current workspace storage map. It is not a payload family named in #163's object inventory, but it is included in #193 because the workspace-level registration contract should not knowingly omit an existing durable store.
+## What #193 must fix, and what it must not fix
 
-## Concrete findings and disposition
+The repository-wide structural problem is now narrow and concrete:
 
-The repository does **not** justify one universal payload DB, one generic CAS, or moving every file into SQLite. The useful common rule is metadata-driven resolution of owned stores and payloads.
+1. make all workspace-owned durable dependencies descendants/leaves of one dedicated Parent Durable Store Root;
+2. move or otherwise bring the persisted Project Config and Effective Profile Set into that Parent tree while preserving their current digest/binding semantics;
+3. make Parent metadata sufficiently self-describing to know which current durable children/leaves have been initialized/used;
+4. distinguish “never initialized optional child” from “known durable child now missing/degraded”;
+5. keep child locators root-relative/backend-relative so whole-Parent move/reopen does not require host-path rewrites.
 
-Two concrete classes of work remain:
+#193 must **not** merge all domain stores into one DB, invent one generic CAS, or make every child independently importable. Existing domain-local layouts that already resolve their payload correctly should remain.
 
-1. **Historical execution/material backing can be unavailable even when metadata survives.** Existing focused work owns that boundary:
-   - #127 — exact retained-material diagnosis/recovery;
-   - #157 — non-authoritative source filename hints and self-contained recovery discovery;
-   - #158 — truthful material backing-content health;
-   - #160 — execution/material store durability unit and whole-root backup/move/restore contract;
-   - #165 — controlled reuse of verified material into a fresh workspace without authority carryover.
-2. **Workspace durable-store metadata is incomplete.** Later production stores are owned only through hard-coded root conventions rather than the workspace storage map. #193 owns the minimal fix: register/track current durable store roots and make initialized-vs-missing state diagnosable, while preserving each domain's current internal storage layout.
+## Execution/material child portability: #160
 
-The second finding corrects the earlier, weaker conclusion that all managed-domain paths were simply conforming because they lived below `.research-loom`.
+The execution/material subtree has an additional concrete use case beyond ordinary Parent membership:
 
-## Gate audit
+```text
+copied execution/material child root
+  -> open independently/read-only
+  -> read its SQLite metadata
+  -> resolve store-local blobs
+  -> verify exact selected material
+```
 
-The audited production boundaries preserve the intended authority ordering:
+That stronger child-root contract is tracked by #160. The existing `execution.db + blobs` physical shape already matches it closely; #160 should verify/formalize path-independent move/restore/read-only opening rather than redesign the storage technology.
 
-- Desktop Research copies acquired bytes into managed execution/material storage before downstream candidate use.
-- Project Input copies intake bytes into managed content-addressed blobs before later package use.
-- Survey capture normalizes/persists response content before aggregation.
-- Writer Composition persists whole immutable proposals before selection or detached section export.
-- Research Package build copies selected exact bodies/attachments into a managed immutable package before export.
+The Parent and child contracts are compatible:
 
-None of those operations, by persistence alone, performs Evidence verification, Finding/Recommendation adoption, Research State mutation, or Publication Release.
+```text
+whole workspace durability: Parent Root includes execution/material child
+selected cross-workspace reuse: #165 may consume a copied execution/material child root directly
+```
 
-The workspace store-root registration fix in #193 must likewise remain operational metadata only. It must not become a new authority gate.
+Independent child portability does not create a second competing Parent tree.
 
-## Liveness boundary
+## Cross-workspace intake: #165
 
-Managed-payload integrity may fail closed on an identity/digest/pin mismatch. Historical failure, an unavailable legacy backing blob, or an unrelated missing optional store is not by itself a reason to block valid new work.
+#165 should take a source Durable Store Root directly, not an arbitrary source file and not the old workspace authority:
 
-#193 therefore needs to distinguish:
+```text
+source execution/material root
+  -> source SQLite metadata
+  -> selected Run/capture/material identity
+  -> store-local verified bytes
+  -> copy into destination Parent tree
+  -> new destination material identity/provenance
+  -> current Desktop Research Run
+```
 
-- a store that was never initialized and is legitimately absent;
-- a store durably known to have been initialized but is now missing/degraded;
-- legacy workspaces where prior use cannot be proven from durable metadata.
+After successful import, the destination must remain usable after the source root disappears. Old Snapshot/Lineage/Run/Finding/candidate authority is provenance only and is never imported as current authority.
 
-Do not solve this by making every possible lazy store mandatory on every workspace.
+#165 therefore depends on the **source-root capability** from #160, not on every unrelated child store becoming independently portable and not on closing the whole #163 umbrella.
 
-The #163 umbrella remains non-blocking for narrower downstream work. In particular, #165 can proceed when its source-byte, destination-managed-copy, and no-authority-carryover prerequisites are verified.
+## Legacy truthfulness and liveness
+
+Missing/corrupt backing content must remain distinguishable from healthy payload. Legacy identity must not be fabricated from filenames, nearby files, URLs, semantic similarity, or mere metadata presence.
+
+At the same time, historical failure must not become unrelated operational blockage. Parent/child integrity checks should fail closed only for the durable child/payload that is actually required by the requested operation.
+
+A lazy optional child that was never initialized is not corruption. A child that Parent metadata proves existed but is now absent is degraded. An old workspace whose prior child existence cannot be proven remains legacy-ambiguous rather than being retroactively invented.
+
+## Issue decomposition after this audit
+
+No additional storage Issue is needed beyond the current focused set:
+
+- **#193** — make workspace durability one hierarchical Parent Durable Store Root tree and correct current tree/discovery violations;
+- **#160** — formalize the execution/material subtree as a portable self-contained child Durable Store Root, including independent read-only source opening;
+- **#165** — import selected verified material from such a read-only source root into a fresh workspace without authority carryover;
+- **#158 / #127 / #157** — retain their narrower material-health/recovery/discovery responsibilities.
+
+This decomposition intentionally avoids a new universal storage framework.
 
 ## Re-audit trigger
 
-Update this inventory when a production path starts persisting a new payload/store family or changes ownership/resolution semantics. New durable stores should not be added only as hard-coded `.research-loom/...` conventions without corresponding workspace-level ownership metadata.
+Re-audit when a production path adds a new durable payload/store family or changes ownership/resolution semantics. New durable state should join the Parent tree deliberately rather than appearing only as another hard-coded workspace path.
