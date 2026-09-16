@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 from core.conversation import ConversationRuntimeError
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade, LocalResearchApplication
+from plugins.local_application.recommendation_facade import _current_authoritative_finding
 from runtime_fixtures import finding, project, rq, seed_state
 from test_survey_production import NullResolver
 
@@ -115,15 +116,14 @@ class Issue135RecommendationProposalTests(unittest.TestCase):
             finally:
                 facade.close()
 
-    def test_rec3_rejects_missing_cross_project_and_candidate_findings(self):
+    def test_rec3_rejects_missing_and_candidate_findings(self):
         cases = (
-            ("missing", "approved", "PRJ-1", ["FND-MISSING"]),
-            ("cross-project", "approved", "PRJ-OTHER", ["FND-1"]),
-            ("candidate", "candidate", "PRJ-1", ["FND-1"]),
+            ("missing", "approved", ["FND-MISSING"]),
+            ("candidate", "candidate", ["FND-1"]),
         )
-        for label, state, project_id, finding_ids in cases:
+        for label, state, finding_ids in cases:
             with self.subTest(label=label), tempfile.TemporaryDirectory() as temp:
-                facade = self.make_facade(temp, finding_state=state, finding_project=project_id)
+                facade = self.make_facade(temp, finding_state=state)
                 try:
                     before = facade._application.state_repository.load_state_view("PRJ-1", "LIN-1").current_snapshot
                     with self.assertRaises(ConversationRuntimeError) as raised:
@@ -133,6 +133,17 @@ class Issue135RecommendationProposalTests(unittest.TestCase):
                     self.assertEqual(before, after)
                 finally:
                     facade.close()
+
+    def test_rec3_cross_project_finding_is_not_authoritative_support(self):
+        effective = {
+            ("finding", "FND-FOREIGN"): {
+                "id": "FND-FOREIGN",
+                "kind": "finding",
+                "project_id": "PRJ-OTHER",
+                "adoption_state": "approved",
+            }
+        }
+        self.assertFalse(_current_authoritative_finding(effective, "PRJ-1", "FND-FOREIGN"))
 
     def test_rec3_stale_proposal_application_leaves_state_unchanged(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -181,6 +192,15 @@ class Issue135RecommendationProposalTests(unittest.TestCase):
                 with self.assertRaises(LocalApplicationError) as raised:
                     facade.submit_action(self.proposal_input(finding_ids=[f"FND-{i}" for i in range(257)]))
                 self.assertEqual(raised.exception.code, "APPLICATION-PAYLOAD-001")
+                for overbound in (
+                    {"statement": "x" * 8_193},
+                    {"rationale": "x" * 8_193},
+                    {"conditions": ["x"] * 65},
+                    {"scope": ["x" * 4_097]},
+                ):
+                    with self.assertRaises(LocalApplicationError) as bounded:
+                        facade.submit_action(self.proposal_input(**overbound))
+                    self.assertEqual(bounded.exception.code, "APPLICATION-PAYLOAD-001")
             finally:
                 facade.close()
 

@@ -13,6 +13,9 @@ _ACTION_REGISTRATION_LOCK = RLock()
 _ACTION_TYPE = "research.recommendation.propose"
 _PAYLOAD_CONTRACT = "research-recommendation-proposal@0.1.0"
 _MAX_FINDING_IDS = 256
+_MAX_SEMANTIC_TEXT_CHARS = 8_192
+_MAX_SEMANTIC_LIST_ITEMS = 64
+_MAX_SEMANTIC_LIST_ITEM_CHARS = 4_096
 
 
 def research_recommendation_proposal_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
@@ -21,8 +24,12 @@ def research_recommendation_proposal_payload(payload: Mapping[str, Any]) -> dict
         raise ValueError("research.recommendation.propose contains unknown fields")
     normalized = deepcopy(dict(payload))
     statement = normalized.get("statement")
-    if not isinstance(statement, str) or not statement.strip():
-        raise ValueError("statement must be a non-empty string")
+    if (
+        not isinstance(statement, str)
+        or not statement.strip()
+        or len(statement) > _MAX_SEMANTIC_TEXT_CHARS
+    ):
+        raise ValueError("statement must be a non-empty string within the size limit")
     finding_ids = normalized.get("finding_ids")
     if (
         not isinstance(finding_ids, list)
@@ -37,13 +44,26 @@ def research_recommendation_proposal_payload(payload: Mapping[str, Any]) -> dict
     normalized["finding_ids"] = list(finding_ids)
     for field in ("conditions", "scope"):
         value = normalized.get(field, [])
-        if not isinstance(value, list) or any(not isinstance(item, str) or not item.strip() for item in value):
-            raise ValueError(f"{field} must be an array of non-empty strings")
+        if (
+            not isinstance(value, list)
+            or len(value) > _MAX_SEMANTIC_LIST_ITEMS
+            or any(
+                not isinstance(item, str)
+                or not item.strip()
+                or len(item) > _MAX_SEMANTIC_LIST_ITEM_CHARS
+                for item in value
+            )
+        ):
+            raise ValueError(f"{field} exceeds the bounded semantic-content limits")
         normalized[field] = list(value)
     if "rationale" in normalized:
         rationale = normalized["rationale"]
-        if rationale is not None and (not isinstance(rationale, str) or not rationale.strip()):
-            raise ValueError("rationale must be a non-empty string when provided")
+        if rationale is not None and (
+            not isinstance(rationale, str)
+            or not rationale.strip()
+            or len(rationale) > _MAX_SEMANTIC_TEXT_CHARS
+        ):
+            raise ValueError("rationale must be a non-empty string within the size limit")
     return normalized
 
 
