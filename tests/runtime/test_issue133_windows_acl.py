@@ -41,7 +41,7 @@ class Issue133WindowsAclTests(ResearchPackageAcceptanceSupport):
         rendered_path = str(path)
         for line in stdout.splitlines():
             stripped = line.strip()
-            if not stripped or stripped.startswith("Successfully processed"):
+            if not stripped or ":(" not in stripped:
                 continue
             if line.startswith(rendered_path):
                 stripped = line[len(rendered_path):].strip()
@@ -164,6 +164,7 @@ class Issue133WindowsAclTests(ResearchPackageAcceptanceSupport):
             self.assertFalse(output.exists())
         finally:
             facade.close()
+
 
     def test_acl3_replace_race_does_not_delete_competing_output(self):
         facade, case = self._build()
