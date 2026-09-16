@@ -265,8 +265,8 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
         return self._research_package_service().export(package_id, output_dir)
 
     def _writer_composition_service(self):
-        from .writer_composition_service import WriterCompositionService
-        return WriterCompositionService(self)
+        from .writer_composition_history_service import WriterCompositionHistoryService
+        return WriterCompositionHistoryService(self)
 
     def capture_writer_composition(self, package_id: str, value: Mapping[str, Any]) -> Mapping[str, Any]:
         return self._writer_composition_service().capture(package_id, value)
