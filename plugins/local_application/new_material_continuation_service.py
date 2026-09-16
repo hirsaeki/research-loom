@@ -48,23 +48,25 @@ class _G1HtmlTextParser(HTMLParser):
     def __init__(self) -> None:
         super().__init__()
         self.parts: list[str] = []
-        self.skip = 0
+        self.skip_tags: list[str] = []
 
     def handle_starttag(self, tag: str, attrs) -> None:
         del attrs
         if tag in _HTML_SKIP_TAGS:
-            self.skip += 1
-        elif tag in _HTML_BREAK_TAGS:
+            self.skip_tags.append(tag)
+        elif not self.skip_tags and tag in _HTML_BREAK_TAGS:
             self.parts.append("\n")
 
     def handle_endtag(self, tag: str) -> None:
-        if tag in _HTML_SKIP_TAGS:
-            self.skip = max(0, self.skip - 1)
-        elif tag in _HTML_CONTAINER_BREAK_TAGS:
+        if self.skip_tags:
+            if tag == self.skip_tags[-1]:
+                self.skip_tags.pop()
+            return
+        if tag in _HTML_CONTAINER_BREAK_TAGS:
             self.parts.append("\n")
 
     def handle_data(self, data: str) -> None:
-        if not self.skip:
+        if not self.skip_tags:
             self.parts.append(data)
 
 
@@ -437,7 +439,7 @@ class NewMaterialContinuationService:
                 if interrupted.status not in {
                     RunStatus.COMPLETED,
                     RunStatus.FAILED,
-                    RunStatus.ABORTED,
+                    RunStatus.ABORTED}
                 }:
                     raise LocalApplicationError(
                         "APPLICATION-NEW-MATERIAL-CONTINUATION-IDEMPOTENCY-001",
@@ -643,12 +645,27 @@ class NewMaterialContinuationService:
             try:
                 if is_target and new_material_kind == "original":
                     target_count += 1
+                    budget = historical_extension["budget"]
+                    original_limit = int(store.config.max_artifact_bytes)
+                    if budget.get("max_original_capture_bytes") is not None:
+                        original_limit = min(
+                            original_limit,
+                            int(budget["max_original_capture_bytes"]),
+                        )
+                    if len(new_artifact.content) > original_limit:
+                        raise LocalApplicationError(
+                            "APPLICATION-NEW-MATERIAL-CONTINUATION-MATERIAL-001",
+                            "reacquired original exceeds the pinned capture budget",
+                        )
                     original_content = new_artifact.content
                     original_media_type = str(new_artifact.media_type or old_original.media_type)
                     text_content = _render_reacquired_html_rendition(
                         new_artifact.content,
                         new_artifact.media_type,
-                        max_bytes=int(store.config.max_artifact_bytes),
+                        max_bytes=min(
+                            int(store.config.max_artifact_bytes),
+                            int(budget["max_text_rendition_bytes"]),
+                        ),
                     )
                     acquired_at = str(result["reacquired_at"])
                 else:
