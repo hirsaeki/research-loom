@@ -134,6 +134,36 @@ class Issue135RecommendationProposalTests(unittest.TestCase):
                 finally:
                     facade.close()
 
+    def test_rec3_cross_project_finding_is_rejected_through_public_ingress(self):
+        with tempfile.TemporaryDirectory() as temp:
+            facade = self.make_facade(temp)
+            try:
+                foreign_state = seed_state(
+                    objects=[
+                        project(),
+                        rq(state="approved"),
+                        finding(project_id="PRJ-OTHER", state="approved"),
+                    ],
+                    snapshot_id="SNP-REC-FOREIGN",
+                )
+                before = facade._application.state_repository.load_state_view(
+                    "PRJ-1", "LIN-1"
+                ).current_snapshot
+                with patch.object(
+                    facade._application.coordinator._states,
+                    "load_state_view",
+                    return_value=foreign_state,
+                ):
+                    with self.assertRaises(ConversationRuntimeError) as raised:
+                        facade.submit_action(self.proposal_input())
+                self.assertEqual(raised.exception.code, "RECOMMENDATION-SUPPORT-001")
+                after = facade._application.state_repository.load_state_view(
+                    "PRJ-1", "LIN-1"
+                ).current_snapshot
+                self.assertEqual(before, after)
+            finally:
+                facade.close()
+
     def test_rec3_cross_project_finding_is_not_authoritative_support(self):
         effective = {
             ("finding", "FND-FOREIGN"): {
