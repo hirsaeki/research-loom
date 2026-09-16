@@ -168,10 +168,11 @@ class HumanDecisionRecoveryTests(unittest.TestCase):
         action = TransitionAction(TransitionKind.APPLY_LINEAGE_PLAN, {
             "plan_ref": "PLAN-HD",
             "target_lineage_id": "LIN-HD",
+            "lineage_kind": "exploratory_fork",
             "baseline_snapshot_ref": state.current_snapshot["id"],
             "baseline_snapshot_digest": state.current_snapshot["content_digest"],
             "treatments": [
-               {"object_kind": "project", "source_ref": "PRJ-1", "treatment": "PRESERVE"},
+                {"object_kind": "project", "source_ref": "PRJ-1", "treatment": "PRESERVE"},
                 {"object_kind": "research_question", "source_ref": "RQ-1", "treatment": "PRESERVE"},
                 {
                     "object_kind": "finding",
@@ -194,7 +195,7 @@ class HumanDecisionRecoveryTests(unittest.TestCase):
                     _candidate(state, [action], proposal_id="SDP-LINEAGE"),
                     state=state,
                     actor=ACTOR,
-               )
+                )
                 kinds = {unit["required_decision_kind"] for unit in gate.decision_request["decision_units"]}
                 self.assertEqual(kinds, {"lineage_plan", "lineage_reconfirmation"})
                 result = service.resolve(make_response(
@@ -206,7 +207,7 @@ class HumanDecisionRecoveryTests(unittest.TestCase):
                 self.assertEqual(result.status, "RESOLVED")
                 self.assertEqual(
                     result.commit_receipt.applied_typed_actions,
-                  ("RECORD_DECISION", "RECORD_DECISION", "APPLY_LINEAGE_PLAN"),
+                    ("RECORD_DECISION", "RECORD_DECISION", "APPLY_LINEAGE_PLAN"),
                 )
                 child = repo.load_state_view("PRJ-1", "LIN-HD")
                 reconfirmed = child.latest_object("finding", "FND-1")
@@ -293,7 +294,7 @@ class PendingDecisionCoordinatorTests(unittest.TestCase):
             objects=[project(), rq(state="approved")],
             mode="real",
             snapshot_id="SNP-PENDING-0",
-         )
+        )
         mapping = {
             "apply": ActionDraft("state.apply_candidate", {"state_delta_proposal_id": "SDP-PENDING"}),
             "run next": ActionDraft("desktop_research.investigate", {"question_id": "RQ-1"}),
