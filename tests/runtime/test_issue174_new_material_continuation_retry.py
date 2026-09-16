@@ -179,6 +179,47 @@ class Issue174NewMaterialContinuationRetryTests(ResearchPackageAcceptanceSupport
         finally:
             facade.close()
 
+    def test_interruption_after_run_prepare_before_binding_recovers_parent_lineage(self):
+        facade, case = self._prepare_case()
+        try:
+            reacquired = self._make_new_version(facade, case)
+            reacq_run_id = reacquired["reacquisition_run_id"]
+            store = facade._application.execution_store
+            original_store = store.store_diagnostic
+            interrupted = {"done": False}
+
+            def stop_before_binding(run_id, kind, payload):
+                if (
+                    not interrupted["done"]
+                    and kind == admission._CONTINUATION_BINDING_DIAGNOSTIC
+                ):
+                    interrupted["done"] = True
+                    raise KeyboardInterrupt("fixture process interruption before binding")
+                return original_store(run_id, kind, payload)
+
+            with patch.object(store, "store_diagnostic", side_effect=stop_before_binding):
+                with self.assertRaises(KeyboardInterrupt):
+                    self._continue(facade, reacq_run_id)
+
+            correlations = facade._application.conversation_store.run_correlations_for_conversation(
+                admission._continuation_conversation_id(reacq_run_id),
+                limit=4,
+            )
+            self.assertEqual(len(correlations), 1)
+            first_run_id = correlations[0]["run_id"]
+            self.assertEqual(store.load_run(first_run_id).status, RunStatus.RUNNING)
+            self.assertIsNone(admission._continuation_binding(store, reacq_run_id))
+
+            completed = self._continue(facade, reacq_run_id)["data"]
+            self.assertEqual(completed["status"], "COMPLETED")
+            self.assertNotEqual(completed["new_run_id"], first_run_id)
+            self.assertEqual(store.load_run(first_run_id).status, RunStatus.ABORTED)
+            retry = store.load_run(completed["new_run_id"])
+            self.assertEqual(retry.parent_run_id, first_run_id)
+            self.assertEqual(retry.attempt, store.load_run(first_run_id).attempt + 1)
+        finally:
+            facade.close()
+
     def test_partial_binding_is_preserved_and_later_attempt_recovers(self):
         facade, case = self._prepare_case()
         try:

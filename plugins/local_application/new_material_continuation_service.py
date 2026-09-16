@@ -216,6 +216,12 @@ class NewMaterialContinuationService:
                 )
             )
             store = self._application.execution_store
+            historical_handoff, historical_extension = admission._historical_canonical_result(
+                self._application, historical.run_id
+            )
+            historical_payload = admission._historical_action_payload(
+                self._application, historical.run_id
+            )
             prior_run = None
             binding = admission._continuation_binding(store, reacquisition_run_id)
             if binding is not None:
@@ -234,6 +240,17 @@ class NewMaterialContinuationService:
                 mirror_complete = admission._continuation_mirror_complete(store, binding)
 
                 if mirror_complete and bound.status is RunStatus.COMPLETED:
+                    # A COMPLETED Run without the exact bound capture is not an
+                    # incomplete continuation result; it is an incompatible or
+                    # forged binding and remains fail-closed. Canonical Handoff /
+                    # proposal closure may still be retried when the capture is intact.
+                    admission._validate_continuation_binding(
+                        self._application,
+                        self._project_id,
+                        binding,
+                        result,
+                        historical,
+                    )
                     if admission._completed_continuation_is_reusable(
                         self._application,
                         self._project_id,
@@ -277,12 +294,32 @@ class NewMaterialContinuationService:
                         )
                     prior_run = bound
 
-            historical_handoff, historical_extension = admission._historical_canonical_result(
-                self._application, historical.run_id
+            interrupted = admission._latest_correlated_continuation_attempt(
+                self._application,
+                self._project_id,
+                reacquisition_run_id,
+                historical_payload,
+                current_bound_run_id=(
+                    str(binding["new_run_id"]) if binding is not None else None
+                ),
             )
-            historical_payload = admission._historical_action_payload(
-                self._application, historical.run_id
-            )
+            if interrupted is not None:
+                if interrupted.status in {RunStatus.PREPARED, RunStatus.RUNNING}:
+                    interrupted = self._application.capability_execution_service.abort(
+                        interrupted.run_id,
+                        reason="interrupted new-material continuation before binding",
+                    )
+                if interrupted.status not in {
+                    RunStatus.COMPLETED,
+                    RunStatus.FAILED,
+                    RunStatus.ABORTED,
+                }:
+                    raise LocalApplicationError(
+                        "APPLICATION-NEW-MATERIAL-CONTINUATION-IDEMPOTENCY-001",
+                        "correlated prior continuation attempt is still active",
+                    )
+                prior_run = interrupted
+
             claim = {
                 "relation": "new_material_version_continuation_claim",
                 "reacquisition_run_id": reacquisition_run_id,
@@ -332,6 +369,9 @@ class NewMaterialContinuationService:
                     "rationale": (
                         "Continue persisted NEW_MATERIAL_VERSION from "
                         f"{reacquisition_run_id}."
+                    ),
+                    "conversation_id": admission._continuation_conversation_id(
+                        reacquisition_run_id
                     ),
                 }
             )

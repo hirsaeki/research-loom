@@ -23,6 +23,15 @@ from .material_reacquisition_facade import (
 
 _CONTINUATION_BINDING_DIAGNOSTIC = "desktop_research.new_material_continuation.binding"
 _CONTINUATION_CLAIM_DIAGNOSTIC = "desktop_research.new_material_continuation.claim"
+_CONTINUATION_CORRELATION_LIMIT = 16
+
+
+def _continuation_conversation_id(reacquisition_run_id: str) -> str:
+    token = hashlib.sha256(
+        f"new-material-continuation\0{reacquisition_run_id}".encode("utf-8")
+    ).hexdigest()[:24]
+    return f"CONV-NMV-{token}"
+
 
 def _new_id(old: str, reacquisition_run_id: str) -> str:
     digest = hashlib.sha256(f"{reacquisition_run_id}\0{old}".encode("utf-8")).hexdigest()[:24]
@@ -223,6 +232,67 @@ def _continuation_binding(store, reacquisition_run_id: str) -> dict[str, Any] | 
             "new-material continuation binding is invalid",
         )
     return binding
+
+
+def _latest_correlated_continuation_attempt(
+    application,
+    project_id: str,
+    reacquisition_run_id: str,
+    historical_payload: Mapping[str, Any],
+    *,
+    current_bound_run_id: str | None,
+):
+    """Recover a Run prepared for this target before its binding was persisted.
+
+    The target-specific conversation id is operational correlation only. The
+    correlated proposal must still match the exact historical Desktop Research
+    payload and execution identity; it never substitutes for material/provenance
+    validation.
+    """
+    conversation_id = _continuation_conversation_id(reacquisition_run_id)
+    store = application.conversation_store
+    query = getattr(store, "run_correlations_for_conversation", None)
+    if query is None:
+        return None
+    expected_payload = deepcopy(dict(historical_payload))
+    expected_payload.pop("parent_run_id", None)
+    for correlation in query(conversation_id, limit=_CONTINUATION_CORRELATION_LIMIT):
+        run_id = str(correlation.get("run_id") or "")
+        if not run_id:
+            continue
+        if current_bound_run_id is not None and run_id == current_bound_run_id:
+            return None
+        proposal = store.load_proposal(str(correlation.get("proposal_id") or ""))
+        action = proposal.get("action") if isinstance(proposal, Mapping) else None
+        payload = action.get("payload") if isinstance(action, Mapping) else None
+        if (
+            not isinstance(proposal, Mapping)
+            or proposal.get("project_id") != project_id
+            or proposal.get("conversation_id") != conversation_id
+            or not isinstance(action, Mapping)
+            or action.get("action_type") != "desktop_research.investigate"
+            or not isinstance(payload, Mapping)
+        ):
+            continue
+        payload_without_parent = deepcopy(dict(payload))
+        parent_run_id = payload_without_parent.pop("parent_run_id", None)
+        if payload_without_parent != expected_payload:
+            continue
+        run = application.execution_store.load_run(run_id)
+        if (
+            run is None
+            or run.project_ref != project_id
+            or run.capability_id != "desktop-research"
+            or run.function_id != "investigate"
+            or run.execution_mode != "real"
+            or run.parent_run_id != parent_run_id
+        ):
+            raise LocalApplicationError(
+                "APPLICATION-NEW-MATERIAL-CONTINUATION-IDEMPOTENCY-001",
+                "correlated continuation attempt has incompatible execution identity",
+            )
+        return run
+    return None
 
 
 def _validate_continuation_binding(
