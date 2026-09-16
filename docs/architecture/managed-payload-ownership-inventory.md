@@ -132,7 +132,7 @@ A gate must never turn an arbitrary filesystem path into durable authority.
 | Human Decision store | inside Parent | SQLite leaf `decision.db` | registered leaf -> durable decision records | **registered** | not required | decision semantics remain explicit authority input | **conforming** |
 | Research Attention | inside Parent | SQLite leaf `attention.sqlite3` | domain identity -> inline durable attention records | **not registered; code convention** | not required | durable planning/control state; separate from Research object adoption | **Parent discovery gap -> #193** |
 | Profile advancement history | inside Parent | managed `profile-history/` subtree | Profile advancement metadata/events/generation records under deterministic child root | **not registered; code convention** | not required | historical profile advancement facts; authority semantics unchanged | **Parent discovery gap -> #193** |
-| Execution / external material / renditions | inside Parent under `execution/` | multi-file child root: `execution.db` + `blobs/sha256/...` + committed execution-side SQLite leaves; staging transient | `artifact_id` / resource identity -> SQLite metadata -> `storage_locator` + digest/size -> store-local managed blob -> verified bytes | `execution_root` and core execution leaves **registered** | **required use case**: copied child root should be openable read-only for #165 | digest/size/binding verification; capture durability is candidate provenance, not Evidence/Finding adoption | **current shape matches target; independent portability contract tracked by #160** |
+| Execution / external material / renditions | inside Parent under `execution/` | multi-file child root: `execution.db` + `blobs/sha256/...` + committed execution-side SQLite leaves; staging transient | `artifact_id` / resource identity -> SQLite metadata -> `storage_locator` + digest/size -> store-local managed blob -> verified bytes | `execution_root` and core execution leaves **registered** | **required use case**: copied child root should be openable read-only after staging for #165 | digest/size/binding verification; capture durability is candidate provenance, not Evidence/Finding adoption | **current shape matches target; independent portability contract tracked by #160** |
 | Legacy execution metadata with missing backing content | inside execution child metadata, required bytes unavailable | same execution child | metadata resolves expected identity/digest but backing bytes are missing/unprovable | execution child registered | unavailable source must remain unavailable | metadata presence never implies content health; no fabricated recovery | **legacy-unavailable; #127/#157/#158, durability #160** |
 | Research Exhibit | inside Parent | inline SQLite leaf `research-exhibits.sqlite3` | `exhibit_id` -> SQLite immutable `document_json`; source refs are provenance, not backing content | **not registered; code convention** | no current independent-portability requirement | Exhibit/content digest + project/RQ/Snapshot binding; not Evidence/Finding/Recommendation authority | **payload layout conforming; Parent discovery gap -> #193** |
 | Project Input | inside Parent | multi-file child root `project-inputs/` with SQLite metadata + digest-derived `blobs/` | `input_id` -> metadata `content_digest` + length -> child-root digest path -> verified bytes; original `source_path` provenance only | **not registered; code convention** | no current independent-portability requirement | SHA-256/length/project/role/lineage/Snapshot binding; does not adopt Research State | **payload layout conforming; Parent discovery gap -> #193** |
@@ -164,7 +164,8 @@ The execution/material subtree has an additional concrete use case beyond ordina
 
 ```text
 copied execution/material child root
-  -> open independently/read-only
+  -> stage under destination workspace intake
+  -> open staged copy independently/read-only
   -> read its SQLite metadata
   -> resolve store-local blobs
   -> verify exact selected material
@@ -176,28 +177,37 @@ The Parent and child contracts are compatible:
 
 ```text
 whole workspace durability: Parent Root includes execution/material child
-selected cross-workspace reuse: #165 may consume a copied execution/material child root directly
+selected cross-workspace reuse: #165 stages a copied source root under destination intake, then consumes that staged copy
 ```
 
 Independent child portability does not create a second competing Parent tree.
 
 ## Cross-workspace intake: #165
 
-#165 should take a source Durable Store Root directly, not an arbitrary source file and not the old workspace authority:
+The canonical #165 workflow is not a live reference to an arbitrary external previous-workspace path. It first creates a stable workspace-local intake snapshot:
 
 ```text
-source execution/material root
-  -> source SQLite metadata
+previous workspace / backup / portable child root
+  -> copy/stage into destination workspace dedicated intake area
+  -> original external source may disappear
+  -> open staged copy read-only
+  -> source SQLite/domain metadata
   -> selected Run/capture/material identity
-  -> store-local verified bytes
-  -> copy into destination Parent tree
+  -> staged store-local verified bytes
+  -> copy selected material into destination Parent tree
   -> new destination material identity/provenance
   -> current Desktop Research Run
 ```
 
-After successful import, the destination must remain usable after the source root disappears. Old Snapshot/Lineage/Run/Finding/candidate authority is provenance only and is never imported as current authority.
+The dedicated intake area is outside the destination Parent Durable Store Root. It is disposable input, not destination durability. A full previous workspace/root container or the smaller independently portable execution/material child may be staged; use the smallest self-contained unit that preserves the metadata and bytes needed for exact verification.
 
-#165 therefore depends on the **source-root capability** from #160, not on every unrelated child store becoming independently portable and not on closing the whole #163 umbrella.
+After staging succeeds, import reads only the staged copy. The original source path is no longer part of the operation. After destination import commits, the staged intake tree may also be deleted without breaking destination material read/use.
+
+A direct import from an arbitrary external live path is therefore not the canonical MVP. It may be considered later only if a concrete need justifies the added consistency/lifecycle semantics.
+
+Old Snapshot/Lineage/Run/Finding/candidate authority remains provenance only and is never imported as current authority.
+
+#165 depends on the **staged source-root capability** from #160, not on every unrelated child store becoming independently portable and not on closing the whole #163 umbrella.
 
 ## Legacy truthfulness and liveness
 
@@ -212,8 +222,8 @@ A lazy optional child that was never initialized is not corruption. A child that
 No additional storage Issue is needed beyond the current focused set:
 
 - **#193** — make workspace durability one hierarchical Parent Durable Store Root tree and correct current tree/discovery violations;
-- **#160** — formalize the execution/material subtree as a portable self-contained child Durable Store Root, including independent read-only source opening;
-- **#165** — import selected verified material from such a read-only source root into a fresh workspace without authority carryover;
+- **#160** — formalize the execution/material subtree as a portable self-contained child Durable Store Root, including independent read-only source opening after staging/copy;
+- **#165** — stage a previous source root under destination workspace intake, then import selected verified material from that stable read-only copy into the destination Parent tree without authority carryover;
 - **#158 / #127 / #157** — retain their narrower material-health/recovery/discovery responsibilities.
 
 This decomposition intentionally avoids a new universal storage framework.
