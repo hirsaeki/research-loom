@@ -535,7 +535,7 @@ class NewMaterialContinuationService:
                     historical,
                     historical_extension,
                     result,
-                    new_artifact,
+                    new_irtifact,
                     reacquisition_run_id,
                 )
                 attempt_map = self._replay_attempts(
