@@ -10,9 +10,10 @@ class DecisionAwareResearchCoordinator(WorkConversationService):
     """PR26 operational authority extension for the PR10 Coordinator.
 
     DecisionRequirements remain owned by PR20/HumanDecisionService. This class
-    only surfaces pending authority and prevents new state-changing work or a
-    new Research Capability from running while an exact Human Decision Request
-    is unresolved.
+    surfaces pending authority and prevents duplicate application of the exact
+    candidate already governed by an unresolved Human Decision Request. Pending
+    authority does not block unrelated candidate-only research or operational
+    lifecycle work.
     """
 
     def __init__(self, *args, human_decisions, **kwargs) -> None:
@@ -61,14 +62,26 @@ class DecisionAwareResearchCoordinator(WorkConversationService):
         return super()._confirm(input_document)
 
     def _execute(self, source_input, proposal, state, confirmation_receipt):
-        route = proposal.get("route", {})
         action = proposal.get("action", {})
         pending = self._human_decisions.pending(str(proposal["project_id"]))
-        blocked_by_pending_decision = bool(pending) and (
-            route.get("route_type") == "capability_invocation"
-            or action.get("effect") == "state_changing"
+        candidate_id = None
+        candidate_digest = None
+        if action.get("action_type") == "state.apply_candidate":
+            candidate_id = action.get("payload", {}).get("state_delta_proposal_id")
+            candidate = self._store.load_state_delta_proposal(str(candidate_id)) if candidate_id else None
+            if candidate is not None:
+                candidate_digest = candidate.get("proposal_digest")
+        matching_pending = tuple(
+            item
+            for item in pending
+            if candidate_id is not None
+            and candidate_digest is not None
+            and str(item.get("source_state_delta_proposal", {}).get("proposal_id"))
+            == str(candidate_id)
+            and str(item.get("source_state_delta_proposal", {}).get("proposal_digest"))
+            == str(candidate_digest)
         )
-        if blocked_by_pending_decision:
+        if matching_pending:
             receipt = self._rejection_receipt(
                 source_input,
                 proposal,
@@ -83,12 +96,12 @@ class DecisionAwareResearchCoordinator(WorkConversationService):
                 action_receipt=receipt,
                 data={
                     "pending_human_decision_request_ids": [
-                        str(item["request_id"]) for item in pending
+                        str(item["request_id"]) for item in matching_pending
                     ]
                 },
                 issues=({
                     "code": "CONV-HUMAN-DECISION-PENDING-001",
-                    "message": "a Human Decision Request is pending before further state-changing work or Research Capability execution",
+                    "message": "the exact candidate is already governed by a pending Human Decision Request",
                 },),
             )
 
