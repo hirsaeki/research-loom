@@ -31,14 +31,20 @@ The legacy `status`, `failure_class`, and producer fields remain the #145 diagno
 ## Divergent material continuation
 
 Issue #171 keeps `NEW_MATERIAL_VERSION` outside historical recovery. A successful
-`desktop_research.material.reacquire` result whose regenerated rendition differs
-from the historical bytes may be continued through
+`desktop_research.material.reacquire` result may be continued through
 `desktop_research.material.continue_new_version` by supplying only the persisted
-reacquisition Run ID.
+reacquisition Run ID. The original #171 path pairs a divergent rendition with its
+verified historical original. Issue #127 adds only the observed complementary case:
+a divergent `text/html` original is paired with a newly derived UTF-8 rendition
+using the bounded G1 HTML-to-text rule; the unavailable historical original and
+rendition remain untouched. Other divergent-original media types remain fail-closed.
 
 The continuation verifies the reacquisition result, the persisted divergent
-artifact, its historical provenance, and the exact historical original used as
-the paired material. It then creates a new normal REAL `desktop-research/investigate` Run, captures a new source pair, replays the persisted retrieval
+artifact, and its historical provenance. The rendition branch also verifies the
+exact historical original used as its pair; the HTML-original branch instead uses
+the verified reacquired original and derives a new text rendition from those bytes.
+It then creates a new normal REAL `desktop-research/investigate` Run, captures a
+new source pair, replays the persisted retrieval
 attempt facts without network retrieval, and submits the candidate research
 content through the ordinary external Desktop Research assembler and validator.
 Citation containment is therefore checked against the new rendition bytes; a
@@ -51,6 +57,8 @@ ordinary Confirmation / Human Decision path remains the only Research State
 authority. `run show` exposes the new Run's explicit reacquisition binding/provenance,
 historical Run/capture, material digest/size, exact locator, and
 historical/reacquired timestamps without exposing managed storage locations.
-The new Run is a root execution; `parent_run_id` is not used for continuation
-lineage. Repeating a completed continuation reuses the one existing bound
-result; conflicting or incomplete prior claims fail closed.
+The first continuation attempt is a root execution. A retry may bind a prior
+terminal continuation Run as its execution parent while material provenance remains
+bound to the historical and reacquisition Runs. A completed reusable result is
+returned idempotently; interrupted or terminal failed attempts remain immutable
+execution facts rather than permanent blockers.
