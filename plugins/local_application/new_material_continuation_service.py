@@ -309,6 +309,51 @@ class NewMaterialContinuationService:
                         interrupted.run_id,
                         reason="interrupted new-material continuation before binding",
                     )
+                if interrupted.status is RunStatus.COMPLETED:
+                    recovered_binding = {
+                        "relation": "new_material_version_continuation",
+                        "reacquisition_run_id": reacquisition_run_id,
+                        "historical_run_id": historical.run_id,
+                        "historical_capture_id": str(result["historical_capture_id"]),
+                        "new_material_artifact_id": new_artifact.reference_id,
+                        "new_run_id": interrupted.run_id,
+                    }
+                    admission._validate_continuation_binding(
+                        self._application,
+                        self._project_id,
+                        recovered_binding,
+                        result,
+                        historical,
+                        require_mirror=False,
+                    )
+                    store.store_diagnostic(
+                        reacquisition_run_id,
+                        admission._CONTINUATION_BINDING_DIAGNOSTIC,
+                        recovered_binding,
+                    )
+                    store.store_diagnostic(
+                        interrupted.run_id,
+                        admission._CONTINUATION_BINDING_DIAGNOSTIC,
+                        recovered_binding,
+                    )
+                    if admission._completed_continuation_is_reusable(
+                        self._application,
+                        self._project_id,
+                        recovered_binding,
+                        result,
+                        historical,
+                    ):
+                        return {
+                            "status": "COMPLETED",
+                            "reacquisition_run_id": reacquisition_run_id,
+                            "historical_run_id": historical.run_id,
+                            "new_run_id": interrupted.run_id,
+                            "new_handoff_id": interrupted.handoff_ref,
+                            "new_handoff_digest": interrupted.handoff_digest,
+                            "candidate_only": True,
+                            "idempotent_reuse": True,
+                            "research_state_mutation_performed": False,
+                        }
                 if interrupted.status not in {
                     RunStatus.COMPLETED,
                     RunStatus.FAILED,

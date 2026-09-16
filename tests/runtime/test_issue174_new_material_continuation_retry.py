@@ -220,6 +220,52 @@ class Issue174NewMaterialContinuationRetryTests(ResearchPackageAcceptanceSupport
         finally:
             facade.close()
 
+    def test_completed_correlated_attempt_without_binding_is_rebound_and_reused(self):
+        facade, case = self._prepare_case()
+        try:
+            reacquired = self._make_new_version(facade, case)
+            reacq_run_id = reacquired["reacquisition_run_id"]
+            store = facade._application.execution_store
+            original_store = store.store_diagnostic
+
+            def drop_binding(run_id, kind, payload):
+                if kind == admission._CONTINUATION_BINDING_DIAGNOSTIC:
+                    return None
+                return original_store(run_id, kind, payload)
+
+            with patch.object(store, "store_diagnostic", side_effect=drop_binding):
+                first = self._continue(facade, reacq_run_id)
+            self.assertEqual(first["status"], "FAILED")
+
+            correlations = facade._application.conversation_store.run_correlations_for_conversation(
+                admission._continuation_conversation_id(reacq_run_id),
+                limit=4,
+            )
+            self.assertEqual(len(correlations), 1)
+            first_run_id = correlations[0]["run_id"]
+            first_run = store.load_run(first_run_id)
+            self.assertEqual(first_run.status, RunStatus.COMPLETED)
+            self.assertIsNone(admission._continuation_binding(store, reacq_run_id))
+
+            recovered = self._continue(facade, reacq_run_id)["data"]
+            self.assertEqual(recovered["status"], "COMPLETED")
+            self.assertTrue(recovered["idempotent_reuse"])
+            self.assertEqual(recovered["new_run_id"], first_run_id)
+            self.assertEqual(
+                len(
+                    facade._application.conversation_store.run_correlations_for_conversation(
+                        admission._continuation_conversation_id(reacq_run_id),
+                        limit=4,
+                    )
+                ),
+                1,
+            )
+            binding = admission._continuation_binding(store, reacq_run_id)
+            self.assertEqual(binding["new_run_id"], first_run_id)
+            self.assertTrue(admission._continuation_mirror_complete(store, binding))
+        finally:
+            facade.close()
+
     def test_partial_binding_is_preserved_and_later_attempt_recovers(self):
         facade, case = self._prepare_case()
         try:
