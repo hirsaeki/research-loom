@@ -36,17 +36,47 @@ class Issue133WindowsAclTests(ResearchPackageAcceptanceSupport):
         return restricted
 
     @staticmethod
-    def _acl_entries(path: Path, stdout: str) -> list[str]:
-        entries: list[str] = []
-        rendered_path = str(path)
-        for line in stdout.splitlines():
-            stripped = line.strip()
-            if not stripped or stripped.startswith("Successfully processed"):
-                continue
-            if line.startswith(rendered_path):
-                stripped = line[len(rendered_path):].strip()
-            entries.append(stripped.replace("(I)", ""))
-        return entries
+    def _acl_access(path: Path) -> list[dict[str, object]]:
+        script = (
+            "$ErrorActionPreference='Stop'; "
+            "$acl=Get-Acl -LiteralPath $args[0]; "
+            "@($acl.Access | ForEach-Object { [pscustomobject]@{"
+            "identity=$_.IdentityReference.Value; "
+            "rights=[int64]$_.FileSystemRights; "
+            "access_type=$_.AccessControlType.ToString(); "
+            "inheritance_flags=$_.InheritanceFlags.ToString(); "
+            "propagation_flags=$_.PropagationFlags.ToString(); "
+            "is_inherited=[bool]$_.IsInherited"
+            "} }) | ConvertTo-Json -Compress"
+        )
+        completed = subprocess.run(
+            ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script, str(path)],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        payload = completed.stdout.strip()
+        if not payload:
+            return []
+        decoded = json.loads(payload)
+        return [decoded] if isinstance(decoded, dict) else decoded
+
+    @staticmethod
+    def _acl_signature(entry: dict[str, object]) -> tuple[object, ...]:
+        return (
+            entry["identity"],
+            entry["rights"],
+            entry["access_type"],
+            entry["inheritance_flags"],
+            entry["propagation_flags"],
+        )
+
+    def _expected_child_acl_signatures(self) -> list[tuple[object, ...]]:
+        return sorted(
+            self._acl_signature(entry)
+            for entry in self._acl_access(self.root)
+            if entry["inheritance_flags"] != "None"
+        )
 
     def _assert_fresh_process_reads_package(self, output: Path) -> None:
         script = (
@@ -67,9 +97,8 @@ class Issue133WindowsAclTests(ResearchPackageAcceptanceSupport):
     def test_acl1_acl2_export_resets_staging_acl_and_is_fresh_process_readable(self):
         facade, case = self._build()
         output = self.root / "issue133-detached"
-        ordinary = self.root / "ordinary-child"
-        ordinary.mkdir()
-        ordinary_acl = self._icacls(ordinary).stdout
+        parent_acl = self._icacls(self.root).stdout
+        expected_signatures = self._expected_child_acl_signatures()
         real_mkdtemp = __import__("tempfile").mkdtemp
         try:
             with patch(
@@ -81,9 +110,12 @@ class Issue133WindowsAclTests(ResearchPackageAcceptanceSupport):
             facade.close()
 
         final_acl = self._icacls(output).stdout
+        final_access = self._acl_access(output)
+        self.assertTrue(final_access)
+        self.assertTrue(all(entry["is_inherited"] for entry in final_access))
         self.assertEqual(
-            self._acl_entries(output, final_acl),
-            self._acl_entries(ordinary, ordinary_acl),
+            sorted(self._acl_signature(entry) for entry in final_access),
+            expected_signatures,
         )
         self._assert_fresh_process_reads_package(output)
         verified = verify_export_root(output)
@@ -91,8 +123,9 @@ class Issue133WindowsAclTests(ResearchPackageAcceptanceSupport):
         self.assertEqual(verified["package_digest"], exported["package_digest"])
         print(json.dumps({
             "ISSUE133_ACL1_ACL2": {
-                "ordinary_acl": ordinary_acl,
+                "parent_acl": parent_acl,
                 "final_acl": final_acl,
+                "final_access": final_access,
                 "package_digest": exported["package_digest"],
             }
         }, sort_keys=True))
@@ -137,9 +170,8 @@ class Issue133WindowsAclTests(ResearchPackageAcceptanceSupport):
     def test_ablation_old_rename_behavior_retains_restrictive_staging_acl(self):
         facade, case = self._build()
         output = self.root / "issue133-ablation"
-        ordinary = self.root / "ordinary-ablation-child"
-        ordinary.mkdir()
-        ordinary_acl = self._icacls(ordinary).stdout
+        parent_acl = self._icacls(self.root).stdout
+        expected_signatures = self._expected_child_acl_signatures()
         real_mkdtemp = __import__("tempfile").mkdtemp
         try:
             with patch(
@@ -154,15 +186,17 @@ class Issue133WindowsAclTests(ResearchPackageAcceptanceSupport):
             facade.close()
 
         ablated_acl = self._icacls(output).stdout
+        ablated_access = self._acl_access(output)
         self.assertNotEqual(
-            self._acl_entries(output, ablated_acl),
-            self._acl_entries(ordinary, ordinary_acl),
+            sorted(self._acl_signature(entry) for entry in ablated_access),
+            expected_signatures,
         )
         self.assertEqual(verify_export_root(output)["status"], "VERIFIED")
         print(json.dumps({
             "ISSUE133_ABLATION": {
-                "ordinary_acl": ordinary_acl,
+                "parent_acl": parent_acl,
                 "final_acl": ablated_acl,
+                "final_access": ablated_access,
             }
         }, sort_keys=True))
 
