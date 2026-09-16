@@ -52,6 +52,60 @@ class Issue133WindowsAclTests(ResearchPackageAcceptanceSupport):
     def _acl_signature(entry: str) -> str:
         return entry.replace("(I)", "")
 
+    def _normal_acl_control_tree(self, source: Path, name: str) -> Path:
+        control = self.root / name
+        control.mkdir()
+        for source_path in sorted(source.rglob("*"), key=lambda item: (len(item.parts), str(item))):
+            relative = source_path.relative_to(source)
+            target = control / relative
+            if source_path.is_dir():
+                target.mkdir(parents=True, exist_ok=True)
+            else:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.touch()
+        return control
+
+    def _assert_tree_acl_matches_normal_creation(self, output: Path, control: Path) -> None:
+        for committed_path in (output, *sorted(output.rglob("*"))):
+            relative = committed_path.relative_to(output)
+            control_path = control / relative
+            committed_entries = self._acl_entries(
+                committed_path,
+                self._icacls(committed_path).stdout,
+            )
+            control_entries = self._acl_entries(
+                control_path,
+                self._icacls(control_path).stdout,
+            )
+            self.assertTrue(committed_entries, committed_path)
+            self.assertTrue(
+                all("(I)" in entry for entry in committed_entries),
+                committed_path,
+            )
+            self.assertEqual(
+                sorted(self._acl_signature(entry) for entry in committed_entries),
+                sorted(self._acl_signature(entry) for entry in control_entries),
+                committed_path,
+            )
+
+    def _tree_acl_differs_from_normal_creation(self, output: Path, control: Path) -> bool:
+        for committed_path in (output, *sorted(output.rglob("*"))):
+            relative = committed_path.relative_to(output)
+            control_path = control / relative
+            committed_entries = self._acl_entries(
+                committed_path,
+                self._icacls(committed_path).stdout,
+            )
+            control_entries = self._acl_entries(
+                control_path,
+                self._icacls(control_path).stdout,
+            )
+            if sorted(self._acl_signature(entry) for entry in committed_entries) != sorted(
+                self._acl_signature(entry) for entry in control_entries
+            ):
+                return True
+        return False
+
     def _assert_fresh_process_reads_package(self, output: Path) -> None:
         script = (
             "from pathlib import Path; import sys; "
@@ -71,9 +125,6 @@ class Issue133WindowsAclTests(ResearchPackageAcceptanceSupport):
     def test_acl1_acl2_export_resets_staging_acl_and_is_fresh_process_readable(self):
         facade, case = self._build()
         output = self.root / "issue133-detached"
-        ordinary = self.root / "ordinary-child"
-        ordinary.mkdir()
-        ordinary_acl = self._icacls(ordinary).stdout
         real_mkdtemp = __import__("tempfile").mkdtemp
         try:
             with patch(
@@ -85,21 +136,15 @@ class Issue133WindowsAclTests(ResearchPackageAcceptanceSupport):
             facade.close()
 
         final_acl = self._icacls(output).stdout
-        final_entries = self._acl_entries(output, final_acl)
-        ordinary_entries = self._acl_entries(ordinary, ordinary_acl)
-        self.assertTrue(final_entries)
-        self.assertTrue(all("(I)" in entry for entry in final_entries))
-        self.assertEqual(
-            [self._acl_signature(entry) for entry in final_entries],
-            [self._acl_signature(entry) for entry in ordinary_entries],
-        )
+        control = self._normal_acl_control_tree(output, "ordinary-control")
+        self._assert_tree_acl_matches_normal_creation(output, control)
         self._assert_fresh_process_reads_package(output)
         verified = verify_export_root(output)
         self.assertEqual(verified["status"], "VERIFIED")
         self.assertEqual(verified["package_digest"], exported["package_digest"])
         print(json.dumps({
             "ISSUE133_ACL1_ACL2": {
-                "ordinary_acl": ordinary_acl,
+                "control_acl": self._icacls(control).stdout,
                 "final_acl": final_acl,
                 "package_digest": exported["package_digest"],
             }
@@ -145,9 +190,6 @@ class Issue133WindowsAclTests(ResearchPackageAcceptanceSupport):
     def test_ablation_old_rename_behavior_retains_restrictive_staging_acl(self):
         facade, case = self._build()
         output = self.root / "issue133-ablation"
-        ordinary = self.root / "ordinary-ablation-child"
-        ordinary.mkdir()
-        ordinary_acl = self._icacls(ordinary).stdout
         real_mkdtemp = __import__("tempfile").mkdtemp
         try:
             with patch(
@@ -162,14 +204,12 @@ class Issue133WindowsAclTests(ResearchPackageAcceptanceSupport):
             facade.close()
 
         ablated_acl = self._icacls(output).stdout
-        self.assertNotEqual(
-            [self._acl_signature(entry) for entry in self._acl_entries(output, ablated_acl)],
-            [self._acl_signature(entry) for entry in self._acl_entries(ordinary, ordinary_acl)],
-        )
+        control = self._normal_acl_control_tree(output, "ordinary-ablation-control")
+        self.assertTrue(self._tree_acl_differs_from_normal_creation(output, control))
         self.assertEqual(verify_export_root(output)["status"], "VERIFIED")
         print(json.dumps({
             "ISSUE133_ABLATION": {
-                "ordinary_acl": ordinary_acl,
+                "control_acl": self._icacls(control).stdout,
                 "final_acl": ablated_acl,
             }
         }, sort_keys=True))
