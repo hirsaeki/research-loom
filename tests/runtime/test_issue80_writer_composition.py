@@ -2,12 +2,75 @@ from __future__ import annotations
 
 from copy import deepcopy
 import json
+from unittest.mock import patch
 
 from plugins.local_application import LocalApplicationError
 import issue80_writer_composition_suite as _suite
 
 
 class Issue80WriterCompositionTests(_suite.Issue80WriterCompositionTests):
+    def test_review_fixes_series_lock_and_list_package_cache(self):
+        facade, case = self._build()
+        try:
+            service = facade._writer_composition_service()
+            facade.capture_writer_composition(case["package_id"], self._proposal(case, composition_id="COMP-LOCK"))
+            with service._series_lock("COMP-LOCK"):
+                with self.assertRaises(LocalApplicationError) as error:
+                    with service._series_lock("COMP-LOCK"):
+                        pass
+            self.assertEqual(error.exception.code, "APPLICATION-WRITER-COMPOSITION-BUSY-001")
+
+            with patch.object(service, "_series_lock", wraps=service._series_lock) as series_lock:
+                with service._capture_lock("COMP-LOCK"):
+                    pass
+            self.assertEqual(series_lock.call_count, 1)
+
+            lock_files_before = sorted(path.name for path in service.root.glob(".*.lock"))
+            for index in range(8):
+                with self.assertRaises(LocalApplicationError) as missing:
+                    facade.select_writer_composition(f"COMP-MISSING-{index}", 1, "sha256:" + "0" * 64)
+                self.assertEqual(missing.exception.code, "APPLICATION-WRITER-COMPOSITION-404")
+            self.assertEqual(sorted(path.name for path in service.root.glob(".*.lock")), lock_files_before)
+
+            facade.capture_writer_composition(case["package_id"], self._proposal(case, composition_id="COMP-A"))
+            facade.capture_writer_composition(case["package_id"], self._proposal(case, composition_id="COMP-B"))
+            with patch.object(service, "_package", wraps=service._package) as package_load:
+                listed = service.list()
+            self.assertEqual(len(listed["compositions"]), 3)
+            self.assertEqual(package_load.call_count, 1)
+        finally:
+            facade.close()
+
+    def test_co6_output_safety_and_write_failure_are_atomic(self):
+        facade, case = self._build()
+        try:
+            v1 = facade.capture_writer_composition(case["package_id"], self._proposal(case))["composition"]
+            facade.select_writer_composition(v1["composition_id"], 1, v1["composition_digest"])
+            existing = self.root / "existing"
+            existing.mkdir()
+            (existing / "keep").write_text("keep")
+            with self.assertRaises(LocalApplicationError):
+                facade.export_writer_section_input(v1["composition_id"], "SEC-FRAME", existing)
+            self.assertEqual((existing / "keep").read_text(), "keep")
+
+            failed = self.root / "failed"
+            with patch("plugins.local_application.writer_composition_service.os.replace", side_effect=OSError("fixture")):
+                with self.assertRaises(LocalApplicationError):
+                    facade.export_writer_section_input(v1["composition_id"], "SEC-FRAME", failed)
+            self.assertFalse(failed.exists())
+
+            retried = facade.select_writer_composition(v1["composition_id"], 1, v1["composition_digest"])
+            self.assertTrue(retried["selection_reused"])
+            self.assertEqual(facade.show_writer_composition(v1["composition_id"], 1)["selection"]["history_total"], 1)
+
+            with patch("plugins.local_application.writer_composition_service.MAX_SECTION_INPUT_BYTES", 1):
+                with self.assertRaises(LocalApplicationError) as output_bound:
+                    facade.export_writer_section_input(v1["composition_id"], "SEC-FRAME", self.root / "too-large")
+                self.assertEqual(output_bound.exception.code, "APPLICATION-WRITER-COMPOSITION-BOUND-001")
+                self.assertFalse((self.root / "too-large").exists())
+        finally:
+            facade.close()
+
     def test_review_round4_support_chain_rq_locator_and_candidate_readiness(self):
         facade, case = self._build_complete_support_package()
         try:
