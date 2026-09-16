@@ -40,6 +40,22 @@ class _SafeG1HtmlTextParser(HTMLParser):
             self.parts.append(data)
 
 
+def _capture_budget_for_run(self, new_run) -> Mapping[str, Any]:
+    extension = self._application.context_extension_store.load(
+        new_run.capability_id,
+        new_run.capability_version,
+        new_run.function_id,
+        new_run.context_pack_id,
+    )
+    budget = extension.get("budget") if isinstance(extension, Mapping) else None
+    if not isinstance(budget, Mapping):
+        raise LocalApplicationError(
+            "APPLICATION-NEW-MATERIAL-CONTINUATION-MATERIAL-001",
+            "new Desktop Research Run has no valid capture budget binding",
+        )
+    return budget
+
+
 def _capture_with_pinned_html_budget(
     self,
     new_run,
@@ -51,12 +67,25 @@ def _capture_with_pinned_html_budget(
 ) -> dict[str, str]:
     kind = str(result.get("new_material_kind") or result.get("kind") or "")
     if kind == "original":
-        budget = historical_extension["budget"]
-        original_limit = int(self._application.execution_store.config.max_artifact_bytes)
-        if budget.get("max_original_capture_bytes") is not None:
-            original_limit = min(
-                original_limit,
-                int(budget["max_original_capture_bytes"]),
+        budget = _capture_budget_for_run(self, new_run)
+        try:
+            store_limit = int(self._application.execution_store.config.max_artifact_bytes)
+            original_declared = budget.get("max_original_capture_bytes")
+            original_limit = (
+                store_limit
+                if original_declared is None
+                else min(store_limit, int(original_declared))
+            )
+            text_limit = min(store_limit, int(budget["max_text_rendition_bytes"]))
+        except (KeyError, TypeError, ValueError) as exc:
+            raise LocalApplicationError(
+                "APPLICATION-NEW-MATERIAL-CONTINUATION-MATERIAL-001",
+                "new Desktop Research Run capture budget is malformed",
+            ) from exc
+        if min(original_limit, text_limit) < 0:
+            raise LocalApplicationError(
+                "APPLICATION-NEW-MATERIAL-CONTINUATION-MATERIAL-001",
+                "new Desktop Research Run capture budget is malformed",
             )
         if len(new_artifact.content) > original_limit:
             raise LocalApplicationError(
@@ -66,10 +95,7 @@ def _capture_with_pinned_html_budget(
         _base._render_reacquired_html_rendition(
             new_artifact.content,
             new_artifact.media_type,
-            max_bytes=min(
-                int(self._application.execution_store.config.max_artifact_bytes),
-                int(budget["max_text_rendition_bytes"]),
-            ),
+            max_bytes=text_limit,
         )
     return _BASE_CAPTURE(
         self,

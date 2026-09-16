@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from copy import deepcopy
+from typing import Mapping
 from unittest.mock import patch
 
-from plugins.local_application import new_material_continuation_admission as admission
 from plugins.local_application.new_material_continuation_service import (
     _render_reacquired_html_rendition,
 )
@@ -18,15 +19,23 @@ class Issue127HtmlContinuationReviewTests(ResearchPackageAcceptanceSupport):
     _make_original_new_version = _Issue171Support._make_original_new_version
 
     def _continue_with_budget(self, facade, case, reacquired, **budget_overrides):
-        handoff, extension = admission._historical_canonical_result(
-            facade._application, case["run_id"]
-        )
-        extension["budget"].update(budget_overrides)
-        with patch.object(
-            admission,
-            "_historical_canonical_result",
-            return_value=(handoff, extension),
-        ):
+        del case
+        extension_store = facade._application.context_extension_store
+        real_load = extension_store.load
+
+        def load_with_budget(*args, **kwargs):
+            extension = real_load(*args, **kwargs)
+            if not isinstance(extension, Mapping):
+                return extension
+            budget = extension.get("budget")
+            if not isinstance(budget, Mapping):
+                return extension
+            overridden = deepcopy(dict(extension))
+            overridden["budget"] = dict(budget)
+            overridden["budget"].update(budget_overrides)
+            return overridden
+
+        with patch.object(extension_store, "load", side_effect=load_with_budget):
             return facade.submit_action(
                 {
                     "action_type": "desktop_research.material.continue_new_version",
