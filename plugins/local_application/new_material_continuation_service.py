@@ -1,7 +1,12 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 from copy import deepcopy
+import errno
+import hashlib
+import os
 from threading import RLock
+import time
 from typing import Any, Mapping
 
 from core.execution import RunStatus
@@ -14,6 +19,61 @@ from .material_reacquisition_public_facade import LocalApplicationFacade as _Bas
 from . import new_material_continuation_admission as admission
 
 _CONTINUATION_LOCK = RLock()
+
+
+@contextmanager
+def _target_lock(workspace_root, reacquisition_run_id: str):
+    """Serialize one continuation target across local processes.
+
+    The lock is operational only: its presence is never persisted as authority or
+    used to rewrite an earlier execution fact.
+    """
+    if workspace_root is None:
+        raise LocalApplicationError(
+            "APPLICATION-NEW-MATERIAL-CONTINUATION-EXECUTION-001",
+            "new-material continuation requires a workspace-bound facade",
+        )
+    lock_root = workspace_root / ".research-loom" / "new-material-continuation-locks"
+    lock_root.mkdir(parents=True, exist_ok=True)
+    token = hashlib.sha256(reacquisition_run_id.encode("utf-8")).hexdigest()
+    lock_path = lock_root / f"{token}.lock"
+    fd = os.open(lock_path, os.O_CREAT | os.O_RDWR | getattr(os, "O_BINARY", 0), 0o600)
+    locked = False
+    try:
+        if os.name == "nt":
+            import msvcrt
+
+            if os.fstat(fd).st_size == 0:
+                os.write(fd, b"\0")
+                os.fsync(fd)
+            os.lseek(fd, 0, os.SEEK_SET)
+            while True:
+                try:
+                    msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+                    locked = True
+                    break
+                except OSError as exc:
+                    if exc.errno not in {errno.EACCES, errno.EAGAIN, errno.EDEADLK}:
+                        raise
+                    time.sleep(0.05)
+        else:
+            import fcntl
+
+            fcntl.flock(fd, fcntl.LOCK_EX)
+            locked = True
+        yield
+    finally:
+        if locked:
+            if os.name == "nt":
+                import msvcrt
+
+                os.lseek(fd, 0, os.SEEK_SET)
+                msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(fd, fcntl.LOCK_UN)
+        os.close(fd)
 
 def _remap_outputs(
     handoff: Mapping[str, Any],
@@ -149,21 +209,53 @@ class NewMaterialContinuationService:
         self._workspace_root = workspace_root
 
     def continue_new_version(self, reacquisition_run_id: str) -> Mapping[str, Any]:
-        with _CONTINUATION_LOCK:
+        with _CONTINUATION_LOCK, _target_lock(self._workspace_root, reacquisition_run_id):
             _reacq, result, new_artifact, historical, _original, _capture = (
                 admission._find_reacquisition_result(
                     self._application, self._project_id, reacquisition_run_id
                 )
             )
             store = self._application.execution_store
+            prior_run = None
             binding = admission._continuation_binding(store, reacquisition_run_id)
             if binding is not None:
+                # Validate immutable identity first. Mirror/capture closure is
+                # operational state: it decides reuse vs recovery, never whether
+                # different material may be admitted.
                 bound = admission._validate_continuation_binding(
-                    self._application, self._project_id, binding, result, historical
+                    self._application,
+                    self._project_id,
+                    binding,
+                    result,
+                    historical,
+                    require_mirror=False,
+                    require_completed_capture=False,
                 )
-                if bound.status is RunStatus.COMPLETED:
+                mirror_complete = admission._continuation_mirror_complete(store, binding)
+
+                if mirror_complete and bound.status is RunStatus.COMPLETED:
+                    if admission._completed_continuation_is_reusable(
+                        self._application,
+                        self._project_id,
+                        binding,
+                        result,
+                        historical,
+                    ):
+                        return {
+                            "status": "COMPLETED",
+                            "reacquisition_run_id": reacquisition_run_id,
+                            "historical_run_id": historical.run_id,
+                            "new_run_id": bound.run_id,
+                            "new_handoff_id": bound.handoff_ref,
+                            "new_handoff_digest": bound.handoff_digest,
+                            "candidate_only": True,
+                            "idempotent_reuse": True,
+                            "research_state_mutation_performed": False,
+                        }
+                    prior_run = bound
+                elif mirror_complete and bound.status in {RunStatus.PREPARED, RunStatus.RUNNING}:
                     return {
-                        "status": "COMPLETED",
+                        "status": bound.status.value,
                         "reacquisition_run_id": reacquisition_run_id,
                         "historical_run_id": historical.run_id,
                         "new_run_id": bound.run_id,
@@ -171,12 +263,19 @@ class NewMaterialContinuationService:
                         "new_handoff_digest": bound.handoff_digest,
                         "candidate_only": True,
                         "idempotent_reuse": True,
+                        "in_progress": True,
                         "research_state_mutation_performed": False,
                     }
-                raise LocalApplicationError(
-                    "APPLICATION-NEW-MATERIAL-CONTINUATION-IDEMPOTENCY-001",
-                    "a bound prior new-material continuation is not a completed reusable result",
-                )
+                else:
+                    if bound.status in {RunStatus.PREPARED, RunStatus.RUNNING}:
+                        # The target-scoped process lock proves no continuation
+                        # request still owns this interrupted partial mirror. Close
+                        # only that unusable execution attempt; its history remains.
+                        bound = self._application.capability_execution_service.abort(
+                            bound.run_id,
+                            reason="interrupted new-material continuation binding",
+                        )
+                    prior_run = bound
 
             historical_handoff, historical_extension = admission._historical_canonical_result(
                 self._application, historical.run_id
@@ -203,34 +302,23 @@ class NewMaterialContinuationService:
                     "new-material continuation claim is conflicting or corrupt",
                 ) from exc
             if not claimed:
-                # A concurrent process may have completed between the initial
-                # binding read and the atomic claim. Reuse only an exact verified
-                # binding; otherwise leave the prior claim fail-closed.
-                binding = admission._continuation_binding(store, reacquisition_run_id)
-                if binding is not None:
-                    bound = admission._validate_continuation_binding(
-                        self._application, self._project_id, binding, result, historical
+                existing_claim = admission._continuation_claim(store, reacquisition_run_id)
+                if existing_claim != claim:
+                    raise LocalApplicationError(
+                        "APPLICATION-NEW-MATERIAL-CONTINUATION-IDEMPOTENCY-001",
+                        "prior new-material continuation claim does not match the admitted material",
                     )
-                    if bound.status is RunStatus.COMPLETED:
-                        return {
-                            "status": "COMPLETED",
-                            "reacquisition_run_id": reacquisition_run_id,
-                            "historical_run_id": historical.run_id,
-                            "new_run_id": bound.run_id,
-                            "new_handoff_id": bound.handoff_ref,
-                            "new_handoff_digest": bound.handoff_digest,
-                            "candidate_only": True,
-                            "idempotent_reuse": True,
-                            "research_state_mutation_performed": False,
-                        }
-                raise LocalApplicationError(
-                    "APPLICATION-NEW-MATERIAL-CONTINUATION-IDEMPOTENCY-001",
-                    "a prior new-material continuation claim exists without a completed reusable result",
-                )
-            # This is a new execution fact, not an Execution Core retry. Historical
-            # action payloads may themselves have been retries, so do not inherit
-            # their parent binding. The reacquisition relation is persisted below.
-            historical_payload.pop("parent_run_id", None)
+
+            if prior_run is None:
+                historical_payload.pop("parent_run_id", None)
+            else:
+                if prior_run.status not in {RunStatus.COMPLETED, RunStatus.FAILED, RunStatus.ABORTED}:
+                    raise LocalApplicationError(
+                        "APPLICATION-NEW-MATERIAL-CONTINUATION-IDEMPOTENCY-001",
+                        "prior continuation attempt is still active",
+                    )
+                historical_payload["parent_run_id"] = prior_run.run_id
+
             facade = _BaseLocalApplicationFacade(
                 self._application,
                 self._project_id,
@@ -262,10 +350,11 @@ class NewMaterialContinuationService:
                 "new_material_artifact_id": new_artifact.reference_id,
                 "new_run_id": new_run_id,
             }
+            collect_attempted = False
             try:
-                # Persist the exact purpose/binding on both sides before consuming
-                # the new material. A partial prior attempt then fails closed rather
-                # than being mistaken for an unrelated Desktop Research Run.
+                # Each attempt is immutable. The reacquisition Run keeps an
+                # append-only attempt index; the child Run carries its own exact
+                # mirror. The newest exact binding is the current attempt.
                 store.store_diagnostic(
                     reacquisition_run_id,
                     admission._CONTINUATION_BINDING_DIAGNOSTIC,
@@ -295,20 +384,41 @@ class NewMaterialContinuationService:
                     capture_map=capture_map,
                     attempt_map=attempt_map,
                 )
+                collect_attempted = True
                 collected = facade.collect_external(
                     new_run_id, {"research_result": research_result}
                 )
                 execution = collected.get("execution_result") or {}
                 run_wire = execution.get("run") if isinstance(execution, Mapping) else None
-                if not isinstance(run_wire, Mapping) or run_wire.get("status") != "COMPLETED":
+                proposal = execution.get("state_delta_proposal") if isinstance(execution, Mapping) else None
+                if (
+                    not isinstance(run_wire, Mapping)
+                    or run_wire.get("status") != "COMPLETED"
+                    or not isinstance(proposal, Mapping)
+                ):
                     issues = execution.get("issues") if isinstance(execution, Mapping) else None
                     raise LocalApplicationError(
                         "APPLICATION-NEW-MATERIAL-CONTINUATION-RESULT-001",
                         "new canonical Desktop Research result did not complete"
                         + (f": {issues}" if issues else ""),
                     )
-                proposal = execution.get("state_delta_proposal")
                 completed = store.load_run(new_run_id)
+                if (
+                    completed is None
+                    or not completed.handoff_ref
+                    or not completed.handoff_digest
+                    or not admission._completed_continuation_is_reusable(
+                        self._application,
+                        self._project_id,
+                        binding,
+                        result,
+                        historical,
+                    )
+                ):
+                    raise LocalApplicationError(
+                        "APPLICATION-NEW-MATERIAL-CONTINUATION-RESULT-001",
+                        "completed continuation is missing canonical reusable result closure",
+                    )
                 return {
                     "status": "COMPLETED",
                     "reacquisition_run_id": reacquisition_run_id,
@@ -316,30 +426,29 @@ class NewMaterialContinuationService:
                     "historical_capture_id": str(result["historical_capture_id"]),
                     "new_material_artifact_id": new_artifact.reference_id,
                     "new_run_id": new_run_id,
-                    "new_handoff_id": completed.handoff_ref if completed else None,
-                    "new_handoff_digest": completed.handoff_digest if completed else None,
+                    "new_handoff_id": completed.handoff_ref,
+                    "new_handoff_digest": completed.handoff_digest,
                     "new_capture_ids": list(capture_map.values()),
-                    "state_delta_proposal_id": (
-                        proposal.get("proposal_id") if isinstance(proposal, Mapping) else None
-                    ),
-                    "state_delta_proposal_digest": (
-                        proposal.get("proposal_digest")
-                        if isinstance(proposal, Mapping)
-                        else None
-                    ),
+                    "state_delta_proposal_id": proposal.get("proposal_id"),
+                    "state_delta_proposal_digest": proposal.get("proposal_digest"),
                     "candidate_only": True,
                     "idempotent_reuse": False,
                     "research_state_mutation_performed": False,
                 }
             except Exception:
-                try:
-                    current = store.load_run(new_run_id)
-                    if current is not None and current.status is RunStatus.RUNNING:
-                        self._application.capability_execution_service.abort(
-                            new_run_id, reason="new material continuation failed closed"
-                        )
-                except Exception:
-                    pass
+                # Failures before external collection leave no public correction
+                # seam, so close only that execution attempt. Once collect has
+                # been attempted, preserve RUNNING so the ordinary public
+                # preflight/collect correction path remains usable.
+                if not collect_attempted:
+                    try:
+                        current = store.load_run(new_run_id)
+                        if current is not None and current.status is RunStatus.RUNNING:
+                            self._application.capability_execution_service.abort(
+                                new_run_id, reason="new material continuation setup failed"
+                            )
+                    except Exception:
+                        pass
                 raise
 
     def _capture_new_material_version(

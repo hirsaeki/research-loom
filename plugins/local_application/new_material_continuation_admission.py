@@ -5,7 +5,13 @@ import hashlib
 from typing import Any, Mapping
 
 from core.execution import RunStatus
-from plugins.local_execution_store import canonical_handoff_for, diagnostics_for, result_extensions_for_run
+from plugins.local_conversation_store import find_state_delta_proposals_by_provenance_run_id
+from plugins.local_execution_store import (
+    canonical_handoff_for,
+    diagnostics_for,
+    latest_diagnostic_for,
+    result_extensions_for_run,
+)
 
 from .facade import LocalApplicationError
 from .material_content_facade import _artifact_pair_for_capture
@@ -192,20 +198,20 @@ def _continuation_claim(store, reacquisition_run_id: str) -> dict[str, Any] | No
 
 
 def _continuation_binding(store, reacquisition_run_id: str) -> dict[str, Any] | None:
-    records = [
-        item.get("payload")
-        for item in diagnostics_for(
-            store, reacquisition_run_id, limit=2, kind=_CONTINUATION_BINDING_DIAGNOSTIC
-        )
-    ]
-    if not records:
+    latest = latest_diagnostic_for(
+        store,
+        reacquisition_run_id,
+        kind=_CONTINUATION_BINDING_DIAGNOSTIC,
+    )
+    if latest is None:
         return None
-    if len(records) != 1 or not isinstance(records[0], Mapping):
+    record = latest.get("payload")
+    if not isinstance(record, Mapping):
         raise LocalApplicationError(
             "APPLICATION-NEW-MATERIAL-CONTINUATION-IDEMPOTENCY-001",
             "new-material continuation binding is ambiguous or corrupt",
         )
-    binding = deepcopy(dict(records[0]))
+    binding = deepcopy(dict(record))
     if (
         binding.get("relation") != "new_material_version_continuation"
         or binding.get("reacquisition_run_id") != reacquisition_run_id
@@ -225,6 +231,9 @@ def _validate_continuation_binding(
     binding: Mapping[str, Any],
     result: Mapping[str, Any],
     historical,
+    *,
+    require_mirror: bool = True,
+    require_completed_capture: bool = True,
 ) -> Any:
     store = application.execution_store
     new_run_id = str(binding.get("new_run_id") or "")
@@ -248,24 +257,39 @@ def _validate_continuation_binding(
         or new_run.capability_id != "desktop-research"
         or new_run.function_id != "investigate"
         or new_run.execution_mode != "real"
-        or new_run.parent_run_id is not None
     ):
         raise LocalApplicationError(
             "APPLICATION-NEW-MATERIAL-CONTINUATION-IDEMPOTENCY-001",
             "bound continuation Run is missing or has incompatible execution identity",
         )
+    if new_run.parent_run_id is not None:
+        parent = store.load_run(new_run.parent_run_id)
+        if (
+            parent is None
+            or parent.project_ref != project_id
+            or parent.capability_id != "desktop-research"
+            or parent.function_id != "investigate"
+            or parent.execution_mode != "real"
+            or parent.status not in {RunStatus.COMPLETED, RunStatus.FAILED, RunStatus.ABORTED}
+        ):
+            raise LocalApplicationError(
+                "APPLICATION-NEW-MATERIAL-CONTINUATION-IDEMPOTENCY-001",
+                "continuation retry parent has incompatible execution identity",
+            )
     own = [
         item.get("payload")
         for item in diagnostics_for(
             store, new_run_id, limit=2, kind=_CONTINUATION_BINDING_DIAGNOSTIC
         )
     ]
-    if len(own) != 1 or own[0] != dict(binding):
+    if not own and not require_mirror:
+        own = []
+    elif len(own) != 1 or own[0] != dict(binding):
         raise LocalApplicationError(
             "APPLICATION-NEW-MATERIAL-CONTINUATION-IDEMPOTENCY-001",
             "continuation Run does not carry the same immutable reacquisition binding",
         )
-    if new_run.status is RunStatus.COMPLETED:
+    if new_run.status is RunStatus.COMPLETED and require_completed_capture:
         target = [
             item
             for item in store.artifacts_for(new_run_id)
@@ -281,6 +305,73 @@ def _validate_continuation_binding(
                 "completed continuation Run does not contain the bound new material capture",
             )
     return new_run
+
+
+def _continuation_mirror_complete(store, binding: Mapping[str, Any]) -> bool:
+    """Return whether the child Run carries the exact immutable binding mirror."""
+    new_run_id = str(binding.get("new_run_id") or "")
+    own = [
+        item.get("payload")
+        for item in diagnostics_for(
+            store, new_run_id, limit=2, kind=_CONTINUATION_BINDING_DIAGNOSTIC
+        )
+    ]
+    if not own:
+        return False
+    if len(own) != 1 or own[0] != dict(binding):
+        raise LocalApplicationError(
+            "APPLICATION-NEW-MATERIAL-CONTINUATION-IDEMPOTENCY-001",
+            "continuation Run does not carry the same immutable reacquisition binding",
+        )
+    return True
+
+
+def _completed_continuation_is_reusable(
+    application,
+    project_id: str,
+    binding: Mapping[str, Any],
+    result: Mapping[str, Any],
+    historical,
+) -> bool:
+    """Require canonical result closure before treating COMPLETED as reusable success."""
+    try:
+        run = _validate_continuation_binding(
+            application,
+            project_id,
+            binding,
+            result,
+            historical,
+        )
+    except LocalApplicationError:
+        # Callers first validate the immutable identity with relaxed operational
+        # closure. A failure here therefore means required result closure is
+        # incomplete, not that the old Run may be rewritten or trusted.
+        return False
+    if run.status is not RunStatus.COMPLETED or not run.handoff_ref or not run.handoff_digest:
+        return False
+    handoff = canonical_handoff_for(application.execution_store, run.handoff_ref)
+    if (
+        handoff is None
+        or handoff.get("run_id") != run.run_id
+        or handoff.get("handoff_digest") != run.handoff_digest
+    ):
+        return False
+    extensions = result_extensions_for_run(application.execution_store, run.run_id, limit=2)
+    if len(extensions) != 1:
+        return False
+    extension_binding = extensions[0].get("handoff_binding")
+    if not isinstance(extension_binding, Mapping) or (
+        extension_binding.get("handoff_id") != run.handoff_ref
+        or extension_binding.get("handoff_digest") != run.handoff_digest
+        or extension_binding.get("run_id") != run.run_id
+    ):
+        return False
+    proposals = find_state_delta_proposals_by_provenance_run_id(
+        application.conversation_store,
+        run.run_id,
+        limit=2,
+    )
+    return len(proposals) == 1
 
 
 def _historical_canonical_result(application, historical_run_id: str):

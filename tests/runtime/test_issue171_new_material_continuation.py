@@ -247,7 +247,7 @@ class Issue171NewMaterialContinuationTests(ResearchPackageAcceptanceSupport):
             child_id = reacq_shown["new_material_continuation"]["new_run_id"]
             self.assertIsNotNone(child_id)
             child = facade.show_run(child_id)
-            self.assertNotEqual(child["run"]["status"], "COMPLETED")
+            self.assertEqual(child["run"]["status"], "RUNNING")
             self.assertEqual(
                 facade._application.execution_store.diagnose_artifact_content(
                     rendition.artifact_id
@@ -262,11 +262,10 @@ class Issue171NewMaterialContinuationTests(ResearchPackageAcceptanceSupport):
                     },
                 }
             )
-            self.assertEqual(repeated["status"], "FAILED")
-            self.assertIn(
-                "bound prior new-material continuation",
-                repeated["issues"][0]["message"],
-            )
+            self.assertEqual(repeated["status"], "SUCCEEDED")
+            self.assertEqual(repeated["data"]["status"], "RUNNING")
+            self.assertTrue(repeated["data"]["in_progress"])
+            self.assertEqual(repeated["data"]["new_run_id"], child_id)
         finally:
             facade.close()
 
