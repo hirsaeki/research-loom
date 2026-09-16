@@ -3,13 +3,20 @@ from __future__ import annotations
 from copy import deepcopy
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from core.conversation import ActionDraft, with_document_digest
 from core.conversation.testing import MappingResolver, SequenceIdProvider
 from core.execution.testing import StaticClock
-from core.runtime import TransitionAction, TransitionKind, canonical_digest
+from core.runtime import (
+    CommitReceipt,
+    StateTransitionRejected,
+    TransitionAction,
+    TransitionKind,
+    canonical_digest,
+)
 from plugins.local_application import LocalResearchApplication
-from runtime_fixtures import project, rq, seed_state
+from runtime_fixtures import codes, make_request, project, rq, seed_state, service
 
 
 CLOCK = StaticClock("2026-08-27T06:30:00Z")
@@ -76,6 +83,45 @@ def _candidate(state, actions, proposal_id):
 
 
 class PendingStateChangingGuardTests(unittest.TestCase):
+    def test_ablation_authority_validation_is_required_for_authoritative_transition(self):
+        seed = seed_state(objects=[project(), rq()])
+        unapproved = make_request(
+            seed,
+            [TransitionAction(
+                TransitionKind.ADOPT_OBJECT,
+                {"object": rq(revision=1, state="approved")},
+            )],
+            suffix="hdg-ablation",
+        )
+
+        # Ablation: removing only the Human Decision validation lets the
+        # otherwise-unapproved authoritative transition commit.
+        repo_without_guard, service_without_guard = service(seed)
+        with patch("core.runtime.validation._validate_human_decisions", return_value=[]):
+            committed = service_without_guard.apply(unapproved)
+        self.assertIsInstance(committed, CommitReceipt)
+        self.assertEqual(
+            repo_without_guard.load_state_view("PRJ-1", "LIN-1")
+            .latest_object("research_question", "RQ-1")["adoption_state"],
+            "approved",
+        )
+
+        # Restore the production guard: the same transition is rejected and
+        # authoritative Research State remains unchanged.
+        repo, guarded_service = service(seed)
+        rejected = guarded_service.apply(unapproved)
+        self.assertIsInstance(rejected, StateTransitionRejected)
+        self.assertIn("RT-DECISION-001", codes(rejected))
+        current = repo.load_state_view("PRJ-1", "LIN-1")
+        self.assertEqual(
+            current.latest_object("research_question", "RQ-1")["adoption_state"],
+            "candidate",
+        )
+        self.assertEqual(
+            current.current_snapshot["content_digest"],
+            seed.current_snapshot["content_digest"],
+        )
+
     def test_pending_decision_does_not_block_unrelated_decision_free_state_apply(self):
         seed = seed_state(
             objects=[project(), rq(state="approved")],
