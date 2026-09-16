@@ -154,6 +154,28 @@ class LocalApplicationFacade(
 ):
     """Canonical Survey response normalization, persistence, and inspection."""
 
+    def capture_virtual_run_response_dataset(
+        self,
+        run_id: str,
+        *,
+        instrument_ref: Mapping[str, Any],
+    ) -> Mapping[str, Any]:
+        try:
+            return super().capture_virtual_run_response_dataset(
+                run_id,
+                instrument_ref=instrument_ref,
+            )
+        except LocalApplicationError as exc:
+            if exc.code != "SURVEY-RESPONSE-DATASET-IMMUTABLE-001":
+                raise
+        # A concurrent caller may have won the immutable Dataset insert after this
+        # caller's initial existence check. Re-enter the verified read/reuse path;
+        # any identity/provenance mismatch still fails closed there.
+        return super().capture_virtual_run_response_dataset(
+            run_id,
+            instrument_ref=instrument_ref,
+        )
+
     def list_actions(self) -> Mapping[str, Any]:
         self._ensure_survey_response_actions()
         return super().list_actions()
