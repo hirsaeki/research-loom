@@ -36,46 +36,96 @@ A gate must not promote an arbitrary filesystem path into durable authority.
 
 Legacy truthfulness is equally important: when managed backing bytes cannot be proven, report the payload as unavailable. Do not reconstruct identity from filenames, neighboring files, URLs, or semantic similarity.
 
-## Current-production inventory
+## Payload-resolution invariant
+
+Being somewhere below `.research-loom` is not sufficient by itself. A durable object must have a stable lookup chain from durable workspace/object metadata to the content required to use or verify it.
+
+For file-backed payloads, the target model is:
+
+```text
+workspace durable metadata
+  -> registered store identity + root-relative locator
+  -> durable object metadata / stable object identity
+  -> managed relative locator or deterministic digest/ID-derived location
+  -> verified bytes
+```
+
+The physical host path is operational configuration, not content identity or research provenance. A store may derive a content path from a verified digest/ID instead of storing the literal path in every row; what matters is that the store root is durably registered and the payload can be resolved without an arbitrary external path.
+
+This preserves the original SQLite/files responsibility split without forcing storage uniformity:
+
+- SQLite/registries own structured identity, relations, history, indexes, pins, digests, and store/object metadata;
+- managed files/CAS own bytes that should not be embedded into SQLite merely for uniformity;
+- export/publish files remain projections rather than authority.
+
+A deterministic code convention alone is weaker than a workspace persistence contract. In particular, if a later-added durable store exists only because application code knows a hard-coded `.research-loom/...` path, workspace metadata cannot distinguish that store from an unknown/unmanaged path or comprehensively diagnose its disappearance.
+
+## Workspace storage-root audit
 
 Audit baseline: `main@9dfe3e978c45b5bfe34ae66ce8595eb52efe9006`.
 
-| Object / production path | Owner | Storage class | Required payload | Arbitrary-path dependency after capture? | Integrity binding | Authority relation | Disposition |
-|---|---|---|---|---|---|---|---|
-| Research State object revisions / Snapshots | state repository / transition service | inline canonical payload | canonical object bodies, member refs, snapshot metadata | No. State reads use persisted revisions/Snapshots; semantic locators are not backing-file authority. | canonical object/member/Snapshot digests and revision pins | State is authoritative only through existing Human Decision / State Transition semantics. | **conforming** |
-| Research Exhibit | `LocalResearchExhibitStore` | inline canonical payload | exact bounded markdown/json/text plus provenance | No. `show` returns the exact saved body; source Run/artifact refs are provenance, not backing content. | Exhibit/content digest, project/RQ/Snapshot binding | Durable working analysis only; explicitly not Evidence/Finding/Recommendation authority. | **conforming** |
-| Desktop Research original capture / UTF-8 rendition | execution artifact store and managed external-original retention | managed artifact payload | exact original bytes and rendition bytes needed for content read/citation verification | No. Public `show`/`export` verifies managed artifacts and never falls back to intake path/network/OCR/LLM regeneration. | artifact identity, digest, size, Run/capture pairing, parent provenance, exact locator | Capture durability is candidate provenance only; Evidence/Finding adoption remains separate. | **conforming for managed captures** |
-| Legacy / missing historical material backing | execution/material diagnostics and recovery surfaces | unavailable legacy | historical metadata may exist while required bytes do not | N/A | managed binding cannot be proven | Must stay historical/unavailable; must not be fabricated or silently treated as current managed content. | **legacy-unavailable**; tracked by #127/#157/#158 and durability work #160 |
-| Project Input | `LocalProjectInputStore` | managed artifact payload + inline registry metadata | exact registered bytes | No. `source_path` is provenance only; registration copies bytes into content-addressed managed blobs and verifies them on read. | SHA-256, byte length, project/role/lineage/Snapshot binding | Durable project working input; does not adopt Research State. | **conforming** |
-| Survey Instrument / design | `LocalSurveyStore` | inline canonical payload | exact canonical Instrument/design documents | No | content digests, immutable revision/identity pins | Instrument is authoritative for response semantics, but persistence itself does not create Evidence/Finding authority. | **conforming** |
-| Survey canonical response / Dataset, including rejected input | `LocalSurveyResponseStore` | inline canonical payload | canonical response, exact raw intake envelope where required, validation/rejection metadata | No. Producer files are normalized at intake; persisted inspection reads the registry. | Instrument pins, raw/canonical digests, dataset content/registry identity | Explicit origin/epistemic status; `verified_evidence_claimed=false`, no Research State mutation. | **conforming** |
-| Survey AnalysisSpec / AggregateResult | `LocalSurveyAnalysisStore` | inline canonical payload | exact AnalysisSpec and aggregate result content | No | deterministic RFC 8785 content digests plus Dataset/Instrument/AnalysisSpec pins | Durable analytical result only; aggregation cannot promote synthetic or REAL results to Evidence/Finding authority. | **conforming** |
-| Writer Composition versions / selection history | Writer composition managed workspace store | inline canonical payload | exact immutable composition versions, indexes and selection events | No. External JSON is intake/edit surface; captured versions are copied into the managed composition root. | composition/section/package digests and immutable source pins | Exposition planning only; no Evidence verification or Finding/Recommendation adoption. | **conforming** |
-| Detached one-section Writer input | Writer composition service | export projection | exact selected section plus bundled needed material/exhibits/gaps/profile constraints | No durable object depends on the detached directory. The export is intentionally self-contained for downstream use. | manifest/output digests and source pins | Export does not mutate Research State; it is not authority. | **conforming projection** |
-| Research Package 0.2.0 managed package | `ResearchPackageService` managed `.research-loom` root | managed bounded package payload | package JSON/Markdown plus exact selected attachments/material text | No. Build copies exact selected content into the package; `show` verifies the managed package and export copies from it. | package digest, attachment digests/sizes, exact Snapshot/Run/Exhibit/Input/material pins | Read-only in-progress package; candidate Handoff content remains candidate-only and release ineligible unless separately authorized. | **conforming** |
-| Research Package export | `ResearchPackageService.export` | export projection | copy of verified managed package | No; source package remains managed. Export refuses overwrite and managed-state destinations and verifies staging before atomic publish. | package/manifest/attachment verification | Export is not a release or Research authority transition. | **conforming projection** |
-| Publication preview artifacts described by PR18 contracts | preview/convergence contract only | not implemented as production durable release store | preview manuscript/artifact manifest semantics are defined, but final renderer/release persistence is not implemented | N/A | N/A in production | Preview is diagnostic and explicitly not Publication Release. | **not implemented** |
-| Final Publication candidate/release/rendered payload | none in current production code | not implemented | no production final DOCX/PDF/release-payload store exists to audit | N/A | N/A | Do not invent a storage defect or generic artifact layer for a future runtime. | **not implemented** |
+The current `workspace-binding.json` `storage` map registers these roots:
+
+- `research_state`;
+- `conversation`;
+- `decision`;
+- `execution_root` / `execution`;
+- `context_extensions`;
+- `operational_trace`.
+
+Later production stores are instead located by application constants/conventions and are not represented in that durable workspace storage map:
+
+- `attention.sqlite3`;
+- `research-exhibits.sqlite3`;
+- `survey-registry.sqlite3`;
+- `survey-response-registry.sqlite3`;
+- `survey-analysis-registry.sqlite3`;
+- `project-inputs/`;
+- `writer-compositions/`;
+- `research-packages/`.
+
+This is a concrete workspace-level ownership/discoverability gap, tracked by #193. It does **not** mean those domain stores need to be merged into one database or rewritten internally.
+
+## Current-production inventory
+
+| Object / production path | Durable owner / metadata | Payload resolution chain | Workspace-root registration | Integrity binding | Authority relation | Disposition |
+|---|---|---|---|---|---|---|
+| Research State object revisions / Snapshots | registered Research State SQLite store | registered `research_state` root -> object/revision or Snapshot key -> canonical JSON row | **registered** in `workspace-binding.json` | canonical object/member/Snapshot digests and revision pins | State is authoritative only through existing Human Decision / State Transition semantics. | **conforming** |
+| Research Exhibit | `LocalResearchExhibitStore`; immutable document and index metadata are inline in SQLite | `exhibit_id` -> SQLite `document_json`; no external body is required | **not registered**; store file is found by `.research-loom/research-exhibits.sqlite3` convention | Exhibit/content digest, project/RQ/Snapshot binding | Durable working analysis only; explicitly not Evidence/Finding/Recommendation authority. | Object payload is sound; **workspace store-root registration gap (#193)** |
+| Desktop Research original capture / UTF-8 rendition | execution SQLite artifact metadata + execution/material managed blob store | registered execution root -> `artifact_id` -> `storage_locator` + digest/size -> root-relative managed blob -> verified bytes | **registered** through `execution_root` / `execution` | artifact identity, digest, size, Run/capture pairing, parent provenance, exact locator | Capture durability is candidate provenance only; Evidence/Finding adoption remains separate. | **conforming for managed captures** |
+| Legacy / missing historical material backing | execution/material diagnostics and recovery surfaces | historical metadata resolves expected artifact identity/digest, but backing blob is absent/unprovable | execution store is registered, but required legacy payload is unavailable | managed binding cannot be proven | Must stay historical/unavailable; must not be fabricated or silently treated as current managed content. | **legacy-unavailable**; #127/#157/#158, durability #160 |
+| Project Input | `LocalProjectInputStore` SQLite metadata + managed blob tree | `input_id` -> `content_digest` + byte length -> digest-derived blob path under Project Input root -> verified bytes; `source_path` is provenance only | **not registered**; root is derived as `.research-loom/project-inputs` in code | SHA-256, byte length, project/role/lineage/Snapshot binding | Durable project working input; does not adopt Research State. | Object-to-bytes chain is sound; **workspace store-root registration gap (#193)** |
+| Survey Instrument / design | `LocalSurveyStore` SQLite registry | project + questionnaire/design identity/version -> inline `document_json` | **not registered**; DB path comes from `.research-loom/survey-registry.sqlite3` convention | content digests, immutable revision/identity pins | Instrument is authoritative for response semantics, but persistence itself does not create Evidence/Finding authority. | Inline payload is sound; **workspace store-root registration gap (#193)** |
+| Survey canonical response / Dataset, including rejected input | `LocalSurveyResponseStore` SQLite registry | response/Dataset identity -> inline canonical/raw/entry JSON rows | **not registered**; DB path comes from `.research-loom/survey-response-registry.sqlite3` convention | Instrument pins, raw/canonical digests, dataset content/registry identity | Explicit origin/epistemic status; no Research State mutation. | Inline payload is sound; **workspace store-root registration gap (#193)** |
+| Survey AnalysisSpec / AggregateResult | `LocalSurveyAnalysisStore` SQLite registry | AnalysisSpec/Aggregate identity -> inline `document_json` | **not registered**; DB path comes from `.research-loom/survey-analysis-registry.sqlite3` convention | deterministic content digests plus Dataset/Instrument/AnalysisSpec pins | Durable analytical result only; aggregation cannot promote results to Evidence/Finding authority. | Inline payload is sound; **workspace store-root registration gap (#193)** |
+| Writer Composition versions / selection history | immutable JSON files in the Writer managed root; no SQLite object registry | `composition_id` + version -> deterministic `writer-compositions/<id>/versions/<version>.json`; selection -> sibling `selection.json`; source Research Package pin is verified on load | **not registered**; root is hard-coded as `.research-loom/writer-compositions` | composition/section/package digests and immutable source pins | Exposition planning only; no Evidence verification or Finding/Recommendation adoption. | Managed/deterministic, but resolution begins from a code path convention; **workspace store-root registration gap (#193)** |
+| Detached one-section Writer input | Writer composition service export | self-contained export directory -> manifest -> exact section input | projection; intentionally outside managed state | manifest/output digests and source pins | Export does not mutate Research State; it is not authority. | **conforming projection** |
+| Research Package 0.2.0 managed package | immutable managed package directory; package JSON carries attachment metadata | `package_id` -> deterministic `research-packages/<package_id>` root -> `research-package.json` -> relative attachment paths + digest/size -> verified package files | **not registered**; root is hard-coded as `.research-loom/research-packages` | package digest, attachment digests/sizes, exact Snapshot/Run/Exhibit/Input/material pins | Read-only in-progress package; candidate Handoff content remains candidate-only and release ineligible unless separately authorized. | Internal package locator chain is sound after root resolution; **workspace store-root registration gap (#193)** |
+| Research Package export | `ResearchPackageService.export` | verified managed package -> staging -> external output copy | projection; not a managed source root | package/manifest/attachment verification | Export is not a release or Research authority transition. | **conforming projection** |
+| Publication preview artifacts described by PR18 contracts | preview/convergence contract only | no production durable release payload store | N/A | N/A in production | Preview is diagnostic and explicitly not Publication Release. | **not implemented** |
+| Final Publication candidate/release/rendered payload | none in current production code | no production final DOCX/PDF/release-payload store exists to resolve | N/A | N/A | Do not invent a storage defect or generic artifact layer for a future runtime. | **not implemented** |
+
+`attention.sqlite3` is also a production durable store located by convention and omitted from the current workspace storage map. It is not a payload family named in #163's object inventory, but it is included in #193 because the workspace-level registration contract should not knowingly omit an existing durable store.
 
 ## Concrete findings and disposition
 
-The current production paths above do **not** justify a new repository-wide payload store, CAS abstraction, generic blob registry, or gate framework.
+The repository does **not** justify one universal payload DB, one generic CAS, or moving every file into SQLite. The useful common rule is metadata-driven resolution of owned stores and payloads.
 
-The concrete historical-material problem remains narrower: a durable execution/history record can truthfully outlive required backing bytes. Existing focused work already owns that boundary:
+Two concrete classes of work remain:
 
-- #127 — exact retained-material diagnosis/recovery;
-- #157 — non-authoritative source filename hints and self-contained recovery discovery;
-- #158 — truthful material backing-content health;
-- #160 — execution/material store durability unit and whole-root backup/move/restore contract;
-- #165 — controlled reuse of verified material into a fresh workspace without authority carryover.
+1. **Historical execution/material backing can be unavailable even when metadata survives.** Existing focused work owns that boundary:
+   - #127 — exact retained-material diagnosis/recovery;
+   - #157 — non-authoritative source filename hints and self-contained recovery discovery;
+   - #158 — truthful material backing-content health;
+   - #160 — execution/material store durability unit and whole-root backup/move/restore contract;
+   - #165 — controlled reuse of verified material into a fresh workspace without authority carryover.
+2. **Workspace durable-store metadata is incomplete.** Later production stores are owned only through hard-coded root conventions rather than the workspace storage map. #193 owns the minimal fix: register/track current durable store roots and make initialized-vs-missing state diagnosable, while preserving each domain's current internal storage layout.
 
-Those issues are not absorbed by this inventory. Other conforming domains are not rewritten for symmetry.
-
-No additional confirmed current-production violation was found in Survey, Exhibit, Writer Composition, Research Package, or a final Publication runtime: the first four already own the content they require, while final Publication release storage is not implemented.
+The second finding corrects the earlier, weaker conclusion that all managed-domain paths were simply conforming because they lived below `.research-loom`.
 
 ## Gate audit
 
-The audited production boundaries preserve the intended ordering:
+The audited production boundaries preserve the intended authority ordering:
 
 - Desktop Research copies acquired bytes into managed execution/material storage before downstream candidate use.
 - Project Input copies intake bytes into managed content-addressed blobs before later package use.
@@ -85,12 +135,22 @@ The audited production boundaries preserve the intended ordering:
 
 None of those operations, by persistence alone, performs Evidence verification, Finding/Recommendation adoption, Research State mutation, or Publication Release.
 
+The workspace store-root registration fix in #193 must likewise remain operational metadata only. It must not become a new authority gate.
+
 ## Liveness boundary
 
-Managed-payload integrity may fail closed on an identity/digest/pin mismatch. Historical failure or unavailable legacy backing is not, by itself, a reason to block unrelated new work.
+Managed-payload integrity may fail closed on an identity/digest/pin mismatch. Historical failure, an unavailable legacy backing blob, or an unrelated missing optional store is not by itself a reason to block valid new work.
 
-This umbrella is therefore not a prerequisite for every downstream feature. In particular, #165 can proceed when its narrower source-byte, destination-managed-copy, and no-authority-carryover prerequisites are verified, even if unrelated Survey/Publication storage work remains absent or unaudited in the future.
+#193 therefore needs to distinguish:
+
+- a store that was never initialized and is legitimately absent;
+- a store durably known to have been initialized but is now missing/degraded;
+- legacy workspaces where prior use cannot be proven from durable metadata.
+
+Do not solve this by making every possible lazy store mandatory on every workspace.
+
+The #163 umbrella remains non-blocking for narrower downstream work. In particular, #165 can proceed when its source-byte, destination-managed-copy, and no-authority-carryover prerequisites are verified.
 
 ## Re-audit trigger
 
-Update this inventory only when a production path starts persisting a new payload family or changes ownership semantics. Do not design storage for hypothetical payloads in advance.
+Update this inventory when a production path starts persisting a new payload/store family or changes ownership/resolution semantics. New durable stores should not be added only as hard-coded `.research-loom/...` conventions without corresponding workspace-level ownership metadata.
