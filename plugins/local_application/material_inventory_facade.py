@@ -90,11 +90,24 @@ def _content_health_projection(diagnosis: Mapping[str, Any]) -> Mapping[str, Any
     status = str(diagnosis.get("status") or "unknown")
     return {
         "status": status,
+        "verification_performed": True,
         "content_available": status == "verified",
         "expected_digest": diagnosis.get("expected_digest"),
         "expected_size": diagnosis.get("expected_size"),
         "actual_digest": diagnosis.get("actual_digest"),
         "actual_size": diagnosis.get("actual_size"),
+    }
+
+
+def _unchecked_content_health_projection(artifact) -> Mapping[str, Any]:
+    return {
+        "status": None,
+        "verification_performed": False,
+        "content_available": None,
+        "expected_digest": artifact.digest,
+        "expected_size": artifact.size,
+        "actual_digest": None,
+        "actual_size": None,
     }
 
 
@@ -114,7 +127,7 @@ def _healthy_artifact_projection(artifact, health: Mapping[str, Any], *, kind: s
         "content_health": deepcopy(dict(health)),
         "source_filename": _source_filename_hint(artifact.provenance, kind=kind),
     }
-    if not health.get("content_available"):
+    if health.get("content_available") is False:
         projected["recovery"] = {
             "requires_operator_supplied_exact_file": True,
             "authority": "digest_and_size",
@@ -257,12 +270,15 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
 
             health_cache: dict[tuple[str, str, int], Mapping[str, Any]] = {}
 
-            def content_health(artifact) -> Mapping[str, Any]:
-                cache_key = (
+            def health_key(artifact) -> tuple[str, str, int]:
+                return (
                     str(artifact.storage_locator),
                     str(artifact.digest),
                     int(artifact.size),
                 )
+
+            def content_health(artifact) -> Mapping[str, Any]:
+                cache_key = health_key(artifact)
                 cached = health_cache.get(cache_key)
                 if cached is None:
                     cached = _content_health_projection(
@@ -273,20 +289,47 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                     health_cache[cache_key] = cached
                 return cached
 
+            def capture_order(key: tuple[str, str]) -> tuple[str, str, str, str]:
+                original = by_capture[key].get("original")
+                if original is None:
+                    raise ValueError("persisted external capture pair is incomplete")
+                return (
+                    _required_provenance_string(original.provenance, "stored_at"),
+                    str(key[0]),
+                    str(key[1]),
+                    str(original.artifact_id),
+                )
+
             grouped: dict[str, list[Mapping[str, Any]]] = {}
-            for key in sorted(by_capture):
+            original_health_by_material: dict[str, Mapping[str, Any]] = {}
+            checked_rendition_by_material: set[str] = set()
+            for key in sorted(by_capture, key=capture_order):
                 slot = by_capture[key]
                 original = slot.get("original")
                 rendition = slot.get("rendition")
                 if original is None or rendition is None:
                     raise ValueError("persisted external capture pair is incomplete")
+                material_id = str(original.digest)
+                original_health = original_health_by_material.get(material_id)
+                if original_health is None:
+                    original_health = content_health(original)
+                    original_health_by_material[material_id] = original_health
+
+                rendition_key = health_key(rendition)
+                rendition_health = health_cache.get(rendition_key)
+                if rendition_health is None and material_id not in checked_rendition_by_material:
+                    rendition_health = content_health(rendition)
+                    checked_rendition_by_material.add(material_id)
+                elif rendition_health is None:
+                    rendition_health = _unchecked_content_health_projection(rendition)
+
                 capture = _capture_projection(
                     original,
                     rendition,
-                    original_health=content_health(original),
-                    rendition_health=content_health(rendition),
+                    original_health=original_health,
+                    rendition_health=rendition_health,
                 )
-                grouped.setdefault(str(original.digest), []).append(capture)
+                grouped.setdefault(material_id, []).append(capture)
 
             materials = [_material_projection(captures) for captures in grouped.values()]
             materials.sort(key=lambda item: (str(item["first_captured_at"]), str(item["material_id"])))

@@ -35,8 +35,12 @@ class ExternalMaterialHealthTests(unittest.TestCase):
                 self.assertEqual(healthy["capture_count"], 2)
                 self.assertEqual(healthy["backing_content_status"], "verified")
                 self.assertEqual(healthy["verified_backing_copy_count"], 1)
-                # One shared original CAS object plus one rendition object for each capture.
-                self.assertEqual(diagnose.call_count, 3)
+                # Health I/O is bounded to one original plus one representative rendition per material.
+                self.assertEqual(diagnose.call_count, 2)
+                self.assertEqual(healthy["captures"][0]["renditions"][0]["content_health"]["status"], "verified")
+                self.assertIsNone(healthy["captures"][1]["renditions"][0]["content_health"]["status"])
+                self.assertFalse(healthy["captures"][1]["renditions"][0]["content_health"]["verification_performed"])
+                self.assertIsNone(healthy["captures"][1]["renditions"][0]["content_health"]["content_available"])
 
                 originals = [
                     artifact
@@ -57,10 +61,8 @@ class ExternalMaterialHealthTests(unittest.TestCase):
                     item["original"]["content_health"]["status"] == "content_missing"
                     for item in missing["captures"]
                 ))
-                self.assertTrue(all(
-                    item["renditions"][0]["content_health"]["status"] == "verified"
-                    for item in missing["captures"]
-                ))
+                self.assertEqual(missing["captures"][0]["renditions"][0]["content_health"]["status"], "verified")
+                self.assertIsNone(missing["captures"][1]["renditions"][0]["content_health"]["status"])
 
                 # Ablation: metadata grouping alone cannot observe the vanished CAS bytes.
                 with patch.object(
@@ -75,6 +77,54 @@ class ExternalMaterialHealthTests(unittest.TestCase):
                     },
                 ):
                     self.assertTrue(opened.list_external_materials()["materials"][0]["content_available"])
+            finally:
+                opened.close()
+
+
+    def test_health_hashing_is_constant_per_material_even_with_many_capture_records(self):
+        with tempfile.TemporaryDirectory() as temp:
+            opened = self._workspace(Path(temp))
+            try:
+                store = opened._application.execution_store
+                for index in range(12):
+                    run = _create_running(
+                        store,
+                        opened.project_id,
+                        f"RUN-BOUND-{index:02d}",
+                        f"2026-09-01T00:{index:02d}:00Z",
+                    )
+                    _capture(
+                        store,
+                        run,
+                        f"CAP-BOUND-{index:02d}",
+                        b"shared bounded original",
+                        f"https://example.test/bounded/{index}",
+                        acquired_at=f"2026-09-01T00:{index:02d}:20Z",
+                    )
+
+                with patch.object(
+                    store,
+                    "diagnose_artifact_content",
+                    wraps=store.diagnose_artifact_content,
+                ) as diagnose:
+                    material = opened.list_external_materials(limit=1)["materials"][0]
+
+                self.assertEqual(material["capture_count"], 12)
+                self.assertEqual(diagnose.call_count, 2)
+                self.assertEqual(
+                    sum(
+                        item["renditions"][0]["content_health"]["status"] == "verified"
+                        for item in material["captures"]
+                    ),
+                    1,
+                )
+                self.assertEqual(
+                    sum(
+                        item["renditions"][0]["content_health"]["status"] is None
+                        for item in material["captures"]
+                    ),
+                    11,
+                )
             finally:
                 opened.close()
 
