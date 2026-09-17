@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from pathlib import Path
-import re
 import sqlite3
 from threading import RLock
 from typing import Iterator
@@ -10,12 +9,10 @@ from typing import Iterator
 from .diagnosed_artifact_read import DiagnosedArtifactReadMixin
 from .retention import LocalExecutionStore as _RetentionLocalExecutionStore
 from .store import (
+    _MIGRATION_RE,
     LocalExecutionStoreConfig,
     LocalExecutionStoreError,
 )
-
-
-_MIGRATION_RE = re.compile(r"^(\d{4})_(.+)\.sql$")
 
 
 class ReadOnlyLocalExecutionStore(
@@ -100,6 +97,9 @@ class ReadOnlyLocalExecutionStore(
                 "read-only execution/material store schema does not match "
                 "the current supported migration history"
             )
+
+    def cleanup_staging(self) -> int:
+        raise self._read_only_error()
 
     def _read_only_error(self) -> LocalExecutionStoreError:
         return LocalExecutionStoreError(

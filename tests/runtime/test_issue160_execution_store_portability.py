@@ -148,6 +148,8 @@ class PortableExecutionMaterialStoreTests(unittest.TestCase):
                     media_type="text/plain",
                     content=b"blocked",
                 )
+            with self.assertRaises(LocalExecutionStoreError):
+                reopened.cleanup_staging()
             after = sorted(
                 path.relative_to(moved)
                 for path in moved.rglob("*")
