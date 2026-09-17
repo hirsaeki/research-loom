@@ -44,9 +44,12 @@ def _require_new_material_artifact_class(
     reacquisition_run_id: str,
 ) -> None:
     """Admission guard for the exact persisted NEW_MATERIAL_VERSION artifact."""
+    kind = str(result.get("new_material_kind") or result.get("kind") or "")
+    expected_role = _NEW_MATERIAL_ROLES.get(kind)
     if (
-        metadata.run_id != reacquisition_run_id
-        or metadata.role != _NEW_MATERIAL_ROLES["rendition"]
+        expected_role is None
+        or metadata.run_id != reacquisition_run_id
+        or metadata.role != expected_role
         or metadata.digest != result.get("actual_digest")
         or metadata.size != result.get("actual_size")
     ):
@@ -96,15 +99,11 @@ def _find_reacquisition_result(application, project_id: str, reacquisition_run_i
             "reacquisition result is not an actionable NEW_MATERIAL_VERSION",
         )
 
-    # #171's live branch is a divergent rendition. It can be paired with the
-    # exact verified historical original. A divergent original cannot safely be
-    # paired with a historical rendition derived from different bytes, so keep
-    # that future branch closed rather than inventing a generic promotion path.
     kind = str(result.get("new_material_kind") or result.get("kind") or "")
-    if kind != "rendition":
+    if kind not in {"original", "rendition"}:
         raise LocalApplicationError(
             "APPLICATION-NEW-MATERIAL-CONTINUATION-PAIR-001",
-            "current continuation requires a divergent rendition with a verified historical original",
+            "new-material continuation requires a divergent original or rendition",
         )
 
     artifact_id = str(result.get("new_artifact_id") or "")
@@ -133,13 +132,17 @@ def _find_reacquisition_result(application, project_id: str, reacquisition_run_i
     historical_run_id = str(result.get("historical_run_id") or "")
     capture_id = str(result.get("historical_capture_id") or "")
     historical_artifact_id = str(result.get("historical_artifact_id") or "")
+    expected_relation = (
+        "reacquired_version_of_historical_capture"
+        if kind == "original"
+        else "regenerated_version_of_historical_rendition"
+    )
     if (
         run.parent_run_id != historical_run_id
         or metadata.provenance.get("historical_run_id") != historical_run_id
         or metadata.provenance.get("historical_capture_id") != capture_id
         or metadata.provenance.get("historical_artifact_id") != historical_artifact_id
-        or metadata.provenance.get("relation")
-        != "regenerated_version_of_historical_rendition"
+        or metadata.provenance.get("relation") != expected_relation
     ):
         raise LocalApplicationError(
             "APPLICATION-NEW-MATERIAL-CONTINUATION-PROVENANCE-001",
@@ -149,31 +152,47 @@ def _find_reacquisition_result(application, project_id: str, reacquisition_run_i
     historical, original, historical_rendition, capture = _artifact_pair_for_capture(
         store, project_id, historical_run_id, capture_id
     )
-    derivation = result.get("derivation_source")
-    if (
-        historical.status is not RunStatus.COMPLETED
-        or historical_rendition.artifact_id != historical_artifact_id
-        or not isinstance(derivation, Mapping)
-        or derivation.get("artifact_id") != original.artifact_id
-        or derivation.get("digest") != original.digest
-        or derivation.get("size") != original.size
-        or metadata.provenance.get("derivation_source") != derivation
-        or metadata.provenance.get("exact_locator")
-        != result.get("requested_exact_locator")
-        or metadata.provenance.get("acquired_at") != result.get("reacquired_at")
-        or metadata.provenance.get("provider") != result.get("provider")
-    ):
-        raise LocalApplicationError(
-            "APPLICATION-NEW-MATERIAL-CONTINUATION-PROVENANCE-001",
-            "reacquisition provenance or paired historical material is inconsistent",
-        )
-    try:
-        store.load_artifact_verified_once(original.artifact_id)
-    except Exception as exc:
-        raise LocalApplicationError(
-            "APPLICATION-NEW-MATERIAL-CONTINUATION-PAIR-001",
-            "verified historical original required for the new rendition is unavailable",
-        ) from exc
+    common_provenance_matches = (
+        historical.status is RunStatus.COMPLETED
+        and metadata.provenance.get("exact_locator")
+        == result.get("requested_exact_locator")
+        and metadata.provenance.get("acquired_at") == result.get("reacquired_at")
+        and metadata.provenance.get("provider") == result.get("provider")
+    )
+    if kind == "original":
+        if (
+            not common_provenance_matches
+            or original.artifact_id != historical_artifact_id
+            or result.get("derivation_source") is not None
+            or metadata.provenance.get("derivation_source") is not None
+            or metadata.provenance.get("capture_id") != result.get("new_capture_id")
+        ):
+            raise LocalApplicationError(
+                "APPLICATION-NEW-MATERIAL-CONTINUATION-PROVENANCE-001",
+                "reacquired original provenance is inconsistent with its historical target",
+            )
+    else:
+        derivation = result.get("derivation_source")
+        if (
+            not common_provenance_matches
+            or historical_rendition.artifact_id != historical_artifact_id
+            or not isinstance(derivation, Mapping)
+            or derivation.get("artifact_id") != original.artifact_id
+            or derivation.get("digest") != original.digest
+            or derivation.get("size") != original.size
+            or metadata.provenance.get("derivation_source") != derivation
+        ):
+            raise LocalApplicationError(
+                "APPLICATION-NEW-MATERIAL-CONTINUATION-PROVENANCE-001",
+                "reacquisition provenance or paired historical material is inconsistent",
+            )
+        try:
+            store.load_artifact_verified_once(original.artifact_id)
+        except Exception as exc:
+            raise LocalApplicationError(
+                "APPLICATION-NEW-MATERIAL-CONTINUATION-PAIR-001",
+                "verified historical original required for the new rendition is unavailable",
+            ) from exc
     return run, result, artifact, historical, original, capture
 
 
@@ -360,14 +379,22 @@ def _validate_continuation_binding(
             "continuation Run does not carry the same immutable reacquisition binding",
         )
     if new_run.status is RunStatus.COMPLETED and require_completed_capture:
+        kind = str(result.get("new_material_kind") or result.get("kind") or "")
+        target_role = (
+            "desktop_research.original_capture"
+            if kind == "original"
+            else "desktop_research.text_rendition"
+        )
         target = [
             item
             for item in store.artifacts_for(new_run_id)
-            if item.role == "desktop_research.text_rendition"
+            if item.role == target_role
             and item.provenance.get("relation") == "new_material_version_continuation"
             and item.provenance.get("reacquisition_run_id") == binding["reacquisition_run_id"]
             and item.provenance.get("historical_capture_id") == result["historical_capture_id"]
             and item.provenance.get("reacquired_artifact_id") == result["new_artifact_id"]
+            and item.digest == result.get("actual_digest")
+            and item.size == result.get("actual_size")
         ]
         if len(target) != 1:
             raise LocalApplicationError(

@@ -3,6 +3,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 from copy import deepcopy
 import errno
+from html.parser import HTMLParser
 import hashlib
 import os
 from threading import RLock
@@ -19,6 +20,85 @@ from .material_reacquisition_public_facade import LocalApplicationFacade as _Bas
 from . import new_material_continuation_admission as admission
 
 _CONTINUATION_LOCK = RLock()
+
+
+_HTML_BREAK_TAGS = frozenset(
+    {
+        "br",
+        "p",
+        "div",
+        "li",
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "section",
+        "article",
+        "title",
+    }
+)
+_HTML_CONTAINER_BREAK_TAGS = frozenset(
+    {"p", "div", "li", "h1", "h2", "h3", "h4", "section", "article"}
+)
+_HTML_SKIP_TAGS = frozenset({"script", "style", "noscript"})
+_HTML_RENDITION_PROVIDER = "python-htmlparser/g1-normalized-text@0.1.0;newline=crlf"
+
+
+class _G1HtmlTextParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self.parts: list[str] = []
+        self.skip = 0
+
+    def handle_starttag(self, tag: str, attrs) -> None:
+        del attrs
+        if tag in _HTML_SKIP_TAGS:
+            self.skip += 1
+        elif tag in _HTML_BREAK_TAGS:
+            self.parts.append("\n")
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag in _HTML_SKIP_TAGS:
+            self.skip = max(0, self.skip - 1)
+        elif tag in _HTML_CONTAINER_BREAK_TAGS:
+            self.parts.append("\n")
+
+    def handle_data(self, data: str) -> None:
+        if not self.skip:
+            self.parts.append(data)
+
+
+def _render_reacquired_html_rendition(
+    original_content: bytes,
+    media_type: str | None,
+    *,
+    max_bytes: int,
+) -> bytes:
+    """Replay the bounded G1 HTML-to-text rule for a new HTML material version."""
+    normalized_media_type = str(media_type or "").split(";", 1)[0].strip().lower()
+    if normalized_media_type != "text/html":
+        raise LocalApplicationError(
+            "APPLICATION-NEW-MATERIAL-CONTINUATION-PAIR-001",
+            "divergent original continuation currently supports only text/html material",
+        )
+    parser = _G1HtmlTextParser()
+    parser.feed(original_content.decode("utf-8", errors="replace"))
+    parser.close()
+    rendered_text = (
+        "\n".join(
+            " ".join(line.split())
+            for line in "".join(parser.parts).splitlines()
+            if line.strip()
+        )
+        + "\n"
+    )
+    rendered = rendered_text.replace("\n", "\r\n").encode("utf-8")
+    if len(rendered) > max_bytes:
+        raise LocalApplicationError(
+            "APPLICATION-NEW-MATERIAL-CONTINUATION-MATERIAL-001",
+            "derived text rendition exceeds bounded artifact limit",
+        )
+    return rendered
 
 
 @contextmanager
@@ -548,6 +628,9 @@ class NewMaterialContinuationService:
         store = self._application.execution_store
         capture_map: dict[str, str] = {}
         target_capture_id = str(result["historical_capture_id"])
+        new_material_kind = str(
+            result.get("new_material_kind") or result.get("kind") or ""
+        )
         target_count = 0
         service = DesktopResearchCaptureService(store)
 
@@ -556,16 +639,32 @@ class NewMaterialContinuationService:
             _run, old_original, old_text, old_capture = _artifact_pair_for_capture(
                 store, self._project_id, historical.run_id, old_capture_id
             )
+            is_target = old_capture_id == target_capture_id
             try:
-                original_current = store.load_artifact_verified_once(old_original.artifact_id)
-                if old_capture_id == target_capture_id:
+                if is_target and new_material_kind == "original":
                     target_count += 1
-                    text_content = new_artifact.content
+                    original_content = new_artifact.content
+                    original_media_type = str(new_artifact.media_type or old_original.media_type)
+                    text_content = _render_reacquired_html_rendition(
+                        new_artifact.content,
+                        new_artifact.media_type,
+                        max_bytes=int(store.config.max_artifact_bytes),
+                    )
                     acquired_at = str(result["reacquired_at"])
                 else:
-                    text_content = store.load_artifact_verified_once(old_text.artifact_id).content
-                    acquired_at = str(old_capture["acquired_at"])
+                    original_current = store.load_artifact_verified_once(old_original.artifact_id)
+                    original_content = original_current.content
+                    original_media_type = old_original.media_type
+                    if is_target:
+                        target_count += 1
+                        text_content = new_artifact.content
+                        acquired_at = str(result["reacquired_at"])
+                    else:
+                        text_content = store.load_artifact_verified_once(old_text.artifact_id).content
+                        acquired_at = str(old_capture["acquired_at"])
             except Exception as exc:
+                if isinstance(exc, LocalApplicationError):
+                    raise
                 raise LocalApplicationError(
                     "APPLICATION-NEW-MATERIAL-CONTINUATION-PAIR-001",
                     f"required paired capture material is unavailable: {old_capture_id}",
@@ -578,23 +677,33 @@ class NewMaterialContinuationService:
                 "historical_capture_id": old_capture_id,
                 "historical_acquired_at": str(old_capture["acquired_at"]),
                 "reacquisition_run_id": reacquisition_run_id,
-                "verified_original_artifact_id": old_original.artifact_id,
             }
-            if old_capture_id == target_capture_id:
+            if is_target and new_material_kind == "original":
                 provenance.update(
                     {
                         "reacquired_artifact_id": new_artifact.reference_id,
+                        "reacquired_original_artifact_id": new_artifact.reference_id,
                         "reacquired_at": str(result["reacquired_at"]),
+                        "text_rendition_provider": _HTML_RENDITION_PROVIDER,
                     }
                 )
+            else:
+                provenance["verified_original_artifact_id"] = old_original.artifact_id
+                if is_target:
+                    provenance.update(
+                        {
+                            "reacquired_artifact_id": new_artifact.reference_id,
+                            "reacquired_at": str(result["reacquired_at"]),
+                        }
+                    )
             service.capture(
                 new_run,
                 capture_id=new_capture_id,
                 source_category=str(old_capture["source_category"]),
                 exact_locator=str(old_capture["source_locator"]),
                 acquired_at=acquired_at,
-                original_bytes=original_current.content,
-                original_media_type=old_original.media_type,
+                original_bytes=original_content,
+                original_media_type=original_media_type,
                 text_rendition=text_content,
                 provenance=provenance,
                 artifact_write_options={"expected_status": RunStatus.RUNNING},

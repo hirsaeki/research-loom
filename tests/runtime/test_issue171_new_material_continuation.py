@@ -68,6 +68,51 @@ class Issue171NewMaterialContinuationTests(ResearchPackageAcceptanceSupport):
         self.assertTrue(reacquired["requires_new_canonical_research_result"])
         return rendition, reacquired
 
+    @staticmethod
+    def _make_original_pair_missing(facade, case):
+        store = facade._application.execution_store
+        pair = {
+            item.role: item
+            for item in store.artifacts_for(case["run_id"])
+            if item.provenance.get("capture_id") == "CAP-1"
+        }
+        original = pair["desktop_research.original_capture"]
+        rendition = pair["desktop_research.text_rendition"]
+        store._locator_path(original.storage_locator, original.digest).unlink()
+        store._locator_path(rendition.storage_locator, rendition.digest).unlink()
+        return original, rendition
+
+    def _make_original_new_version(self, facade, case):
+        self._remove_producer_candidate(facade, case)
+        original, rendition = self._make_original_pair_missing(facade, case)
+        changed = (
+            b"<html><body><p>Source A contains the exact supporting excerpt used here.</p>"
+            b"<p>Current material version.</p></body></html>"
+        )
+        with patch(
+            "plugins.local_application.material_reacquisition_facade._retrieve_exact_locator",
+            return_value=RetrievedMaterial(
+                changed,
+                "text/html",
+                "https://example.test/source-a#section-1",
+                "fixture-http",
+                200,
+            ),
+        ):
+            reacquired = facade.submit_action(
+                {
+                    "action_type": "desktop_research.material.reacquire",
+                    "payload": {
+                        "historical_run_id": case["run_id"],
+                        "capture_id": "CAP-1",
+                        "kind": "original",
+                    },
+                }
+            )["data"]
+        self.assertEqual(reacquired["status"], "NEW_MATERIAL_VERSION")
+        self.assertEqual(reacquired["new_material_kind"], "original")
+        return original, rendition, changed, reacquired
+
     def test_public_continuation_creates_new_candidate_result_without_historical_mutation(self):
         facade, case = self._prepare_case()
         try:
@@ -141,6 +186,115 @@ class Issue171NewMaterialContinuationTests(ResearchPackageAcceptanceSupport):
             )["data"]
             self.assertTrue(repeated["idempotent_reuse"])
             self.assertEqual(repeated["new_run_id"], data["new_run_id"])
+        finally:
+            facade.close()
+
+    def test_divergent_html_original_continues_with_new_pair_without_historical_rewrite(self):
+        facade, case = self._prepare_case()
+        try:
+            historical_before = facade._application.execution_store.load_run(case["run_id"])
+            state_before = self._snapshot(facade)
+            original, rendition, changed, reacquired = self._make_original_new_version(
+                facade, case
+            )
+            result = facade.submit_action(
+                {
+                    "action_type": "desktop_research.material.continue_new_version",
+                    "payload": {
+                        "reacquisition_run_id": reacquired["reacquisition_run_id"]
+                    },
+                }
+            )
+            self.assertEqual(result["status"], "SUCCEEDED")
+            data = result["data"]
+            self.assertEqual(data["status"], "COMPLETED")
+            self.assertTrue(data["candidate_only"])
+            self.assertFalse(data["research_state_mutation_performed"])
+
+            store = facade._application.execution_store
+            self.assertEqual(store.load_run(case["run_id"]), historical_before)
+            self.assertEqual(self._snapshot(facade), state_before)
+            self.assertEqual(
+                store.diagnose_artifact_content(original.artifact_id)["status"],
+                "content_missing",
+            )
+            self.assertEqual(
+                store.diagnose_artifact_content(rendition.artifact_id)["status"],
+                "content_missing",
+            )
+
+            artifacts = store.artifacts_for(data["new_run_id"])
+            new_original = next(
+                item for item in artifacts if item.role == "desktop_research.original_capture"
+            )
+            new_text = next(
+                item for item in artifacts if item.role == "desktop_research.text_rendition"
+            )
+            self.assertEqual(
+                store.load_artifact_verified_once(new_original.artifact_id).content,
+                changed,
+            )
+            self.assertEqual(new_original.digest, reacquired["actual_digest"])
+            self.assertEqual(new_original.size, reacquired["actual_size"])
+            self.assertEqual(
+                store.load_artifact_verified_once(new_text.artifact_id).content,
+                b"Source A contains the exact supporting excerpt used here.\r\nCurrent material version.\r\n",
+            )
+            self.assertEqual(
+                new_text.provenance["reacquired_original_artifact_id"],
+                reacquired["new_artifact_id"],
+            )
+            self.assertEqual(
+                new_text.provenance["text_rendition_provider"],
+                "python-htmlparser/g1-normalized-text@0.1.0;newline=crlf",
+            )
+            shown = facade.show_run(reacquired["reacquisition_run_id"])
+            self.assertEqual(shown["new_material_continuation"]["status"], "completed")
+            self.assertEqual(
+                shown["new_material_continuation"]["new_material_kind"],
+                "original",
+            )
+        finally:
+            facade.close()
+
+    def test_divergent_original_class_guard_ablation_preserves_material_identity(self):
+        facade, case = self._prepare_case()
+        try:
+            _original, _rendition, _changed, reacquired = self._make_original_new_version(
+                facade, case
+            )
+            artifact_id = reacquired["new_artifact_id"]
+            facade._application.execution_store._connection.execute(
+                "UPDATE execution_artifacts SET role=? WHERE artifact_id=?",
+                ("desktop_research.reacquired_rendition", artifact_id),
+            )
+            rejected = facade.submit_action(
+                {
+                    "action_type": "desktop_research.material.continue_new_version",
+                    "payload": {
+                        "reacquisition_run_id": reacquired["reacquisition_run_id"]
+                    },
+                }
+            )
+            self.assertEqual(rejected["status"], "FAILED")
+            self.assertIn(
+                "persisted new material does not match",
+                rejected["issues"][0]["message"],
+            )
+
+            with patch(
+                "plugins.local_application.new_material_continuation_admission._require_new_material_artifact_class",
+                return_value=None,
+            ):
+                admitted = facade.submit_action(
+                    {
+                        "action_type": "desktop_research.material.continue_new_version",
+                        "payload": {
+                            "reacquisition_run_id": reacquired["reacquisition_run_id"]
+                        },
+                    }
+                )["data"]
+            self.assertEqual(admitted["status"], "COMPLETED")
         finally:
             facade.close()
 

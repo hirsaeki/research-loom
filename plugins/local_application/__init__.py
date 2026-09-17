@@ -2,6 +2,11 @@
 
 from .application import LocalResearchApplication, LocalStaticAuthorizationProvider
 from .facade import LocalApplicationError
+from .new_material_continuation_html_hardening import (
+    install_new_material_continuation_html_hardening as _install_new_material_continuation_html_hardening,
+)
+
+_install_new_material_continuation_html_hardening()
 from .recommendation_facade import LocalApplicationFacade
 from .workspace import LocalWorkspace, LocalWorkspaceError, OpenedLocalWorkspace
 from .writer_composition_service import verify_section_input_root as verify_writer_section_input
