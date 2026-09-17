@@ -119,6 +119,8 @@ def _capture_projection(original, rendition) -> Mapping[str, Any]:
         "run_id": original.run_id,
         "capture_id": capture_id,
         "source_locator": exact_locator,
+        "original_source_filename": original_provenance.get("original_source_filename"),
+        "text_rendition_source_filename": original_provenance.get("text_rendition_source_filename"),
         "source_category": source_category,
         "acquired_at": acquired_at,
         "captured_at": captured_at,
