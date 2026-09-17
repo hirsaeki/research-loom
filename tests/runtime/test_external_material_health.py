@@ -5,6 +5,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+from plugins.desktop_research import DesktopResearchCaptureService
 from plugins.local_application import LocalApplicationFacade, LocalWorkspace
 from plugins.local_application.material_recovery_facade import HistoricalMaterialRecoveryService
 from research_package_acceptance_support import ResearchPackageAcceptanceSupport
@@ -104,6 +105,58 @@ class ExternalMaterialHealthTests(unittest.TestCase):
                 health = [item["renditions"][0]["content_health"] for item in material["captures"]]
                 self.assertEqual(sum(item["status"] == "verified" for item in health), 1)
                 self.assertEqual(sum(item["verification_performed"] is False for item in health), 11)
+            finally:
+                facade.close()
+
+    def test_cached_representative_rendition_still_bounds_each_material_to_one_check(self):
+        with tempfile.TemporaryDirectory() as temp:
+            facade = self._workspace(Path(temp))
+            try:
+                store = facade._application.execution_store
+                capture = DesktopResearchCaptureService(store)
+                run_a = _create_running(store, facade.project_id, "RUN-CACHE-A", "2026-09-01T00:01:00Z")
+                run_b1 = _create_running(store, facade.project_id, "RUN-CACHE-B1", "2026-09-01T00:02:00Z")
+                run_b2 = _create_running(store, facade.project_id, "RUN-CACHE-B2", "2026-09-01T00:03:00Z")
+
+                capture.capture(
+                    run_a,
+                    capture_id="CAP-CACHE-A",
+                    source_category="public_web",
+                    exact_locator="https://example.test/cache-a",
+                    acquired_at="2026-09-01T00:01:20Z",
+                    original_bytes=b"material-a",
+                    original_media_type="application/pdf",
+                    text_rendition="shared rendition",
+                )
+                capture.capture(
+                    run_b1,
+                    capture_id="CAP-CACHE-B1",
+                    source_category="public_web",
+                    exact_locator="https://example.test/cache-b1",
+                    acquired_at="2026-09-01T00:02:20Z",
+                    original_bytes=b"material-b",
+                    original_media_type="application/pdf",
+                    text_rendition="shared rendition",
+                )
+                capture.capture(
+                    run_b2,
+                    capture_id="CAP-CACHE-B2",
+                    source_category="public_web",
+                    exact_locator="https://example.test/cache-b2",
+                    acquired_at="2026-09-01T00:03:20Z",
+                    original_bytes=b"material-b",
+                    original_media_type="application/pdf",
+                    text_rendition="distinct rendition",
+                )
+
+                with patch.object(store, "diagnose_artifact_content", wraps=store.diagnose_artifact_content) as diagnose:
+                    materials = facade.list_external_materials()["materials"]
+
+                self.assertEqual(diagnose.call_count, 3)
+                material_b = next(item for item in materials if item["capture_count"] == 2)
+                rendition_health = [item["renditions"][0]["content_health"] for item in material_b["captures"]]
+                self.assertEqual(sum(item["status"] == "verified" for item in rendition_health), 1)
+                self.assertEqual(sum(item["verification_performed"] is False for item in rendition_health), 1)
             finally:
                 facade.close()
 

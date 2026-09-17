@@ -317,8 +317,9 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
 
                 rendition_key = health_key(rendition)
                 rendition_health = health_cache.get(rendition_key)
-                if rendition_health is None and material_id not in checked_rendition_by_material:
-                    rendition_health = content_health(rendition)
+                if material_id not in checked_rendition_by_material:
+                    if rendition_health is None:
+                        rendition_health = content_health(rendition)
                     checked_rendition_by_material.add(material_id)
                 elif rendition_health is None:
                     rendition_health = _unchecked_content_health_projection(rendition)
