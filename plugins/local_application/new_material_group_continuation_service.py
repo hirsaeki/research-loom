@@ -480,12 +480,12 @@ class PairedNewMaterialContinuationService(NewMaterialContinuationService):
                         "reacquisition_run_id": str(
                             replacement["reacquisition_run_id"]
                         ),
-                        "reacquired_artifact_id": artifact.artifact_id,
+                        "reacquired_artifact_id": artifact.reference_id,
                         "reacquired_at": str(result["reacquired_at"]),
                     }
                 )
                 if kind == "original":
-                    provenance["reacquired_original_artifact_id"] = artifact.artifact_id
+                    provenance["reacquired_original_artifact_id"] = artifact.reference_id
                     provenance["text_rendition_provider"] = (
                         "python-htmlparser/g1-normalized-text@0.1.0;newline=crlf"
                     )
