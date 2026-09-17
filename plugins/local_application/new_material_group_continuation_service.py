@@ -443,6 +443,11 @@ class PairedNewMaterialContinuationService(NewMaterialContinuationService):
                             old_original.artifact_id
                         ).content
                         original_media_type = old_original.media_type
+                        if len(artifact.content) > text_limit:
+                            raise LocalApplicationError(
+                                "APPLICATION-NEW-MATERIAL-CONTINUATION-MATERIAL-001",
+                                "reacquired rendition exceeds the pinned capture budget",
+                            )
                         text_content = artifact.content
                     acquired_at = str(result["reacquired_at"])
             except Exception as exc:
@@ -475,12 +480,12 @@ class PairedNewMaterialContinuationService(NewMaterialContinuationService):
                         "reacquisition_run_id": str(
                             replacement["reacquisition_run_id"]
                         ),
-                        "reacquired_artifact_id": artifact.reference_id,
+                        "reacquired_artifact_id": artifact.artifact_id,
                         "reacquired_at": str(result["reacquired_at"]),
                     }
                 )
                 if kind == "original":
-                    provenance["reacquired_original_artifact_id"] = artifact.reference_id
+                    provenance["reacquired_original_artifact_id"] = artifact.artifact_id
                     provenance["text_rendition_provider"] = (
                         "python-htmlparser/g1-normalized-text@0.1.0;newline=crlf"
                     )

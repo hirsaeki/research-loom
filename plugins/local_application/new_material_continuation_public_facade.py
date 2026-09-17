@@ -5,7 +5,7 @@ from threading import RLock
 from typing import Any, Mapping
 
 from core.conversation import ActionDefinition, ConversationRuntimeError, HarnessServiceResult
-from plugins.local_execution_store import diagnostics_for
+from plugins.local_execution_store import artifact_metadata_for, diagnostics_for
 
 from .facade import LocalApplicationError
 from .material_reacquisition_facade import (
@@ -24,6 +24,7 @@ from .new_material_group_continuation_service import (
 _ACTION_TYPE = "desktop_research.material.continue_new_version"
 _PAYLOAD_CONTRACT = "desktop-research-new-material-continuation@0.2.0"
 _ACTION_REGISTRATION_LOCK = RLock()
+_GROUP_INSPECTION_ARTIFACT_LIMIT = 100
 
 def _payload(payload: Mapping[str, Any]) -> dict[str, Any]:
     allowed = {"reacquisition_run_id", "paired_reacquisition_run_ids"}
@@ -282,7 +283,11 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                     "historical_recovery_satisfied": False,
                 }
             elif not own_bindings:
-                artifacts = self._application.execution_store.artifacts_for(run.run_id)
+                artifacts = artifact_metadata_for(
+                    self._application.execution_store,
+                    run.run_id,
+                    limit=_GROUP_INSPECTION_ARTIFACT_LIMIT,
+                )
                 grouped = [
                     item
                     for item in artifacts

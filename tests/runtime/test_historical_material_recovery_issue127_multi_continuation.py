@@ -39,17 +39,23 @@ class Issue127MultiMaterialContinuationTests(ResearchPackageAcceptanceSupport):
         captures: dict[str, dict] = {}
         for index, capture_id in enumerate(("CAP-1", "CAP-2", "CAP-3"), start=1):
             attempt_id = f"ATT-{index}"
+            source_name = "source-a" if index == 1 else f"source-{index}"
+            exact_locator = (
+                "https://example.test/source-a#section-1"
+                if index == 1
+                else f"https://example.test/source-{index}#section"
+            )
             facade.start_external_retrieval_attempt(
                 run_id,
                 {
                     "attempt_id": attempt_id,
                     "strategy": f"source {index} search",
                     "coverage_dimension_ids": ["COV-SUPPORT"],
-                    "target_locator": f"https://example.test/source-{index}",
+                    "target_locator": f"https://example.test/{source_name}",
                 },
             )
-            raw = self.workspace / f"captures/raw/source-{index}.html"
-            text = self.workspace / f"captures/text/source-{index}.txt"
+            raw = self.workspace / f"captures/raw/{source_name}.html"
+            text = self.workspace / f"captures/text/{source_name}.txt"
             raw.parent.mkdir(parents=True, exist_ok=True)
             text.parent.mkdir(parents=True, exist_ok=True)
             if index == 1:
@@ -63,11 +69,11 @@ class Issue127MultiMaterialContinuationTests(ResearchPackageAcceptanceSupport):
                 {
                     "capture_id": capture_id,
                     "source_category": "other",
-                    "exact_locator": f"https://example.test/source-{index}#section",
+                    "exact_locator": exact_locator,
                     "acquired_at": f"2026-09-07T00:00:0{index}Z",
-                    "original_file": f"captures/raw/source-{index}.html",
+                    "original_file": f"captures/raw/{source_name}.html",
                     "original_media_type": "text/html",
-                    "text_rendition_file": f"captures/text/source-{index}.txt",
+                    "text_rendition_file": f"captures/text/{source_name}.txt",
                 },
             )["capture"]
             facade.complete_external_retrieval_attempt(
