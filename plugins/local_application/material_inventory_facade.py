@@ -86,7 +86,43 @@ def _artifact_projection(artifact) -> Mapping[str, Any]:
     }
 
 
-def _capture_projection(original, rendition) -> Mapping[str, Any]:
+def _content_health_projection(diagnosis: Mapping[str, Any]) -> Mapping[str, Any]:
+    status = str(diagnosis.get("status") or "unknown")
+    return {
+        "status": status,
+        "content_available": status == "verified",
+        "expected_digest": diagnosis.get("expected_digest"),
+        "expected_size": diagnosis.get("expected_size"),
+        "actual_digest": diagnosis.get("actual_digest"),
+        "actual_size": diagnosis.get("actual_size"),
+    }
+
+
+def _source_filename_hint(provenance: Mapping[str, Any], *, kind: str) -> str | None:
+    key = (
+        "original_source_filename"
+        if kind == "original"
+        else "text_rendition_source_filename"
+    )
+    value = provenance.get(key)
+    return value if isinstance(value, str) and value else None
+
+
+def _healthy_artifact_projection(artifact, health: Mapping[str, Any], *, kind: str) -> Mapping[str, Any]:
+    projected = {
+        **_artifact_projection(artifact),
+        "content_health": deepcopy(dict(health)),
+        "source_filename": _source_filename_hint(artifact.provenance, kind=kind),
+    }
+    if not health.get("content_available"):
+        projected["recovery"] = {
+            "requires_operator_supplied_exact_file": True,
+            "authority": "digest_and_size",
+        }
+    return projected
+
+
+def _capture_projection(original, rendition, *, original_health, rendition_health) -> Mapping[str, Any]:
     original_provenance = original.provenance
     rendition_provenance = rendition.provenance
     capture_id = _required_provenance_string(original_provenance, "capture_id")
@@ -122,8 +158,17 @@ def _capture_projection(original, rendition) -> Mapping[str, Any]:
         "source_category": source_category,
         "acquired_at": acquired_at,
         "captured_at": captured_at,
-        "original": _artifact_projection(original),
-        "renditions": [{**_artifact_projection(rendition), "kind": "utf8_text", "encoding": "UTF-8"}],
+        "capture_record_present": True,
+        "original": _healthy_artifact_projection(
+            original, original_health, kind="original"
+        ),
+        "renditions": [{
+            **_healthy_artifact_projection(
+                rendition, rendition_health, kind="rendition"
+            ),
+            "kind": "utf8_text",
+            "encoding": "UTF-8",
+        }],
         "provenance": _public_provenance(deepcopy(dict(original_provenance))),
     }
 
@@ -140,9 +185,14 @@ def _material_projection(captures: list[Mapping[str, Any]]) -> Mapping[str, Any]
     )
     canonical = ordered[0]
     material_id = str(canonical["original"]["digest"])
+    original_health = deepcopy(dict(canonical["original"]["content_health"]))
     return {
         "material_id": material_id,
         "original_digest": material_id,
+        "capture_count": len(ordered),
+        "backing_content_status": original_health["status"],
+        "content_available": bool(original_health["content_available"]),
+        "verified_backing_copy_count": 1 if original_health["content_available"] else 0,
         "original": deepcopy(dict(canonical["original"])),
         "renditions": deepcopy(list(canonical["renditions"])),
         "source_locators": sorted({str(item["source_locator"]) for item in ordered}),
@@ -195,6 +245,24 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                         raise ValueError("external capture has multiple UTF-8 renditions")
                     slot["rendition"] = artifact
 
+            health_cache: dict[tuple[str, str, int], Mapping[str, Any]] = {}
+
+            def content_health(artifact) -> Mapping[str, Any]:
+                cache_key = (
+                    str(artifact.storage_locator),
+                    str(artifact.digest),
+                    int(artifact.size),
+                )
+                cached = health_cache.get(cache_key)
+                if cached is None:
+                    cached = _content_health_projection(
+                        self._application.execution_store.diagnose_artifact_content(
+                            artifact.artifact_id
+                        )
+                    )
+                    health_cache[cache_key] = cached
+                return cached
+
             grouped: dict[str, list[Mapping[str, Any]]] = {}
             for key in sorted(by_capture):
                 slot = by_capture[key]
@@ -202,7 +270,12 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                 rendition = slot.get("rendition")
                 if original is None or rendition is None:
                     raise ValueError("persisted external capture pair is incomplete")
-                capture = _capture_projection(original, rendition)
+                capture = _capture_projection(
+                    original,
+                    rendition,
+                    original_health=content_health(original),
+                    rendition_health=content_health(rendition),
+                )
                 grouped.setdefault(str(original.digest), []).append(capture)
 
             materials = [_material_projection(captures) for captures in grouped.values()]
