@@ -70,6 +70,22 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
         run_id: str,
         submission: Mapping[str, Any],
     ) -> Mapping[str, Any]:
+        value = _input_object(submission, _CAPTURE_FIELDS, "external capture")
+        provenance = _provenance(value, capture=True)
+        reserved = {"original_source_filename", "text_rendition_source_filename"}
+        if reserved & set(provenance):
+            raise LocalApplicationError(
+                "APPLICATION-EXTERNAL-INPUT-001",
+                "capture provenance may not supply source filename hints",
+            )
+        original_path = self._workspace_capture_path(_required_string(value, "original_file"))
+        text_path = self._workspace_capture_path(_required_string(value, "text_rendition_file"))
+        value["provenance"] = {
+            **provenance,
+            "original_source_filename": original_path.name,
+            "text_rendition_source_filename": text_path.name,
+        }
+
         # Once a Run contains a managed large original, keep later capture-pair
         # accounting on the same seam so that the large payload never consumes the
         # generic Run-output budget used by bounded artifacts.
@@ -79,16 +95,16 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
             and artifact.storage_locator.startswith(_LARGE_ORIGINAL_PREFIX)
             for artifact in self._application.execution_store.artifacts_for(run_id)
         ):
-            return self._capture_external_source_with_large_original(run_id, submission)
+            return self._capture_external_source_with_large_original(run_id, value)
         try:
-            return super().capture_external_source(run_id, submission)
+            return super().capture_external_source(run_id, value)
         except LocalApplicationError as exc:
             if (
                 exc.code != "APPLICATION-EXTERNAL-FILE-002"
                 or "file exceeds configured intake size limit" not in exc.message
             ):
                 raise
-        return self._capture_external_source_with_large_original(run_id, submission)
+        return self._capture_external_source_with_large_original(run_id, value)
 
     def _capture_external_source_with_large_original(
         self,
