@@ -1,6 +1,6 @@
 from __future__ import annotations
 from copy import deepcopy
-import json, os, shutil, tempfile
+import json, os, shutil, subprocess, tempfile
 from pathlib import Path
 from typing import Any, Mapping
 from core.runtime import canonical_digest as core_canonical_digest
@@ -8,6 +8,21 @@ from plugins.local_execution_store import canonical_handoff_for
 from .facade import LocalApplicationError
 from .research_package_builder import build_package
 from .research_package_format import MAX_OUTPUT_BYTES, MAX_PACKAGES, safe_component, validate_schema, verify_export_root
+
+
+
+def _normalize_windows_export_acl(root: Path) -> None:
+    if os.name != "nt":
+        return
+    completed = subprocess.run(
+        ["icacls", str(root), "/reset", "/T", "/Q"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if completed.returncode != 0:
+        detail = (completed.stderr or completed.stdout or "icacls /reset failed").strip()
+        raise OSError(detail)
 
 class ResearchPackageService:
     def __init__(self,facade)->None:
@@ -112,6 +127,7 @@ class ResearchPackageService:
         managed=(self.workspace/".research-loom").resolve(strict=False); out=parent/out.name
         if out.resolve(strict=False).is_relative_to(managed): raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-EXPORT-001","export may not write inside managed workspace state")
         temp=Path(tempfile.mkdtemp(prefix=".rp-export-",dir=parent)); staging=temp/"payload"
+        committed=False
         try:
             source=self.root/pid
             staging.mkdir()
@@ -125,8 +141,11 @@ class ResearchPackageService:
                 if not src.is_relative_to(source_root):
                     raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",f"unsafe Research Package export member: {rel}")
                 dst=staging/rel; dst.parent.mkdir(parents=True,exist_ok=True); shutil.copyfile(src,dst)
-            result=verify_export_root(staging); os.replace(staging,out)
+            result=verify_export_root(staging); os.replace(staging,out); committed=True
+            _normalize_windows_export_acl(out)
         except OSError as exc:
+            if committed:
+                shutil.rmtree(out,ignore_errors=True)
             shutil.rmtree(temp,ignore_errors=True)
             raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-WRITE-001","Research Package export failed") from exc
         except Exception:
