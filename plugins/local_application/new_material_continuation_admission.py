@@ -423,27 +423,8 @@ def _continuation_mirror_complete(store, binding: Mapping[str, Any]) -> bool:
     return True
 
 
-def _completed_continuation_is_reusable(
-    application,
-    project_id: str,
-    binding: Mapping[str, Any],
-    result: Mapping[str, Any],
-    historical,
-) -> bool:
-    """Require canonical result closure before treating COMPLETED as reusable success."""
-    try:
-        run = _validate_continuation_binding(
-            application,
-            project_id,
-            binding,
-            result,
-            historical,
-        )
-    except LocalApplicationError:
-        # Callers first validate the immutable identity with relaxed operational
-        # closure. A failure here therefore means required result closure is
-        # incomplete, not that the old Run may be rewritten or trusted.
-        return False
+def _canonical_result_closure_is_complete(application, run) -> bool:
+    """Verify the persisted canonical result closure for one completed Run."""
     if run.status is not RunStatus.COMPLETED or not run.handoff_ref or not run.handoff_digest:
         return False
     handoff = canonical_handoff_for(application.execution_store, run.handoff_ref)
@@ -469,6 +450,30 @@ def _completed_continuation_is_reusable(
         limit=2,
     )
     return len(proposals) == 1
+
+
+def _completed_continuation_is_reusable(
+    application,
+    project_id: str,
+    binding: Mapping[str, Any],
+    result: Mapping[str, Any],
+    historical,
+) -> bool:
+    """Require canonical result closure before treating COMPLETED as reusable success."""
+    try:
+        run = _validate_continuation_binding(
+            application,
+            project_id,
+            binding,
+            result,
+            historical,
+        )
+    except LocalApplicationError:
+        # Callers first validate the immutable identity with relaxed operational
+        # closure. A failure here therefore means required result closure is
+        # incomplete, not that the old Run may be rewritten or trusted.
+        return False
+    return _canonical_result_closure_is_complete(application, run)
 
 
 def _historical_canonical_result(application, historical_run_id: str):
