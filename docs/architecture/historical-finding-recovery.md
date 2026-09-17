@@ -32,12 +32,16 @@ The legacy `status`, `failure_class`, and producer fields remain the #145 diagno
 
 Issue #171 keeps `NEW_MATERIAL_VERSION` outside historical recovery. A successful
 `desktop_research.material.reacquire` result may be continued through
-`desktop_research.material.continue_new_version` by supplying only the persisted
-reacquisition Run ID. The original #171 path pairs a divergent rendition with its
-verified historical original. Issue #127 adds only the observed complementary case:
-a divergent `text/html` original is paired with a newly derived UTF-8 rendition
-using the bounded G1 HTML-to-text rule; the unavailable historical original and
-rendition remain untouched. Other divergent-original media types remain fail-closed.
+`desktop_research.material.continue_new_version`. The ordinary path supplies one
+persisted reacquisition Run ID. When one historical canonical result contains
+multiple independently verified `NEW_MATERIAL_VERSION` captures, the same action
+may also supply explicit `paired_reacquisition_run_ids`; the set is treated as one
+continuation group and no additional replacement is inferred. The original #171
+path pairs a divergent rendition with its verified historical original. Issue #127
+adds the observed complementary case: a divergent `text/html` original is paired
+with a newly derived UTF-8 rendition using the bounded G1 HTML-to-text rule; the
+unavailable historical original and rendition remain untouched. Other
+divergent-original media types remain fail-closed.
 
 The continuation verifies the reacquisition result, the persisted divergent
 artifact, and its historical provenance. The rendition branch also verifies the
@@ -50,6 +54,15 @@ content through the ordinary external Desktop Research assembler and validator.
 Citation containment is therefore checked against the new rendition bytes; a
 changed version that no longer contains the cited material fails closed rather
 than rematerializing the historical result.
+
+For a paired continuation, every listed reacquisition must resolve to the same
+historical Run and a distinct historical capture. Captures not listed in the group
+still require their exact verified historical original/rendition bytes. A failed or
+aborted group attempt remains an execution fact but does not consume its immutable
+reacquisition Runs; the operator may retry the same group or explicitly expand it
+with another verified replacement. Idempotent reuse is scoped to the exact sorted
+group, while a completed candidate remains candidate-only and does not mutate
+Research State.
 
 This branch never restores or rewrites the missing historical artifact and never
 satisfies historical Finding recovery. Its output remains candidate-only and the

@@ -16,24 +16,52 @@ from .material_reacquisition_public_facade import LocalApplicationFacade as _Bas
 from . import new_material_continuation_admission as admission
 from .new_material_continuation_admission import _find_reacquisition_result
 from .new_material_continuation_service import NewMaterialContinuationService
+from .new_material_group_continuation_service import (
+    PairedNewMaterialContinuationService,
+    _GROUP_RELATION,
+)
 
 _ACTION_TYPE = "desktop_research.material.continue_new_version"
-_PAYLOAD_CONTRACT = "desktop-research-new-material-continuation@0.1.0"
+_PAYLOAD_CONTRACT = "desktop-research-new-material-continuation@0.2.0"
 _ACTION_REGISTRATION_LOCK = RLock()
 
-def _payload(payload: Mapping[str, Any]) -> dict[str, str]:
-    if not isinstance(payload, Mapping) or set(payload) != {"reacquisition_run_id"}:
+def _payload(payload: Mapping[str, Any]) -> dict[str, Any]:
+    allowed = {"reacquisition_run_id", "paired_reacquisition_run_ids"}
+    if (
+        not isinstance(payload, Mapping)
+        or "reacquisition_run_id" not in payload
+        or set(payload) - allowed
+    ):
         raise ValueError(
-            "desktop_research.material.continue_new_version requires only reacquisition_run_id"
+            "desktop_research.material.continue_new_version requires reacquisition_run_id "
+            "and optional paired_reacquisition_run_ids"
         )
     run_id = payload.get("reacquisition_run_id")
     if not isinstance(run_id, str) or not run_id:
         raise ValueError("reacquisition_run_id must be a non-empty string")
-    return {"reacquisition_run_id": run_id}
+    paired = payload.get("paired_reacquisition_run_ids", [])
+    if (
+        not isinstance(paired, list)
+        or len(paired) > 15
+        or any(not isinstance(item, str) or not item for item in paired)
+        or len(set(paired)) != len(paired)
+        or run_id in paired
+    ):
+        raise ValueError(
+            "paired_reacquisition_run_ids must contain up to 15 unique non-empty Run IDs "
+            "different from reacquisition_run_id"
+        )
+    normalized: dict[str, Any] = {"reacquisition_run_id": run_id}
+    if paired:
+        normalized["paired_reacquisition_run_ids"] = sorted(paired)
+    return normalized
 
 class NewMaterialContinuationHandler:
     def __init__(self, application, project_id: str, workspace_root) -> None:
         self._service = NewMaterialContinuationService(
+            application, project_id, workspace_root
+        )
+        self._paired_service = PairedNewMaterialContinuationService(
             application, project_id, workspace_root
         )
 
@@ -46,11 +74,15 @@ class NewMaterialContinuationHandler:
         proposal: Mapping[str, Any],
     ):
         del state, actor, proposal
-        result = self._service.continue_new_version(str(payload["reacquisition_run_id"]))
+        primary = str(payload["reacquisition_run_id"])
+        paired = tuple(str(item) for item in payload.get("paired_reacquisition_run_ids", []))
+        result = (
+            self._paired_service.continue_new_versions((primary, *paired))
+            if paired
+            else self._service.continue_new_version(primary)
+        )
         return HarnessServiceResult(
-            result_reference=str(
-                result.get("new_run_id") or payload["reacquisition_run_id"]
-            ),
+            result_reference=str(result.get("new_run_id") or primary),
             data=result,
             research_state_mutation_performed=False,
         )
@@ -249,4 +281,88 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                     "new_handoff_digest": run.handoff_digest,
                     "historical_recovery_satisfied": False,
                 }
+            elif not own_bindings:
+                artifacts = self._application.execution_store.artifacts_for(run.run_id)
+                grouped = [
+                    item
+                    for item in artifacts
+                    if item.provenance.get("relation") == _GROUP_RELATION
+                ]
+                if grouped:
+                    group_ids = {
+                        str(item.provenance.get("continuation_group_id") or "")
+                        for item in grouped
+                    }
+                    historical_ids = {
+                        str(item.provenance.get("historical_run_id") or "")
+                        for item in grouped
+                    }
+                    run_id_lists = {
+                        tuple(item.provenance.get("reacquisition_run_ids") or ())
+                        for item in grouped
+                    }
+                    if (
+                        len(group_ids) == 1
+                        and "" not in group_ids
+                        and len(historical_ids) == 1
+                        and "" not in historical_ids
+                        and len(run_id_lists) == 1
+                    ):
+                        paired_ids = next(iter(run_id_lists))
+                        replacements = []
+                        valid = bool(paired_ids)
+                        for paired_id in paired_ids:
+                            try:
+                                _parent, mra, _artifact, historical, _original, _capture = (
+                                    _find_reacquisition_result(
+                                        self._application, self._project_id, str(paired_id)
+                                    )
+                                )
+                            except LocalApplicationError:
+                                valid = False
+                                break
+                            kind = str(mra.get("new_material_kind") or mra.get("kind") or "")
+                            role = (
+                                "desktop_research.original_capture"
+                                if kind == "original"
+                                else "desktop_research.text_rendition"
+                            )
+                            matches = [
+                                item
+                                for item in grouped
+                                if item.role == role
+                                and item.provenance.get("reacquisition_run_id") == paired_id
+                                and item.provenance.get("historical_capture_id")
+                                == mra.get("historical_capture_id")
+                                and item.provenance.get("reacquired_artifact_id")
+                                == mra.get("new_artifact_id")
+                                and item.digest == mra.get("actual_digest")
+                                and item.size == mra.get("actual_size")
+                            ]
+                            if len(matches) != 1 or historical.run_id not in historical_ids:
+                                valid = False
+                                break
+                            replacements.append(
+                                {
+                                    "reacquisition_run_id": str(paired_id),
+                                    "historical_capture_id": mra["historical_capture_id"],
+                                    "new_material_artifact_id": mra["new_artifact_id"],
+                                    "new_material_kind": kind,
+                                    "new_material_digest": mra["actual_digest"],
+                                    "new_material_size": mra["actual_size"],
+                                }
+                            )
+                        if valid:
+                            result["new_material_continuation"] = {
+                                "status": run.status.value.lower(),
+                                "mode": "paired",
+                                "continuation_group_id": next(iter(group_ids)),
+                                "reacquisition_run_ids": list(paired_ids),
+                                "historical_run_id": next(iter(historical_ids)),
+                                "replacements": replacements,
+                                "new_run_id": run.run_id,
+                                "new_handoff_id": run.handoff_ref,
+                                "new_handoff_digest": run.handoff_digest,
+                                "historical_recovery_satisfied": False,
+                            }
         return result
