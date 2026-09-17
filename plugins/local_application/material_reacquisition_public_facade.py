@@ -4,6 +4,7 @@ from copy import deepcopy
 from typing import Any, Mapping
 
 from plugins.local_execution_store import result_extensions_for_run
+from plugins.local_execution_store.capture_query import artifacts_for_capture_ids
 
 from .historical_result_recovery_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
 from .material_reacquisition_facade import material_recovery_action_guidance
@@ -52,7 +53,10 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                         )
                         artifact_id = enriched_details.get("artifact_id")
                         source_filename = None
-                        for artifact in self._application.execution_store.artifacts_for(run_id):
+                        artifacts = artifacts_for_capture_ids(
+                            self._application.execution_store, run_id, [capture_id]
+                        )
+                        for artifact in artifacts:
                             if artifact.artifact_id == artifact_id:
                                 value = artifact.provenance.get(filename_field)
                                 if isinstance(value, str) and value:
