@@ -8,6 +8,7 @@ import tempfile
 from typing import Any
 
 from . import material_reacquisition_facade as _base
+from .facade import LocalApplicationError
 
 
 _PYPDF_VERSION = "6.16.2"
@@ -178,6 +179,29 @@ def _regenerate_text_rendition(
     max_bytes: int,
 ) -> _base.RetrievedMaterial:
     media_type = str(original_media_type).split(";", 1)[0].strip().lower()
+    if media_type == "text/html":
+        # Reuse the already-composed bounded/safe G1 renderer rather than
+        # introducing a second HTML rendition contract for reacquisition.
+        from . import new_material_continuation_service as continuation
+
+        try:
+            rendered = continuation._render_reacquired_html_rendition(
+                original_content,
+                original_media_type,
+                max_bytes=max_bytes,
+            )
+        except LocalApplicationError as exc:
+            raise _base.MaterialReacquisitionRetrievalError(
+                f"historical HTML rendition regeneration failed: {exc}"
+            ) from exc
+        return _base.RetrievedMaterial(
+            rendered,
+            "text/plain",
+            exact_locator,
+            continuation._HTML_RENDITION_PROVIDER,
+            None,
+        )
+
     if media_type != "application/pdf":
         return _BASE_GENERATOR(
             original_content,

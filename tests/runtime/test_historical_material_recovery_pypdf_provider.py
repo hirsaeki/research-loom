@@ -177,6 +177,65 @@ class HistoricalMaterialReacquisitionPypdfProviderTests(unittest.TestCase):
             self.assertIs(result, fallback_result)
             fallback.assert_called_once()
 
+    def test_html_provider_reuses_composed_g1_renderer_and_keeps_other_media_closed(self):
+        html = (
+            b"<html><body><p>AISI agenda</p><noscript>hidden</script>"
+            b"must-stay-hidden</noscript><p>Visible evidence</p></body></html>"
+        )
+        with patch.object(
+            provider,
+            "_BASE_GENERATOR",
+            side_effect=AssertionError("HTML must use the trusted composed renderer"),
+        ):
+            result = provider._regenerate_text_rendition(
+                html,
+                "text/html; charset=utf-8",
+                "https://example.test/aisi#agenda",
+                max_bytes=1024,
+            )
+
+        self.assertEqual(result.media_type, "text/plain")
+        self.assertEqual(result.final_locator, "https://example.test/aisi#agenda")
+        self.assertEqual(
+            result.provider,
+            "python-htmlparser/g1-normalized-text@0.1.0;newline=crlf",
+        )
+        self.assertIn(b"AISI agenda", result.content)
+        self.assertIn(b"Visible evidence", result.content)
+        self.assertNotIn(b"hidden", result.content)
+        self.assertNotIn(b"must-stay-hidden", result.content)
+
+        with self.assertRaisesRegex(
+            base.MaterialReacquisitionRetrievalError,
+            "historical HTML rendition regeneration failed",
+        ):
+            provider._regenerate_text_rendition(
+                b"<p>" + b"x" * 1024 + b"</p>",
+                "text/html",
+                "https://example.test/aisi#agenda",
+                max_bytes=8,
+            )
+
+        fallback_error = base.MaterialReacquisitionRetrievalError(
+            "no trusted rendition generator is available for media type 'application/xhtml+xml'"
+        )
+        with patch.object(
+            provider,
+            "_BASE_GENERATOR",
+            side_effect=fallback_error,
+        ) as fallback:
+            with self.assertRaisesRegex(
+                base.MaterialReacquisitionRetrievalError,
+                "no trusted rendition generator",
+            ):
+                provider._regenerate_text_rendition(
+                    b"<p>unsupported</p>",
+                    "application/xhtml+xml",
+                    "https://example.test/unsupported",
+                    max_bytes=1024,
+                )
+            fallback.assert_called_once()
+
     def test_provider_target_match_rejects_results_from_old_implementation_version(self):
         old_child = SimpleNamespace(
             capability_id=base._CAPABILITY_ID,
