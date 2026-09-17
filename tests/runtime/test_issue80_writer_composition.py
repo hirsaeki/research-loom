@@ -9,6 +9,79 @@ import issue80_writer_composition_suite as _suite
 
 
 class Issue80WriterCompositionTests(_suite.Issue80WriterCompositionTests):
+
+    def _build_complete_support_package(self, *, include_unrelated=False, include_recommendation=False, include_adverse=False):
+        if not include_recommendation:
+            return super()._build_complete_support_package(
+                include_unrelated=include_unrelated, include_recommendation=False, include_adverse=include_adverse
+            )
+        facade, case = super()._build_complete_support_package(
+            include_unrelated=include_unrelated, include_recommendation=False, include_adverse=include_adverse
+        )
+        try:
+            package = facade.show_research_package(case["package_id"])["package"]
+            finding_id = package["content"]["finding_refs"][0]
+            proposed = facade.submit_action({
+                "action_type": "research.recommendation.propose",
+                "payload": {
+                    "statement": "Carry the supported implication into the Writer plan.",
+                    "finding_ids": [finding_id],
+                },
+                "actor_id": "HUMAN-I80-SUPPORT",
+            })
+            recommendation_id = proposed["data"]["recommendation_candidate"]["id"]
+            pending = facade.submit_action({
+                "action_type": "state.apply_candidate",
+                "payload": {"state_delta_proposal_id": proposed["data"]["state_delta_proposal_id"]},
+                "actor_id": "HUMAN-I80-SUPPORT",
+            })
+            confirmed = facade.submit_confirmation({
+                "confirmation_request_id": pending["confirmation_request"]["confirmation_request_id"],
+                "actor_id": "HUMAN-I80-SUPPORT",
+            })
+            request = confirmed["decision_request"]
+            resolved = facade.resolve_human_decision({
+                "request_id": request["request_id"],
+                "request_digest": request["request_digest"],
+                "disposition": "approve_exact",
+                "actor_id": "HUMAN-I80-SUPPORT",
+            })
+            self.assertEqual(resolved["status"], "RESOLVED")
+            state = facade._application.state_repository.load_state_view(
+                facade.project_id, facade._application.state_repository.load_active_lineage_ref(facade.project_id)
+            )
+            object_ids = [
+                obj["id"] for obj in package["resolved_content"]["research_objects"]
+                if obj.get("kind") != "research_question"
+            ] + [recommendation_id]
+            run_ids = [row["run_id"] for row in package["resolved_content"]["working_material"]["run_candidates"]]
+            materials = [
+                {"run_id": row["run_id"], "capture_id": row["capture"]["capture_id"]}
+                for row in package["resolved_content"]["materials"]
+            ]
+            exhibit_ids = [
+                row["exhibit_id"] for row in package["resolved_content"]["working_material"]["research_exhibits"]
+            ]
+            project_input_ids = [
+                row["metadata"]["input_id"] for row in package["resolved_content"]["working_material"]["project_inputs"]
+            ]
+            gap_ids = [row["gap_id"] for row in package["resolved_content"]["unresolved_gaps"]]
+            built = facade.build_research_package({
+                "snapshot_id": state.current_snapshot["id"],
+                "rq_id": case["rq_id"],
+                "object_ids": object_ids,
+                "run_ids": run_ids,
+                "materials": materials,
+                "exhibit_ids": exhibit_ids,
+                "project_input_ids": project_input_ids,
+                "gap_ids": gap_ids,
+            })
+            case["package_id"] = built["package"]["package_id"]
+            case["recommendation_id"] = recommendation_id
+            return facade, case
+        except Exception:
+            facade.close()
+            raise
     def test_review_fixes_series_lock_and_list_package_cache(self):
         facade, case = self._build()
         try:
