@@ -122,7 +122,13 @@ def _healthy_artifact_projection(artifact, health: Mapping[str, Any], *, kind: s
     return projected
 
 
-def _capture_projection(original, rendition, *, original_health, rendition_health) -> Mapping[str, Any]:
+def _capture_projection(
+    original,
+    rendition,
+    *,
+    original_health: Mapping[str, Any] | None = None,
+    rendition_health: Mapping[str, Any] | None = None,
+) -> Mapping[str, Any]:
     original_provenance = original.provenance
     rendition_provenance = rendition.provenance
     capture_id = _required_provenance_string(original_provenance, "capture_id")
@@ -159,12 +165,16 @@ def _capture_projection(original, rendition, *, original_health, rendition_healt
         "acquired_at": acquired_at,
         "captured_at": captured_at,
         "capture_record_present": True,
-        "original": _healthy_artifact_projection(
-            original, original_health, kind="original"
+        "original": (
+            _healthy_artifact_projection(original, original_health, kind="original")
+            if original_health is not None
+            else _artifact_projection(original)
         ),
         "renditions": [{
-            **_healthy_artifact_projection(
-                rendition, rendition_health, kind="rendition"
+            **(
+                _healthy_artifact_projection(rendition, rendition_health, kind="rendition")
+                if rendition_health is not None
+                else _artifact_projection(rendition)
             ),
             "kind": "utf8_text",
             "encoding": "UTF-8",
