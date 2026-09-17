@@ -129,15 +129,19 @@ class Issue157SourceFilenameProvenanceTests(ResearchPackageAcceptanceSupport):
             store = facade._application.execution_store
             artifacts = store.artifacts_for(case["run_id"])
             original = next(item for item in artifacts if item.role == "desktop_research.original_capture")
-            for artifact in artifacts:
-                provenance = dict(artifact.provenance)
-                provenance.pop("original_source_filename", None)
-                provenance.pop("text_rendition_source_filename", None)
-                store._db.execute(
-                    "UPDATE execution_artifacts SET provenance_json=? WHERE artifact_id=?",
-                    (json.dumps(provenance, sort_keys=True, separators=(",", ":")), artifact.artifact_id),
-                )
-            store._db.commit()
+            with store._lock:
+                for artifact in artifacts:
+                    provenance = dict(artifact.provenance)
+                    provenance.pop("original_source_filename", None)
+                    provenance.pop("text_rendition_source_filename", None)
+                    store._connection.execute(
+                        "UPDATE execution_artifacts SET provenance_json=? WHERE artifact_id=?",
+                        (
+                            json.dumps(provenance, sort_keys=True, separators=(",", ":")),
+                            artifact.artifact_id,
+                        ),
+                    )
+                store._connection.commit()
             store._locator_path(original.storage_locator, original.digest).unlink()
             facade.close()
             facade = None
