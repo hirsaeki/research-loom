@@ -51,3 +51,34 @@ research-loom writer-composition section-input --workspace WORKSPACE --compositi
 `section-input/section-writer-input.json` contains the selected Section Contract, its digest, compact outline context, exact needed material text with original capture locator/digest metadata, exact Research Exhibits, unresolved gaps, supplied research objects, Profile constraints, and immutable source pins. `manifest.json` records output path, size, digest, and a manifest digest. The export is atomic and never overwrites an existing path. The directory can be read after the original Workspace and Research Package directory are unavailable.
 
 The export explicitly records that Evidence verification, Finding/Recommendation adoption, and Research State mutation did not occur. Writer prose import belongs to #78; research-side Writing Feedback import belongs to #79.
+
+
+## External Writer production round trip
+
+The selected immutable composition is now the entry point for an external Writer round trip:
+
+```text
+verified Research Package
+  -> selected Writer Composition version
+  -> writer-round-trip export-input
+  -> external Writer / human / Work
+  -> writer-round-trip import-response
+  -> immutable manuscript revision
+  -> writer-round-trip inspect
+```
+
+`export-input` reuses the canonical detached one-section Writer input builder for every selected section. The round-trip receipt therefore preserves the exact Research Package, Snapshot, Effective Profile Set, composition version/digest, section digest, resolved profile constraints, research-object closure, material bodies, Exhibit refs, and citation locator scope already verified by the composition path.
+
+External responses may return draft prose, supplied citation/Exhibit refs, and structured Writing Feedback. Feedback remains non-Evidence candidate follow-up material. Import does not verify Evidence, adopt Findings/Recommendations, or mutate Research State.
+
+Manuscript revisions are immutable. Re-submitting the exact same response verifies and reuses the existing revision. A changed response must name the exact current base revision and creates a new child. Within the same exact exported input, omitted sections reuse their prior immutable section content; after a changed composition/input, all exported sections must be supplied again so stale prose is not silently carried across an outline change.
+
+Public CLI:
+
+```text
+research-loom writer-round-trip export-input --workspace ... --composition-id COMP-... --section-id SEC-A --section-id SEC-B --output ...
+research-loom writer-round-trip import-response --workspace ... --json writer-response.json
+research-loom writer-round-trip inspect --workspace ... --composition-id COMP-... [--revision-id WMR-...] --json
+```
+
+The joined inspection exposes package/snapshot/profile pins, selected composition, effective constraints, exported Writer input, section content, citations/Exhibits, Writing Feedback, candidate follow-ups, and revision lineage.

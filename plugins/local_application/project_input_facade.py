@@ -288,3 +288,20 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
 
     def export_writer_section_input(self, composition_id: str, section_id: str, output: str | Path) -> Mapping[str, Any]:
         return self._writer_composition_service().export_section_input(composition_id, section_id, output)
+
+    def _writer_round_trip_service(self):
+        from .writer_round_trip_service import WriterRoundTripService
+        return WriterRoundTripService(self)
+
+    def export_writer_round_trip_input(
+        self, composition_id: str, section_ids: list[str], output: str | Path
+    ) -> Mapping[str, Any]:
+        return self._writer_round_trip_service().export_input(composition_id, section_ids, output)
+
+    def import_writer_response(self, value: Mapping[str, Any]) -> Mapping[str, Any]:
+        return self._writer_round_trip_service().import_response(value)
+
+    def inspect_writer_round_trip(
+        self, composition_id: str, revision_id: str | None = None
+    ) -> Mapping[str, Any]:
+        return self._writer_round_trip_service().inspect(composition_id, revision_id)
