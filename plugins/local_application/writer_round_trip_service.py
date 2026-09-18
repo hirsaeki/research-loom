@@ -15,7 +15,7 @@ from jsonschema import Draft202012Validator, FormatChecker
 from core.runtime import canonical_digest
 from .facade import LocalApplicationError
 from .research_package_format import safe_component
-from .writer_composition_service import _digest_document, _object_index, _package_ref_sets
+from .writer_composition_service import _digest_document, _material_ref, _object_index, _package_ref_sets
 
 SCHEMA_VERSION = "0.1.0"
 MAX_SECTIONS = 64
@@ -239,11 +239,87 @@ class WriterRoundTripService:
         }
         if dict(source) != expected_source:
             raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-PIN-001", "Writer input pins do not match the immutable composition and Research Package")
+
         by_id = {str(section["section_id"]): section for section in composition["sections"]}
+        package_objects = _object_index(package)
+        package_materials = {
+            _material_ref(material): material
+            for material in package.get("resolved_content", {}).get("materials", [])
+            if isinstance(material, Mapping) and _material_ref(material)
+        }
+        package_exhibits = {
+            str(exhibit.get("exhibit_id")): exhibit
+            for exhibit in package.get("resolved_content", {}).get("working_material", {}).get("research_exhibits", [])
+            if isinstance(exhibit, Mapping) and isinstance(exhibit.get("exhibit_id"), str)
+        }
+        package_gaps = {
+            str(gap.get("gap_id")): gap
+            for gap in package.get("resolved_content", {}).get("unresolved_gaps", [])
+            if isinstance(gap, Mapping) and isinstance(gap.get("gap_id"), str)
+        }
+        run_candidates = {
+            str(run.get("run_id")): run
+            for run in package.get("resolved_content", {}).get("working_material", {}).get("run_candidates", [])
+            if isinstance(run, Mapping) and isinstance(run.get("run_id"), str)
+        }
+        expected_constraints = package.get("resolved_profiles", {}).get("effective_constraints", [])
+
         for row in value["sections"]:
             section = by_id.get(str(row["section_id"]))
-            if section is None or section.get("section_digest") != row.get("section_digest"):
+            embedded = row.get("section_input")
+            if (
+                section is None
+                or section.get("section_digest") != row.get("section_digest")
+                or not isinstance(embedded, Mapping)
+            ):
                 raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-PIN-001", "Writer input section pin no longer resolves")
+            if _digest_document(embedded, "section_input_digest") != embedded.get("section_input_digest"):
+                raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-INTEGRITY-001", "embedded section Writer input digest mismatch")
+            if dict(embedded.get("source", {})) != expected_source or embedded.get("section_contract") != section:
+                raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-PIN-001", "embedded section Writer input does not match the pinned composition")
+            if embedded.get("resolved_profile_constraints") != expected_constraints:
+                raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-PIN-001", "embedded Writer profile constraints do not match the pinned Effective Profile Set")
+
+            expected_objects = [
+                deepcopy(dict(package_objects[object_id]))
+                for object_id in embedded.get("resolved_object_ids", [])
+                if object_id in package_objects
+            ]
+            if len(expected_objects) != len(embedded.get("resolved_object_ids", [])) or embedded.get("resolved_research_objects") != expected_objects:
+                raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-PIN-001", "embedded Writer research objects do not match the pinned Research Package")
+
+            expected_materials = []
+            for embedded_material in embedded.get("resolved_materials", []):
+                material_ref = embedded_material.get("material_ref") if isinstance(embedded_material, Mapping) else None
+                base = package_materials.get(material_ref)
+                if base is None:
+                    raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-PIN-001", "embedded Writer material does not resolve in the pinned Research Package")
+                expected_material = deepcopy(dict(base))
+                expected_material["material_ref"] = material_ref
+                expected_material["text_rendition"]["content"] = composer._resolve_material_text(package, base)
+                run = run_candidates.get(str(expected_material.get("run_id")))
+                expected_material["candidate_only"] = bool(run.get("candidate_only")) if run else False
+                expected_materials.append(expected_material)
+            if embedded.get("resolved_materials") != expected_materials:
+                raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-PIN-001", "embedded Writer material bodies do not match the pinned Research Package")
+
+            expected_exhibits = [
+                deepcopy(dict(package_exhibits[exhibit_id]))
+                for exhibit_id in section.get("exhibit_refs", [])
+                if exhibit_id in package_exhibits
+            ]
+            expected_gaps = [
+                deepcopy(dict(package_gaps[gap_id]))
+                for gap_id in section.get("gap_refs", [])
+                if gap_id in package_gaps
+            ]
+            if embedded.get("resolved_exhibits") != expected_exhibits or embedded.get("unresolved_gaps") != expected_gaps:
+                raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-PIN-001", "embedded Writer Exhibit/Gap bindings do not match the pinned Research Package")
+
+            expected_scope = dict(self._section_scope(embedded))
+            for key in ("section_id", "section_digest", "section_input_digest", "source_refs", "citation_scope", "exhibit_refs"):
+                if row.get(key) != expected_scope.get(key):
+                    raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-PIN-001", "Writer input receipt summary does not match its embedded section input")
         return composition, package
 
     def export_input(self, composition_id: str, section_ids: list[str], output_dir: str | Path) -> Mapping[str, Any]:
@@ -261,7 +337,6 @@ class WriterRoundTripService:
         parent = out.parent
         if not parent.exists():
             raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-EXPORT-001", "Writer input export parent must exist")
-
         composer = self._composition_service()
         selection = composer._selection(composition_id)
         if not selection or not isinstance(selection.get("selected"), Mapping):
@@ -277,19 +352,28 @@ class WriterRoundTripService:
         if missing:
             raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-404", "selected Writer sections do not exist: " + ", ".join(missing))
 
-        tmp = Path(tempfile.mkdtemp(prefix=".writer-input-", dir=parent))
-        staging = tmp / "payload"
-        staging.mkdir()
-        section_records: list[dict[str, Any]] = []
+        reservation = parent / f".{out.name}.writer-round-trip-reserved"
         try:
+            reservation.mkdir()
+        except FileExistsError as exc:
+            raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-EXPORT-001", "Writer input export destination is busy") from exc
+        tmp: Path | None = None
+        try:
+            tmp = Path(tempfile.mkdtemp(prefix=".writer-input-", dir=parent))
+            staging = tmp / "payload"
+            staging.mkdir()
+            section_records: list[dict[str, Any]] = []
             sections_root = staging / "sections"
             sections_root.mkdir()
             for section_id in section_ids:
                 section_out = sections_root / safe_component(section_id, "section_id")
                 composer.export_section_input(composition_id, section_id, section_out)
                 section_input = json.loads((section_out / "section-writer-input.json").read_text(encoding="utf-8"))
-                record = dict(self._section_scope(section_input))
-                record["relative_path"] = f"sections/{safe_component(section_id, 'section_id')}/section-writer-input.json"
+                record = {
+                    **dict(self._section_scope(section_input)),
+                    "relative_path": f"sections/{safe_component(section_id, 'section_id')}/section-writer-input.json",
+                    "section_input": deepcopy(section_input),
+                }
                 section_records.append(record)
 
             source = {
@@ -318,14 +402,17 @@ class WriterRoundTripService:
             self._validate_input_context(document)
             reused = self._write_immutable(self._input_path(document["input_id"]), document)
             (staging / "writer-input.json").write_bytes(_json_bytes(document))
-            os.replace(staging, out)
-            shutil.rmtree(tmp, ignore_errors=True)
+            if out.exists():
+                raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-EXPORT-001", "Writer input export will not overwrite an existing path")
+            os.rename(staging, out)
         except LocalApplicationError:
-            shutil.rmtree(tmp, ignore_errors=True)
             raise
         except (OSError, UnicodeError, json.JSONDecodeError) as exc:
-            shutil.rmtree(tmp, ignore_errors=True)
             raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-WRITE-001", "Writer input export failed") from exc
+        finally:
+            if tmp is not None:
+                shutil.rmtree(tmp, ignore_errors=True)
+            shutil.rmtree(reservation, ignore_errors=True)
         return {
             "status": "EXPORTED",
             "input_id": document["input_id"],
@@ -412,6 +499,20 @@ class WriterRoundTripService:
                 existing = self._load_revision(composition_id, revision_id)
                 if existing.get("response_digest") != response_digest or existing.get("source", {}).get("input_digest") != receipt["input_digest"]:
                     raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-IMMUTABLE-001", "existing manuscript revision identity conflicts with this response")
+                head = self._head(composition_id)
+                if head is None or int(head["revision_number"]) < int(existing["revision_number"]):
+                    self._write_head(
+                        composition_id,
+                        {
+                            "revision_id": revision_id,
+                            "revision_digest": existing["revision_digest"],
+                            "revision_number": existing["revision_number"],
+                        },
+                    )
+                elif int(head["revision_number"]) == int(existing["revision_number"]) and (
+                    head["revision_id"] != revision_id or head["revision_digest"] != existing["revision_digest"]
+                ):
+                    raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-INTEGRITY-001", "manuscript head conflicts with an existing revision at the same revision number")
                 return {
                     "status": "VERIFIED_REUSE",
                     "revision_id": revision_id,

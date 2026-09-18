@@ -7,13 +7,15 @@ from unittest.mock import patch
 from plugins.local_application import LocalApplicationError
 from plugins.local_application.writer_round_trip_service import WriterRoundTripService
 from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-from issue80_writer_composition_suite import Issue80WriterCompositionTests
+import issue80_writer_composition_suite as writer_comp_support
 
 
 class Issue219WriterRoundTripTests(ResearchPackageAcceptanceSupport):
     def _build_round_trip(self):
-        facade, case = Issue80WriterCompositionTests._build_complete_support_package(self)
-        proposal = Issue80WriterCompositionTests._proposal(self, case)
+        facade, case = writer_comp_support.Issue80WriterCompositionTests._build_complete_support_package(self)
+        proposal = writer_comp_support.Issue80WriterCompositionTests._proposal(self, case)
+        proposal["sections"][1]["narrative_stage_refs"] = ["framing"]
+        proposal["sections"][1]["semantic_purpose_refs"] = ["frame_problem"]
         composition = facade.capture_writer_composition(case["package_id"], proposal)["composition"]
         facade.select_writer_composition(
             composition["composition_id"], 1, composition["composition_digest"]
@@ -110,11 +112,26 @@ class Issue219WriterRoundTripTests(ResearchPackageAcceptanceSupport):
             self.assertEqual(first["revision_id"], retry["revision_id"])
             self.assertFalse(first["research_state_mutation_performed"])
 
+            service = facade._writer_round_trip_service()
+            service._head_path(composition["composition_id"]).unlink()
+            recovered = facade.import_writer_response(deepcopy(response))
+            self.assertEqual(recovered["status"], "VERIFIED_REUSE")
+            recovered_head = service._head(composition["composition_id"])
+            self.assertEqual(recovered_head["revision_id"], first["revision_id"])
+            self.assertEqual(recovered_head["revision_digest"], first["revision_digest"])
+
             shown = facade.inspect_writer_round_trip(composition["composition_id"])
             self.assertEqual(shown["source_package"]["package_id"], case["package_id"])
             self.assertEqual(
                 shown["writer_input"]["source"]["effective_profile_set_digest"],
                 input_doc["source"]["effective_profile_set_digest"],
+            )
+            self.assertEqual(
+                shown["writer_input"]["sections"][0]["section_input"]["section_input_digest"],
+                input_doc["sections"][0]["section_input"]["section_input_digest"],
+            )
+            self.assertTrue(
+                shown["writer_input"]["sections"][0]["section_input"]["resolved_profile_constraints"]
             )
             self.assertTrue(shown["effective_constraints"])
             self.assertEqual(len(shown["revision"]["sections"]), 2)
@@ -199,14 +216,50 @@ class Issue219WriterRoundTripTests(ResearchPackageAcceptanceSupport):
         finally:
             facade.close()
 
+    def test_managed_receipt_summary_must_match_embedded_section_input(self):
+        facade, _case, _composition, _exported, input_doc = self._build_round_trip()
+        try:
+            service = facade._writer_round_trip_service()
+            receipt_path = service._input_path(input_doc["input_id"])
+            tampered = json.loads(receipt_path.read_text(encoding="utf-8"))
+            tampered["sections"][0]["citation_scope"] = []
+            from plugins.local_application.writer_composition_service import _digest_document
+            tampered["input_digest"] = _digest_document(tampered, "input_digest")
+            receipt_path.write_text(
+                json.dumps(tampered, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            with self.assertRaises(LocalApplicationError) as error:
+                facade.import_writer_response(self._response(tampered))
+            self.assertEqual(error.exception.code, "APPLICATION-WRITER-ROUND-TRIP-PIN-001")
+        finally:
+            facade.close()
+
+    def test_export_destination_reservation_prevents_parallel_overwrite(self):
+        facade, _case, composition, _exported, _input_doc = self._build_round_trip()
+        try:
+            output = self.root / "writer-round-trip-contended"
+            reservation = output.parent / f".{output.name}.writer-round-trip-reserved"
+            reservation.mkdir()
+            with self.assertRaises(LocalApplicationError) as error:
+                facade.export_writer_round_trip_input(
+                    composition["composition_id"], ["SEC-FRAME"], output
+                )
+            self.assertEqual(error.exception.code, "APPLICATION-WRITER-ROUND-TRIP-EXPORT-001")
+            self.assertFalse(output.exists())
+        finally:
+            facade.close()
+
     def test_changed_input_does_not_reuse_sections_from_older_outline(self):
         facade, case, composition, first_export, input_doc = self._build_round_trip()
         try:
             first = facade.import_writer_response(self._response(input_doc))
-            proposal = Issue80WriterCompositionTests._proposal(
+            proposal = writer_comp_support.Issue80WriterCompositionTests._proposal(
                 self, case, composition_id=composition["composition_id"], base=composition
             )
             proposal["sections"][0]["purpose"] = "Changed outline purpose requiring a fresh draft set."
+            proposal["sections"][1]["narrative_stage_refs"] = ["framing"]
+            proposal["sections"][1]["semantic_purpose_refs"] = ["frame_problem"]
             v2 = facade.capture_writer_composition(case["package_id"], proposal)["composition"]
             facade.select_writer_composition(v2["composition_id"], 2, v2["composition_digest"])
             out = self.root / "writer-round-trip-v2"
