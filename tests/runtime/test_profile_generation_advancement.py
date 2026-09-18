@@ -875,8 +875,8 @@ class ProfileGenerationAdvancementTests(ResearchPackageAcceptanceSupport):
                 opened.project_id,
                 opened.application.state_repository.load_active_lineage_ref(opened.project_id),
             )
-            self.assertEqual(state.project_config_ref, PROJECT_CONFIG_NAME)
-            self.assertEqual(state.effective_profile_set_ref, EFFECTIVE_PROFILE_SET_NAME)
+            self.assertEqual(state.project_config_ref, "project-config.json")
+            self.assertEqual(state.effective_profile_set_ref, "effective-profile-set.json")
 
     def test_ablation_old_new_history_guard_is_detected_then_baseline_restored(self):
         request, output, _ = self._resolve()
