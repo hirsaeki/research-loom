@@ -64,7 +64,12 @@ class LocalApplicationFacade(VirtualRunnerInspectionMixin, VirtualRunnerExecuteM
 
     def _effective_profile_set(self, state) -> Mapping[str, Any]:
         if self._workspace_root is not None:
-            path = workspace_document_path(self._workspace_root, "effective_profile_set")
+            binding_path = self._workspace_root / ".research-loom" / "workspace-binding.json"
+            path = (
+                workspace_document_path(self._workspace_root, "effective_profile_set")
+                if binding_path.is_file()
+                else self._workspace_root / "effective-profile-set.json"
+            )
             if path.is_file():
                 try:
                     value = json.loads(path.read_text(encoding="utf-8"))
