@@ -139,7 +139,7 @@ def _package_visual_target(service, exhibit: Mapping[str, Any], attachments: lis
         derived_meta = metadata.get(derived_ref)
         if (
             derived_meta is None
-            or artifact_ref not in tuple(derived_meta.parent_artifact_refs)
+            or artifact_ref not in tuple(derived_meta.provenance.get("parent_artifact_refs", ()))
             or str(derived.get("derived_from_artifact_ref")) != artifact_ref
             or str(derived_meta.digest) != str(derived.get("digest"))
             or int(derived_meta.size) != int(derived.get("byte_length", -1))
