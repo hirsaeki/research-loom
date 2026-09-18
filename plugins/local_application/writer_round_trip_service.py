@@ -22,6 +22,7 @@ MAX_SECTIONS = 64
 MAX_FEEDBACK_ISSUES = 128
 MAX_INSPECT_ANCESTRY = 64
 MAX_RESPONSE_BYTES = 8 * 1024 * 1024
+MAX_ROUND_TRIP_INPUT_BYTES = 16 * 1024 * 1024
 SCHEMA = Path(__file__).resolve().parents[2] / "core/packages/writer-publication/writer-round-trip.schema.json"
 
 
@@ -169,7 +170,31 @@ class WriterRoundTripService:
         _validate_schema(value)
         if _digest_document(value, "revision_digest") != value.get("revision_digest"):
             raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-INTEGRITY-001", "manuscript revision digest mismatch")
+        if value.get("revision_id") != revision_id:
+            raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-INTEGRITY-001", "manuscript revision identity does not match its storage path")
         return value
+
+    def _load_latest_revision(self, composition_id: str) -> Mapping[str, Any] | None:
+        root = self._revision_root(composition_id) / "revisions"
+        if not root.exists():
+            return None
+        latest: Mapping[str, Any] | None = None
+        seen_numbers: dict[int, str] = {}
+        for path in sorted(root.glob("*.json")):
+            if not path.is_file():
+                continue
+            revision = self._load_revision(composition_id, path.stem)
+            number = int(revision["revision_number"])
+            prior = seen_numbers.get(number)
+            if prior is not None and prior != revision["revision_id"]:
+                raise LocalApplicationError(
+                    "APPLICATION-WRITER-ROUND-TRIP-INTEGRITY-001",
+                    "multiple manuscript revisions claim the same revision number",
+                )
+            seen_numbers[number] = str(revision["revision_id"])
+            if latest is None or number > int(latest["revision_number"]):
+                latest = revision
+        return latest
 
     def _head(self, composition_id: str) -> Mapping[str, Any] | None:
         path = self._head_path(composition_id)
@@ -183,7 +208,42 @@ class WriterRoundTripService:
         revision = self._load_revision(composition_id, revision_id)
         if revision.get("revision_digest") != revision_digest:
             raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-INTEGRITY-001", "manuscript revision head digest does not resolve")
+        if value.get("revision_number") != revision.get("revision_number"):
+            raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-INTEGRITY-001", "manuscript revision head number does not resolve")
         return value
+
+    def _reconcile_head(self, composition_id: str) -> Mapping[str, Any] | None:
+        latest = self._load_latest_revision(composition_id)
+        head = self._head(composition_id)
+        if latest is None:
+            return head
+        latest_ref = {
+            "revision_id": latest["revision_id"],
+            "revision_digest": latest["revision_digest"],
+            "revision_number": latest["revision_number"],
+        }
+        if head is None or int(head["revision_number"]) < int(latest["revision_number"]):
+            self._write_head(composition_id, latest_ref)
+            return latest_ref
+        if int(head["revision_number"]) > int(latest["revision_number"]):
+            raise LocalApplicationError(
+                "APPLICATION-WRITER-ROUND-TRIP-INTEGRITY-001",
+                "manuscript head is ahead of all stored revisions",
+            )
+        if (
+            head["revision_id"] != latest["revision_id"]
+            or head["revision_digest"] != latest["revision_digest"]
+        ):
+            raise LocalApplicationError(
+                "APPLICATION-WRITER-ROUND-TRIP-INTEGRITY-001",
+                "manuscript head conflicts with the latest stored revision",
+            )
+        return head
+
+    def _export_lock_path(self, output: Path) -> Path:
+        resolved = os.path.normcase(str(output.resolve(strict=False)))
+        token = hashlib.sha256(resolved.encode("utf-8")).hexdigest()
+        return self._composition_service().root / f".writer-round-trip-export-{token}.lock"
 
     @staticmethod
     def _section_scope(section_input: Mapping[str, Any]) -> Mapping[str, Any]:
@@ -325,67 +385,93 @@ class WriterRoundTripService:
         if missing:
             raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-404", "selected Writer sections do not exist: " + ", ".join(missing))
 
-        reservation = parent / f".{out.name}.writer-round-trip-reserved"
-        try:
-            reservation.mkdir()
-        except FileExistsError as exc:
-            raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-EXPORT-001", "Writer input export destination is busy") from exc
         tmp: Path | None = None
         try:
-            tmp = Path(tempfile.mkdtemp(prefix=".writer-input-", dir=parent))
-            staging = tmp / "payload"
-            staging.mkdir()
-            section_records: list[dict[str, Any]] = []
-            sections_root = staging / "sections"
-            sections_root.mkdir()
-            for section_id in section_ids:
-                section_out = sections_root / safe_component(section_id, "section_id")
-                composer.export_section_input(composition_id, section_id, section_out)
-                section_input = json.loads((section_out / "section-writer-input.json").read_text(encoding="utf-8"))
-                record = {
-                    **dict(self._section_scope(section_input)),
-                    "relative_path": f"sections/{safe_component(section_id, 'section_id')}/section-writer-input.json",
-                    "section_input": deepcopy(section_input),
-                }
-                section_records.append(record)
+            with composer._file_lock(
+                self._export_lock_path(out),
+                "Writer round-trip output destination is being exported",
+            ):
+                if out.exists():
+                    raise LocalApplicationError(
+                        "APPLICATION-WRITER-ROUND-TRIP-EXPORT-001",
+                        "Writer input export will not overwrite an existing path",
+                    )
+                tmp = Path(tempfile.mkdtemp(prefix=".writer-input-", dir=parent))
+                staging = tmp / "payload"
+                staging.mkdir()
+                section_records: list[dict[str, Any]] = []
+                total_input_bytes = 0
+                sections_root = staging / "sections"
+                sections_root.mkdir()
+                for section_id in section_ids:
+                    section_out = sections_root / safe_component(section_id, "section_id")
+                    composer.export_section_input(composition_id, section_id, section_out)
+                    payload_path = section_out / "section-writer-input.json"
+                    section_bytes = payload_path.read_bytes()
+                    total_input_bytes += len(section_bytes)
+                    if total_input_bytes > MAX_ROUND_TRIP_INPUT_BYTES:
+                        raise LocalApplicationError(
+                            "APPLICATION-WRITER-ROUND-TRIP-BOUND-001",
+                            "Writer round-trip section inputs exceed supported aggregate size",
+                        )
+                    section_input = json.loads(section_bytes.decode("utf-8"))
+                    record = {
+                        **dict(self._section_scope(section_input)),
+                        "relative_path": f"sections/{safe_component(section_id, 'section_id')}/section-writer-input.json",
+                        "section_input": deepcopy(section_input),
+                    }
+                    section_records.append(record)
 
-            source = {
-                "composition_id": composition["composition_id"],
-                "composition_version": composition["version"],
-                "composition_digest": composition["composition_digest"],
-                **composition["source"],
-            }
-            fingerprint = canonical_digest({"source": source, "sections": section_records})
-            document: dict[str, Any] = {
-                "schema_version": SCHEMA_VERSION,
-                "object_type": "writer_round_trip_input",
-                "input_id": "WRI-" + fingerprint.split(":", 1)[1][:24],
-                "source": source,
-                "sections": section_records,
-                "authority_boundary": {
-                    "research_state_mutation_performed": False,
-                    "evidence_verification_performed": False,
-                    "finding_adoption_performed": False,
-                    "recommendation_adoption_performed": False,
-                },
-                "input_digest": "",
-            }
-            document["input_digest"] = _digest_document(document, "input_digest")
-            _validate_schema(document)
-            self._validate_input_context(document)
-            reused = self._write_immutable(self._input_path(document["input_id"]), document)
-            (staging / "writer-input.json").write_bytes(_json_bytes(document))
-            if out.exists():
-                raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-EXPORT-001", "Writer input export will not overwrite an existing path")
-            os.rename(staging, out)
-        except LocalApplicationError:
+                source = {
+                    "composition_id": composition["composition_id"],
+                    "composition_version": composition["version"],
+                    "composition_digest": composition["composition_digest"],
+                    **composition["source"],
+                }
+                fingerprint = canonical_digest({"source": source, "sections": section_records})
+                document: dict[str, Any] = {
+                    "schema_version": SCHEMA_VERSION,
+                    "object_type": "writer_round_trip_input",
+                    "input_id": "WRI-" + fingerprint.split(":", 1)[1][:24],
+                    "source": source,
+                    "sections": section_records,
+                    "authority_boundary": {
+                        "research_state_mutation_performed": False,
+                        "evidence_verification_performed": False,
+                        "finding_adoption_performed": False,
+                        "recommendation_adoption_performed": False,
+                    },
+                    "input_digest": "",
+                }
+                document["input_digest"] = _digest_document(document, "input_digest")
+                _validate_schema(document)
+                self._validate_input_context(document)
+                receipt_bytes = _json_bytes(document)
+                if len(receipt_bytes) > MAX_ROUND_TRIP_INPUT_BYTES:
+                    raise LocalApplicationError(
+                        "APPLICATION-WRITER-ROUND-TRIP-BOUND-001",
+                        "Writer round-trip receipt exceeds supported aggregate size",
+                    )
+                reused = self._write_immutable(self._input_path(document["input_id"]), document)
+                (staging / "writer-input.json").write_bytes(receipt_bytes)
+                if out.exists():
+                    raise LocalApplicationError(
+                        "APPLICATION-WRITER-ROUND-TRIP-EXPORT-001",
+                        "Writer input export will not overwrite an existing path",
+                    )
+                os.rename(staging, out)
+        except LocalApplicationError as exc:
+            if exc.code == "APPLICATION-WRITER-COMPOSITION-BUSY-001":
+                raise LocalApplicationError(
+                    "APPLICATION-WRITER-ROUND-TRIP-EXPORT-001",
+                    "Writer input export destination is busy",
+                ) from exc
             raise
         except (OSError, UnicodeError, json.JSONDecodeError) as exc:
             raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-WRITE-001", "Writer input export failed") from exc
         finally:
             if tmp is not None:
                 shutil.rmtree(tmp, ignore_errors=True)
-            shutil.rmtree(reservation, ignore_errors=True)
         return {
             "status": "EXPORTED",
             "input_id": document["input_id"],
@@ -467,25 +553,12 @@ class WriterRoundTripService:
         response_section_ids = {str(row["section_id"]) for row in value["sections"]}
         receipt_section_ids = {str(row["section_id"]) for row in receipt["sections"]}
         with composer._series_lock(composition_id):
+            head = self._reconcile_head(composition_id)
             existing_path = self._revision_path(composition_id, revision_id)
             if existing_path.is_file():
                 existing = self._load_revision(composition_id, revision_id)
                 if existing.get("response_digest") != response_digest or existing.get("source", {}).get("input_digest") != receipt["input_digest"]:
                     raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-IMMUTABLE-001", "existing manuscript revision identity conflicts with this response")
-                head = self._head(composition_id)
-                if head is None or int(head["revision_number"]) < int(existing["revision_number"]):
-                    self._write_head(
-                        composition_id,
-                        {
-                            "revision_id": revision_id,
-                            "revision_digest": existing["revision_digest"],
-                            "revision_number": existing["revision_number"],
-                        },
-                    )
-                elif int(head["revision_number"]) == int(existing["revision_number"]) and (
-                    head["revision_id"] != revision_id or head["revision_digest"] != existing["revision_digest"]
-                ):
-                    raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-INTEGRITY-001", "manuscript head conflicts with an existing revision at the same revision number")
                 return {
                     "status": "VERIFIED_REUSE",
                     "revision_id": revision_id,
@@ -494,7 +567,6 @@ class WriterRoundTripService:
                     "research_state_mutation_performed": False,
                 }
 
-            head = self._head(composition_id)
             base_ref = value.get("base_revision_ref")
             base_revision = None
             if head is None:

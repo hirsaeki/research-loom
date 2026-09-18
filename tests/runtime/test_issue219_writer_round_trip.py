@@ -168,6 +168,13 @@ class Issue219WriterRoundTripTests(ResearchPackageAcceptanceSupport):
             self.assertEqual(second["reused_section_ids"], ["SEC-VALIDATE"])
             self.assertEqual(revision_path.read_bytes(), original_bytes)
 
+            service._head_path(composition["composition_id"]).unlink()
+            old_replay = facade.import_writer_response(deepcopy(response))
+            self.assertEqual(old_replay["status"], "VERIFIED_REUSE")
+            latest_head = service._head(composition["composition_id"])
+            self.assertEqual(latest_head["revision_id"], second["revision_id"])
+            self.assertEqual(latest_head["revision_digest"], second["revision_digest"])
+
             joined = facade.inspect_writer_round_trip(
                 composition["composition_id"], second["revision_id"]
             )
@@ -264,18 +271,55 @@ class Issue219WriterRoundTripTests(ResearchPackageAcceptanceSupport):
         finally:
             facade.close()
 
-    def test_export_destination_reservation_prevents_parallel_overwrite(self):
+    def test_export_destination_lock_prevents_parallel_overwrite_and_recovers(self):
         facade, _case, composition, _exported, _input_doc = self._build_round_trip()
         try:
             output = self.root / "writer-round-trip-contended"
-            reservation = output.parent / f".{output.name}.writer-round-trip-reserved"
-            reservation.mkdir()
-            with self.assertRaises(LocalApplicationError) as error:
-                facade.export_writer_round_trip_input(
-                    composition["composition_id"], ["SEC-FRAME"], output
+            service = facade._writer_round_trip_service()
+            composer = facade._writer_composition_service()
+            lock_path = service._export_lock_path(output)
+            with composer._file_lock(lock_path, "fixture lock"):
+                with self.assertRaises(LocalApplicationError) as error:
+                    facade.export_writer_round_trip_input(
+                        composition["composition_id"], ["SEC-FRAME"], output
+                    )
+                self.assertEqual(
+                    error.exception.code, "APPLICATION-WRITER-ROUND-TRIP-EXPORT-001"
                 )
-            self.assertEqual(error.exception.code, "APPLICATION-WRITER-ROUND-TRIP-EXPORT-001")
+                self.assertFalse(output.exists())
+
+            # The lock file remains as a harmless marker; only the OS lock owns exclusion.
+            self.assertTrue(lock_path.exists())
+            exported = facade.export_writer_round_trip_input(
+                composition["composition_id"], ["SEC-FRAME"], output
+            )
+            self.assertEqual(exported["status"], "EXPORTED")
+            self.assertTrue(output.is_dir())
+        finally:
+            facade.close()
+
+    def test_round_trip_input_has_aggregate_size_bound_and_releases_lock(self):
+        facade, _case, composition, _exported, _input_doc = self._build_round_trip()
+        try:
+            output = self.root / "writer-round-trip-too-large"
+            with patch(
+                "plugins.local_application.writer_round_trip_service.MAX_ROUND_TRIP_INPUT_BYTES",
+                1,
+            ):
+                with self.assertRaises(LocalApplicationError) as error:
+                    facade.export_writer_round_trip_input(
+                        composition["composition_id"], ["SEC-FRAME"], output
+                    )
+            self.assertEqual(
+                error.exception.code, "APPLICATION-WRITER-ROUND-TRIP-BOUND-001"
+            )
             self.assertFalse(output.exists())
+
+            # A failed bounded export must not poison the destination.
+            exported = facade.export_writer_round_trip_input(
+                composition["composition_id"], ["SEC-FRAME"], output
+            )
+            self.assertEqual(exported["status"], "EXPORTED")
         finally:
             facade.close()
 
