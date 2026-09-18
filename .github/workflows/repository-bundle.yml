@@ -70,6 +70,7 @@ jobs:
           ls -lh bundle-parts
 
       - name: Upload git bundle part 00
+        id: upload_00
         if: ${{ hashFiles('bundle-parts/repo.bundle.part-00') != '' }}
         uses: actions/upload-artifact@v7
         with:
@@ -80,6 +81,7 @@ jobs:
           compression-level: 0
 
       - name: Upload git bundle part 01
+        id: upload_01
         if: ${{ hashFiles('bundle-parts/repo.bundle.part-01') != '' }}
         uses: actions/upload-artifact@v7
         with:
@@ -90,6 +92,7 @@ jobs:
           compression-level: 0
 
       - name: Upload git bundle part 02
+        id: upload_02
         if: ${{ hashFiles('bundle-parts/repo.bundle.part-02') != '' }}
         uses: actions/upload-artifact@v7
         with:
@@ -100,6 +103,7 @@ jobs:
           compression-level: 0
 
       - name: Upload git bundle part 03
+        id: upload_03
         if: ${{ hashFiles('bundle-parts/repo.bundle.part-03') != '' }}
         uses: actions/upload-artifact@v7
         with:
@@ -110,6 +114,7 @@ jobs:
           compression-level: 0
 
       - name: Upload git bundle part 04
+        id: upload_04
         if: ${{ hashFiles('bundle-parts/repo.bundle.part-04') != '' }}
         uses: actions/upload-artifact@v7
         with:
@@ -120,6 +125,7 @@ jobs:
           compression-level: 0
 
       - name: Upload git bundle part 05
+        id: upload_05
         if: ${{ hashFiles('bundle-parts/repo.bundle.part-05') != '' }}
         uses: actions/upload-artifact@v7
         with:
@@ -130,6 +136,7 @@ jobs:
           compression-level: 0
 
       - name: Upload git bundle part 06
+        id: upload_06
         if: ${{ hashFiles('bundle-parts/repo.bundle.part-06') != '' }}
         uses: actions/upload-artifact@v7
         with:
@@ -140,6 +147,7 @@ jobs:
           compression-level: 0
 
       - name: Upload git bundle part 07
+        id: upload_07
         if: ${{ hashFiles('bundle-parts/repo.bundle.part-07') != '' }}
         uses: actions/upload-artifact@v7
         with:
@@ -150,6 +158,7 @@ jobs:
           compression-level: 0
 
       - name: Upload git bundle part 08
+        id: upload_08
         if: ${{ hashFiles('bundle-parts/repo.bundle.part-08') != '' }}
         uses: actions/upload-artifact@v7
         with:
@@ -160,6 +169,7 @@ jobs:
           compression-level: 0
 
       - name: Upload git bundle part 09
+        id: upload_09
         if: ${{ hashFiles('bundle-parts/repo.bundle.part-09') != '' }}
         uses: actions/upload-artifact@v7
         with:
@@ -170,6 +180,7 @@ jobs:
           compression-level: 0
 
       - name: Upload git bundle part 10
+        id: upload_10
         if: ${{ hashFiles('bundle-parts/repo.bundle.part-10') != '' }}
         uses: actions/upload-artifact@v7
         with:
@@ -180,6 +191,7 @@ jobs:
           compression-level: 0
 
       - name: Upload git bundle part 11
+        id: upload_11
         if: ${{ hashFiles('bundle-parts/repo.bundle.part-11') != '' }}
         uses: actions/upload-artifact@v7
         with:
@@ -190,6 +202,7 @@ jobs:
           compression-level: 0
 
       - name: Upload git bundle part 12
+        id: upload_12
         if: ${{ hashFiles('bundle-parts/repo.bundle.part-12') != '' }}
         uses: actions/upload-artifact@v7
         with:
@@ -200,6 +213,7 @@ jobs:
           compression-level: 0
 
       - name: Upload git bundle part 13
+        id: upload_13
         if: ${{ hashFiles('bundle-parts/repo.bundle.part-13') != '' }}
         uses: actions/upload-artifact@v7
         with:
@@ -210,6 +224,7 @@ jobs:
           compression-level: 0
 
       - name: Upload git bundle part 14
+        id: upload_14
         if: ${{ hashFiles('bundle-parts/repo.bundle.part-14') != '' }}
         uses: actions/upload-artifact@v7
         with:
@@ -220,6 +235,7 @@ jobs:
           compression-level: 0
 
       - name: Upload git bundle part 15
+        id: upload_15
         if: ${{ hashFiles('bundle-parts/repo.bundle.part-15') != '' }}
         uses: actions/upload-artifact@v7
         with:
@@ -229,11 +245,148 @@ jobs:
           retention-days: 7
           compression-level: 0
 
-      - name: Close trigger issue
+      - name: Publish result manifest and close trigger issue
         if: ${{ github.event_name == 'issues' }}
         uses: actions/github-script@v8
+        env:
+          SELECTED_REF: ${{ steps.select.outputs.ref }}
+          BUNDLE_COMMIT: ${{ steps.bundle.outputs.commit }}
         with:
           script: |
+            const fs = require('fs');
+            const path = require('path');
+            const crypto = require('crypto');
+
+            const uploaded = {
+              '00': {
+                id: '${{ steps.upload_00.outputs.artifact-id }}',
+                url: '${{ steps.upload_00.outputs.artifact-url }}',
+                digest: '${{ steps.upload_00.outputs.artifact-digest }}',
+              },
+              '01': {
+                id: '${{ steps.upload_01.outputs.artifact-id }}',
+                url: '${{ steps.upload_01.outputs.artifact-url }}',
+                digest: '${{ steps.upload_01.outputs.artifact-digest }}',
+              },
+              '02': {
+                id: '${{ steps.upload_02.outputs.artifact-id }}',
+                url: '${{ steps.upload_02.outputs.artifact-url }}',
+                digest: '${{ steps.upload_02.outputs.artifact-digest }}',
+              },
+              '03': {
+                id: '${{ steps.upload_03.outputs.artifact-id }}',
+                url: '${{ steps.upload_03.outputs.artifact-url }}',
+                digest: '${{ steps.upload_03.outputs.artifact-digest }}',
+              },
+              '04': {
+                id: '${{ steps.upload_04.outputs.artifact-id }}',
+                url: '${{ steps.upload_04.outputs.artifact-url }}',
+                digest: '${{ steps.upload_04.outputs.artifact-digest }}',
+              },
+              '05': {
+                id: '${{ steps.upload_05.outputs.artifact-id }}',
+                url: '${{ steps.upload_05.outputs.artifact-url }}',
+                digest: '${{ steps.upload_05.outputs.artifact-digest }}',
+              },
+              '06': {
+                id: '${{ steps.upload_06.outputs.artifact-id }}',
+                url: '${{ steps.upload_06.outputs.artifact-url }}',
+                digest: '${{ steps.upload_06.outputs.artifact-digest }}',
+              },
+              '07': {
+                id: '${{ steps.upload_07.outputs.artifact-id }}',
+                url: '${{ steps.upload_07.outputs.artifact-url }}',
+                digest: '${{ steps.upload_07.outputs.artifact-digest }}',
+              },
+              '08': {
+                id: '${{ steps.upload_08.outputs.artifact-id }}',
+                url: '${{ steps.upload_08.outputs.artifact-url }}',
+                digest: '${{ steps.upload_08.outputs.artifact-digest }}',
+              },
+              '09': {
+                id: '${{ steps.upload_09.outputs.artifact-id }}',
+                url: '${{ steps.upload_09.outputs.artifact-url }}',
+                digest: '${{ steps.upload_09.outputs.artifact-digest }}',
+              },
+              '10': {
+                id: '${{ steps.upload_10.outputs.artifact-id }}',
+                url: '${{ steps.upload_10.outputs.artifact-url }}',
+                digest: '${{ steps.upload_10.outputs.artifact-digest }}',
+              },
+              '11': {
+                id: '${{ steps.upload_11.outputs.artifact-id }}',
+                url: '${{ steps.upload_11.outputs.artifact-url }}',
+                digest: '${{ steps.upload_11.outputs.artifact-digest }}',
+              },
+              '12': {
+                id: '${{ steps.upload_12.outputs.artifact-id }}',
+                url: '${{ steps.upload_12.outputs.artifact-url }}',
+                digest: '${{ steps.upload_12.outputs.artifact-digest }}',
+              },
+              '13': {
+                id: '${{ steps.upload_13.outputs.artifact-id }}',
+                url: '${{ steps.upload_13.outputs.artifact-url }}',
+                digest: '${{ steps.upload_13.outputs.artifact-digest }}',
+              },
+              '14': {
+                id: '${{ steps.upload_14.outputs.artifact-id }}',
+                url: '${{ steps.upload_14.outputs.artifact-url }}',
+                digest: '${{ steps.upload_14.outputs.artifact-digest }}',
+              },
+              '15': {
+                id: '${{ steps.upload_15.outputs.artifact-id }}',
+                url: '${{ steps.upload_15.outputs.artifact-url }}',
+                digest: '${{ steps.upload_15.outputs.artifact-digest }}',
+              },
+            };
+
+            const files = fs.readdirSync('bundle-parts')
+              .filter((name) => /^repo\.bundle\.part-\d{2}$/.test(name))
+              .sort();
+
+            const parts = files.map((fileName) => {
+              const part = fileName.slice(-2);
+              const artifact = uploaded[part];
+              if (!artifact || !artifact.id) {
+                throw new Error(`Missing artifact output for ${fileName}`);
+              }
+
+              const bytes = fs.readFileSync(path.join('bundle-parts', fileName));
+              const rawDigest = crypto.createHash('sha256').update(bytes).digest('hex');
+
+              return {
+                part: Number(part),
+                file_name: fileName,
+                byte_length: bytes.length,
+                sha256: `sha256:${rawDigest}`,
+                artifact_id: Number(artifact.id),
+                artifact_name: `${context.repo.repo}-git-bundle-${process.env.BUNDLE_COMMIT}-${process.env.GITHUB_RUN_ID}-${process.env.GITHUB_RUN_ATTEMPT}-part-${part}`,
+                artifact_url: artifact.url,
+                artifact_digest: `sha256:${artifact.digest}`,
+              };
+            });
+
+            const manifest = {
+              schema: 'repository-bundle-result/v1',
+              repository: `${context.repo.owner}/${context.repo.repo}`,
+              trigger_issue: context.issue.number,
+              requested_ref: process.env.SELECTED_REF,
+              commit: process.env.BUNDLE_COMMIT,
+              run_id: Number(process.env.GITHUB_RUN_ID),
+              run_attempt: Number(process.env.GITHUB_RUN_ATTEMPT),
+              parts,
+            };
+
+            const marker = '<!-- repository-bundle-result:v1 -->';
+            const body = `${marker}\n\n\`\`\`json\n${JSON.stringify(manifest, null, 2)}\n\`\`\``;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });
+
             await github.rest.issues.update({
               owner: context.repo.owner,
               repo: context.repo.repo,
