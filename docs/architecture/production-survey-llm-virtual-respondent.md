@@ -139,3 +139,26 @@ survey_virtual_pretest.show
 joins the existing Run, Instrument pin, generation report, canonical Dataset, individual responses/validation, AnalysisSpec, and existing `SurveyAggregateResult`. It validates exact Run/Instrument/Dataset/Aggregate/profile/attempt bindings and fails closed on mismatches. When more than one AggregateResult exists for the Dataset, the caller must supply `aggregate_result_id`; the inspection path never chooses an implicit latest result and never recalculates aggregation.
 
 The joined projection is Human inspection material only. It keeps `response_origin = synthetic` and `SYNTHETIC_TEST_ONLY`, and explicitly makes no population estimate, empirical-evidence claim, questionnaire-validity certification, automatic Instrument revision, Research Exhibit capture, or Research State mutation.
+
+## Instrument revision comparison
+
+The public read-only action:
+
+```text
+survey_virtual_pretest.compare
+```
+
+compares two completed LLM Virtual Respondent Runs as Instrument pretest material. It reuses the joined pretest inspection for each Run and never creates a second response, Dataset, or aggregation path.
+
+A comparison is `COMPARABLE` only when the two Runs retain explicit profile-response lineage and pin the same synthetic respondent plan, backend/provider/model configuration, and prompt template. Instrument version and digest are expected to differ. Material pin mismatches produce a `NON_COMPARABLE` result rather than inferring equivalence from profile order, participant IDs, or Run order.
+
+For comparable Runs the projection surfaces, where present:
+
+- generated / failed / valid / rejected summary changes;
+- validation issue counts and branch-rule violations;
+- per-question response-state / missingness changes;
+- shared aggregate changes, including frequency/cross-tab and scale summaries;
+- per-profile answer changes;
+- bounded free-text and answer-pattern changes for Human ambiguity inspection.
+
+The comparison is not a validity score and does not decide that one Instrument revision is better. It remains `synthetic` / `SYNTHETIC_TEST_ONLY`, performs no Research State mutation, and never rewrites or adopts an Instrument automatically.

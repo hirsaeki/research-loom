@@ -56,6 +56,7 @@ def _answer_projection(answer: Mapping[str, Any], question: Mapping[str, Any]) -
         "question_id": str(answer["question_id"]),
         "response_key": str(answer["response_key"]),
         "question_prompt": str(question.get("text", "")),
+        "question_type": str(question.get("question_type", "")),
         "stable_value": value,
         "display_label": display_label,
         "response_state": state,
@@ -67,6 +68,57 @@ def _producer_from_raw(raw: Any) -> Mapping[str, Any] | None:
         return None
     provenance = raw.get("provenance")
     return provenance if isinstance(provenance, Mapping) else None
+
+
+def _issue_code_counts(respondents: list[dict[str, Any]]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for row in respondents:
+        response = row.get("response")
+        if not isinstance(response, Mapping):
+            continue
+        for issue in response.get("validation_issues", ()):
+            if not isinstance(issue, Mapping):
+                continue
+            code = str(issue.get("code", ""))
+            if code:
+                counts[code] = counts.get(code, 0) + 1
+    return dict(sorted(counts.items()))
+
+
+def _state_counts(respondents: list[dict[str, Any]]) -> dict[str, dict[str, int]]:
+    result: dict[str, dict[str, int]] = {}
+    for row in respondents:
+        response = row.get("response")
+        if not isinstance(response, Mapping):
+            continue
+        for answer in response.get("answers", ()):
+            if not isinstance(answer, Mapping):
+                continue
+            key = str(answer.get("response_key", ""))
+            state = str(answer.get("response_state", ""))
+            if key and state:
+                bucket = result.setdefault(key, {})
+                bucket[state] = bucket.get(state, 0) + 1
+    return {key: dict(sorted(value.items())) for key, value in sorted(result.items())}
+
+
+def _answers_by_key(row: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
+    response = row.get("response")
+    if not isinstance(response, Mapping):
+        return {}
+    answers = response.get("answers")
+    if not isinstance(answers, list):
+        return {}
+    return {str(item["response_key"]): item for item in answers if isinstance(item, Mapping) and item.get("response_key")}
+
+
+def _aggregate_key(item: Mapping[str, Any]) -> str:
+    if item.get("item_id"):
+        return str(item["item_id"])
+    return "|".join(
+        str(item.get(field, ""))
+        for field in ("analysis_type", "question_id", "row_question_id", "column_question_id")
+    )
 
 
 class SurveyVirtualPretestInspectionMixin:
@@ -354,6 +406,11 @@ class SurveyVirtualPretestInspectionMixin:
             "generator_backend": "llm",
             "instrument_ref": deepcopy(dataset["instrument_ref"]),
             "interaction_model": plan.get("interaction_model"),
+            "comparison_pins": {
+                "respondent_plan": deepcopy(input_pins.get("respondent_plan")),
+                "backend": deepcopy(input_pins.get("backend")),
+                "prompt_template": deepcopy(input_pins.get("prompt_template")),
+            },
             "synthetic_firewall": {
                 "response_origin": "synthetic",
                 "epistemic_status": "SYNTHETIC_TEST_ONLY",
@@ -383,3 +440,155 @@ class SurveyVirtualPretestInspectionMixin:
             "validity_judgment_performed": False,
             "instrument_revision_performed": False,
         }
+
+    def compare_survey_virtual_pretests(
+        self,
+        run_a_id: str,
+        run_b_id: str,
+        *,
+        aggregate_a_result_id: str | None = None,
+        aggregate_b_result_id: str | None = None,
+    ) -> Mapping[str, Any]:
+        before = deepcopy(self._state().current_snapshot)
+        left = self.show_survey_virtual_pretest(run_a_id, aggregate_result_id=aggregate_a_result_id)
+        right = self.show_survey_virtual_pretest(run_b_id, aggregate_result_id=aggregate_b_result_id)
+
+        mismatches: list[dict[str, Any]] = []
+        if left.get("profile_response_binding") != "explicit" or right.get("profile_response_binding") != "explicit":
+            mismatches.append({
+                "pin": "profile_response_binding",
+                "left": left.get("profile_response_binding"),
+                "right": right.get("profile_response_binding"),
+                "reason": "explicit profile-response lineage is required for revision comparison",
+            })
+        left_pins = left.get("comparison_pins") if isinstance(left.get("comparison_pins"), Mapping) else {}
+        right_pins = right.get("comparison_pins") if isinstance(right.get("comparison_pins"), Mapping) else {}
+        for pin in ("respondent_plan", "backend", "prompt_template"):
+            if left_pins.get(pin) != right_pins.get(pin):
+                mismatches.append({
+                    "pin": pin,
+                    "left": deepcopy(left_pins.get(pin)),
+                    "right": deepcopy(right_pins.get(pin)),
+                    "reason": "revision comparison requires the same pinned synthetic condition",
+                })
+
+        base = {
+            "status": "OK",
+            "object_type": "survey_virtual_pretest_comparison",
+            "project_id": self._project_id,
+            "run_refs": {"a": str(run_a_id), "b": str(run_b_id)},
+            "instrument_refs": {"a": deepcopy(left["instrument_ref"]), "b": deepcopy(right["instrument_ref"])},
+            "comparison_pins": {"a": deepcopy(dict(left_pins)), "b": deepcopy(dict(right_pins))},
+            "synthetic_firewall": deepcopy(left["synthetic_firewall"]),
+            "comparability": {
+                "status": "COMPARABLE" if not mismatches else "NON_COMPARABLE",
+                "mismatches": mismatches,
+            },
+            "research_state_mutation_performed": False,
+            "validity_judgment_performed": False,
+            "instrument_revision_performed": False,
+        }
+        if mismatches:
+            after = deepcopy(self._state().current_snapshot)
+            if before != after:
+                raise LocalApplicationError(_ERROR, "Survey Virtual pretest comparison mutated Research State")
+            return base
+
+        left_rows = {str(item["profile"]["profile_id"]): item for item in left["respondents"]}
+        right_rows = {str(item["profile"]["profile_id"]): item for item in right["respondents"]}
+        if set(left_rows) != set(right_rows):
+            raise LocalApplicationError(_ERROR, "comparable respondent plans produced different profile identities")
+
+        per_profile: list[dict[str, Any]] = []
+        free_text_changes: list[dict[str, Any]] = []
+        for profile_id in left_rows:
+            a = left_rows[profile_id]
+            b = right_rows[profile_id]
+            changes: list[dict[str, Any]] = []
+            if a.get("generation_status") != b.get("generation_status"):
+                changes.append({"kind": "generation_status", "before": a.get("generation_status"), "after": b.get("generation_status")})
+            ar = a.get("response") if isinstance(a.get("response"), Mapping) else {}
+            br = b.get("response") if isinstance(b.get("response"), Mapping) else {}
+            if ar.get("validation_status") != br.get("validation_status"):
+                changes.append({"kind": "validation_status", "before": ar.get("validation_status"), "after": br.get("validation_status")})
+            aa = _answers_by_key(a)
+            ba = _answers_by_key(b)
+            for key in sorted(set(aa) | set(ba)):
+                av = aa.get(key)
+                bv = ba.get(key)
+                if av != bv:
+                    change = {
+                        "kind": "answer",
+                        "response_key": key,
+                        "before": deepcopy(av),
+                        "after": deepcopy(bv),
+                    }
+                    changes.append(change)
+                    qtype = str((bv or av or {}).get("question_type", ""))
+                    if qtype == "free_text":
+                        free_text_changes.append({"profile_id": profile_id, **deepcopy(change)})
+            per_profile.append({
+                "profile_id": profile_id,
+                "profile_digest": a["profile"]["profile_digest"],
+                "changed": bool(changes),
+                "changes": changes,
+            })
+
+        left_issue_counts = _issue_code_counts(left["respondents"])
+        right_issue_counts = _issue_code_counts(right["respondents"])
+        left_states = _state_counts(left["respondents"])
+        right_states = _state_counts(right["respondents"])
+        state_changes = [
+            {"response_key": key, "before": deepcopy(left_states.get(key, {})), "after": deepcopy(right_states.get(key, {}))}
+            for key in sorted(set(left_states) | set(right_states))
+            if left_states.get(key, {}) != right_states.get(key, {})
+        ]
+
+        aggregate_changes: list[dict[str, Any]] = []
+        left_aggregate = left.get("aggregate_inspection")
+        right_aggregate = right.get("aggregate_inspection")
+        if isinstance(left_aggregate, Mapping) and isinstance(right_aggregate, Mapping):
+            left_items = {_aggregate_key(item): item for item in left_aggregate.get("result_items", ()) if isinstance(item, Mapping)}
+            right_items = {_aggregate_key(item): item for item in right_aggregate.get("result_items", ()) if isinstance(item, Mapping)}
+            for key in sorted(set(left_items) | set(right_items)):
+                if left_items.get(key) != right_items.get(key):
+                    aggregate_changes.append({
+                        "item_key": key,
+                        "analysis_type": str((right_items.get(key) or left_items.get(key) or {}).get("analysis_type", "")),
+                        "before": deepcopy(left_items.get(key)),
+                        "after": deepcopy(right_items.get(key)),
+                    })
+
+        frequency_changes = [item for item in aggregate_changes if item["analysis_type"] in {"frequency", "cross_tab"}]
+        scale_changes = [item for item in aggregate_changes if item["analysis_type"] == "scale_summary"]
+        aggregate_missingness_changes = [item for item in aggregate_changes if item["analysis_type"] == "missingness"]
+        free_text_aggregate_changes = [item for item in aggregate_changes if item["analysis_type"] == "free_text_listing"]
+
+        base["comparison"] = {
+            "generation_summary": {"before": deepcopy(left["generation_summary"]), "after": deepcopy(right["generation_summary"])},
+            "validation": {
+                "issue_code_counts": {"before": left_issue_counts, "after": right_issue_counts},
+                "branch_rule_violations": {
+                    "before": left_issue_counts.get("SURVEY_RESPONSE_BRANCH_VIOLATION", 0),
+                    "after": right_issue_counts.get("SURVEY_RESPONSE_BRANCH_VIOLATION", 0),
+                },
+            },
+            "response_state_changes": state_changes,
+            "missingness_changes": {
+                "response_states": state_changes,
+                "aggregate": aggregate_missingness_changes,
+            },
+            "response_distribution_changes": frequency_changes,
+            "scale_distribution_changes": scale_changes,
+            "per_profile_changes": per_profile,
+            "aggregate_changes": aggregate_changes,
+            "answer_pattern_signals": {
+                "per_profile_changes": [row for row in per_profile if row["changed"]],
+                "free_text_changes": free_text_changes,
+                "free_text_aggregate_changes": free_text_aggregate_changes,
+            },
+        }
+        after = deepcopy(self._state().current_snapshot)
+        if before != after:
+            raise LocalApplicationError(_ERROR, "Survey Virtual pretest comparison mutated Research State")
+        return base
