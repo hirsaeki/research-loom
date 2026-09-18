@@ -37,6 +37,8 @@ INTERNAL_DIR = ".research-loom"
 INITIALIZING_MARKER = ".initializing"
 PROJECT_CONFIG_NAME = "project-config.json"
 EFFECTIVE_PROFILE_SET_NAME = "effective-profile-set.json"
+PROJECT_CONFIG_LOCATOR = f"{INTERNAL_DIR}/{PROJECT_CONFIG_NAME}"
+EFFECTIVE_PROFILE_SET_LOCATOR = f"{INTERNAL_DIR}/{EFFECTIVE_PROFILE_SET_NAME}"
 
 _STORAGE = {
     "research_state": f"{INTERNAL_DIR}/research-state.sqlite3",
@@ -46,6 +48,26 @@ _STORAGE = {
     "execution": f"{INTERNAL_DIR}/execution/execution.db",
     "context_extensions": f"{INTERNAL_DIR}/execution/context-extensions.sqlite3",
     "operational_trace": f"{INTERNAL_DIR}/execution/operational-trace.sqlite3",
+}
+
+_BASE_DURABLE_CHILDREN = {
+    "project_config": {"locator": PROJECT_CONFIG_LOCATOR, "kind": "file"},
+    "effective_profile_set": {"locator": EFFECTIVE_PROFILE_SET_LOCATOR, "kind": "file"},
+    "research_state": {"locator": _STORAGE["research_state"], "kind": "file"},
+    "conversation": {"locator": _STORAGE["conversation"], "kind": "file"},
+    "decision": {"locator": _STORAGE["decision"], "kind": "file"},
+    "execution_material": {"locator": _STORAGE["execution_root"], "kind": "directory"},
+}
+_OPTIONAL_DURABLE_CHILDREN = {
+    "research_attention": {"locator": f"{INTERNAL_DIR}/attention.sqlite3", "kind": "file"},
+    "profile_history": {"locator": f"{INTERNAL_DIR}/profile-history", "kind": "directory"},
+    "research_exhibits": {"locator": f"{INTERNAL_DIR}/research-exhibits.sqlite3", "kind": "file"},
+    "survey_registry": {"locator": f"{INTERNAL_DIR}/survey-registry.sqlite3", "kind": "file"},
+    "survey_response_registry": {"locator": f"{INTERNAL_DIR}/survey-response-registry.sqlite3", "kind": "file"},
+    "survey_analysis_registry": {"locator": f"{INTERNAL_DIR}/survey-analysis-registry.sqlite3", "kind": "file"},
+    "project_inputs": {"locator": f"{INTERNAL_DIR}/project-inputs", "kind": "directory"},
+    "writer_compositions": {"locator": f"{INTERNAL_DIR}/writer-compositions", "kind": "directory"},
+    "research_packages": {"locator": f"{INTERNAL_DIR}/research-packages", "kind": "directory"},
 }
 
 
@@ -74,6 +96,7 @@ class OpenedLocalWorkspace:
         self._workspace_lock = None
         try:
             self.application.close()
+            _refresh_durable_children(self.root)
         finally:
             if lock is not None:
                 lock.__exit__(None, None, None)
@@ -348,34 +371,115 @@ def _bootstrap_state(
     )
 
 
-def _binding(project_id: str, config_digest: str, profile_digest: str, *, initialized_at: str) -> dict[str, Any]:
-    return {
+def _binding(
+    project_id: str,
+    config_digest: str,
+    profile_digest: str,
+    *,
+    initialized_at: str,
+    project_config_locator: str = PROJECT_CONFIG_LOCATOR,
+    effective_profile_set_locator: str = EFFECTIVE_PROFILE_SET_LOCATOR,
+    durable_children: Mapping[str, Any] | None = _BASE_DURABLE_CHILDREN,
+) -> dict[str, Any]:
+    binding = {
         "workspace_format": WORKSPACE_FORMAT,
         "workspace_version": WORKSPACE_VERSION,
         "project_id": project_id,
-        "project_config": {"locator": PROJECT_CONFIG_NAME, "digest": config_digest},
-        "effective_profile_set": {"locator": EFFECTIVE_PROFILE_SET_NAME, "digest": profile_digest},
+        "project_config": {"locator": project_config_locator, "ref": PROJECT_CONFIG_NAME, "digest": config_digest},
+        "effective_profile_set": {
+            "locator": effective_profile_set_locator,
+            "ref": EFFECTIVE_PROFILE_SET_NAME,
+            "digest": profile_digest,
+        },
         "storage": deepcopy(_STORAGE),
         "initialized_at": initialized_at,
     }
+    if durable_children is not None:
+        binding["durable_children"] = deepcopy(dict(durable_children))
+    return binding
+
+
+def _binding_document_ref(binding: Mapping[str, Any], key: str) -> str:
+    value = binding[key]
+    return str(value.get("ref", value["locator"]))
 
 
 def _validate_binding_shape(binding: Mapping[str, Any]) -> None:
-    expected_keys = {
+    required_keys = {
         "workspace_format", "workspace_version", "project_id", "project_config",
         "effective_profile_set", "storage", "initialized_at",
     }
-    if set(binding) != expected_keys:
+    if not required_keys <= set(binding) or set(binding) - required_keys - {"durable_children"}:
         raise LocalWorkspaceError("WORKSPACE-BINDING-001", "workspace binding has unexpected or missing fields")
     if binding.get("workspace_format") != WORKSPACE_FORMAT or binding.get("workspace_version") != WORKSPACE_VERSION:
         raise LocalWorkspaceError("WORKSPACE-FORMAT-001", "workspace format/version is incompatible")
     for key in ("project_config", "effective_profile_set"):
         value = binding.get(key)
-        if not isinstance(value, Mapping) or set(value) != {"locator", "digest"}:
+        if (
+            not isinstance(value, Mapping)
+            or set(value) not in ({"locator", "digest"}, {"locator", "ref", "digest"})
+        ):
             raise LocalWorkspaceError("WORKSPACE-BINDING-001", f"malformed {key} binding")
     storage = binding.get("storage")
     if not isinstance(storage, Mapping) or dict(storage) != _STORAGE:
         raise LocalWorkspaceError("WORKSPACE-BINDING-001", "runtime storage layout does not match this workspace version")
+    children = binding.get("durable_children")
+    if children is not None:
+        if not isinstance(children, Mapping):
+            raise LocalWorkspaceError("WORKSPACE-BINDING-001", "durable_children must be an object")
+        for name, spec in children.items():
+            if not isinstance(name, str) or not isinstance(spec, Mapping) or set(spec) != {"locator", "kind"}:
+                raise LocalWorkspaceError("WORKSPACE-BINDING-001", "durable child entry is malformed")
+            if spec.get("kind") not in {"file", "directory"}:
+                raise LocalWorkspaceError("WORKSPACE-BINDING-001", "durable child kind is invalid")
+            locator = Path(str(spec.get("locator", "")))
+            if locator.is_absolute() or ".." in locator.parts or not locator.parts or locator.parts[0] != INTERNAL_DIR:
+                raise LocalWorkspaceError("WORKSPACE-BINDING-001", "durable child locator must stay under Parent Durable Store Root")
+        for name, spec in _BASE_DURABLE_CHILDREN.items():
+            if children.get(name) != spec:
+                raise LocalWorkspaceError("WORKSPACE-BINDING-001", f"required durable child binding is missing or changed: {name}")
+        for name, spec in children.items():
+            if name not in _BASE_DURABLE_CHILDREN and _OPTIONAL_DURABLE_CHILDREN.get(name) != spec:
+                raise LocalWorkspaceError("WORKSPACE-BINDING-001", f"unknown durable child binding: {name}")
+
+
+def _validate_registered_children(root: Path, binding: Mapping[str, Any]) -> bool:
+    children = binding.get("durable_children")
+    if children is None:
+        return False
+    for name, spec in children.items():
+        path = _safe_locator(root, str(spec["locator"]), require_exists=False)
+        if not path.exists():
+            raise LocalWorkspaceError(
+                "WORKSPACE-DURABLE-CHILD-MISSING-001",
+                f"registered durable child is missing: {name} ({spec['locator']})",
+            )
+        if spec["kind"] == "file" and not path.is_file():
+            raise LocalWorkspaceError("WORKSPACE-DURABLE-CHILD-MISSING-001", f"registered durable child is not a file: {name}")
+        if spec["kind"] == "directory" and not path.is_dir():
+            raise LocalWorkspaceError("WORKSPACE-DURABLE-CHILD-MISSING-001", f"registered durable child is not a directory: {name}")
+    return True
+
+
+def _refresh_durable_children(root: Path) -> None:
+    binding_path = root / INTERNAL_DIR / BINDING_NAME
+    if not binding_path.is_file():
+        return
+    binding = _read_json(binding_path, code="WORKSPACE-BINDING-001")
+    _validate_binding_shape(binding)
+    if "durable_children" not in binding:
+        return
+    children = deepcopy(dict(binding["durable_children"]))
+    changed = False
+    for name, spec in _OPTIONAL_DURABLE_CHILDREN.items():
+        path = _safe_locator(root, str(spec["locator"]), require_exists=False)
+        if path.exists() and name not in children:
+            children[name] = deepcopy(spec)
+            changed = True
+    if changed:
+        updated = deepcopy(dict(binding))
+        updated["durable_children"] = children
+        _atomic_json_write(binding_path, updated)
 
 
 def _sqlite_quick_check(path: Path, *, code: str) -> None:
@@ -414,9 +518,9 @@ def _validate_state_database(path: Path, binding: Mapping[str, Any]) -> None:
             if project is None:
                 raise LocalWorkspaceError("WORKSPACE-STATE-PROJECT-001", "Research State belongs to another or missing project")
             if (
-                str(project["project_config_ref"]) != str(binding["project_config"]["locator"])
+                str(project["project_config_ref"]) != _binding_document_ref(binding, "project_config")
                 or str(project["project_config_digest"]) != str(binding["project_config"]["digest"])
-                or str(project["effective_profile_set_ref"]) != str(binding["effective_profile_set"]["locator"])
+                or str(project["effective_profile_set_ref"]) != _binding_document_ref(binding, "effective_profile_set")
                 or str(project["effective_profile_set_digest"]) != str(binding["effective_profile_set"]["digest"])
             ):
                 raise LocalWorkspaceError("WORKSPACE-STATE-PIN-001", "Research State Config/Profile pins do not match workspace binding")
@@ -432,9 +536,9 @@ def _validate_state_database(path: Path, binding: Mapping[str, Any]) -> None:
             if lineage is None:
                 raise LocalWorkspaceError("WORKSPACE-STATE-HEAD-001", "active Research Lineage does not resolve")
             if (
-                str(lineage["project_config_ref"]) != str(binding["project_config"]["locator"])
+                str(lineage["project_config_ref"]) != _binding_document_ref(binding, "project_config")
                 or str(lineage["project_config_digest"]) != str(binding["project_config"]["digest"])
-                or str(lineage["effective_profile_set_ref"]) != str(binding["effective_profile_set"]["locator"])
+                or str(lineage["effective_profile_set_ref"]) != _binding_document_ref(binding, "effective_profile_set")
                 or str(lineage["effective_profile_set_digest"]) != str(binding["effective_profile_set"]["digest"])
             ):
                 raise LocalWorkspaceError("WORKSPACE-STATE-PIN-001", "active Lineage Config/Profile pins do not match workspace binding")
@@ -450,6 +554,18 @@ def _validate_state_database(path: Path, binding: Mapping[str, Any]) -> None:
         raise
     except sqlite3.Error as exc:
         raise LocalWorkspaceError("WORKSPACE-STATE-DB-001", "Research State DB is unreadable or incompatible") from exc
+
+
+def workspace_document_path(root: str | Path, key: str) -> Path:
+    root = _assert_safe_workspace_root(Path(root))
+    if key not in {"project_config", "effective_profile_set"}:
+        raise LocalWorkspaceError("WORKSPACE-BINDING-001", f"unsupported workspace document: {key}")
+    binding = _read_json(
+        _safe_locator(root, f"{INTERNAL_DIR}/{BINDING_NAME}"),
+        code="WORKSPACE-BINDING-001",
+    )
+    _validate_binding_shape(binding)
+    return _safe_locator(root, str(binding[key]["locator"]))
 
 
 def _validated_documents(root: Path, binding: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -504,8 +620,8 @@ class LocalWorkspace:
         root.mkdir(parents=True, exist_ok=True)
         internal = root / INTERNAL_DIR
         marker = internal / INITIALIZING_MARKER
-        config_path = root / PROJECT_CONFIG_NAME
-        profile_path = root / EFFECTIVE_PROFILE_SET_NAME
+        config_path = internal / PROJECT_CONFIG_NAME
+        profile_path = internal / EFFECTIVE_PROFILE_SET_NAME
         internal_created = False
         config_written = False
         profile_written = False
@@ -580,6 +696,7 @@ class LocalWorkspace:
         binding_path = _safe_locator(root, f"{INTERNAL_DIR}/{BINDING_NAME}")
         binding = _read_json(binding_path, code="WORKSPACE-BINDING-001")
         _validate_binding_shape(binding)
+        _validate_registered_children(root, binding)
         config, effective = _validated_documents(root, binding)
         for key, locator in binding["storage"].items():
             path = _safe_locator(root, str(locator))
@@ -635,6 +752,14 @@ class LocalWorkspace:
             binding = _read_json(binding_path, code="WORKSPACE-BINDING-001")
             _validate_binding_shape(binding)
             checks.append({"check": "workspace_binding", "status": "OK"})
+            if _validate_registered_children(root, binding):
+                checks.append({"check": "durable_children", "status": "OK"})
+            else:
+                checks.append({
+                    "check": "durable_children",
+                    "status": "LEGACY_AMBIGUOUS",
+                    "message": "legacy workspace has no durable child registry; prior optional-child initialization cannot be proven",
+                })
 
             config, effective = _validated_documents(root, binding)
             checks.append({"check": "project_config", "status": "OK"})
