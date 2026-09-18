@@ -251,6 +251,23 @@ def build_parser() -> argparse.ArgumentParser:
     wc_section.add_argument("--output", required=True)
     _add_output_json(wc_section)
 
+    writer_round_trip = sub.add_parser("writer-round-trip")
+    writer_round_trip_sub = writer_round_trip.add_subparsers(dest="writer_round_trip_command", required=True)
+    wrt_export = writer_round_trip_sub.add_parser("export-input")
+    _add_workspace(wrt_export)
+    wrt_export.add_argument("--composition-id", required=True)
+    wrt_export.add_argument("--section-id", action="append", required=True)
+    wrt_export.add_argument("--output", required=True)
+    _add_output_json(wrt_export)
+    wrt_import = writer_round_trip_sub.add_parser("import-response")
+    _add_workspace(wrt_import)
+    _add_input_json(wrt_import)
+    wrt_inspect = writer_round_trip_sub.add_parser("inspect")
+    _add_workspace(wrt_inspect)
+    wrt_inspect.add_argument("--composition-id", required=True)
+    wrt_inspect.add_argument("--revision-id")
+    _add_output_json(wrt_inspect)
+
     survey = sub.add_parser("survey")
     survey_sub = survey.add_subparsers(dest="survey_command", required=True)
 
@@ -452,6 +469,15 @@ def _run(args: argparse.Namespace) -> Mapping[str, Any]:
                 return facade.select_writer_composition(args.composition_id, args.version, args.digest)
             if args.writer_composition_command == "section-input":
                 return facade.export_writer_section_input(args.composition_id, args.section_id, args.output)
+        if args.command == "writer-round-trip":
+            if args.writer_round_trip_command == "export-input":
+                return facade.export_writer_round_trip_input(
+                    args.composition_id, args.section_id, args.output
+                )
+            if args.writer_round_trip_command == "import-response":
+                return facade.import_writer_response(_read_input(args.json_input))
+            if args.writer_round_trip_command == "inspect":
+                return facade.inspect_writer_round_trip(args.composition_id, args.revision_id)
         if args.command == "exhibit":
             if args.exhibit_command == "capture":
                 return facade.capture_exhibit(_read_input(args.json_input))
