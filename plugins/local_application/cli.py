@@ -279,6 +279,11 @@ def build_parser() -> argparse.ArgumentParser:
     _add_workspace(publication_show)
     publication_show.add_argument("--build-id", required=True)
     _add_output_json(publication_show)
+    publication_release_request = publication_sub.add_parser("release-request")
+    _add_workspace(publication_release_request)
+    publication_release_request.add_argument("--build-id", required=True)
+    publication_release_request.add_argument("--actor-id", required=True)
+    _add_output_json(publication_release_request)
     publication_release = publication_sub.add_parser("release")
     _add_workspace(publication_release)
     publication_release.add_argument("--build-id", required=True)
@@ -506,6 +511,8 @@ def _run(args: argparse.Namespace) -> Mapping[str, Any]:
                 return facade.build_publication_preview(args.composition_id, args.revision_id)
             if args.publication_command == "show":
                 return facade.show_publication_preview(args.build_id)
+            if args.publication_command == "release-request":
+                return facade.request_publication_release(args.build_id, args.actor_id)
             if args.publication_command == "release":
                 return facade.release_publication(args.build_id, _read_input(args.json_input))
         if args.command == "survey":
