@@ -57,6 +57,7 @@ class StagedMaterialImportAcceptanceTests(unittest.TestCase):
             source_run = helper.prepare(source)["run_id"]
             _capture_source(source_root, source, source_run)
             source.close()
+            source_app.close()
 
             destination_app, destination = helper.make_facade(destination_root)
             try:
@@ -118,9 +119,10 @@ class StagedMaterialImportAcceptanceTests(unittest.TestCase):
                 shown = destination.show_external_material(
                     destination_run, "CAP-1"
                 )
-                self.assertEqual(
-                    shown["capture"]["original"]["content_health"]["status"],
-                    "verified",
+                self.assertEqual(shown["status"], "OK")
+                self.assertIn(
+                    "exact supporting excerpt",
+                    shown["text_rendition"]["content"],
                 )
                 exported = root / "imported-original.html"
                 destination.export_external_material(
@@ -179,6 +181,7 @@ class StagedMaterialImportAcceptanceTests(unittest.TestCase):
                 )
             finally:
                 destination.close()
+                destination_app.close()
 
     def test_corrupt_staged_backing_is_rejected_without_destination_artifact(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -187,10 +190,11 @@ class StagedMaterialImportAcceptanceTests(unittest.TestCase):
             destination_root = root / "new-workspace"
             helper = intake.ExternalDesktopResearchIntakeTests()
 
-            _source_app, source = helper.make_facade(source_root)
+            source_app, source = helper.make_facade(source_root)
             source_run = helper.prepare(source)["run_id"]
             _capture_source(source_root, source, source_run)
             source.close()
+            source_app.close()
 
             destination_app, destination = helper.make_facade(destination_root)
             try:
@@ -228,6 +232,7 @@ class StagedMaterialImportAcceptanceTests(unittest.TestCase):
                 )
             finally:
                 destination.close()
+                destination_app.close()
 
 
 if __name__ == "__main__":
