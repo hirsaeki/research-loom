@@ -5,6 +5,10 @@ from pathlib import Path, PureWindowsPath
 from typing import Any, Mapping
 from jsonschema import Draft202012Validator, FormatChecker
 import rfc8785
+from plugins.local_research_exhibit_store import (
+    LocalResearchExhibitStoreError,
+    validate_visual_target,
+)
 from .facade import LocalApplicationError
 
 SCHEMA_VERSION="0.2.0"; TOOL_VERSION="0.2.0"
@@ -106,7 +110,14 @@ def validate_resolved_references(package:Mapping[str,Any])->None:
     actual_sources={oid for oid,obj in by_id.items() if obj.get("kind")=="source"}
     if len(declared_sources)!=len(source_refs) or declared_sources!=actual_sources: missing.append("content.source_refs")
     manifest={str(a.get("path")):a for a in package.get("attachments",[]) if isinstance(a,Mapping) and isinstance(a.get("path"),str)}
-    def require_attachment(ref: Any, *, digest: Any = None, size: Any = None, label: str) -> None:
+    def require_attachment(
+        ref: Any,
+        *,
+        digest: Any = None,
+        size: Any = None,
+        media_type: Any = None,
+        label: str,
+    ) -> None:
         if not isinstance(ref,str) or ref not in manifest:
             missing.append(label)
             return
@@ -118,6 +129,11 @@ def validate_resolved_references(package:Mapping[str,Any])->None:
             isinstance(size,bool) or not isinstance(size,int) or size < 0
             or isinstance(entry_size,bool) or not isinstance(entry_size,int)
             or entry_size != size
+        ):
+            missing.append(label)
+        if media_type is not None and (
+            not isinstance(media_type, str)
+            or entry.get("media_type") != media_type
         ):
             missing.append(label)
 
@@ -164,6 +180,79 @@ def validate_resolved_references(package:Mapping[str,Any])->None:
     if not isinstance(working,Mapping):
         missing.append("resolved_content.working_material")
         working={}
+    visual_targets=[]
+    exhibits=working.get("research_exhibits",[])
+    if not isinstance(exhibits,list):
+        missing.append("working_material.research_exhibits")
+        exhibits=[]
+    for exhibit in exhibits:
+        if not isinstance(exhibit,Mapping):
+            missing.append("working_material.research_exhibits")
+            continue
+        visual=exhibit.get("visual_target")
+        if visual is None:
+            continue
+        label=f"visual_target:{exhibit.get('exhibit_id')}"
+        if not isinstance(visual,Mapping) or visual.get("target_type")!="source_visual":
+            missing.append(label)
+            continue
+        canonical_visual=deepcopy(dict(visual))
+        canonical_visual.pop("source_attachment_path",None)
+        canonical_derived=canonical_visual.get("derived_artifact")
+        if isinstance(canonical_derived,Mapping):
+            canonical_derived=deepcopy(dict(canonical_derived)); canonical_derived.pop("attachment_path",None); canonical_visual["derived_artifact"]=canonical_derived
+        try:
+            validate_visual_target(canonical_visual)
+        except LocalResearchExhibitStoreError:
+            missing.append(label)
+        if (
+            visual.get("source_run_id") not in (exhibit.get("source_run_ids") or [])
+            or visual.get("source_artifact_ref") not in (exhibit.get("source_artifact_refs") or [])
+        ):
+            missing.append(label)
+        visual_targets.append((label, visual, exhibit))
+        require_attachment(
+            visual.get("source_attachment_path"),
+            digest=visual.get("source_digest"),
+            size=visual.get("source_byte_length"),
+            media_type=visual.get("source_media_type"),
+            label=label,
+        )
+        derived=visual.get("derived_artifact")
+        if derived is not None:
+            derived_label=f"{label}:derived"
+            if (
+                not isinstance(derived,Mapping)
+                or derived.get("derived_from_artifact_ref") != visual.get("source_artifact_ref")
+                or derived.get("artifact_ref") not in (exhibit.get("source_artifact_refs") or [])
+            ):
+                missing.append(derived_label)
+            else:
+                require_attachment(
+                    derived.get("attachment_path"),
+                    digest=derived.get("digest"),
+                    size=derived.get("byte_length"),
+                    media_type=derived.get("media_type"),
+                    label=derived_label,
+                )
+
+    material_index={
+        (str(material.get("run_id")), str(material.get("capture",{}).get("capture_id"))): material
+        for material in material_rows
+        if isinstance(material,Mapping) and isinstance(material.get("capture"),Mapping)
+    }
+    for label, visual, _exhibit in visual_targets:
+        material=material_index.get((str(visual.get("source_run_id")), str(visual.get("capture_id"))))
+        original=material.get("capture",{}).get("original",{}) if isinstance(material,Mapping) else {}
+        if (
+            not isinstance(original,Mapping)
+            or original.get("artifact_id") != visual.get("source_artifact_ref")
+            or original.get("digest") != visual.get("source_digest")
+            or original.get("media_type") != visual.get("source_media_type")
+            or original.get("size_bytes") != visual.get("source_byte_length")
+        ):
+            missing.append(label+":capture_binding")
+
     project_inputs=working.get("project_inputs",[])
     if not isinstance(project_inputs,list):
         missing.append("working_material.project_inputs")

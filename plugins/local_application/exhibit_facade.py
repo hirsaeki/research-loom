@@ -9,6 +9,7 @@ from plugins.local_research_exhibit_store import (
     SUPPORTED_EXHIBIT_KINDS,
     content_digest,
     normalized_content,
+    validate_visual_locator,
 )
 
 from .run_inspection_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
@@ -27,6 +28,7 @@ _CAPTURE_FIELDS = {
     "source_object_ids",
     "derived_from_exhibit_ids",
     "content",
+    "visual_target",
     "capture_origin",
 }
 _HARNESS_OWNED_FIELDS = {
@@ -145,8 +147,9 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
         self,
         source_run_ids: list[str],
         source_artifact_refs: list[str],
-    ) -> None:
+    ) -> dict[str, Any]:
         artifact_to_run: dict[str, str] = {}
+        artifact_index: dict[str, Any] = {}
         for run_id in source_run_ids:
             run = self._application.execution_store.load_run(run_id)
             if run is None:
@@ -160,6 +163,7 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                 )
             for artifact in self._application.execution_store.artifacts_for(run_id):
                 artifact_to_run[str(artifact.artifact_id)] = run_id
+                artifact_index[str(artifact.artifact_id)] = artifact
 
         if source_artifact_refs and not source_run_ids:
             raise LocalApplicationError(
@@ -177,6 +181,114 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                 "source artifacts must exist on one of the declared current-project source Runs: "
                 + ", ".join(missing),
             )
+        return artifact_index
+
+    @staticmethod
+    def _normalize_visual_locator(value: Any) -> dict[str, Any]:
+        try:
+            validate_visual_locator(value)
+        except LocalResearchExhibitStoreError as exc:
+            raise LocalApplicationError("APPLICATION-EXHIBIT-VISUAL-001", exc.message) from exc
+        return deepcopy(dict(value))
+
+    def _normalize_visual_target(
+        self,
+        value: Any,
+        *,
+        source_run_ids: list[str],
+        source_artifact_refs: list[str],
+        artifact_index: Mapping[str, Any],
+    ) -> dict[str, Any] | None:
+        if value is None:
+            return None
+        allowed = {
+            "source_run_id", "capture_id", "source_artifact_ref", "locator",
+            "derived_artifact_ref", "derivation_type",
+        }
+        if not isinstance(value, Mapping) or set(value) - allowed:
+            raise LocalApplicationError(
+                "APPLICATION-EXHIBIT-VISUAL-001", "visual_target shape is invalid"
+            )
+        for field in ("source_run_id", "capture_id", "source_artifact_ref"):
+            item = value.get(field)
+            if not isinstance(item, str) or not item.strip():
+                raise LocalApplicationError(
+                    "APPLICATION-EXHIBIT-VISUAL-001", f"visual_target.{field} is required"
+                )
+        source_run_id = str(value["source_run_id"])
+        capture_id = str(value["capture_id"])
+        source_artifact_ref = str(value["source_artifact_ref"])
+        if source_run_id not in source_run_ids or source_artifact_ref not in source_artifact_refs:
+            raise LocalApplicationError(
+                "APPLICATION-EXHIBIT-VISUAL-001",
+                "visual_target must use declared source_run_ids/source_artifact_refs",
+            )
+        source = artifact_index.get(source_artifact_ref)
+        if (
+            source is None
+            or str(source.run_id) != source_run_id
+            or str(source.role) != "desktop_research.original_capture"
+        ):
+            raise LocalApplicationError(
+                "APPLICATION-EXHIBIT-VISUAL-001",
+                "visual_target source artifact must be a stored Desktop Research original capture",
+            )
+        if str(source.provenance.get("capture_id", "")) != capture_id:
+            raise LocalApplicationError(
+                "APPLICATION-EXHIBIT-VISUAL-001",
+                "visual_target capture_id does not match the source artifact provenance",
+            )
+        media_type = str(source.media_type)
+        if not (media_type.startswith("image/") or media_type == "application/pdf"):
+            raise LocalApplicationError(
+                "APPLICATION-EXHIBIT-VISUAL-001",
+                "visual_target source must be a stored PDF or image",
+            )
+        normalized = {
+            "target_type": "source_visual",
+            "source_run_id": source_run_id,
+            "capture_id": capture_id,
+            "source_artifact_ref": source_artifact_ref,
+            "locator": self._normalize_visual_locator(value.get("locator")),
+            "source_media_type": media_type,
+            "source_byte_length": int(source.size),
+            "source_digest": str(source.digest),
+            "derived_artifact": None,
+        }
+        derived_ref = value.get("derived_artifact_ref")
+        derivation_type = value.get("derivation_type")
+        if derived_ref is None and derivation_type is None:
+            return normalized
+        if (
+            not isinstance(derived_ref, str)
+            or not derived_ref.strip()
+            or derived_ref not in source_artifact_refs
+            or derivation_type not in {"crop", "table_extraction"}
+        ):
+            raise LocalApplicationError(
+                "APPLICATION-EXHIBIT-VISUAL-001",
+                "derived visual artifacts require declared artifact ref and derivation_type",
+            )
+        derived = artifact_index.get(derived_ref)
+        if (
+            derived is None
+            or str(derived.run_id) != source_run_id
+            or source_artifact_ref not in tuple(derived.provenance.get("parent_artifact_refs", ()))
+            or str(derived.provenance.get("derivation_type", "")) != str(derivation_type)
+        ):
+            raise LocalApplicationError(
+                "APPLICATION-EXHIBIT-VISUAL-001",
+                "derived visual artifact must match the source parent and derivation type",
+            )
+        normalized["derived_artifact"] = {
+            "artifact_ref": str(derived.artifact_id),
+            "derived_from_artifact_ref": source_artifact_ref,
+            "derivation_type": str(derivation_type),
+            "media_type": str(derived.media_type),
+            "byte_length": int(derived.size),
+            "digest": str(derived.digest),
+        }
+        return normalized
 
     def _validate_source_objects(self, source_object_ids: list[str], state) -> None:
         effective = {
@@ -278,7 +390,13 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
 
         state = self._current_state()
         self._validate_rqs(rq_ids, state)
-        self._validate_source_runs(source_run_ids, source_artifact_refs)
+        artifact_index = self._validate_source_runs(source_run_ids, source_artifact_refs)
+        visual_target = self._normalize_visual_target(
+            input_value.get("visual_target"),
+            source_run_ids=source_run_ids,
+            source_artifact_refs=source_artifact_refs,
+            artifact_index=artifact_index,
+        )
         self._validate_source_objects(source_object_ids, state)
         store = self._exhibit_store()
         self._validate_derived_exhibits(derived_from, store)
@@ -317,6 +435,8 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                 "capture_origin": str(capture_origin),
             },
         }
+        if visual_target is not None:
+            document["visual_target"] = visual_target
         try:
             store.capture(document)
         except LocalResearchExhibitStoreError as exc:
