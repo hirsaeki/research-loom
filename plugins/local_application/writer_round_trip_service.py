@@ -15,7 +15,7 @@ from jsonschema import Draft202012Validator, FormatChecker
 from core.runtime import canonical_digest
 from .facade import LocalApplicationError
 from .research_package_format import safe_component
-from .writer_composition_service import _digest_document, _material_ref, _object_index, _package_ref_sets
+from .writer_composition_service import _digest_document, _object_index, _package_ref_sets
 
 SCHEMA_VERSION = "0.1.0"
 MAX_SECTIONS = 64
@@ -223,12 +223,19 @@ class WriterRoundTripService:
             "exhibit_refs": list(contract.get("exhibit_refs", [])),
         }
 
-    def _validate_input_context(self, value: Mapping[str, Any]) -> tuple[Mapping[str, Any], Mapping[str, Any]]:
+    def _validate_input_context(
+        self, value: Mapping[str, Any]
+    ) -> tuple[Mapping[str, Any], Mapping[str, Any]]:
         source = value["source"]
         composer = self._composition_service()
-        composition = composer._load_version(str(source["composition_id"]), int(source["composition_version"]))
+        composition = composer._load_version(
+            str(source["composition_id"]), int(source["composition_version"])
+        )
         if composition.get("composition_digest") != source.get("composition_digest"):
-            raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-PIN-001", "Writer input composition pin no longer resolves")
+            raise LocalApplicationError(
+                "APPLICATION-WRITER-ROUND-TRIP-PIN-001",
+                "Writer input composition pin no longer resolves",
+            )
         package = composer._package(str(source["research_package_id"]))
         composer._validate_source_pin(composition["source"], package)
         expected_source = {
@@ -238,88 +245,54 @@ class WriterRoundTripService:
             **composition["source"],
         }
         if dict(source) != expected_source:
-            raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-PIN-001", "Writer input pins do not match the immutable composition and Research Package")
-
-        by_id = {str(section["section_id"]): section for section in composition["sections"]}
-        package_objects = _object_index(package)
-        package_materials = {
-            _material_ref(material): material
-            for material in package.get("resolved_content", {}).get("materials", [])
-            if isinstance(material, Mapping) and _material_ref(material)
-        }
-        package_exhibits = {
-            str(exhibit.get("exhibit_id")): exhibit
-            for exhibit in package.get("resolved_content", {}).get("working_material", {}).get("research_exhibits", [])
-            if isinstance(exhibit, Mapping) and isinstance(exhibit.get("exhibit_id"), str)
-        }
-        package_gaps = {
-            str(gap.get("gap_id")): gap
-            for gap in package.get("resolved_content", {}).get("unresolved_gaps", [])
-            if isinstance(gap, Mapping) and isinstance(gap.get("gap_id"), str)
-        }
-        run_candidates = {
-            str(run.get("run_id")): run
-            for run in package.get("resolved_content", {}).get("working_material", {}).get("run_candidates", [])
-            if isinstance(run, Mapping) and isinstance(run.get("run_id"), str)
-        }
-        expected_constraints = package.get("resolved_profiles", {}).get("effective_constraints", [])
+            raise LocalApplicationError(
+                "APPLICATION-WRITER-ROUND-TRIP-PIN-001",
+                "Writer input pins do not match the immutable composition and Research Package",
+            )
 
         for row in value["sections"]:
-            section = by_id.get(str(row["section_id"]))
+            section_id = str(row["section_id"])
             embedded = row.get("section_input")
-            if (
-                section is None
-                or section.get("section_digest") != row.get("section_digest")
-                or not isinstance(embedded, Mapping)
+            if not isinstance(embedded, Mapping):
+                raise LocalApplicationError(
+                    "APPLICATION-WRITER-ROUND-TRIP-PIN-001",
+                    "Writer input receipt is missing its canonical section input",
+                )
+            expected = composer._build_section_input_document(
+                composition["composition_id"],
+                section_id,
+                version=int(composition["version"]),
+                digest=str(composition["composition_digest"]),
+            )
+            if dict(embedded) != dict(expected):
+                raise LocalApplicationError(
+                    "APPLICATION-WRITER-ROUND-TRIP-PIN-001",
+                    "embedded section Writer input differs from the canonical pinned payload",
+                )
+            expected_scope = dict(self._section_scope(expected))
+            for key in (
+                "section_id",
+                "section_digest",
+                "section_input_digest",
+                "source_refs",
+                "citation_scope",
+                "exhibit_refs",
             ):
-                raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-PIN-001", "Writer input section pin no longer resolves")
-            if _digest_document(embedded, "section_input_digest") != embedded.get("section_input_digest"):
-                raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-INTEGRITY-001", "embedded section Writer input digest mismatch")
-            if dict(embedded.get("source", {})) != expected_source or embedded.get("section_contract") != section:
-                raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-PIN-001", "embedded section Writer input does not match the pinned composition")
-            if embedded.get("resolved_profile_constraints") != expected_constraints:
-                raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-PIN-001", "embedded Writer profile constraints do not match the pinned Effective Profile Set")
-
-            expected_objects = [
-                deepcopy(dict(package_objects[object_id]))
-                for object_id in embedded.get("resolved_object_ids", [])
-                if object_id in package_objects
-            ]
-            if len(expected_objects) != len(embedded.get("resolved_object_ids", [])) or embedded.get("resolved_research_objects") != expected_objects:
-                raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-PIN-001", "embedded Writer research objects do not match the pinned Research Package")
-
-            expected_materials = []
-            for embedded_material in embedded.get("resolved_materials", []):
-                material_ref = embedded_material.get("material_ref") if isinstance(embedded_material, Mapping) else None
-                base = package_materials.get(material_ref)
-                if base is None:
-                    raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-PIN-001", "embedded Writer material does not resolve in the pinned Research Package")
-                expected_material = deepcopy(dict(base))
-                expected_material["material_ref"] = material_ref
-                expected_material["text_rendition"]["content"] = composer._resolve_material_text(package, base)
-                run = run_candidates.get(str(expected_material.get("run_id")))
-                expected_material["candidate_only"] = bool(run.get("candidate_only")) if run else False
-                expected_materials.append(expected_material)
-            if embedded.get("resolved_materials") != expected_materials:
-                raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-PIN-001", "embedded Writer material bodies do not match the pinned Research Package")
-
-            expected_exhibits = [
-                deepcopy(dict(package_exhibits[exhibit_id]))
-                for exhibit_id in section.get("exhibit_refs", [])
-                if exhibit_id in package_exhibits
-            ]
-            expected_gaps = [
-                deepcopy(dict(package_gaps[gap_id]))
-                for gap_id in section.get("gap_refs", [])
-                if gap_id in package_gaps
-            ]
-            if embedded.get("resolved_exhibits") != expected_exhibits or embedded.get("unresolved_gaps") != expected_gaps:
-                raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-PIN-001", "embedded Writer Exhibit/Gap bindings do not match the pinned Research Package")
-
-            expected_scope = dict(self._section_scope(embedded))
-            for key in ("section_id", "section_digest", "section_input_digest", "source_refs", "citation_scope", "exhibit_refs"):
                 if row.get(key) != expected_scope.get(key):
-                    raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-PIN-001", "Writer input receipt summary does not match its embedded section input")
+                    raise LocalApplicationError(
+                        "APPLICATION-WRITER-ROUND-TRIP-PIN-001",
+                        "Writer input receipt summary does not match its canonical section input",
+                    )
+
+        fingerprint = canonical_digest(
+            {"source": source, "sections": value["sections"]}
+        )
+        expected_input_id = "WRI-" + fingerprint.split(":", 1)[1][:24]
+        if value.get("input_id") != expected_input_id:
+            raise LocalApplicationError(
+                "APPLICATION-WRITER-ROUND-TRIP-INTEGRITY-001",
+                "Writer input identity does not match its canonical pinned content",
+            )
         return composition, package
 
     def export_input(self, composition_id: str, section_ids: list[str], output_dir: str | Path) -> Mapping[str, Any]:
@@ -661,7 +634,7 @@ class WriterRoundTripService:
             "source_package": {
                 "package_id": package["package_id"],
                 "package_digest": package["package_digest"],
-                "research_snapshot": deepcopy(package["research_snapshot"]),
+                "research_snapshot": deepcopy(package["source_research_snapshot"]),
                 "effective_profile_set": deepcopy(package["effective_profile_set"]),
             },
             "composition": {

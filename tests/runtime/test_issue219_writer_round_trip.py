@@ -235,6 +235,35 @@ class Issue219WriterRoundTripTests(ResearchPackageAcceptanceSupport):
         finally:
             facade.close()
 
+    def test_managed_receipt_cannot_drop_canonical_objects_or_materials(self):
+        facade, _case, _composition, _exported, input_doc = self._build_round_trip()
+        try:
+            service = facade._writer_round_trip_service()
+            receipt_path = service._input_path(input_doc["input_id"])
+            tampered = json.loads(receipt_path.read_text(encoding="utf-8"))
+            embedded = tampered["sections"][0]["section_input"]
+            embedded["resolved_object_ids"] = []
+            embedded["resolved_research_objects"] = []
+            embedded["resolved_material_refs"] = []
+            embedded["resolved_materials"] = []
+            from plugins.local_application.writer_composition_service import _digest_document
+            embedded["section_input_digest"] = _digest_document(
+                embedded, "section_input_digest"
+            )
+            tampered["sections"][0]["section_input_digest"] = embedded[
+                "section_input_digest"
+            ]
+            tampered["input_digest"] = _digest_document(tampered, "input_digest")
+            receipt_path.write_text(
+                json.dumps(tampered, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            with self.assertRaises(LocalApplicationError) as error:
+                facade.import_writer_response(self._response(tampered))
+            self.assertEqual(error.exception.code, "APPLICATION-WRITER-ROUND-TRIP-PIN-001")
+        finally:
+            facade.close()
+
     def test_export_destination_reservation_prevents_parallel_overwrite(self):
         facade, _case, composition, _exported, _input_doc = self._build_round_trip()
         try:
