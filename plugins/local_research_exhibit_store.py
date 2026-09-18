@@ -131,6 +131,126 @@ def _validate_snapshot_binding(value: Any) -> None:
         )
 
 
+def _validate_digest(value: Any, field: str) -> None:
+    if (
+        not isinstance(value, str)
+        or len(value) != 71
+        or not value.startswith("sha256:")
+        or any(ch not in "0123456789abcdef" for ch in value[7:])
+    ):
+        raise LocalResearchExhibitStoreError(
+            "EXHIBIT-DOCUMENT-001", f"Research Exhibit visual target {field} is invalid"
+        )
+
+
+def _validate_visual_locator(value: Any) -> None:
+    allowed = {"kind", "page", "label", "region"}
+    if not isinstance(value, Mapping) or set(value) - allowed:
+        raise LocalResearchExhibitStoreError(
+            "EXHIBIT-DOCUMENT-001", "Research Exhibit visual locator is invalid"
+        )
+    if value.get("kind") not in {"figure", "table", "diagram", "region"}:
+        raise LocalResearchExhibitStoreError(
+            "EXHIBIT-DOCUMENT-001", "Research Exhibit visual locator kind is invalid"
+        )
+    page = value.get("page")
+    if page is not None and (isinstance(page, bool) or not isinstance(page, int) or page < 1):
+        raise LocalResearchExhibitStoreError(
+            "EXHIBIT-DOCUMENT-001", "Research Exhibit visual locator page is invalid"
+        )
+    label = value.get("label")
+    if label is not None and (not isinstance(label, str) or not label.strip()):
+        raise LocalResearchExhibitStoreError(
+            "EXHIBIT-DOCUMENT-001", "Research Exhibit visual locator label is invalid"
+        )
+    region = value.get("region")
+    if region is not None:
+        if not isinstance(region, Mapping) or set(region) != {"x", "y", "width", "height", "unit"}:
+            raise LocalResearchExhibitStoreError(
+                "EXHIBIT-DOCUMENT-001", "Research Exhibit visual locator region is invalid"
+            )
+        if region.get("unit") != "normalized":
+            raise LocalResearchExhibitStoreError(
+                "EXHIBIT-DOCUMENT-001", "Research Exhibit visual locator region unit is invalid"
+            )
+        for field in ("x", "y", "width", "height"):
+            item = region.get(field)
+            if isinstance(item, bool) or not isinstance(item, (int, float)) or item < 0 or item > 1:
+                raise LocalResearchExhibitStoreError(
+                    "EXHIBIT-DOCUMENT-001", f"Research Exhibit visual locator region {field} is invalid"
+                )
+        if region["width"] <= 0 or region["height"] <= 0 or region["x"] + region["width"] > 1 or region["y"] + region["height"] > 1:
+            raise LocalResearchExhibitStoreError(
+                "EXHIBIT-DOCUMENT-001", "Research Exhibit visual locator region exceeds page bounds"
+            )
+    if page is None and label is None and region is None:
+        raise LocalResearchExhibitStoreError(
+            "EXHIBIT-DOCUMENT-001", "Research Exhibit visual locator needs page, label, or region"
+        )
+
+
+def _validate_visual_target(value: Any) -> None:
+    required = {
+        "target_type", "source_run_id", "capture_id", "source_artifact_ref",
+        "locator", "source_media_type", "source_byte_length", "source_digest",
+        "derived_artifact",
+    }
+    if not isinstance(value, Mapping) or set(value) != required or value.get("target_type") != "source_visual":
+        raise LocalResearchExhibitStoreError(
+            "EXHIBIT-DOCUMENT-001", "Research Exhibit visual target shape is invalid"
+        )
+    for field in ("source_run_id", "capture_id", "source_artifact_ref", "source_media_type"):
+        item = value.get(field)
+        if not isinstance(item, str) or not item.strip():
+            raise LocalResearchExhibitStoreError(
+                "EXHIBIT-DOCUMENT-001", f"Research Exhibit visual target {field} is invalid"
+            )
+    if not (
+        str(value["source_media_type"]).startswith("image/")
+        or value["source_media_type"] == "application/pdf"
+    ):
+        raise LocalResearchExhibitStoreError(
+            "EXHIBIT-DOCUMENT-001", "Research Exhibit visual source must be an image or PDF"
+        )
+    size = value.get("source_byte_length")
+    if isinstance(size, bool) or not isinstance(size, int) or size < 0:
+        raise LocalResearchExhibitStoreError(
+            "EXHIBIT-DOCUMENT-001", "Research Exhibit visual target source_byte_length is invalid"
+        )
+    _validate_digest(value.get("source_digest"), "source_digest")
+    _validate_visual_locator(value.get("locator"))
+    derived = value.get("derived_artifact")
+    if derived is not None:
+        expected = {
+            "artifact_ref", "derived_from_artifact_ref", "derivation_type",
+            "media_type", "byte_length", "digest",
+        }
+        if not isinstance(derived, Mapping) or set(derived) != expected:
+            raise LocalResearchExhibitStoreError(
+                "EXHIBIT-DOCUMENT-001", "Research Exhibit derived visual artifact is invalid"
+            )
+        for field in ("artifact_ref", "derived_from_artifact_ref", "media_type"):
+            item = derived.get(field)
+            if not isinstance(item, str) or not item.strip():
+                raise LocalResearchExhibitStoreError(
+                    "EXHIBIT-DOCUMENT-001", f"Research Exhibit derived visual artifact {field} is invalid"
+                )
+        if derived.get("derived_from_artifact_ref") != value.get("source_artifact_ref"):
+            raise LocalResearchExhibitStoreError(
+                "EXHIBIT-DOCUMENT-001", "Research Exhibit derived artifact source binding is invalid"
+            )
+        if derived.get("derivation_type") not in {"crop", "table_extraction"}:
+            raise LocalResearchExhibitStoreError(
+                "EXHIBIT-DOCUMENT-001", "Research Exhibit derived artifact derivation type is invalid"
+            )
+        derived_size = derived.get("byte_length")
+        if isinstance(derived_size, bool) or not isinstance(derived_size, int) or derived_size < 0:
+            raise LocalResearchExhibitStoreError(
+                "EXHIBIT-DOCUMENT-001", "Research Exhibit derived visual artifact byte_length is invalid"
+            )
+        _validate_digest(derived.get("digest"), "derived artifact digest")
+
+
 def validate_exhibit_document(value: Mapping[str, Any]) -> None:
     required = {
         "schema_version", "exhibit_id", "project_id", "kind", "title", "purpose",
@@ -138,7 +258,8 @@ def validate_exhibit_document(value: Mapping[str, Any]) -> None:
         "derived_from_exhibit_ids", "captured_against", "content", "content_digest",
         "provenance",
     }
-    if not isinstance(value, Mapping) or set(value) != required:
+    allowed = required | {"visual_target"}
+    if not isinstance(value, Mapping) or set(value) - allowed or not required.issubset(value):
         raise LocalResearchExhibitStoreError(
             "EXHIBIT-DOCUMENT-001", "stored Research Exhibit document shape is invalid"
         )
@@ -163,6 +284,8 @@ def validate_exhibit_document(value: Mapping[str, Any]) -> None:
     ):
         _validate_string_list(value.get(field), field)
     _validate_snapshot_binding(value.get("captured_against"))
+    if "visual_target" in value:
+        _validate_visual_target(value.get("visual_target"))
 
     content = value.get("content")
     if not isinstance(content, Mapping) or set(content) != {
