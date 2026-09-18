@@ -27,6 +27,7 @@ from plugins.local_application.workspace import (
     LocalWorkspaceError,
     _assert_safe_workspace_root,
     _binding,
+    _binding_document_ref,
     _read_json,
     _safe_locator,
     _schema_validate,
@@ -279,10 +280,10 @@ def _state_rebind(root: Path, binding: Mapping[str, Any], *, expected_config: st
             str(binding["project_id"]),
             expected_project_config_digest=expected_config,
             expected_effective_profile_set_digest=expected_profile,
-            project_config_ref=PROJECT_CONFIG_NAME,
+            project_config_ref=_binding_document_ref(binding, "project_config"),
             project_config_digest=str(config["configuration_digest"]),
             project_config=config,
-            effective_profile_set_ref=EFFECTIVE_PROFILE_SET_NAME,
+            effective_profile_set_ref=_binding_document_ref(binding, "effective_profile_set"),
             effective_profile_set_digest=effective_profile_digest(effective),
             effective_constraints=_flatten_constraints(effective),
         )
@@ -342,8 +343,8 @@ def _recover_incomplete_profile_advancement_locked(root: Path) -> None:
             and state.effective_profile_set_digest == str(old_binding["effective_profile_set"]["digest"])
         ):
             raise LocalWorkspaceError("PROFILE-ADVANCE-RECOVERY-001", "Research State is neither the old nor target Profile binding")
-    _write_text(root / PROJECT_CONFIG_NAME, str(marker["old_project_config_text"]))
-    _write_text(root / EFFECTIVE_PROFILE_SET_NAME, str(marker["old_effective_profile_set_text"]))
+    _write_text(_safe_locator(root, str(old_binding["project_config"]["locator"]), require_exists=False), str(marker["old_project_config_text"]))
+    _write_text(_safe_locator(root, str(old_binding["effective_profile_set"]["locator"]), require_exists=False), str(marker["old_effective_profile_set_text"]))
     _write_json(root / INTERNAL_DIR / BINDING_NAME, old_binding)
     if event_path is not None and event_path.exists():
         event_path.unlink()
@@ -457,14 +458,22 @@ def _advance_profile_generation_locked(root: Path, request: Mapping[str, Any]) -
             "effective_profile_set_digest": old_profile_digest,
         }
 
-    target_binding = _binding(str(old_binding["project_id"]), new_config_digest, new_profile_digest, initialized_at=str(old_binding["initialized_at"]))
+    target_binding = _binding(
+        str(old_binding["project_id"]),
+        new_config_digest,
+        new_profile_digest,
+        initialized_at=str(old_binding["initialized_at"]),
+        project_config_locator=str(old_binding["project_config"]["locator"]),
+        effective_profile_set_locator=str(old_binding["effective_profile_set"]["locator"]),
+        durable_children=old_binding.get("durable_children"),
+    )
     event_id = "PGA-" + uuid.uuid4().hex
     event_locator = (
         f"{INTERNAL_DIR}/{HISTORY_DIR}/{EVENTS_DIR}/by-source/"
         f"{old_config_digest.removeprefix('sha256:')}/{event_id}.json"
     )
-    old_config_text = (root / PROJECT_CONFIG_NAME).read_text(encoding="utf-8")
-    old_eps_text = (root / EFFECTIVE_PROFILE_SET_NAME).read_text(encoding="utf-8")
+    old_config_text = _safe_locator(root, str(old_binding["project_config"]["locator"])).read_text(encoding="utf-8")
+    old_eps_text = _safe_locator(root, str(old_binding["effective_profile_set"]["locator"])).read_text(encoding="utf-8")
     target_config_text = target_config_path.read_text(encoding="utf-8")
     target_eps_text = target_eps_path.read_text(encoding="utf-8")
     event = {
@@ -517,8 +526,8 @@ def _advance_profile_generation_locked(root: Path, request: Mapping[str, Any]) -
     try:
         _archive_generation(root, config_text=old_config_text, effective_text=old_eps_text, config_digest=old_config_digest, profile_digest=old_profile_digest)
         _archive_generation(root, config_text=target_config_text, effective_text=target_eps_text, config_digest=new_config_digest, profile_digest=new_profile_digest)
-        _write_text(root / PROJECT_CONFIG_NAME, target_config_text)
-        _write_text(root / EFFECTIVE_PROFILE_SET_NAME, target_eps_text)
+        _write_text(_safe_locator(root, str(target_binding["project_config"]["locator"]), require_exists=False), target_config_text)
+        _write_text(_safe_locator(root, str(target_binding["effective_profile_set"]["locator"]), require_exists=False), target_eps_text)
         _write_json(root / INTERNAL_DIR / BINDING_NAME, target_binding)
         _state_rebind(
             root,

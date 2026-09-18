@@ -98,6 +98,8 @@ jobs:
         run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue160_execution_store_portability.py' -v
       - name: Run Issue 165 staged material import acceptance
         run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue165_staged_material_import.py' -v
+      - name: Run Issue 193 Parent Durable Store acceptance
+        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue193_parent_durable_store.py' -v
       - name: Run Issue 171 new material continuation acceptance
         run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue171_new_material_continuation.py' -v
 
