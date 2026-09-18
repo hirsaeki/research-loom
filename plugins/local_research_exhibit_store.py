@@ -3,6 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 import hashlib
 import json
+import math
 from pathlib import Path
 import sqlite3
 from typing import Any, Mapping
@@ -143,7 +144,7 @@ def _validate_digest(value: Any, field: str) -> None:
         )
 
 
-def _validate_visual_locator(value: Any) -> None:
+def validate_visual_locator(value: Any) -> None:
     allowed = {"kind", "page", "label", "region"}
     if not isinstance(value, Mapping) or set(value) - allowed:
         raise LocalResearchExhibitStoreError(
@@ -175,7 +176,13 @@ def _validate_visual_locator(value: Any) -> None:
             )
         for field in ("x", "y", "width", "height"):
             item = region.get(field)
-            if isinstance(item, bool) or not isinstance(item, (int, float)) or item < 0 or item > 1:
+            if (
+                isinstance(item, bool)
+                or not isinstance(item, (int, float))
+                or not math.isfinite(item)
+                or item < 0
+                or item > 1
+            ):
                 raise LocalResearchExhibitStoreError(
                     "EXHIBIT-DOCUMENT-001", f"Research Exhibit visual locator region {field} is invalid"
                 )
@@ -218,7 +225,7 @@ def _validate_visual_target(value: Any) -> None:
             "EXHIBIT-DOCUMENT-001", "Research Exhibit visual target source_byte_length is invalid"
         )
     _validate_digest(value.get("source_digest"), "source_digest")
-    _validate_visual_locator(value.get("locator"))
+    validate_visual_locator(value.get("locator"))
     derived = value.get("derived_artifact")
     if derived is not None:
         expected = {

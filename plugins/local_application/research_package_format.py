@@ -5,6 +5,10 @@ from pathlib import Path, PureWindowsPath
 from typing import Any, Mapping
 from jsonschema import Draft202012Validator, FormatChecker
 import rfc8785
+from plugins.local_research_exhibit_store import (
+    LocalResearchExhibitStoreError,
+    validate_visual_locator,
+)
 from .facade import LocalApplicationError
 
 SCHEMA_VERSION="0.2.0"; TOOL_VERSION="0.2.0"
@@ -192,6 +196,10 @@ def validate_resolved_references(package:Mapping[str,Any])->None:
         if not isinstance(visual,Mapping) or visual.get("target_type")!="source_visual":
             missing.append(label)
             continue
+        try:
+            validate_visual_locator(visual.get("locator"))
+        except LocalResearchExhibitStoreError:
+            missing.append(label+":locator")
         if (
             visual.get("source_run_id") not in (exhibit.get("source_run_ids") or [])
             or visual.get("source_artifact_ref") not in (exhibit.get("source_artifact_refs") or [])

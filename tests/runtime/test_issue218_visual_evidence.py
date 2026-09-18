@@ -137,6 +137,75 @@ class Issue218VisualEvidenceTests(ResearchPackageAcceptanceSupport):
         )
         self.assertEqual(verify_export_root(out)["status"], "VERIFIED")
 
+    def test_derived_visual_type_must_match_persisted_provenance(self):
+        facade, case = self._prepare_case(
+            original_media_type="image/png",
+            original_bytes=b"source-image",
+        )
+        try:
+            run = facade._application.execution_store.load_run(case["run_id"])
+            source_ref = f"{case['run_id']}.CAP-1.original"
+            derived = facade._application.execution_store.put_bytes(
+                run,
+                role="research_visual.crop",
+                media_type="image/png",
+                content=b"derived-image",
+                artifact_id="ART-VISUAL-TYPE-MISMATCH",
+                provenance={"derivation_type": "crop"},
+                parent_artifact_refs=(source_ref,),
+            )
+            payload = exhibits.exhibit_payload(
+                rq_id=case["rq_id"],
+                source_run_ids=[case["run_id"]],
+                source_artifact_refs=[source_ref, derived.artifact_id],
+                source_object_ids=[],
+            )
+            payload["visual_target"] = {
+                "source_run_id": case["run_id"],
+                "capture_id": "CAP-1",
+                "source_artifact_ref": source_ref,
+                "locator": {"kind": "table", "page": 1},
+                "derived_artifact_ref": derived.artifact_id,
+                "derivation_type": "table_extraction",
+            }
+            with self.assertRaises(LocalApplicationError) as caught:
+                facade.capture_exhibit(payload)
+            self.assertEqual(caught.exception.code, "APPLICATION-EXHIBIT-VISUAL-001")
+        finally:
+            facade.close()
+
+    def test_visual_region_rejects_non_finite_coordinates(self):
+        facade, case = self._prepare_case(
+            original_media_type="image/png",
+            original_bytes=b"source-image",
+        )
+        try:
+            source_ref = f"{case['run_id']}.CAP-1.original"
+            payload = exhibits.exhibit_payload(
+                rq_id=case["rq_id"],
+                source_run_ids=[case["run_id"]],
+                source_artifact_refs=[source_ref],
+                source_object_ids=[],
+            )
+            payload["visual_target"] = {
+                "source_run_id": case["run_id"],
+                "capture_id": "CAP-1",
+                "source_artifact_ref": source_ref,
+                "locator": {
+                    "kind": "region",
+                    "page": 1,
+                    "region": {
+                        "x": float("nan"), "y": 0.1,
+                        "width": 0.5, "height": 0.5, "unit": "normalized",
+                    },
+                },
+            }
+            with self.assertRaises(LocalApplicationError) as caught:
+                facade.capture_exhibit(payload)
+            self.assertEqual(caught.exception.code, "APPLICATION-EXHIBIT-VISUAL-001")
+        finally:
+            facade.close()
+
     def test_text_capture_cannot_be_promoted_to_visual_target(self):
         facade, case = self._prepare_case()
         try:
@@ -179,6 +248,67 @@ class Issue218VisualEvidenceTests(ResearchPackageAcceptanceSupport):
         with self.assertRaises(LocalApplicationError) as caught:
             verify_export_root(out)
         self.assertEqual(caught.exception.code, "APPLICATION-RESEARCH-PACKAGE-REFERENCE-001")
+
+    def test_package_verification_rejects_visual_locator_tamper(self):
+        facade, case = self._visual_case()
+        out = self.root / "visual-locator-tamper"
+        try:
+            facade.export_research_package(case["package_id"], out)
+        finally:
+            facade.close()
+
+        package_path = out / "research-package.json"
+        package = json.loads(package_path.read_text(encoding="utf-8"))
+        visual = package["resolved_content"]["working_material"]["research_exhibits"][0]["visual_target"]
+        visual["locator"]["page"] = 0
+        package["package_digest"] = digest_json(without_digest(package))
+        package_path.write_text(
+            json.dumps(package, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        with self.assertRaises(LocalApplicationError) as caught:
+            verify_export_root(out)
+        self.assertEqual(caught.exception.code, "APPLICATION-RESEARCH-PACKAGE-REFERENCE-001")
+
+    def test_same_visual_source_is_bundled_once_for_multiple_exhibits(self):
+        facade, case = self._prepare_case(
+            original_media_type="image/png",
+            original_bytes=b"shared-source-image",
+        )
+        try:
+            source_ref = f"{case['run_id']}.CAP-1.original"
+            exhibit_ids = []
+            for title, label in (("Figure use A", "Figure 1"), ("Figure use B", "Figure 1 detail")):
+                payload = exhibits.exhibit_payload(
+                    rq_id=case["rq_id"],
+                    title=title,
+                    source_run_ids=[case["run_id"]],
+                    source_artifact_refs=[source_ref],
+                    source_object_ids=[],
+                )
+                payload["visual_target"] = {
+                    "source_run_id": case["run_id"],
+                    "capture_id": "CAP-1",
+                    "source_artifact_ref": source_ref,
+                    "locator": {"kind": "figure", "page": 1, "label": label},
+                }
+                exhibit_ids.append(facade.capture_exhibit(payload)["exhibit"]["exhibit_id"])
+            case["build_input"]["exhibit_ids"] = exhibit_ids
+            built = facade.build_research_package(case["build_input"])
+            package = facade.show_research_package(built["package"]["package_id"])["package"]
+        finally:
+            facade.close()
+
+        visual_attachments = [
+            item for item in package["attachments"]
+            if item["source"].startswith("visual_source:")
+        ]
+        self.assertEqual(len(visual_attachments), 1)
+        paths = {
+            exhibit["visual_target"]["source_attachment_path"]
+            for exhibit in package["resolved_content"]["working_material"]["research_exhibits"]
+        }
+        self.assertEqual(paths, {visual_attachments[0]["path"]})
 
     def test_ablation_without_visual_target_has_no_citable_visual_attachment(self):
         facade, case = self._prepare_case(

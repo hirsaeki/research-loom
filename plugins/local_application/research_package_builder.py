@@ -71,7 +71,12 @@ def _visual_extension(media_type: str) -> str:
     }.get(media_type, "bin")
 
 
-def _package_visual_target(service, exhibit: Mapping[str, Any], attachments: list) -> Mapping[str, Any]:
+def _package_visual_target(
+    service,
+    exhibit: Mapping[str, Any],
+    attachments: list,
+    attachment_paths: dict[tuple[str, str], str],
+) -> Mapping[str, Any]:
     target = exhibit.get("visual_target")
     if target is None:
         return deepcopy(dict(exhibit))
@@ -102,28 +107,38 @@ def _package_visual_target(service, exhibit: Mapping[str, Any], attachments: lis
             "APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",
             f"visual target source binding changed: {exhibit.get('exhibit_id')}",
         )
-    source_payload = service.app.execution_store.load_artifact_verified_once(artifact_ref)
-    source_bytes = bytes(source_payload.content)
-    if (
-        len(source_bytes) != int(target["source_byte_length"])
-        or digest_bytes(source_bytes) != str(target["source_digest"])
-        or str(source_payload.media_type) != str(target["source_media_type"])
-    ):
-        raise LocalApplicationError(
-            "APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",
-            f"visual target source bytes changed: {exhibit.get('exhibit_id')}",
-        )
     exhibit_id = safe_component(str(exhibit["exhibit_id"]), "exhibit_id")
-    source_path = (
-        f"attachments/visual/{exhibit_id}/source."
-        f"{_visual_extension(str(target['source_media_type']))}"
-    )
-    attachments.append((
-        source_path,
-        source_bytes,
-        str(target["source_media_type"]),
-        f"visual_source:{exhibit_id}",
-    ))
+    source_key=(artifact_ref,str(target["source_digest"]))
+    source_path=attachment_paths.get(source_key)
+    if source_path is None:
+        source_size=int(target["source_byte_length"])
+        if source_size > MAX_TEXT_BYTES or sum(len(item[1]) for item in attachments)+source_size > MAX_TEXT_BYTES:
+            raise LocalApplicationError(
+                "APPLICATION-RESEARCH-PACKAGE-BOUND-001",
+                f"visual source exceeds detached package output bound: {exhibit.get('exhibit_id')}",
+            )
+        source_payload = service.app.execution_store.load_artifact_verified_once(artifact_ref)
+        source_bytes = bytes(source_payload.content)
+        if (
+            len(source_bytes) != source_size
+            or digest_bytes(source_bytes) != str(target["source_digest"])
+            or str(source_payload.media_type) != str(target["source_media_type"])
+        ):
+            raise LocalApplicationError(
+                "APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",
+                f"visual target source bytes changed: {exhibit.get('exhibit_id')}",
+            )
+        source_path = (
+            f"attachments/visual/{exhibit_id}/source."
+            f"{_visual_extension(str(target['source_media_type']))}"
+        )
+        attachments.append((
+            source_path,
+            source_bytes,
+            str(target["source_media_type"]),
+            f"visual_source:{artifact_ref}",
+        ))
+        attachment_paths[source_key]=source_path
     packaged = deepcopy(dict(exhibit))
     packaged_target = deepcopy(dict(target))
     packaged_target["source_attachment_path"] = source_path
@@ -140,6 +155,7 @@ def _package_visual_target(service, exhibit: Mapping[str, Any], attachments: lis
         if (
             derived_meta is None
             or artifact_ref not in tuple(derived_meta.provenance.get("parent_artifact_refs", ()))
+            or str(derived_meta.provenance.get("derivation_type", "")) != str(derived.get("derivation_type"))
             or str(derived.get("derived_from_artifact_ref")) != artifact_ref
             or str(derived_meta.digest) != str(derived.get("digest"))
             or int(derived_meta.size) != int(derived.get("byte_length", -1))
@@ -149,27 +165,37 @@ def _package_visual_target(service, exhibit: Mapping[str, Any], attachments: lis
                 "APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",
                 f"derived visual artifact binding changed: {exhibit.get('exhibit_id')}",
             )
-        derived_payload = service.app.execution_store.load_artifact_verified_once(derived_ref)
-        derived_bytes = bytes(derived_payload.content)
-        if (
-            len(derived_bytes) != int(derived["byte_length"])
-            or digest_bytes(derived_bytes) != str(derived["digest"])
-            or str(derived_payload.media_type) != str(derived["media_type"])
-        ):
-            raise LocalApplicationError(
-                "APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",
-                f"derived visual artifact bytes changed: {exhibit.get('exhibit_id')}",
+        derived_key=(derived_ref,str(derived["digest"]))
+        derived_path=attachment_paths.get(derived_key)
+        if derived_path is None:
+            derived_size=int(derived["byte_length"])
+            if derived_size > MAX_TEXT_BYTES or sum(len(item[1]) for item in attachments)+derived_size > MAX_TEXT_BYTES:
+                raise LocalApplicationError(
+                    "APPLICATION-RESEARCH-PACKAGE-BOUND-001",
+                    f"derived visual artifact exceeds detached package output bound: {exhibit.get('exhibit_id')}",
+                )
+            derived_payload = service.app.execution_store.load_artifact_verified_once(derived_ref)
+            derived_bytes = bytes(derived_payload.content)
+            if (
+                len(derived_bytes) != derived_size
+                or digest_bytes(derived_bytes) != str(derived["digest"])
+                or str(derived_payload.media_type) != str(derived["media_type"])
+            ):
+                raise LocalApplicationError(
+                    "APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",
+                    f"derived visual artifact bytes changed: {exhibit.get('exhibit_id')}",
+                )
+            derived_path = (
+                f"attachments/visual/{exhibit_id}/derived."
+                f"{_visual_extension(str(derived['media_type']))}"
             )
-        derived_path = (
-            f"attachments/visual/{exhibit_id}/derived."
-            f"{_visual_extension(str(derived['media_type']))}"
-        )
-        attachments.append((
-            derived_path,
-            derived_bytes,
-            str(derived["media_type"]),
-            f"visual_derived:{exhibit_id}",
-        ))
+            attachments.append((
+                derived_path,
+                derived_bytes,
+                str(derived["media_type"]),
+                f"visual_derived:{derived_ref}",
+            ))
+            attachment_paths[derived_key]=derived_path
         packaged_target["derived_artifact"] = deepcopy(dict(derived))
         packaged_target["derived_artifact"]["attachment_path"] = derived_path
     packaged["visual_target"] = packaged_target
@@ -255,7 +281,7 @@ def build_package(service, value:Mapping[str,Any])->Mapping[str,Any]:
         runs.append({"run_id":rid,"execution_mode":str(run.execution_mode),"historical_binding":{"lineage_ref":str(run.lineage_ref),"snapshot_id":str(run.snapshot_ref),"snapshot_digest":str(run.snapshot_digest)},"handoff":deepcopy(dict(h)) if isinstance(h,Mapping) else None,"candidate_only":True})
     if len(modes)>1: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-EPISTEMIC-001","REAL and VIRTUAL Run material may not be mixed")
 
-    exhs=[]; inputs=[]; attachments=[]; exhibit_provenance_seen=set()
+    exhs=[]; inputs=[]; attachments=[]; exhibit_provenance_seen=set(); visual_attachment_paths={}
     for eid in str_list(value.get("exhibit_ids"),"exhibit_ids",MAX_EXHIBITS):
         ex=service.facade.show_exhibit(eid).get("exhibit")
         if not isinstance(ex,Mapping): raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",f"Research Exhibit did not resolve: {eid}")
@@ -266,7 +292,7 @@ def build_package(service, value:Mapping[str,Any])->Mapping[str,Any]:
         else: data=str(raw).encode(); ext="md" if rep=="markdown" else "txt"; media="text/markdown" if rep=="markdown" else "text/plain"
         if len(data)>MAX_ITEM_BYTES: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-BOUND-001",f"Research Exhibit exceeds per-item bound: {eid}")
         modes.update(_collect_exhibit_modes(service, ex, state, exhibit_provenance_seen))
-        path=f"attachments/exhibits/{safe_component(eid,'exhibit_id')}.{ext}"; attachments.append((path,data,media,f"research_exhibit:{eid}")); exhs.append(_package_visual_target(service, ex, attachments))
+        path=f"attachments/exhibits/{safe_component(eid,'exhibit_id')}.{ext}"; attachments.append((path,data,media,f"research_exhibit:{eid}")); exhs.append(_package_visual_target(service, ex, attachments, visual_attachment_paths))
     for iid in str_list(value.get("project_input_ids"),"project_input_ids",MAX_INPUTS):
         shown=service.facade.show_project_input(iid,format="text"); item=shown.get("project_input",{}); content=shown.get("content",{})
         if item.get("project_id")!=service.project_id or item.get("lineage_ref")!=state.active_lineage_ref: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-BINDING-001",f"Project Input belongs to another project/lineage: {iid}")

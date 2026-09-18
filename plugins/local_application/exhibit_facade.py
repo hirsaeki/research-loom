@@ -9,6 +9,7 @@ from plugins.local_research_exhibit_store import (
     SUPPORTED_EXHIBIT_KINDS,
     content_digest,
     normalized_content,
+    validate_visual_locator,
 )
 
 from .run_inspection_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
@@ -184,65 +185,11 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
 
     @staticmethod
     def _normalize_visual_locator(value: Any) -> dict[str, Any]:
-        allowed = {"kind", "page", "label", "region"}
-        if not isinstance(value, Mapping) or set(value) - allowed:
-            raise LocalApplicationError(
-                "APPLICATION-EXHIBIT-VISUAL-001", "visual_target.locator is invalid"
-            )
-        kind = value.get("kind")
-        if kind not in {"figure", "table", "diagram", "region"}:
-            raise LocalApplicationError(
-                "APPLICATION-EXHIBIT-VISUAL-001", "visual_target.locator.kind is invalid"
-            )
-        page = value.get("page")
-        if page is not None and (isinstance(page, bool) or not isinstance(page, int) or page < 1):
-            raise LocalApplicationError(
-                "APPLICATION-EXHIBIT-VISUAL-001", "visual_target.locator.page is invalid"
-            )
-        label = value.get("label")
-        if label is not None and (not isinstance(label, str) or not label.strip()):
-            raise LocalApplicationError(
-                "APPLICATION-EXHIBIT-VISUAL-001", "visual_target.locator.label is invalid"
-            )
-        region = value.get("region")
-        normalized_region = None
-        if region is not None:
-            if not isinstance(region, Mapping) or set(region) != {"x", "y", "width", "height", "unit"} or region.get("unit") != "normalized":
-                raise LocalApplicationError(
-                    "APPLICATION-EXHIBIT-VISUAL-001", "visual_target.locator.region is invalid"
-                )
-            normalized_region = {"unit": "normalized"}
-            for field in ("x", "y", "width", "height"):
-                item = region.get(field)
-                if isinstance(item, bool) or not isinstance(item, (int, float)) or item < 0 or item > 1:
-                    raise LocalApplicationError(
-                        "APPLICATION-EXHIBIT-VISUAL-001",
-                        f"visual_target.locator.region.{field} is invalid",
-                    )
-                normalized_region[field] = item
-            if (
-                normalized_region["width"] <= 0
-                or normalized_region["height"] <= 0
-                or normalized_region["x"] + normalized_region["width"] > 1
-                or normalized_region["y"] + normalized_region["height"] > 1
-            ):
-                raise LocalApplicationError(
-                    "APPLICATION-EXHIBIT-VISUAL-001",
-                    "visual_target.locator.region exceeds normalized page bounds",
-                )
-        if page is None and label is None and normalized_region is None:
-            raise LocalApplicationError(
-                "APPLICATION-EXHIBIT-VISUAL-001",
-                "visual_target.locator requires page, label, or region",
-            )
-        result = {"kind": str(kind)}
-        if page is not None:
-            result["page"] = page
-        if label is not None:
-            result["label"] = label
-        if normalized_region is not None:
-            result["region"] = normalized_region
-        return result
+        try:
+            validate_visual_locator(value)
+        except LocalResearchExhibitStoreError as exc:
+            raise LocalApplicationError("APPLICATION-EXHIBIT-VISUAL-001", exc.message) from exc
+        return deepcopy(dict(value))
 
     def _normalize_visual_target(
         self,
@@ -327,10 +274,11 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
             derived is None
             or str(derived.run_id) != source_run_id
             or source_artifact_ref not in tuple(derived.provenance.get("parent_artifact_refs", ()))
+            or str(derived.provenance.get("derivation_type", "")) != str(derivation_type)
         ):
             raise LocalApplicationError(
                 "APPLICATION-EXHIBIT-VISUAL-001",
-                "derived visual artifact must declare the source original as its parent",
+                "derived visual artifact must match the source parent and derivation type",
             )
         normalized["derived_artifact"] = {
             "artifact_ref": str(derived.artifact_id),
