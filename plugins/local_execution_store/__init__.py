@@ -8,6 +8,7 @@ from .inspection import artifact_metadata_for, diagnostics_for, latest_diagnosti
 from .intake import bind_controlled_import_root, read_controlled_file
 from .material_inventory import external_capture_artifact_metadata_for_project
 from .recovery import result_extensions_for_run
+from .read_only import ReadOnlyLocalExecutionStore, open_read_only_execution_store
 from .status import child_runs_for_parent, pending_runs_for_project, recent_runs_for_project
 from .store import (
     LocalExecutionStoreConfig,
@@ -34,6 +35,7 @@ __all__ = [
     "LocalExecutionStoreError",
     "LocalExecutionStoreIntegrityError",
     "LocalOperationalTraceStore",
+    "ReadOnlyLocalExecutionStore",
     "RegisteredResource",
     "StoreIntegrityDiagnostic",
     "artifact_metadata_for",
@@ -43,6 +45,7 @@ __all__ = [
     "diagnostics_for",
     "latest_diagnostic_for",
     "external_capture_artifact_metadata_for_project",
+    "open_read_only_execution_store",
     "pending_runs_for_project",
     "read_controlled_file",
     "result_extensions_for_run",
