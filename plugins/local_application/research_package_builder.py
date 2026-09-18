@@ -112,7 +112,12 @@ def _package_visual_target(
     source_path=attachment_paths.get(source_key)
     if source_path is None:
         source_size=int(target["source_byte_length"])
-        if source_size > MAX_TEXT_BYTES or sum(len(item[1]) for item in attachments)+source_size > MAX_TEXT_BYTES:
+        if source_size > MAX_ITEM_BYTES:
+            raise LocalApplicationError(
+                "APPLICATION-RESEARCH-PACKAGE-BOUND-001",
+                f"visual source exceeds per-item bound: {exhibit.get('exhibit_id')}",
+            )
+        if sum(len(item[1]) for item in attachments)+source_size > MAX_TEXT_BYTES:
             raise LocalApplicationError(
                 "APPLICATION-RESEARCH-PACKAGE-BOUND-001",
                 f"visual source exceeds detached package output bound: {exhibit.get('exhibit_id')}",
@@ -169,7 +174,12 @@ def _package_visual_target(
         derived_path=attachment_paths.get(derived_key)
         if derived_path is None:
             derived_size=int(derived["byte_length"])
-            if derived_size > MAX_TEXT_BYTES or sum(len(item[1]) for item in attachments)+derived_size > MAX_TEXT_BYTES:
+            if derived_size > MAX_ITEM_BYTES:
+                raise LocalApplicationError(
+                    "APPLICATION-RESEARCH-PACKAGE-BOUND-001",
+                    f"derived visual artifact exceeds per-item bound: {exhibit.get('exhibit_id')}",
+                )
+            if sum(len(item[1]) for item in attachments)+derived_size > MAX_TEXT_BYTES:
                 raise LocalApplicationError(
                     "APPLICATION-RESEARCH-PACKAGE-BOUND-001",
                     f"derived visual artifact exceeds detached package output bound: {exhibit.get('exhibit_id')}",

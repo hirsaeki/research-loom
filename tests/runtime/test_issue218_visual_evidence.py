@@ -4,6 +4,7 @@ import json
 
 from plugins.local_application import LocalApplicationError
 from plugins.local_application.research_package_format import (
+    MAX_ITEM_BYTES,
     digest_json,
     without_digest,
 )
@@ -309,6 +310,33 @@ class Issue218VisualEvidenceTests(ResearchPackageAcceptanceSupport):
             for exhibit in package["resolved_content"]["working_material"]["research_exhibits"]
         }
         self.assertEqual(paths, {visual_attachments[0]["path"]})
+
+    def test_visual_source_respects_per_item_package_bound(self):
+        facade, case = self._prepare_case(
+            original_media_type="image/png",
+            original_bytes=b"x" * (MAX_ITEM_BYTES + 1),
+        )
+        try:
+            source_ref = f"{case['run_id']}.CAP-1.original"
+            payload = exhibits.exhibit_payload(
+                rq_id=case["rq_id"],
+                source_run_ids=[case["run_id"]],
+                source_artifact_refs=[source_ref],
+                source_object_ids=[],
+            )
+            payload["visual_target"] = {
+                "source_run_id": case["run_id"],
+                "capture_id": "CAP-1",
+                "source_artifact_ref": source_ref,
+                "locator": {"kind": "figure", "page": 1},
+            }
+            exhibit = facade.capture_exhibit(payload)["exhibit"]
+            case["build_input"]["exhibit_ids"] = [exhibit["exhibit_id"]]
+            with self.assertRaises(LocalApplicationError) as caught:
+                facade.build_research_package(case["build_input"])
+            self.assertEqual(caught.exception.code, "APPLICATION-RESEARCH-PACKAGE-BOUND-001")
+        finally:
+            facade.close()
 
     def test_ablation_without_visual_target_has_no_citable_visual_attachment(self):
         facade, case = self._prepare_case(
