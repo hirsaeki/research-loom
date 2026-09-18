@@ -72,7 +72,12 @@ class ResearchPackageAcceptanceSupport(unittest.TestCase):
 
     def tearDown(self): self.temp.cleanup()
 
-    def _prepare_case(self):
+    def _prepare_case(
+        self,
+        *,
+        original_media_type: str = "text/html",
+        original_bytes: bytes = b"<html>fixed source body</html>",
+    ):
         facade = LocalApplicationFacade.open_workspace(self.workspace)
         rq_id = intake.adopt_rq(facade)
         state = facade._application.state_repository.load_state_view(facade.project_id, facade._application.state_repository.load_active_lineage_ref(facade.project_id))
@@ -81,9 +86,10 @@ class ResearchPackageAcceptanceSupport(unittest.TestCase):
         project_input=facade.register_project_input({"file":str(input_path),"role":"other","expected_snapshot_id":state.current_snapshot["id"],"expected_snapshot_digest":state.current_snapshot["content_digest"],"provenance":{"supplied_by":"rp1-acceptance"}})["project_input"]
         run_id = facade.submit_action({"action_type":"desktop_research.investigate","payload":{"question_id":rq_id,"purpose":"RP1 fixed-source acceptance."}})["run_id"]
         facade.start_external_retrieval_attempt(run_id,{"attempt_id":"ATT-1","strategy":"support search","coverage_dimension_ids":["COV-SUPPORT"],"target_locator":"https://example.test/source-a"})
-        raw=self.workspace/"captures/raw/source-a.html"; text=self.workspace/"captures/text/source-a.txt"; raw.parent.mkdir(parents=True); text.parent.mkdir(parents=True)
-        raw.write_bytes(b"<html>fixed source body</html>"); exact="Source A contains the exact supporting excerpt used here."; text.write_text(exact,encoding="utf-8")
-        capture=facade.capture_external_source(run_id,{"capture_id":"CAP-1","source_category":"other","exact_locator":"https://example.test/source-a#section-1","acquired_at":"2026-09-07T00:00:00Z","original_file":"captures/raw/source-a.html","original_media_type":"text/html","text_rendition_file":"captures/text/source-a.txt"})["capture"]
+        suffix={"image/png":"png","image/jpeg":"jpg","application/pdf":"pdf"}.get(original_media_type,"html")
+        raw=self.workspace/f"captures/raw/source-a.{suffix}"; text=self.workspace/"captures/text/source-a.txt"; raw.parent.mkdir(parents=True); text.parent.mkdir(parents=True)
+        raw.write_bytes(original_bytes); exact="Source A contains the exact supporting excerpt used here."; text.write_text(exact,encoding="utf-8")
+        capture=facade.capture_external_source(run_id,{"capture_id":"CAP-1","source_category":"other","exact_locator":"https://example.test/source-a#section-1","acquired_at":"2026-09-07T00:00:00Z","original_file":f"captures/raw/source-a.{suffix}","original_media_type":original_media_type,"text_rendition_file":"captures/text/source-a.txt"})["capture"]
         facade.complete_external_retrieval_attempt(run_id,{"attempt_id":"ATT-1","outcome":"source_captured","resulting_capture_id":"CAP-1"})
         facade.start_external_retrieval_attempt(run_id,{"attempt_id":"ATT-2","strategy":"counter search","coverage_dimension_ids":["COV-COUNTER"]})
         facade.complete_external_retrieval_attempt(run_id,{"attempt_id":"ATT-2","outcome":"no_relevant_source"})
@@ -94,7 +100,7 @@ class ResearchPackageAcceptanceSupport(unittest.TestCase):
         exhibit=facade.capture_exhibit(exhibits.exhibit_payload(rq_id=rq_id,source_run_ids=[run_id],source_artifact_refs=[f"{run_id}.CAP-1.text"],source_object_ids=[]))["exhibit"]
         state2=facade._application.state_repository.load_state_view(facade.project_id, facade._application.state_repository.load_active_lineage_ref(facade.project_id))
         build_input={"snapshot_id":state2.current_snapshot["id"],"rq_id":rq_id,"run_ids":[run_id],"exhibit_ids":[exhibit["exhibit_id"]],"project_input_ids":[project_input["input_id"]],"materials":[{"run_id":run_id,"capture_id":"CAP-1"}],"gap_ids":["GAP-1"]}
-        return facade,{"rq_id":rq_id,"run_id":run_id,"capture":capture,"exhibit_id":exhibit["exhibit_id"],"project_input_id":project_input["input_id"],"project_input_text":input_text,"source_text":exact,"before":before,"proposal":proposal,"build_input":build_input}
+        return facade,{"rq_id":rq_id,"run_id":run_id,"capture":capture,"exhibit_id":exhibit["exhibit_id"],"project_input_id":project_input["input_id"],"project_input_text":input_text,"source_text":exact,"source_original_bytes":original_bytes,"before":before,"proposal":proposal,"build_input":build_input}
 
     def _build(self):
         facade,case=self._prepare_case(); result=facade.build_research_package(case["build_input"]); case["package_id"]=result["package"]["package_id"]; case["digest"]=result["package"]["package_digest"]; return facade,case
