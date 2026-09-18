@@ -176,6 +176,7 @@ def validate_resolved_references(package:Mapping[str,Any])->None:
     if not isinstance(working,Mapping):
         missing.append("resolved_content.working_material")
         working={}
+    visual_targets=[]
     exhibits=working.get("research_exhibits",[])
     if not isinstance(exhibits,list):
         missing.append("working_material.research_exhibits")
@@ -191,6 +192,12 @@ def validate_resolved_references(package:Mapping[str,Any])->None:
         if not isinstance(visual,Mapping) or visual.get("target_type")!="source_visual":
             missing.append(label)
             continue
+        if (
+            visual.get("source_run_id") not in (exhibit.get("source_run_ids") or [])
+            or visual.get("source_artifact_ref") not in (exhibit.get("source_artifact_refs") or [])
+        ):
+            missing.append(label)
+        visual_targets.append((label, visual, exhibit))
         require_attachment(
             visual.get("source_attachment_path"),
             digest=visual.get("source_digest"),
@@ -204,6 +211,7 @@ def validate_resolved_references(package:Mapping[str,Any])->None:
             if (
                 not isinstance(derived,Mapping)
                 or derived.get("derived_from_artifact_ref") != visual.get("source_artifact_ref")
+                or derived.get("artifact_ref") not in (exhibit.get("source_artifact_refs") or [])
             ):
                 missing.append(derived_label)
             else:
@@ -214,6 +222,23 @@ def validate_resolved_references(package:Mapping[str,Any])->None:
                     media_type=derived.get("media_type"),
                     label=derived_label,
                 )
+
+    material_index={
+        (str(material.get("run_id")), str(material.get("capture",{}).get("capture_id"))): material
+        for material in material_rows
+        if isinstance(material,Mapping) and isinstance(material.get("capture"),Mapping)
+    }
+    for label, visual, _exhibit in visual_targets:
+        material=material_index.get((str(visual.get("source_run_id")), str(visual.get("capture_id"))))
+        original=material.get("capture",{}).get("original",{}) if isinstance(material,Mapping) else {}
+        if (
+            not isinstance(original,Mapping)
+            or original.get("artifact_id") != visual.get("source_artifact_ref")
+            or original.get("digest") != visual.get("source_digest")
+            or original.get("media_type") != visual.get("source_media_type")
+            or original.get("size_bytes") != visual.get("source_byte_length")
+        ):
+            missing.append(label+":capture_binding")
 
     project_inputs=working.get("project_inputs",[])
     if not isinstance(project_inputs,list):
