@@ -229,6 +229,35 @@ class Issue218VisualEvidenceTests(ResearchPackageAcceptanceSupport):
         finally:
             facade.close()
 
+    def test_visual_target_requires_selected_source_material_before_persist(self):
+        facade, case = self._prepare_case(
+            original_media_type="image/png",
+            original_bytes=b"source-image",
+        )
+        try:
+            source_ref = f"{case['run_id']}.CAP-1.original"
+            payload = exhibits.exhibit_payload(
+                rq_id=case["rq_id"],
+                source_run_ids=[case["run_id"]],
+                source_artifact_refs=[source_ref],
+                source_object_ids=[],
+            )
+            payload["visual_target"] = {
+                "source_run_id": case["run_id"],
+                "capture_id": "CAP-1",
+                "source_artifact_ref": source_ref,
+                "locator": {"kind": "figure", "page": 1},
+            }
+            exhibit = facade.capture_exhibit(payload)["exhibit"]
+            case["build_input"]["exhibit_ids"] = [exhibit["exhibit_id"]]
+            case["build_input"]["materials"] = []
+            with self.assertRaises(LocalApplicationError) as caught:
+                facade.build_research_package(case["build_input"])
+            self.assertEqual(caught.exception.code, "APPLICATION-RESEARCH-PACKAGE-REFERENCE-001")
+            self.assertEqual(facade.list_research_packages()["packages"], [])
+        finally:
+            facade.close()
+
     def test_package_verification_rejects_visual_digest_binding_tamper(self):
         facade, case = self._visual_case()
         out = self.root / "visual-tamper"

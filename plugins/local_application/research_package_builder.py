@@ -341,6 +341,18 @@ def build_package(service, value:Mapping[str,Any])->Mapping[str,Any]:
         materials.append(material_row)
     if len(modes)>1: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-EPISTEMIC-001","REAL and VIRTUAL material may not be mixed")
     selected_material_pairs={(str(m.get("run_id")),str(m.get("capture_id"))) for m in rawm if isinstance(m,Mapping)}
+    missing_visual_materials=[]
+    for exhibit in exhs:
+        visual=exhibit.get("visual_target") if isinstance(exhibit,Mapping) else None
+        if isinstance(visual,Mapping):
+            pair=(str(visual.get("source_run_id")),str(visual.get("capture_id")))
+            if pair not in selected_material_pairs:
+                missing_visual_materials.append(f"{pair[0]}:{pair[1]}")
+    if missing_visual_materials:
+        raise LocalApplicationError(
+            "APPLICATION-RESEARCH-PACKAGE-REFERENCE-001",
+            "visual targets require bundled source materials: "+", ".join(sorted(set(missing_visual_materials))),
+        )
     missing_run_materials=[]
     for row in runs:
         outputs=row.get("handoff",{}).get("outputs",{}) if isinstance(row.get("handoff"),Mapping) else {}

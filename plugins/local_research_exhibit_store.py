@@ -179,7 +179,7 @@ def validate_visual_locator(value: Any) -> None:
             if (
                 isinstance(item, bool)
                 or not isinstance(item, (int, float))
-                or not math.isfinite(item)
+                or (isinstance(item, float) and not math.isfinite(item))
                 or item < 0
                 or item > 1
             ):
@@ -196,7 +196,7 @@ def validate_visual_locator(value: Any) -> None:
         )
 
 
-def _validate_visual_target(value: Any) -> None:
+def validate_visual_target(value: Any) -> None:
     required = {
         "target_type", "source_run_id", "capture_id", "source_artifact_ref",
         "locator", "source_media_type", "source_byte_length", "source_digest",
@@ -292,7 +292,7 @@ def validate_exhibit_document(value: Mapping[str, Any]) -> None:
         _validate_string_list(value.get(field), field)
     _validate_snapshot_binding(value.get("captured_against"))
     if "visual_target" in value:
-        _validate_visual_target(value.get("visual_target"))
+        validate_visual_target(value.get("visual_target"))
 
     content = value.get("content")
     if not isinstance(content, Mapping) or set(content) != {

@@ -7,7 +7,7 @@ from jsonschema import Draft202012Validator, FormatChecker
 import rfc8785
 from plugins.local_research_exhibit_store import (
     LocalResearchExhibitStoreError,
-    validate_visual_locator,
+    validate_visual_target,
 )
 from .facade import LocalApplicationError
 
@@ -196,10 +196,15 @@ def validate_resolved_references(package:Mapping[str,Any])->None:
         if not isinstance(visual,Mapping) or visual.get("target_type")!="source_visual":
             missing.append(label)
             continue
+        canonical_visual=deepcopy(dict(visual))
+        canonical_visual.pop("source_attachment_path",None)
+        canonical_derived=canonical_visual.get("derived_artifact")
+        if isinstance(canonical_derived,Mapping):
+            canonical_derived=deepcopy(dict(canonical_derived)); canonical_derived.pop("attachment_path",None); canonical_visual["derived_artifact"]=canonical_derived
         try:
-            validate_visual_locator(visual.get("locator"))
+            validate_visual_target(canonical_visual)
         except LocalResearchExhibitStoreError:
-            missing.append(label+":locator")
+            missing.append(label)
         if (
             visual.get("source_run_id") not in (exhibit.get("source_run_ids") or [])
             or visual.get("source_artifact_ref") not in (exhibit.get("source_artifact_refs") or [])
