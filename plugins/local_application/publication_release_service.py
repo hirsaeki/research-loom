@@ -813,7 +813,11 @@ class PublicationReleaseService:
         }
 
     @staticmethod
-    def _release_checks_pass(build: Mapping[str, Any]) -> bool:
+    def _release_checks_pass(
+        build: Mapping[str, Any], preview: Mapping[str, Any]
+    ) -> bool:
+        if preview.get("source_epistemic_status") != "EMPIRICAL_RESEARCH_STATE":
+            return False
         return not any(
             value == "failed"
             for key, value in build["verification"].items()
@@ -829,7 +833,7 @@ class PublicationReleaseService:
         shown = self.show_preview(build_id)
         build = shown["build"]
         preview = shown["preview_manifest"]
-        if not self._release_checks_pass(build):
+        if not self._release_checks_pass(build, preview):
             raise LocalApplicationError(
                 "APPLICATION-PUBLICATION-RELEASE-CHECK-001",
                 "Publication release checks have not passed",
@@ -925,7 +929,7 @@ class PublicationReleaseService:
         shown = self.show_preview(build_id)
         build = shown["build"]
         preview = shown["preview_manifest"]
-        if not self._release_checks_pass(build):
+        if not self._release_checks_pass(build, preview):
             raise LocalApplicationError(
                 "APPLICATION-PUBLICATION-RELEASE-CHECK-001",
                 "Publication release checks have not passed",

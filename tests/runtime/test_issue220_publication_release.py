@@ -228,6 +228,52 @@ class Issue220PublicationReleaseTests(ResearchPackageAcceptanceSupport):
         finally:
             facade.close()
 
+    def test_synthetic_preview_cannot_request_or_complete_release(self):
+        facade, _case, composition, imported, _source_ref = self._prepared()
+        try:
+            built = facade.build_publication_preview(
+                composition["composition_id"], imported["revision_id"]
+            )
+            synthetic_preview = deepcopy(built["preview_manifest"])
+            synthetic_preview["source_epistemic_status"] = "SYNTHETIC_TEST_ONLY"
+            shown = {
+                "build": deepcopy(built["build"]),
+                "preview_manifest": synthetic_preview,
+            }
+            service = facade._publication_release_service()
+            with patch.object(service, "show_preview", return_value=shown):
+                with self.assertRaises(LocalApplicationError) as request_error:
+                    service.request_release(built["build"]["build_id"], "HUMAN-RELEASE")
+            self.assertEqual(
+                request_error.exception.code,
+                "APPLICATION-PUBLICATION-RELEASE-CHECK-001",
+            )
+
+            request = {
+                "request_id": "PUBRELREQ-SYNTHETIC",
+                "request_digest": "sha256:" + "1" * 64,
+                "human_actor_id": "HUMAN-RELEASE",
+                "allowed_dispositions": ["approve_release"],
+            }
+            response = {
+                "request_id": request["request_id"],
+                "request_digest": request["request_digest"],
+                "disposition": "approve_release",
+                "actor_id": request["human_actor_id"],
+            }
+            with (
+                patch.object(service, "_load_release_request", return_value=request),
+                patch.object(service, "show_preview", return_value=shown),
+            ):
+                with self.assertRaises(LocalApplicationError) as release_error:
+                    service.release(built["build"]["build_id"], response)
+            self.assertEqual(
+                release_error.exception.code,
+                "APPLICATION-PUBLICATION-RELEASE-CHECK-001",
+            )
+        finally:
+            facade.close()
+
     def test_token_only_citation_resolves_from_pinned_package(self):
         facade, _case, composition, imported, source_ref = self._prepared(
             structured_citation=False
