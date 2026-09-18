@@ -10,7 +10,7 @@ from .research_question_review import (
     research_question_review_payload,
 )
 from .question_review_resume import append_question_review_candidates
-from .survey_analysis_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
+from .delphi_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
 
 _ACTION_REGISTRATION_LOCK = RLock()
 _ACTION_TYPE = "research_question.review"

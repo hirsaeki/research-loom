@@ -320,6 +320,68 @@ def build_parser() -> argparse.ArgumentParser:
     survey_instrument_export.add_argument("--format", required=True, choices=("json", "markdown"))
     _add_output_json(survey_instrument_export)
 
+    delphi = sub.add_parser("delphi")
+    delphi_sub = delphi.add_subparsers(dest="delphi_command", required=True)
+
+    delphi_design = delphi_sub.add_parser("design")
+    delphi_design_sub = delphi_design.add_subparsers(dest="delphi_design_command", required=True)
+    delphi_design_capture = delphi_design_sub.add_parser("capture")
+    _add_workspace(delphi_design_capture)
+    _add_input_json(delphi_design_capture)
+    delphi_design_show = delphi_design_sub.add_parser("show")
+    _add_workspace(delphi_design_show)
+    delphi_design_show.add_argument("--delphi-design-id", required=True)
+    delphi_design_show.add_argument("--version", required=True)
+    _add_output_json(delphi_design_show)
+
+    delphi_instrument = delphi_sub.add_parser("instrument")
+    delphi_instrument_sub = delphi_instrument.add_subparsers(dest="delphi_instrument_command", required=True)
+    delphi_instrument_capture = delphi_instrument_sub.add_parser("capture")
+    _add_workspace(delphi_instrument_capture)
+    _add_input_json(delphi_instrument_capture)
+    delphi_instrument_show = delphi_instrument_sub.add_parser("show")
+    _add_workspace(delphi_instrument_show)
+    delphi_instrument_show.add_argument("--instrument-id", required=True)
+    delphi_instrument_show.add_argument("--version", required=True)
+    _add_output_json(delphi_instrument_show)
+
+    delphi_round = delphi_sub.add_parser("round")
+    delphi_round_sub = delphi_round.add_subparsers(dest="delphi_round_command", required=True)
+    delphi_round_capture = delphi_round_sub.add_parser("capture")
+    _add_workspace(delphi_round_capture)
+    _add_input_json(delphi_round_capture)
+    delphi_round_show = delphi_round_sub.add_parser("show")
+    _add_workspace(delphi_round_show)
+    delphi_round_show.add_argument("--round-result-id", required=True)
+    _add_output_json(delphi_round_show)
+
+    delphi_feedback = delphi_sub.add_parser("feedback")
+    delphi_feedback_sub = delphi_feedback.add_subparsers(dest="delphi_feedback_command", required=True)
+    delphi_feedback_build = delphi_feedback_sub.add_parser("build")
+    _add_workspace(delphi_feedback_build)
+    delphi_feedback_build.add_argument("--round-result-id", required=True)
+    _add_output_json(delphi_feedback_build)
+    delphi_feedback_show = delphi_feedback_sub.add_parser("show")
+    _add_workspace(delphi_feedback_show)
+    delphi_feedback_show.add_argument("--feedback-id", required=True)
+    _add_output_json(delphi_feedback_show)
+
+    delphi_inspect = delphi_sub.add_parser("inspect")
+    _add_workspace(delphi_inspect)
+    delphi_inspect.add_argument("--panel-id", required=True)
+    _add_output_json(delphi_inspect)
+
+    delphi_stopping = delphi_sub.add_parser("stopping")
+    delphi_stopping_sub = delphi_stopping.add_subparsers(dest="delphi_stopping_command", required=True)
+    delphi_stopping_build = delphi_stopping_sub.add_parser("build")
+    _add_workspace(delphi_stopping_build)
+    delphi_stopping_build.add_argument("--panel-id", required=True)
+    _add_output_json(delphi_stopping_build)
+    delphi_stopping_show = delphi_stopping_sub.add_parser("show")
+    _add_workspace(delphi_stopping_show)
+    delphi_stopping_show.add_argument("--stopping-candidate-id", required=True)
+    _add_output_json(delphi_stopping_show)
+
     action = sub.add_parser("action")
     action_sub = action.add_subparsers(dest="action_command", required=True)
     submit = action_sub.add_parser("submit")
@@ -515,6 +577,34 @@ def _run(args: argparse.Namespace) -> Mapping[str, Any]:
                 return facade.request_publication_release(args.build_id, args.actor_id)
             if args.publication_command == "release":
                 return facade.release_publication(args.build_id, _read_input(args.json_input))
+        if args.command == "delphi":
+            if args.delphi_command == "design":
+                if args.delphi_design_command == "capture":
+                    return facade.capture_delphi_design(_read_input(args.json_input))
+                if args.delphi_design_command == "show":
+                    return facade.show_delphi_design(args.delphi_design_id, args.version)
+            if args.delphi_command == "instrument":
+                if args.delphi_instrument_command == "capture":
+                    return facade.capture_delphi_instrument(_read_input(args.json_input))
+                if args.delphi_instrument_command == "show":
+                    return facade.show_delphi_instrument(args.instrument_id, args.version)
+            if args.delphi_command == "round":
+                if args.delphi_round_command == "capture":
+                    return facade.capture_delphi_round(_read_input(args.json_input))
+                if args.delphi_round_command == "show":
+                    return facade.show_delphi_round(args.round_result_id)
+            if args.delphi_command == "feedback":
+                if args.delphi_feedback_command == "build":
+                    return facade.build_delphi_feedback(args.round_result_id)
+                if args.delphi_feedback_command == "show":
+                    return facade.show_delphi_feedback(args.feedback_id)
+            if args.delphi_command == "inspect":
+                return facade.inspect_delphi_panel(args.panel_id)
+            if args.delphi_command == "stopping":
+                if args.delphi_stopping_command == "build":
+                    return facade.build_delphi_stopping_candidate(args.panel_id)
+                if args.delphi_stopping_command == "show":
+                    return facade.show_delphi_stopping_candidate(args.stopping_candidate_id)
         if args.command == "survey":
             if args.survey_command == "design":
                 if args.survey_design_command == "capture":
