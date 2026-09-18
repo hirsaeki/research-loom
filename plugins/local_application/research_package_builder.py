@@ -59,6 +59,123 @@ def _validate_selected_reference_closure(selected: list[Mapping[str, Any]]) -> N
         )
 
 
+def _visual_extension(media_type: str) -> str:
+    return {
+        "application/pdf": "pdf",
+        "image/png": "png",
+        "image/jpeg": "jpg",
+        "image/webp": "webp",
+        "image/gif": "gif",
+        "application/json": "json",
+        "text/csv": "csv",
+    }.get(media_type, "bin")
+
+
+def _package_visual_target(service, exhibit: Mapping[str, Any], attachments: list) -> Mapping[str, Any]:
+    target = exhibit.get("visual_target")
+    if target is None:
+        return deepcopy(dict(exhibit))
+    if not isinstance(target, Mapping) or target.get("target_type") != "source_visual":
+        raise LocalApplicationError(
+            "APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",
+            f"invalid Research Exhibit visual target: {exhibit.get('exhibit_id')}",
+        )
+    run_id = str(target.get("source_run_id", ""))
+    artifact_ref = str(target.get("source_artifact_ref", ""))
+    capture_id = str(target.get("capture_id", ""))
+    if run_id not in (exhibit.get("source_run_ids") or []) or artifact_ref not in (exhibit.get("source_artifact_refs") or []):
+        raise LocalApplicationError(
+            "APPLICATION-RESEARCH-PACKAGE-REFERENCE-001",
+            f"visual target is not declared by Research Exhibit provenance: {exhibit.get('exhibit_id')}",
+        )
+    metadata = {str(item.artifact_id): item for item in service.app.execution_store.artifacts_for(run_id)}
+    source = metadata.get(artifact_ref)
+    if (
+        source is None
+        or str(source.role) != "desktop_research.original_capture"
+        or str(source.provenance.get("capture_id", "")) != capture_id
+        or str(source.digest) != str(target.get("source_digest"))
+        or int(source.size) != int(target.get("source_byte_length", -1))
+        or str(source.media_type) != str(target.get("source_media_type"))
+    ):
+        raise LocalApplicationError(
+            "APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",
+            f"visual target source binding changed: {exhibit.get('exhibit_id')}",
+        )
+    source_payload = service.app.execution_store.load_artifact_verified_once(artifact_ref)
+    source_bytes = bytes(source_payload.content)
+    if (
+        len(source_bytes) != int(target["source_byte_length"])
+        or digest_bytes(source_bytes) != str(target["source_digest"])
+        or str(source_payload.media_type) != str(target["source_media_type"])
+    ):
+        raise LocalApplicationError(
+            "APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",
+            f"visual target source bytes changed: {exhibit.get('exhibit_id')}",
+        )
+    exhibit_id = safe_component(str(exhibit["exhibit_id"]), "exhibit_id")
+    source_path = (
+        f"attachments/visual/{exhibit_id}/source."
+        f"{_visual_extension(str(target['source_media_type']))}"
+    )
+    attachments.append((
+        source_path,
+        source_bytes,
+        str(target["source_media_type"]),
+        f"visual_source:{exhibit_id}",
+    ))
+    packaged = deepcopy(dict(exhibit))
+    packaged_target = deepcopy(dict(target))
+    packaged_target["source_attachment_path"] = source_path
+
+    derived = target.get("derived_artifact")
+    if derived is not None:
+        if not isinstance(derived, Mapping):
+            raise LocalApplicationError(
+                "APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",
+                f"invalid derived visual artifact: {exhibit.get('exhibit_id')}",
+            )
+        derived_ref = str(derived.get("artifact_ref", ""))
+        derived_meta = metadata.get(derived_ref)
+        if (
+            derived_meta is None
+            or artifact_ref not in tuple(derived_meta.parent_artifact_refs)
+            or str(derived.get("derived_from_artifact_ref")) != artifact_ref
+            or str(derived_meta.digest) != str(derived.get("digest"))
+            or int(derived_meta.size) != int(derived.get("byte_length", -1))
+            or str(derived_meta.media_type) != str(derived.get("media_type"))
+        ):
+            raise LocalApplicationError(
+                "APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",
+                f"derived visual artifact binding changed: {exhibit.get('exhibit_id')}",
+            )
+        derived_payload = service.app.execution_store.load_artifact_verified_once(derived_ref)
+        derived_bytes = bytes(derived_payload.content)
+        if (
+            len(derived_bytes) != int(derived["byte_length"])
+            or digest_bytes(derived_bytes) != str(derived["digest"])
+            or str(derived_payload.media_type) != str(derived["media_type"])
+        ):
+            raise LocalApplicationError(
+                "APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",
+                f"derived visual artifact bytes changed: {exhibit.get('exhibit_id')}",
+            )
+        derived_path = (
+            f"attachments/visual/{exhibit_id}/derived."
+            f"{_visual_extension(str(derived['media_type']))}"
+        )
+        attachments.append((
+            derived_path,
+            derived_bytes,
+            str(derived["media_type"]),
+            f"visual_derived:{exhibit_id}",
+        ))
+        packaged_target["derived_artifact"] = deepcopy(dict(derived))
+        packaged_target["derived_artifact"]["attachment_path"] = derived_path
+    packaged["visual_target"] = packaged_target
+    return packaged
+
+
 def _collect_exhibit_modes(service, exhibit: Mapping[str, Any], state, visited: set[str]) -> set[str]:
     modes: set[str] = set()
     stack = [exhibit]
@@ -149,7 +266,7 @@ def build_package(service, value:Mapping[str,Any])->Mapping[str,Any]:
         else: data=str(raw).encode(); ext="md" if rep=="markdown" else "txt"; media="text/markdown" if rep=="markdown" else "text/plain"
         if len(data)>MAX_ITEM_BYTES: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-BOUND-001",f"Research Exhibit exceeds per-item bound: {eid}")
         modes.update(_collect_exhibit_modes(service, ex, state, exhibit_provenance_seen))
-        path=f"attachments/exhibits/{safe_component(eid,'exhibit_id')}.{ext}"; attachments.append((path,data,media,f"research_exhibit:{eid}")); exhs.append(deepcopy(dict(ex)))
+        path=f"attachments/exhibits/{safe_component(eid,'exhibit_id')}.{ext}"; attachments.append((path,data,media,f"research_exhibit:{eid}")); exhs.append(_package_visual_target(service, ex, attachments))
     for iid in str_list(value.get("project_input_ids"),"project_input_ids",MAX_INPUTS):
         shown=service.facade.show_project_input(iid,format="text"); item=shown.get("project_input",{}); content=shown.get("content",{})
         if item.get("project_id")!=service.project_id or item.get("lineage_ref")!=state.active_lineage_ref: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-BINDING-001",f"Project Input belongs to another project/lineage: {iid}")
