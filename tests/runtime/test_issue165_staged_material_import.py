@@ -122,7 +122,7 @@ class StagedMaterialImportAcceptanceTests(unittest.TestCase):
                 self.assertEqual(shown["status"], "OK")
                 self.assertIn(
                     "exact supporting excerpt",
-                    shown["text_rendition"]["content"],
+                    shown["text_rendition_view"]["content"],
                 )
                 exported = root / "imported-original.html"
                 destination.export_external_material(

@@ -114,6 +114,14 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                 "staged material import requires a workspace-backed application",
             )
         workspace = self._workspace_root.resolve()
+        current = workspace
+        for part in _INTAKE_RELATIVE.parts:
+            current = current / part
+            if (current.exists() or current.is_symlink()) and _link_like(current):
+                raise LocalApplicationError(
+                    "APPLICATION-MATERIAL-STAGE-001",
+                    "material intake path may not contain a link or junction",
+                )
         managed = (workspace / ".research-loom").resolve(strict=False)
         intake = (workspace / _INTAKE_RELATIVE).resolve(strict=False)
         try:
@@ -187,6 +195,11 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
     def _open_staged_material_source(self, stage_id: str):
         stage_id = _stage_id(stage_id)
         stage_root = self._material_intake_root() / stage_id
+        if _link_like(stage_root):
+            raise LocalApplicationError(
+                "APPLICATION-MATERIAL-IMPORT-001",
+                "staged material source may not be a link or junction",
+            )
         manifest_path = stage_root / _STAGE_MANIFEST
         try:
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -255,11 +268,16 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                     source_run_id,
                     source_capture_id,
                 )
-                original_path = source_store.verified_artifact_path(original.artifact_id)
-                text_payload = source_store.load_artifact_verified_once(rendition.artifact_id)
             except LocalApplicationError:
                 raise
-            except (KeyError, FileNotFoundError, LocalExecutionStoreIntegrityError, OSError) as exc:
+            except (
+                KeyError,
+                FileNotFoundError,
+                LocalExecutionStoreIntegrityError,
+                OSError,
+                TypeError,
+                ValueError,
+            ) as exc:
                 raise LocalApplicationError(
                     "APPLICATION-MATERIAL-IMPORT-VERIFY-001",
                     "selected staged material is missing, corrupt, unreadable, or incorrectly bound",
@@ -312,11 +330,25 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                     "selected material exceeds destination Desktop Research capture budget",
                 )
             try:
+                original_path = source_store.verified_artifact_path(original.artifact_id)
+                text_payload = source_store.load_artifact_verified_once(rendition.artifact_id)
                 text_payload.content.decode("utf-8")
             except UnicodeDecodeError as exc:
                 raise LocalApplicationError(
                     "APPLICATION-MATERIAL-IMPORT-VERIFY-001",
                     "selected text rendition is not valid UTF-8",
+                ) from exc
+            except (
+                KeyError,
+                FileNotFoundError,
+                LocalExecutionStoreIntegrityError,
+                OSError,
+                TypeError,
+                ValueError,
+            ) as exc:
+                raise LocalApplicationError(
+                    "APPLICATION-MATERIAL-IMPORT-VERIFY-001",
+                    "selected staged material is missing, corrupt, unreadable, or incorrectly bound",
                 ) from exc
 
             imported_at = self._application.clock.now()
