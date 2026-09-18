@@ -319,7 +319,7 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                 "derived visual artifacts require declared artifact ref and derivation_type",
             )
         derived = artifact_index.get(derived_ref)
-        if derived is None or source_artifact_ref not in tuple(derived.parent_artifact_refs):
+        if derived is None or source_artifact_ref not in tuple(derived.provenance.get("parent_artifact_refs", ())):
             raise LocalApplicationError(
                 "APPLICATION-EXHIBIT-VISUAL-001",
                 "derived visual artifact must declare the source original as its parent",
