@@ -77,6 +77,66 @@ class Issue218VisualEvidenceTests(ResearchPackageAcceptanceSupport):
         self.assertEqual((out / visual["source_attachment_path"]).read_bytes(), case["visual_original"])
         self.assertIn("Source visual:", (out / "research-package.md").read_text(encoding="utf-8"))
 
+    def test_derived_crop_keeps_source_derivation_and_is_detached(self):
+        facade, case = self._prepare_case(
+            original_media_type="image/png",
+            original_bytes=b"\\x89PNG\\r\\n\\x1a\\nsource-for-crop",
+        )
+        out = self.root / "visual-derived"
+        try:
+            run = facade._application.execution_store.load_run(case["run_id"])
+            source_ref = f"{case['run_id']}.CAP-1.original"
+            derived = facade._application.execution_store.put_bytes(
+                run,
+                role="research_visual.crop",
+                media_type="image/png",
+                content=b"\\x89PNG\\r\\n\\x1a\\ncropped-region",
+                artifact_id="ART-VISUAL-CROP-1",
+                provenance={"derivation_type": "crop"},
+                parent_artifact_refs=(source_ref,),
+            )
+            payload = exhibits.exhibit_payload(
+                rq_id=case["rq_id"],
+                title="Derived source crop",
+                kind="graph",
+                representation="text",
+                value="Working note for the crop.",
+                source_run_ids=[case["run_id"]],
+                source_artifact_refs=[source_ref, derived.artifact_id],
+                source_object_ids=[],
+            )
+            payload["visual_target"] = {
+                "source_run_id": case["run_id"],
+                "capture_id": "CAP-1",
+                "source_artifact_ref": source_ref,
+                "locator": {"kind": "figure", "page": 1, "label": "Figure 1"},
+                "derived_artifact_ref": derived.artifact_id,
+                "derivation_type": "crop",
+            }
+            exhibit = facade.capture_exhibit(payload)["exhibit"]
+            case["build_input"]["exhibit_ids"] = [exhibit["exhibit_id"]]
+            built = facade.build_research_package(case["build_input"])
+            package_id = built["package"]["package_id"]
+            shown = facade.show_research_package(package_id)["package"]
+            visual = shown["resolved_content"]["working_material"]["research_exhibits"][0]["visual_target"]
+            self.assertEqual(
+                visual["derived_artifact"]["derived_from_artifact_ref"],
+                source_ref,
+            )
+            self.assertEqual(visual["derived_artifact"]["derivation_type"], "crop")
+            facade.export_research_package(package_id, out)
+        finally:
+            facade.close()
+
+        package = json.loads((out / "research-package.json").read_text(encoding="utf-8"))
+        visual = package["resolved_content"]["working_material"]["research_exhibits"][0]["visual_target"]
+        derived_path = visual["derived_artifact"]["attachment_path"]
+        self.assertEqual(
+            (out / derived_path).read_bytes(),
+            b"\\x89PNG\\r\\n\\x1a\\ncropped-region",
+        )
+        self.assertEqual(verify_export_root(out)["status"], "VERIFIED")
+
     def test_text_capture_cannot_be_promoted_to_visual_target(self):
         facade, case = self._prepare_case()
         try:
