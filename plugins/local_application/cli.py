@@ -318,6 +318,19 @@ def build_parser() -> argparse.ArgumentParser:
 
     materials = external_sub.add_parser("materials")
     materials_sub = materials.add_subparsers(dest="materials_command", required=True)
+    materials_stage = materials_sub.add_parser("stage")
+    _add_workspace(materials_stage)
+    materials_stage.add_argument("--source", required=True)
+    _add_output_json(materials_stage)
+
+    materials_import = materials_sub.add_parser("import")
+    _add_workspace(materials_import)
+    materials_import.add_argument("--stage-id", required=True)
+    materials_import.add_argument("--source-run-id", required=True)
+    materials_import.add_argument("--capture-id", required=True)
+    materials_import.add_argument("--destination-run-id", required=True)
+    _add_output_json(materials_import)
+
     materials_list = materials_sub.add_parser("list")
     _add_workspace(materials_list)
     materials_list.add_argument(
@@ -494,6 +507,15 @@ def _run(args: argparse.Namespace) -> Mapping[str, Any]:
                 )
             if args.external_command == "collect":
                 return facade.collect_external(args.run_id, _read_input(args.json_input))
+            if args.external_command == "materials" and args.materials_command == "stage":
+                return facade.stage_external_material_source(args.source)
+            if args.external_command == "materials" and args.materials_command == "import":
+                return facade.import_staged_external_material(
+                    args.stage_id,
+                    source_run_id=args.source_run_id,
+                    source_capture_id=args.capture_id,
+                    destination_run_id=args.destination_run_id,
+                )
             if args.external_command == "materials" and args.materials_command == "list":
                 return facade.list_external_materials(
                     limit=args.limit,

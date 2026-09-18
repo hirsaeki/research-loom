@@ -12,6 +12,7 @@ from .store import (
     _MIGRATION_RE,
     LocalExecutionStoreConfig,
     LocalExecutionStoreError,
+    LocalExecutionStoreIntegrityError,
 )
 
 
@@ -97,6 +98,44 @@ class ReadOnlyLocalExecutionStore(
                 "read-only execution/material store schema does not match "
                 "the current supported migration history"
             )
+
+    def verified_artifact_path(self, artifact_id: str) -> Path:
+        """Return the staged backing path only after exact digest/size verification."""
+        with self._lock:
+            row = self._connection.execute(
+                """
+                SELECT storage_locator, digest
+                FROM execution_artifacts WHERE artifact_id = ?
+                """,
+                (str(artifact_id),),
+            ).fetchone()
+        if row is None:
+            raise KeyError(str(artifact_id))
+        diagnosis = self.diagnose_artifact_content(str(artifact_id))
+        if diagnosis.get("status") != "verified":
+            error = LocalExecutionStoreIntegrityError(
+                "staged artifact backing content is not verified"
+            )
+            error.diagnosis = dict(diagnosis)
+            raise error
+        path = self._locator_path(str(row["storage_locator"]), str(row["digest"]))
+        root = self.root.resolve()
+        resolved = path.resolve()
+        try:
+            relative = resolved.relative_to(root)
+        except ValueError as exc:
+            raise LocalExecutionStoreIntegrityError(
+                "staged artifact backing path escapes the staged source root"
+            ) from exc
+        current = root
+        for part in relative.parts:
+            current = current / part
+            is_junction = getattr(current, "is_junction", lambda: False)
+            if current.is_symlink() or is_junction():
+                raise LocalExecutionStoreIntegrityError(
+                    "staged artifact backing path contains a link or junction"
+                )
+        return path
 
     def cleanup_staging(self) -> int:
         raise self._read_only_error()
