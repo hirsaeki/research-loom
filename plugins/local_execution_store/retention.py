@@ -372,6 +372,10 @@ class LocalExecutionStore(_AtomicExecutionStore):
         role_byte_limits: Mapping[str, int],
         role_count_limits: Mapping[str, int],
         expected_status: RunStatus,
+        expected_original_digest: str | None = None,
+        expected_original_size: int | None = None,
+        expected_text_digest: str | None = None,
+        expected_text_size: int | None = None,
     ) -> tuple[ExecutionArtifactMetadata, ExecutionArtifactMetadata]:
         """Persist one original/text capture pair; large originals bypass only generic output bounds."""
         if not isinstance(text_content, bytes):
@@ -384,6 +388,15 @@ class LocalExecutionStore(_AtomicExecutionStore):
             text_content.decode("utf-8")
         except UnicodeDecodeError as exc:
             raise LocalExecutionStoreError("text rendition must be valid UTF-8") from exc
+        actual_text_digest = "sha256:" + hashlib.sha256(text_content).hexdigest()
+        if expected_text_digest is not None and actual_text_digest != expected_text_digest:
+            raise LocalExecutionStoreIntegrityError(
+                "text rendition does not match verified source digest"
+            )
+        if expected_text_size is not None and len(text_content) != expected_text_size:
+            raise LocalExecutionStoreIntegrityError(
+                "text rendition does not match verified source size"
+            )
 
         # A small OS lock is the reservation: only one managed capture for this
         # Run may pass preflight and occupy staging at a time, including across
@@ -411,6 +424,22 @@ class LocalExecutionStore(_AtomicExecutionStore):
                 original_path,
                 max_bytes=max_original_bytes,
             )
+            if expected_original_digest is not None and original_digest != expected_original_digest:
+                try:
+                    staged.unlink()
+                except FileNotFoundError:
+                    pass
+                raise LocalExecutionStoreIntegrityError(
+                    "original capture does not match verified source digest"
+                )
+            if expected_original_size is not None and original_size != expected_original_size:
+                try:
+                    staged.unlink()
+                except FileNotFoundError:
+                    pass
+                raise LocalExecutionStoreIntegrityError(
+                    "original capture does not match verified source size"
+                )
             large = original_size > self.config.max_artifact_bytes
             original_role = "desktop_research.original_capture"
             text_role = "desktop_research.text_rendition"
