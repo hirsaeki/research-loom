@@ -106,7 +106,14 @@ def validate_resolved_references(package:Mapping[str,Any])->None:
     actual_sources={oid for oid,obj in by_id.items() if obj.get("kind")=="source"}
     if len(declared_sources)!=len(source_refs) or declared_sources!=actual_sources: missing.append("content.source_refs")
     manifest={str(a.get("path")):a for a in package.get("attachments",[]) if isinstance(a,Mapping) and isinstance(a.get("path"),str)}
-    def require_attachment(ref: Any, *, digest: Any = None, size: Any = None, label: str) -> None:
+    def require_attachment(
+        ref: Any,
+        *,
+        digest: Any = None,
+        size: Any = None,
+        media_type: Any = None,
+        label: str,
+    ) -> None:
         if not isinstance(ref,str) or ref not in manifest:
             missing.append(label)
             return
@@ -118,6 +125,11 @@ def validate_resolved_references(package:Mapping[str,Any])->None:
             isinstance(size,bool) or not isinstance(size,int) or size < 0
             or isinstance(entry_size,bool) or not isinstance(entry_size,int)
             or entry_size != size
+        ):
+            missing.append(label)
+        if media_type is not None and (
+            not isinstance(media_type, str)
+            or entry.get("media_type") != media_type
         ):
             missing.append(label)
 
@@ -164,6 +176,45 @@ def validate_resolved_references(package:Mapping[str,Any])->None:
     if not isinstance(working,Mapping):
         missing.append("resolved_content.working_material")
         working={}
+    exhibits=working.get("research_exhibits",[])
+    if not isinstance(exhibits,list):
+        missing.append("working_material.research_exhibits")
+        exhibits=[]
+    for exhibit in exhibits:
+        if not isinstance(exhibit,Mapping):
+            missing.append("working_material.research_exhibits")
+            continue
+        visual=exhibit.get("visual_target")
+        if visual is None:
+            continue
+        label=f"visual_target:{exhibit.get('exhibit_id')}"
+        if not isinstance(visual,Mapping) or visual.get("target_type")!="source_visual":
+            missing.append(label)
+            continue
+        require_attachment(
+            visual.get("source_attachment_path"),
+            digest=visual.get("source_digest"),
+            size=visual.get("source_byte_length"),
+            media_type=visual.get("source_media_type"),
+            label=label,
+        )
+        derived=visual.get("derived_artifact")
+        if derived is not None:
+            derived_label=f"{label}:derived"
+            if (
+                not isinstance(derived,Mapping)
+                or derived.get("derived_from_artifact_ref") != visual.get("source_artifact_ref")
+            ):
+                missing.append(derived_label)
+            else:
+                require_attachment(
+                    derived.get("attachment_path"),
+                    digest=derived.get("digest"),
+                    size=derived.get("byte_length"),
+                    media_type=derived.get("media_type"),
+                    label=derived_label,
+                )
+
     project_inputs=working.get("project_inputs",[])
     if not isinstance(project_inputs,list):
         missing.append("working_material.project_inputs")
