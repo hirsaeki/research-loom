@@ -8,6 +8,7 @@ import unittest
 from plugins.local_application import LocalApplicationError
 from plugins.local_execution_store import open_read_only_execution_store
 import test_external_desktop_research_intake as intake
+import test_issue92_external_submission_preflight as submission
 
 
 def _capture_source(root: Path, facade, run_id: str):
@@ -162,9 +163,19 @@ class StagedMaterialImportAcceptanceTests(unittest.TestCase):
                 handoff, extension = intake.golden_submission(
                     destination_app, destination_run, capture
                 )
+                research_result = (
+                    submission.Issue92ExternalSubmissionPreflightTests.research_result(
+                        handoff, extension
+                    )
+                )
+                preflight = destination.preflight_external(
+                    destination_run,
+                    {"research_result": research_result},
+                )
+                self.assertEqual(preflight["status"], "PREFLIGHT_OK")
                 result = destination.collect_external(
                     destination_run,
-                    {"handoff": handoff, "extension": extension},
+                    {"research_result": research_result},
                 )
                 after = destination_app.state_repository.load_state_view(
                     "PRJ-1", "LIN-1"
