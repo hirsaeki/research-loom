@@ -188,13 +188,13 @@ class LocalWorkspaceBootstrapTests(unittest.TestCase):
                     binding["project_id"] = "PRJ-OTHER"
                     binding_path.write_text(json.dumps(binding))
                 elif case == "config":
-                    config = json.loads((workspace / "project-config.json").read_text())
+                    config = json.loads((workspace / ".research-loom/project-config.json").read_text())
                     config["project"]["title"] += " tampered"
-                    (workspace / "project-config.json").write_text(json.dumps(config))
+                    (workspace / ".research-loom/project-config.json").write_text(json.dumps(config))
                 elif case == "profiles":
-                    profiles = json.loads((workspace / "effective-profile-set.json").read_text())
+                    profiles = json.loads((workspace / ".research-loom/effective-profile-set.json").read_text())
                     profiles["core_contracts"]["research_contract"] = "0.1.1"
-                    (workspace / "effective-profile-set.json").write_text(json.dumps(profiles))
+                    (workspace / ".research-loom/effective-profile-set.json").write_text(json.dumps(profiles))
                 elif case == "db_pin":
                     db = sqlite3.connect(workspace / ".research-loom/research-state.sqlite3")
                     try:

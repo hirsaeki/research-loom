@@ -301,8 +301,8 @@ class ProfileGenerationAdvancementTests(ResearchPackageAcceptanceSupport):
     def test_kody_recovery_rejects_workspace_escape_locators_before_deletion(self):
         marker_path = Path(self.workspace) / ".research-loom" / "profile-advancement.pending.json"
         binding = json.loads((Path(self.workspace) / ".research-loom" / "workspace-binding.json").read_text(encoding="utf-8"))
-        config_text = (Path(self.workspace) / "project-config.json").read_text(encoding="utf-8")
-        eps_text = (Path(self.workspace) / "effective-profile-set.json").read_text(encoding="utf-8")
+        config_text = (Path(self.workspace) / ".research-loom" / "project-config.json").read_text(encoding="utf-8")
+        eps_text = (Path(self.workspace) / ".research-loom" / "effective-profile-set.json").read_text(encoding="utf-8")
         config = json.loads(config_text)
         eps = json.loads(eps_text)
         base_marker = {

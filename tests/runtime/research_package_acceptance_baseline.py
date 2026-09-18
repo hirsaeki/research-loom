@@ -144,7 +144,7 @@ class ResearchPackageAcceptanceTests(ResearchPackageAcceptanceSupport):
             })
             self.assertEqual(virtual_result["status"], "SUCCEEDED")
             self.assertEqual(virtual_result["execution_mode"], "virtual")
-            (self.root / "virtual-workspace" / "effective-profile-set.json").write_text(
+            (self.root / "virtual-workspace" / ".research-loom" / "effective-profile-set.json").write_text(
                 (self.root / "profiles-input.json").read_text(encoding="utf-8"), encoding="utf-8"
             )
             state = virtual_facade._application.state_repository.load_state_view(

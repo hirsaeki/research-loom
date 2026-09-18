@@ -556,6 +556,18 @@ def _validate_state_database(path: Path, binding: Mapping[str, Any]) -> None:
         raise LocalWorkspaceError("WORKSPACE-STATE-DB-001", "Research State DB is unreadable or incompatible") from exc
 
 
+def workspace_document_path(root: str | Path, key: str) -> Path:
+    root = _assert_safe_workspace_root(Path(root))
+    if key not in {"project_config", "effective_profile_set"}:
+        raise LocalWorkspaceError("WORKSPACE-BINDING-001", f"unsupported workspace document: {key}")
+    binding = _read_json(
+        _safe_locator(root, f"{INTERNAL_DIR}/{BINDING_NAME}"),
+        code="WORKSPACE-BINDING-001",
+    )
+    _validate_binding_shape(binding)
+    return _safe_locator(root, str(binding[key]["locator"]))
+
+
 def _validated_documents(root: Path, binding: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
     config_path = _safe_locator(root, str(binding["project_config"]["locator"]))
     profile_path = _safe_locator(root, str(binding["effective_profile_set"]["locator"]))

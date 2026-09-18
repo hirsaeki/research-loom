@@ -8,6 +8,7 @@ import rfc8785
 from core.execution import RunStatus
 from core.runtime import canonical_digest as core_canonical_digest
 from .facade import LocalApplicationError
+from .workspace import workspace_document_path
 from .research_package_format import (
     ALLOWED, MAX_EXHIBITS, MAX_INPUTS, MAX_ITEM_BYTES, MAX_MATERIALS, MAX_OBJECTS,
     MAX_RUNS, MAX_TEXT_BYTES, NARRATIVE, SCHEMA_VERSION, TOOL_VERSION, brief,
@@ -210,7 +211,7 @@ def build_package(service, value:Mapping[str,Any])->Mapping[str,Any]:
         if missing: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INPUT-001","selected gap IDs do not resolve: "+", ".join(missing))
         gaps=[by[x] for x in requested]
 
-    config=deepcopy(dict(state.project_config)); eps_path=service.workspace/"effective-profile-set.json"
+    config=deepcopy(dict(state.project_config)); eps_path=workspace_document_path(service.workspace, "effective_profile_set")
     try: eps=json.loads(eps_path.read_text(encoding="utf-8"))
     except Exception as exc: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001","persisted Effective Profile Set is unreadable") from exc
     if core_canonical_digest(eps)!=str(state.effective_profile_set_digest): raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001","persisted Effective Profile Set no longer matches fixed Research State digest")

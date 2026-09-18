@@ -50,11 +50,11 @@ Most Loom-owned durable stores live below it. That makes a migration to the targ
 However, two workspace-owned documents required by `LocalWorkspace.open()` are currently persisted outside that Parent candidate:
 
 ```text
-<workspace>/project-config.json
-<workspace>/effective-profile-set.json
+<workspace>/.research-loom/project-config.json
+<workspace>/.research-loom/effective-profile-set.json
 ```
 
-`workspace-binding.json` points to them, `open()` reads and digest-validates them, Profile advancement rewrites them, and Writer/Virtual Runner paths consume the effective Profile Set. Therefore they are durable workspace dependencies, not disposable intake files.
+`workspace-binding.json` points to them, `open()` reads and digest-validates them, Profile advancement rewrites them, and Writer/Virtual Runner paths consume the effective Profile Set. Therefore they are durable workspace dependencies, not disposable intake files. Issue #193 moves both documents under the Parent Durable Store Root; legacy bindings remain readable without inventing historical child-initialization metadata.
 
 If `.research-loom/` is the Parent Durable Store Root, these two files are a **confirmed tree-membership violation**. #193 owns the structural correction. Their original caller-supplied input files remain intake; the persisted workspace-owned copies are durable.
 

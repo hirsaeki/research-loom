@@ -8,6 +8,7 @@ from typing import Any, Mapping
 from plugins.local_application.facade import LocalApplicationError, _AUTHORITY_PAYLOAD_FIELDS, _INGRESS_FIELDS
 from plugins.local_application.survey_response_facade import LocalApplicationFacade as SurveyResponseApplicationFacade
 from .virtual_runner_binding import build_survey_virtual_extension
+from .workspace import workspace_document_path
 from .virtual_runner_input import _payload
 from .virtual_runner_method_context import build_method_context
 from .virtual_runner_resolve import resolve_virtual_inputs
@@ -63,7 +64,7 @@ class LocalApplicationFacade(VirtualRunnerInspectionMixin, VirtualRunnerExecuteM
 
     def _effective_profile_set(self, state) -> Mapping[str, Any]:
         if self._workspace_root is not None:
-            path = self._workspace_root / "effective-profile-set.json"
+            path = workspace_document_path(self._workspace_root, "effective_profile_set")
             if path.is_file():
                 try:
                     value = json.loads(path.read_text(encoding="utf-8"))
