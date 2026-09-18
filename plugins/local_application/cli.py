@@ -268,6 +268,27 @@ def build_parser() -> argparse.ArgumentParser:
     wrt_inspect.add_argument("--revision-id")
     _add_output_json(wrt_inspect)
 
+    publication = sub.add_parser("publication")
+    publication_sub = publication.add_subparsers(dest="publication_command", required=True)
+    publication_preview = publication_sub.add_parser("preview")
+    _add_workspace(publication_preview)
+    publication_preview.add_argument("--composition-id", required=True)
+    publication_preview.add_argument("--revision-id")
+    _add_output_json(publication_preview)
+    publication_show = publication_sub.add_parser("show")
+    _add_workspace(publication_show)
+    publication_show.add_argument("--build-id", required=True)
+    _add_output_json(publication_show)
+    publication_release_request = publication_sub.add_parser("release-request")
+    _add_workspace(publication_release_request)
+    publication_release_request.add_argument("--build-id", required=True)
+    publication_release_request.add_argument("--actor-id", required=True)
+    _add_output_json(publication_release_request)
+    publication_release = publication_sub.add_parser("release")
+    _add_workspace(publication_release)
+    publication_release.add_argument("--build-id", required=True)
+    _add_input_json(publication_release)
+
     survey = sub.add_parser("survey")
     survey_sub = survey.add_subparsers(dest="survey_command", required=True)
 
@@ -485,6 +506,15 @@ def _run(args: argparse.Namespace) -> Mapping[str, Any]:
                 return facade.list_exhibits(rq_id=args.rq_id)
             if args.exhibit_command == "show":
                 return facade.show_exhibit(args.exhibit_id)
+        if args.command == "publication":
+            if args.publication_command == "preview":
+                return facade.build_publication_preview(args.composition_id, args.revision_id)
+            if args.publication_command == "show":
+                return facade.show_publication_preview(args.build_id)
+            if args.publication_command == "release-request":
+                return facade.request_publication_release(args.build_id, args.actor_id)
+            if args.publication_command == "release":
+                return facade.release_publication(args.build_id, _read_input(args.json_input))
         if args.command == "survey":
             if args.survey_command == "design":
                 if args.survey_design_command == "capture":
