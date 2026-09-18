@@ -331,10 +331,10 @@ def _recover_incomplete_profile_advancement_locked(root: Path) -> None:
                 str(old_binding["project_id"]),
                 expected_project_config_digest=str(new_binding["project_config"]["digest"]),
                 expected_effective_profile_set_digest=str(new_binding["effective_profile_set"]["digest"]),
-                project_config_ref=str(old_binding["project_config"]["locator"]),
+                project_config_ref=_binding_document_ref(old_binding, "project_config"),
                 project_config_digest=str(old_binding["project_config"]["digest"]),
                 project_config=old_config,
-                effective_profile_set_ref=str(old_binding["effective_profile_set"]["locator"]),
+                effective_profile_set_ref=_binding_document_ref(old_binding, "effective_profile_set"),
                 effective_profile_set_digest=str(old_binding["effective_profile_set"]["digest"]),
                 effective_constraints=_flatten_constraints(old_effective),
             )

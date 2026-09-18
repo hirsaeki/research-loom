@@ -849,6 +849,35 @@ class ProfileGenerationAdvancementTests(ResearchPackageAcceptanceSupport):
         self.assertEqual(code, 0)
         self.assertEqual(final_resume["research_state"]["snapshot"], before_resume["research_state"]["snapshot"])
 
+    def test_recovery_after_state_rebind_restores_logical_document_refs(self):
+        request, output, _ = self._resolve()
+        code, before_resume = _run_cli(["resume", "--workspace", self.workspace, "--json"])
+        self.assertEqual(code, 0)
+
+        from plugins.local_application import profile_advancement as advancement
+        real_write_json = advancement._write_json
+
+        def fail_after_state_rebind(path, value):
+            if Path(path).name.startswith("PGA-"):
+                raise RuntimeError("injected event write failure after state rebind")
+            return real_write_json(path, value)
+
+        with patch.object(advancement, "_write_json", side_effect=fail_after_state_rebind):
+            code, failed = self._advance(request, output)
+        self.assertEqual(code, 3, failed)
+
+        code, recovered = _run_cli(["resume", "--workspace", self.workspace, "--json"])
+        self.assertEqual(code, 0, recovered)
+        self.assertEqual(recovered["research_state"], before_resume["research_state"])
+
+        with LocalWorkspace.open(self.workspace) as opened:
+            state = opened.application.state_repository.load_state_view(
+                opened.project_id,
+                opened.application.state_repository.load_active_lineage_ref(opened.project_id),
+            )
+            self.assertEqual(state.project_config_ref, PROJECT_CONFIG_NAME)
+            self.assertEqual(state.effective_profile_set_ref, EFFECTIVE_PROFILE_SET_NAME)
+
     def test_ablation_old_new_history_guard_is_detected_then_baseline_restored(self):
         request, output, _ = self._resolve()
         from plugins.local_application import profile_advancement as advancement
