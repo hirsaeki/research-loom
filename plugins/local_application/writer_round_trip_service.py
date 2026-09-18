@@ -172,6 +172,12 @@ class WriterRoundTripService:
             raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-INTEGRITY-001", "manuscript revision digest mismatch")
         if value.get("revision_id") != revision_id:
             raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-INTEGRITY-001", "manuscript revision identity does not match its storage path")
+        source = value.get("source")
+        if not isinstance(source, Mapping) or source.get("composition_id") != composition_id:
+            raise LocalApplicationError(
+                "APPLICATION-WRITER-ROUND-TRIP-INTEGRITY-001",
+                "manuscript revision source composition does not match its storage series",
+            )
         return value
 
     def _load_latest_revision(self, composition_id: str) -> Mapping[str, Any] | None:
@@ -213,32 +219,19 @@ class WriterRoundTripService:
         return value
 
     def _reconcile_head(self, composition_id: str) -> Mapping[str, Any] | None:
-        latest = self._load_latest_revision(composition_id)
         head = self._head(composition_id)
-        if latest is None:
+        if head is not None:
             return head
+        latest = self._load_latest_revision(composition_id)
+        if latest is None:
+            return None
         latest_ref = {
             "revision_id": latest["revision_id"],
             "revision_digest": latest["revision_digest"],
             "revision_number": latest["revision_number"],
         }
-        if head is None or int(head["revision_number"]) < int(latest["revision_number"]):
-            self._write_head(composition_id, latest_ref)
-            return latest_ref
-        if int(head["revision_number"]) > int(latest["revision_number"]):
-            raise LocalApplicationError(
-                "APPLICATION-WRITER-ROUND-TRIP-INTEGRITY-001",
-                "manuscript head is ahead of all stored revisions",
-            )
-        if (
-            head["revision_id"] != latest["revision_id"]
-            or head["revision_digest"] != latest["revision_digest"]
-        ):
-            raise LocalApplicationError(
-                "APPLICATION-WRITER-ROUND-TRIP-INTEGRITY-001",
-                "manuscript head conflicts with the latest stored revision",
-            )
-        return head
+        self._write_head(composition_id, latest_ref)
+        return latest_ref
 
     def _export_lock_path(self, output: Path) -> Path:
         resolved = os.path.normcase(str(output.resolve(strict=False)))
@@ -559,6 +552,28 @@ class WriterRoundTripService:
                 existing = self._load_revision(composition_id, revision_id)
                 if existing.get("response_digest") != response_digest or existing.get("source", {}).get("input_digest") != receipt["input_digest"]:
                     raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-IMMUTABLE-001", "existing manuscript revision identity conflicts with this response")
+                if head is None or int(existing["revision_number"]) > int(head["revision_number"]):
+                    latest = self._load_latest_revision(composition_id)
+                    if latest is None:
+                        raise LocalApplicationError(
+                            "APPLICATION-WRITER-ROUND-TRIP-INTEGRITY-001",
+                            "stored manuscript revision cannot be reconciled with its series",
+                        )
+                    latest_ref = {
+                        "revision_id": latest["revision_id"],
+                        "revision_digest": latest["revision_digest"],
+                        "revision_number": latest["revision_number"],
+                    }
+                    self._write_head(composition_id, latest_ref)
+                    head = latest_ref
+                if int(head["revision_number"]) == int(existing["revision_number"]) and (
+                    head["revision_id"] != existing["revision_id"]
+                    or head["revision_digest"] != existing["revision_digest"]
+                ):
+                    raise LocalApplicationError(
+                        "APPLICATION-WRITER-ROUND-TRIP-INTEGRITY-001",
+                        "manuscript head conflicts with an existing revision at the same revision number",
+                    )
                 return {
                     "status": "VERIFIED_REUSE",
                     "revision_id": revision_id,

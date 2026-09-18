@@ -106,7 +106,12 @@ class Issue219WriterRoundTripTests(ResearchPackageAcceptanceSupport):
                 side_effect=AssertionError("Writer import must not mutate Research State"),
             ):
                 first = facade.import_writer_response(response)
-                retry = facade.import_writer_response(deepcopy(response))
+                with patch.object(
+                    WriterRoundTripService,
+                    "_load_latest_revision",
+                    side_effect=AssertionError("healthy head must avoid full revision history scans"),
+                ):
+                    retry = facade.import_writer_response(deepcopy(response))
             self.assertEqual(first["status"], "IMPORTED")
             self.assertEqual(retry["status"], "VERIFIED_REUSE")
             self.assertEqual(first["revision_id"], retry["revision_id"])
@@ -194,6 +199,80 @@ class Issue219WriterRoundTripTests(ResearchPackageAcceptanceSupport):
             self.assertEqual(
                 [row["revision_id"] for row in joined["revision_lineage"]],
                 [second["revision_id"], first["revision_id"]],
+            )
+        finally:
+            facade.close()
+
+    def test_retry_recovers_head_after_revision_persisted_before_head_update(self):
+        facade, _case, composition, _exported, input_doc = self._build_round_trip()
+        try:
+            first = facade.import_writer_response(self._response(input_doc))
+            base = {
+                "revision_id": first["revision_id"],
+                "revision_digest": first["revision_digest"],
+            }
+            changed = self._response(
+                input_doc,
+                response_id="WR-HEAD-RECOVERY",
+                base=base,
+                sections=[{
+                    "section_id": "SEC-FRAME",
+                    "content": "Revision persisted before the simulated head write failure.",
+                    "citations": [],
+                    "exhibit_refs": list(input_doc["sections"][0]["exhibit_refs"]),
+                }],
+                feedback=[],
+            )
+            with patch.object(
+                WriterRoundTripService,
+                "_write_head",
+                side_effect=LocalApplicationError(
+                    "APPLICATION-WRITER-ROUND-TRIP-WRITE-001",
+                    "simulated head persistence failure",
+                ),
+            ):
+                with self.assertRaises(LocalApplicationError) as error:
+                    facade.import_writer_response(changed)
+            self.assertEqual(
+                error.exception.code, "APPLICATION-WRITER-ROUND-TRIP-WRITE-001"
+            )
+
+            recovered = facade.import_writer_response(deepcopy(changed))
+            self.assertEqual(recovered["status"], "VERIFIED_REUSE")
+            self.assertEqual(recovered["revision_number"], 2)
+            head = facade._writer_round_trip_service()._head(
+                composition["composition_id"]
+            )
+            self.assertEqual(head["revision_id"], recovered["revision_id"])
+            self.assertEqual(head["revision_digest"], recovered["revision_digest"])
+        finally:
+            facade.close()
+
+    def test_revision_storage_series_must_match_source_composition(self):
+        facade, _case, composition, _exported, input_doc = self._build_round_trip()
+        try:
+            imported = facade.import_writer_response(self._response(input_doc))
+            service = facade._writer_round_trip_service()
+            path = service._revision_path(
+                composition["composition_id"], imported["revision_id"]
+            )
+            tampered = json.loads(path.read_text(encoding="utf-8"))
+            tampered["source"]["composition_id"] = "WCP-TAMPERED"
+            from plugins.local_application.writer_composition_service import _digest_document
+            tampered["revision_digest"] = _digest_document(
+                tampered, "revision_digest"
+            )
+            path.write_text(
+                json.dumps(tampered, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
+                encoding="utf-8",
+            )
+
+            with self.assertRaises(LocalApplicationError) as error:
+                service._load_revision(
+                    composition["composition_id"], imported["revision_id"]
+                )
+            self.assertEqual(
+                error.exception.code, "APPLICATION-WRITER-ROUND-TRIP-INTEGRITY-001"
             )
         finally:
             facade.close()
