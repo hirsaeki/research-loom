@@ -67,7 +67,24 @@ class ResearchPackageService:
         lines += ["","Canonical Narrative semantics: `attachments/profile/narrative-semantics.yaml`","","## Research Objects",""]
         for o in rc["research_objects"]: lines += [f"### {o.get('kind')} `{o.get('id')}`","","```json",json.dumps(o,ensure_ascii=False,sort_keys=True,indent=2),"```",""]
         lines += ["## Working Material",""]
-        for x in rc["working_material"]["research_exhibits"]: lines.append(f"- Exhibit `{x.get('exhibit_id')}`: {x.get('title','')}")
+        for x in rc["working_material"]["research_exhibits"]:
+            lines.append(f"- Exhibit `{x.get('exhibit_id')}`: {x.get('title','')}")
+            visual=x.get("visual_target")
+            if isinstance(visual,Mapping):
+                locator=visual.get("locator",{})
+                lines.append(
+                    "  - Source visual: "
+                    f"{visual.get('source_run_id')}:{visual.get('capture_id')} "
+                    f"{json.dumps(locator,ensure_ascii=False,sort_keys=True)} "
+                    f"-> `{visual.get('source_attachment_path')}`"
+                )
+                derived=visual.get("derived_artifact")
+                if isinstance(derived,Mapping):
+                    lines.append(
+                        "  - Derived visual: "
+                        f"{derived.get('derivation_type')} -> "
+                        f"`{derived.get('attachment_path')}`"
+                    )
         for r in rc["working_material"]["run_candidates"]: lines.append(f"- Candidate Run `{r['run_id']}` captured against `{r['historical_binding']['snapshot_id']}`; candidate-only")
         lines += ["","## Evidence Materials",""]
         for m in rc["materials"]:
