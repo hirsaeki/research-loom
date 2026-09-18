@@ -211,7 +211,13 @@ def build_package(service, value:Mapping[str,Any])->Mapping[str,Any]:
         if missing: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INPUT-001","selected gap IDs do not resolve: "+", ".join(missing))
         gaps=[by[x] for x in requested]
 
-    config=deepcopy(dict(state.project_config)); eps_path=workspace_document_path(service.workspace, "effective_profile_set")
+    config=deepcopy(dict(state.project_config))
+    binding_path=service.workspace/".research-loom"/"workspace-binding.json"
+    eps_path=(
+        workspace_document_path(service.workspace, "effective_profile_set")
+        if binding_path.is_file()
+        else service.workspace/"effective-profile-set.json"
+    )
     try: eps=json.loads(eps_path.read_text(encoding="utf-8"))
     except Exception as exc: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001","persisted Effective Profile Set is unreadable") from exc
     if core_canonical_digest(eps)!=str(state.effective_profile_set_digest): raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001","persisted Effective Profile Set no longer matches fixed Research State digest")
