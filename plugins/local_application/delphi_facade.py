@@ -66,19 +66,27 @@ def _item_map(instrument: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
     return result
 
 
-def _numeric_answer(answer: Mapping[str, Any]) -> float | None:
+def _numeric_answer_with_field(answer: Mapping[str, Any]) -> tuple[str | None, float | None]:
     for field in ("rating", "probability", "confidence"):
         value = answer.get(field)
         if isinstance(value, (int, float)) and not isinstance(value, bool):
-            return float(value)
-    return None
+            return field, float(value)
+    return None, None
+
+
+def _numeric_answer(answer: Mapping[str, Any]) -> float | None:
+    return _numeric_answer_with_field(answer)[1]
 
 
 def _decision_matches(state, decision_id: Any, instrument_id: str, choice: str) -> bool:
     for decision in state.decisions:
         if str(decision.get("id")) != str(decision_id):
             continue
-        if str(decision.get("project_id", state.project_ref)) != str(state.project_ref):
+        if (
+            str(decision.get("project_id", state.project_ref)) != str(state.project_ref)
+            or decision.get("actor_type") != "human"
+            or decision.get("decision_kind") != "research_revision"
+        ):
             return False
         subjects = decision.get("subjects")
         return bool(
@@ -130,10 +138,15 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
         validate_digest(design, "content_digest", "APPLICATION-DELPHI-DESIGN-DIGEST-001")
         planned = design["planned_rounds"]
         planned_sequences = {int(item["sequence"]) for item in planned["round_plan"]}
-        if int(planned["minimum_rounds"]) > 2 or int(planned["maximum_approved_rounds"]) < 2 or not {1, 2} <= planned_sequences:
+        if (
+            int(planned["minimum_rounds"]) != 2
+            or int(planned["maximum_approved_rounds"]) != 2
+            or len(planned["round_plan"]) != 2
+            or planned_sequences != {1, 2}
+        ):
             raise LocalApplicationError(
                 "APPLICATION-DELPHI-ROUND-001",
-                "the production slice requires approved Round 1 and Round 2 plans",
+                "the production slice requires exactly approved Round 1 and Round 2 plans",
             )
         state = self._delphi_state()
         validate_rqs(rq_ids, state)
@@ -207,6 +220,10 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                 or str(feedback.get("panel_id")) != panel_id
                 or str(prior_inst.get("content_digest")) != str(derived["prior_instrument_digest"])
                 or str(prior_round.get("content_digest")) != str(derived["prior_round_result_digest"])
+                or not isinstance(prior_round.get("instrument_ref"), Mapping)
+                or str(prior_round["instrument_ref"].get("instrument_id")) != str(derived["prior_instrument_id"])
+                or str(prior_round["instrument_ref"].get("version")) != str(derived["prior_instrument_version"])
+                or str(prior_round["instrument_ref"].get("content_digest")) != str(derived["prior_instrument_digest"])
                 or str(feedback.get("content_digest")) != str(derived["feedback_digest"])
                 or str(feedback.get("source_round_result_id")) != str(prior_round["identity"])
             ):
@@ -301,6 +318,13 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                 if state not in _ALLOWED_STATES:
                     raise LocalApplicationError("APPLICATION-DELPHI-RESPONSE-001", "unsupported Delphi answer state")
                 value_fields = [field for field in ("rating", "probability", "confidence", "ranking", "rationale") if field in ans]
+                mode_for_field = {"rationale": "free_text_rationale"}
+                response_modes = set(item.get("response_modes", ()))
+                if any(mode_for_field.get(field, field) not in response_modes for field in value_fields):
+                    raise LocalApplicationError(
+                        "APPLICATION-DELPHI-RESPONSE-001",
+                        "answer uses a response mode not allowed by the Instrument",
+                    )
                 if state == "answered" and not value_fields:
                     raise LocalApplicationError("APPLICATION-DELPHI-RESPONSE-001", "answered Delphi item requires a response value")
                 if state != "answered" and value_fields:
@@ -339,11 +363,15 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
             prior_by_participant = {str(r["participant_id"]): r for r in prior_round["responses"]}
 
         item_analysis = []
+        answers_by_response = [
+            {str(answer["item_id"]): answer for answer in response["answers"]}
+            for response in responses
+        ]
         for item_id, item in items.items():
             answered = []
             missing_states = {state: 0 for state in sorted(_ALLOWED_STATES - {"answered"})}
-            for response in responses:
-                answer = next(a for a in response["answers"] if a["item_id"] == item_id)
+            for response, answer_map in zip(responses, answers_by_response):
+                answer = answer_map[item_id]
                 if answer["state"] == "answered":
                     answered.append((str(response["participant_id"]), answer))
                 else:
@@ -409,9 +437,17 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                     old = prior_answers.get(item_id)
                     if old is None or old.get("state") != "answered" or answer.get("state") != "answered":
                         continue
-                    before = _numeric_answer(old); after = _numeric_answer(answer)
-                    if before is not None and after is not None:
-                        changes.append({"participant_id": response["participant_id"], "item_id": item_id, "before": before, "after": after, "changed": before != after})
+                    before_field, before = _numeric_answer_with_field(old)
+                    after_field, after = _numeric_answer_with_field(answer)
+                    if before_field == after_field and before is not None and after is not None:
+                        changes.append({
+                            "participant_id": response["participant_id"],
+                            "item_id": item_id,
+                            "response_mode": before_field,
+                            "before": before,
+                            "after": after,
+                            "changed": before != after,
+                        })
 
         analysis = {
             "expected_participant_count": len(expected),
@@ -520,11 +556,39 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
         round2 = [row for row in rounds if int(row.get("round_sequence") or 0) == 2]
         if len(round2) != 1:
             raise LocalApplicationError("APPLICATION-DELPHI-STOPPING-001", "stopping assessment requires exactly one Round 2 result")
-        designs = self._delphi_store().panel_documents(self._project_id, panel_id, "design")
-        if len(designs) != 1:
-            raise LocalApplicationError("APPLICATION-DELPHI-STOPPING-001", "stopping assessment requires exactly one panel design")
-        design = designs[0]["design"]
-        analysis = round2[0]["analysis"]
+        round2_record = round2[0]
+        instrument_ref = round2_record.get("instrument_ref")
+        if not isinstance(instrument_ref, Mapping):
+            raise LocalApplicationError("APPLICATION-DELPHI-STOPPING-001", "Round 2 Instrument binding is missing")
+        instrument_record = self._delphi_store().load(
+            self._project_id,
+            "instrument",
+            _str(instrument_ref.get("instrument_id"), "instrument_id"),
+            _str(instrument_ref.get("version"), "instrument_version"),
+        )
+        if (
+            instrument_record is None
+            or str(instrument_record.get("panel_id")) != panel_id
+            or str(instrument_record.get("content_digest")) != str(instrument_ref.get("content_digest"))
+        ):
+            raise LocalApplicationError("APPLICATION-DELPHI-STOPPING-001", "Round 2 Instrument binding is stale or mismatched")
+        design_ref = instrument_record.get("design_ref")
+        if not isinstance(design_ref, Mapping):
+            raise LocalApplicationError("APPLICATION-DELPHI-STOPPING-001", "Round 2 Design binding is missing")
+        design_record = self._delphi_store().load(
+            self._project_id,
+            "design",
+            _str(design_ref.get("delphi_design_id"), "delphi_design_id"),
+            _str(design_ref.get("version"), "delphi_design_version"),
+        )
+        if (
+            design_record is None
+            or str(design_record.get("panel_id")) != panel_id
+            or str(design_record.get("content_digest")) != str(design_ref.get("content_digest"))
+        ):
+            raise LocalApplicationError("APPLICATION-DELPHI-STOPPING-001", "bound Delphi Design is stale or mismatched")
+        design = design_record["design"]
+        analysis = round2_record["analysis"]
         max_rounds = int(design["planned_rounds"]["maximum_approved_rounds"])
         max_reached = 2 >= max_rounds
         stability_goal = design.get("stopping", {}).get("stability_goal", {})
