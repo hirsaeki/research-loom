@@ -830,6 +830,17 @@ class LocalWorkspace:
                 )
                 checks.append({"check": label, "status": "OK"})
 
+            from plugins.local_application.decision_state_health import check_decision_state_receipts
+            try:
+                checked = check_decision_state_receipts(
+                    state_path,
+                    _safe_locator(root, str(binding["storage"]["decision"])),
+                    str(binding["project_id"]),
+                )
+            except (sqlite3.Error, ValueError) as exc:
+                raise LocalWorkspaceError("WORKSPACE-DECISION-STATE-MISMATCH-001", str(exc)) from exc
+            checks.append({"check": "decision_state_receipts", "status": "OK", "resolved_decisions_checked": checked})
+
             return {
                 "status": "OK",
                 "project_id": str(config["project"]["project_id"]),

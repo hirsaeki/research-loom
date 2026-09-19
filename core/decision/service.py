@@ -15,6 +15,7 @@ from core.runtime import (
     canonical_digest,
 )
 from core.runtime.authority_validation import DecisionRequirement, required_decisions_for_action
+from core.runtime.ports import RepositoryError
 
 from .models import (
     DecisionGateResult,
@@ -162,12 +163,12 @@ class HumanDecisionService:
                     "DECISION-TERMINAL-001",
                     f"Human Decision Request is already {status} with another response",
                 )
-            return DecisionResolutionResult(
-                status,
-                request,
-                response,
-                commit_receipt=_receipt_from_wire(resolution.get("commit_receipt")),
+            receipt = (
+                self._verify_committed_resolution(request, response, resolution.get("commit_receipt"))
+                if status == "RESOLVED"
+                else _receipt_from_wire(resolution.get("commit_receipt"))
             )
+            return DecisionResolutionResult(status, request, response, commit_receipt=receipt)
 
         actor = response["actor"]
         if actor.get("actor_type") != "human" or actor.get("actor_id") != request.get("human_actor_id"):
@@ -203,18 +204,7 @@ class HumanDecisionService:
         resolver = getattr(self._store, "resolution", None)
         return resolver(request_id) if resolver is not None else None
 
-    def _resolve_claimed(self, request, response) -> DecisionResolutionResult:
-        request_id = str(request["request_id"])
-        disposition = str(response["disposition"])
-        if disposition == "decline":
-            self._store.finalize(request_id, str(response["response_digest"]), "DECLINED")
-            return DecisionResolutionResult("DECLINED", request, response)
-        if disposition == "request_revision":
-            self._store.finalize(request_id, str(response["response_digest"]), "REVISION_REQUESTED")
-            return DecisionResolutionResult("REVISION_REQUESTED", request, response)
-        if disposition != "approve_exact":
-            raise HumanDecisionError("DECISION-DISPOSITION-001", "unsupported Human Decision disposition")
-
+    def _approval_transition(self, request, response):
         target_actions = self._request_actions(request)
         decision_actions, bound_actions = self._materialize_decisions_and_bind(
             request,
@@ -229,6 +219,61 @@ class HumanDecisionService:
             decision_actions=decision_actions,
             submitted_at=str(response["responded_at"]),
         )
+        return decision_actions, transition
+
+    def _verify_committed_resolution(self, request, response, stored_receipt) -> CommitReceipt:
+        """Verify historical success without applying a transition or requiring today's HEAD."""
+        message = (
+            "resolved Human Decision does not match canonical State commit history; "
+            "restore a consistent quiesced Parent backup set, not individual stores"
+        )
+        try:
+            if response.get("disposition") != "approve_exact" or not isinstance(stored_receipt, Mapping):
+                raise HumanDecisionError("DECISION-STATE-MISMATCH-001", message)
+            decisions, transition = self._approval_transition(request, response)
+            receipt = _receipt_from_wire(stored_receipt)
+            prior = self._states.find_commit_by_idempotency_key(transition.idempotency_key)
+            if (
+                receipt is None
+                or prior is None
+                or prior[0] != transition.request_digest
+                or prior[1] != receipt
+                or receipt.commit_id != transition.commit_id
+                or receipt.transition_id != transition.transition_id
+            ):
+                raise HumanDecisionError("DECISION-STATE-MISMATCH-001", message)
+            if receipt.new_snapshot_ref is not None:
+                snapshot = self._states.load_snapshot(receipt.new_snapshot_ref)
+                if (
+                    snapshot is None
+                    or snapshot.get("project_id") != request["project_ref"]
+                    or snapshot.get("content_digest") != receipt.new_snapshot_digest
+                ):
+                    raise HumanDecisionError("DECISION-STATE-MISMATCH-001", message)
+            for action in decisions:
+                expected = action.object_payload()
+                actual = self._states.load_object_revision(
+                    "decision", str(expected["id"]), int(expected["revision"]),
+                )
+                if actual != expected:
+                    raise HumanDecisionError("DECISION-STATE-MISMATCH-001", message)
+            return receipt
+        except (KeyError, TypeError, ValueError, RepositoryError) as exc:
+            raise HumanDecisionError("DECISION-STATE-MISMATCH-001", message) from exc
+
+    def _resolve_claimed(self, request, response) -> DecisionResolutionResult:
+        request_id = str(request["request_id"])
+        disposition = str(response["disposition"])
+        if disposition == "decline":
+            self._store.finalize(request_id, str(response["response_digest"]), "DECLINED")
+            return DecisionResolutionResult("DECLINED", request, response)
+        if disposition == "request_revision":
+            self._store.finalize(request_id, str(response["response_digest"]), "REVISION_REQUESTED")
+            return DecisionResolutionResult("REVISION_REQUESTED", request, response)
+        if disposition != "approve_exact":
+            raise HumanDecisionError("DECISION-DISPOSITION-001", "unsupported Human Decision disposition")
+
+        _decision_actions, transition = self._approval_transition(request, response)
         result = self._transitions.apply(transition)
         if isinstance(result, CommitReceipt):
             # The Research State transaction is authoritative and may already have
