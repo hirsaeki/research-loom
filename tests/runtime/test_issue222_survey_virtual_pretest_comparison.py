@@ -4,7 +4,12 @@ from copy import deepcopy
 import tempfile
 import unittest
 
-from plugins.local_application import LocalApplicationFacade
+from plugins.local_application import LocalApplicationError, LocalApplicationFacade
+from plugins.local_application.survey_virtual_pretest_inspection import (
+    _all_aggregate_items,
+    _answer_semantics,
+    _comparison_item,
+)
 from plugins.local_survey_store import canonical_document_digest
 from plugins.survey_virtual_runner.llm_backend import DeterministicFakeVirtualRespondentBackend
 from tests.runtime.survey_analysis_test_support import analysis_questionnaire
@@ -78,6 +83,15 @@ class Issue222SurveyVirtualPretestComparisonTests(SurveyVirtualRunnerTestBase):
                 self.assertEqual(run_b["response_dataset"]["rejected_count"], 0)
                 self.assertIsNotNone(run_b["aggregate_result"])
 
+                with self.assertRaises(LocalApplicationError) as same_run:
+                    facade.compare_survey_virtual_pretests(
+                        run_a["run_id"], run_a["run_id"]
+                    )
+                self.assertEqual(
+                    same_run.exception.code,
+                    "APPLICATION-SURVEY-VIRTUAL-PRETEST-001",
+                )
+
                 compared = facade.compare_survey_virtual_pretests(
                     run_a["run_id"], run_b["run_id"]
                 )
@@ -133,6 +147,80 @@ class Issue222SurveyVirtualPretestComparisonTests(SurveyVirtualRunnerTestBase):
                 self.assertEqual(state_signature(app), before)
             finally:
                 app.close()
+
+    def test_comparison_helpers_ignore_presentation_and_run_provenance_and_page_all_items(self):
+        before_answer = {
+            "response_key": "role",
+            "stable_value": "manager",
+            "response_state": "answered",
+            "question_prompt": "Old wording",
+            "display_label": "Manager",
+            "question_type": "single_choice",
+        }
+        after_answer = {
+            **before_answer,
+            "question_prompt": "New clearer wording",
+            "display_label": "Management",
+        }
+        self.assertEqual(
+            _answer_semantics(before_answer),
+            _answer_semantics(after_answer),
+        )
+
+        before_item = {
+            "item_id": "AN-1",
+            "analysis_type": "frequency",
+            "question_id": "Q1",
+            "categories": [
+                {"value": "manager", "label": "Manager", "count": 2, "percentage": 50.0}
+            ],
+            "provenance": {"analysis_item_id": "AN-1", "dataset_id": "SRD-A"},
+        }
+        after_item = deepcopy(before_item)
+        after_item["categories"][0]["label"] = "Management"
+        after_item["provenance"]["dataset_id"] = "SRD-B"
+        self.assertEqual(
+            _comparison_item(before_item),
+            _comparison_item(after_item),
+        )
+
+        all_items = [
+            {
+                "item_id": f"AN-{index:03d}",
+                "analysis_type": "missingness",
+                "question_id": "Q1",
+            }
+            for index in range(1, 102)
+        ]
+
+        class PagedAggregate:
+            def __init__(self):
+                self.offsets = []
+
+            def show_survey_aggregate_result(self, aggregate_result_id, *, limit, offset):
+                self.offsets.append(offset)
+                page = deepcopy(all_items[offset : offset + limit])
+                return {
+                    "aggregate_result": {
+                        "aggregate_result_id": aggregate_result_id,
+                        "content_digest": "sha256:" + "a" * 64,
+                    },
+                    "result_items": page,
+                    "pagination": {
+                        "limit": limit,
+                        "offset": offset,
+                        "returned": len(page),
+                        "total": len(all_items),
+                    },
+                }
+
+        paged = PagedAggregate()
+        resolved = _all_aggregate_items(
+            paged,
+            {"id": "SAG-1", "content_digest": "sha256:" + "a" * 64},
+        )
+        self.assertEqual(len(resolved), 101)
+        self.assertEqual(paged.offsets, [0, 100])
 
     def test_material_backend_pin_mismatch_is_non_comparable(self):
         with tempfile.TemporaryDirectory() as temp:

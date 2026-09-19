@@ -112,6 +112,16 @@ def _answers_by_key(row: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
     return {str(item["response_key"]): item for item in answers if isinstance(item, Mapping) and item.get("response_key")}
 
 
+def _answer_semantics(answer: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    if answer is None:
+        return None
+    return {
+        "response_key": str(answer.get("response_key", "")),
+        "stable_value": deepcopy(answer.get("stable_value")),
+        "response_state": str(answer.get("response_state", "")),
+    }
+
+
 def _aggregate_key(item: Mapping[str, Any]) -> str:
     if item.get("item_id"):
         return str(item["item_id"])
@@ -119,6 +129,69 @@ def _aggregate_key(item: Mapping[str, Any]) -> str:
         str(item.get(field, ""))
         for field in ("analysis_type", "question_id", "row_question_id", "column_question_id")
     )
+
+
+def _comparison_item(item: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    if item is None:
+        return None
+    value = deepcopy(dict(item))
+    value.pop("provenance", None)
+    if value.get("analysis_type") == "frequency":
+        for category in value.get("categories", ()):
+            if isinstance(category, dict):
+                category.pop("label", None)
+    if value.get("analysis_type") == "free_text_listing":
+        for row in value.get("rows", ()):
+            if isinstance(row, dict):
+                for field in ("response_id", "participant_id", "identity_namespace"):
+                    row.pop(field, None)
+    return value
+
+
+def _all_aggregate_items(facade, aggregate_ref: Mapping[str, Any]) -> list[dict[str, Any]]:
+    aggregate_result_id = str(aggregate_ref["id"])
+    expected_digest = str(aggregate_ref["content_digest"])
+    offset = 0
+    total: int | None = None
+    result: list[dict[str, Any]] = []
+    while total is None or offset < total:
+        page = facade.show_survey_aggregate_result(
+            aggregate_result_id,
+            limit=100,
+            offset=offset,
+        )
+        summary = page.get("aggregate_result")
+        pagination = page.get("pagination")
+        items = page.get("result_items")
+        if (
+            not isinstance(summary, Mapping)
+            or str(summary.get("content_digest", "")) != expected_digest
+            or not isinstance(pagination, Mapping)
+            or not isinstance(items, list)
+        ):
+            raise LocalApplicationError(_ERROR, "SurveyAggregateResult pagination is malformed or stale")
+        page_total = pagination.get("total")
+        returned = pagination.get("returned")
+        if (
+            not isinstance(page_total, int)
+            or isinstance(page_total, bool)
+            or page_total < 0
+            or not isinstance(returned, int)
+            or isinstance(returned, bool)
+            or returned != len(items)
+        ):
+            raise LocalApplicationError(_ERROR, "SurveyAggregateResult pagination metadata is invalid")
+        if total is None:
+            total = page_total
+        elif page_total != total:
+            raise LocalApplicationError(_ERROR, "SurveyAggregateResult pagination total changed during inspection")
+        if returned == 0 and offset < total:
+            raise LocalApplicationError(_ERROR, "SurveyAggregateResult pagination ended before total items were read")
+        result.extend(deepcopy(items))
+        offset += returned
+    if total is None or len(result) != total:
+        raise LocalApplicationError(_ERROR, "SurveyAggregateResult pagination did not resolve the complete result")
+    return result
 
 
 class SurveyVirtualPretestInspectionMixin:
@@ -449,6 +522,8 @@ class SurveyVirtualPretestInspectionMixin:
         aggregate_a_result_id: str | None = None,
         aggregate_b_result_id: str | None = None,
     ) -> Mapping[str, Any]:
+        if str(run_a_id) == str(run_b_id):
+            raise LocalApplicationError(_ERROR, "run_a_id and run_b_id must identify different Runs")
         before = deepcopy(self._state().current_snapshot)
         left = self.show_survey_virtual_pretest(run_a_id, aggregate_result_id=aggregate_a_result_id)
         right = self.show_survey_virtual_pretest(run_b_id, aggregate_result_id=aggregate_b_result_id)
@@ -516,7 +591,7 @@ class SurveyVirtualPretestInspectionMixin:
             for key in sorted(set(aa) | set(ba)):
                 av = aa.get(key)
                 bv = ba.get(key)
-                if av != bv:
+                if _answer_semantics(av) != _answer_semantics(bv):
                     change = {
                         "kind": "answer",
                         "response_key": key,
@@ -545,18 +620,28 @@ class SurveyVirtualPretestInspectionMixin:
         ]
 
         aggregate_changes: list[dict[str, Any]] = []
-        left_aggregate = left.get("aggregate_inspection")
-        right_aggregate = right.get("aggregate_inspection")
-        if isinstance(left_aggregate, Mapping) and isinstance(right_aggregate, Mapping):
-            left_items = {_aggregate_key(item): item for item in left_aggregate.get("result_items", ()) if isinstance(item, Mapping)}
-            right_items = {_aggregate_key(item): item for item in right_aggregate.get("result_items", ()) if isinstance(item, Mapping)}
+        left_aggregate_ref = left.get("aggregate_result_ref")
+        right_aggregate_ref = right.get("aggregate_result_ref")
+        if isinstance(left_aggregate_ref, Mapping) and isinstance(right_aggregate_ref, Mapping):
+            left_items = {
+                _aggregate_key(item): item
+                for item in _all_aggregate_items(self, left_aggregate_ref)
+                if isinstance(item, Mapping)
+            }
+            right_items = {
+                _aggregate_key(item): item
+                for item in _all_aggregate_items(self, right_aggregate_ref)
+                if isinstance(item, Mapping)
+            }
             for key in sorted(set(left_items) | set(right_items)):
-                if left_items.get(key) != right_items.get(key):
+                before_item = _comparison_item(left_items.get(key))
+                after_item = _comparison_item(right_items.get(key))
+                if before_item != after_item:
                     aggregate_changes.append({
                         "item_key": key,
-                        "analysis_type": str((right_items.get(key) or left_items.get(key) or {}).get("analysis_type", "")),
-                        "before": deepcopy(left_items.get(key)),
-                        "after": deepcopy(right_items.get(key)),
+                        "analysis_type": str((after_item or before_item or {}).get("analysis_type", "")),
+                        "before": before_item,
+                        "after": after_item,
                     })
 
         frequency_changes = [item for item in aggregate_changes if item["analysis_type"] in {"frequency", "cross_tab"}]
