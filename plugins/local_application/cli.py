@@ -9,6 +9,7 @@ from typing import Any, Mapping
 
 from core.conversation import ConversationRuntimeError
 from core.decision import HumanDecisionError
+from plugins.local_durable_store import OptionalDurableStoreError
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade
 from plugins.local_application.application import ATTENTION_STORE_NAME
 from plugins.local_application.workspace import LocalWorkspaceError
@@ -698,7 +699,7 @@ def main(argv: list[str] | None = None) -> int:
         else:
             _emit(result)
         return 1 if result.get("status") == "ERROR" else 0
-    except (LocalWorkspaceError, LocalApplicationError, ConversationRuntimeError, HumanDecisionError) as exc:
+    except (LocalWorkspaceError, LocalApplicationError, ConversationRuntimeError, HumanDecisionError, OptionalDurableStoreError) as exc:
         _emit({
             "status": "ERROR",
             "issues": [{"code": str(exc.code), "message": str(exc.message)}],

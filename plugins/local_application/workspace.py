@@ -16,6 +16,11 @@ import uuid
 from jsonschema import Draft202012Validator, FormatChecker
 import rfc8785
 
+from plugins.local_durable_store import (
+    OPTIONAL_DURABLE_CHILDREN as _OPTIONAL_DURABLE_CHILDREN,
+    inspect_optional_children, register_optional_path,
+)
+
 from core.runtime import LineageView, StateView, canonical_digest
 from core.runtime.transition_models import with_content_digest
 from plugins.local_application.application import LocalResearchApplication, SystemClock, UUIDIdProvider
@@ -58,20 +63,6 @@ _BASE_DURABLE_CHILDREN = {
     "decision": {"locator": _STORAGE["decision"], "kind": "file"},
     "execution_material": {"locator": _STORAGE["execution_root"], "kind": "directory"},
 }
-_OPTIONAL_DURABLE_CHILDREN = {
-    "research_attention": {"locator": f"{INTERNAL_DIR}/attention.sqlite3", "kind": "file"},
-    "profile_history": {"locator": f"{INTERNAL_DIR}/profile-history", "kind": "directory"},
-    "research_exhibits": {"locator": f"{INTERNAL_DIR}/research-exhibits.sqlite3", "kind": "file"},
-    "survey_registry": {"locator": f"{INTERNAL_DIR}/survey-registry.sqlite3", "kind": "file"},
-    "survey_response_registry": {"locator": f"{INTERNAL_DIR}/survey-response-registry.sqlite3", "kind": "file"},
-    "survey_analysis_registry": {"locator": f"{INTERNAL_DIR}/survey-analysis-registry.sqlite3", "kind": "file"},
-    "delphi_registry": {"locator": f"{INTERNAL_DIR}/delphi-registry.sqlite3", "kind": "file"},
-    "project_inputs": {"locator": f"{INTERNAL_DIR}/project-inputs", "kind": "directory"},
-    "writer_compositions": {"locator": f"{INTERNAL_DIR}/writer-compositions", "kind": "directory"},
-    "writer_round_trips": {"locator": f"{INTERNAL_DIR}/writer-round-trips", "kind": "directory"},
-    "research_packages": {"locator": f"{INTERNAL_DIR}/research-packages", "kind": "directory"},
-}
-
 
 class LocalWorkspaceError(RuntimeError):
     def __init__(self, code: str, message: str) -> None:
@@ -450,6 +441,8 @@ def _validate_registered_children(root: Path, binding: Mapping[str, Any]) -> boo
     if children is None:
         return False
     for name, spec in children.items():
+        if name in _OPTIONAL_DURABLE_CHILDREN:
+            continue  # Optional health is local to dependent operations.
         path = _safe_locator(root, str(spec["locator"]), require_exists=False)
         if not path.exists():
             raise LocalWorkspaceError(
@@ -471,17 +464,9 @@ def _refresh_durable_children(root: Path) -> None:
     _validate_binding_shape(binding)
     if "durable_children" not in binding:
         return
-    children = deepcopy(dict(binding["durable_children"]))
-    changed = False
-    for name, spec in _OPTIONAL_DURABLE_CHILDREN.items():
-        path = _safe_locator(root, str(spec["locator"]), require_exists=False)
-        if path.exists() and name not in children:
-            children[name] = deepcopy(spec)
-            changed = True
-    if changed:
-        updated = deepcopy(dict(binding))
-        updated["durable_children"] = children
-        _atomic_json_write(binding_path, updated)
+    for row in inspect_optional_children(root, binding):
+        if row["status"] == "OK" and not row["registered"]:
+            register_optional_path(root / row["locator"])
 
 
 def _sqlite_quick_check(path: Path, *, code: str) -> None:
@@ -841,11 +826,15 @@ class LocalWorkspace:
                 raise LocalWorkspaceError("WORKSPACE-DECISION-STATE-MISMATCH-001", str(exc)) from exc
             checks.append({"check": "decision_state_receipts", "status": "OK", "resolved_decisions_checked": checked})
 
+            optional = inspect_optional_children(root, binding, quick=True)
+            unavailable = [row for row in optional if row["status"] == "UNAVAILABLE"]
+            checks.extend({"check": "optional_child", **row} for row in optional)
             return {
-                "status": "OK",
+                "status": "DEGRADED" if unavailable else "OK",
                 "project_id": str(config["project"]["project_id"]),
                 "checks": checks,
-                "issues": [],
+                "issues": [{"code": row["code"], "message": row["message"],
+                            "child": row["name"], "next_action": row["next_action"]} for row in unavailable],
             }
         except LocalWorkspaceError as exc:
             return {

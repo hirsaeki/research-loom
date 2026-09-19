@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from plugins.local_durable_store import require_optional_available, register_optional_path
+
 from copy import deepcopy
 import hashlib
 import json
@@ -215,6 +217,7 @@ class LocalSurveyStore:
             )
 
     def _read(self) -> sqlite3.Connection | None:
+        require_optional_available(self.path, LocalSurveyStoreError)
         if not self.exists:
             return None
         try:
@@ -234,6 +237,7 @@ class LocalSurveyStore:
             ) from exc
 
     def _write(self) -> sqlite3.Connection:
+        require_optional_available(self.path, LocalSurveyStoreError)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         try:
             connection = sqlite3.connect(self.path)
@@ -245,6 +249,7 @@ class LocalSurveyStore:
             )
             self._schema_version(connection)
             connection.commit()
+            register_optional_path(self.path)
             return connection
         except LocalSurveyStoreError:
             if "connection" in locals():
@@ -258,6 +263,11 @@ class LocalSurveyStore:
             raise LocalSurveyStoreError(
                 "SURVEY-STORE-DB-001", "Survey registry could not be initialized"
             ) from exc
+
+        except BaseException:
+            if "connection" in locals():
+                connection.close()
+            raise
 
     @staticmethod
     def _encoded(document: Mapping[str, Any]) -> str:

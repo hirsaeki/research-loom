@@ -51,9 +51,14 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
     def _registry(self) -> LocalProjectInputStore:
         if self._workspace_root is None:
             raise LocalApplicationError("APPLICATION-PROJECT-INPUT-001", "project input registration requires an opened workspace")
-        if self._project_input_store is None:
-            self._project_input_store = LocalProjectInputStore(self._workspace_root)
-        return self._project_input_store
+        try:
+            if self._project_input_store is None:
+                self._project_input_store = LocalProjectInputStore(self._workspace_root, create=False)
+            from plugins.local_durable_store import require_optional_available
+            require_optional_available(self._project_input_store.root, LocalProjectInputStoreError)
+            return self._project_input_store
+        except LocalProjectInputStoreError as exc:
+            raise LocalApplicationError(exc.code, exc.message) from exc
 
     def _current_binding(self) -> tuple[str, str, str]:
         repo = self._application.state_repository

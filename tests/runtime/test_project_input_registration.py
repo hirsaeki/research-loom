@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from contextlib import closing
+
 import hashlib
 from pathlib import Path
 import sqlite3
@@ -158,6 +160,15 @@ class ProjectInputRegistrationTests(unittest.TestCase):
             try:
                 items = facade.list_project_inputs()["project_inputs"]
                 self.assertEqual([item["input_id"] for item in items], ["PIN-legacy"])
+                # Listing an older schema is read-only; migration is a write concern.
+                with closing(sqlite3.connect(database)) as legacy:
+                    self.assertEqual(legacy.execute("PRAGMA user_version").fetchone()[0], 0)
+                registered = facade.register_project_input({
+                    "file": str(source),
+                    "role": "theme",
+                    "expected_snapshot_id": current["snapshot_id"],
+                    "expected_snapshot_digest": current["content_digest"],
+                })["project_input"]
                 migrated = sqlite3.connect(database)
                 try:
                     self.assertEqual(migrated.execute("PRAGMA user_version").fetchone()[0], 2)
@@ -177,12 +188,6 @@ class ProjectInputRegistrationTests(unittest.TestCase):
                 finally:
                     migrated.close()
 
-                registered = facade.register_project_input({
-                    "file": str(source),
-                    "role": "theme",
-                    "expected_snapshot_id": current["snapshot_id"],
-                    "expected_snapshot_digest": current["content_digest"],
-                })["project_input"]
                 self.assertNotEqual(registered["input_id"], "PIN-legacy")
                 self.assertEqual(registered["content_digest"], digest)
                 self.assertEqual(len(facade.list_project_inputs()["project_inputs"]), 2)
