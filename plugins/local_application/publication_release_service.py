@@ -824,6 +824,92 @@ class PublicationReleaseService:
             if key != "writing_feedback"
         )
 
+    def _request_binding(
+        self, build: Mapping[str, Any], preview: Mapping[str, Any], actor_id: str,
+    ) -> dict[str, Any]:
+        formal = next(row for row in build["outputs"] if row["format"] == "docx")
+        return {
+            "project_ref": self.facade.project_id,
+            "human_actor_id": actor_id,
+            "source_preview": {
+                "preview_id": build["build_id"],
+                "preview_digest": preview["content_digest"],
+            },
+            "source_manuscript": build["source_manuscript"],
+            "snapshot_binding": build["research_provenance"]["research_snapshot"],
+            "publication_profile": build["publication_profile"],
+            "output_binding": {
+                "format": "docx", "digest": formal["digest"], "size": formal["size"],
+            },
+            "allowed_dispositions": ["approve_release"],
+        }
+
+    @staticmethod
+    def _read_release_json(path: Path) -> dict[str, Any]:
+        try:
+            value = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, ValueError) as exc:
+            raise LocalApplicationError(
+                "APPLICATION-PUBLICATION-INTEGRITY-001",
+                f"stored Publication record is unreadable: {path.name}",
+            ) from exc
+        if not isinstance(value, dict):
+            raise LocalApplicationError(
+                "APPLICATION-PUBLICATION-INTEGRITY-001",
+                f"stored Publication record must be an object: {path.name}",
+            )
+        return value
+
+    def _verify_release_binding(
+        self, manifest: Mapping[str, Any], *, release_id: str, decision_id: str,
+        request: Mapping[str, Any], build: Mapping[str, Any],
+        preview: Mapping[str, Any],
+    ) -> None:
+        """Verify against the independently approved build, not only self-digests."""
+        formal = next(row for row in build["outputs"] if row["format"] == "docx")
+        expected = {
+            "schema_version": SCHEMA_VERSION,
+            "object_type": "release_manifest",
+            "release_id": release_id,
+            "source_preview": {
+                "preview_id": build["build_id"],
+                "preview_digest": preview["content_digest"],
+            },
+            "source_manuscript": build["source_manuscript"],
+            "research_provenance": build["research_provenance"],
+            "publication_profile": build["publication_profile"],
+            "output": {
+                "relative_path": "artifact.docx",
+                "artifact_reference": f"publication/releases/{release_id}/artifact.docx",
+                "media_type": formal["media_type"],
+                "size": formal["size"],
+                "digest": formal["digest"],
+            },
+            "verification": build["verification"],
+            "research_state_mutation_performed": False,
+        }
+        decision = manifest.get("human_release_decision")
+        expected_decision = {
+            "decision_id": decision_id,
+            "request_id": request["request_id"],
+            "request_digest": request["request_digest"],
+            "disposition": "approve_release",
+            "actor": {"actor_id": request["human_actor_id"], "actor_type": "human"},
+        }
+        if (
+            manifest.get("content_digest") != _digest(manifest, "content_digest")
+            or any(manifest.get(key) != value for key, value in expected.items())
+            or not isinstance(decision, Mapping)
+            or any(decision.get(key) != value for key, value in expected_decision.items())
+            or decision.get("decision_digest") != _digest(decision, "decision_digest")
+            or not isinstance(decision.get("decided_at"), str)
+            or not decision["decided_at"]
+        ):
+            raise LocalApplicationError(
+                "APPLICATION-PUBLICATION-INTEGRITY-001",
+                "stored Release does not match its exact approved request and preview build",
+            )
+
     def request_release(self, build_id: str, actor_id: str) -> Mapping[str, Any]:
         if not isinstance(actor_id, str) or not actor_id:
             raise LocalApplicationError(
@@ -848,8 +934,13 @@ class PublicationReleaseService:
         with self._file_lock(f"request-{request_id}"):
             path = self._release_request_path(request_id)
             if path.is_file():
-                request = json.loads(path.read_text(encoding="utf-8"))
-                if request.get("request_digest") != _digest(request, "request_digest"):
+                request = self._read_release_json(path)
+                expected = self._request_binding(build, preview, actor_id)
+                if (
+                    request.get("request_id") != request_id
+                    or request.get("request_digest") != _digest(request, "request_digest")
+                    or any(request.get(key) != value for key, value in expected.items())
+                ):
                     raise LocalApplicationError(
                         "APPLICATION-PUBLICATION-INTEGRITY-001",
                         "Publication release request digest does not verify",
@@ -894,8 +985,11 @@ class PublicationReleaseService:
                 "APPLICATION-PUBLICATION-RELEASE-DECISION-001",
                 "Publication release decision request does not resolve",
             )
-        request = json.loads(path.read_text(encoding="utf-8"))
-        if request.get("request_digest") != _digest(request, "request_digest"):
+        request = self._read_release_json(path)
+        if (
+            request.get("request_id") != request_id
+            or request.get("request_digest") != _digest(request, "request_digest")
+        ):
             raise LocalApplicationError(
                 "APPLICATION-PUBLICATION-INTEGRITY-001",
                 "Publication release request digest does not verify",
@@ -982,23 +1076,23 @@ class PublicationReleaseService:
                     "stored Publication DOCX failed structural XML verification",
                 )
             if manifest_path.is_file():
-                existing = json.loads(manifest_path.read_text(encoding="utf-8"))
-                if existing.get("content_digest") != _digest(existing, "content_digest"):
-                    raise LocalApplicationError(
-                        "APPLICATION-PUBLICATION-INTEGRITY-001",
-                        "stored Release Manifest digest does not verify",
-                    )
+                existing = self._read_release_json(manifest_path)
+                self._verify_release_binding(
+                    existing, release_id=release_id, decision_id=decision_id,
+                    request=request, build=build, preview=preview,
+                )
                 artifact = target / "artifact.docx"
-                if (
-                    existing.get("human_release_decision", {}).get("decision_id")
-                    != decision_id
-                    or not artifact.is_file()
-                    or artifact.stat().st_size != int(existing["output"]["size"])
-                    or _sha(artifact.read_bytes()) != existing["output"]["digest"]
-                ):
+                try:
+                    matches = artifact.is_file() and artifact.read_bytes() == payload
+                except OSError as exc:
                     raise LocalApplicationError(
                         "APPLICATION-PUBLICATION-INTEGRITY-001",
-                        "Release identity conflicts with stored release",
+                        "stored Release artifact is unreadable",
+                    ) from exc
+                if not matches:
+                    raise LocalApplicationError(
+                        "APPLICATION-PUBLICATION-INTEGRITY-001",
+                        "stored Release artifact differs from the exact approved output",
                     )
                 return {
                     "status": "VERIFIED_REUSE",

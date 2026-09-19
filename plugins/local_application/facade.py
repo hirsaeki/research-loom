@@ -8,7 +8,7 @@ from typing import Any, Mapping
 
 from core.conversation import ActionDraft, ConversationRuntimeError, CoordinatorResult
 from core.conversation.validation import with_document_digest
-from core.decision import make_response
+from core.decision import make_response, response_digest
 from plugins.local_application.workspace import LocalWorkspace, OpenedLocalWorkspace
 from plugins.local_execution_store import pending_runs_for_project
 
@@ -383,12 +383,48 @@ class LocalApplicationFacade:
                 raise LocalApplicationError(
                     "APPLICATION-DECISION-BINDING-001", "Human Decision actor does not match request"
                 )
-            response_value = make_response(
-                request=request,
-                disposition=str(disposition),
-                actor_id=actor_id,
-                responded_at=self._application.clock.now(),
-            )
+            try:
+                claimed = self._application.decision_store.get_claimed_response(request_id)
+            except (ValueError, TypeError) as exc:
+                raise LocalApplicationError(
+                    "APPLICATION-DECISION-RECOVERY-001",
+                    "stored claimed Human Decision response is unreadable",
+                ) from exc
+            if claimed is None:
+                raise LocalApplicationError(
+                    "APPLICATION-DECISION-RECOVERY-001", "Human Decision claim does not resolve"
+                )
+            if claimed["status"] == "PENDING" and claimed["response_digest"] is None:
+                response_value = make_response(
+                    request=request,
+                    disposition=str(disposition),
+                    actor_id=actor_id,
+                    responded_at=self._application.clock.now(),
+                )
+            else:
+                saved = claimed["response"]
+                if (
+                    not isinstance(saved, Mapping)
+                    or saved.get("response_digest") != claimed["response_digest"]
+                    or response_digest(saved) != claimed["response_digest"]
+                    or not isinstance(saved.get("responded_at"), str)
+                    or not saved["responded_at"]
+                ):
+                    raise LocalApplicationError(
+                        "APPLICATION-DECISION-RECOVERY-001",
+                        "stored claimed Human Decision response is missing or inconsistent",
+                    )
+                if (
+                    saved.get("request_id") != request_id
+                    or saved.get("request_digest") != supplied_digest
+                    or saved.get("actor") != {"actor_id": actor_id, "actor_type": "human"}
+                    or saved.get("disposition") != disposition
+                ):
+                    raise LocalApplicationError(
+                        "APPLICATION-DECISION-BINDING-001",
+                        "Human Decision intent differs from the already claimed response",
+                    )
+                response_value = deepcopy(dict(saved))
 
         result = self._application.resolve_human_decision(response_value)
         return {
