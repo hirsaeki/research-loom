@@ -47,6 +47,7 @@ _AGGREGATE_RUN_FIELDS = {
 }
 _AGGREGATE_SHOW_FIELDS = {"aggregate_result_id", "limit", "offset"}
 _VIRTUAL_PRETEST_SHOW_FIELDS = {"run_id", "aggregate_result_id"}
+_VIRTUAL_PRETEST_COMPARE_FIELDS = {"run_a_id", "run_b_id", "aggregate_a_result_id", "aggregate_b_result_id"}
 _REAL_INTAKE_CAPTURE_FIELDS = {
     "file",
     "instrument_id",
@@ -82,6 +83,11 @@ _SURVEY_ANALYSIS_ACTIONS = (
         "survey_virtual_pretest.show",
         "survey-virtual-pretest-show@0.1.0",
         "show_virtual_pretest",
+    ),
+    (
+        "survey_virtual_pretest.compare",
+        "survey-virtual-pretest-compare@0.1.0",
+        "compare_virtual_pretest",
     ),
     (
         "survey_real_intake.capture",
@@ -140,6 +146,17 @@ def _virtual_pretest_show_payload(payload: Mapping[str, Any]) -> None:
         _nonempty_string(payload, "aggregate_result_id")
 
 
+def _virtual_pretest_compare_payload(payload: Mapping[str, Any]) -> None:
+    _payload_fields(payload, _VIRTUAL_PRETEST_COMPARE_FIELDS, "Survey Virtual pretest compare")
+    _nonempty_string(payload, "run_a_id")
+    _nonempty_string(payload, "run_b_id")
+    if payload["run_a_id"] == payload["run_b_id"]:
+        raise ValueError("run_a_id and run_b_id must identify different Runs")
+    for field in ("aggregate_a_result_id", "aggregate_b_result_id"):
+        if field in payload:
+            _nonempty_string(payload, field)
+
+
 def _aggregate_show_payload(payload: Mapping[str, Any]) -> None:
     _payload_fields(payload, _AGGREGATE_SHOW_FIELDS, "Survey aggregate show")
     _nonempty_string(payload, "aggregate_result_id")
@@ -175,6 +192,7 @@ _ACTION_VALIDATORS = {
     "survey_aggregate.run": _aggregate_run_payload,
     "survey_aggregate.show": _aggregate_show_payload,
     "survey_virtual_pretest.show": _virtual_pretest_show_payload,
+    "survey_virtual_pretest.compare": _virtual_pretest_compare_payload,
     "survey_real_intake.capture": _real_intake_capture_payload,
     "survey_real_intake.show": _real_intake_show_payload,
 }
@@ -212,6 +230,13 @@ class _SurveyAnalysisActionHandler:
             result = facade.show_survey_virtual_pretest(
                 _nonempty_string(payload, "run_id"),
                 aggregate_result_id=payload.get("aggregate_result_id"),
+            )
+        elif self._operation == "compare_virtual_pretest":
+            result = facade.compare_survey_virtual_pretests(
+                _nonempty_string(payload, "run_a_id"),
+                _nonempty_string(payload, "run_b_id"),
+                aggregate_a_result_id=payload.get("aggregate_a_result_id"),
+                aggregate_b_result_id=payload.get("aggregate_b_result_id"),
             )
         elif self._operation == "capture_real_intake":
             result = facade.capture_real_survey_intake(payload)
