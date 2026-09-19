@@ -12,6 +12,7 @@ import unittest
 from unittest.mock import patch
 
 from core.decision import HumanDecisionError, make_response
+from core.runtime import canonical_digest
 from plugins.local_application import LocalApplicationFacade, LocalWorkspace
 from test_research_question_review import _workspace, _adopt_question
 
@@ -106,6 +107,53 @@ class DecisionStateRestoreTests(unittest.TestCase):
         with self.assertRaises(HumanDecisionError) as raised:
             self._resolve()
         self.assertEqual(raised.exception.code, "DECISION-STATE-MISMATCH-001")
+
+    def _assert_doctor_history_mismatch(self):
+        state_path = self.parent / "research-state.sqlite3"
+        before = state_path.read_bytes()
+        diagnosis = LocalWorkspace.doctor(self.workspace)
+        self.assertEqual(diagnosis["status"], "ERROR", diagnosis)
+        self.assertIn("WORKSPACE-DECISION-STATE-MISMATCH-001", {item["code"] for item in diagnosis["issues"]})
+        self.assertEqual(state_path.read_bytes(), before)
+
+    def test_doctor_rejects_object_revision_from_another_project(self):
+        receipt = self._resolve()["commit_receipt"]
+        project_id = self.request["project_ref"]
+        for kind, ref in (("snapshot", receipt["new_snapshot_ref"]), ("decision", receipt["resolving_decision_refs"][0])):
+            with self.subTest(kind=kind):
+                with closing(sqlite3.connect(self.parent / "research-state.sqlite3")) as db, db:
+                    db.execute("UPDATE object_revisions SET project_ref=? WHERE kind=? AND object_id=?", ("PRJ-OTHER", kind, ref))
+                try:
+                    self._assert_doctor_history_mismatch()
+                finally:
+                    with closing(sqlite3.connect(self.parent / "research-state.sqlite3")) as db, db:
+                        db.execute("UPDATE object_revisions SET project_ref=? WHERE kind=? AND object_id=?", (project_id, kind, ref))
+        self.assertEqual(LocalWorkspace.doctor(self.workspace)["status"], "OK")
+
+    def test_doctor_rejects_self_consistent_cross_project_decision_payload(self):
+        decision_id = self._resolve()["commit_receipt"]["resolving_decision_refs"][0]
+        with closing(sqlite3.connect(self.parent / "research-state.sqlite3")) as db, db:
+            row = db.execute("SELECT payload_json FROM object_revisions WHERE kind='decision' AND object_id=?", (decision_id,)).fetchone()
+            payload = json.loads(row[0])
+            payload["project_id"] = "PRJ-OTHER"
+            digest = canonical_digest(payload)
+            db.execute("UPDATE object_revisions SET payload_json=?,payload_digest=?,content_digest=? WHERE kind='decision' AND object_id=?", (json.dumps(payload), digest, digest, decision_id))
+            db.execute("UPDATE decisions SET payload_digest=? WHERE decision_ref=?", (digest, decision_id))
+        self._assert_doctor_history_mismatch()
+
+    def test_doctor_rejects_snapshot_and_decision_index_digest_mismatch(self):
+        receipt = self._resolve()["commit_receipt"]
+        for table, key, ref in (("snapshots", "snapshot_ref", receipt["new_snapshot_ref"]), ("decisions", "decision_ref", receipt["resolving_decision_refs"][0])):
+            with self.subTest(table=table):
+                with closing(sqlite3.connect(self.parent / "research-state.sqlite3")) as db, db:
+                    original = db.execute(f"SELECT payload_digest FROM {table} WHERE {key}=?", (ref,)).fetchone()[0]
+                    db.execute(f"UPDATE {table} SET payload_digest=? WHERE {key}=?", ("sha256:" + "0" * 64, ref))
+                try:
+                    self._assert_doctor_history_mismatch()
+                finally:
+                    with closing(sqlite3.connect(self.parent / "research-state.sqlite3")) as db, db:
+                        db.execute(f"UPDATE {table} SET payload_digest=? WHERE {key}=?", (original, ref))
+        self.assertEqual(LocalWorkspace.doctor(self.workspace)["status"], "OK")
 
     def test_omitted_state_wal_is_a_mixed_generation_not_a_safe_backup(self):
         restored = self.root / "unsupported-db-only-copy"

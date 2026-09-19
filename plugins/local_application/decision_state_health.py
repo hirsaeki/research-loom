@@ -54,10 +54,11 @@ def check_decision_state_receipts(state_path: Path, decision_path: Path, project
                         snapshot_row = state.execute(
                             "SELECT o.payload_json,o.payload_digest FROM snapshots s "
                             "JOIN object_revisions o ON o.kind='snapshot' AND o.object_id=s.snapshot_ref AND o.revision=s.revision "
+                            "AND o.project_ref=s.project_ref AND o.payload_digest=s.payload_digest "
                             "WHERE s.snapshot_ref=? AND s.project_ref=? AND s.content_digest=?",
                             (snapshot_ref, project_id, receipt["new_snapshot_digest"]),
                         ).fetchone()
-                        snapshot = _verified_payload(snapshot_row)
+                        snapshot = _verified_payload(snapshot_row, project_id)
                         basis = dict(snapshot)
                         basis.pop("content_digest", None)
                         if snapshot.get("content_digest") != receipt["new_snapshot_digest"] or canonical_digest(basis) != receipt["new_snapshot_digest"]:
@@ -66,11 +67,12 @@ def check_decision_state_receipts(state_path: Path, decision_path: Path, project
                         decision_row = state.execute(
                             "SELECT o.payload_json,o.payload_digest FROM decisions d "
                             "JOIN object_revisions o ON o.kind='decision' AND o.object_id=d.decision_ref AND o.revision=d.revision "
+                            "AND o.project_ref=d.project_ref AND o.payload_digest=d.payload_digest "
                             "JOIN used_decisions u ON u.decision_ref=d.decision_ref "
                             "WHERE d.decision_ref=? AND d.project_ref=? AND u.consuming_commit_id=?",
                             (decision_ref, project_id, receipt["commit_id"]),
                         ).fetchone()
-                        _verified_payload(decision_row)
+                        _verified_payload(decision_row, project_id)
                     count += 1
                 except (KeyError, TypeError, ValueError) as exc:
                     raise ValueError(
@@ -84,10 +86,12 @@ def check_decision_state_receipts(state_path: Path, decision_path: Path, project
         decisions.close()
 
 
-def _verified_payload(row) -> Mapping[str, Any]:
+def _verified_payload(row, project_id: str) -> Mapping[str, Any]:
     if row is None:
         raise ValueError("canonical Snapshot/Decision is missing")
     payload = json.loads(row["payload_json"])
     if not isinstance(payload, Mapping) or canonical_digest(payload) != row["payload_digest"]:
         raise ValueError("canonical Snapshot/Decision payload does not verify")
+    if payload.get("project_id") != project_id:
+        raise ValueError("canonical Snapshot/Decision belongs to another project")
     return payload
