@@ -65,6 +65,7 @@ _OPTIONAL_DURABLE_CHILDREN = {
     "survey_registry": {"locator": f"{INTERNAL_DIR}/survey-registry.sqlite3", "kind": "file"},
     "survey_response_registry": {"locator": f"{INTERNAL_DIR}/survey-response-registry.sqlite3", "kind": "file"},
     "survey_analysis_registry": {"locator": f"{INTERNAL_DIR}/survey-analysis-registry.sqlite3", "kind": "file"},
+    "delphi_registry": {"locator": f"{INTERNAL_DIR}/delphi-registry.sqlite3", "kind": "file"},
     "project_inputs": {"locator": f"{INTERNAL_DIR}/project-inputs", "kind": "directory"},
     "writer_compositions": {"locator": f"{INTERNAL_DIR}/writer-compositions", "kind": "directory"},
     "writer_round_trips": {"locator": f"{INTERNAL_DIR}/writer-round-trips", "kind": "directory"},
