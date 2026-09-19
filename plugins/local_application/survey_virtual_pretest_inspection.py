@@ -151,47 +151,21 @@ def _comparison_item(item: Mapping[str, Any] | None) -> dict[str, Any] | None:
 def _all_aggregate_items(facade, aggregate_ref: Mapping[str, Any]) -> list[dict[str, Any]]:
     aggregate_result_id = str(aggregate_ref["id"])
     expected_digest = str(aggregate_ref["content_digest"])
-    offset = 0
-    total: int | None = None
-    result: list[dict[str, Any]] = []
-    while total is None or offset < total:
-        page = facade.show_survey_aggregate_result(
-            aggregate_result_id,
-            limit=100,
-            offset=offset,
+    try:
+        document = facade._survey_analysis_store().load_result(
+            facade._project_id, aggregate_result_id
         )
-        summary = page.get("aggregate_result")
-        pagination = page.get("pagination")
-        items = page.get("result_items")
-        if (
-            not isinstance(summary, Mapping)
-            or str(summary.get("content_digest", "")) != expected_digest
-            or not isinstance(pagination, Mapping)
-            or not isinstance(items, list)
-        ):
-            raise LocalApplicationError(_ERROR, "SurveyAggregateResult pagination is malformed or stale")
-        page_total = pagination.get("total")
-        returned = pagination.get("returned")
-        if (
-            not isinstance(page_total, int)
-            or isinstance(page_total, bool)
-            or page_total < 0
-            or not isinstance(returned, int)
-            or isinstance(returned, bool)
-            or returned != len(items)
-        ):
-            raise LocalApplicationError(_ERROR, "SurveyAggregateResult pagination metadata is invalid")
-        if total is None:
-            total = page_total
-        elif page_total != total:
-            raise LocalApplicationError(_ERROR, "SurveyAggregateResult pagination total changed during inspection")
-        if returned == 0 and offset < total:
-            raise LocalApplicationError(_ERROR, "SurveyAggregateResult pagination ended before total items were read")
-        result.extend(deepcopy(items))
-        offset += returned
-    if total is None or len(result) != total:
-        raise LocalApplicationError(_ERROR, "SurveyAggregateResult pagination did not resolve the complete result")
-    return result
+    except LocalSurveyAnalysisStoreError as exc:
+        raise LocalApplicationError(exc.code, exc.message) from exc
+    if (
+        not isinstance(document, Mapping)
+        or str(document.get("content_digest", "")) != expected_digest
+        or not isinstance(document.get("result_items"), list)
+    ):
+        raise LocalApplicationError(
+            _ERROR, "SurveyAggregateResult binding is missing, malformed, or stale"
+        )
+    return deepcopy(document["result_items"])
 
 
 class SurveyVirtualPretestInspectionMixin:

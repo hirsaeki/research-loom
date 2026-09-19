@@ -193,34 +193,34 @@ class Issue222SurveyVirtualPretestComparisonTests(SurveyVirtualRunnerTestBase):
             for index in range(1, 102)
         ]
 
-        class PagedAggregate:
+        class AggregateStore:
             def __init__(self):
-                self.offsets = []
+                self.calls = []
 
-            def show_survey_aggregate_result(self, aggregate_result_id, *, limit, offset):
-                self.offsets.append(offset)
-                page = deepcopy(all_items[offset : offset + limit])
+            def load_result(self, project_id, aggregate_result_id):
+                self.calls.append((project_id, aggregate_result_id))
                 return {
-                    "aggregate_result": {
-                        "aggregate_result_id": aggregate_result_id,
-                        "content_digest": "sha256:" + "a" * 64,
-                    },
-                    "result_items": page,
-                    "pagination": {
-                        "limit": limit,
-                        "offset": offset,
-                        "returned": len(page),
-                        "total": len(all_items),
-                    },
+                    "aggregate_result_id": aggregate_result_id,
+                    "content_digest": "sha256:" + "a" * 64,
+                    "result_items": deepcopy(all_items),
                 }
 
-        paged = PagedAggregate()
+        class AggregateFacade:
+            _project_id = "PRJ-1"
+
+            def __init__(self):
+                self.store = AggregateStore()
+
+            def _survey_analysis_store(self):
+                return self.store
+
+        aggregate_facade = AggregateFacade()
         resolved = _all_aggregate_items(
-            paged,
+            aggregate_facade,
             {"id": "SAG-1", "content_digest": "sha256:" + "a" * 64},
         )
         self.assertEqual(len(resolved), 101)
-        self.assertEqual(paged.offsets, [0, 100])
+        self.assertEqual(aggregate_facade.store.calls, [("PRJ-1", "SAG-1")])
 
     def test_material_backend_pin_mismatch_is_non_comparable(self):
         with tempfile.TemporaryDirectory() as temp:
