@@ -5,8 +5,10 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade
+from plugins.local_survey_response_store import LocalSurveyResponseStore
 from tests.runtime.survey_analysis_test_support import analysis_questionnaire
 from tests.runtime.survey_virtual_runner_test_support import SurveyVirtualRunnerTestBase, make_virtual_app
 from tests.runtime.test_survey_production import state_signature
@@ -194,6 +196,48 @@ class Issue221RealSurveyIntakeTests(SurveyVirtualRunnerTestBase):
                 self.assertEqual(
                     file_error.exception.code,
                     "APPLICATION-SURVEY-REAL-INTAKE-FILE-001",
+                )
+            finally:
+                app.close()
+
+
+    def test_immutable_first_capture_race_recovers_to_verified_reuse(self):
+        with tempfile.TemporaryDirectory() as temp:
+            app, facade, _, payload = self._fixture(temp)
+            original_capture = facade._capture_dataset
+
+            def competing_capture(*args, **kwargs):
+                original_capture(*args, **kwargs)
+                raise LocalApplicationError(
+                    "SURVEY-RESPONSE-DATASET-IMMUTABLE-001",
+                    "simulated competing first capture won",
+                )
+
+            try:
+                with patch.object(facade, "_capture_dataset", side_effect=competing_capture):
+                    recovered = facade.capture_real_survey_intake(payload)
+                self.assertEqual(recovered["status"], "ALREADY_CAPTURED")
+                shown = facade.show_survey_response_dataset(recovered["dataset_id"])["dataset"]
+                self.assertEqual(shown["content_digest"], recovered["content_digest"])
+                self.assertEqual(shown["capture_origin"], "survey_real_intake")
+            finally:
+                app.close()
+
+    def test_joined_inspection_batches_canonical_response_loading(self):
+        with tempfile.TemporaryDirectory() as temp:
+            app, facade, _, payload = self._fixture(temp)
+            try:
+                captured = facade.capture_real_survey_intake(payload)
+                with patch.object(
+                    LocalSurveyResponseStore,
+                    "load_response",
+                    side_effect=AssertionError("joined inspection must batch response loading"),
+                ):
+                    shown = facade.show_real_survey_intake(captured["dataset_id"], limit=100)
+                self.assertEqual(len(shown["responses"]), 3)
+                self.assertEqual(
+                    {row["canonical_response"]["response_id"] for row in shown["responses"] if row["kind"] == "accepted_response"},
+                    {"REAL-A", "REAL-B"},
                 )
             finally:
                 app.close()

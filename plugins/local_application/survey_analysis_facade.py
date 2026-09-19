@@ -603,19 +603,38 @@ class LocalApplicationFacade(SurveyVirtualPretestInspectionMixin, VirtualRunnerA
                 raw_inputs=raw_inputs,
             )
         else:
-            dataset_capture = self._capture_dataset(
-                {
-                    "instrument_id": instrument_id,
-                    "instrument_version": instrument_version,
-                    "instrument_digest": instrument_digest,
-                    "response_origin": "real",
-                    "epistemic_status": "EMPIRICAL",
-                    "responses": raw_inputs,
-                    "capture_origin": "survey_real_intake",
-                    "source_provenance": provenance,
-                },
-                dataset_id=dataset_id,
-            )
+            try:
+                dataset_capture = self._capture_dataset(
+                    {
+                        "instrument_id": instrument_id,
+                        "instrument_version": instrument_version,
+                        "instrument_digest": instrument_digest,
+                        "response_origin": "real",
+                        "epistemic_status": "EMPIRICAL",
+                        "responses": raw_inputs,
+                        "capture_origin": "survey_real_intake",
+                        "source_provenance": provenance,
+                    },
+                    dataset_id=dataset_id,
+                )
+            except LocalApplicationError as exc:
+                if exc.code != "SURVEY-RESPONSE-DATASET-IMMUTABLE-001":
+                    raise
+                try:
+                    raced = self._survey_response_store().load_dataset(
+                        self._project_id,
+                        dataset_id,
+                    )
+                except LocalSurveyResponseStoreError as store_exc:
+                    raise LocalApplicationError(store_exc.code, store_exc.message) from store_exc
+                if raced is None:
+                    raise
+                dataset_capture = self._verified_real_dataset_reuse(
+                    raced,
+                    instrument_ref=resolved_instrument,
+                    provenance=provenance,
+                    raw_inputs=raw_inputs,
+                )
 
         spec = self.capture_survey_analysis_spec(
             {
@@ -720,19 +739,26 @@ class LocalApplicationFacade(SurveyVirtualPretestInspectionMixin, VirtualRunnerA
                 "SurveyAggregateResult is not bound to the exact REAL intake Dataset",
             )
 
+        response_keys = [
+            (str(ref["identity_namespace"]), str(ref["response_id"]))
+            for entry in shown["entries"]
+            if (ref := entry.get("response_ref")) is not None
+        ]
+        try:
+            records = self._survey_response_store().load_responses(
+                self._project_id,
+                response_keys,
+            )
+        except LocalSurveyResponseStoreError as exc:
+            raise LocalApplicationError(exc.code, exc.message) from exc
+
         joined = []
         for entry in shown["entries"]:
             item = deepcopy(entry)
             ref = item.get("response_ref")
             if ref is not None:
-                try:
-                    record = self._survey_response_store().load_response(
-                        self._project_id,
-                        str(ref["response_id"]),
-                        identity_namespace=str(ref["identity_namespace"]),
-                    )
-                except LocalSurveyResponseStoreError as exc:
-                    raise LocalApplicationError(exc.code, exc.message) from exc
+                key = (str(ref["identity_namespace"]), str(ref["response_id"]))
+                record = records.get(key)
                 if record is None:
                     raise LocalApplicationError(
                         "APPLICATION-SURVEY-REAL-INTAKE-001",
