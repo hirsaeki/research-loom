@@ -138,6 +138,7 @@ class SurveyResponseCaptureMixin:
         input_value: Mapping[str, Any],
         *,
         enforce_unique_participant: bool = False,
+        dataset_id: str | None = None,
     ) -> Mapping[str, Any]:
         value = input_object(input_value, _DATASET_FIELDS, "Survey response dataset capture")
         questionnaire, instrument_ref = self._resolve_instrument(value)
@@ -283,7 +284,10 @@ class SurveyResponseCaptureMixin:
             "schema_version": "0.1.0",
             "object_type": "survey_response_dataset",
             "project_id": self._project_id,
-            "dataset_id": (f"SRD-{source_run_id}" if source_run_id and origin == "synthetic" else self._application.ids.new("SRD-")),
+            "dataset_id": (
+                dataset_id
+                or (f"SRD-{source_run_id}" if source_run_id and origin == "synthetic" else self._application.ids.new("SRD-"))
+            ),
             "instrument_ref": instrument_ref,
             "response_origin": origin,
             "epistemic_status": epistemic,
