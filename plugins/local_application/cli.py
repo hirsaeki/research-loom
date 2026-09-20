@@ -284,6 +284,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_workspace(publication_release_request)
     publication_release_request.add_argument("--build-id", required=True)
     publication_release_request.add_argument("--actor-id", required=True)
+    publication_release_request.add_argument("--renewal-of", help="Old request ID for an explicit new approval")
     _add_output_json(publication_release_request)
     publication_release = publication_sub.add_parser("release")
     _add_workspace(publication_release)
@@ -575,7 +576,7 @@ def _run(args: argparse.Namespace) -> Mapping[str, Any]:
             if args.publication_command == "show":
                 return facade.show_publication_preview(args.build_id)
             if args.publication_command == "release-request":
-                return facade.request_publication_release(args.build_id, args.actor_id)
+                return facade.request_publication_release(args.build_id, args.actor_id, renewal_of=args.renewal_of)
             if args.publication_command == "release":
                 return facade.release_publication(args.build_id, _read_input(args.json_input))
         if args.command == "delphi":
