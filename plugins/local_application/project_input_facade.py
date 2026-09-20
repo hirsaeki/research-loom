@@ -137,6 +137,40 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
             "next_cursor": page["next_cursor"],
         }
 
+    def recover_project_input(self, input_id: str, source_file: str | Path) -> Mapping[str, Any]:
+        registry = self._registry()
+        staged = None
+        result = None
+        try:
+            source = Path(source_file)
+            if not source.is_absolute():
+                source = self._workspace_root / source
+            managed = self._workspace_root / ".research-loom"
+            if source.resolve(strict=False).is_relative_to(managed.resolve(strict=False)):
+                raise LocalApplicationError(
+                    "APPLICATION-PROJECT-INPUT-RECOVERY-001", "repair source must be an operator-controlled workspace file"
+                )
+            if registry.get(str(input_id), self._project_id) is None:
+                raise LocalApplicationError("APPLICATION-PROJECT-INPUT-404", "project input does not exist in this project")
+            staged, _, _ = self._application.execution_store._stage_controlled_original(
+                source, max_bytes=_MAX_BYTES
+            )
+            result = registry.restore_content(str(input_id), self._project_id, staged)
+            return result
+        except LocalProjectInputStoreError as exc:
+            raise LocalApplicationError(exc.code, exc.message) from exc
+        except (OSError, ValueError, LocalExecutionStoreError) as exc:
+            raise LocalApplicationError(
+                "APPLICATION-PROJECT-INPUT-RECOVERY-001", "project input could not be restored from the exact workspace file"
+            ) from exc
+        finally:
+            if staged is not None:
+                try:
+                    staged.unlink(missing_ok=True)
+                except OSError:
+                    if result is not None:
+                        result["staging_cleanup_warning"] = "verified payload retained; remove abandoned staging after restoring access"
+
     def show_project_input(self, input_id: str, *, format: str = "metadata") -> Mapping[str, Any]:
         if format not in {"metadata", "text", "base64"}:
             raise LocalApplicationError(
@@ -155,6 +189,7 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                 "status": "OK",
                 "project_input": item,
                 "content": None,
+                "payload_health": registry.diagnose_content(str(input_id), self._project_id),
                 "available_content_formats": self._content_formats(str(item["media_type"])),
             }
         try:

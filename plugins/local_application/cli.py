@@ -174,6 +174,11 @@ def build_parser() -> argparse.ArgumentParser:
         default="metadata",
     )
     _add_output_json(research_input_show)
+    research_input_recover = research_input_sub.add_parser("recover")
+    _add_workspace(research_input_recover)
+    research_input_recover.add_argument("--input-id", required=True)
+    research_input_recover.add_argument("--source-file", required=True)
+    _add_output_json(research_input_recover)
 
     exhibit = sub.add_parser("exhibit")
     exhibit_sub = exhibit.add_subparsers(dest="exhibit_command", required=True)
@@ -631,6 +636,8 @@ def _run(args: argparse.Namespace) -> Mapping[str, Any]:
                 return facade.list_project_inputs(limit=args.limit, cursor=args.cursor)
             if args.research_input_command == "show":
                 return facade.show_project_input(args.input_id, format=args.format)
+            if args.research_input_command == "recover":
+                return facade.recover_project_input(args.input_id, args.source_file)
         if args.command == "action" and args.action_command == "submit":
             return facade.submit_action(_read_input(args.json_input))
         if args.command == "confirmation" and args.confirmation_command == "submit":

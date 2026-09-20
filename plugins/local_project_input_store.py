@@ -379,6 +379,64 @@ class LocalProjectInputStore:
             )
         return bytes(content)
 
+    def _repair_target(self, item: Mapping[str, Any]) -> Path:
+        from plugins.local_payload_repair import checked_path
+        size = item["byte_length"]
+        if not isinstance(size, int) or isinstance(size, bool) or not 0 <= size <= 8 * 1024 * 1024:
+            raise LocalProjectInputStoreError(
+                "APPLICATION-PROJECT-INPUT-INTEGRITY-001", "project-input byte length is invalid"
+            )
+        if not isinstance(item["content_digest"], str):
+            raise LocalProjectInputStoreError(
+                "APPLICATION-PROJECT-INPUT-INTEGRITY-001", "project-input content digest is invalid"
+            )
+        return checked_path(self.root, self._blob_path(item["content_digest"]))
+
+    def diagnose_content(self, input_id: str, project_id: str) -> dict[str, Any]:
+        from plugins.local_payload_repair import PayloadRepairError, REPAIRABLE, inspect_payload
+        try:
+            item = self.get(input_id, project_id)
+            if item is None:
+                return {"status": "metadata_missing", "next_action": "restore exact registry backup or register a new input"}
+            target = self._repair_target(item)
+            health = inspect_payload(target, item["content_digest"], item["byte_length"])
+        except OSError:
+            return {"status": "content_unreadable", "next_action": "restore filesystem access, then retry"}
+        except PayloadRepairError:
+            return {"status": "locator_invalid", "next_action": "restore safe store paths; do not overwrite links"}
+        except (LocalProjectInputStoreError, ValueError, TypeError, KeyError):
+            return {"status": "metadata_invalid", "next_action": "restore exact registry backup; payload repair cannot reconstruct metadata"}
+        health["next_action"] = (
+            "research-input recover --input-id ID --source-file EXACT_WORKSPACE_FILE"
+            if health["status"] in REPAIRABLE else
+            "restore filesystem access, then retry" if health["status"] == "content_unreadable" else
+            "show or consume the verified input"
+        )
+        return health
+
+    def restore_content(self, input_id: str, project_id: str, staged: Path) -> dict[str, Any]:
+        from plugins.local_payload_repair import PayloadRepairError, install_exact_payload
+        item = self.get(input_id, project_id)
+        if item is None:
+            raise LocalProjectInputStoreError(
+                "APPLICATION-PROJECT-INPUT-404", "project input does not exist in this project"
+            )
+        try:
+            target = self._repair_target(item)
+            # Validate the supplied bytes even on a verified-reuse request.
+            self._verify_blob(staged, item["content_digest"], item["byte_length"])
+            result = install_exact_payload(
+                self.root, target, staged, item["content_digest"], item["byte_length"],
+                verify=self._verify_blob,
+            )
+        except (OSError, PayloadRepairError) as exc:
+            raise LocalProjectInputStoreError(
+                "APPLICATION-PROJECT-INPUT-RECOVERY-001",
+                "exact payload repair failed; retain existing bytes and restore access or retry",
+            ) from exc
+        return {**result, "project_input": item, "historical_metadata_rewritten": False,
+                "research_state_mutation_performed": False, "verification_status": "verified"}
+
     def verify_content(self, input_id: str, project_id: str) -> dict[str, Any] | None:
         if not self._open_read():
             return None

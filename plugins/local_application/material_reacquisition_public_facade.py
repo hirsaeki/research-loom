@@ -63,7 +63,14 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                                     source_filename = value
                                 break
                         enriched_details["source_filename"] = source_filename
-        enriched_details["available_actions"] = material_recovery_action_guidance()
+        verification_status = enriched_details.get("verification_status")
+        enriched_details["available_actions"] = material_recovery_action_guidance(verification_status)
+        if not enriched_details["available_actions"]:
+            enriched_details["operator_guidance"] = (
+                "restore filesystem permissions/access, then retry"
+                if verification_status == "content_unreadable" else
+                "restore exact metadata and safe bindings from backup; payload repair cannot reconstruct them"
+            )
         enriched_recovery["recovery_failure_details"] = enriched_details
         result["finding_recovery"] = enriched_recovery
         return result
