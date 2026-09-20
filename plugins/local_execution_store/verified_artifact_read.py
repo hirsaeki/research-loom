@@ -157,7 +157,11 @@ class VerifiedArtifactReadMixin:
                 if cached is not None:
                     cached.clear()
         finally:
-            temporary.unlink(missing_ok=True)
+            try:
+                temporary.unlink(missing_ok=True)
+            except OSError:
+                # Cleanup must not mask a verified effect or the original error.
+                pass
         return {
             **result,
             "artifact_id": artifact_id,
