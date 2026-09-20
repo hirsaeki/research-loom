@@ -39,9 +39,12 @@ class PayloadRepairReviewTests(ResearchPackageAcceptanceSupport):
     def test_staging_cleanup_does_not_mask_verified_repair(self):
         _, case, store, artifact, target, exact, source, service = self._ready()
         target.write_bytes(b"bad")
-        with self._failed_staging_cleanup(store) as staged:
-            result = service.recover(case["run_id"], "CAP-1", kind="rendition", source_file=source)
+        with self.assertLogs("plugins.local_execution_store.verified_artifact_read", level="WARNING") as logs:
+            with self._failed_staging_cleanup(store) as staged:
+                result = service.recover(case["run_id"], "CAP-1", kind="rendition", source_file=source)
         self.assertTrue(staged)
+        self.assertIn(staged[0].name, logs.output[0])
+        self.assertIn("PermissionError", logs.output[0])
         self.assertEqual(result["status"], "REPAIRED")
         self.assertEqual(result["artifact_id"], artifact.artifact_id)
         self.assertEqual(target.read_bytes(), exact)
@@ -52,10 +55,12 @@ class PayloadRepairReviewTests(ResearchPackageAcceptanceSupport):
         _, _, store, artifact, target, exact, source, _ = self._ready()
         target.write_bytes(b"bad")
         source.write_bytes(exact[:-1] + bytes([exact[-1] ^ 1]))
-        with self._failed_staging_cleanup(store):
-            with self.assertRaisesRegex(LocalExecutionStoreIntegrityError,
-                                        "do not match persisted artifact digest/size"):
-                store.restore_missing_artifact_from_file(artifact.artifact_id, source)
+        with self.assertLogs("plugins.local_execution_store.verified_artifact_read", level="WARNING") as logs:
+            with self._failed_staging_cleanup(store) as staged:
+                with self.assertRaisesRegex(LocalExecutionStoreIntegrityError,
+                                            "do not match persisted artifact digest/size"):
+                    store.restore_missing_artifact_from_file(artifact.artifact_id, source)
+        self.assertIn(staged[0].name, logs.output[0])
         self.assertEqual(target.read_bytes(), b"bad")
 
     def test_recorruption_retrieves_again_and_package_resumes(self):

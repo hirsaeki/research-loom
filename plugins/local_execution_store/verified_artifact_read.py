@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -159,9 +160,12 @@ class VerifiedArtifactReadMixin:
         finally:
             try:
                 temporary.unlink(missing_ok=True)
-            except OSError:
+            except OSError as cleanup_error:
                 # Cleanup must not mask a verified effect or the original error.
-                pass
+                logging.getLogger(__name__).warning(
+                    "Recovery staging cleanup failed for %s (%s); inspect staging after restoring access.",
+                    temporary.name, type(cleanup_error).__name__,
+                )
         return {
             **result,
             "artifact_id": artifact_id,

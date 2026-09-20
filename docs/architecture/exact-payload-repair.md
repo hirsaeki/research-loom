@@ -87,7 +87,12 @@ verified; it does not fabricate a successful diagnostic write or undo the repair
 A crash before installation keeps old bytes and the quarantine copy. A crash
 after installation can leave an exact blob without its final receipt: re-open,
 verify and reuse that effect. Temporary intake/staging leftovers are not canonical
-objects. Do not delete valid shared blobs to roll back a diagnostic or cleanup
+objects. If staging cleanup fails, a warning identifies the generated temporary
+filename and error class without exposing source content or an absolute path.
+After restoring access, stop all Workspace users and inspect that exact file in
+the execution store staging directory before removing it; do not sweep staging
+while an intake/repair may still be active. No background cleanup is scheduled.
+Do not delete valid shared blobs to roll back a diagnostic or cleanup
 failure. Recovery does not change Research State or previously recorded facts.
 
 The supported backup procedure remains a quiesced whole Parent copy, as described
