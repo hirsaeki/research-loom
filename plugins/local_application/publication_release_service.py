@@ -505,7 +505,9 @@ class PublicationReleaseService:
         return self.root / "builds" / _safe(build_id)
 
     def _release_request_path(self, request_id: str) -> Path:
-        return self.root / "release-requests" / f"{_safe(request_id)}.json"
+        # One request replica per operation, addressed without scanning nonce IDs.
+        # The full immutable request ID remains in the document and is verified.
+        return self.root / "release-requests" / f"{self._request_operation_id(request_id)}.json"
 
     @staticmethod
     def _validation_checks(
@@ -915,7 +917,101 @@ class PublicationReleaseService:
                 "stored Release does not match its exact approved request and preview build",
             )
 
-    def request_release(self, build_id: str, actor_id: str) -> Mapping[str, Any]:
+    @staticmethod
+    def _request_operation_id(request_id: str) -> str:
+        # New IDs carry a nonce; the stable prefix addresses their operation.
+        # Legacy IDs remain readable without assigning new historical facts.
+        match = re.fullmatch(r"(PUBRELREQ-[0-9a-f]{24})(?:-[0-9a-f]{32})?", request_id)
+        return match.group(1) if match else _safe(request_id)
+
+    def _operation_path(self, request_id: str) -> Path:
+        return self.root / "release-operations" / f"{self._request_operation_id(request_id)}.json"
+
+    def _checked_record_path(self, path: Path) -> Path:
+        from .workspace import _safe_locator
+        return _safe_locator(self.workspace, path.relative_to(self.workspace).as_posix(), require_exists=False)
+
+    def _load_release_operation(self, request_id: str) -> dict[str, Any] | None:
+        path = self._checked_record_path(self._operation_path(request_id))
+        if not path.exists():
+            return None
+        record = self._read_release_json(path)
+        request = record.get("request")
+        if (
+            record.get("object_type") != "publication_release_operation"
+            or record.get("operation_digest") != _digest(record, "operation_digest")
+            or record.get("phase") not in {"PENDING", "DECIDED"}
+            or not isinstance(request, dict)
+            or not isinstance(request.get("request_id"), str)
+            or self._request_operation_id(request["request_id"]) != self._request_operation_id(request_id)
+            or request.get("request_digest") != _digest(request, "request_digest")
+            or (record["phase"] == "DECIDED") != isinstance(record.get("release"), dict)
+        ):
+            raise LocalApplicationError(
+                "APPLICATION-PUBLICATION-INTEGRITY-001",
+                "Publication operation record does not verify; restore its exact backup or request a new approval with renewal_of",
+            )
+        return record
+
+    def _atomic_release_write(self, path: Path, data: bytes, *, replace: bool = False) -> None:
+        path = self._checked_record_path(path)
+        staging = None
+        fd = None
+        try:
+            try:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                fd, name = tempfile.mkstemp(prefix=".publication-", dir=path.parent)
+                staging = Path(name)
+                with os.fdopen(fd, "wb") as stream:
+                    fd = None  # The stream now owns the descriptor.
+                    stream.write(data)
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                if replace:
+                    os.replace(staging, path)
+                else:
+                    try:
+                        os.link(staging, path)
+                    except FileExistsError:
+                        if path.read_bytes() != data:
+                            raise LocalApplicationError(
+                                "APPLICATION-PUBLICATION-INTEGRITY-001",
+                                "Publication recovery refuses to replace different existing bytes",
+                            )
+            finally:
+                if fd is not None:
+                    os.close(fd)
+                if staging is not None:
+                    staging.unlink(missing_ok=True)
+        except OSError as exc:
+            raise LocalApplicationError(
+                "APPLICATION-PUBLICATION-WRITE-001",
+                "Publication record could not be persisted; retry the exact request after resolving the I/O error",
+            ) from exc
+
+    def _write_release_operation(self, request: Mapping[str, Any], manifest=None) -> None:
+        record = {
+            "object_type": "publication_release_operation",
+            "phase": "PENDING" if manifest is None else "DECIDED",
+            "request": deepcopy(dict(request)),
+            "release": deepcopy(manifest),
+            "operation_digest": "",
+        }
+        record["operation_digest"] = _digest(record, "operation_digest")
+        self._atomic_release_write(self._operation_path(request["request_id"]), _json_bytes(record), replace=True)
+
+    @staticmethod
+    def _lost_release_facts() -> None:
+        raise LocalApplicationError(
+            "APPLICATION-PUBLICATION-RECOVERY-REQUIRED-001",
+            "Original Publication request/decision facts are unavailable. Restore the exact operation record, "
+            "or issue release-request with renewal_of set to the old request_id and obtain a new approval; "
+            "do not recreate the old identity or timestamps",
+        )
+
+    def request_release(
+        self, build_id: str, actor_id: str, *, renewal_of: str | None = None,
+    ) -> Mapping[str, Any]:
         if not isinstance(actor_id, str) or not actor_id:
             raise LocalApplicationError(
                 "APPLICATION-PUBLICATION-RELEASE-DECISION-001",
@@ -935,69 +1031,84 @@ class PublicationReleaseService:
             "preview_digest": preview["content_digest"],
             "actor_id": actor_id,
         }
-        request_id = "PUBRELREQ-" + _sha(_canonical_bytes(basis)).split(":", 1)[1][:24]
-        with self._file_lock(f"request-{request_id}"):
-            path = self._release_request_path(request_id)
-            if path.is_file():
-                request = self._read_release_json(path)
+        if renewal_of is not None:
+            if not isinstance(renewal_of, str) or not renewal_of.startswith("PUBRELREQ-"):
+                raise LocalApplicationError("APPLICATION-PUBLICATION-INPUT-001", "renewal_of must be a Publication request ID")
+            basis["renewal_of"] = _safe(renewal_of)
+        operation_id = "PUBRELREQ-" + _sha(_canonical_bytes(basis)).split(":", 1)[1][:24]
+        with self._file_lock(f"request-{operation_id}"):
+            operation = self._load_release_operation(operation_id)
+            legacy_path = self._checked_record_path(self._release_request_path(operation_id))
+            if operation is not None or legacy_path.exists():
+                request = operation["request"] if operation else self._read_release_json(legacy_path)
                 expected = self._request_binding(build, preview, actor_id)
                 if (
-                    request.get("request_id") != request_id
+                    self._request_operation_id(str(request.get("request_id", ""))) != operation_id
                     or request.get("request_digest") != _digest(request, "request_digest")
                     or any(request.get(key) != value for key, value in expected.items())
+                    or request.get("renewal_of") != renewal_of
                 ):
                     raise LocalApplicationError(
                         "APPLICATION-PUBLICATION-INTEGRITY-001",
-                        "Publication release request digest does not verify",
+                        "Publication release request does not match its exact operation binding",
                     )
-                return {"status": "VERIFIED_REUSE", "decision_request": request}
-            formal = next(row for row in build["outputs"] if row["format"] == "docx")
+                if operation is None and request.get("recovery_contract") == "release-operation-v1":
+                    # The replica cannot prove whether approval already committed.
+                    self._lost_release_facts()
+                path = self._checked_record_path(self._release_request_path(request["request_id"]))
+                if path.exists():
+                    if self._read_release_json(path) != request:
+                        raise LocalApplicationError("APPLICATION-PUBLICATION-INTEGRITY-001", "Publication request differs from its operation record")
+                    return {"status": "VERIFIED_REUSE", "decision_request": request}
+                self._atomic_release_write(path, _json_bytes(request))
+                return {"status": "RESTORED", "decision_request": request,
+                        "recovered_at": self.facade._application.clock.now()}
+
+            from uuid import uuid4
             request: dict[str, Any] = {
                 "schema_version": SCHEMA_VERSION,
                 "object_type": "publication_release_decision_request",
-                "request_id": request_id,
-                "project_ref": self.facade.project_id,
-                "human_actor_id": actor_id,
-                "source_preview": {
-                    "preview_id": build_id,
-                    "preview_digest": preview["content_digest"],
-                },
-                "source_manuscript": deepcopy(build["source_manuscript"]),
-                "snapshot_binding": deepcopy(
-                    build["research_provenance"]["research_snapshot"]
-                ),
-                "publication_profile": deepcopy(build["publication_profile"]),
-                "output_binding": {
-                    "format": "docx",
-                    "digest": formal["digest"],
-                    "size": formal["size"],
-                },
-                "allowed_dispositions": ["approve_release"],
+                "request_id": operation_id + "-" + uuid4().hex,
+                **deepcopy(self._request_binding(build, preview, actor_id)),
                 "issued_at": self.facade._application.clock.now(),
+                "recovery_contract": "release-operation-v1",
+                "renewal_of": renewal_of,
                 "request_digest": "",
             }
             request["request_digest"] = _digest(request, "request_digest")
-            path.parent.mkdir(parents=True, exist_ok=True)
-            staging = path.with_suffix(".json.tmp")
-            staging.write_bytes(_json_bytes(request))
-            os.replace(staging, path)
+            # The operation is the write-ahead record for request/decision facts.
+            # A response loss cannot invent another issued_at or decided_at.
+            self._write_release_operation(request)
+            self._atomic_release_write(self._release_request_path(request["request_id"]), _json_bytes(request))
         return {"status": "PENDING", "decision_request": request}
 
     def _load_release_request(self, request_id: str) -> Mapping[str, Any]:
-        path = self._release_request_path(request_id)
-        if not path.is_file():
+        operation = self._load_release_operation(request_id)
+        path = self._checked_record_path(self._release_request_path(request_id))
+        if not path.exists():
+            # Older replicas used the complete nonce ID. Probe only the exact
+            # caller-supplied identity; do not scan unrelated request history.
+            legacy = self._checked_record_path(self.root / "release-requests" / f"{_safe(request_id)}.json")
+            if legacy.exists():
+                path = legacy
+        if operation is not None:
+            request = operation["request"]
+            if path.exists() and self._read_release_json(path) != request:
+                raise LocalApplicationError("APPLICATION-PUBLICATION-INTEGRITY-001", "Publication request differs from its operation record")
+        elif path.is_file():
+            request = self._read_release_json(path)
+        else:
             raise LocalApplicationError(
                 "APPLICATION-PUBLICATION-RELEASE-DECISION-001",
-                "Publication release decision request does not resolve",
+                "Publication request is missing; restore the exact record or issue a new release-request and approval",
             )
-        request = self._read_release_json(path)
         if (
             request.get("request_id") != request_id
             or request.get("request_digest") != _digest(request, "request_digest")
         ):
             raise LocalApplicationError(
                 "APPLICATION-PUBLICATION-INTEGRITY-001",
-                "Publication release request digest does not verify",
+                "Publication release request identity/digest does not verify",
             )
         if request.get("project_ref") != self.facade.project_id:
             raise LocalApplicationError(
@@ -1024,7 +1135,6 @@ class PublicationReleaseService:
                 "APPLICATION-PUBLICATION-RELEASE-DECISION-001",
                 "Publication release response does not match its exact decision request",
             )
-
         shown = self.show_preview(build_id)
         build = shown["build"]
         preview = shown["preview_manifest"]
@@ -1033,131 +1143,103 @@ class PublicationReleaseService:
                 "APPLICATION-PUBLICATION-RELEASE-CHECK-001",
                 "Publication release checks have not passed",
             )
-        if (
-            request["source_preview"]["preview_id"] != build_id
-            or request["source_preview"]["preview_digest"] != preview["content_digest"]
-            or request["source_manuscript"] != build["source_manuscript"]
-            or request["snapshot_binding"]
-            != build["research_provenance"]["research_snapshot"]
-            or request["publication_profile"] != build["publication_profile"]
-        ):
+        if any(request.get(key) != value for key, value in self._request_binding(build, preview, str(response["actor_id"])).items()):
             raise LocalApplicationError(
                 "APPLICATION-PUBLICATION-RELEASE-DECISION-001",
-                "Publication release request is stale or bound to another build",
+                "Publication release request is stale or bound to another build/output",
             )
         formal = next(row for row in build["outputs"] if row["format"] == "docx")
-        if (
-            request["output_binding"]["digest"] != formal["digest"]
-            or int(request["output_binding"]["size"]) != int(formal["size"])
-        ):
-            raise LocalApplicationError(
-                "APPLICATION-PUBLICATION-RELEASE-DECISION-001",
-                "Publication release request output binding is stale",
-            )
-
         decision_id = "PUBRELDEC-" + hashlib.sha256(
-            (
-                request["request_digest"]
-                + str(response["actor_id"])
-                + str(response["disposition"])
-            ).encode("utf-8")
+            (request["request_digest"] + str(response["actor_id"]) + str(response["disposition"])).encode("utf-8")
         ).hexdigest()[:24]
         release_id = "REL-" + hashlib.sha256(
             (build_id + preview["content_digest"] + decision_id).encode("utf-8")
         ).hexdigest()[:24]
-        with self._file_lock(f"release-{release_id}"):
-            target = self.root / "releases" / release_id
-            manifest_path = target / "release-manifest.json"
-            source = self._build_path(build_id) / "formal.docx"
-            payload = source.read_bytes()
-            if len(payload) != int(formal["size"]) or _sha(payload) != formal["digest"]:
+        operation_id = self._request_operation_id(request["request_id"])
+        with self._file_lock(f"request-{operation_id}"):
+            operation = self._load_release_operation(request["request_id"])
+            if operation is not None and operation["request"] != request:
+                raise LocalApplicationError("APPLICATION-PUBLICATION-INTEGRITY-001", "Publication operation changed its request identity")
+            target = self._checked_record_path(self.root / "releases" / release_id)
+            manifest_path = self._checked_record_path(target / "release-manifest.json")
+            artifact = self._checked_record_path(target / "artifact.docx")
+            payload = (self._build_path(build_id) / "formal.docx").read_bytes()
+            if len(payload) != int(formal["size"]) or _sha(payload) != formal["digest"] or not _verify_docx_bytes(payload):
                 raise LocalApplicationError(
                     "APPLICATION-PUBLICATION-INTEGRITY-001",
-                    "stored Publication DOCX no longer matches its verified preview build",
+                    "stored Publication DOCX does not match its exact approved preview build",
                 )
-            if not _verify_docx_bytes(payload):
-                raise LocalApplicationError(
-                    "APPLICATION-PUBLICATION-INTEGRITY-001",
-                    "stored Publication DOCX failed structural XML verification",
-                )
-            if manifest_path.is_file():
-                existing = self._read_release_json(manifest_path)
-                self._verify_release_binding(
-                    existing, release_id=release_id, decision_id=decision_id,
-                    request=request, build=build, preview=preview,
-                )
-                artifact = target / "artifact.docx"
+            existing = self._read_release_json(manifest_path) if manifest_path.exists() else None
+            if existing is not None:
+                self._verify_release_binding(existing, release_id=release_id, decision_id=decision_id,
+                                             request=request, build=build, preview=preview)
+            if artifact.exists():
                 try:
                     matches = artifact.is_file() and artifact.read_bytes() == payload
                 except OSError as exc:
-                    raise LocalApplicationError(
-                        "APPLICATION-PUBLICATION-INTEGRITY-001",
-                        "stored Release artifact is unreadable",
-                    ) from exc
+                    raise LocalApplicationError("APPLICATION-PUBLICATION-INTEGRITY-001", "stored Release artifact is unreadable") from exc
                 if not matches:
-                    raise LocalApplicationError(
-                        "APPLICATION-PUBLICATION-INTEGRITY-001",
-                        "stored Release artifact differs from the exact approved output",
-                    )
-                return {
-                    "status": "VERIFIED_REUSE",
-                    "release": existing,
-                    "research_state_mutation_performed": False,
-                }
+                    raise LocalApplicationError("APPLICATION-PUBLICATION-INTEGRITY-001", "stored Release artifact differs from the exact approved output")
 
-            decision: dict[str, Any] = {
-                "decision_id": decision_id,
-                "request_id": request["request_id"],
-                "request_digest": request["request_digest"],
-                "disposition": "approve_release",
-                "actor": {
-                    "actor_id": str(response["actor_id"]),
-                    "actor_type": "human",
-                },
-                "decided_at": self.facade._application.clock.now(),
-                "decision_digest": "",
-            }
-            decision["decision_digest"] = _digest(decision, "decision_digest")
-            manifest: dict[str, Any] = {
-                "schema_version": SCHEMA_VERSION,
-                "object_type": "release_manifest",
-                "release_id": release_id,
-                "source_preview": {
-                    "preview_id": build_id,
-                    "preview_digest": preview["content_digest"],
-                },
-                "source_manuscript": deepcopy(build["source_manuscript"]),
-                "research_provenance": deepcopy(build["research_provenance"]),
-                "publication_profile": deepcopy(build["publication_profile"]),
-                "output": {
-                    "relative_path": "artifact.docx",
-                    "artifact_reference": f"publication/releases/{release_id}/artifact.docx",
-                    "media_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    "size": len(payload),
-                    "digest": _sha(payload),
-                },
-                "verification": deepcopy(build["verification"]),
-                "human_release_decision": decision,
-                "research_state_mutation_performed": False,
-                "content_digest": "",
-            }
-            manifest["content_digest"] = _digest(manifest, "content_digest")
-            target.parent.mkdir(parents=True, exist_ok=True)
-            staging = Path(tempfile.mkdtemp(prefix=f".{release_id}.", dir=target.parent))
-            try:
-                (staging / "artifact.docx").write_bytes(payload)
-                (staging / "release-manifest.json").write_bytes(_json_bytes(manifest))
-                os.rename(staging, target)
-            except OSError as exc:
-                raise LocalApplicationError(
-                    "APPLICATION-PUBLICATION-WRITE-001",
-                    "Publication release could not be persisted",
-                ) from exc
-            finally:
-                if staging.exists():
-                    shutil.rmtree(staging, ignore_errors=True)
-        return {
-            "status": "RELEASED",
-            "release": manifest,
-            "research_state_mutation_performed": False,
-        }
+            fresh = operation is not None and operation["phase"] == "PENDING"
+            operation_restored = False
+            if operation is not None and operation["phase"] == "DECIDED":
+                manifest = operation["release"]
+                self._verify_release_binding(manifest, release_id=release_id, decision_id=decision_id,
+                                             request=request, build=build, preview=preview)
+                if existing is not None and existing != manifest:
+                    raise LocalApplicationError("APPLICATION-PUBLICATION-INTEGRITY-001", "Release differs from its retained decision facts")
+            elif existing is not None:
+                if fresh:
+                    raise LocalApplicationError("APPLICATION-PUBLICATION-INTEGRITY-001", "Release exists before its recorded decision")
+                # Supported legacy recovery: the original immutable manifest,
+                # including its decision time, still exists and verifies.
+                manifest = existing
+                self._write_release_operation(request, manifest)
+                operation_restored = True
+            elif operation is None:
+                self._lost_release_facts()
+            else:
+                decision = {
+                    "decision_id": decision_id,
+                    "request_id": request["request_id"],
+                    "request_digest": request["request_digest"],
+                    "disposition": "approve_release",
+                    "actor": {"actor_id": str(response["actor_id"]), "actor_type": "human"},
+                    "decided_at": self.facade._application.clock.now(),
+                    "decision_digest": "",
+                }
+                decision["decision_digest"] = _digest(decision, "decision_digest")
+                manifest = {
+                    "schema_version": SCHEMA_VERSION,
+                    "object_type": "release_manifest",
+                    "release_id": release_id,
+                    "source_preview": {"preview_id": build_id, "preview_digest": preview["content_digest"]},
+                    "source_manuscript": deepcopy(build["source_manuscript"]),
+                    "research_provenance": deepcopy(build["research_provenance"]),
+                    "publication_profile": deepcopy(build["publication_profile"]),
+                    "output": {
+                        "relative_path": "artifact.docx",
+                        "artifact_reference": f"publication/releases/{release_id}/artifact.docx",
+                        "media_type": formal["media_type"], "size": len(payload), "digest": _sha(payload),
+                    },
+                    "verification": deepcopy(build["verification"]),
+                    "human_release_decision": decision,
+                    "research_state_mutation_performed": False,
+                    "content_digest": "",
+                }
+                manifest["content_digest"] = _digest(manifest, "content_digest")
+                self._write_release_operation(request, manifest)
+
+            restored = ["release-operation"] if operation_restored else []
+            for part, data in ((self._release_request_path(request["request_id"]), _json_bytes(request)),
+                               (artifact, payload), (manifest_path, _json_bytes(manifest))):
+                if not part.exists():
+                    self._atomic_release_write(part, data)
+                    restored.append(part.name)
+            result = {"status": "RELEASED" if fresh else ("RESTORED" if restored else "VERIFIED_REUSE"),
+                      "release": manifest, "research_state_mutation_performed": False}
+            if restored and not fresh:
+                result["restored_components"] = restored
+                result["recovered_at"] = self.facade._application.clock.now()
+            return result

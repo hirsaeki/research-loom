@@ -22,6 +22,8 @@ from test_survey_production import NullResolver
 class ResearchPackageAcceptanceSupport(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(); self.root = Path(self.temp.name)
+        # Later application cleanups run first, releasing Windows SQLite handles.
+        self.addCleanup(self.temp.cleanup)
         cfg, eps = self._write_structured_workspace_inputs()
         opened = LocalWorkspace.init(self.root / "workspace", cfg, eps)
         opened.close(); self.workspace = self.root / "workspace"
@@ -69,8 +71,6 @@ class ResearchPackageAcceptanceSupport(unittest.TestCase):
         cfg.write_text(json.dumps(config), encoding="utf-8")
         eps.write_text(json.dumps(effective), encoding="utf-8")
         return cfg, eps
-
-    def tearDown(self): self.temp.cleanup()
 
     def _prepare_case(
         self,

@@ -224,8 +224,10 @@ class LocalApplicationFacade:
     def show_publication_preview(self, build_id: str) -> Mapping[str, Any]:
         return self._publication_release_service().show_preview(build_id)
 
-    def request_publication_release(self, build_id: str, actor_id: str) -> Mapping[str, Any]:
-        return self._publication_release_service().request_release(build_id, actor_id)
+    def request_publication_release(
+        self, build_id: str, actor_id: str, *, renewal_of: str | None = None,
+    ) -> Mapping[str, Any]:
+        return self._publication_release_service().request_release(build_id, actor_id, renewal_of=renewal_of)
 
     def release_publication(self, build_id: str, decision: Mapping[str, Any]) -> Mapping[str, Any]:
         return self._publication_release_service().release(build_id, decision)
