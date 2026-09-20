@@ -288,6 +288,7 @@ class Issue80WriterCompositionTests(ResearchPackageAcceptanceSupport):
             p2 = self._proposal(case, composition_id=v1["composition_id"], base=v1)
             v2 = facade.capture_writer_composition(case["package_id"], p2)["composition"]
             stale = self._proposal(case, composition_id=v1["composition_id"], base=v1)
+            stale["change_reason"] = "A different edit based on the old version."
             with self.assertRaises(LocalApplicationError) as e: facade.capture_writer_composition(case["package_id"], stale)
             self.assertEqual(e.exception.code, "APPLICATION-WRITER-COMPOSITION-STALE-001")
             with self.assertRaises(LocalApplicationError): facade.select_writer_composition(v1["composition_id"], 2, "sha256:" + "0"*64)
@@ -375,13 +376,13 @@ class Issue80WriterCompositionTests(ResearchPackageAcceptanceSupport):
                         pass
             self.assertEqual(error.exception.code, "APPLICATION-WRITER-COMPOSITION-BUSY-001")
 
-            with (
-                patch.object(service, "_versions", side_effect=[[], [1], [1]]),
-                patch.object(service, "_series_lock", wraps=service._series_lock) as series_lock,
-            ):
-                with service._capture_lock("COMP-LOCK"):
-                    pass
-            self.assertEqual(series_lock.call_count, 1)
+            # Capture must acquire this same series lock even when its derived
+            # latest index needs recovery, rather than validating before locking.
+            with service._series_lock("COMP-LOCK"):
+                with self.assertRaises(LocalApplicationError) as error:
+                    with service._capture_lock("COMP-LOCK"):
+                        pass
+            self.assertEqual(error.exception.code, "APPLICATION-WRITER-COMPOSITION-BUSY-001")
 
             lock_files_before = sorted(path.name for path in service.root.glob(".*.lock"))
             for index in range(8):

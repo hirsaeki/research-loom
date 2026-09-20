@@ -164,6 +164,8 @@ class Issue177WriterHistoryTests(ResearchPackageAcceptanceSupport):
 
             with self.assertRaises(LocalApplicationError) as restored:
                 facade.capture_writer_composition(case["package_id"], stale)
-            self.assertEqual(restored.exception.code, "APPLICATION-WRITER-COMPOSITION-STALE-001")
+            # The intentionally invalid committed successor is now detected by
+            # continuity-record validation before even exact-replay reuse.
+            self.assertEqual(restored.exception.code, "APPLICATION-WRITER-COMPOSITION-INTEGRITY-001")
         finally:
             facade.close()

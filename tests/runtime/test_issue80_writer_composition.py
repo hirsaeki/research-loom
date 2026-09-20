@@ -93,10 +93,11 @@ class Issue80WriterCompositionTests(_suite.Issue80WriterCompositionTests):
                         pass
             self.assertEqual(error.exception.code, "APPLICATION-WRITER-COMPOSITION-BUSY-001")
 
-            with patch.object(service, "_series_lock", wraps=service._series_lock) as series_lock:
-                with service._capture_lock("COMP-LOCK"):
-                    pass
-            self.assertEqual(series_lock.call_count, 1)
+            with service._series_lock("COMP-LOCK"):
+                with self.assertRaises(LocalApplicationError) as error:
+                    with service._capture_lock("COMP-LOCK"):
+                        pass
+            self.assertEqual(error.exception.code, "APPLICATION-WRITER-COMPOSITION-BUSY-001")
 
             lock_files_before = sorted(path.name for path in service.root.glob(".*.lock"))
             for index in range(8):

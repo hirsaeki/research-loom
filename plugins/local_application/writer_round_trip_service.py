@@ -7,6 +7,8 @@ from datetime import datetime, timezone
 import hashlib
 import json
 import os
+import re
+from uuid import uuid4
 from pathlib import Path
 import shutil
 import tempfile
@@ -84,7 +86,14 @@ class WriterRoundTripService:
         return self.series_root / safe_component(composition_id, "composition_id")
 
     def _revision_path(self, composition_id: str, revision_id: str) -> Path:
-        return self._revision_root(composition_id) / "revisions" / f"{safe_component(revision_id, 'revision_id')}.json"
+        # The response key permits direct retry lookup; the full nonce ID stays in the
+        # immutable document, so losing every retained fact cannot resurrect an old ID.
+        match = re.fullmatch(r"(WMR-[0-9a-f]{24})(?:-[0-9a-f]{32})?", revision_id)
+        key = match.group(1) if match else safe_component(revision_id, "revision_id")
+        return self._revision_root(composition_id) / "revisions" / f"{key}.json"
+
+    def _checkpoint_path(self, composition_id: str) -> Path:
+        return self.root / f".{safe_component(composition_id, 'composition_id')}.latest.json"
 
     def _head_path(self, composition_id: str) -> Path:
         return self._revision_root(composition_id) / "head.json"
@@ -99,62 +108,56 @@ class WriterRoundTripService:
         return value
 
     def _write_immutable(self, path: Path, value: Mapping[str, Any]) -> bool:
-        require_optional_available(self.root, LocalApplicationError)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        register_optional_path(self.root)
-        payload = _json_bytes(value)
-        if path.exists():
-            existing = self._read_json(path, message="immutable Writer round-trip record is unreadable")
-            if dict(existing) != dict(value):
-                raise LocalApplicationError(
-                    "APPLICATION-WRITER-ROUND-TRIP-IMMUTABLE-001",
-                    "immutable Writer round-trip identity already contains different content",
-                )
-            return True
-        fd, tmp_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
-        tmp = Path(tmp_name)
-        try:
-            with os.fdopen(fd, "wb") as handle:
-                handle.write(payload)
-                handle.flush()
-                os.fsync(handle.fileno())
-            try:
-                os.link(tmp, path)
-            except FileExistsError:
-                existing = self._read_json(path, message="immutable Writer round-trip record is unreadable")
-                if dict(existing) != dict(value):
-                    raise LocalApplicationError(
-                        "APPLICATION-WRITER-ROUND-TRIP-IMMUTABLE-001",
-                        "immutable Writer round-trip identity raced with different content",
-                    )
-                return True
-            return False
-        except OSError as exc:
-            raise LocalApplicationError(
-                "APPLICATION-WRITER-ROUND-TRIP-WRITE-001",
-                "Writer round-trip immutable persistence failed",
-            ) from exc
-        finally:
-            tmp.unlink(missing_ok=True)
+        return self._write_record(path, value, replace=False)
 
     def _write_head(self, composition_id: str, value: Mapping[str, Any]) -> None:
-        path = self._head_path(composition_id)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        fd, tmp_name = tempfile.mkstemp(prefix=".head.", suffix=".tmp", dir=path.parent)
-        tmp = Path(tmp_name)
+        self._write_pointer(self._head_path(composition_id), value)
+
+    def _write_pointer(self, path: Path, value: Mapping[str, Any]) -> None:
+        self._write_record(path, value, replace=True)
+
+    def _write_record(self, path: Path, value: Mapping[str, Any], *, replace: bool) -> bool:
+        from .workspace import _safe_locator
+        require_optional_available(self.root, LocalApplicationError)
+        path = _safe_locator(self.workspace, path.relative_to(self.workspace).as_posix(), require_exists=False)
+        fd, tmp = None, None
         try:
-            with os.fdopen(fd, "wb") as handle:
-                handle.write(_json_bytes(value))
-                handle.flush()
-                os.fsync(handle.fileno())
-            os.replace(tmp, path)
+            try:
+                if not replace and path.exists():
+                    existing = self._read_json(path, message="immutable Writer round-trip record is unreadable")
+                    if dict(existing) != dict(value):
+                        raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-IMMUTABLE-001",
+                                                    "immutable Writer identity contains different content; restore its exact backup")
+                    return True
+                path.parent.mkdir(parents=True, exist_ok=True)
+                register_optional_path(self.root)
+                fd, name = tempfile.mkstemp(prefix=".writer-", suffix=".tmp", dir=path.parent)
+                tmp = Path(name)
+                with os.fdopen(fd, "wb") as handle:
+                    fd = None
+                    handle.write(_json_bytes(value))
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                if replace:
+                    os.replace(tmp, path)
+                else:
+                    try:
+                        os.link(tmp, path)
+                    except FileExistsError:
+                        existing = self._read_json(path, message="immutable Writer round-trip record is unreadable")
+                        if dict(existing) != dict(value):
+                            raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-IMMUTABLE-001",
+                                                        "immutable Writer identity contains different content; restore its exact backup")
+                        return True
+                return False
+            finally:
+                if fd is not None:
+                    os.close(fd)
+                if tmp is not None:
+                    tmp.unlink(missing_ok=True)
         except OSError as exc:
-            raise LocalApplicationError(
-                "APPLICATION-WRITER-ROUND-TRIP-WRITE-001",
-                "Writer manuscript head persistence failed",
-            ) from exc
-        finally:
-            tmp.unlink(missing_ok=True)
+            raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-WRITE-001",
+                                        "Writer persistence failed; resolve the I/O error and retry the exact response") from exc
 
     def _load_input(self, input_id: str) -> Mapping[str, Any]:
         path = self._input_path(input_id)
@@ -172,6 +175,11 @@ class WriterRoundTripService:
         if not path.is_file():
             raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-404", "manuscript revision does not exist")
         value = self._read_json(path, message="manuscript revision is unreadable")
+        self._validate_revision(value, composition_id, revision_id)
+        return value
+
+    @staticmethod
+    def _validate_revision(value: Mapping[str, Any], composition_id: str, revision_id: str) -> None:
         _validate_schema(value)
         if _digest_document(value, "revision_digest") != value.get("revision_digest"):
             raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-INTEGRITY-001", "manuscript revision digest mismatch")
@@ -183,29 +191,32 @@ class WriterRoundTripService:
                 "APPLICATION-WRITER-ROUND-TRIP-INTEGRITY-001",
                 "manuscript revision source composition does not match its storage series",
             )
-        return value
 
     def _load_latest_revision(self, composition_id: str) -> Mapping[str, Any] | None:
+        # Only used when the continuity record is absent, never on healthy imports.
         root = self._revision_root(composition_id) / "revisions"
         if not root.exists():
             return None
-        latest: Mapping[str, Any] | None = None
-        seen_numbers: dict[int, str] = {}
-        for path in sorted(root.glob("*.json")):
-            if not path.is_file():
-                continue
-            revision = self._load_revision(composition_id, path.stem)
+        by_number: dict[int, Mapping[str, Any]] = {}
+        for path in root.glob("*.json"):
+            stored = self._read_json(path, message="manuscript revision is unreadable")
+            revision_id = str(stored.get("revision_id", ""))
+            if self._revision_path(composition_id, revision_id) != path:
+                raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-INTEGRITY-001", "manuscript revision path mismatch")
+            revision = self._load_revision(composition_id, revision_id)
             number = int(revision["revision_number"])
-            prior = seen_numbers.get(number)
-            if prior is not None and prior != revision["revision_id"]:
-                raise LocalApplicationError(
-                    "APPLICATION-WRITER-ROUND-TRIP-INTEGRITY-001",
-                    "multiple manuscript revisions claim the same revision number",
-                )
-            seen_numbers[number] = str(revision["revision_id"])
-            if latest is None or number > int(latest["revision_number"]):
-                latest = revision
-        return latest
+            if number in by_number:
+                raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-INTEGRITY-001",
+                                            "ambiguous manuscript history: multiple successors; restore a consistent exact backup")
+            by_number[number] = revision
+        previous = None
+        for number, revision in sorted(by_number.items()):
+            expected_parent = {key: previous[key] for key in ("revision_id", "revision_digest")} if previous else None
+            if number != (int(previous["revision_number"]) + 1 if previous else 1) or revision["parent_revision_ref"] != expected_parent:
+                raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-INTEGRITY-001",
+                                            "manuscript history has missing or conflicting ancestry; restore a consistent exact backup")
+            previous = revision
+        return previous
 
     def _head(self, composition_id: str) -> Mapping[str, Any] | None:
         path = self._head_path(composition_id)
@@ -223,20 +234,61 @@ class WriterRoundTripService:
             raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-INTEGRITY-001", "manuscript revision head number does not resolve")
         return value
 
-    def _reconcile_head(self, composition_id: str) -> Mapping[str, Any] | None:
-        head = self._head(composition_id)
-        if head is not None:
-            return head
-        latest = self._load_latest_revision(composition_id)
-        if latest is None:
-            return None
-        latest_ref = {
-            "revision_id": latest["revision_id"],
-            "revision_digest": latest["revision_digest"],
-            "revision_number": latest["revision_number"],
-        }
-        self._write_head(composition_id, latest_ref)
-        return latest_ref
+    @staticmethod
+    def _revision_ref(revision: Mapping[str, Any]) -> dict[str, Any]:
+        return {key: revision[key] for key in ("revision_id", "revision_digest", "revision_number")}
+
+    def _reconcile_head(self, composition_id: str) -> tuple[Mapping[str, Any] | None, list[str]]:
+        checkpoint = self._checkpoint_path(composition_id)
+        new_checkpoint = not checkpoint.exists()
+        if new_checkpoint:
+            latest = self._load_latest_revision(composition_id)
+            if latest is None:
+                if self._revision_root(composition_id).exists():
+                    raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-RECOVERY-REQUIRED-001",
+                                                "Original manuscript facts are missing. Restore an exact backup or start a new composition series; do not recreate old identities.")
+                return None, []
+        else:
+            latest = self._read_json(checkpoint, message="Writer continuity record is unreadable; preserve it and restore an exact backup")
+        self._validate_revision(latest, composition_id, str(latest.get("revision_id", "")))
+        receipt = self._load_input(str(latest["source"]["input_id"]))
+        if latest["source"] != {"input_id": receipt["input_id"], "input_digest": receipt["input_digest"], **receipt["source"]}:
+            raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-PIN-001", "Writer continuity record does not match its exact input")
+        expected = self._revision_ref(latest)
+        parent_ref = latest.get("parent_revision_ref")
+        if int(latest["revision_number"]) == 1:
+            if parent_ref is not None:
+                raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-INTEGRITY-001", "initial manuscript has a parent")
+        else:
+            if not isinstance(parent_ref, Mapping):
+                raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-INTEGRITY-001", "manuscript predecessor is missing")
+            parent = self._load_revision(composition_id, str(parent_ref["revision_id"]))
+            if parent["revision_digest"] != parent_ref["revision_digest"] or int(parent["revision_number"]) + 1 != int(latest["revision_number"]):
+                raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-INTEGRITY-001", "manuscript predecessor binding differs")
+        head_path = self._head_path(composition_id)
+        head = self._read_json(head_path, message="manuscript head is corrupt; restore its exact backup or remove only this derived pointer before retry") if head_path.exists() else None
+        # A lagging pointer is accepted only when it is an exact ancestor. Healthy
+        # imports do not traverse ancestry; interrupted imports normally check one edge.
+        ancestor = latest
+        while head is not None and head != self._revision_ref(ancestor):
+            parent_ref = ancestor.get("parent_revision_ref")
+            if not isinstance(parent_ref, Mapping):
+                raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-INTEGRITY-001",
+                                            "manuscript head conflicts with retained history; preserve it and restore an exact backup")
+            parent = self._load_revision(composition_id, str(parent_ref["revision_id"]))
+            if parent["revision_digest"] != parent_ref["revision_digest"] or int(parent["revision_number"]) + 1 != int(ancestor["revision_number"]):
+                raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-INTEGRITY-001", "manuscript ancestry does not verify")
+            ancestor = parent
+        restored = []
+        if new_checkpoint:
+            self._write_pointer(checkpoint, latest)
+            restored.append("continuity_record")
+        if not self._write_immutable(self._revision_path(composition_id, str(latest["revision_id"])), latest):
+            restored.append("manuscript_revision")
+        if head != expected:
+            self._write_head(composition_id, expected)
+            restored.append("head")
+        return expected, restored
 
     def _export_lock_path(self, output: Path) -> Path:
         resolved = os.path.normcase(str(output.resolve(strict=False)))
@@ -551,26 +603,17 @@ class WriterRoundTripService:
         response_section_ids = {str(row["section_id"]) for row in value["sections"]}
         receipt_section_ids = {str(row["section_id"]) for row in receipt["sections"]}
         with composer._series_lock(composition_id):
-            head = self._reconcile_head(composition_id)
+            head, restored = self._reconcile_head(composition_id)
             existing_path = self._revision_path(composition_id, revision_id)
             if existing_path.is_file():
+                stored = self._read_json(existing_path, message="manuscript revision is unreadable")
+                revision_id = str(stored.get("revision_id", ""))
                 existing = self._load_revision(composition_id, revision_id)
                 if existing.get("response_digest") != response_digest or existing.get("source", {}).get("input_digest") != receipt["input_digest"]:
                     raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-IMMUTABLE-001", "existing manuscript revision identity conflicts with this response")
                 if head is None or int(existing["revision_number"]) > int(head["revision_number"]):
-                    latest = self._load_latest_revision(composition_id)
-                    if latest is None:
-                        raise LocalApplicationError(
-                            "APPLICATION-WRITER-ROUND-TRIP-INTEGRITY-001",
-                            "stored manuscript revision cannot be reconciled with its series",
-                        )
-                    latest_ref = {
-                        "revision_id": latest["revision_id"],
-                        "revision_digest": latest["revision_digest"],
-                        "revision_number": latest["revision_number"],
-                    }
-                    self._write_head(composition_id, latest_ref)
-                    head = latest_ref
+                    raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-INTEGRITY-001",
+                                                "stored response is ahead of the retained continuity record; restore a consistent exact backup")
                 if int(head["revision_number"]) == int(existing["revision_number"]) and (
                     head["revision_id"] != existing["revision_id"]
                     or head["revision_digest"] != existing["revision_digest"]
@@ -580,7 +623,8 @@ class WriterRoundTripService:
                         "manuscript head conflicts with an existing revision at the same revision number",
                     )
                 return {
-                    "status": "VERIFIED_REUSE",
+                    "status": "RESTORED" if "manuscript_revision" in restored else "VERIFIED_REUSE",
+                    **({"restored_components": restored, "recovered_at": _now()} if restored else {}),
                     "revision_id": revision_id,
                     "revision_digest": existing["revision_digest"],
                     "revision_number": existing["revision_number"],
@@ -603,6 +647,7 @@ class WriterRoundTripService:
                 if base_revision["source"]["input_id"] != receipt["input_id"] and response_section_ids != receipt_section_ids:
                     raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-INPUT-001", "a changed Writer input requires a complete fresh section response; unchanged sections are reused only within the same exact input")
 
+            revision_id += "-" + uuid4().hex
             drafts = {str(row["section_id"]): row for row in value["sections"]}
             sections: list[dict[str, Any]] = []
             base_sections = {
@@ -669,6 +714,9 @@ class WriterRoundTripService:
             }
             document["revision_digest"] = _digest_document(document, "revision_digest")
             _validate_schema(document)
+            # Retain exact immutable facts before either emitted copy. This latest
+            # per-series record is also the O(1) pending-write witness on next import.
+            self._write_pointer(self._checkpoint_path(composition_id), document)
             self._write_immutable(self._revision_path(composition_id, revision_id), document)
             self._write_head(
                 composition_id,
@@ -692,6 +740,15 @@ class WriterRoundTripService:
     def inspect(self, composition_id: str, revision_id: str | None = None) -> Mapping[str, Any]:
         composer = self._composition_service()
         if revision_id is None:
+            checkpoint = self._checkpoint_path(composition_id)
+            if checkpoint.exists():
+                latest = self._read_json(checkpoint, message="Writer continuity record is unreadable; restore an exact backup")
+                self._validate_revision(latest, composition_id, str(latest.get("revision_id", "")))
+                head_path = self._head_path(composition_id)
+                head_copy = self._read_json(head_path, message="manuscript head is unreadable; restore the derived pointer") if head_path.exists() else None
+                if head_copy != self._revision_ref(latest):
+                    raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-RECOVERY-REQUIRED-001",
+                                                "manuscript import needs recovery; retry the exact stored response before requesting the latest revision")
             head = self._head(composition_id)
             if head is None:
                 raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-404", "manuscript revision head does not exist")
