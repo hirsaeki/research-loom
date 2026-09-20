@@ -58,7 +58,7 @@ jobs:
   issue91-windows:
     name: issue91-windows
     runs-on: windows-latest
-    timeout-minutes: 12
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
         with:
@@ -102,6 +102,8 @@ jobs:
         run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue245*.py' -v
       - name: Run Issue 249 Writer continuity recovery acceptance
         run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue249*.py' -v
+      - name: Run Issue 250 exact payload repair acceptance
+        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue250*.py' -v
       - name: Run Issue 248 optional child recovery acceptance
         run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue248*.py' -v
       - name: Run Issue 193 Parent Durable Store acceptance

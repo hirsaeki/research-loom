@@ -223,7 +223,7 @@ class HistoricalMaterialRecoveryTests(ResearchPackageAcceptanceSupport):
             if facade is not None:
                 facade.close()
 
-    def test_present_corrupt_artifact_is_diagnosed_and_not_overwritten(self):
+    def test_present_corrupt_artifact_is_diagnosed_and_exactly_repaired(self):
         facade, case = self._prepare_case()
         try:
             self._remove_producer_candidate(facade, case)
@@ -258,9 +258,11 @@ class HistoricalMaterialRecoveryTests(ResearchPackageAcceptanceSupport):
                 source_file="captures/text/source-a.txt",
             )
             self.assertEqual(code, 0)
-            self.assertEqual(recovery_result["status"], "FAILED")
-            self.assertEqual(recovery_result["issues"][0]["code"], "CONV-AUDIT-001")
-            self.assertEqual(managed.read_bytes(), before)
+            self.assertEqual(recovery_result["status"], "SUCCEEDED")
+            self.assertEqual(recovery_result["data"]["status"], "REPAIRED")
+            self.assertEqual(managed.read_bytes(), (self.workspace / "captures/text/source-a.txt").read_bytes())
+            quarantine = store.root / recovery_result["data"]["quarantine_ref"]
+            self.assertEqual(quarantine.read_bytes(), before)
         finally:
             if facade is not None:
                 facade.close()

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -116,7 +117,7 @@ class VerifiedArtifactReadMixin:
         artifact_id: str,
         source_path: str | Path,
     ) -> Mapping[str, Any]:
-        """Restore missing content-addressed bytes when the supplied file is identical."""
+        """Restore missing or quarantine/repair corrupt bytes from an identical file."""
         with self._lock:
             row = self._connection.execute(
                 """
@@ -131,28 +132,13 @@ class VerifiedArtifactReadMixin:
         expected_digest = str(row["digest"])
         expected_size = int(row["size"])
         locator = str(row["storage_locator"])
-        target = self._locator_path(locator, expected_digest)
-        if target.exists():
-            self._verify_blob_streaming(target, expected_digest, expected_size)
-            return {
-                "status": "ALREADY_VERIFIED",
-                "artifact_id": artifact_id,
-                "run_id": str(row["run_id"]),
-                "role": str(row["role"]),
-                "digest": expected_digest,
-                "byte_length": expected_size,
-                "content_created": False,
-            }
+        from plugins.local_payload_repair import checked_path, install_exact_payload
 
-        if locator.startswith("external-original://sha256/"):
-            large = True
-        elif locator.startswith("artifact://sha256/"):
-            large = False
-        else:
+        if not locator.startswith(("external-original://sha256/", "artifact://sha256/")):
             raise LocalExecutionStoreIntegrityError(
                 "persisted artifact storage locator is not eligible for same-bytes restoration"
             )
-
+        target = checked_path(self.root, self._locator_path(locator, expected_digest))
         temporary, actual_digest, actual_size = self._stage_controlled_original(
             source_path, max_bytes=expected_size
         )
@@ -161,40 +147,32 @@ class VerifiedArtifactReadMixin:
                 raise LocalExecutionStoreIntegrityError(
                     "provided recovery bytes do not match persisted artifact digest/size"
                 )
-            installed_locator, installed_path, created = self._install_staged_original(
-                temporary,
-                digest=actual_digest,
-                size=actual_size,
-                large=large,
+            result = install_exact_payload(
+                self.root, target, temporary, expected_digest, expected_size,
+                verify=self._verify_blob_streaming,
             )
-            try:
-                if installed_locator != locator:
-                    raise LocalExecutionStoreIntegrityError(
-                        "restored artifact locator would not preserve persisted binding"
-                    )
-                self._verify_blob_streaming(
-                    installed_path, expected_digest, expected_size
-                )
-            except Exception:
-                if created:
-                    try:
-                        installed_path.unlink()
-                    except OSError:
-                        pass
-                raise
+            # Diagnoses are one-read caches, not durable facts; another artifact
+            # may share the repaired address. Recheck all physical health next time.
+            with self._lock:
+                cached = getattr(self, "_verified_artifact_diagnoses", None)
+                if cached is not None:
+                    cached.clear()
         finally:
             try:
-                temporary.unlink()
-            except FileNotFoundError:
-                pass
+                temporary.unlink(missing_ok=True)
+            except OSError as cleanup_error:
+                # Cleanup must not mask a verified effect or the original error.
+                logging.getLogger(__name__).warning(
+                    "Recovery staging cleanup failed for %s (%s); inspect staging after restoring access.",
+                    temporary.name, type(cleanup_error).__name__,
+                )
         return {
-            "status": "RESTORED",
+            **result,
             "artifact_id": artifact_id,
             "run_id": str(row["run_id"]),
             "role": str(row["role"]),
             "digest": expected_digest,
             "byte_length": expected_size,
-            "content_created": created,
         }
 
     def load_artifact_verified_once(self, artifact_id: str) -> ResourcePayload:

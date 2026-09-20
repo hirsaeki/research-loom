@@ -29,6 +29,8 @@ from plugins.local_execution_store import (
     diagnostics_for,
 )
 
+from plugins.local_payload_repair import REPAIRABLE
+
 from .facade import LocalApplicationError
 from .material_content_facade import _artifact_pair_for_capture
 from .material_recovery_facade import _canonical_artifact_binding_for_capture
@@ -61,11 +63,13 @@ class MaterialReacquisitionRetrievalError(RuntimeError):
     pass
 
 
-def material_recovery_action_guidance() -> list[dict[str, Any]]:
+def material_recovery_action_guidance(verification_status: str | None = None) -> list[dict[str, Any]]:
+    if verification_status is not None and verification_status not in REPAIRABLE | {"verified"}:
+        return []  # Access and metadata faults require operator restoration, not byte replacement.
     return [
         {
             "action_type": "desktop_research.material.recover",
-            "when": "operator has exact retained bytes",
+            "when": "operator has exact retained bytes for a missing or corrupt readable payload",
             "caller_fields": ["run_id", "capture_id", "kind", "source_file"],
         },
         {
@@ -692,10 +696,10 @@ class HistoricalMaterialReacquisitionService:
                 "historical_metadata_rewritten": False,
                 "research_state_mutation_performed": False,
             }
-        if diagnosis.get("status") != "content_missing":
+        if diagnosis.get("status") not in REPAIRABLE:
             raise LocalApplicationError(
                 "APPLICATION-MATERIAL-REACQUISITION-001",
-                "only missing historical material is eligible for locator reacquisition",
+                "only missing or corrupt readable payloads are eligible; restore access/metadata first",
             )
 
         exact_locator = str(capture["source_locator"])
@@ -714,10 +718,10 @@ class HistoricalMaterialReacquisitionService:
                     "historical_metadata_rewritten": False,
                     "research_state_mutation_performed": False,
                 }
-            if diagnosis.get("status") != "content_missing":
+            if diagnosis.get("status") not in REPAIRABLE:
                 raise LocalApplicationError(
                     "APPLICATION-MATERIAL-REACQUISITION-001",
-                    "only missing historical material is eligible for locator reacquisition",
+                    "only missing or corrupt readable payloads are eligible; restore access/metadata first",
                 )
 
             previous = self._previous_success(
@@ -830,6 +834,8 @@ class HistoricalMaterialReacquisitionService:
                         "status": "IDENTICAL_REACQUISITION",
                         "verification_status": "verified",
                         "historical_restore_status": restored["status"],
+                        "quarantine_ref": restored.get("quarantine_ref"),
+                        "recovery_record": restored.get("recovery_record"),
                     }
                 else:
                     version_token = uuid.uuid4().hex

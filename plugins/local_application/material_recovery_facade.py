@@ -176,7 +176,7 @@ def ensure_material_recovery_action(application, project_id: str, workspace_root
 
 
 class HistoricalMaterialRecoveryService:
-    """Diagnose and restore exact missing bytes without rewriting historical metadata."""
+    """Restore exact missing/corrupt bytes without rewriting historical metadata."""
 
     def __init__(self, store, project_id: str, workspace_root: Path | None):
         self._store = store
@@ -221,11 +221,6 @@ class HistoricalMaterialRecoveryService:
             artifact = _canonical_artifact_binding_for_capture(
                 self._store, run_id, capture_id, kind
             )
-            before = self._store.diagnose_artifact_content(artifact.artifact_id)
-            if before.get("status") not in {"verified", "content_missing"}:
-                raise LocalExecutionStoreIntegrityError(
-                    "only missing persisted artifact bytes are eligible for same-bytes recovery"
-                )
             result = self._store.restore_missing_artifact_from_file(
                 artifact.artifact_id, source_path
             )
@@ -239,7 +234,7 @@ class HistoricalMaterialRecoveryService:
 
         diagnostic_recorded = False
         diagnostic_warning = None
-        if result.get("status") == "RESTORED":
+        if result.get("status") in {"RESTORED", "REPAIRED"}:
             try:
                 self._store.store_diagnostic(
                     run_id,
@@ -253,6 +248,9 @@ class HistoricalMaterialRecoveryService:
                         "recovered_at": datetime.now(timezone.utc).isoformat(),
                         "verified_digest": artifact.digest,
                         "verified_size": artifact.size,
+                        "previous_status": result.get("previous_status"),
+                        "quarantine_ref": result.get("quarantine_ref"),
+                        "recovery_record": result.get("recovery_record"),
                     },
                 )
             except Exception:
@@ -277,6 +275,9 @@ class HistoricalMaterialRecoveryService:
             "research_state_mutation_performed": False,
             "diagnostic_recorded": diagnostic_recorded,
         }
+        for field in ("previous_status", "quarantine_ref", "recovered_at", "recovery_record", "recovery_record_warning"):
+            if field in result:
+                response[field] = result[field]
         if diagnostic_warning is not None:
             response["diagnostic_warning"] = diagnostic_warning
         return response
