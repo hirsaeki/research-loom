@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from plugins.local_durable_store import require_optional_available, register_optional_path
+
 from copy import deepcopy
 import json
 from pathlib import Path
@@ -224,6 +226,7 @@ class LocalAttentionStore:
         return self.path.is_file()
 
     def _connect_read(self) -> sqlite3.Connection | None:
+        require_optional_available(self.path, LocalAttentionStoreError)
         if not self.exists:
             return None
         try:
@@ -237,6 +240,7 @@ class LocalAttentionStore:
             raise
 
     def _connect_write(self) -> sqlite3.Connection:
+        require_optional_available(self.path, LocalAttentionStoreError)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         try:
             connection = sqlite3.connect(self.path)
@@ -249,6 +253,7 @@ class LocalAttentionStore:
             )
             _read_schema_version(connection)
             connection.commit()
+            register_optional_path(self.path)
             return connection
         except Exception:
             if "connection" in locals():

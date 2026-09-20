@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from plugins.local_durable_store import require_optional_available, register_optional_path
+
 from copy import deepcopy
 import hashlib
 import json
@@ -458,6 +460,7 @@ class LocalResearchExhibitStore:
             )
 
     def _connect_read(self) -> sqlite3.Connection | None:
+        require_optional_available(self.path, LocalResearchExhibitStoreError)
         if not self.exists:
             return None
         try:
@@ -477,6 +480,7 @@ class LocalResearchExhibitStore:
             ) from exc
 
     def _connect_write(self) -> sqlite3.Connection:
+        require_optional_available(self.path, LocalResearchExhibitStoreError)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         try:
             connection = sqlite3.connect(self.path)
@@ -490,6 +494,7 @@ class LocalResearchExhibitStore:
             self._read_schema_version(connection)
             self._backfill_metadata(connection)
             connection.commit()
+            register_optional_path(self.path)
             return connection
         except LocalResearchExhibitStoreError:
             if "connection" in locals():
@@ -503,6 +508,11 @@ class LocalResearchExhibitStore:
             raise LocalResearchExhibitStoreError(
                 "EXHIBIT-STORE-DB-001", "Research Exhibit store could not be initialized"
             ) from exc
+
+        except BaseException:
+            if "connection" in locals():
+                connection.close()
+            raise
 
     @staticmethod
     def _decode_document(row: sqlite3.Row) -> Mapping[str, Any]:

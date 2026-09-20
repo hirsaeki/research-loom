@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from plugins.local_durable_store import require_optional_available, register_optional_path
+
 from copy import deepcopy
 from datetime import datetime, timezone
 import hashlib
@@ -68,6 +70,7 @@ class WriterRoundTripService:
                 "APPLICATION-WRITER-ROUND-TRIP-001", "opened workspace is required"
             )
         self.root = self.workspace / ".research-loom" / "writer-round-trips"
+        require_optional_available(self.root, LocalApplicationError)
         self.inputs_root = self.root / "inputs"
         self.series_root = self.root / "series"
 
@@ -96,7 +99,9 @@ class WriterRoundTripService:
         return value
 
     def _write_immutable(self, path: Path, value: Mapping[str, Any]) -> bool:
+        require_optional_available(self.root, LocalApplicationError)
         path.parent.mkdir(parents=True, exist_ok=True)
+        register_optional_path(self.root)
         payload = _json_bytes(value)
         if path.exists():
             existing = self._read_json(path, message="immutable Writer round-trip record is unreadable")

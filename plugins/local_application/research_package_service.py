@@ -1,4 +1,6 @@
 from __future__ import annotations
+
+from plugins.local_durable_store import require_optional_available, register_optional_path
 from copy import deepcopy
 import json, os, shutil, subprocess, tempfile
 from pathlib import Path
@@ -29,6 +31,7 @@ class ResearchPackageService:
         self.facade=facade; self.app=facade._application; self.project_id=facade._project_id; self.workspace=facade._workspace_root
         if self.workspace is None: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-001","opened workspace is required")
         self.root=self.workspace/".research-loom"/"research-packages"
+        require_optional_available(self.root, LocalApplicationError)
     def _state(self):
         repo=self.app.state_repository; lineage=repo.load_active_lineage_ref(self.project_id); return repo.load_state_view(self.project_id,lineage)
     def _snapshot(self,snapshot_id,state)->Mapping[str,Any]:
@@ -95,7 +98,7 @@ class ResearchPackageService:
         lines += ["","## Authority Boundary","","This is a read-only in-progress material package. It does not verify Evidence, adopt Findings or Recommendations, freeze Research State, or make a Publication release eligible.",""]
         return "\n".join(lines)
     def _persist(self,p,md,attachments):
-        self.root.mkdir(parents=True,exist_ok=True); pid=safe_component(str(p["package_id"]),"package_id"); target=self.root/pid
+        self.root.mkdir(parents=True,exist_ok=True); register_optional_path(self.root); pid=safe_component(str(p["package_id"]),"package_id"); target=self.root/pid
         if target.exists(): raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-IMMUTABLE-001","Research Package ID already exists")
         tmp=Path(tempfile.mkdtemp(prefix=".rp-",dir=self.root))
         try:

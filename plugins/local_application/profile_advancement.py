@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from plugins.local_durable_store import require_optional_available, register_optional_path
+
 from copy import deepcopy
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -118,14 +120,18 @@ def _now() -> str:
 
 
 def _write_json(path: Path, value: Mapping[str, Any]) -> None:
+    require_optional_available(path, LocalWorkspaceError)
     path.parent.mkdir(parents=True, exist_ok=True)
+    register_optional_path(path)
     temporary = path.with_name(path.name + ".tmp-" + uuid.uuid4().hex)
     temporary.write_text(json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n", encoding="utf-8")
     os.replace(temporary, path)
 
 
 def _write_text(path: Path, text: str) -> None:
+    require_optional_available(path, LocalWorkspaceError)
     path.parent.mkdir(parents=True, exist_ok=True)
+    register_optional_path(path)
     temporary = path.with_name(path.name + ".tmp-" + uuid.uuid4().hex)
     temporary.write_text(text, encoding="utf-8")
     os.replace(temporary, path)
@@ -405,6 +411,7 @@ def advance_profile_generation(workspace: str | Path, request: Mapping[str, Any]
 
 
 def _advance_profile_generation_locked(root: Path, request: Mapping[str, Any]) -> Mapping[str, Any]:
+    require_optional_available(root / INTERNAL_DIR / HISTORY_DIR, LocalWorkspaceError)
     target_config_file = request.get("project_config_file")
     target_eps_file = request.get("effective_profile_set_file")
     manifest_files = request.get("profile_manifest_files")
@@ -571,6 +578,7 @@ def _advance_profile_generation_locked(root: Path, request: Mapping[str, Any]) -
 
 
 def profile_history(workspace: str | Path) -> Mapping[str, Any]:
+    require_optional_available(Path(workspace) / INTERNAL_DIR / HISTORY_DIR, LocalWorkspaceError)
     root = _assert_safe_workspace_root(Path(workspace))
     recover_incomplete_profile_advancement(root)
     with LocalWorkspace.open(root) as opened:

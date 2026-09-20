@@ -61,8 +61,8 @@ class ParentDurableStoreAcceptanceTests(unittest.TestCase):
             self.assertEqual(LocalWorkspace.doctor(moved)["status"], "OK")
             child = moved / ".research-loom" / "project-inputs"; removed = moved / "project-inputs.removed"; child.rename(removed)
             degraded = LocalWorkspace.doctor(moved)
-            self.assertEqual(degraded["status"], "ERROR")
-            self.assertEqual(degraded["issues"][0]["code"], "WORKSPACE-DURABLE-CHILD-MISSING-001")
+            self.assertEqual(degraded["status"], "DEGRADED")
+            self.assertEqual(degraded["issues"][0]["code"], "WORKSPACE-OPTIONAL-CHILD-MISSING-001")
             removed.rename(child)
             self.assertEqual(LocalWorkspace.doctor(moved)["status"], "OK")
 

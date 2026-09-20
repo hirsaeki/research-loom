@@ -493,9 +493,16 @@ class LocalApplicationFacade:
             for run in run_probe[:_STATUS_ITEM_LIMIT]
         ]
 
+        optional = []
+        if self._workspace_root is not None:
+            from plugins.local_durable_store import inspect_optional_children
+            from .workspace import _read_json, BINDING_NAME, INTERNAL_DIR
+            binding = _read_json(self._workspace_root / INTERNAL_DIR / BINDING_NAME, code="WORKSPACE-BINDING-001")
+            optional = inspect_optional_children(self._workspace_root, binding)
         snapshot = state.current_snapshot
         return {
-            "status": "OK",
+            "status": "DEGRADED" if any(row["status"] == "UNAVAILABLE" for row in optional) else "OK",
+            "optional_children": optional,
             "project_id": self._project_id,
             "active_lineage": state.active_lineage_ref,
             "snapshot": {

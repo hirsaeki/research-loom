@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from plugins.local_durable_store import require_optional_available, register_optional_path
+
 from contextlib import contextmanager
 from copy import deepcopy
 import hashlib
@@ -205,11 +207,14 @@ class PublicationReleaseService:
         self.facade = facade
         self.workspace = Path(facade._workspace_root)
         self.root = self.workspace / ".research-loom" / "publication"
+        require_optional_available(self.root, LocalApplicationError)
 
     @contextmanager
     def _file_lock(self, name: str):
+        require_optional_available(self.root, LocalApplicationError)
         lock_root = self.root / "locks"
         lock_root.mkdir(parents=True, exist_ok=True)
+        register_optional_path(self.root)
         path = lock_root / f"{_safe(name)}.lock"
         handle = path.open("a+b")
         try:

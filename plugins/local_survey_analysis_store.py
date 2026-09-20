@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from plugins.local_durable_store import require_optional_available, register_optional_path
+
 from copy import deepcopy
 import json
 from pathlib import Path
@@ -117,6 +119,7 @@ class LocalSurveyAnalysisStore:
             ) from exc
 
     def _read(self) -> sqlite3.Connection | None:
+        require_optional_available(self.path, LocalSurveyAnalysisStoreError)
         if not self.exists:
             return None
         try:
@@ -137,6 +140,7 @@ class LocalSurveyAnalysisStore:
             ) from exc
 
     def _write(self) -> sqlite3.Connection:
+        require_optional_available(self.path, LocalSurveyAnalysisStoreError)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         try:
             connection = sqlite3.connect(self.path, timeout=5.0)
@@ -153,6 +157,7 @@ class LocalSurveyAnalysisStore:
                 )
             self._schema_version(connection)
             connection.commit()
+            register_optional_path(self.path)
             return connection
         except LocalSurveyAnalysisStoreError:
             if "connection" in locals():
@@ -167,6 +172,11 @@ class LocalSurveyAnalysisStore:
                 "SURVEY-ANALYSIS-STORE-DB-001",
                 "Survey analysis registry could not be initialized",
             ) from exc
+
+        except BaseException:
+            if "connection" in locals():
+                connection.close()
+            raise
 
     @staticmethod
     def _decode_spec(row: sqlite3.Row) -> dict[str, Any]:

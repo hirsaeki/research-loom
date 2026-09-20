@@ -511,6 +511,7 @@ def build_resume_context(
 
     attention_limit = _limit(effective_limits, "attention_maps")
     active_activation_id = None
+    attention_issue = None
     try:
         active, effective_attention = application.effective_attention.resolve(state)
         map_probe = attention_maps_for_project(
@@ -526,11 +527,13 @@ def build_resume_context(
                 active,
             )
     except Exception as exc:
-        if isinstance(exc, ConversationRuntimeError):
-            raise
         code = getattr(exc, "code", "RESUME-ATTENTION-001")
         message = getattr(exc, "message", str(exc))
-        raise ConversationRuntimeError(str(code), str(message)) from exc
+        if str(code).startswith("WORKSPACE-OPTIONAL-"):
+            active, effective_attention, map_probe = None, [], []
+            attention_issue = {"code": str(code), "message": str(message)}
+        else:
+            raise ConversationRuntimeError(str(code), str(message)) from exc
     maps_truncated = len(map_probe) > attention_limit
     stored_maps = []
     active_map_id = str(active["map_id"]) if active is not None else None
@@ -584,7 +587,8 @@ def build_resume_context(
     })
 
     return {
-        "status": "OK",
+        "status": "DEGRADED" if attention_issue or status_projection.get("status") == "DEGRADED" else "OK",
+        "optional_children": deepcopy(status_projection.get("optional_children", [])),
         "project": project_projection,
         "research_state": {
             "active_lineage": str(status_projection["active_lineage"]),
@@ -597,6 +601,8 @@ def build_resume_context(
             "candidates": candidate_output,
         },
         "research_attention": {
+            "status": "UNAVAILABLE" if attention_issue else "OK",
+            "issues": [attention_issue] if attention_issue else [],
             "baseline": deepcopy(list(project_config.get("research_attention", ()))),
             "active_map": active_projection,
             "effective": deepcopy(list(effective_attention)),

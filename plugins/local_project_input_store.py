@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from plugins.local_durable_store import require_optional_available, register_optional_path
+
 import base64
 import binascii
 from datetime import datetime, timezone
@@ -54,14 +56,55 @@ def _decode_cursor(cursor: str) -> tuple[str, str]:
 
 
 class LocalProjectInputStore:
-    def __init__(self, workspace_root: Path) -> None:
+    def __init__(self, workspace_root: Path, *, create: bool = True) -> None:
         self.root = workspace_root / ".research-loom" / "project-inputs"
-        self.root.mkdir(parents=True, exist_ok=True)
         self.blobs = self.root / "blobs"
+        self.path = self.root / "project-inputs.sqlite3"
+        self.db: sqlite3.Connection | None = None
+        self._writable = False
+        require_optional_available(self.root, LocalProjectInputStoreError)
+        if create:
+            self._open_write()
+
+    def _require_available(self) -> None:
+        try:
+            require_optional_available(self.root, LocalProjectInputStoreError)
+        except LocalProjectInputStoreError:
+            # A restored path must be opened anew, never through a connection
+            # to the lost or replaced database. This applies to writes too.
+            self.close()
+            raise
+
+    def _open_read(self) -> bool:
+        self._require_available()
+        if not self.path.exists():
+            self.close()
+            return False
+        if self.db is None:
+            self.db = sqlite3.connect(self.path.absolute().as_uri() + "?mode=ro", uri=True)
+            self.db.row_factory = sqlite3.Row
+        return True
+
+    def _open_write(self) -> None:
+        self._require_available()
+        if self._writable:
+            return
+        if self.db is not None:
+            self.db.close()
+            self.db = None
+        self.root.mkdir(parents=True, exist_ok=True)
         self.blobs.mkdir(parents=True, exist_ok=True)
-        self.db = sqlite3.connect(self.root / "project-inputs.sqlite3")
-        self.db.row_factory = sqlite3.Row
-        self._ensure_schema()
+        try:
+            self.db = sqlite3.connect(self.path)
+            self.db.row_factory = sqlite3.Row
+            self._ensure_schema()
+            register_optional_path(self.root)
+            self._writable = True
+        except BaseException:
+            if self.db is not None:
+                self.db.close()
+                self.db = None
+            raise
 
     @staticmethod
     def _create_table_sql(table: str = "project_inputs") -> str:
@@ -145,7 +188,10 @@ class LocalProjectInputStore:
             raise
 
     def close(self) -> None:
-        self.db.close()
+        if self.db is not None:
+            self.db.close()
+            self.db = None
+        self._writable = False
 
     def register(
         self,
@@ -160,6 +206,7 @@ class LocalProjectInputStore:
         snapshot_id: str,
         snapshot_digest: str,
     ) -> dict[str, Any]:
+        self._open_write()
         digest = "sha256:" + hashlib.sha256(content).hexdigest()
         identity_seed = (
             f"{project_id}\0{role}\0{digest}\0{lineage_ref}\0{snapshot_id}\0{snapshot_digest}"
@@ -285,6 +332,8 @@ class LocalProjectInputStore:
             )
 
     def get(self, input_id: str, project_id: str) -> dict[str, Any] | None:
+        if not self._open_read():
+            return None
         row = self.db.execute(
             "SELECT * FROM project_inputs WHERE input_id=? AND project_id=?",
             (input_id, project_id),
@@ -331,6 +380,8 @@ class LocalProjectInputStore:
         return bytes(content)
 
     def verify_content(self, input_id: str, project_id: str) -> dict[str, Any] | None:
+        if not self._open_read():
+            return None
         row = self.db.execute(
             "SELECT * FROM project_inputs WHERE input_id=? AND project_id=?",
             (input_id, project_id),
@@ -346,6 +397,8 @@ class LocalProjectInputStore:
         return self._project(row)
 
     def read_content(self, input_id: str, project_id: str) -> tuple[dict[str, Any], bytes] | None:
+        if not self._open_read():
+            return None
         row = self.db.execute(
             "SELECT * FROM project_inputs WHERE input_id=? AND project_id=?",
             (input_id, project_id),
@@ -383,6 +436,8 @@ class LocalProjectInputStore:
             where += " AND (registered_at>? OR (registered_at=? AND input_id>?))"
             params.extend([registered_at, registered_at, input_id])
         params.append(limit + 1)
+        if not self._open_read():
+            return {"items": [], "truncated": False, "next_cursor": None, "limit": limit}
         rows = self.db.execute(
             f"SELECT * FROM project_inputs WHERE {where} "
             "ORDER BY registered_at ASC,input_id ASC LIMIT ?",

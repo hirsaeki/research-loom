@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from plugins.local_durable_store import require_optional_available, register_optional_path
+
 from contextlib import contextmanager
 from copy import deepcopy
 from datetime import datetime, timezone
@@ -320,6 +322,7 @@ class WriterCompositionService:
         if self.workspace is None:
             raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-001", "opened workspace is required")
         self.root = self.workspace / ".research-loom" / "writer-compositions"
+        require_optional_available(self.root, LocalApplicationError)
 
     def _package_service(self):
         return self.facade._research_package_service()
@@ -338,7 +341,9 @@ class WriterCompositionService:
 
     @contextmanager
     def _file_lock(self, lock_path: Path, message: str):
+        require_optional_available(self.root, LocalApplicationError)
         self.root.mkdir(parents=True, exist_ok=True)
+        register_optional_path(self.root)
         handle = lock_path.open("a+b")
         try:
             handle.seek(0, os.SEEK_END)

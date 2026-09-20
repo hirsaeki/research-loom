@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from plugins.local_durable_store import require_optional_available, register_optional_path
+
 from copy import deepcopy
 import hashlib
 import json
@@ -61,6 +63,7 @@ class LocalDelphiStore:
         return self.path.is_file()
 
     def _write(self) -> sqlite3.Connection:
+        require_optional_available(self.path, LocalDelphiStoreError)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         try:
             con = sqlite3.connect(self.path)
@@ -76,6 +79,7 @@ class LocalDelphiStore:
                     "DELPHI-STORE-SCHEMA-001", "Delphi registry schema is incompatible"
                 )
             con.commit()
+            register_optional_path(self.path)
             return con
         except LocalDelphiStoreError:
             if "con" in locals():
@@ -88,7 +92,13 @@ class LocalDelphiStore:
                 "DELPHI-STORE-DB-001", "Delphi registry could not be initialized"
             ) from exc
 
+        except BaseException:
+            if "con" in locals():
+                con.close()
+            raise
+
     def _read(self) -> sqlite3.Connection | None:
+        require_optional_available(self.path, LocalDelphiStoreError)
         if not self.exists:
             return None
         try:
