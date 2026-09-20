@@ -1085,6 +1085,12 @@ class PublicationReleaseService:
     def _load_release_request(self, request_id: str) -> Mapping[str, Any]:
         operation = self._load_release_operation(request_id)
         path = self._checked_record_path(self._release_request_path(request_id))
+        if not path.exists():
+            # Older replicas used the complete nonce ID. Probe only the exact
+            # caller-supplied identity; do not scan unrelated request history.
+            legacy = self._checked_record_path(self.root / "release-requests" / f"{_safe(request_id)}.json")
+            if legacy.exists():
+                path = legacy
         if operation is not None:
             request = operation["request"]
             if path.exists() and self._read_release_json(path) != request:

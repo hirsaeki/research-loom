@@ -85,3 +85,36 @@ class PublicationReviewTests(ResearchPackageAcceptanceSupport):
             service._release_request_path(request['request_id']).unlink()
             new = facade.request_publication_release(build_id, 'H')['decision_request']
         self.assertNotEqual(new['request_id'], request['request_id'])
+
+    def test_exact_legacy_nonce_request_path_recovers_without_scanning_history(self):
+        from plugins.local_application.publication_release_service import _digest, _json_bytes
+        facade, build_id = self._ready()
+        request = facade.request_publication_release(build_id, 'H')['decision_request']
+        response = support.Issue220PublicationReleaseTests._approval(request)
+        manifest = facade.release_publication(build_id, response)['release']
+        service = facade._publication_release_service()
+        stable = service._release_request_path(request['request_id'])
+        legacy = stable.with_name(request['request_id'] + '.json')
+        stable.rename(legacy)
+        service._operation_path(request['request_id']).unlink()
+        original = legacy.read_bytes()
+        # Exact caller-supplied identity permits one bounded fallback, not a directory scan.
+        forged = dict(request, request_id=request['request_id'] + '-other')
+        forged['request_digest'] = _digest(forged, 'request_digest')
+        legacy.write_bytes(_json_bytes(forged))
+        with self.assertRaises(LocalApplicationError) as error:
+            facade.release_publication(build_id, response)
+        self.assertEqual(error.exception.code, 'APPLICATION-PUBLICATION-INTEGRITY-001')
+        legacy.write_bytes(original)
+        facade.close()
+        with LocalApplicationFacade.open_workspace(self.workspace) as reopened:
+            with patch.object(Path, 'glob', side_effect=AssertionError('history scan')), \
+                 patch.object(Path, 'iterdir', side_effect=AssertionError('history scan')), \
+                 patch.object(reopened._application.clock, 'now', return_value='2099-01-01T00:00:00Z'):
+                restored = reopened.release_publication(build_id, response)
+            self.assertEqual(restored['status'], 'RESTORED')
+            self.assertEqual(restored['release'], manifest)
+            self.assertEqual(restored['recovered_at'], '2099-01-01T00:00:00Z')
+            self.assertEqual(stable.read_bytes(), original)
+            self.assertEqual(legacy.read_bytes(), original)
+            self.assertEqual(reopened.release_publication(build_id, response)['status'], 'VERIFIED_REUSE')
