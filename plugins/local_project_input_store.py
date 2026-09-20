@@ -66,9 +66,19 @@ class LocalProjectInputStore:
         if create:
             self._open_write()
 
+    def _require_available(self) -> None:
+        try:
+            require_optional_available(self.root, LocalProjectInputStoreError)
+        except LocalProjectInputStoreError:
+            # A restored path must be opened anew, never through a connection
+            # to the lost or replaced database. This applies to writes too.
+            self.close()
+            raise
+
     def _open_read(self) -> bool:
-        require_optional_available(self.root, LocalProjectInputStoreError)
+        self._require_available()
         if not self.path.exists():
+            self.close()
             return False
         if self.db is None:
             self.db = sqlite3.connect(self.path.absolute().as_uri() + "?mode=ro", uri=True)
@@ -76,7 +86,7 @@ class LocalProjectInputStore:
         return True
 
     def _open_write(self) -> None:
-        require_optional_available(self.root, LocalProjectInputStoreError)
+        self._require_available()
         if self._writable:
             return
         if self.db is not None:

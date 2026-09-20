@@ -59,7 +59,11 @@ class OptionalDurableHealthTests(unittest.TestCase):
                                              "payload": {"text": "An independent candidate"}})
             self.assertIn("state_delta_proposal_id", proposed["data"])
             self.assertEqual(facade.status()["snapshot"], before)
-            return facade.resume_context()
+            resumed = facade.resume_context()
+            self.assertEqual(resumed["status"], "DEGRADED")
+            health = next(row for row in resumed["optional_children"] if row["name"] == child_name)
+            self.assertEqual(health["status"], "UNAVAILABLE")
+            return resumed
         finally:
             facade.close()
 

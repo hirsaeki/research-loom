@@ -162,7 +162,11 @@ def _workspace_child(path: Path) -> tuple[Path, str] | None:
         for name, spec in OPTIONAL_DURABLE_CHILDREN.items():
             locator = spec["locator"]
             if relative == locator or (spec["kind"] == "directory" and relative.startswith(locator + "/")):
-                return root, name
+                # Match the lexical child first so its symlink remains visible,
+                # then normalize only the workspace root (Windows 8.3 aliases
+                # and parent aliases are also normalized by LocalWorkspace.open).
+                from plugins.local_application.workspace import _assert_safe_workspace_root
+                return _assert_safe_workspace_root(root), name
         break
     return None
 

@@ -58,6 +58,8 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
             require_optional_available(self._project_input_store.root, LocalProjectInputStoreError)
             return self._project_input_store
         except LocalProjectInputStoreError as exc:
+            if self._project_input_store is not None:
+                self._project_input_store.close()
             raise LocalApplicationError(exc.code, exc.message) from exc
 
     def _current_binding(self) -> tuple[str, str, str]:
