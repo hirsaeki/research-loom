@@ -199,6 +199,8 @@ class WriterRoundTripService:
             return None
         by_number: dict[int, Mapping[str, Any]] = {}
         for path in root.glob("*.json"):
+            if not path.is_file():
+                continue
             stored = self._read_json(path, message="manuscript revision is unreadable")
             revision_id = str(stored.get("revision_id", ""))
             if self._revision_path(composition_id, revision_id) != path:

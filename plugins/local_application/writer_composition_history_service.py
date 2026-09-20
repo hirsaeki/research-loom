@@ -146,7 +146,7 @@ class WriterCompositionHistoryService(WriterCompositionService):
             # A one-time recovery walk must prove a unique contiguous history.
             # Healthy captures use the single directly addressed record instead.
             versions = self._series_root(composition_id) / "versions"
-            paths = list(versions.glob("*.json")) if versions.exists() else []
+            paths = [path for path in versions.glob("*.json") if path.is_file()] if versions.exists() else []
             if not paths:
                 return None, []
             documents = {}

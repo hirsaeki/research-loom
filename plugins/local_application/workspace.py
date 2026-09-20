@@ -243,10 +243,11 @@ def _safe_locator(root: Path, locator: str, *, require_exists: bool = True) -> P
     relative = Path(locator)
     if relative.is_absolute() or ".." in relative.parts:
         raise LocalWorkspaceError("WORKSPACE-PATH-001", f"unsafe workspace locator: {locator}")
+    normalized_root = _assert_safe_workspace_root(root)
     target = root.joinpath(relative)
     resolved = target.resolve(strict=False)
     try:
-        resolved.relative_to(root)
+        resolved.relative_to(normalized_root)
     except ValueError as exc:
         raise LocalWorkspaceError("WORKSPACE-PATH-001", f"workspace locator escapes root: {locator}") from exc
     if target.is_symlink():
