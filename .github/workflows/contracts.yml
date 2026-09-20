@@ -100,6 +100,8 @@ jobs:
         run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue165_staged_material_import.py' -v
       - name: Run Issue 245 Publication recovery acceptance
         run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue245*.py' -v
+      - name: Run Issue 249 Writer continuity recovery acceptance
+        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue249*.py' -v
       - name: Run Issue 248 optional child recovery acceptance
         run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue248*.py' -v
       - name: Run Issue 193 Parent Durable Store acceptance
