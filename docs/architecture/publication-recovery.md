@@ -6,6 +6,9 @@ operation record under `publication/release-operations` moves atomically from
 `PENDING` (exact request) to `DECIDED` (exact request and release manifest).
 The emitted request JSON and release directory are copies of those facts and the
 independently approved preview output. This does not change Research State.
+Request copies use the stable operation ID as their filename; the full immutable
+request ID (including its nonce) is retained and verified inside the document.
+Missing-operation diagnosis therefore does not enumerate unrelated requests.
 
 ## Detection and continuation
 

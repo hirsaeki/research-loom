@@ -505,7 +505,9 @@ class PublicationReleaseService:
         return self.root / "builds" / _safe(build_id)
 
     def _release_request_path(self, request_id: str) -> Path:
-        return self.root / "release-requests" / f"{_safe(request_id)}.json"
+        # One request replica per operation, addressed without scanning nonce IDs.
+        # The full immutable request ID remains in the document and is verified.
+        return self.root / "release-requests" / f"{self._request_operation_id(request_id)}.json"
 
     @staticmethod
     def _validation_checks(
@@ -953,32 +955,39 @@ class PublicationReleaseService:
 
     def _atomic_release_write(self, path: Path, data: bytes, *, replace: bool = False) -> None:
         path = self._checked_record_path(path)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        fd, name = tempfile.mkstemp(prefix=".publication-", dir=path.parent)
-        staging = Path(name)
+        staging = None
+        fd = None
         try:
-            with os.fdopen(fd, "wb") as stream:
-                stream.write(data)
-                stream.flush()
-                os.fsync(stream.fileno())
-            if replace:
-                os.replace(staging, path)
-            else:
-                try:
-                    os.link(staging, path)
-                except FileExistsError:
-                    if path.read_bytes() != data:
-                        raise LocalApplicationError(
-                            "APPLICATION-PUBLICATION-INTEGRITY-001",
-                            "Publication recovery refuses to replace different existing bytes",
-                        )
+            try:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                fd, name = tempfile.mkstemp(prefix=".publication-", dir=path.parent)
+                staging = Path(name)
+                with os.fdopen(fd, "wb") as stream:
+                    fd = None  # The stream now owns the descriptor.
+                    stream.write(data)
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                if replace:
+                    os.replace(staging, path)
+                else:
+                    try:
+                        os.link(staging, path)
+                    except FileExistsError:
+                        if path.read_bytes() != data:
+                            raise LocalApplicationError(
+                                "APPLICATION-PUBLICATION-INTEGRITY-001",
+                                "Publication recovery refuses to replace different existing bytes",
+                            )
+            finally:
+                if fd is not None:
+                    os.close(fd)
+                if staging is not None:
+                    staging.unlink(missing_ok=True)
         except OSError as exc:
             raise LocalApplicationError(
                 "APPLICATION-PUBLICATION-WRITE-001",
                 "Publication record could not be persisted; retry the exact request after resolving the I/O error",
             ) from exc
-        finally:
-            staging.unlink(missing_ok=True)
 
     def _write_release_operation(self, request: Mapping[str, Any], manifest=None) -> None:
         record = {
@@ -1043,6 +1052,9 @@ class PublicationReleaseService:
                         "APPLICATION-PUBLICATION-INTEGRITY-001",
                         "Publication release request does not match its exact operation binding",
                     )
+                if operation is None and request.get("recovery_contract") == "release-operation-v1":
+                    # The replica cannot prove whether approval already committed.
+                    self._lost_release_facts()
                 path = self._checked_record_path(self._release_request_path(request["request_id"]))
                 if path.exists():
                     if self._read_release_json(path) != request:
@@ -1052,11 +1064,6 @@ class PublicationReleaseService:
                 return {"status": "RESTORED", "decision_request": request,
                         "recovered_at": self.facade._application.clock.now()}
 
-            # Only a lost operation needs this bounded-result discovery. Normal
-            # request/release reads address one record; no history is loaded.
-            request_root = self._checked_record_path(self.root / "release-requests")
-            if next(request_root.glob(f"{operation_id}-*.json"), None) is not None:
-                self._lost_release_facts()
             from uuid import uuid4
             request: dict[str, Any] = {
                 "schema_version": SCHEMA_VERSION,
@@ -1169,6 +1176,7 @@ class PublicationReleaseService:
                     raise LocalApplicationError("APPLICATION-PUBLICATION-INTEGRITY-001", "stored Release artifact differs from the exact approved output")
 
             fresh = operation is not None and operation["phase"] == "PENDING"
+            operation_restored = False
             if operation is not None and operation["phase"] == "DECIDED":
                 manifest = operation["release"]
                 self._verify_release_binding(manifest, release_id=release_id, decision_id=decision_id,
@@ -1182,6 +1190,7 @@ class PublicationReleaseService:
                 # including its decision time, still exists and verifies.
                 manifest = existing
                 self._write_release_operation(request, manifest)
+                operation_restored = True
             elif operation is None:
                 self._lost_release_facts()
             else:
@@ -1216,7 +1225,7 @@ class PublicationReleaseService:
                 manifest["content_digest"] = _digest(manifest, "content_digest")
                 self._write_release_operation(request, manifest)
 
-            restored = []
+            restored = ["release-operation"] if operation_restored else []
             for part, data in ((self._release_request_path(request["request_id"]), _json_bytes(request)),
                                (artifact, payload), (manifest_path, _json_bytes(manifest))):
                 if not part.exists():

@@ -89,7 +89,7 @@ class PublicationApprovalBindingTests(ResearchPackageAcceptanceSupport):
 
     def test_request_reuse_checks_binding_and_record_parse_errors_are_diagnostic(self):
         facade, build, request, response, manifest, root = self._released()
-        request_path = self.workspace / ".research-loom" / "publication" / "release-requests" / (request["request_id"] + ".json")
+        request_path = facade._publication_release_service()._release_request_path(request["request_id"])
         forged = deepcopy(request)
         forged["output_binding"]["digest"] = "sha256:" + "0" * 64
         forged["request_digest"] = _digest(forged, "request_digest")
