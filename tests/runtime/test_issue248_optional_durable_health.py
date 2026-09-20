@@ -315,8 +315,13 @@ os._exit(0)
         child.mkdir()
         register_optional_path(child)
         from plugins.local_durable_store import inspect_optional_child
-        with patch("plugins.local_durable_store.os.scandir", side_effect=PermissionError("denied")):
-            row = inspect_optional_child(self.workspace, "publication", self._binding())
+        # Public doctor/open normalize the workspace root before inspection.
+        # Do the same here: Windows TemporaryDirectory may use an 8.3 alias,
+        # which otherwise fails the containment check before reaching scandir.
+        root = self.workspace.resolve()
+        with patch("plugins.local_durable_store.os.scandir", side_effect=PermissionError("denied")) as scan:
+            row = inspect_optional_child(root, "publication", self._binding())
+        scan.assert_called_once_with(root / ".research-loom" / "publication")
         self.assertEqual(row["status"], "UNAVAILABLE")
         self.assertEqual(row["code"], "WORKSPACE-OPTIONAL-UNREADABLE-001")
 
