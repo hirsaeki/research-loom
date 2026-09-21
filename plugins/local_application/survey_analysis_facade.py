@@ -32,6 +32,7 @@ from plugins.survey_analysis import (
 )
 from .facade import LocalApplicationError
 from .survey_facade import _snapshot
+from .survey_response_capture import _real_response_provenance
 from .survey_validation import input_object, required_string
 from .virtual_runner_facade import LocalApplicationFacade as VirtualRunnerApplicationFacade
 from .survey_virtual_pretest_inspection import SurveyVirtualPretestInspectionMixin
@@ -542,12 +543,16 @@ class LocalApplicationFacade(SurveyVirtualPretestInspectionMixin, VirtualRunnerA
         for ref in refs:
             key = (str(ref["identity_namespace"]), str(ref["response_id"]))
             stored = loaded[key]["response"]
+            expected_provenance = {"intake_format": provenance["intake_format"]}
+            producer = loaded[key]["raw_input"].get("provenance")
+            if isinstance(producer, Mapping):
+                expected_provenance["producer"] = deepcopy(dict(producer))
             if (
                 str(stored["content_digest"]) != str(ref["content_digest"])
                 or stored["instrument_ref"] != dict(instrument_ref)
                 or stored["response_origin"] != "real"
                 or stored["epistemic_status"] != "EMPIRICAL"
-                or stored.get("source_provenance") != dict(provenance)
+                or _real_response_provenance(stored["source_provenance"]) != expected_provenance
             ):
                 raise LocalApplicationError(
                     "APPLICATION-SURVEY-REAL-INTAKE-REUSE-001",
@@ -641,6 +646,7 @@ class LocalApplicationFacade(SurveyVirtualPretestInspectionMixin, VirtualRunnerA
                         "source_provenance": provenance,
                     },
                     dataset_id=dataset_id,
+                    reuse_real_responses=True,
                 )
             except LocalApplicationError as exc:
                 if exc.code != "SURVEY-RESPONSE-DATASET-IMMUTABLE-001":

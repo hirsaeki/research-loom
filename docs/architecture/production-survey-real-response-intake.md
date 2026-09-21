@@ -63,3 +63,56 @@ The file must be a controlled regular file inside the opened workspace. Its SHA-
 `survey_real_intake.show` joins the persisted intake lineage, raw/canonical response records or rejection diagnostics, Dataset, and one exact Aggregate result. If more than one Aggregate result exists for the Dataset, the caller must provide `aggregate_result_id`; inspection never guesses a latest result.
 
 Provider connector ecosystems, invitation delivery, statistical inference, automated free-text coding, and automatic Finding adoption remain out of scope.
+
+## Incremental and cumulative exports (Issue #251)
+
+The existing Dataset is also the immutable **acquisition batch**; there is no
+second response store or parallel aggregation pipeline. The batch retains its
+file locator, exact file digest, Instrument pins, first capture time and response
+references. Its Aggregate refers to that exact Dataset ID/digest, not to an
+implicit union of every export ever received.
+
+A different filename, or different bytes at the same filename, creates a new
+batch. Unchanged answers reuse their existing canonical records. Consequently,
+`R1/R2` followed by a cumulative `R1/R2/R3` export produces populations of **2
+and 3**, not 2 and 5. Do not sum overlapping batch populations. An export that
+contains only R3 describes only that batch; automatic delta-export union is not
+part of this interface.
+
+New REAL file-intake responses bind the interchange format and record-level
+producer provenance, not the enclosing file locator/digest. Reuse still requires
+matching project, namespace/response ID, exact Instrument, origin/epistemic
+status, canonical answers, validation result, raw input and producer facts.
+Changing an answer or its Instrument under an existing response identity remains
+`SURVEY_RESPONSE_DUPLICATE_RECORD`; use an explicitly new identity for revised
+source records rather than overwriting historical responses.
+
+Legacy responses carrying file-level provenance are also reusable after these
+checks. Their original documents, ingestion time, raw inputs, provenance and
+content/registry digests are retained unchanged; new batches refer to those
+original digests. Repeated IDs within a single batch remain visible rejected
+inputs, and malformed or origin-invalid records are not silently dropped to make
+an analysis succeed.
+
+### Recovery and concurrency
+
+Response inserts and the Dataset/entry records commit in one existing SQLite
+transaction. An interrupted batch write rolls back new answers without altering
+older responses. After Dataset commit but before analysis completion, repeat the
+same `survey_real_intake.capture` request: it verifies/reuses the batch and resumes
+the existing shared analysis path. Close/reopen does not generate new historical
+capture metadata.
+
+Concurrent first captures use stable response content digests and the existing
+SQLite write boundary. A new registry is published only after its complete schema
+has committed, using a no-overwrite hard link from a same-directory staging file.
+Another initializer's registry is never replaced. Existing/missing registered
+stores retain the optional-child health rules; schema writes do not silently
+recreate or repair a damaged registered database.
+
+Acceptance tests cover renamed and cumulative exports, changed-answer/producer
+conflicts, Instrument/origin separation, legacy records, rejected duplicates,
+post-Dataset analysis interruption, transaction rollback/reopen, concurrent alias
+and exact batches, and initial schema publication failure. The Windows CI job
+runs the same acceptance suite; mocked interruptions are not a claim of physical
+power-loss coverage.
