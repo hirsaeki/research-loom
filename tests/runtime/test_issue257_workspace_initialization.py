@@ -3,10 +3,12 @@ from __future__ import annotations
 from copy import deepcopy
 import hashlib
 import json
+import os
 import queue
 import threading
 from pathlib import Path
 import shutil
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -26,8 +28,10 @@ from pathlib import Path
 from unittest.mock import patch
 from plugins.local_application import workspace as w
 stage,workspace,config,eps=sys.argv[1:]
-write_json,copy_json,app,unlink=w._atomic_json_write,w._copy_json,w.LocalResearchApplication,Path.unlink
+write_json,copy_json,app,unlink,mkdir=w._atomic_json_write,w._copy_json,w.LocalResearchApplication,Path.unlink,Path.mkdir
 def after_json(path,value):
+    if stage == 'lock_acquired' and Path(path).name == w.INITIALIZING_MARKER:
+        os._exit(77)
     write_json(path,value)
     if stage == 'live_binding' and Path(path).name == w.BINDING_NAME:
         print('READY',flush=True)
@@ -50,7 +54,12 @@ def after_unlink(path,*args,**kwargs):
     if stage == 'marker_removed' and path.name == w.INITIALIZING_MARKER:
         os._exit(77)
     return result
-with patch.object(w,'_atomic_json_write',after_json), patch.object(w,'_copy_json',after_copy), patch.object(w,'LocalResearchApplication',after_app), patch.object(Path,'unlink',after_unlink):
+def after_mkdir(path,*args,**kwargs):
+    result=mkdir(path,*args,**kwargs)
+    if stage == 'internal_created' and path.name == w.INTERNAL_DIR:
+        os._exit(77)
+    return result
+with patch.object(Path,'mkdir',after_mkdir), patch.object(w,'_atomic_json_write',after_json), patch.object(w,'_copy_json',after_copy), patch.object(w,'LocalResearchApplication',after_app), patch.object(Path,'unlink',after_unlink):
     w.LocalWorkspace.init(workspace,config,eps).close()
 '''
 
@@ -72,9 +81,59 @@ class Issue257InitializationTests(unittest.TestCase):
     def _bytes(root):
         # SQLite read-only opens may create/refresh SHM coordination and empty
         # WAL sidecars. Nonempty WAL holds real committed bytes and IS protected.
-        return {str(p.relative_to(root)): (p.stat().st_mtime_ns, hashlib.sha256(p.read_bytes()).hexdigest())
+        return {p.relative_to(root).as_posix(): (p.stat().st_mtime_ns, hashlib.sha256(p.read_bytes()).hexdigest())
                 for p in root.rglob('*') if p.is_file() and not p.name.endswith('-shm')
                 and not (p.name.endswith('-wal') and p.stat().st_size == 0)}
+
+    def test_markerless_initialization_crash_has_read_only_safe_guidance(self):
+        for stage in ("internal_created", "lock_acquired"):
+            with self.subTest(stage=stage):
+                self.workspace = self.root / stage
+                self._crash(stage)
+                marker = self.workspace / INTERNAL_DIR / INITIALIZING_MARKER
+                self.assertFalse(marker.exists())
+                before = self._bytes(self.workspace)
+                code, _, result = support.run_cli(["doctor", "--workspace", str(self.workspace), "--json"])
+                self.assertEqual(code, 1, result)
+                self.assertEqual(result["status"], "ERROR")
+                # Retain the actual binding/store failure, not just a generic marker error.
+                self.assertEqual(result["issues"][0]["code"], "WORKSPACE-MISSING-001")
+                diagnosis = result["initialization"]
+                self.assertEqual(diagnosis["classification"], "INDETERMINATE")
+                self.assertFalse(diagnosis["marker_present"])
+                self.assertFalse(diagnosis["cleanup_allowed"])
+                self.assertFalse(diagnosis["quarantine_after_quiescence"])
+                self.assertIn("NEW empty Workspace", diagnosis["next_action"])
+                self.assertEqual(self._bytes(self.workspace), before)
+                with self.assertRaises(LocalWorkspaceError):
+                    LocalWorkspace.init(self.workspace, self.config, self.eps)
+                self.assertEqual(self._bytes(self.workspace), before)
+                # A separate ordinary initialization is possible without touching old bytes.
+                with LocalWorkspace.init(self.root / (stage + "-fresh"), self.config, self.eps):
+                    pass
+                self.assertEqual(self._bytes(self.workspace), before)
+
+    def test_precommit_intent_matches_native_text_output_bytes(self):
+        from plugins.local_application import workspace as workspace_module
+        config = json.loads(self.config.read_text(encoding="utf-8"))
+        effective = json.loads(self.eps.read_text(encoding="utf-8"))
+        for index, separator in enumerate(("\n", "\r\n")):
+            with self.subTest(separator=repr(separator)):
+                root = self.root / f"native-newlines-{index}"
+                internal = root / INTERNAL_DIR
+                internal.mkdir(parents=True)
+                with patch.object(os, "linesep", separator):
+                    intent = initial_intent(root.resolve(), config, effective)
+                (internal / INITIALIZING_MARKER).write_text(json.dumps(intent), encoding="utf-8")
+                for name, value in ((workspace_module.PROJECT_CONFIG_NAME, config),
+                                    (workspace_module.EFFECTIVE_PROFILE_SET_NAME, effective)):
+                    # Reproduce TextIOWrapper's native LF/CRLF output on either host.
+                    text = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n"
+                    (internal / name).write_text(text, encoding="utf-8", newline=separator)
+                    self.assertEqual(intent["files"][name], hashlib.sha256((internal / name).read_bytes()).hexdigest())
+                before = self._bytes(root)
+                self.assertEqual(LocalWorkspace.doctor(root)["initialization"]["classification"], "PRECOMMIT_STAGING")
+                self.assertEqual(self._bytes(root), before)
 
     def test_process_exit_boundaries_have_safe_read_only_classification(self):
         expected = {'intent': 'PRECOMMIT_STAGING', 'config': 'PRECOMMIT_STAGING', 'profiles': 'PRECOMMIT_STAGING',
@@ -224,6 +283,45 @@ class Issue257InitializationTests(unittest.TestCase):
         process.communicate(input='finish\n', timeout=10)
         self.assertEqual(process.returncode, 0)
         self.assertEqual(LocalWorkspace.doctor(self.workspace)['status'], 'OK')
+
+    def test_empty_or_incomplete_required_store_schema_is_not_committed(self):
+        cases = [("execution/execution.db", "empty"),
+                 ("execution/context-extensions.sqlite3", "empty"),
+                 ("execution/operational-trace.sqlite3", "empty"),
+                 ("decision.db", "missing_responses"),
+                 ("execution/execution.db", "missing_events"),
+                 ("execution/execution.db", "missing_column")]
+        for index, (locator, fault) in enumerate(cases):
+            with self.subTest(locator=locator, fault=fault):
+                root = self.root / f"schema-{index}"
+                with LocalWorkspace.init(root, self.config, self.eps) as opened:
+                    digest = canonical_digest(opened.binding)
+                marker = root / INTERNAL_DIR / INITIALIZING_MARKER
+                marker.write_text("initializing\n", encoding="utf-8")
+                database = root / INTERNAL_DIR / locator
+                if fault == "empty":
+                    database.write_bytes(b"")
+                else:
+                    connection = sqlite3.connect(database)
+                    try:
+                        sql = {"missing_responses": "DROP TABLE decision_responses",
+                               "missing_events": "DROP TABLE run_events",
+                               "missing_column": "ALTER TABLE execution_documents DROP COLUMN payload_json"}[fault]
+                        connection.execute(sql)
+                        connection.commit()
+                    finally:
+                        connection.close()
+                before = self._bytes(root)
+                self.assertEqual(LocalWorkspace.doctor(root)["initialization"]["classification"], "RESEARCH_RECORDS_PRESENT")
+                with self.assertRaises(LocalWorkspaceError):
+                    finish_initialization(root, digest)
+                self.assertEqual(self._bytes(root), before)
+                # Removing the marker must not hide a missing required schema or
+                # allow normal open to silently regenerate an empty operational store.
+                marker.unlink()
+                self.assertEqual(LocalWorkspace.doctor(root)["status"], "ERROR")
+                with self.assertRaises(LocalWorkspaceError):
+                    LocalWorkspace.open(root)
 
     def test_corrupt_committed_state_and_linked_marker_never_pass_finalization(self):
         self._crash('binding')

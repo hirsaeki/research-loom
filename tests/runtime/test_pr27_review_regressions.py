@@ -111,7 +111,7 @@ def create_legacy_conversation_schema(path: Path) -> None:
 
 
 class PR27ReviewRegressionTests(unittest.TestCase):
-    def test_failed_init_cleans_only_paths_created_by_attempt(self):
+    def test_failed_init_preserves_attempt_and_explicit_inputs(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             config = bootstrap_config(root / "project.json")
@@ -129,13 +129,21 @@ class PR27ReviewRegressionTests(unittest.TestCase):
                     with self.assertRaisesRegex(RuntimeError, "synthetic initialization failure"):
                         LocalWorkspace.init(workspace, config, EFFECTIVE_PROFILES)
 
-                if preexisting:
-                    self.assertTrue(workspace.is_dir())
-                    self.assertEqual(list(workspace.iterdir()), [])
-                else:
-                    self.assertFalse(workspace.exists())
+                # Initialization now retains failed attempts rather than deleting
+                # directories that may already hold State or concurrent user input.
+                self.assertTrue(workspace.is_dir())
+                marker = workspace / ".research-loom" / ".initializing"
+                self.assertEqual(json.loads(marker.read_text(encoding="utf-8"))["phase"], "STATE_STARTED")
+                self.assertTrue(config.is_file())
+                result = LocalWorkspace.doctor(workspace)
+                self.assertEqual(result["initialization"]["classification"], "INDETERMINATE")
+                self.assertFalse(result["initialization"]["cleanup_allowed"])
+                fresh = root / (workspace.name + "-retry")
+                with LocalWorkspace.init(fresh, config, EFFECTIVE_PROFILES):
+                    pass
+                self.assertTrue(marker.is_file())
 
-    def test_partial_project_config_write_cannot_strand_workspace(self):
+    def test_partial_project_config_write_is_retained_with_new_path_recovery(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             config = bootstrap_config(root / "project.json")
@@ -149,7 +157,15 @@ class PR27ReviewRegressionTests(unittest.TestCase):
                 with self.assertRaisesRegex(OSError, "synthetic partial copy failure"):
                     LocalWorkspace.init(workspace, config, EFFECTIVE_PROFILES)
 
-            self.assertFalse(workspace.exists())
+            partial = workspace / ".research-loom" / "project-config.json"
+            self.assertEqual(partial.read_bytes(), b"{")
+            result = LocalWorkspace.doctor(workspace)
+            self.assertEqual(result["initialization"]["classification"], "INDETERMINATE")
+            self.assertFalse(result["initialization"]["cleanup_allowed"])
+            self.assertTrue(config.is_file())
+            with LocalWorkspace.init(root / "fresh-workspace", config, EFFECTIVE_PROFILES):
+                pass
+            self.assertEqual(partial.read_bytes(), b"{")
 
     def test_doctor_converts_direct_sqlite_error_to_structured_issue(self):
         with tempfile.TemporaryDirectory() as temp:

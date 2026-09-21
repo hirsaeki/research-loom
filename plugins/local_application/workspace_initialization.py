@@ -8,6 +8,7 @@ from __future__ import annotations
 import hashlib
 from itertools import islice
 import json
+import os
 from pathlib import Path
 import sqlite3
 import stat
@@ -21,9 +22,44 @@ from .workspace import (BINDING_NAME, EFFECTIVE_PROFILE_SET_NAME, INITIALIZING_M
 INTENT_FORMAT = "research-loom-initialization/v1"
 
 
+# A readable SQLite file can still have no initialized schema. Require the
+# existing operational store shape before normal open or init-finish can claim
+# it is usable. This checks schema only, not the truth/completeness of all history.
+_REQUIRED_STORE_COLUMNS = {
+    "WORKSPACE-DECISION-DB-001": {
+        "decision_requests": "request_id request_digest project_ref lineage_ref source_candidate_id source_candidate_digest snapshot_ref snapshot_digest payload_json status claimed_response_digest commit_id commit_receipt_json detail",
+        "decision_responses": "response_digest request_id response_id disposition actor_id actor_type payload_json outcome detail",
+    },
+    "WORKSPACE-EXECUTION-DB-001": {
+        "schema_migrations": "version name applied_at",
+        "runs": "run_id invocation_id invocation_digest capability_id capability_version descriptor_digest implementation_id implementation_version function_id execution_mode context_pack_id context_pack_digest project_ref lineage_ref snapshot_ref snapshot_digest attempt parent_run_id status prepared_at started_at completed_at handoff_ref handoff_digest failure_json provenance_json",
+        "run_events": "run_id sequence from_status to_status occurred_at reason",
+        "execution_documents": "document_type identity payload_sha256 payload_json run_id",
+        "diagnostics": "diagnostic_id run_id kind payload_json",
+        "execution_artifacts": "artifact_id run_id role media_type size digest storage_locator execution_mode provenance_json",
+        "input_resources": "reference_id media_type size digest storage_locator provenance_json",
+    },
+    "WORKSPACE-CONTEXT-EXTENSIONS-DB-001": {
+        "context_extensions": "capability_id capability_version function_id context_pack_id payload_sha256 payload_json",
+    },
+    "WORKSPACE-OPERATIONAL-TRACE-DB-001": {
+        "operational_events": "run_id sequence event_id event_type occurred_at payload_sha256 payload_json",
+    },
+}
+
+
+def validate_required_store_schema(connection: sqlite3.Connection, code: str) -> None:
+    for table, columns in _REQUIRED_STORE_COLUMNS.get(code, {}).items():
+        row = connection.execute("SELECT type FROM sqlite_master WHERE name=?", (table,)).fetchone()
+        present = {str(row[1]) for row in connection.execute(f'PRAGMA table_info("{table}")')}
+        if row is None or row[0] != "table" or not set(columns.split()) <= present:
+            raise LocalWorkspaceError(code, f"required store schema is missing/incompatible: {table}; preserve the Workspace and restore an exact complete backup")
+
+
 def initial_intent(root: Path, config: Mapping[str, Any], effective: Mapping[str, Any]) -> dict:
     def digest(value):
-        raw = (json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
+        # Match _copy_json/TextIOWrapper native newline bytes, including CRLF.
+        raw = (json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + os.linesep).encode("utf-8")
         return hashlib.sha256(raw).hexdigest()
     return {"format": INTENT_FORMAT, "phase": "PRE_STATE",
             "root": hashlib.sha256(str(root).encode("utf-8")).hexdigest(),

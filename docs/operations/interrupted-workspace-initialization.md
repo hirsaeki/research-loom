@@ -9,7 +9,10 @@ owned by the initializer.
 Run `research-loom doctor --workspace <PATH> --json`. When `.initializing`
 remains, the overall status is still `ERROR / WORKSPACE-PARTIAL-001`; the
 `initialization` object supplies a classification and the next operation.
-Normal `open` also refers the operator to this diagnosis. No research records,
+If the marker was never written, a failed Workspace with an existing internal
+directory also receives conservative initialization guidance (`marker_present=false`),
+while keeping its original binding/store error. A missing intent is not proof of
+precommit staging. Normal `open` also refers the operator to this diagnosis. No research records,
 markers, Config/Profile inputs or directories are changed by diagnosis. SQLite
 may create/refresh SHM coordination or empty WAL sidecars during read-only
 checks; this is not a checkpoint, repair, or consistent hot-backup protocol.
@@ -71,7 +74,8 @@ child diagnoses and does not imply that missing research material was restored.
 
 ## Verification scope
 
-Tests terminate child processes at intent, Config, Profile, State-start,
+Tests terminate child processes just after internal-directory creation and lock
+acquisition (before any marker), and at intent, Config, Profile, State-start,
 State-store, binding and marker-removal boundaries. They cover read-only
 classification, exact finalization, live-process exclusion, wrong-target and
 unexpected-file rejection, failed finalization, ordinary reopen failure after
@@ -81,3 +85,14 @@ incomplete/corrupt fixture still fails the canonical checks (ablation).
 These are process-exit fault injections, not a claim that every filesystem,
 power-loss, disk-cache or network-share failure has been simulated. The existing
 stopped complete-Parent backup requirements still apply.
+
+### Required schema is not an empty SQLite container
+
+Canonical-store checks also require the existing Decision, Execution, Context
+Extension and Operational Trace tables/columns. SQLite `quick_check=ok` alone
+can describe an empty database, so it cannot authorize `init-finish`. A missing
+required schema is rejected even after marker removal, before normal open can
+recreate its tables. This is schema compatibility, not proof that every
+historical payload is present or correct. Optional child degradation remains
+separate. Initialization intent hashes match the native serialized Config/Profile
+bytes (LF or CRLF); diagnosis compares exact bytes without newline normalization.

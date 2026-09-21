@@ -476,6 +476,8 @@ def _sqlite_quick_check(path: Path, *, code: str) -> None:
             row = connection.execute("PRAGMA quick_check").fetchone()
             if row is None or str(row[0]).lower() != "ok":
                 raise LocalWorkspaceError(code, f"SQLite quick_check failed: {path}")
+            from .workspace_initialization import validate_required_store_schema
+            validate_required_store_schema(connection, code)
         finally:
             connection.close()
     except LocalWorkspaceError:
@@ -722,7 +724,14 @@ class LocalWorkspace:
             try:
                 marker.lstat()
             except FileNotFoundError:
-                return integrity
+                # A crash may precede the first intent write. Preserve the actual
+                # integrity error and add conservative guidance; absent intent is
+                # never evidence that a nonempty Workspace is disposable.
+                if integrity.get("status") != "ERROR" or not (root / INTERNAL_DIR).is_dir():
+                    return integrity
+                from .workspace_initialization import diagnose_initialization
+                diagnosis = diagnose_initialization(root, integrity)["initialization"]
+                return {**integrity, "initialization": {**diagnosis, "marker_present": False}}
             from .workspace_initialization import diagnose_initialization
             return diagnose_initialization(root, integrity)
         except LocalWorkspaceError as exc:
