@@ -3,14 +3,11 @@ from __future__ import annotations
 from plugins.local_durable_store import require_optional_available, register_optional_path
 
 from copy import deepcopy
-from contextlib import contextmanager
 from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
 import shutil
-import threading
-import time
 from typing import Any, Mapping
 import uuid
 
@@ -41,78 +38,17 @@ from plugins.local_application.workspace import (
 )
 from plugins.sqlite_state_store import SQLiteResearchStateRepository
 
+
+from .workspace_lock import ADVANCEMENT_LOCK, workspace_lock as _workspace_advancement_lock
+
 HISTORY_DIR = "profile-history"
 GENERATIONS_DIR = "generations"
 EVENTS_DIR = "events"
 PENDING_MARKER = "profile-advancement.pending.json"
-ADVANCEMENT_LOCK = "profile-advancement.lock"
-_LOCK_STATE = threading.local()
 _ADVANCEMENT_NOTE = "Profile generation advancement: direct Profile requests changed mechanically; other project semantics are unchanged."
 
 
 
-
-@contextmanager
-def _workspace_advancement_lock(root: Path):
-    if not root.is_dir():
-        raise LocalWorkspaceError("WORKSPACE-MISSING-001", "workspace directory does not exist")
-    key = str(root.resolve(strict=True))
-    leases = getattr(_LOCK_STATE, "leases", None)
-    if leases is None:
-        leases = {}
-        _LOCK_STATE.leases = leases
-    lease = leases.get(key)
-    if lease is None:
-        internal = _safe_locator(root, INTERNAL_DIR)
-        if not internal.is_dir():
-            raise LocalWorkspaceError("WORKSPACE-MISSING-001", "workspace internal directory is missing")
-        lock_path = _safe_locator(root, f"{INTERNAL_DIR}/{ADVANCEMENT_LOCK}", require_exists=False)
-        handle = lock_path.open("a+b")
-        try:
-            handle.seek(0, os.SEEK_END)
-            if handle.tell() == 0:
-                handle.write(b"\0")
-                handle.flush()
-            if os.name == "nt":
-                import msvcrt
-
-                while True:
-                    try:
-                        handle.seek(0)
-                        msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
-                        break
-                    except OSError:
-                        time.sleep(0.05)
-            else:
-                import fcntl
-
-                fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
-        except BaseException:
-            handle.close()
-            raise
-        lease = {"handle": handle, "count": 0}
-        leases[key] = lease
-
-    lease["count"] += 1
-    try:
-        yield
-    finally:
-        lease["count"] -= 1
-        if lease["count"] == 0:
-            leases.pop(key, None)
-            handle = lease["handle"]
-            try:
-                if os.name == "nt":
-                    import msvcrt
-
-                    handle.seek(0)
-                    msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
-                else:
-                    import fcntl
-
-                    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
-            finally:
-                handle.close()
 
 
 def _now() -> str:
@@ -360,6 +296,9 @@ def _recover_incomplete_profile_advancement_locked(root: Path) -> None:
 
 def recover_incomplete_profile_advancement(root: Path) -> None:
     root = _assert_safe_workspace_root(Path(root))
+    marker = _safe_locator(root, f"{INTERNAL_DIR}/{PENDING_MARKER}", require_exists=False)
+    if not marker.exists():
+        return
     with _workspace_advancement_lock(root):
         _recover_incomplete_profile_advancement_locked(root)
 

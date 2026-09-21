@@ -261,32 +261,18 @@ class ProfileGenerationAdvancementTests(ResearchPackageAcceptanceSupport):
         self.assertEqual([item["result"] for item in results], ["ADVANCED"])
 
     def test_kody_workspace_lock_closes_handle_when_initialization_fails(self):
+        import errno
         from plugins.local_application import profile_advancement as advancement
-
-        class FailingHandle:
-            def __init__(self):
-                self.closed = False
-
-            def seek(self, *_args):
-                return 0
-
-            def tell(self):
-                return 0
-
-            def write(self, payload):
-                return len(payload)
-
-            def flush(self):
-                raise OSError("injected lock initialization failure")
-
-            def close(self):
-                self.closed = True
-
-        handle = FailingHandle()
-        with patch.object(Path, "open", return_value=handle):
-            with self.assertRaisesRegex(OSError, "injected lock initialization failure"):
+        from plugins.local_application.workspace import LocalWorkspaceError
+        handle = io.BytesIO()
+        with patch.object(Path, "open", return_value=handle), patch(
+            "plugins.local_application.workspace_lock._try_lock",
+            side_effect=OSError(errno.EIO, "injected lock initialization failure"),
+        ):
+            with self.assertRaises(LocalWorkspaceError) as rejected:
                 with advancement._workspace_advancement_lock(Path(self.workspace).resolve()):
                     self.fail("lock acquisition unexpectedly succeeded")
+        self.assertEqual(rejected.exception.code, "WORKSPACE-LOCK-IO-001")
         self.assertTrue(handle.closed)
 
     def test_kody_profile_commands_keep_missing_workspace_error_contract(self):
