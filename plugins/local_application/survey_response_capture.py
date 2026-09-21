@@ -28,6 +28,18 @@ def _canonical_raw(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
+def _raw_response_key(raw: Any) -> tuple[str, str] | None:
+    if (
+        isinstance(raw, Mapping)
+        and isinstance(raw.get("identity_namespace"), str)
+        and raw["identity_namespace"]
+        and isinstance(raw.get("response_id"), str)
+        and raw["response_id"]
+    ):
+        return raw["identity_namespace"], raw["response_id"]
+    return None
+
+
 _REAL_INTAKE_FORMAT = "provider-neutral-json@0.1.0"
 
 
@@ -224,10 +236,11 @@ class SurveyResponseCaptureMixin:
             )
 
         if reuse_real_responses:
+            # Structural validation can reject a raw record before producing a
+            # canonical response. Its existing identity still needs checking.
             keys = [
-                (str(response["identity_namespace"]), str(response["response_id"]))
-                for outcome in outcomes
-                if (response := outcome["canonical_response"]) is not None
+                key for outcome in outcomes
+                if (key := _raw_response_key(outcome["raw_input"])) is not None
             ]
             try:
                 stored = self._survey_response_store().load_responses(self._project_id, keys)
@@ -246,15 +259,7 @@ class SurveyResponseCaptureMixin:
             response = outcome["canonical_response"]
             issues = list(outcome["issues"])
             raw = outcome["raw_input"]
-            raw_response_key = (
-                (str(raw["identity_namespace"]), str(raw["response_id"]))
-                if isinstance(raw, Mapping)
-                and isinstance(raw.get("identity_namespace"), str)
-                and raw["identity_namespace"]
-                and isinstance(raw.get("response_id"), str)
-                and raw["response_id"]
-                else None
-            )
+            raw_response_key = _raw_response_key(raw)
             duplicate_response_id = (
                 raw_response_key is not None
                 and raw_response_key in seen_response_keys
@@ -263,6 +268,16 @@ class SurveyResponseCaptureMixin:
                 seen_response_keys.add(raw_response_key)
 
             if response is None:
+                if (
+                    reuse_real_responses
+                    and not duplicate_response_id
+                    and raw_response_key is not None
+                    and stored.get(raw_response_key) is not None
+                ):
+                    raise LocalApplicationError(
+                        "SURVEY_RESPONSE_DUPLICATE_RECORD",
+                        f"immutable Survey response_id already exists with different content: {raw_response_key[1]}",
+                    )
                 if duplicate_response_id:
                     issues.append(
                         _issue(
