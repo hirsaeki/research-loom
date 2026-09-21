@@ -661,8 +661,11 @@ class LocalWorkspace:
         root = _assert_safe_workspace_root(Path(workspace))
         if not root.is_dir():
             raise LocalWorkspaceError("WORKSPACE-MISSING-001", "workspace directory does not exist")
-        from plugins.local_application.profile_advancement import _workspace_advancement_lock
-        lock = _workspace_advancement_lock(root)
+        from plugins.local_application.profile_advancement import _workspace_advancement_lock, recover_incomplete_profile_advancement
+        # Recovery writes require exclusivity before taking a shared lifetime.
+        # _open_locked rechecks the marker after acquisition to catch a racing crash.
+        recover_incomplete_profile_advancement(root)
+        lock = _workspace_advancement_lock(root, shared=True)
         lock.__enter__()
         try:
             opened = cls._open_locked(root)
