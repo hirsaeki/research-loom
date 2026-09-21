@@ -472,6 +472,40 @@ class LocalSurveyResponseStore:
                     "SurveyResponseDataset identity is single-use",
                 )
 
+            if (
+                dataset["response_origin"] == "real"
+                and dataset["capture_origin"] == "survey_real_intake"
+            ):
+                # A malformed retry has no canonical response for the ordinary
+                # immutable-response check below. Check its exact raw identity
+                # under the same write lock, including commits after prefetch.
+                for rejected in dataset["rejected_inputs"]:
+                    if rejected.get("canonical_response_ref"):
+                        continue
+                    raw = rejected["raw_input"]
+                    if not isinstance(raw, Mapping):
+                        continue
+                    namespace = raw.get("identity_namespace")
+                    response_id = raw.get("response_id")
+                    if (
+                        not isinstance(namespace, str) or not namespace
+                        or not isinstance(response_id, str) or not response_id
+                        or (namespace, response_id) in response_by_id
+                    ):
+                        # Unidentifiable/new inputs remain visible rejections.
+                        # A later within-batch duplicate does not suppress the
+                        # canonical first record, which is checked below.
+                        continue
+                    existing = connection.execute(
+                        "SELECT 1 FROM survey_responses WHERE project_id=? AND identity_namespace=? AND response_id=?",
+                        (str(dataset["project_id"]), namespace, response_id),
+                    ).fetchone()
+                    if existing is not None:
+                        raise LocalSurveyResponseStoreError(
+                            "SURVEY_RESPONSE_DUPLICATE_RECORD",
+                            f"immutable Survey response_id already exists with different content: {response_id}",
+                        )
+
             for response, raw_input in responses:
                 response_id = str(response["response_id"])
                 identity_namespace = str(response["identity_namespace"])

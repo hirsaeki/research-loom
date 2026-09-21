@@ -98,7 +98,16 @@ an analysis succeed.
 
 Response inserts and the Dataset/entry records commit in one existing SQLite
 transaction. An interrupted batch write rolls back new answers without altering
-older responses. After Dataset commit but before analysis completion, repeat the
+older responses. A structurally malformed record with an already-persisted exact
+project/namespace/response ID is also an immutable conflict, not a way to remove
+that answer from a new batch's analysis population. The check runs under the
+existing write transaction, so a valid response committed after normalization is
+not missed. New/unidentifiable malformed records remain visible rejections, as do
+later duplicates when the batch still retains its canonical first response.
+Previously committed rejection batches remain immutable and can still be replayed;
+a later valid answer does not retroactively rewrite their population.
+
+After Dataset commit but before analysis completion, repeat the
 same `survey_real_intake.capture` request: it verifies/reuses the batch and resumes
 the existing shared analysis path. Close/reopen does not generate new historical
 capture metadata.
