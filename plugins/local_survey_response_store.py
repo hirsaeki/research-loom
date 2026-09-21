@@ -4,8 +4,10 @@ from plugins.local_durable_store import require_optional_available, register_opt
 
 from copy import deepcopy
 import json
+import os
 from pathlib import Path
 import sqlite3
+import tempfile
 from typing import Any, Mapping, Sequence
 
 from plugins.survey_response.contracts import (
@@ -205,24 +207,49 @@ class LocalSurveyResponseStore:
                 "Survey response registry is unreadable",
             ) from exc
 
+    def _initialize(self) -> None:
+        # Publish a complete SQLite schema. Readers must see either no registry
+        # yet or a committed schema, never the half-created first batch store.
+        descriptor, name = tempfile.mkstemp(prefix=f".{self.path.name}.", suffix=".tmp", dir=self.path.parent)
+        os.close(descriptor)
+        staging = Path(name)
+        try:
+            connection = sqlite3.connect(staging)
+            try:
+                connection.row_factory = sqlite3.Row
+                connection.executescript(_SCHEMA_SQL)
+                connection.execute(
+                    "INSERT INTO survey_response_store_meta(schema_version) VALUES (?)",
+                    (SURVEY_RESPONSE_STORE_SCHEMA_VERSION,),
+                )
+                self._schema_version(connection)
+                connection.commit()
+            finally:
+                connection.close()
+            try:
+                # A concurrent initializer can win; never replace its registry.
+                os.link(staging, self.path)
+            except FileExistsError:
+                pass
+        finally:
+            try:
+                staging.unlink(missing_ok=True)
+            except OSError:
+                # Staging cleanup must not mask a completed schema publication.
+                pass
+
     def _write(self) -> sqlite3.Connection:
         require_optional_available(self.path, LocalSurveyResponseStoreError)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         try:
-            connection = sqlite3.connect(self.path, timeout=5.0)
+            if not self.exists:
+                self._initialize()
+            # rw does not recreate a removed registered store, nor repair schema
+            # metadata by running CREATE TABLE against an existing damaged DB.
+            connection = sqlite3.connect(self.path.resolve().as_uri() + "?mode=rw", uri=True, timeout=5.0)
             connection.row_factory = sqlite3.Row
             connection.execute("PRAGMA busy_timeout=5000")
-            connection.executescript(_SCHEMA_SQL)
-            rows = connection.execute(
-                "SELECT schema_version FROM survey_response_store_meta"
-            ).fetchall()
-            if not rows:
-                connection.execute(
-                    "INSERT OR IGNORE INTO survey_response_store_meta(schema_version) VALUES (?)",
-                    (SURVEY_RESPONSE_STORE_SCHEMA_VERSION,),
-                )
             self._schema_version(connection)
-            connection.commit()
             register_optional_path(self.path)
             return connection
         except LocalSurveyResponseStoreError:
@@ -230,7 +257,7 @@ class LocalSurveyResponseStore:
                 connection.rollback()
                 connection.close()
             raise
-        except sqlite3.Error as exc:
+        except (sqlite3.Error, OSError) as exc:
             if "connection" in locals():
                 connection.rollback()
                 connection.close()
@@ -238,7 +265,6 @@ class LocalSurveyResponseStore:
                 "SURVEY-RESPONSE-STORE-DB-001",
                 "Survey response registry could not be initialized",
             ) from exc
-
         except BaseException:
             if "connection" in locals():
                 connection.close()

@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import Counter
 from copy import deepcopy
 import json
+import re
 from typing import Any, Mapping
 
 from plugins.local_survey_response_store import LocalSurveyResponseStoreError
@@ -25,6 +26,44 @@ def _issue(code: str, message: str, *, response_id: str | None = None) -> dict[s
 
 def _canonical_raw(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+_REAL_INTAKE_FORMAT = "provider-neutral-json@0.1.0"
+
+
+def _real_response_provenance(provenance: Mapping[str, Any]) -> dict[str, Any]:
+    """Project only legacy file acquisition fields out of REAL answer identity.
+
+    Persisted response documents are never rewritten. Producer provenance remains
+    part of the answer; the enclosing Dataset retains the exact acquisition.
+    """
+    value = deepcopy(dict(provenance))
+    if value.get("intake_format") != _REAL_INTAKE_FORMAT:
+        return value
+    acquisition = {key for key in ("intake_file", "intake_file_digest") if key in value}
+    if acquisition:
+        if (
+            len(acquisition) != 2
+            or not isinstance(value["intake_file"], str)
+            or not value["intake_file"].strip()
+            or not isinstance(value.get("intake_file_digest"), str)
+            or re.fullmatch(r"sha256:[0-9a-f]{64}", value["intake_file_digest"]) is None
+        ):
+            raise LocalApplicationError(
+                "APPLICATION-SURVEY-REAL-INTAKE-REUSE-001",
+                "legacy REAL response acquisition metadata is invalid",
+            )
+        for key in acquisition:
+            value.pop(key)
+    return value
+
+
+def _real_response_identity(response: Mapping[str, Any]) -> dict[str, Any]:
+    value = deepcopy(dict(response))
+    for key in ("ingested_at", "content_digest", "registry_digest"):
+        value.pop(key, None)
+    value["source_provenance"] = _real_response_provenance(value["source_provenance"])
+    return value
 
 
 class SurveyResponseCaptureMixin:
@@ -139,12 +178,26 @@ class SurveyResponseCaptureMixin:
         *,
         enforce_unique_participant: bool = False,
         dataset_id: str | None = None,
+        reuse_real_responses: bool = False,
     ) -> Mapping[str, Any]:
         value = input_object(input_value, _DATASET_FIELDS, "Survey response dataset capture")
         questionnaire, instrument_ref = self._resolve_instrument(value)
         origin, epistemic = self._origin(value)
         source_run_id = self._source_run(value, origin=origin)
         provenance = self._source_provenance(value)
+        response_provenance = provenance
+        if reuse_real_responses:
+            if (
+                origin != "real"
+                or source_run_id is not None
+                or capture_origin(value) != "survey_real_intake"
+                or provenance.get("intake_format") != _REAL_INTAKE_FORMAT
+            ):
+                raise LocalApplicationError(
+                    "APPLICATION-SURVEY-REAL-INTAKE-REUSE-001",
+                    "batch response reuse requires the REAL file intake boundary",
+                )
+            response_provenance = {"intake_format": _REAL_INTAKE_FORMAT}
         raw_inputs = value.get("responses")
         if not isinstance(raw_inputs, list):
             raise LocalApplicationError(
@@ -166,9 +219,20 @@ class SurveyResponseCaptureMixin:
                     epistemic_status=epistemic,
                     ingested_at=ingested_at,
                     source_run_id=source_run_id,
-                    source_provenance=provenance,
+                    source_provenance=response_provenance,
                 )
             )
+
+        if reuse_real_responses:
+            keys = [
+                (str(response["identity_namespace"]), str(response["response_id"]))
+                for outcome in outcomes
+                if (response := outcome["canonical_response"]) is not None
+            ]
+            try:
+                stored = self._survey_response_store().load_responses(self._project_id, keys)
+            except LocalSurveyResponseStoreError as exc:
+                raise LocalApplicationError(exc.code, exc.message) from exc
 
         seen_response_keys: set[tuple[str, str]] = set()
         seen_participants: set[tuple[str, str]] = set()
@@ -252,6 +316,22 @@ class SurveyResponseCaptureMixin:
                         ),
                     )
                 seen_participants.add(participant)
+
+            if reuse_real_responses:
+                key = (str(response["identity_namespace"]), response_id)
+                previous = stored.get(key)
+                if previous is not None:
+                    if (
+                        _real_response_identity(previous["response"]) != _real_response_identity(response)
+                        or _canonical_raw(previous["raw_input"]) != _canonical_raw(raw)
+                    ):
+                        raise LocalApplicationError(
+                            "SURVEY_RESPONSE_DUPLICATE_RECORD",
+                            f"immutable Survey response_id already exists with different content: {response_id}",
+                        )
+                    # Preserve the first record even for legacy acquisitions;
+                    # repeated identities within this batch were rejected above.
+                    response = deepcopy(previous["response"])
 
             response_issues = list(response["validation"]["issues"])
             for issue in response_issues:
