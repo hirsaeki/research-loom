@@ -133,7 +133,7 @@ except LocalWorkspaceError as exc:
             self.assertEqual(path.stat().st_ino, before)
 
     def test_io_and_permission_errors_are_immediate_not_contention(self):
-        for error in [PermissionError(errno.EACCES, 'denied'), OSError(errno.EIO, 'I/O'),
+        for error in [PermissionError(errno.EPERM, 'denied'), OSError(errno.EIO, 'I/O'),
                       OSError(errno.ENOSYS, 'locking unsupported')]:
             handle = io.BytesIO()
             start = time.monotonic()
@@ -156,6 +156,21 @@ except LocalWorkspaceError as exc:
                 error = OSError(errno.EACCES, 'windows test')
                 error.winerror = winerror
                 self.assertIs(locking._contention(error), busy)
+
+    def test_portable_posix_fcntl_emulation_conflict_is_bounded(self):
+        # A native flock usually reports EWOULDBLOCK, whereas some Python
+        # platforms emulate it with fcntl and can report EACCES instead.
+        error = OSError(errno.EACCES, 'emulated nonblocking lock conflict')
+        with patch.object(locking.os, 'name', 'posix'):
+            self.assertTrue(locking._contention(error))
+        with patch.object(locking, '_try_lock', side_effect=error) as attempt, patch.object(locking, '_contention', return_value=True):
+            with self.assertRaises(LocalWorkspaceError) as rejected:
+                with locking.workspace_lock(self.workspace, timeout=0):
+                    self.fail('conflicting lock acquired')
+        self.assertEqual(rejected.exception.code, 'WORKSPACE-LOCK-BUSY-001')
+        self.assertEqual(attempt.call_count, 1)
+        with locking.workspace_lock(self.workspace, timeout=0):
+            pass  # failed acquisition did not leave a lease/handle behind
 
     def test_pending_recovery_and_degraded_operations_keep_their_boundaries(self):
         # A recoverable interrupted Profile operation still restores exact old

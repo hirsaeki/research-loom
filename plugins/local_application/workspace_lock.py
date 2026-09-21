@@ -45,7 +45,9 @@ def _try_lock(handle, *, shared: bool) -> None:
 def _contention(exc: OSError) -> bool:
     if os.name == "nt":
         return getattr(exc, "winerror", None) == 33  # ERROR_LOCK_VIOLATION, not access denied.
-    return exc.errno in {errno.EAGAIN, errno.EWOULDBLOCK}
+    # Some Python platforms emulate flock with fcntl record locking, whose
+    # nonblocking conflict can be EACCES. File-open EACCES is handled separately.
+    return exc.errno in {errno.EACCES, errno.EAGAIN, errno.EWOULDBLOCK}
 
 
 @contextmanager

@@ -15,7 +15,11 @@ upgrade is rejected immediately, rather than allowing a stale open application
 to survive a Profile change. Internal exclusive nesting remains supported.
 
 `WORKSPACE-LOCK-IO-001` means access, unsupported locking or filesystem I/O failed;
-resolve that cause before retrying. Windows uses shared/exclusive `LockFileEx`
+resolve that cause before retrying. POSIX nonblocking acquisition also treats
+`EACCES` as possible contention for platforms emulating `flock` with `fcntl`;
+file-open access denial is still immediate I/O failure. A persistent BUSY on
+such a platform can require a permission/filesystem check as well as closing
+active handles. Windows uses shared/exclusive `LockFileEx`
 locks and distinguishes lock violation from access denied. Lock files are not
 ownership records. Never delete them, infer ownership from timestamps, or break
 a live lock. Normal close and process termination release the OS resource.
