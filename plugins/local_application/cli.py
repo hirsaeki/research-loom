@@ -116,6 +116,11 @@ def build_parser() -> argparse.ArgumentParser:
     init.add_argument("--effective-profile-set", required=True)
     _add_output_json(init)
 
+    init_finish = sub.add_parser("init-finish")
+    _add_workspace(init_finish)
+    init_finish.add_argument("--expected-binding-digest", required=True)
+    _add_output_json(init_finish)
+
     status = sub.add_parser("status")
     _add_workspace(status)
     _add_output_json(status)
@@ -529,6 +534,10 @@ def _run(args: argparse.Namespace) -> Mapping[str, Any]:
             args.project_config,
             args.effective_profile_set,
         )
+
+    if args.command == "init-finish":
+        from .workspace_initialization import finish_initialization
+        return finish_initialization(args.workspace, args.expected_binding_digest)
 
     if args.command == "doctor":
         return _doctor_with_optional_attention(args.workspace)
