@@ -8,7 +8,6 @@ import hashlib
 import json
 import os
 from pathlib import Path
-import shutil
 import sqlite3
 from typing import Any, Mapping
 import uuid
@@ -477,6 +476,8 @@ def _sqlite_quick_check(path: Path, *, code: str) -> None:
             row = connection.execute("PRAGMA quick_check").fetchone()
             if row is None or str(row[0]).lower() != "ok":
                 raise LocalWorkspaceError(code, f"SQLite quick_check failed: {path}")
+            from .workspace_initialization import validate_required_store_schema
+            validate_required_store_schema(connection, code)
         finally:
             connection.close()
     except LocalWorkspaceError:
@@ -608,53 +609,39 @@ class LocalWorkspace:
         root.mkdir(parents=True, exist_ok=True)
         internal = root / INTERNAL_DIR
         marker = internal / INITIALIZING_MARKER
-        config_path = internal / PROJECT_CONFIG_NAME
-        profile_path = internal / EFFECTIVE_PROFILE_SET_NAME
-        internal_created = False
-        config_written = False
-        profile_written = False
         app: LocalResearchApplication | None = None
-        try:
-            internal.mkdir(parents=False, exist_ok=False)
-            internal_created = True
-            marker.write_text("initializing\n", encoding="utf-8")
-            config_written = True
-            _copy_json(config_path, config)
-            profile_written = True
-            _copy_json(profile_path, effective)
-
-            app = LocalResearchApplication(
-                internal,
-                resolver=_TypedOnlyResolver(),
-                effective_profile_set_provider=_runtime_profile_provider(project_id, profile_digest, effective),
-                seed_state=seed,
-                clock=clock,
-                id_provider=ids,
-            )
-            binding = _binding(project_id, config_digest, profile_digest, initialized_at=clock.now())
-            app.close()
-            app = None
-            _atomic_json_write(internal / BINDING_NAME, binding)
-            marker.unlink()
-            return cls.open(root)
-        except Exception:
-            if app is not None:
-                with suppress(Exception):
-                    app.close()
-            if internal_created and internal.exists():
-                with suppress(OSError):
-                    shutil.rmtree(internal)
-            if config_written and config_path.exists() and config_path.is_file():
-                with suppress(OSError):
-                    config_path.unlink()
-            if profile_written and profile_path.exists() and profile_path.is_file():
-                with suppress(OSError):
-                    profile_path.unlink()
-            if not root_preexisting and root.exists():
-                with suppress(OSError):
-                    if not any(root.iterdir()):
-                        root.rmdir()
-            raise
+        internal.mkdir(parents=False, exist_ok=False)
+        from .workspace_initialization import initial_intent
+        from .workspace_lock import workspace_lock
+        # Failed initialization is retained, not recursively deleted. In
+        # particular, a failure after a State commit must not erase that commit.
+        with workspace_lock(root):
+            intent = initial_intent(root, config, effective)
+            _atomic_json_write(marker, intent)
+            _copy_json(internal / PROJECT_CONFIG_NAME, config)
+            _copy_json(internal / EFFECTIVE_PROFILE_SET_NAME, effective)
+            _atomic_json_write(marker, {**intent, "phase": "STATE_STARTED"})
+            try:
+                app = LocalResearchApplication(
+                    internal,
+                    resolver=_TypedOnlyResolver(),
+                    effective_profile_set_provider=_runtime_profile_provider(project_id, profile_digest, effective),
+                    seed_state=seed,
+                    clock=clock,
+                    id_provider=ids,
+                )
+                binding = _binding(project_id, config_digest, profile_digest, initialized_at=clock.now())
+                app.close()
+                app = None
+                _atomic_json_write(internal / BINDING_NAME, binding)
+                marker.unlink()
+            finally:
+                if app is not None:
+                    with suppress(Exception):
+                        app.close()
+        # Do not make the returned ordinary handle inherit the initializer's
+        # exclusive lease, and never clean up a valid binding on open failure.
+        return cls.open(root)
 
     @classmethod
     def open(cls, workspace: str | Path) -> OpenedLocalWorkspace:
@@ -683,7 +670,7 @@ class LocalWorkspace:
         recover_incomplete_profile_advancement(root)
         internal = _safe_locator(root, INTERNAL_DIR)
         if (internal / INITIALIZING_MARKER).exists():
-            raise LocalWorkspaceError("WORKSPACE-PARTIAL-001", "workspace initialization is incomplete")
+            raise LocalWorkspaceError("WORKSPACE-PARTIAL-001", "workspace initialization is incomplete; run doctor for classification and the safe next operation")
         binding_path = _safe_locator(root, f"{INTERNAL_DIR}/{BINDING_NAME}")
         binding = _read_json(binding_path, code="WORKSPACE-BINDING-001")
         _validate_binding_shape(binding)
@@ -730,6 +717,33 @@ class LocalWorkspace:
 
     @classmethod
     def doctor(cls, workspace: str | Path) -> Mapping[str, Any]:
+        integrity = cls._doctor_integrity(workspace)
+        try:
+            root = _assert_safe_workspace_root(Path(workspace))
+            marker = _safe_locator(root, f"{INTERNAL_DIR}/{INITIALIZING_MARKER}", require_exists=False)
+            try:
+                marker.lstat()
+            except FileNotFoundError:
+                # A crash may precede the first intent write. Preserve the actual
+                # integrity error and add conservative guidance; absent intent is
+                # never evidence that a nonempty Workspace is disposable.
+                if integrity.get("status") != "ERROR" or not (root / INTERNAL_DIR).is_dir():
+                    return integrity
+                from .workspace_initialization import diagnose_initialization
+                diagnosis = diagnose_initialization(root, integrity)["initialization"]
+                return {**integrity, "initialization": {**diagnosis, "marker_present": False}}
+            from .workspace_initialization import diagnose_initialization
+            return diagnose_initialization(root, integrity)
+        except LocalWorkspaceError as exc:
+            return {"status": "ERROR", "checks": integrity.get("checks", []),
+                    "issues": [{"code": exc.code, "message": exc.message}]}
+        except OSError:
+            return {"status": "ERROR", "checks": integrity.get("checks", []),
+                    "issues": [{"code": "WORKSPACE-PARTIAL-001", "message": "initialization marker cannot be inspected; preserve the Workspace and resolve access/I/O"}]}
+        return integrity
+
+    @classmethod
+    def _doctor_integrity(cls, workspace: str | Path) -> Mapping[str, Any]:
         """Read-only integrity checks. Never migrate, repair, or reopen stores read/write."""
         checks: list[dict[str, Any]] = []
         try:
@@ -737,8 +751,6 @@ class LocalWorkspace:
             if not root.is_dir():
                 raise LocalWorkspaceError("WORKSPACE-MISSING-001", "workspace directory does not exist")
             internal = _safe_locator(root, INTERNAL_DIR)
-            if (internal / INITIALIZING_MARKER).exists():
-                raise LocalWorkspaceError("WORKSPACE-PARTIAL-001", "workspace initialization is incomplete")
             binding_path = _safe_locator(root, f"{INTERNAL_DIR}/{BINDING_NAME}")
             binding = _read_json(binding_path, code="WORKSPACE-BINDING-001")
             _validate_binding_shape(binding)
