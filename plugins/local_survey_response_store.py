@@ -479,6 +479,7 @@ class LocalSurveyResponseStore:
                 # A malformed retry has no canonical response for the ordinary
                 # immutable-response check below. Check its exact raw identity
                 # under the same write lock, including commits after prefetch.
+                malformed_keys: dict[tuple[str, str], None] = {}
                 for rejected in dataset["rejected_inputs"]:
                     if rejected.get("canonical_response_ref"):
                         continue
@@ -496,14 +497,25 @@ class LocalSurveyResponseStore:
                         # A later within-batch duplicate does not suppress the
                         # canonical first record, which is checked below.
                         continue
+                    malformed_keys[(namespace, response_id)] = None
+                keys = list(malformed_keys)
+                # Match the existing prefetch's conservative SQLite parameter
+                # budget, while retaining this check inside BEGIN IMMEDIATE.
+                for start in range(0, len(keys), 400):
+                    chunk = keys[start:start + 400]
+                    pairs = ",".join("(?,?)" for _ in chunk)
+                    parameters = [str(dataset["project_id"])]
+                    parameters.extend(value for key in chunk for value in key)
                     existing = connection.execute(
-                        "SELECT 1 FROM survey_responses WHERE project_id=? AND identity_namespace=? AND response_id=?",
-                        (str(dataset["project_id"]), namespace, response_id),
+                        "SELECT response_id FROM survey_responses WHERE project_id=? "
+                        f"AND (identity_namespace,response_id) IN ({pairs}) "
+                        "ORDER BY identity_namespace,response_id LIMIT 1",
+                        parameters,
                     ).fetchone()
                     if existing is not None:
                         raise LocalSurveyResponseStoreError(
                             "SURVEY_RESPONSE_DUPLICATE_RECORD",
-                            f"immutable Survey response_id already exists with different content: {response_id}",
+                            f"immutable Survey response_id already exists with different content: {existing['response_id']}",
                         )
 
             for response, raw_input in responses:

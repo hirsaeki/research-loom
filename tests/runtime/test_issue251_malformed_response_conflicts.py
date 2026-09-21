@@ -6,6 +6,7 @@ from pathlib import Path
 import tempfile
 from unittest.mock import patch
 
+from plugins.local_survey_response_store import LocalSurveyResponseStore
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade, LocalResearchApplication
 from tests.runtime import test_issue251_real_survey_batches as batches
 from tests.runtime.survey_virtual_runner_test_support import SurveyVirtualRunnerTestBase
@@ -197,5 +198,41 @@ class Issue251MalformedResponseConflictTests(SurveyVirtualRunnerTestBase):
                 self.assertEqual(replay["aggregate_result_id"], earlier["aggregate_result_id"])
                 self.assertEqual(facade.show_real_survey_intake(earlier["dataset_id"]), earlier_result)
                 self.assertEqual(facade.show_survey_response("REAL-A"), original)
+            finally:
+                app.close()
+
+    def test_many_malformed_rejections_use_bounded_write_transaction_queries(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            app, facade, _, payload = self._fixture(temp)
+            try:
+                first = facade.capture_real_survey_intake(payload)
+                source = root / payload["file"]
+                document = json.loads(source.read_text(encoding="utf-8"))
+                new_inputs = [
+                    {"identity_namespace": "real:issue221", "response_id": f"NEW-{i}", "answers": []}
+                    for i in range(801)
+                ]
+                document["responses"].extend(new_inputs + [new_inputs[-1]])
+                source.write_text(json.dumps(document), encoding="utf-8")
+                statements = []
+                original_write = LocalSurveyResponseStore._write
+
+                def traced_write(store):
+                    con = original_write(store)
+                    con.set_trace_callback(statements.append)
+                    return con
+
+                with patch.object(LocalSurveyResponseStore, "_write", traced_write):
+                    captured = facade.capture_real_survey_intake(payload)
+                queries = [q for q in statements if q.startswith("SELECT response_id FROM survey_responses")]
+                self.assertEqual(len(queries), 3)
+                self.assertFalse(any(q.startswith("SELECT 1 FROM survey_responses") for q in statements))
+                begin = statements.index("BEGIN IMMEDIATE")
+                commit = statements.index("COMMIT")
+                self.assertTrue(all(begin < statements.index(q) < commit for q in queries))
+                self.assertEqual(captured["accepted_count"], first["accepted_count"])
+                self.assertEqual(captured["rejected_count"], first["rejected_count"] + 802)
+                self.assertEqual(facade.capture_real_survey_intake(payload)["status"], "ALREADY_CAPTURED")
             finally:
                 app.close()
