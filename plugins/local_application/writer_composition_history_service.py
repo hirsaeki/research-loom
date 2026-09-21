@@ -13,6 +13,7 @@ from typing import Any, Mapping
 
 from core.runtime import canonical_digest
 from .facade import LocalApplicationError
+from .item_listing import ITEM_ERRORS, directory_page, read_mapping, unavailable
 from .writer_composition_service import (
     SCHEMA_VERSION,
     WriterCompositionService,
@@ -23,7 +24,7 @@ from .writer_composition_service import (
 )
 
 MAX_LIST_COMPOSITIONS = 64
-MAX_LIST_DIRECTORY_ENTRIES = 256
+MAX_LIST_METADATA_BYTES = 4 * 1024 * 1024
 MAX_LEGACY_VERSIONS = 64
 MAX_SELECTION_HISTORY_READ = 256
 MAX_LEGACY_SELECTION_EVENTS = 256
@@ -75,9 +76,9 @@ class WriterCompositionHistoryService(WriterCompositionService):
             raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-WRITE-001", message + "; resolve the I/O error and retry the exact capture") from exc
 
     @staticmethod
-    def _read_mapping_json(path: Path, unreadable_message: str, invalid_message: str) -> Mapping[str, Any]:
+    def _read_mapping_json(path: Path, unreadable_message: str, invalid_message: str, *, metadata_limit: int | None = None) -> Mapping[str, Any]:
         try:
-            value = json.loads(path.read_text(encoding="utf-8"))
+            value = json.loads(path.read_text(encoding="utf-8")) if metadata_limit is None else read_mapping(path, metadata_limit)
         except (OSError, UnicodeError, json.JSONDecodeError) as exc:
             raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-INTEGRITY-001", unreadable_message) from exc
         if not isinstance(value, Mapping):
@@ -199,6 +200,7 @@ class WriterCompositionHistoryService(WriterCompositionService):
         self,
         composition_id: str,
         package_cache: dict[tuple[str, str], Mapping[str, Any]] | None = None,
+        metadata_limit: int | None = None,
     ) -> Mapping[str, Any] | None:
         root = self._series_root(composition_id) / "versions"
         if not root.exists():
@@ -218,7 +220,7 @@ class WriterCompositionHistoryService(WriterCompositionService):
         if not versions:
             return None
         latest = max(versions)
-        document = self._load_version(composition_id, latest, package_cache)
+        document = self._load_version(composition_id, latest, package_cache, metadata_limit=metadata_limit)
         return {"version": latest, "digest": document["composition_digest"]}
 
     def _write_series_index(self, composition_id: str, version: int, digest: str) -> None:
@@ -234,10 +236,11 @@ class WriterCompositionHistoryService(WriterCompositionService):
         *,
         repair: bool = False,
         package_cache: dict[tuple[str, str], Mapping[str, Any]] | None = None,
+        metadata_limit: int | None = None,
     ) -> Mapping[str, Any] | None:
         index_path = self._series_index_path(composition_id)
         if not index_path.exists():
-            legacy = self._legacy_latest_version_info(composition_id, package_cache)
+            legacy = self._legacy_latest_version_info(composition_id, package_cache, metadata_limit=metadata_limit)
             if legacy is not None and repair:
                 self._write_series_index(composition_id, int(legacy["version"]), str(legacy["digest"]))
             return legacy
@@ -245,12 +248,13 @@ class WriterCompositionHistoryService(WriterCompositionService):
             index_path,
             "composition latest-version index is unreadable",
             "composition latest-version index is invalid",
+            metadata_limit=metadata_limit,
         )
         version = index.get("latest_version")
         digest = index.get("latest_digest")
         if not isinstance(version, int) or version < 1 or not isinstance(digest, str) or not digest:
             raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-INTEGRITY-001", "composition latest-version index is invalid")
-        document = self._load_version(composition_id, version, package_cache)
+        document = self._load_version(composition_id, version, package_cache, metadata_limit=metadata_limit)
         if document["composition_digest"] != digest:
             raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-INTEGRITY-001", "composition latest-version index digest mismatch")
 
@@ -258,7 +262,7 @@ class WriterCompositionHistoryService(WriterCompositionService):
         if next_path.exists():
             if self._version_path(composition_id, version + 2).exists():
                 raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-INTEGRITY-001", "composition latest-version index is behind multiple saved versions")
-            next_document = self._load_version(composition_id, version + 1, package_cache)
+            next_document = self._load_version(composition_id, version + 1, package_cache, metadata_limit=metadata_limit)
             if next_document.get("base_version") != version or next_document.get("base_digest") != digest:
                 raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-INTEGRITY-001", "unindexed composition version does not extend the indexed latest version")
             version = version + 1
@@ -349,28 +353,35 @@ class WriterCompositionHistoryService(WriterCompositionService):
             self._write_series_index(composition_id, version, str(document["composition_digest"]))
         return {"status": "CAPTURED", "composition": deepcopy(document), "selection_changed": False}
 
-    def list(self) -> Mapping[str, Any]:
-        if not self.root.exists():
-            return {"status": "OK", "compositions": [], "truncated": False}
-        entries = list(islice(self.root.iterdir(), MAX_LIST_DIRECTORY_ENTRIES + 1))
-        roots = [entry for entry in entries[:MAX_LIST_DIRECTORY_ENTRIES] if entry.is_dir()]
-        roots.sort(key=lambda path: path.name)
+    def list(self, *, limit: int = MAX_LIST_COMPOSITIONS, cursor: str | None = None) -> Mapping[str, Any]:
+        roots, next_cursor = directory_page(
+            self.root, project_id=self.facade.project_id, kind="writer-composition",
+            limit=limit, maximum=MAX_LIST_COMPOSITIONS, cursor=cursor,
+        )
         rows = []
         package_cache: dict[tuple[str, str], Mapping[str, Any]] = {}
-        for root in roots[:MAX_LIST_COMPOSITIONS]:
-            latest_info = self._latest_version_info(root.name, package_cache=package_cache)
-            if latest_info is None:
-                continue
-            latest_version = int(latest_info["version"])
-            latest = self._load_version(root.name, latest_version, package_cache)
-            rows.append({"composition_id": root.name, "latest_version": latest_version, "latest_digest": latest["composition_digest"], "source": latest["source"], "selected": self._selected(root.name, package_cache)})
-        return {
-            "status": "OK",
-            "compositions": rows,
-            "truncated": len(entries) > MAX_LIST_DIRECTORY_ENTRIES or len(roots) > MAX_LIST_COMPOSITIONS,
-        }
+        for root in roots:
+            try:
+                if root.is_symlink() or (hasattr(root, "is_junction") and root.is_junction()):
+                    raise LocalApplicationError("APPLICATION-LIST-UNSAFE-PATH-001", "linked composition paths are not read")
+                latest_info = self._latest_version_info(root.name, package_cache=package_cache, metadata_limit=MAX_LIST_METADATA_BYTES)
+                if latest_info is None:
+                    raise FileNotFoundError("composition history is missing")
+                latest_version = int(latest_info["version"])
+                latest = self._load_version(root.name, latest_version, package_cache, metadata_limit=MAX_LIST_METADATA_BYTES)
+                if latest["source"]["project_id"] != self.facade.project_id:
+                    continue
+                rows.append({"composition_id": root.name, "latest_version": latest_version,
+                             "latest_digest": latest["composition_digest"], "source": latest["source"],
+                             "selected": self._selected(root.name, package_cache, metadata_limit=MAX_LIST_METADATA_BYTES),
+                             "availability": "AVAILABLE", "verification_scope": "METADATA_ONLY"})
+            except ITEM_ERRORS as exc:
+                rows.append(unavailable("composition_id", root.name, exc))
+        return {"status": "OK", "compositions": rows, "project_id": self.facade.project_id,
+                "truncated": next_cursor is not None, "next_cursor": next_cursor,
+                "limit": limit, "scanned_items": len(roots)}
 
-    def _legacy_selection(self, composition_id: str) -> Mapping[str, Any] | None:
+    def _legacy_selection(self, composition_id: str, metadata_limit: int | None = None) -> Mapping[str, Any] | None:
         path = self._series_root(composition_id) / "selection.json"
         if not path.exists():
             return None
@@ -378,6 +389,7 @@ class WriterCompositionHistoryService(WriterCompositionService):
             path,
             "composition selection history is unreadable",
             "legacy composition selection history is invalid",
+            metadata_limit=metadata_limit,
         )
         selected = value.get("selected")
         history = value.get("history")
@@ -389,7 +401,7 @@ class WriterCompositionHistoryService(WriterCompositionService):
             raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-INTEGRITY-001", "legacy composition selection pointer does not match its history")
         return {"selected": deepcopy(dict(selected)), "history": [deepcopy(dict(event)) for event in history]}
 
-    def _selection_event(self, composition_id: str, sequence: int, package_cache: dict[tuple[str, str], Mapping[str, Any]] | None = None) -> Mapping[str, Any]:
+    def _selection_event(self, composition_id: str, sequence: int, package_cache: dict[tuple[str, str], Mapping[str, Any]] | None = None, metadata_limit: int | None = None) -> Mapping[str, Any]:
         path = self._selection_event_path(composition_id, sequence)
         if not path.is_file():
             raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-INTEGRITY-001", "composition selection event is missing")
@@ -397,6 +409,7 @@ class WriterCompositionHistoryService(WriterCompositionService):
             path,
             "composition selection event is unreadable",
             "composition selection event is invalid",
+            metadata_limit=metadata_limit,
         )
         if event.get("sequence") != sequence or _digest_document(event, "event_digest") != event.get("event_digest"):
             raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-INTEGRITY-001", "composition selection event integrity check failed")
@@ -404,7 +417,7 @@ class WriterCompositionHistoryService(WriterCompositionService):
         digest = event.get("digest")
         if not isinstance(version, int) or version < 1 or not isinstance(digest, str) or not isinstance(event.get("selected_at"), str):
             raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-INTEGRITY-001", "composition selection event is invalid")
-        document = self._load_version(composition_id, version, package_cache)
+        document = self._load_version(composition_id, version, package_cache, metadata_limit=metadata_limit)
         if document["composition_digest"] != digest:
             raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-INTEGRITY-001", "composition selection event digest no longer resolves")
         return event
@@ -427,10 +440,11 @@ class WriterCompositionHistoryService(WriterCompositionService):
         *,
         repair: bool = False,
         package_cache: dict[tuple[str, str], Mapping[str, Any]] | None = None,
+        metadata_limit: int | None = None,
     ) -> Mapping[str, Any] | None:
         state_path = self._selection_state_path(composition_id)
         if not state_path.exists():
-            legacy = self._legacy_selection(composition_id)
+            legacy = self._legacy_selection(composition_id, metadata_limit=metadata_limit)
             legacy_count = len(legacy["history"]) if legacy is not None else 0
             next_sequence = legacy_count + 1
             next_path = self._selection_event_path(composition_id, next_sequence)
@@ -438,13 +452,13 @@ class WriterCompositionHistoryService(WriterCompositionService):
                 if legacy is None:
                     return None
                 selected = legacy["selected"]
-                document = self._load_version(composition_id, int(selected["version"]), package_cache)
+                document = self._load_version(composition_id, int(selected["version"]), package_cache, metadata_limit=metadata_limit)
                 if document["composition_digest"] != selected.get("digest"):
                     raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-INTEGRITY-001", "legacy composition selection digest no longer resolves")
                 return {"selected": selected, "event_count": legacy_count, "legacy_event_count": legacy_count}
             if self._selection_event_path(composition_id, next_sequence + 1).exists():
                 raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-INTEGRITY-001", "composition selection state is missing behind multiple events")
-            event = self._selection_event(composition_id, next_sequence, package_cache)
+            event = self._selection_event(composition_id, next_sequence, package_cache, metadata_limit=metadata_limit)
             if repair:
                 self._write_selection_state(composition_id, event, legacy_count)
             return {"selected": event, "event_count": next_sequence, "legacy_event_count": legacy_count}
@@ -452,6 +466,7 @@ class WriterCompositionHistoryService(WriterCompositionService):
             state_path,
             "composition selection state is unreadable",
             "composition selection state is invalid",
+            metadata_limit=metadata_limit,
         )
         event_count = state.get("event_count")
         legacy_count = state.get("legacy_event_count")
@@ -464,21 +479,21 @@ class WriterCompositionHistoryService(WriterCompositionService):
             or not isinstance(selected, Mapping)
         ):
             raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-INTEGRITY-001", "composition selection state is invalid")
-        current = self._selection_event(composition_id, event_count, package_cache)
+        current = self._selection_event(composition_id, event_count, package_cache, metadata_limit=metadata_limit)
         if dict(current) != dict(selected):
             raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-INTEGRITY-001", "composition selection state does not match its latest event")
         next_path = self._selection_event_path(composition_id, event_count + 1)
         if next_path.exists():
             if self._selection_event_path(composition_id, event_count + 2).exists():
                 raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-INTEGRITY-001", "composition selection state is behind multiple events")
-            current = self._selection_event(composition_id, event_count + 1, package_cache)
+            current = self._selection_event(composition_id, event_count + 1, package_cache, metadata_limit=metadata_limit)
             event_count += 1
             if repair:
                 self._write_selection_state(composition_id, current, legacy_count)
         return {"selected": current, "event_count": event_count, "legacy_event_count": legacy_count}
 
-    def _selected(self, composition_id: str, package_cache: dict[tuple[str, str], Mapping[str, Any]] | None = None) -> Mapping[str, Any] | None:
-        state = self._selection_state(composition_id, package_cache=package_cache)
+    def _selected(self, composition_id: str, package_cache: dict[tuple[str, str], Mapping[str, Any]] | None = None, metadata_limit: int | None = None) -> Mapping[str, Any] | None:
+        state = self._selection_state(composition_id, package_cache=package_cache, metadata_limit=metadata_limit)
         return deepcopy(dict(state["selected"])) if state is not None else None
 
     def _selection(self, composition_id: str) -> Mapping[str, Any] | None:

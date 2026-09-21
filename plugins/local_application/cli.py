@@ -205,6 +205,8 @@ def build_parser() -> argparse.ArgumentParser:
     _add_input_json(research_package_build)
     research_package_list = research_package_sub.add_parser("list")
     _add_workspace(research_package_list)
+    research_package_list.add_argument("--limit", type=int, default=100)
+    research_package_list.add_argument("--cursor")
     _add_output_json(research_package_list)
     research_package_show = research_package_sub.add_parser("show")
     _add_workspace(research_package_show)
@@ -227,6 +229,8 @@ def build_parser() -> argparse.ArgumentParser:
     _add_input_json(wc_capture)
     wc_list = writer_composition_sub.add_parser("list")
     _add_workspace(wc_list)
+    wc_list.add_argument("--limit", type=int, default=64)
+    wc_list.add_argument("--cursor")
     _add_output_json(wc_list)
     wc_show = writer_composition_sub.add_parser("show")
     _add_workspace(wc_show)
@@ -560,7 +564,7 @@ def _run(args: argparse.Namespace) -> Mapping[str, Any]:
             if args.research_package_command == "build":
                 return facade.build_research_package(_read_input(args.json_input))
             if args.research_package_command == "list":
-                return facade.list_research_packages()
+                return facade.list_research_packages(limit=args.limit, cursor=args.cursor)
             if args.research_package_command == "show":
                 return facade.show_research_package(args.package_id)
             if args.research_package_command == "export":
@@ -569,7 +573,7 @@ def _run(args: argparse.Namespace) -> Mapping[str, Any]:
             if args.writer_composition_command == "capture":
                 return facade.capture_writer_composition(args.package_id, _read_input(args.json_input))
             if args.writer_composition_command == "list":
-                return facade.list_writer_compositions()
+                return facade.list_writer_compositions(limit=args.limit, cursor=args.cursor)
             if args.writer_composition_command == "show":
                 return facade.show_writer_composition(args.composition_id, args.version)
             if args.writer_composition_command == "diff":

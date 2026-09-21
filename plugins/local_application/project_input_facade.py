@@ -297,8 +297,8 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
     def build_research_package(self, value: Mapping[str, Any]) -> Mapping[str, Any]:
         return self._research_package_service().build(value)
 
-    def list_research_packages(self) -> Mapping[str, Any]:
-        return self._research_package_service().list()
+    def list_research_packages(self, *, limit: int = 100, cursor: str | None = None) -> Mapping[str, Any]:
+        return self._research_package_service().list(limit=limit, cursor=cursor)
 
     def show_research_package(self, package_id: str) -> Mapping[str, Any]:
         return self._research_package_service().show(package_id)
@@ -313,8 +313,8 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
     def capture_writer_composition(self, package_id: str, value: Mapping[str, Any]) -> Mapping[str, Any]:
         return self._writer_composition_service().capture(package_id, value)
 
-    def list_writer_compositions(self) -> Mapping[str, Any]:
-        return self._writer_composition_service().list()
+    def list_writer_compositions(self, *, limit: int = 64, cursor: str | None = None) -> Mapping[str, Any]:
+        return self._writer_composition_service().list(limit=limit, cursor=cursor)
 
     def show_writer_composition(self, composition_id: str, version: int) -> Mapping[str, Any]:
         return self._writer_composition_service().show(composition_id, version)
