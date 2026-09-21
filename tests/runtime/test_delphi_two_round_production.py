@@ -17,11 +17,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def make_app(root: str | Path, *, decisions_override: list[dict] | None = None) -> LocalResearchApplication:
-    decisions = decisions_override or [
-        decision("DEC-DL-I1", "research_revision", "approve", "instrument", "DLI-R1"),
-        decision("DEC-DL-I2", "research_revision", "approve", "instrument", "DLI-R2"),
-        decision("DEC-DL-R2", "research_revision", "revise", "instrument", "DLI-R2"),
-    ]
+    decisions = [] if decisions_override is None else decisions_override
     seed = seed_state(
         objects=[project(), rq(state="approved")],
         decisions=decisions,
@@ -118,6 +114,12 @@ def instrument(
             "text": "AI delegation should remain bounded.",
             "item_type": "statement",
             "response_modes": response_modes or ["rating", "free_text_rationale"],
+            "response_scales": {
+                mode: {"scale_id": "likert5" if mode == "rating" else mode,
+                       "minimum": 1 if mode == "rating" else 0, "maximum": 5 if mode == "rating" else 1}
+                for mode in (response_modes or ["rating", "free_text_rationale"])
+                if mode in ("rating", "probability", "confidence")
+            },
             "traceability": {"research_question_ids": ["RQ-1"]},
             "controlled_feedback": {} if not round2 else {"feedback_id": feedback_id, "feedback_digest": feedback_digest},
             "lineage": {"lifecycle": "new"} if not round2 else {"prior_item_id": "ITEM-1", "prior_item_revision": 1},
@@ -151,6 +153,19 @@ def response(
     }
 
 
+def approve_instrument(facade, payload):
+    """Public request/human response only; no approval records are seeded."""
+    request = facade.request_delphi_instrument_approval({**payload, "human_actor_id": "operator"})
+    result = facade.resolve_delphi_instrument_approval({
+        "request_id": request["request_id"], "request_digest": request["request_digest"],
+        "actor": {"actor_id": "operator", "actor_type": "human"}, "choice": "approve_exact",
+    })
+    instrument = payload["instrument"]
+    instrument.clear()
+    instrument.update(deepcopy(request["request"]["target_document"]["instrument"]))
+    return result
+
+
 class DelphiTwoRoundProductionTests(unittest.TestCase):
     def test_two_round_vertical_slice_preserves_lineage_dissent_attrition_and_authority_boundary(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -162,7 +177,7 @@ class DelphiTwoRoundProductionTests(unittest.TestCase):
                 self.assertEqual(captured_design["status"], "CAPTURED")
 
                 r1i = instrument(1)
-                facade.capture_delphi_instrument({
+                approve_instrument(facade, {
                     "delphi_design_id": "DLD-1", "delphi_design_version": "1.0.0",
                     "panel_id": "PANEL-1", "instrument": r1i,
                 })
@@ -192,7 +207,7 @@ class DelphiTwoRoundProductionTests(unittest.TestCase):
                 self.assertEqual(repeated_feedback["status"], "ALREADY_CAPTURED")
 
                 r2i = instrument(2, feedback_id=feedback["feedback_id"], feedback_digest=feedback["content_digest"])
-                facade.capture_delphi_instrument({
+                approve_instrument(facade, {
                     "delphi_design_id": "DLD-1", "delphi_design_version": "1.0.0",
                     "panel_id": "PANEL-1", "instrument": r2i,
                     "derived_from": {
@@ -246,7 +261,7 @@ class DelphiTwoRoundProductionTests(unittest.TestCase):
                 facade = LocalApplicationFacade(app, "PRJ-1")
                 facade.capture_delphi_design({"rq_ids": ["RQ-1"], "panel_id": "PANEL-1", "design": design()})
                 r1i = instrument(1)
-                facade.capture_delphi_instrument({
+                approve_instrument(facade, {
                     "delphi_design_id": "DLD-1", "delphi_design_version": "1.0.0",
                     "panel_id": "PANEL-1", "instrument": r1i,
                 })
@@ -320,7 +335,7 @@ class DelphiTwoRoundProductionTests(unittest.TestCase):
                 facade.capture_delphi_design({"rq_ids": ["RQ-1"], "panel_id": "PANEL-1", "design": design()})
 
                 rating_only = instrument(1)
-                facade.capture_delphi_instrument({
+                approve_instrument(facade, {
                     "delphi_design_id": "DLD-1", "delphi_design_version": "1.0.0",
                     "panel_id": "PANEL-1", "instrument": rating_only,
                 })
@@ -342,7 +357,7 @@ class DelphiTwoRoundProductionTests(unittest.TestCase):
                 facade.capture_delphi_design({"rq_ids": ["RQ-1"], "panel_id": "PANEL-1", "design": design()})
                 modes = ["rating", "probability", "free_text_rationale"]
                 r1i = instrument(1, response_modes=modes)
-                facade.capture_delphi_instrument({
+                approve_instrument(facade, {
                     "delphi_design_id": "DLD-1", "delphi_design_version": "1.0.0",
                     "panel_id": "PANEL-1", "instrument": r1i,
                 })
@@ -357,7 +372,7 @@ class DelphiTwoRoundProductionTests(unittest.TestCase):
                     2, response_modes=modes,
                     feedback_id=feedback["feedback_id"], feedback_digest=feedback["content_digest"],
                 )
-                facade.capture_delphi_instrument({
+                approve_instrument(facade, {
                     "delphi_design_id": "DLD-1", "delphi_design_version": "1.0.0",
                     "panel_id": "PANEL-1", "instrument": r2i,
                     "derived_from": {
@@ -391,7 +406,7 @@ class DelphiTwoRoundProductionTests(unittest.TestCase):
                 r1a = instrument(1, version="1.0.0")
                 r1b = instrument(1, version="1.1.0")
                 for row in (r1a, r1b):
-                    facade.capture_delphi_instrument({
+                    approve_instrument(facade, {
                         "delphi_design_id": "DLD-1", "delphi_design_version": "1.0.0",
                         "panel_id": "PANEL-1", "instrument": row,
                     })

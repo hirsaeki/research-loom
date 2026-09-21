@@ -10,6 +10,7 @@ from typing import Any, Mapping
 from core.conversation import ConversationRuntimeError
 from core.decision import HumanDecisionError
 from plugins.local_durable_store import OptionalDurableStoreError
+from plugins.local_delphi_store import LocalDelphiStoreError
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade
 from plugins.local_application.application import ATTENTION_STORE_NAME
 from plugins.local_application.workspace import LocalWorkspaceError
@@ -346,6 +347,14 @@ def build_parser() -> argparse.ArgumentParser:
     delphi_instrument_capture = delphi_instrument_sub.add_parser("capture")
     _add_workspace(delphi_instrument_capture)
     _add_input_json(delphi_instrument_capture)
+    for command in ("approval-request", "approval-resolve"):
+        approval_parser = delphi_instrument_sub.add_parser(command)
+        _add_workspace(approval_parser)
+        _add_input_json(approval_parser)
+    delphi_approval_show = delphi_instrument_sub.add_parser("approval-show")
+    _add_workspace(delphi_approval_show)
+    delphi_approval_show.add_argument("--request-id", required=True)
+    _add_output_json(delphi_approval_show)
     delphi_instrument_show = delphi_instrument_sub.add_parser("show")
     _add_workspace(delphi_instrument_show)
     delphi_instrument_show.add_argument("--instrument-id", required=True)
@@ -360,13 +369,21 @@ def build_parser() -> argparse.ArgumentParser:
     delphi_round_show = delphi_round_sub.add_parser("show")
     _add_workspace(delphi_round_show)
     delphi_round_show.add_argument("--round-result-id", required=True)
+    delphi_round_show.add_argument("--version", default="1")
     _add_output_json(delphi_round_show)
+
+    delphi_round_recalculate = delphi_round_sub.add_parser("recalculate")
+    _add_workspace(delphi_round_recalculate)
+    delphi_round_recalculate.add_argument("--round-result-id", required=True)
+    delphi_round_recalculate.add_argument("--version", default="1")
+    _add_output_json(delphi_round_recalculate)
 
     delphi_feedback = delphi_sub.add_parser("feedback")
     delphi_feedback_sub = delphi_feedback.add_subparsers(dest="delphi_feedback_command", required=True)
     delphi_feedback_build = delphi_feedback_sub.add_parser("build")
     _add_workspace(delphi_feedback_build)
     delphi_feedback_build.add_argument("--round-result-id", required=True)
+    delphi_feedback_build.add_argument("--version", default="1")
     _add_output_json(delphi_feedback_build)
     delphi_feedback_show = delphi_feedback_sub.add_parser("show")
     _add_workspace(delphi_feedback_show)
@@ -376,6 +393,8 @@ def build_parser() -> argparse.ArgumentParser:
     delphi_inspect = delphi_sub.add_parser("inspect")
     _add_workspace(delphi_inspect)
     delphi_inspect.add_argument("--panel-id", required=True)
+    delphi_inspect.add_argument("--limit", type=int, default=25)
+    delphi_inspect.add_argument("--offset", type=int, default=0)
     _add_output_json(delphi_inspect)
 
     delphi_stopping = delphi_sub.add_parser("stopping")
@@ -383,6 +402,8 @@ def build_parser() -> argparse.ArgumentParser:
     delphi_stopping_build = delphi_stopping_sub.add_parser("build")
     _add_workspace(delphi_stopping_build)
     delphi_stopping_build.add_argument("--panel-id", required=True)
+    delphi_stopping_build.add_argument("--round-result-id")
+    delphi_stopping_build.add_argument("--version")
     _add_output_json(delphi_stopping_build)
     delphi_stopping_show = delphi_stopping_sub.add_parser("show")
     _add_workspace(delphi_stopping_show)
@@ -591,6 +612,12 @@ def _run(args: argparse.Namespace) -> Mapping[str, Any]:
                 if args.delphi_design_command == "show":
                     return facade.show_delphi_design(args.delphi_design_id, args.version)
             if args.delphi_command == "instrument":
+                if args.delphi_instrument_command == "approval-request":
+                    return facade.request_delphi_instrument_approval(_read_input(args.json_input))
+                if args.delphi_instrument_command == "approval-resolve":
+                    return facade.resolve_delphi_instrument_approval(_read_input(args.json_input))
+                if args.delphi_instrument_command == "approval-show":
+                    return facade.show_delphi_instrument_approval(args.request_id)
                 if args.delphi_instrument_command == "capture":
                     return facade.capture_delphi_instrument(_read_input(args.json_input))
                 if args.delphi_instrument_command == "show":
@@ -599,17 +626,19 @@ def _run(args: argparse.Namespace) -> Mapping[str, Any]:
                 if args.delphi_round_command == "capture":
                     return facade.capture_delphi_round(_read_input(args.json_input))
                 if args.delphi_round_command == "show":
-                    return facade.show_delphi_round(args.round_result_id)
+                    return facade.show_delphi_round(args.round_result_id, args.version)
+                if args.delphi_round_command == "recalculate":
+                    return facade.recalculate_delphi_round(args.round_result_id, args.version)
             if args.delphi_command == "feedback":
                 if args.delphi_feedback_command == "build":
-                    return facade.build_delphi_feedback(args.round_result_id)
+                    return facade.build_delphi_feedback(args.round_result_id, args.version)
                 if args.delphi_feedback_command == "show":
                     return facade.show_delphi_feedback(args.feedback_id)
             if args.delphi_command == "inspect":
-                return facade.inspect_delphi_panel(args.panel_id)
+                return facade.inspect_delphi_panel(args.panel_id, limit=args.limit, offset=args.offset)
             if args.delphi_command == "stopping":
                 if args.delphi_stopping_command == "build":
-                    return facade.build_delphi_stopping_candidate(args.panel_id)
+                    return facade.build_delphi_stopping_candidate(args.panel_id, round_result_id=args.round_result_id, version=args.version)
                 if args.delphi_stopping_command == "show":
                     return facade.show_delphi_stopping_candidate(args.stopping_candidate_id)
         if args.command == "survey":
@@ -707,7 +736,7 @@ def main(argv: list[str] | None = None) -> int:
         else:
             _emit(result)
         return 1 if result.get("status") == "ERROR" else 0
-    except (LocalWorkspaceError, LocalApplicationError, ConversationRuntimeError, HumanDecisionError, OptionalDurableStoreError) as exc:
+    except (LocalWorkspaceError, LocalApplicationError, ConversationRuntimeError, HumanDecisionError, OptionalDurableStoreError, LocalDelphiStoreError) as exc:
         _emit({
             "status": "ERROR",
             "issues": [{"code": str(exc.code), "message": str(exc.message)}],

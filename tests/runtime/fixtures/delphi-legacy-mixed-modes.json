@@ -1,0 +1,364 @@
+{
+  "source_commit": "b303851f637e0feb8dba46fb528bed13fd13b953",
+  "purpose": "Synthetic legacy Delphi documents from the unmodified production path; tests restore these records, never infer missing approval facts.",
+  "observed_before_fix": {
+    "old_id_only_approval_on_changed_version": "CAPTURED",
+    "mixed_median": 2.9,
+    "mixed_explicit_disagreement": true,
+    "late_response_error": "DELPHI-STORE-CONFLICT-001"
+  },
+  "documents": [
+    {
+      "captured_against": {
+        "lineage_ref": "LIN-1",
+        "snapshot_digest": "sha256:fd6627456f839a9d89b1b96cb1649e19aac0e53454fdc2d96c18faed09f05e66",
+        "snapshot_ref": "SNP-DL-0"
+      },
+      "content_digest": "sha256:c35a5d891356d0d37854ffe4685c3e1a54a6c4bb7afa132038ef397e127cf827",
+      "created_at": "2026-09-21T07:43:53.194479Z",
+      "design": {
+        "candidate_only": true,
+        "conflict_of_interest": {
+          "capture": true
+        },
+        "content_digest": "sha256:c35a5d891356d0d37854ffe4685c3e1a54a6c4bb7afa132038ef397e127cf827",
+        "coverage_dimensions": [
+          "governance"
+        ],
+        "delphi_design_id": "DLD-1",
+        "facilitator_boundary": {
+          "facilitator_role": "summarize",
+          "may_modify_panel_responses": false,
+          "researcher_role": "inspect"
+        },
+        "identity_policy": {
+          "cross_round_linkage": true,
+          "identity_disclosure_policy": "researcher_only",
+          "mode": "pseudonymous"
+        },
+        "method_design_ref": {
+          "method_id": "METHOD-DL-1"
+        },
+        "panel_change_policy": {
+          "late_join": "record",
+          "replacement": "record"
+        },
+        "panel_population": {
+          "definition": "fixture experts",
+          "unit_of_analysis": "expert judgement"
+        },
+        "participation_targets": {
+          "minimum_viable_participation": 1,
+          "target_is_research_sufficiency": false,
+          "target_panel_size": 3
+        },
+        "planned_rounds": {
+          "maximum_approved_rounds": 2,
+          "minimum_rounds": 2,
+          "round_plan": [
+            {
+              "sequence": 1
+            },
+            {
+              "sequence": 2
+            }
+          ]
+        },
+        "purpose": {
+          "intended_use": "two-round fixture",
+          "target_question": "What remains contested?"
+        },
+        "representativeness": {
+          "assumptions": [
+            "fixture only"
+          ],
+          "limitations": [
+            "small panel"
+          ]
+        },
+        "schema_version": "0.1.0",
+        "selection": {
+          "exclusion_criteria": [
+            "none"
+          ],
+          "inclusion_criteria": [
+            "fixture panel"
+          ],
+          "selection_criteria": [
+            "relevant expertise"
+          ]
+        },
+        "stopping": {
+          "consensus_goal": {
+            "maximum_disagreement_item_count": 0
+          },
+          "criteria": [
+            "stability",
+            "disagreement",
+            "approved_round_limit"
+          ],
+          "no_universal_numeric_threshold": true,
+          "stability_goal": {
+            "minimum_ratio": 0.75
+          },
+          "stopping_is_research_completion": false
+        },
+        "version": "1.0.0"
+      },
+      "document_kind": "design",
+      "identity": "DLD-1",
+      "panel_id": "PANEL-1",
+      "project_id": "PRJ-1",
+      "registry_digest": "sha256:74a8171fa0e240eceb7849255951c83696df286a6536bdfd30b704f1195da5cf",
+      "round_sequence": null,
+      "rq_ids": [
+        "RQ-1"
+      ],
+      "schema_version": "0.1.0",
+      "version": "1.0.0"
+    },
+    {
+      "captured_against": {
+        "lineage_ref": "LIN-1",
+        "snapshot_digest": "sha256:fd6627456f839a9d89b1b96cb1649e19aac0e53454fdc2d96c18faed09f05e66",
+        "snapshot_ref": "SNP-DL-0"
+      },
+      "content_digest": "sha256:d843b28f7045a6ab299a04d5f9577a286fe0619aee20ba2cb29527d926e82823",
+      "created_at": "2026-09-21T07:43:53.197660Z",
+      "derived_from": null,
+      "design_ref": {
+        "content_digest": "sha256:c35a5d891356d0d37854ffe4685c3e1a54a6c4bb7afa132038ef397e127cf827",
+        "delphi_design_id": "DLD-1",
+        "version": "1.0.0"
+      },
+      "document_kind": "instrument",
+      "identity": "DLI-R1",
+      "instrument": {
+        "approval_decision_id": "DEC-DL-I1",
+        "approval_status": "approved",
+        "content_digest": "sha256:d843b28f7045a6ab299a04d5f9577a286fe0619aee20ba2cb29527d926e82823",
+        "instrument_id": "DLI-R1",
+        "items": [
+          {
+            "controlled_feedback": {},
+            "item_id": "ITEM-1",
+            "item_revision": 1,
+            "item_type": "statement",
+            "lineage": {
+              "lifecycle": "new"
+            },
+            "response_modes": [
+              "rating",
+              "probability",
+              "free_text_rationale"
+            ],
+            "response_scales": {
+              "probability": {
+                "maximum": 1,
+                "minimum": 0,
+                "scale_id": "probability"
+              },
+              "rating": {
+                "maximum": 5,
+                "minimum": 1,
+                "scale_id": "likert5"
+              }
+            },
+            "text": "AI delegation should remain bounded.",
+            "traceability": {
+              "research_question_ids": [
+                "RQ-1"
+              ]
+            }
+          }
+        ],
+        "material_revision": false,
+        "object_type": "delphi_round_instrument",
+        "retired_item_ids": [],
+        "revision_changes": [],
+        "round_sequence": 1,
+        "schema_version": "0.1.0",
+        "version": "1.0.0"
+      },
+      "panel_id": "PANEL-1",
+      "project_id": "PRJ-1",
+      "registry_digest": "sha256:d30e85c0074c0a8438202297f892087f792cc8338192699c0ccc1ef063037c68",
+      "round_sequence": 1,
+      "schema_version": "0.1.0",
+      "version": "1.0.0"
+    },
+    {
+      "analysis": {
+        "attrited_participant_ids": [],
+        "attrition_count": 0,
+        "changed_opinion_count": 0,
+        "comparable_opinion_count": 0,
+        "expected_participant_count": 3,
+        "explicit_disagreement_item_count": 1,
+        "late_join_count": 0,
+        "late_joined_participant_ids": [],
+        "missing_participant_ids": [
+          "P3"
+        ],
+        "missing_response_count": 1,
+        "opinion_changes": [],
+        "stability_ratio": null,
+        "submitted_response_count": 2
+      },
+      "candidate_only": true,
+      "content_digest": "sha256:3d25eb2f72bd6a2cddb2ea7de0138ab1f8417f798a5f8ab46a6f5d320b2aed8f",
+      "created_at": "2026-09-21T07:43:53.201610Z",
+      "document_kind": "round",
+      "expected_participant_ids": [
+        "P1",
+        "P2",
+        "P3"
+      ],
+      "identity": "DLR-PANEL-1-R1",
+      "instrument_ref": {
+        "content_digest": "sha256:d843b28f7045a6ab299a04d5f9577a286fe0619aee20ba2cb29527d926e82823",
+        "instrument_id": "DLI-R1",
+        "version": "1.0.0"
+      },
+      "item_analysis": [
+        {
+          "answered_count": 2,
+          "explicit_disagreement": true,
+          "item_id": "ITEM-1",
+          "item_revision": 1,
+          "missing_states": {
+            "missing": 0,
+            "not_applicable": 0,
+            "prefer_not_to_answer": 0
+          },
+          "numeric_summary": {
+            "distinct_count": 2,
+            "maximum": 5.0,
+            "median": 2.9,
+            "minimum": 0.8
+          },
+          "positions": [
+            {
+              "minority": true,
+              "participant_id": "P1",
+              "value": 5.0
+            },
+            {
+              "minority": true,
+              "participant_id": "P2",
+              "value": 0.8
+            }
+          ],
+          "rationales": [
+            {
+              "participant_id": "P1",
+              "rationale": "rating opinion"
+            },
+            {
+              "participant_id": "P2",
+              "rationale": "probability opinion"
+            }
+          ],
+          "submitted_response_count": 2
+        }
+      ],
+      "panel_id": "PANEL-1",
+      "project_id": "PRJ-1",
+      "registry_digest": "sha256:71e4fcef21307a2951b51f33715f75fbfe260b589761dc498fe7de8dbaa3c897",
+      "research_state_mutation_performed": false,
+      "responses": [
+        {
+          "answers": [
+            {
+              "item_id": "ITEM-1",
+              "item_revision": 1,
+              "rating": 5,
+              "rationale": "rating opinion",
+              "state": "answered"
+            }
+          ],
+          "binding": {
+            "instrument_digest": "sha256:d843b28f7045a6ab299a04d5f9577a286fe0619aee20ba2cb29527d926e82823",
+            "instrument_id": "DLI-R1",
+            "instrument_version": "1.0.0",
+            "panel_id": "PANEL-1",
+            "round_sequence": 1
+          },
+          "participant_id": "P1",
+          "response_id": "R1-P1"
+        },
+        {
+          "answers": [
+            {
+              "item_id": "ITEM-1",
+              "item_revision": 1,
+              "probability": 0.8,
+              "rationale": "probability opinion",
+              "state": "answered"
+            }
+          ],
+          "binding": {
+            "instrument_digest": "sha256:d843b28f7045a6ab299a04d5f9577a286fe0619aee20ba2cb29527d926e82823",
+            "instrument_id": "DLI-R1",
+            "instrument_version": "1.0.0",
+            "panel_id": "PANEL-1",
+            "round_sequence": 1
+          },
+          "participant_id": "P2",
+          "response_id": "R1-P2"
+        }
+      ],
+      "round_sequence": 1,
+      "schema_version": "0.1.0",
+      "version": "1"
+    },
+    {
+      "candidate_only": true,
+      "content_digest": "sha256:f9bc45b8fe40e879d2348996543ad270acb67167587d14b6b4a6a3d7e058b815",
+      "created_at": "2026-09-21T07:43:53.202978Z",
+      "document_kind": "feedback",
+      "identity": "DLF-f9bc45b8fe40e879d2348996",
+      "immutable": true,
+      "panel_id": "PANEL-1",
+      "project_id": "PRJ-1",
+      "registry_digest": "sha256:f4d6121f8463b067246d5961258dd7644a97c8c9ea239ca7c2f7c0a215899e39",
+      "round_sequence": 1,
+      "schema_version": "0.1.0",
+      "source_analysis_digest": "sha256:ec38d8115b78b6f1292e8cfae4dc68c1ff5a8db9d3dcb72f1b77ca3fbe2198a6",
+      "source_round_result_digest": "sha256:3d25eb2f72bd6a2cddb2ea7de0138ab1f8417f798a5f8ab46a6f5d320b2aed8f",
+      "source_round_result_id": "DLR-PANEL-1-R1",
+      "summaries": [
+        {
+          "answered_count": 2,
+          "explicit_disagreement": true,
+          "item_id": "ITEM-1",
+          "item_revision": 1,
+          "minority_positions": [
+            {
+              "value": 5.0
+            },
+            {
+              "value": 0.8
+            }
+          ],
+          "missing_states": {
+            "missing": 0,
+            "not_applicable": 0,
+            "prefer_not_to_answer": 0
+          },
+          "numeric_summary": {
+            "distinct_count": 2,
+            "maximum": 5.0,
+            "median": 2.9,
+            "minimum": 0.8
+          },
+          "rationales": [
+            "rating opinion",
+            "probability opinion"
+          ]
+        }
+      ],
+      "version": "1"
+    }
+  ]
+}
