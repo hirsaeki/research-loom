@@ -296,7 +296,7 @@ class LocalDelphiStore:
                 prior = self._decode(previous)
                 new_responses = {entry["response_id"]: entry for entry in document["responses"]}
                 if (prior["instrument_ref"] != document["instrument_ref"]
-                    or not set(prior["expected_participant_ids"]) <= set(document["expected_participant_ids"])
+                    or set(prior["expected_participant_ids"]) != set(document["expected_participant_ids"])
                     or any(new_responses.get(entry["response_id"]) != entry for entry in prior["responses"])):
                     raise LocalDelphiStoreError("DELPHI-STORE-CONFLICT-001", "late-response revision must preserve earlier answers and expected participants")
             latest = con.execute(

@@ -59,11 +59,11 @@ def _median(values):
     return low + (high - low) / 2 if (low >= 0 or high <= 0) else low / 2 + high / 2
 
 
-def _item_analysis(item, responses):
+def _item_analysis(item, responses, answer_maps):
     answered = []
     missing = {state: 0 for state in MISSING_STATES}
-    for response in responses:
-        answer = next(a for a in response["answers"] if a["item_id"] == item["item_id"])
+    for response, answers in zip(responses, answer_maps):
+        answer = answers[item["item_id"]]
         if answer["state"] == "answered":
             answered.append((response["participant_id"], answer))
         else:
@@ -113,7 +113,8 @@ def _item_analysis(item, responses):
 
 def analyze_round(instrument, responses, expected, *, prior_round=None, prior_instrument=None):
     items = {item["item_id"]: item for item in instrument["items"]}
-    summaries = [_item_analysis(item, responses) for item in items.values()]
+    answer_maps = [{answer["item_id"]: answer for answer in response["answers"]} for response in responses]
+    summaries = [_item_analysis(item, responses, answer_maps) for item in items.values()]
     current_ids = {response["participant_id"] for response in responses}
     prior_responses = {} if prior_round is None else {row["participant_id"]: row for row in prior_round["responses"]}
     prior_items = {} if prior_instrument is None else {item["item_id"]: item for item in prior_instrument["items"]}
