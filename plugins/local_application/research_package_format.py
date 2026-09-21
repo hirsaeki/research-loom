@@ -352,7 +352,7 @@ def _bounded_file_digest(path:Path,maximum:int)->tuple[int,str]:
         raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",f"file changed while verifying: {path.name}")
     return size,"sha256:"+digest.hexdigest()
 
-def verify_export_root(root:str|Path)->Mapping[str,Any]:
+def verify_export_root(root:str|Path, *, _visual_diagnostics:list[dict[str,str]]|None=None)->Mapping[str,Any]:
     try: base=Path(root).expanduser().resolve(strict=True)
     except OSError as exc: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001","export root does not exist") from exc
     package_path=base/"research-package.json"
@@ -373,19 +373,35 @@ def verify_export_root(root:str|Path)->Mapping[str,Any]:
     validate_schema(package)
     validate_resolved_references(package)
     if package.get("package_digest")!=digest_json(without_digest(package)): raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001","Research Package digest mismatch")
+    # Publication may retain a diagnostic preview when only declared visual
+    # payloads are lost. Metadata, reference closure and all other bytes remain
+    # strict. The ordinary verifier never uses this diagnostic-only option.
+    visual_paths=set()
+    if _visual_diagnostics is not None:
+        for exhibit in package.get("resolved_content",{}).get("working_material",{}).get("research_exhibits",[]):
+            visual=exhibit.get("visual_target")
+            if isinstance(visual,Mapping):
+                visual_paths.add(visual["source_attachment_path"])
+                if isinstance(visual.get("derived_artifact"),Mapping):
+                    visual_paths.add(visual["derived_artifact"]["attachment_path"])
     total=package_size; seen=set()
     for a in package.get("attachments",[]):
         rel=str(a["path"]); p=Path(rel)
         if p.is_absolute() or ".." in p.parts or rel in seen: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001","unsafe or duplicate attachment path")
         seen.add(rel); path=(base/p).resolve(strict=False)
         if not path.is_relative_to(base): raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001","attachment escapes export root")
-        try: size=path.stat().st_size
-        except OSError as exc: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",f"missing attachment: {rel}") from exc
-        if total+size>MAX_OUTPUT_BYTES: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-BOUND-001","Research Package export exceeds output bound")
-        if size!=int(a["byte_length"]): raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",f"attachment digest/size mismatch: {rel}")
-        _,digest=_bounded_file_digest(path,MAX_OUTPUT_BYTES-total)
-        if digest!=a["content_digest"]: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",f"attachment digest/size mismatch: {rel}")
-        total+=size
+        try:
+            try: size=path.stat().st_size
+            except OSError as exc: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",f"missing attachment: {rel}") from exc
+            if total+size>MAX_OUTPUT_BYTES: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-BOUND-001","Research Package export exceeds output bound")
+            if size!=int(a["byte_length"]): raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",f"attachment digest/size mismatch: {rel}")
+            _,digest=_bounded_file_digest(path,MAX_OUTPUT_BYTES-total)
+            if digest!=a["content_digest"]: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",f"attachment digest/size mismatch: {rel}")
+            total+=size
+        except LocalApplicationError as exc:
+            if _visual_diagnostics is None or rel not in visual_paths or exc.code != "APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001":
+                raise
+            _visual_diagnostics.append({"path":rel,"code":"VISUAL_ASSET_UNAVAILABLE"})
     md_path=base/"research-package.md"
     try: md_size=md_path.stat().st_size
     except OSError as exc: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001","missing Research Package Markdown") from exc
@@ -394,4 +410,4 @@ def verify_export_root(root:str|Path)->Mapping[str,Any]:
     proj=package.get("projections",{}).get("markdown",{})
     if proj.get("path")!="research-package.md" or int(proj.get("byte_length",-1))!=md_size or proj.get("content_digest")!=md_digest: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001","Research Package Markdown integrity mismatch")
     total+=md_size
-    return {"status":"VERIFIED","package_id":package["package_id"],"package_digest":package["package_digest"],"attachment_count":len(package.get("attachments",[])),"total_verified_bytes":total}
+    return {"status":"DEGRADED" if _visual_diagnostics else "VERIFIED","package_id":package["package_id"],"package_digest":package["package_digest"],"attachment_count":len(package.get("attachments",[])),"total_verified_bytes":total}
