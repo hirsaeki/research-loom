@@ -403,7 +403,8 @@ class WriterCompositionHistoryService(WriterCompositionService):
 
     def _selection_event(self, composition_id: str, sequence: int, package_cache: dict[tuple[str, str], Mapping[str, Any]] | None = None, metadata_limit: int | None = None) -> Mapping[str, Any]:
         path = self._selection_event_path(composition_id, sequence)
-        if not path.is_file():
+        # Bounded inventory reads preserve the underlying missing/access cause.
+        if metadata_limit is None and not path.is_file():
             raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-INTEGRITY-001", "composition selection event is missing")
         event = self._read_mapping_json(
             path,

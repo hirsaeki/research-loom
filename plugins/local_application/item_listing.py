@@ -59,6 +59,7 @@ def directory_page(root: Path, *, project_id: str, kind: str, limit: int,
                 yield entry.name
 
     try:
+        _require_unlinked(root)
         with os.scandir(root) as entries:
             selected = heapq.nsmallest(limit + 1, names(entries))
     except FileNotFoundError:
@@ -75,11 +76,15 @@ def directory_page(root: Path, *, project_id: str, kind: str, limit: int,
     return [root / name for name in selected], next_cursor
 
 
-def read_mapping(path: Path, maximum: int) -> Mapping[str, Any]:
-    """Bound before allocation. Never follow static linked metadata paths."""
+def _require_unlinked(path: Path) -> None:
     for part in (path, *path.parents):
         if part.is_symlink() or (hasattr(part, "is_junction") and part.is_junction()):
             raise LocalApplicationError("APPLICATION-LIST-UNSAFE-PATH-001", "linked inventory paths are not read")
+
+
+def read_mapping(path: Path, maximum: int) -> Mapping[str, Any]:
+    """Bound before allocation. Never follow static linked metadata paths."""
+    _require_unlinked(path)
     info = path.stat()
     if not stat.S_ISREG(info.st_mode):
         raise LocalApplicationError("APPLICATION-LIST-METADATA-001", "item metadata is not a regular file")
