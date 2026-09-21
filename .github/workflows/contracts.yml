@@ -19,7 +19,7 @@ jobs:
   contract-checks:
     name: contract-checks
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v5
         with:
@@ -106,6 +106,8 @@ jobs:
         run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue250*.py' -v
       - name: Run Issue 251 REAL Survey batch acceptance
         run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue251*.py' -v
+      - name: Run Issue 254 bounded item inventory acceptance
+        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue254*.py' -v
       - name: Run Issue 248 optional child recovery acceptance
         run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue248*.py' -v
       - name: Run Issue 193 Parent Durable Store acceptance

@@ -20,6 +20,7 @@ from jsonschema import Draft202012Validator, FormatChecker
 
 from core.runtime import canonical_digest
 from .facade import LocalApplicationError
+from .item_listing import read_mapping
 from .research_package_format import _package_required_refs, safe_component
 
 SCHEMA_VERSION = "0.1.0"
@@ -327,7 +328,14 @@ class WriterCompositionService:
     def _package_service(self):
         return self.facade._research_package_service()
 
-    def _package(self, package_id: str) -> Mapping[str, Any]:
+    def _package(self, package_id: str, *, metadata_limit: int | None = None) -> Mapping[str, Any]:
+        if metadata_limit is not None:
+            package = self._package_service()._load_metadata(package_id, metadata_limit)
+            # Only pin fields enter the per-page cache; never retain full package bodies.
+            return {key: package[key] for key in (
+                "package_id", "package_digest", "project", "source_research_snapshot", "effective_profile_set",
+                "package_mode", "source_epistemic_status", "preview_only", "authoritative_research_freeze", "release_eligible",
+            )}
         return self._package_service().show(package_id)["package"]
 
     def _series_root(self, composition_id: str) -> Path:
@@ -402,14 +410,17 @@ class WriterCompositionService:
     def _version_path(self, composition_id: str, version: int) -> Path:
         return self._series_root(composition_id) / "versions" / f"{version:04d}.json"
 
-    def _load_version(self, composition_id: str, version: int, package_cache: dict[tuple[str, str], Mapping[str, Any]] | None = None) -> Mapping[str, Any]:
+    def _load_version(self, composition_id: str, version: int, package_cache: dict[tuple[str, str], Mapping[str, Any]] | None = None, *, metadata_limit: int | None = None) -> Mapping[str, Any]:
         path = self._version_path(composition_id, version)
         if not path.is_file():
             raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-404", "composition version does not exist")
         try:
-            value = json.loads(path.read_text(encoding="utf-8"))
+            value = json.loads(path.read_text(encoding="utf-8")) if metadata_limit is None else read_mapping(path, metadata_limit)
         except (OSError, UnicodeError, json.JSONDecodeError) as exc:
             raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-INTEGRITY-001", "saved composition version is unreadable") from exc
+        _validate_schema(value)
+        if value.get("composition_id") != composition_id or value.get("version") != version:
+            raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-INTEGRITY-001", "saved composition identity differs from its path")
         if _digest_document(value, "composition_digest") != value.get("composition_digest"):
             raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-INTEGRITY-001", "saved composition digest mismatch")
         package_id = str(value["source"]["research_package_id"])
@@ -417,10 +428,13 @@ class WriterCompositionService:
         key = (package_id, package_digest)
         package = package_cache.get(key) if package_cache is not None else None
         if package is None:
-            package = self._package(package_id)
+            package = self._package(package_id) if metadata_limit is None else self._package(package_id, metadata_limit=metadata_limit)
             if package_cache is not None:
                 package_cache[key] = package
-        self._validate_source_pin(value["source"], package)
+        if metadata_limit is None:
+            self._validate_source_pin(value["source"], package)
+        elif value["source"] != self._source_pin(package, lineage_ref=value["source"].get("lineage_ref")):
+            raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-PIN-001", "composition source pin differs from package metadata")
         return value
 
     def _versions(self, composition_id: str) -> list[int]:

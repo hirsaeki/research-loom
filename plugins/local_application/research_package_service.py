@@ -8,6 +8,8 @@ from typing import Any, Mapping
 from core.runtime import canonical_digest as core_canonical_digest
 from plugins.local_execution_store import canonical_handoff_for
 from .facade import LocalApplicationError
+from .item_listing import ITEM_ERRORS, directory_page, read_mapping, unavailable
+from .research_package_format import digest_json, without_digest
 from .research_package_builder import build_package
 from .research_package_format import MAX_OUTPUT_BYTES, MAX_PACKAGES, safe_component, validate_schema, verify_export_root
 
@@ -115,29 +117,39 @@ class ResearchPackageService:
     def _load(self,pid):
         pid=safe_component(pid,"package_id"); root=self.root/pid
         if not root.is_dir(): raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-404","Research Package does not exist")
-        verify_export_root(root); return json.loads((root/"research-package.json").read_text(encoding="utf-8"))
-    def list(self):
-        if not self.root.exists(): return {"status":"OK","project_id":self.project_id,"packages":[],"truncated":False}
-        roots=[x for x in sorted(self.root.iterdir()) if x.is_dir() and not x.name.startswith(".rp-")]
-        selected=roots[:MAX_PACKAGES]
-        packages=[]
-        for root in selected:
-            path=root/"research-package.json"
+        verify_export_root(root)
+        value = json.loads((root/"research-package.json").read_text(encoding="utf-8"))
+        if value["package_id"] != pid:
+            raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001", "Research Package identity differs from directory")
+        return value
+    def _load_metadata(self, pid: str, maximum: int = MAX_OUTPUT_BYTES) -> Mapping[str, Any]:
+        pid = safe_component(pid, "package_id")
+        value = read_mapping(self.root / pid / "research-package.json", maximum)
+        validate_schema(value)
+        if value["package_id"] != pid:
+            raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001", "Research Package identity differs from directory")
+        if value["package_digest"] != digest_json(without_digest(value)):
+            raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001", "Research Package metadata digest mismatch")
+        return value
+
+    def list(self, *, limit: int = MAX_PACKAGES, cursor: str | None = None):
+        roots, next_cursor = directory_page(
+            self.root, project_id=self.project_id, kind="research-package", limit=limit,
+            maximum=MAX_PACKAGES, cursor=cursor, skip_prefix=".rp-",
+        )
+        packages = []
+        for root in roots:
             try:
-                size=path.stat().st_size
-                if size>MAX_OUTPUT_BYTES: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-BOUND-001","Research Package metadata exceeds output bound")
-                with path.open("rb") as handle: raw=handle.read(MAX_OUTPUT_BYTES+1)
-                if len(raw)>MAX_OUTPUT_BYTES: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-BOUND-001","Research Package metadata exceeds output bound")
-                if len(raw)!=size: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",f"saved Research Package metadata changed while reading: {root.name}")
-                value=json.loads(raw.decode("utf-8"))
-                if not isinstance(value,Mapping): raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",f"invalid saved Research Package metadata: {root.name}")
-                validate_schema(value)
-                packages.append(self._summary(value))
-            except LocalApplicationError:
-                raise
-            except (OSError,UnicodeError,json.JSONDecodeError,KeyError,TypeError) as exc:
-                raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",f"invalid saved Research Package metadata: {root.name}") from exc
-        return {"status":"OK","project_id":self.project_id,"packages":packages,"truncated":len(roots)>MAX_PACKAGES}
+                value = self._load_metadata(root.name)
+                if value["project"]["project_id"] != self.project_id:
+                    continue
+                packages.append({**self._summary(value), "availability": "AVAILABLE",
+                                 "verification_scope": "METADATA_ONLY"})
+            except ITEM_ERRORS as exc:
+                packages.append(unavailable("package_id", root.name, exc))
+        return {"status": "OK", "project_id": self.project_id, "packages": packages,
+                "truncated": next_cursor is not None, "next_cursor": next_cursor,
+                "limit": limit, "scanned_items": len(roots)}
     def show(self,pid): return {"status":"OK","package":self._load(pid)}
     def export(self,pid,output_dir):
         p=self._load(pid); raw=Path(output_dir).expanduser(); out=raw if raw.is_absolute() else Path.cwd()/raw
