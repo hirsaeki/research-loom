@@ -14,15 +14,17 @@ import shutil
 import tempfile
 from typing import Any, Mapping
 from xml.etree import ElementTree
-from xml.sax.saxutils import escape
 import zipfile
 
 from jsonschema import Draft202012Validator, FormatChecker
 
 from .facade import LocalApplicationError
+from .publication_docx import docx_bytes as _docx_bytes, verify_native_docx
+from .publication_exhibits import prepare_exhibits, render_input_digest
+from .publication_input import inspect_inputs
 
 SCHEMA_VERSION = "0.1.0"
-SERVICE_VERSION = "0.1.0"
+SERVICE_VERSION = "0.2.0"
 MAX_SECTIONS = 128
 MAX_OUTPUT_BYTES = 16 * 1024 * 1024
 _XREF = re.compile(r"\[\[(section|exhibit|citation):([^\]]+)\]\]")
@@ -81,16 +83,16 @@ def _artifact_pin(artifact_id: str, basis: bytes) -> dict[str, str]:
 
 _TEMPLATE_PIN = _artifact_pin(
     "research-loom.builtin-docx-template",
-    b"research-loom deterministic docx template v0.1.0",
+    b"research-loom deterministic native table/PNG docx template v0.2.0",
 )
 _STYLE_MAP_PIN = _artifact_pin(
     "research-loom.builtin-docx-style-map",
-    b"Title=Title;heading=Heading1;heading2=Heading2;body=Normal;v0.1.0",
+    b"Title=Title;heading=Heading1;heading2=Heading2;body=Normal;table=TableText;v0.2.0",
 )
 _RENDERER = {
     "renderer_id": "research-loom.deterministic-docx",
     "renderer_version": SERVICE_VERSION,
-    "tool_digest": _sha(b"research-loom.deterministic-docx@0.1.0"),
+    "tool_digest": _sha(b"research-loom.deterministic-docx@0.2.0;native-table-png;provenance-v1"),
 }
 
 
@@ -107,74 +109,6 @@ def _validate_preview_manifest(value: Mapping[str, Any]) -> None:
             "APPLICATION-PUBLICATION-SCHEMA-001",
             f"canonical Publication preview manifest is invalid at {path}: {first.message}",
         )
-
-
-def _xml_compatible(text: str) -> bool:
-    for char in text:
-        code = ord(char)
-        if code in {0x9, 0xA, 0xD}:
-            continue
-        if 0x20 <= code <= 0xD7FF or 0xE000 <= code <= 0xFFFD or 0x10000 <= code <= 0x10FFFF:
-            continue
-        return False
-    return True
-
-
-def _zip_member(name: str, data: bytes) -> tuple[zipfile.ZipInfo, bytes]:
-    info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
-    info.compress_type = zipfile.ZIP_STORED
-    info.external_attr = 0o600 << 16
-    info.create_system = 3
-    return info, data
-
-
-def _docx_bytes(lines: list[tuple[str, str]]) -> bytes:
-    paragraphs = []
-    for role, text in lines:
-        text = text.replace("\r", "").strip("\n")
-        if not _xml_compatible(text):
-            raise LocalApplicationError(
-                "APPLICATION-PUBLICATION-RENDER-001",
-                "publication text contains XML-incompatible characters",
-            )
-        if not text:
-            paragraphs.append("<w:p/>")
-            continue
-        style = ""
-        if role == "title":
-            style = '<w:pPr><w:pStyle w:val="Title"/></w:pPr>'
-        elif role == "heading":
-            style = '<w:pPr><w:pStyle w:val="Heading1"/></w:pPr>'
-        elif role == "heading2":
-            style = '<w:pPr><w:pStyle w:val="Heading2"/></w:pPr>'
-        paragraphs.append(
-            f'<w:p>{style}<w:r><w:t xml:space="preserve">{escape(text)}</w:t></w:r></w:p>'
-        )
-    document = (
-        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-        '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
-        '<w:body>'
-        + "".join(paragraphs)
-        + '<w:sectPr><w:pgSz w:w="12240" w:h="15840"/>'
-        '<w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/>'
-        "</w:sectPr></w:body></w:document>"
-    ).encode("utf-8")
-    styles = b'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style><w:style w:type="paragraph" w:styleId="Title"><w:name w:val="Title"/><w:basedOn w:val="Normal"/></w:style><w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/><w:basedOn w:val="Normal"/></w:style><w:style w:type="paragraph" w:styleId="Heading2"><w:name w:val="heading 2"/><w:basedOn w:val="Normal"/></w:style></w:styles>'''
-    content_types = b'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>'''
-    rels = b'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>'''
-    doc_rels = b'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>'''
-    output = io.BytesIO()
-    with zipfile.ZipFile(output, "w") as archive:
-        for name, data in (
-            ("[Content_Types].xml", content_types),
-            ("_rels/.rels", rels),
-            ("word/document.xml", document),
-            ("word/_rels/document.xml.rels", doc_rels),
-            ("word/styles.xml", styles),
-        ):
-            info, payload = _zip_member(name, data)
-            archive.writestr(info, payload)
-    return output.getvalue()
 
 
 def _verify_docx_bytes(data: bytes) -> bool:
@@ -415,16 +349,25 @@ class PublicationReleaseService:
             label, number = exhibit_numbers[ref]
             return f"{label} {number}"
 
-        title = str(package.get("project", {}).get("title") or "Publication")
+        def resolve_text(text: str, section_id: str) -> str:
+            result = _XREF.sub(lambda match: replace_token(match, section_id), text)
+            if "[[" in result:
+                add_issue("UNRESOLVED_CROSS_REFERENCE", "malformed-token", section_id, True)
+            return result
+
+        blocks = inspection.get("exhibit_blocks")
+        if blocks is None:
+            blocks = prepare_exhibits(inspection, self.workspace)
+        for diagnostic in inspection.get("visual_diagnostics", []):
+            add_issue("VISUAL_ASSET_UNAVAILABLE", diagnostic["path"], None, True)
+        title = resolve_text(str(package.get("project", {}).get("title") or "Publication"), "document")
         md: list[str] = [f"# {title}", ""]
-        docx_lines: list[tuple[str, str]] = [("title", title)]
+        docx_lines: list[tuple[str, Any]] = [("title", title)]
         rendered_exhibits: set[str] = set()
         for section in sections:
             sid = str(section["section_id"])
-            heading = heading_by_section.get(sid, sid)
-            content = _XREF.sub(
-                lambda match: replace_token(match, sid), str(section.get("content", ""))
-            )
+            heading = resolve_text(heading_by_section.get(sid, sid), sid)
+            content = resolve_text(str(section.get("content", "")), sid)
             md.extend([f"## {heading}", "", content, ""])
             docx_lines.extend([("heading", heading), ("body", content)])
             structured_citations = []
@@ -444,17 +387,35 @@ class PublicationReleaseService:
                 rendered_exhibits.add(ref)
                 exhibit = exhibits[ref]
                 label, number = exhibit_numbers[ref]
-                caption = f"{label} {number}. {exhibit.get('title') or ref}"
-                content_obj = exhibit.get("content", {})
-                exhibit_text = (
-                    content_obj.get("value", "")
-                    if isinstance(content_obj, Mapping)
-                    else str(content_obj)
-                )
-                if not isinstance(exhibit_text, str):
-                    exhibit_text = json.dumps(exhibit_text, ensure_ascii=False, sort_keys=True)
-                md.extend([f"**{caption}**", "", exhibit_text, ""])
-                docx_lines.extend([("heading2", caption), ("body", exhibit_text)])
+                caption = resolve_text(f"{label} {number}. {exhibit.get('title') or ref}", sid)
+                block = {**deepcopy(blocks[ref]), "ref": ref, "caption": caption}
+                if block["kind"] == "table":
+                    block["rows"] = [[resolve_text(cell, sid) for cell in row] for row in block["rows"]]
+                    # Markdown remains a preview companion; DOCX has native cells.
+                    preview_text = "\n".join("| " + " | ".join(row) + " |" for row in block["rows"])
+                elif block["kind"] == "image":
+                    visual = exhibit["visual_target"]
+                    locator = visual["locator"]
+                    capture = block["provenance"]["source_capture"]
+                    source = (capture.get("source_locators") or [capture.get("source_locator") or visual["capture_id"]])[0]
+                    note = f"Source: {source}; {locator.get('label') or locator['kind']}"
+                    if "page" in locator:
+                        note += f"; page {locator['page']}"
+                    if locator.get("region"):
+                        region = locator["region"]
+                        note += "; region " + ", ".join(f"{key}={region[key]}" for key in ("x", "y", "width", "height")) + f" ({region['unit']})"
+                    derived = visual.get("derived_artifact")
+                    note += f"; retained {derived['derivation_type']}." if derived else "; original image."
+                    content_obj = exhibit.get("content", {})
+                    if content_obj.get("representation") in {"text", "markdown"}:
+                        note += "\n" + str(content_obj.get("value", ""))
+                    block["note"] = resolve_text(note, sid)
+                    preview_text = "[Exact retained image is embedded in formal.docx.]\n" + block["note"]
+                else:
+                    add_issue(block["code"], ref, sid, True)
+                    preview_text = f"[UNAVAILABLE: {block['code']}. Preserve the source and supply a supported exact representation.]"
+                md.extend([f"**{caption}**", "", preview_text, ""])
+                docx_lines.append(("exhibit", block))
 
         if citation_numbers:
             md.extend(["## References", ""])
@@ -465,7 +426,7 @@ class PublicationReleaseService:
                 source = sources[source_ref]
                 locators = locators_by_source.get(source_ref, [])
                 rendered = self._citation_label(source, locators[0] if locators else None)
-                entry = f"[{number}] {rendered}"
+                entry = resolve_text(f"[{number}] {rendered}", "references")
                 md.append(entry)
                 docx_lines.append(("body", entry))
             md.append("")
@@ -474,6 +435,18 @@ class PublicationReleaseService:
         if feedback:
             add_issue("WRITING_FEEDBACK_OPEN", str(len(feedback)), None, False)
 
+        blocking_issues = [item for item in issues if item["blocking"]]
+        if blocking_issues:
+            md.extend(["## Publication diagnostics — release blocked", ""])
+            docx_lines.append(("heading", "Publication diagnostics — release blocked"))
+            for item in blocking_issues:
+                message = f"{item['code']}: {item['ref']}. Restore exact bytes or create a supported new material/version; rebuild this preview."
+                md.extend([message, ""])
+                docx_lines.append(("body", message))
+        layout_note = "Machine verification checks native structure, content, image bytes and references only. Inspect every rendered page before approving release; layout quality is not automatically verified."
+        md.extend([layout_note, ""])
+        if blocking_issues:
+            docx_lines.append(("body", layout_note))
         markdown = ("\n".join(md).rstrip() + "\n").encode("utf-8")
         docx = _docx_bytes(docx_lines)
         if len(markdown) + len(docx) > MAX_OUTPUT_BYTES:
@@ -481,22 +454,23 @@ class PublicationReleaseService:
                 "APPLICATION-PUBLICATION-BOUND-001",
                 "Publication outputs exceed supported aggregate size",
             )
-        if not _verify_docx_bytes(docx):
+        if not _verify_docx_bytes(docx) or not verify_native_docx(docx, docx_lines):
             raise LocalApplicationError(
                 "APPLICATION-PUBLICATION-RENDER-001",
-                "generated DOCX failed structural XML verification",
+                "generated DOCX failed native structure/content verification",
             )
         checks = {
             "citation_resolution": "failed"
             if any(item["code"] == "UNRESOLVED_CITATION" for item in issues)
             else "passed",
             "exhibit_resolution": "failed"
-            if any(item["code"] == "MISSING_EXHIBIT" for item in issues)
+            if any(item["code"] in {"MISSING_EXHIBIT", "UNSUPPORTED_EXHIBIT", "VISUAL_ASSET_UNAVAILABLE"} for item in issues)
             else "passed",
             "cross_reference_resolution": "failed"
             if any(item["code"] == "UNRESOLVED_CROSS_REFERENCE" for item in issues)
             else "passed",
-            "render_verification": "passed",
+            "render_verification": "failed" if blocking_issues else "passed",
+            "layout_verification": "warning",
             "writing_feedback": "warning" if feedback else "passed",
         }
         return markdown, docx, issues, checks
@@ -514,11 +488,12 @@ class PublicationReleaseService:
         checks: Mapping[str, str], issues: list[Mapping[str, Any]]
     ) -> list[dict[str, Any]]:
         code_for_check = {
-            "citation_resolution": "UNRESOLVED_CITATION",
-            "exhibit_resolution": "MISSING_EXHIBIT",
-            "cross_reference_resolution": "UNRESOLVED_CROSS_REFERENCE",
-            "render_verification": None,
-            "writing_feedback": "WRITING_FEEDBACK_OPEN",
+            "citation_resolution": {"UNRESOLVED_CITATION"},
+            "exhibit_resolution": {"MISSING_EXHIBIT", "UNSUPPORTED_EXHIBIT", "VISUAL_ASSET_UNAVAILABLE"},
+            "cross_reference_resolution": {"UNRESOLVED_CROSS_REFERENCE"},
+            "render_verification": {item["code"] for item in issues if item["blocking"]},
+            "layout_verification": set(),
+            "writing_feedback": {"WRITING_FEEDBACK_OPEN"},
         }
         result = []
         for check_id, status in checks.items():
@@ -526,7 +501,7 @@ class PublicationReleaseService:
             refs = [
                 str(issue["defect_id"])
                 for issue in issues
-                if issue_code is not None and issue.get("code") == issue_code
+                if issue.get("code") in issue_code
             ]
             result.append(
                 {
@@ -647,6 +622,7 @@ class PublicationReleaseService:
                 },
             ],
             "verification": deepcopy(dict(checks)),
+            "verification_scope": "Native DOCX structure, literal table cells, exact PNG parts, captions and resolved reference text; rendered layout requires human review.",
             "issues": deepcopy(list(issues)),
             "research_state_mutation_performed": False,
             "content_digest": "",
@@ -724,13 +700,9 @@ class PublicationReleaseService:
     def build_preview(
         self, composition_id: str, revision_id: str | None = None
     ) -> Mapping[str, Any]:
-        inspection = self.facade.inspect_writer_round_trip(composition_id, revision_id)
-        receipt = inspection["writer_input"]
-        package = self.facade._writer_composition_service()._package(
-            str(receipt["source"]["research_package_id"])
-        )
-        inspection = deepcopy(dict(inspection))
-        inspection["source_package_document"] = package
+        inspection = inspect_inputs(self.facade, composition_id, revision_id)
+        package = inspection["source_package_document"]
+        inspection["exhibit_blocks"] = prepare_exhibits(inspection, self.workspace)
         profile = self._profile_pin(package)
         revision = inspection["revision"]
         build_key = {
@@ -742,6 +714,7 @@ class PublicationReleaseService:
             "template_pin": _TEMPLATE_PIN,
             "style_map_pin": _STYLE_MAP_PIN,
             "renderer": _RENDERER,
+            "render_inputs": render_input_digest(inspection["exhibit_blocks"], inspection["visual_diagnostics"]),
         }
         key_digest = _sha(_canonical_bytes(build_key))
         build_id = "PUB-" + key_digest.split(":", 1)[1][:24]
@@ -825,6 +798,10 @@ class PublicationReleaseService:
     ) -> bool:
         if preview.get("source_epistemic_status") != "EMPIRICAL_RESEARCH_STATE":
             return False
+        if any(build["verification"].get(key) != "passed" for key in (
+            "citation_resolution", "exhibit_resolution", "cross_reference_resolution", "render_verification",
+        )):
+            return False
         return not any(
             value == "failed"
             for key, value in build["verification"].items()
@@ -849,7 +826,17 @@ class PublicationReleaseService:
                 "format": "docx", "digest": formal["digest"], "size": formal["size"],
             },
             "allowed_dispositions": ["approve_release"],
+            **({"required_human_review": "Inspect every rendered page, including table cells, images, captions, reference targets and layout, before approving these exact output bytes."}
+               if "layout_verification" in build["verification"] else {}),
         }
+
+    @staticmethod
+    def _require_current_renderer(preview: Mapping[str, Any]) -> None:
+        if preview.get("renderer") != _RENDERER:
+            raise LocalApplicationError(
+                "APPLICATION-PUBLICATION-REBUILD-REQUIRED-001",
+                "Create a new preview with the current renderer before a new approval; retain historical releases unchanged",
+            )
 
     @staticmethod
     def _read_release_json(path: Path) -> dict[str, Any]:
@@ -1064,6 +1051,7 @@ class PublicationReleaseService:
                 return {"status": "RESTORED", "decision_request": request,
                         "recovered_at": self.facade._application.clock.now()}
 
+            self._require_current_renderer(preview)
             from uuid import uuid4
             request: dict[str, Any] = {
                 "schema_version": SCHEMA_VERSION,
@@ -1200,6 +1188,7 @@ class PublicationReleaseService:
             elif operation is None:
                 self._lost_release_facts()
             else:
+                self._require_current_renderer(preview)
                 decision = {
                     "decision_id": decision_id,
                     "request_id": request["request_id"],
