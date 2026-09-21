@@ -4,6 +4,7 @@ from __future__ import annotations
 from copy import deepcopy
 import hashlib
 import json
+import os
 from pathlib import Path, PureWindowsPath
 import re
 import stat
@@ -131,11 +132,24 @@ def _asset(root: Path, package: Mapping[str, Any], path: str, digest: str, size:
         raise ValueError("visual attachment pin mismatch")
     target = root / rel
     _require_unlinked(target)
-    info = target.stat()
-    if not stat.S_ISREG(info.st_mode) or info.st_size != size or not 0 <= size <= MAX_ITEM_BYTES:
+    if not 0 <= size <= MAX_ITEM_BYTES:
         raise ValueError("visual attachment size/type mismatch")
-    with target.open("rb") as handle:
-        data = handle.read(MAX_ITEM_BYTES + 1)
+    before = target.lstat()
+    if not stat.S_ISREG(before.st_mode) or before.st_size != size:
+        raise ValueError("visual attachment size/type mismatch")
+    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(target, flags)
+    try:
+        opened = os.fstat(fd)
+        if not stat.S_ISREG(opened.st_mode) or opened.st_size != size or not os.path.samestat(before, opened):
+            raise ValueError("visual attachment changed during verification")
+        after = target.lstat()
+        if not stat.S_ISREG(after.st_mode) or not os.path.samestat(opened, after):
+            raise ValueError("visual attachment changed during verification")
+        with os.fdopen(fd, "rb", closefd=False) as handle:
+            data = handle.read(MAX_ITEM_BYTES + 1)
+    finally:
+        os.close(fd)
     if len(data) != size or "sha256:" + hashlib.sha256(data).hexdigest() != digest:
         raise ValueError("visual attachment digest mismatch")
     return data
@@ -146,6 +160,14 @@ def prepare_exhibits(inspection: Mapping[str, Any], workspace: Path) -> dict[str
     root = workspace / ".research-loom" / "research-packages" / safe_component(package["package_id"], "package_id")
     selected = {ref for row in inspection["revision"]["sections"] for ref in row.get("exhibit_refs", [])}
     result = {}
+    asset_cache: dict[tuple[str, str, int, str], bytes] = {}
+
+    def asset(path: str, digest: str, size: int, media: str) -> bytes:
+        key = (path, digest, size, media)
+        if key not in asset_cache:
+            asset_cache[key] = _asset(root, package, path, digest, size, media)
+        return asset_cache[key]
+
     for exhibit in package["resolved_content"]["working_material"]["research_exhibits"]:
         ref = exhibit["exhibit_id"]
         if ref not in selected:
@@ -162,13 +184,13 @@ def prepare_exhibits(inspection: Mapping[str, Any], workspace: Path) -> dict[str
                                if item["run_id"] == visual["source_run_id"] and item["capture"]["capture_id"] == visual["capture_id"])
                 provenance["source_capture"] = deepcopy(capture)
                 # The original must still verify even when a retained crop is used.
-                original = _asset(root, package, visual["source_attachment_path"], visual["source_digest"],
-                                  visual["source_byte_length"], visual["source_media_type"])
+                original = asset(visual["source_attachment_path"], visual["source_digest"],
+                                 visual["source_byte_length"], visual["source_media_type"])
                 derived = visual.get("derived_artifact")
                 if derived:
                     if derived["derived_from_artifact_ref"] != visual["source_artifact_ref"]:
                         raise ValueError("derived image does not belong to this original")
-                    data = _asset(root, package, derived["attachment_path"], derived["digest"], derived["byte_length"], derived["media_type"])
+                    data = asset(derived["attachment_path"], derived["digest"], derived["byte_length"], derived["media_type"])
                     media = derived["media_type"]
                 else:
                     if visual["locator"].get("region") or visual["locator"].get("page", 1) != 1:

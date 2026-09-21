@@ -136,38 +136,67 @@ def verify_native_docx(data: bytes, lines: list[tuple[str, Any]]) -> bool:
     try:
         with zipfile.ZipFile(io.BytesIO(data)) as archive:
             doc = ET.fromstring(archive.read('word/document.xml'))
-            blocks = [b for role, b in lines if role == 'exhibit']
-            tables = doc.findall(f'.//{{{W}}}tbl')
-            expected_tables = [b for b in blocks if b['kind'] == 'table']
-            if len(tables) != len(expected_tables):
+            body = doc.find(f'{{{W}}}body')
+            if body is None:
                 return False
-            for table, block in zip(tables, expected_tables):
-                rows = [[_paragraph_text(cell) for cell in row.findall(f'{{{W}}}tc')] for row in table.findall(f'{{{W}}}tr')]
-                if rows != [[cell.replace('\r\n', '\n').replace('\r', '\n') for cell in row] for row in block['rows']]:
-                    return False
-            paragraphs = [_paragraph_text(p) for p in doc.findall(f'.//{{{W}}}p')]
-            bookmarks = {n.get(f'{{{W}}}name') for n in doc.findall(f'.//{{{W}}}bookmarkStart')}
-            for block in blocks:
-                if block['caption'].replace('\r\n', '\n').replace('\r', '\n') not in paragraphs or _bookmark(block['ref']) not in bookmarks:
-                    return False
-                if block.get('note') and block['note'].replace('\r\n', '\n').replace('\r', '\n') not in paragraphs:
-                    return False
-            # Body paragraphs include the already resolved section/citation/exhibit tokens.
-            for role, text in lines:
-                if role != 'exhibit' and text.replace('\r\n', '\n').replace('\r', '\n') not in paragraphs:
-                    return False
+            children = [node for node in body if node.tag != f'{{{W}}}sectPr']
             relations = {r.attrib['Id']: r.attrib for r in ET.fromstring(archive.read('word/_rels/document.xml.rels'))}
-            images = [b for b in blocks if b['kind'] == 'image']
-            blips = doc.findall(f'.//{{{A}}}blip')
-            if len(blips) != len(images):
+            cursor = 0
+
+            def normalized(value: str) -> str:
+                return value.replace('\r\n', '\n').replace('\r', '\n')
+
+            def take(tag: str) -> ET.Element:
+                nonlocal cursor
+                if cursor >= len(children) or children[cursor].tag != f'{{{W}}}{tag}':
+                    raise ValueError('unexpected publication block order')
+                node = children[cursor]
+                cursor += 1
+                return node
+
+            for role, value in lines:
+                if role != 'exhibit':
+                    if _paragraph_text(take('p')) != normalized(value):
+                        return False
+                    continue
+
+                block = value
+                caption = take('p')
+                if _paragraph_text(caption) != normalized(block['caption']):
+                    return False
+                bookmarks = caption.findall(f'.//{{{W}}}bookmarkStart')
+                if len(bookmarks) != 1 or bookmarks[0].get(f'{{{W}}}name') != _bookmark(block['ref']):
+                    return False
+
+                if block['kind'] == 'table':
+                    table = take('tbl')
+                    rows = [[_paragraph_text(cell) for cell in row.findall(f'{{{W}}}tc')] for row in table.findall(f'{{{W}}}tr')]
+                    expected = [[normalized(cell) for cell in row] for row in block['rows']]
+                    if rows != expected:
+                        return False
+                elif block['kind'] == 'image':
+                    image = take('p')
+                    blips = image.findall(f'.//{{{A}}}blip')
+                    doc_props = image.findall(f'.//{{{WP}}}docPr')
+                    if len(blips) != 1 or len(doc_props) != 1 or doc_props[0].get('descr') != block['caption']:
+                        return False
+                    relation = relations[blips[0].attrib[f'{{{R}}}embed']]
+                    if relation['Type'] != R + '/image' or relation.get('TargetMode') == 'External':
+                        return False
+                    payload = archive.read('word/' + relation['Target'])
+                    if payload != block['data'] or 'sha256:' + hashlib.sha256(payload).hexdigest() != block['asset_digest']:
+                        return False
+                else:
+                    unavailable = take('p')
+                    expected = f'[Unavailable exhibit: {block["code"]}. Preserve the source and supply a supported representation under a new identity.]'
+                    if _paragraph_text(unavailable) != expected:
+                        return False
+
+                if block.get('note') and _paragraph_text(take('p')) != normalized(block['note']):
+                    return False
+
+            if cursor != len(children):
                 return False
-            for blip, block in zip(blips, images):
-                relation = relations[blip.attrib[f'{{{R}}}embed']]
-                if relation['Type'] != R + '/image' or relation.get('TargetMode') == 'External':
-                    return False
-                payload = archive.read('word/' + relation['Target'])
-                if payload != block['data'] or 'sha256:' + hashlib.sha256(payload).hexdigest() != block['asset_digest']:
-                    return False
             if json.loads(ET.fromstring(archive.read('customXml/item1.xml')).text) != _provenance(lines):
                 return False
     except (OSError, KeyError, ValueError, zipfile.BadZipFile, ET.ParseError):

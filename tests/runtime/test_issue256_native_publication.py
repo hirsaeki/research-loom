@@ -4,6 +4,7 @@ from copy import deepcopy
 import hashlib
 import io
 import json
+import os
 from pathlib import Path
 import struct
 from unittest.mock import patch
@@ -13,8 +14,9 @@ import zlib
 
 from plugins.local_application import LocalApplicationError
 from plugins.local_application import publication_release_service as publication
+from plugins.local_application import publication_exhibits
 from plugins.local_application.publication_docx import W, A, R, docx_bytes, verify_native_docx
-from plugins.local_application.publication_exhibits import png_size, table_rows
+from plugins.local_application.publication_exhibits import _asset, png_size, prepare_exhibits, table_rows
 from research_package_acceptance_support import ResearchPackageAcceptanceSupport
 import test_issue219_writer_round_trip as writer
 import issue80_writer_composition_suite as composition_support
@@ -196,6 +198,56 @@ class Issue256NativePublicationTests(ResearchPackageAcceptanceSupport):
             self.assertFalse([name for name in archive.namelist() if name.startswith('word/media/')])
         self.assertIn('VISUAL_ASSET_UNAVAILABLE', shown['preview_markdown'])
 
+    def test_asset_read_rejects_path_swap_between_check_and_open(self):
+        root = self.root / 'asset-race'
+        root.mkdir()
+        expected = b'expected-image-bytes'
+        decoy = b'unrelated-file-bytes'
+        self.assertEqual(len(expected), len(decoy))
+        (root / 'visual.png').write_bytes(expected)
+        decoy_path = root / 'decoy.png'
+        decoy_path.write_bytes(decoy)
+        package = {'attachments': [{
+            'path': 'visual.png',
+            'content_digest': 'sha256:' + hashlib.sha256(expected).hexdigest(),
+            'byte_length': len(expected),
+            'media_type': 'image/png',
+        }]}
+        real_open = os.open
+        with patch.object(publication_exhibits.os, 'open', side_effect=lambda _path, flags: real_open(decoy_path, flags)):
+            with self.assertRaisesRegex(ValueError, 'changed during verification'):
+                _asset(root, package, 'visual.png', package['attachments'][0]['content_digest'], len(expected), 'image/png')
+
+    def test_reused_visual_attachment_is_verified_once_per_build(self):
+        image = fixture_png(8, 8)
+        digest = 'sha256:' + hashlib.sha256(image).hexdigest()
+        visual = {
+            'source_run_id': 'RUN-CACHE', 'capture_id': 'CAP-CACHE', 'source_artifact_ref': 'RUN-CACHE.CAP-CACHE.original',
+            'source_attachment_path': 'attachments/shared.png', 'source_digest': digest,
+            'source_byte_length': len(image), 'source_media_type': 'image/png', 'locator': {'page': 1},
+        }
+        def exhibit(ref):
+            return {
+                'exhibit_id': ref, 'content_digest': 'sha256:' + ref.lower().replace('-', '0').ljust(64, '0')[:64],
+                'source_run_ids': ['RUN-CACHE'], 'source_artifact_refs': ['RUN-CACHE.CAP-CACHE.original'],
+                'source_object_ids': [], 'derived_from_exhibit_ids': [], 'captured_against': {},
+                'kind': 'graph', 'content': {'representation': 'text', 'value': ref}, 'visual_target': dict(visual),
+            }
+        inspection = {
+            'revision': {'sections': [{'exhibit_refs': ['EX-CACHE-1', 'EX-CACHE-2']}]},
+            'source_package_document': {
+                'package_id': 'PKG-CACHE', 'attachments': [],
+                'resolved_content': {
+                    'materials': [{'run_id': 'RUN-CACHE', 'capture': {'capture_id': 'CAP-CACHE'}}],
+                    'working_material': {'research_exhibits': [exhibit('EX-CACHE-1'), exhibit('EX-CACHE-2')]},
+                },
+            },
+        }
+        with patch.object(publication_exhibits, '_asset', return_value=image) as verified:
+            result = prepare_exhibits(inspection, self.root)
+        self.assertEqual(verified.call_count, 1)
+        self.assertIs(result['EX-CACHE-1']['data'], result['EX-CACHE-2']['data'])
+
     def test_invalid_png_and_unsupported_tables_cannot_be_claimed_supported(self):
         for data in [b'\x89PNG\r\n\x1a\nlabel-only', fixture_png()[:-8], fixture_png() + b'extra']:
             with self.subTest(data=data[:8]), self.assertRaises(ValueError):
@@ -221,7 +273,7 @@ class Issue256NativePublicationTests(ResearchPackageAcceptanceSupport):
         self.assertTrue(verify_native_docx(data, lines))
         with zipfile.ZipFile(io.BytesIO(data)) as archive:
             original = {name: archive.read(name) for name in archive.namelist()}
-        for change in ['flatten', 'wrong-image', 'caption']:
+        for change in ['flatten', 'wrong-image', 'caption', 'swapped-captions', 'swapped-blocks']:
             parts = dict(original)
             if change == 'flatten':
                 doc = ET.fromstring(parts['word/document.xml'])
@@ -230,8 +282,22 @@ class Issue256NativePublicationTests(ResearchPackageAcceptanceSupport):
                 parts['word/document.xml'] = ET.tostring(doc)
             elif change == 'wrong-image':
                 parts['word/_rels/document.xml.rels'] = parts['word/_rels/document.xml.rels'].replace(b'media/image-2.png', b'media/missing.png')
-            else:
+            elif change == 'caption':
                 parts['word/document.xml'] = parts['word/document.xml'].replace(b'Table 1. Values', b'Table 2. Wrong')
+            else:
+                doc = ET.fromstring(parts['word/document.xml'])
+                body = doc.find(f'{{{W}}}body')
+                if change == 'swapped-captions':
+                    captions = [node for node in body.findall(f'{{{W}}}p') if node.find(f'.//{{{W}}}bookmarkStart') is not None]
+                    texts = [node.find(f'.//{{{W}}}t') for node in captions]
+                    texts[0].text, texts[1].text = texts[1].text, texts[0].text
+                else:
+                    children = list(body)
+                    table_index = next(i for i, node in enumerate(children) if node.tag == f'{{{W}}}tbl')
+                    image_index = next(i for i, node in enumerate(children) if node.find(f'.//{{{A}}}blip') is not None)
+                    children[table_index], children[image_index] = children[image_index], children[table_index]
+                    body[:] = children
+                parts['word/document.xml'] = ET.tostring(doc)
             output = io.BytesIO()
             with zipfile.ZipFile(output, 'w') as archive:
                 for name, payload in parts.items():
