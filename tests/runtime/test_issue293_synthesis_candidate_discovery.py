@@ -240,6 +240,86 @@ def test_corrupt_items_are_isolated_and_unattributable_json_marks_collection_inc
             facade.close()
 
 
+
+
+def test_projection_validation_failure_isolated_as_unavailable_item():
+    with tempfile.TemporaryDirectory() as temp:
+        facade = _make_facade(temp)
+        try:
+            result = facade.submit_action(_recommendation_input(statement="Broken projection binding"))
+            candidate_id = result["data"]["state_delta_proposal_id"]
+            store = facade._application.conversation_store
+            wire = store.load_state_delta_proposal(candidate_id)
+            wire.pop("lineage_ref", None)
+            wire.pop("proposal_digest", None)
+            wire["proposal_digest"] = canonical_digest(wire)
+            store._db.execute(
+                "UPDATE state_delta_proposals SET payload_json=? WHERE proposal_id=?",
+                (json.dumps(wire, ensure_ascii=False), candidate_id),
+            )
+
+            listing = facade.list_synthesis_candidates(kind="recommendation")
+            item = next(row for row in listing["items"] if row["candidate_id"] == candidate_id)
+            assert listing["status"] == "DEGRADED"
+            assert item["availability"] == "UNAVAILABLE"
+            assert item["issues"][0]["code"] == "APPLICATION-CANDIDATE-PROJECTION-001"
+
+            resumed = facade.resume_context()["saved_synthesis_candidates"]
+            resumed_item = next(row for row in resumed["items"] if row["candidate_id"] == candidate_id)
+            assert resumed_item["availability"] == "UNAVAILABLE"
+        finally:
+            facade.close()
+
+
+def test_synthesis_list_queries_use_operational_indexes():
+    with tempfile.TemporaryDirectory() as temp:
+        facade = _make_facade(temp)
+        try:
+            store = facade._application.conversation_store
+            names = {
+                row["name"]
+                for row in store._db.execute(
+                    "SELECT name FROM sqlite_master WHERE type='index'"
+                ).fetchall()
+            }
+            assert "state_delta_proposals_json_valid" in names
+            assert "state_delta_proposals_synthesis_lookup" in names
+
+            malformed_plan = store._db.execute(
+                "EXPLAIN QUERY PLAN SELECT 1 FROM state_delta_proposals "
+                "WHERE json_valid(payload_json)=0 LIMIT 1"
+            ).fetchall()
+            assert any(
+                "state_delta_proposals_json_valid" in str(row["detail"])
+                for row in malformed_plan
+            )
+
+            list_plan = store._db.execute(
+                """
+                EXPLAIN QUERY PLAN
+                SELECT s.rowid,s.proposal_id,s.payload_json
+                FROM state_delta_proposals s
+                WHERE json_valid(s.payload_json)=1
+                  AND json_extract(s.payload_json, '$.project_ref')=?
+                  AND json_extract(s.payload_json, '$.candidate_only')=1
+                  AND json_extract(s.payload_json, '$.provenance.producer')=?
+                ORDER BY s.rowid DESC
+                LIMIT ?
+                """,
+                ("PRJ-1", "research.recommendation.propose@0.1.0", 21),
+            ).fetchall()
+            assert any(
+                "state_delta_proposals_synthesis_lookup" in str(row["detail"])
+                for row in list_plan
+            )
+            assert not any(
+                str(row["detail"]).startswith("SCAN s")
+                for row in list_plan
+            )
+        finally:
+            facade.close()
+
+
 def test_cross_project_candidate_and_cursor_do_not_leak_content_and_reads_do_not_write():
     with tempfile.TemporaryDirectory() as temp:
         facade = _make_facade(temp)
@@ -319,3 +399,20 @@ def test_cli_list_and_show_route_to_public_facade():
         ])
     assert code == 0
     assert fake.calls == [("show", "SDP-ONE")]
+
+
+def load_tests(loader, tests, pattern):
+    del loader, tests, pattern
+    suite = unittest.TestSuite()
+    for test_function in (
+        test_saved_recommendation_and_argument_are_discoverable_after_reopen,
+        test_list_is_bounded_cursor_stable_and_filter_bound,
+        test_more_than_one_hundred_candidates_are_reachable_by_cursor_without_preloading_history,
+        test_corrupt_items_are_isolated_and_unattributable_json_marks_collection_incomplete,
+        test_projection_validation_failure_isolated_as_unavailable_item,
+        test_synthesis_list_queries_use_operational_indexes,
+        test_cross_project_candidate_and_cursor_do_not_leak_content_and_reads_do_not_write,
+        test_cli_list_and_show_route_to_public_facade,
+    ):
+        suite.addTest(unittest.FunctionTestCase(test_function))
+    return suite

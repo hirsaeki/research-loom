@@ -262,6 +262,7 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                     project_id=self._project_id,
                     expected_kind=kind,
                 )
+                projection = build_candidate_projection(candidate, state)
             except ConversationRuntimeError as exc:
                 degraded = True
                 items.append({
@@ -278,7 +279,7 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                 "availability": "AVAILABLE",
                 "label": _label(label_source),
                 "created_at": str(source["created_at"]),
-                "candidate_projection": build_candidate_projection(candidate, state),
+                "candidate_projection": projection,
             })
 
         issues = []

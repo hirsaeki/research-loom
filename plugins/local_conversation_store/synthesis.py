@@ -65,11 +65,11 @@ def list_synthesis_candidate_rows(
     if type(limit) is not int or limit <= 0 or limit > 100:
         raise ValueError("synthesis candidate list limit must be between 1 and 100")
     producers = _producer_filter(kind)
-    placeholders = ",".join("?" for _ in producers)
     try:
         with store._lock:
             malformed = store._db.execute(
-                "SELECT 1 FROM state_delta_proposals WHERE NOT json_valid(payload_json) LIMIT 1"
+                "SELECT 1 FROM state_delta_proposals "
+                "WHERE json_valid(payload_json)=0 LIMIT 1"
             ).fetchone() is not None
             cursor_rowid = None
             if cursor is not None:
@@ -78,38 +78,43 @@ def list_synthesis_candidate_rows(
                 cursor_rowid = _cursor_rowid(
                     store, cursor, project_ref=str(project_ref), producers=producers
                 )
-            where_cursor = "AND s.rowid < ?" if cursor_rowid is not None else ""
-            params: list[Any] = [str(project_ref), *producers]
-            if cursor_rowid is not None:
-                params.append(cursor_rowid)
-            params.append(limit + 1)
-            rows = store._db.execute(
-                f"""
-                SELECT s.rowid,s.proposal_id,s.payload_json,d.payload_json AS source_payload_json
-                FROM state_delta_proposals s
-                LEFT JOIN documents d
-                  ON d.message_type='action_proposal'
-                 AND d.document_id=json_extract(s.payload_json, '$.provenance.source_action_proposal.proposal_id')
-                WHERE json_valid(s.payload_json)
-                  AND json_extract(s.payload_json, '$.project_ref')=?
-                  AND json_extract(s.payload_json, '$.candidate_only')=1
-                  AND json_extract(s.payload_json, '$.provenance.producer') IN ({placeholders})
-                  {where_cursor}
-                ORDER BY s.rowid DESC
-                LIMIT ?
-                """,
-                tuple(params),
-            ).fetchall()
+
+            rows = []
+            for producer in producers:
+                where_cursor = "AND s.rowid < ?" if cursor_rowid is not None else ""
+                params: list[Any] = [str(project_ref), producer]
+                if cursor_rowid is not None:
+                    params.append(cursor_rowid)
+                params.append(limit + 1)
+                rows.extend(store._db.execute(
+                    f"""
+                    SELECT s.rowid,s.proposal_id,s.payload_json,d.payload_json AS source_payload_json
+                    FROM state_delta_proposals s
+                    LEFT JOIN documents d
+                      ON d.message_type='action_proposal'
+                     AND d.document_id=json_extract(s.payload_json, '$.provenance.source_action_proposal.proposal_id')
+                    WHERE json_valid(s.payload_json)=1
+                      AND json_extract(s.payload_json, '$.project_ref')=?
+                      AND json_extract(s.payload_json, '$.candidate_only')=1
+                      AND json_extract(s.payload_json, '$.provenance.producer')=?
+                      {where_cursor}
+                    ORDER BY s.rowid DESC
+                    LIMIT ?
+                    """,
+                    tuple(params),
+                ).fetchall())
     except ConversationRuntimeError:
         raise
     except sqlite3.Error as exc:
         raise ConversationRuntimeError(_ERROR, "synthesis candidate collection is unreadable") from exc
 
-    page = rows[:limit]
+    rows.sort(key=lambda row: int(row["rowid"]), reverse=True)
+    page_probe = rows[: limit + 1]
+    page = page_probe[:limit]
     return {
         "rows": tuple(dict(row) for row in page),
-        "truncated": len(rows) > limit,
-        "next_cursor": str(page[-1]["proposal_id"]) if len(rows) > limit and page else None,
+        "truncated": len(page_probe) > limit,
+        "next_cursor": str(page[-1]["proposal_id"]) if len(page_probe) > limit and page else None,
         "collection_incomplete": malformed,
     }
 
