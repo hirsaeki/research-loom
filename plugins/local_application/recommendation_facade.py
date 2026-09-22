@@ -6,7 +6,9 @@ from typing import Any, Mapping
 
 from core.conversation import ActionDefinition, ConversationRuntimeError, HarnessServiceResult
 from core.runtime import ObjectRef, StateDeltaProposal, TransitionAction, TransitionKind
+from plugins.local_conversation_store.resume import state_delta_proposals_by_ids_for_project
 
+from .candidate_projection import build_candidate_projection
 from .new_material_continuation_public_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
 
 _ACTION_REGISTRATION_LOCK = RLock()
@@ -16,6 +18,12 @@ _MAX_FINDING_IDS = 256
 _MAX_SEMANTIC_TEXT_CHARS = 8_192
 _MAX_SEMANTIC_LIST_ITEMS = 64
 _MAX_SEMANTIC_LIST_ITEM_CHARS = 4_096
+_CANDIDATE_PROJECTION_ACTIONS = {
+    "research_question.propose",
+    "research_question.propose_many",
+    "research.argument.propose",
+    "research.recommendation.propose",
+}
 
 
 def research_recommendation_proposal_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
@@ -188,7 +196,66 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
 
     def submit_action(self, draft_input: Mapping[str, Any]) -> Mapping[str, Any]:
         self._ensure_recommendation_action()
-        return super().submit_action(draft_input)
+        result = dict(super().submit_action(draft_input))
+        if draft_input.get("action_type") not in _CANDIDATE_PROJECTION_ACTIONS:
+            return result
+        data = result.get("data")
+        candidate = data.get("state_delta_proposal") if isinstance(data, Mapping) else None
+        if not isinstance(candidate, Mapping):
+            return result
+        projected_data = deepcopy(dict(data))
+        projected_data["candidate_projection"] = build_candidate_projection(
+            candidate, self._current_state_view()
+        )
+        result["data"] = projected_data
+        return result
+
+    def resume_context(self, *, limits: Mapping[str, int] | None = None) -> Mapping[str, Any]:
+        result = deepcopy(dict(super().resume_context(limits=limits)))
+        questions = result.get("research_questions")
+        candidates = questions.get("candidates") if isinstance(questions, Mapping) else None
+        if not isinstance(candidates, list) or not candidates:
+            return result
+        state = self._current_state_view()
+        candidate_ids = []
+        for row in candidates:
+            if not isinstance(row, dict):
+                continue
+            candidate_id = row.get("state_delta_proposal_id")
+            if not isinstance(candidate_id, str) or not candidate_id:
+                raise ConversationRuntimeError(
+                    "APPLICATION-CANDIDATE-PROJECTION-001",
+                    "resume candidate identity is invalid",
+                )
+            candidate_ids.append(candidate_id)
+        candidates_by_id = state_delta_proposals_by_ids_for_project(
+            self._application.conversation_store,
+            self._project_id,
+            candidate_ids,
+        )
+        for row in candidates:
+            if not isinstance(row, dict):
+                continue
+            candidate_id = row.get("state_delta_proposal_id")
+            if not isinstance(candidate_id, str) or not candidate_id:
+                raise ConversationRuntimeError(
+                    "APPLICATION-CANDIDATE-PROJECTION-001",
+                    "resume candidate identity is invalid",
+                )
+            candidate = candidates_by_id.get(candidate_id)
+            if not isinstance(candidate, Mapping):
+                raise ConversationRuntimeError(
+                    "APPLICATION-CANDIDATE-PROJECTION-001",
+                    "resume candidate does not resolve",
+                )
+            row["candidate_projection"] = build_candidate_projection(candidate, state)
+        return result
+
+    def _current_state_view(self):
+        repository = self._application.state_repository
+        return repository.load_state_view(
+            self._project_id, repository.load_active_lineage_ref(self._project_id)
+        )
 
     def _ensure_recommendation_action(self) -> None:
         coordinator = self._application.coordinator
