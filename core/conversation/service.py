@@ -252,7 +252,7 @@ class WorkConversationService:
             if obj.get("kind") in {"project", "research_question", "evidence_gap"}:
                 objects.append({
                     key: obj[key]
-                    for key in ("kind", "id", "revision", "state", "adoption_state", "question", "statement")
+                    for key in ("kind", "id", "revision", "state", "adoption_state", "text", "question", "statement")
                     if key in obj
                 })
         return {
