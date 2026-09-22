@@ -150,6 +150,23 @@ def build_parser() -> argparse.ArgumentParser:
     _add_workspace(actions)
     _add_output_json(actions)
 
+    synthesis_candidate = sub.add_parser("synthesis-candidate")
+    synthesis_candidate_sub = synthesis_candidate.add_subparsers(
+        dest="synthesis_candidate_command", required=True
+    )
+    synthesis_candidate_list = synthesis_candidate_sub.add_parser("list")
+    _add_workspace(synthesis_candidate_list)
+    synthesis_candidate_list.add_argument(
+        "--kind", choices=("recommendation", "argument")
+    )
+    synthesis_candidate_list.add_argument("--limit", type=int, default=20)
+    synthesis_candidate_list.add_argument("--cursor")
+    _add_output_json(synthesis_candidate_list)
+    synthesis_candidate_show = synthesis_candidate_sub.add_parser("show")
+    _add_workspace(synthesis_candidate_show)
+    synthesis_candidate_show.add_argument("--candidate-id", required=True)
+    _add_output_json(synthesis_candidate_show)
+
     run = sub.add_parser("run")
     run_sub = run.add_subparsers(dest="run_command", required=True)
     run_show = run_sub.add_parser("show")
@@ -565,6 +582,13 @@ def _run(args: argparse.Namespace) -> Mapping[str, Any]:
             return facade.resume_context()
         if args.command == "actions":
             return facade.list_actions()
+        if args.command == "synthesis-candidate":
+            if args.synthesis_candidate_command == "list":
+                return facade.list_synthesis_candidates(
+                    kind=args.kind, limit=args.limit, cursor=args.cursor
+                )
+            if args.synthesis_candidate_command == "show":
+                return facade.show_synthesis_candidate(args.candidate_id)
         if args.command == "run" and args.run_command == "show":
             return facade.show_run(args.run_id)
         if args.command == "run" and args.run_command == "replay":
