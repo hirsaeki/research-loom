@@ -7,7 +7,7 @@ import json
 import tempfile
 from unittest.mock import patch
 
-import pytest
+import unittest
 
 from core.conversation import ConversationRuntimeError
 from core.runtime import canonical_digest
@@ -147,13 +147,13 @@ def test_list_is_bounded_cursor_stable_and_filter_bound():
             assert second["next_cursor"] is None
 
             facade.submit_action(_argument_input())
-            with pytest.raises(ConversationRuntimeError) as error:
+            with unittest.TestCase().assertRaises(ConversationRuntimeError) as error:
                 facade.list_synthesis_candidates(
                     kind="argument", limit=20, cursor=first["next_cursor"]
                 )
-            assert error.value.code == "SYNTHESIS-CANDIDATE-CURSOR-001"
+            assert error.exception.code == "SYNTHESIS-CANDIDATE-CURSOR-001"
 
-            with pytest.raises(ValueError):
+            with unittest.TestCase().assertRaises(ValueError):
                 facade.list_synthesis_candidates(limit=101)
         finally:
             facade.close()
@@ -215,9 +215,9 @@ def test_corrupt_items_are_isolated_and_unattributable_json_marks_collection_inc
 
             shown = facade.show_synthesis_candidate(healthy_id)
             assert shown["status"] == "OK"
-            with pytest.raises(ConversationRuntimeError):
+            with unittest.TestCase().assertRaises(ConversationRuntimeError):
                 facade.show_synthesis_candidate(corrupt_id)
-            with pytest.raises(ConversationRuntimeError):
+            with unittest.TestCase().assertRaises(ConversationRuntimeError):
                 facade.show_synthesis_candidate("SDP-UNATTRIBUTABLE")
 
             malformed = facade.submit_action(_recommendation_input(statement="Malformed fields"))
@@ -265,11 +265,11 @@ def test_cross_project_candidate_and_cursor_do_not_leak_content_and_reads_do_not
             assert count_after == count_before
             assert state_after == state_before
 
-            with pytest.raises(ConversationRuntimeError):
+            with unittest.TestCase().assertRaises(ConversationRuntimeError):
                 facade.show_synthesis_candidate("SDP-FOREIGN")
-            with pytest.raises(ConversationRuntimeError) as error:
+            with unittest.TestCase().assertRaises(ConversationRuntimeError) as error:
                 facade.list_synthesis_candidates(cursor="SDP-FOREIGN")
-            assert error.value.code == "SYNTHESIS-CANDIDATE-CURSOR-001"
+            assert error.exception.code == "SYNTHESIS-CANDIDATE-CURSOR-001"
         finally:
             facade.close()
 
