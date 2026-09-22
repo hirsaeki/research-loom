@@ -6,6 +6,7 @@ from typing import Any, Mapping
 
 from core.conversation import ActionDefinition, ConversationRuntimeError, HarnessServiceResult
 from core.runtime import ObjectRef, StateDeltaProposal, TransitionAction, TransitionKind
+from plugins.local_conversation_store.resume import research_question_candidates_for_project
 
 from .candidate_projection import build_candidate_projection
 from .new_material_continuation_public_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
@@ -213,9 +214,18 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
         result = deepcopy(dict(super().resume_context(limits=limits)))
         questions = result.get("research_questions")
         candidates = questions.get("candidates") if isinstance(questions, Mapping) else None
-        if not isinstance(candidates, list):
+        if not isinstance(candidates, list) or not candidates:
             return result
         state = self._current_state_view()
+        candidate_documents = research_question_candidates_for_project(
+            self._application.conversation_store,
+            self._project_id,
+            limit=max(len(candidates), 1),
+        )
+        candidates_by_id = {
+            str(candidate["proposal_id"]): candidate
+            for candidate in candidate_documents
+        }
         for row in candidates:
             if not isinstance(row, dict):
                 continue
@@ -225,7 +235,7 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                     "APPLICATION-CANDIDATE-PROJECTION-001",
                     "resume candidate identity is invalid",
                 )
-            candidate = self._application.conversation_store.load_state_delta_proposal(candidate_id)
+            candidate = candidates_by_id.get(candidate_id)
             if not isinstance(candidate, Mapping):
                 raise ConversationRuntimeError(
                     "APPLICATION-CANDIDATE-PROJECTION-001",

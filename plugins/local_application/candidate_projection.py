@@ -19,7 +19,8 @@ def build_candidate_projection(
         raise ConversationRuntimeError(_ERROR, "candidate_only must be true")
     if candidate.get("project_ref") != state.project_ref:
         raise ConversationRuntimeError(_ERROR, "candidate project binding is invalid")
-    if candidate.get("lineage_ref") != state.lineage_ref:
+    lineage_ref = candidate.get("lineage_ref")
+    if not isinstance(lineage_ref, str) or not lineage_ref:
         raise ConversationRuntimeError(_ERROR, "candidate lineage binding is invalid")
 
     proposal_id = candidate.get("proposal_id")
@@ -91,6 +92,8 @@ def build_candidate_projection(
     return {
         "candidate_only": True,
         "proposal_id": proposal_id,
+        "bound_lineage_ref": lineage_ref,
+        "bound_to_current_lineage": lineage_ref == state.lineage_ref,
         "bound_snapshot": {
             "snapshot_id": snapshot_ref,
             "content_digest": snapshot_digest,

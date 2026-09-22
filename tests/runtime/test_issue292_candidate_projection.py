@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 from plugins.local_application import LocalApplicationFacade
+from plugins.local_application.candidate_projection import build_candidate_projection
 from test_issue134_argument_proposal import Issue134ArgumentProposalTests
 from test_issue135_recommendation_proposal import Issue135RecommendationProposalTests
 from test_research_question_adoption import _init_workspace, _proposal_input
@@ -88,3 +90,42 @@ def test_historical_batch_projection_reports_current_values_without_false_reprop
             assert projection["bound_to_current_snapshot"] is False
             assert [item["subject"]["id"] for item in projection["subjects"]] == generated_ids
             assert all(item["current_value"] is not None for item in projection["subjects"])
+
+
+def test_historical_candidate_from_another_lineage_remains_readable():
+    with tempfile.TemporaryDirectory() as temp:
+        workspace = _init_workspace(Path(temp))
+        with LocalApplicationFacade.open_workspace(workspace) as facade:
+            result = facade.submit_action(_proposal_input())
+            candidate = result["data"]["state_delta_proposal"]
+            current = facade._current_state_view()
+
+            class OtherLineageState:
+                project_ref = current.project_ref
+                lineage_ref = "LIN-HISTORICAL-SUCCESSOR"
+                current_snapshot = current.current_snapshot
+
+                @staticmethod
+                def effective_objects():
+                    return current.effective_objects()
+
+            projection = build_candidate_projection(candidate, OtherLineageState())
+            assert projection["bound_lineage_ref"] == candidate["lineage_ref"]
+            assert projection["bound_to_current_lineage"] is False
+            assert projection["subjects"][0]["current_value"] is None
+
+
+def test_resume_projection_does_not_reload_candidates_one_by_one():
+    with tempfile.TemporaryDirectory() as temp:
+        workspace = _init_workspace(Path(temp))
+        with LocalApplicationFacade.open_workspace(workspace) as facade:
+            facade.submit_action(_proposal_input())
+            facade.submit_action(_proposal_input(text="二つ目の研究問い候補"))
+            with patch.object(
+                facade._application.conversation_store,
+                "load_state_delta_proposal",
+                side_effect=AssertionError("resume must not issue per-candidate loads"),
+            ):
+                resumed = facade.resume_context()["research_questions"]["candidates"]
+            assert len(resumed) >= 2
+            assert all("candidate_projection" in row for row in resumed)
