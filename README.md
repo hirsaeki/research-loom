@@ -27,6 +27,8 @@ Windows / PowerShell:
 .\research-loom.cmd status --workspace PATH --json
 .\research-loom.cmd resume --workspace PATH --json
 .\research-loom.cmd actions --workspace PATH --json
+.\research-loom.cmd synthesis-candidate list --workspace PATH --limit 20 --json
+.\research-loom.cmd synthesis-candidate show --workspace PATH --candidate-id SDP-ID --json
 .\research-loom.cmd run show --workspace PATH --run-id RUN-ID --json
 .\research-loom.cmd external materials list --workspace PATH
 .\research-loom.cmd external materials list --workspace PATH --json
@@ -39,6 +41,8 @@ POSIX:
 ./research-loom status --workspace PATH --json
 ./research-loom resume --workspace PATH --json
 ./research-loom actions --workspace PATH --json
+./research-loom synthesis-candidate list --workspace PATH --limit 20 --json
+./research-loom synthesis-candidate show --workspace PATH --candidate-id SDP-ID --json
 ./research-loom run show --workspace PATH --run-id RUN-ID --json
 ./research-loom external materials list --workspace PATH
 ./research-loom external materials list --workspace PATH --json

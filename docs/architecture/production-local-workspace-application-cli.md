@@ -125,6 +125,15 @@ PR37 adds transport-neutral Exhibit methods outside the action/authority pipelin
 
 `research-loom resume` is the saved bounded research continuation checkpoint. It remains focused on continuing the research conversation and does not absorb historical Run artifact/diagnostic/attempt detail or Research Exhibit content.
 
+Saved Recommendation and Argument candidates are discoverable through the same public boundary without exposing a generic StateDelta browser:
+
+```text
+research-loom synthesis-candidate list --workspace PATH [--kind recommendation|argument] [--limit N] [--cursor SDP-ID] --json
+research-loom synthesis-candidate show --workspace PATH --candidate-id SDP-ID --json
+```
+
+The list is newest-first, bounded to 1-100 items, and uses an immutable candidate ID as the continuation cursor. `resume` includes only the first 20 compact candidate summaries; exact semantic content, support references, conditions/qualifiers, and current-vs-candidate values are retrieved with `show`. Historical candidates remain readable even when their Snapshot or lineage binding is stale; staleness does not imply adoption or re-approval. Candidate reads never rebind, adopt, repair, or mutate Research State.
+
 PR36 adds:
 
 ```text
@@ -224,6 +233,8 @@ Windows / PowerShell:
 .\research-loom.cmd resume --workspace PATH --json
 .\research-loom.cmd doctor --workspace PATH --json
 .\research-loom.cmd actions --workspace PATH --json
+.\research-loom.cmd synthesis-candidate list --workspace PATH --limit 20 --json
+.\research-loom.cmd synthesis-candidate show --workspace PATH --candidate-id SDP-ID --json
 .\research-loom.cmd run show --workspace PATH --run-id RUN-ID --json
 .\research-loom.cmd exhibit capture --workspace PATH --json EXHIBIT.json
 .\research-loom.cmd exhibit list --workspace PATH --json
@@ -246,6 +257,8 @@ POSIX:
 ./research-loom resume --workspace PATH --json
 ./research-loom doctor --workspace PATH --json
 ./research-loom actions --workspace PATH --json
+./research-loom synthesis-candidate list --workspace PATH --limit 20 --json
+./research-loom synthesis-candidate show --workspace PATH --candidate-id SDP-ID --json
 ./research-loom run show --workspace PATH --run-id RUN-ID --json
 ./research-loom exhibit capture --workspace PATH --json EXHIBIT.json
 ./research-loom exhibit list --workspace PATH --json
