@@ -15,6 +15,8 @@ The legacy directories remain reference material only:
 
 New work should converge toward the canonical areas below rather than adding new cross-cutting concepts to either legacy tree.
 
+For a human-facing research session driven by Codex or ChatGPT Work, explicitly load [`skills/research-conversation/SKILL.md`](skills/research-conversation/SKILL.md). The repository does not assume either host automatically discovers this skill, and repository development/review tasks should not be routed through it.
+
 ## Production CLI
 
 Research Loom requires Python 3.12+ and `uv`. Root `pyproject.toml` and `uv.lock` are the single repository/application dependency contract.
