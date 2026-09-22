@@ -124,3 +124,33 @@ def research_question_review_candidates_for_project(
         _validated_state_delta(row, project_ref=str(project_ref))
         for row in rows
     )
+
+
+def state_delta_proposals_by_ids_for_project(
+    store,
+    project_ref: str,
+    proposal_ids,
+):
+    """Load an exact bounded set of candidate documents for one project in one query."""
+    ids = tuple(str(item) for item in proposal_ids)
+    if not ids:
+        return {}
+    if len(ids) > 100 or any(not item for item in ids) or len(set(ids)) != len(ids):
+        raise ValueError("candidate proposal ID query must contain 1-100 unique non-empty IDs")
+    placeholders = ",".join("?" for _ in ids)
+    try:
+        with store._lock:
+            rows = store._db.execute(
+                f"SELECT proposal_id,payload_json FROM state_delta_proposals "
+                f"WHERE proposal_id IN ({placeholders})",
+                ids,
+            ).fetchall()
+    except sqlite3.Error as exc:
+        raise ConversationRuntimeError(
+            "RESUME-CANDIDATE-001", "StateDeltaProposal lookup is unreadable"
+        ) from exc
+    result = {}
+    for row in rows:
+        candidate = _validated_state_delta(row, project_ref=str(project_ref))
+        result[str(candidate["proposal_id"])] = candidate
+    return result
