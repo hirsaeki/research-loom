@@ -38,6 +38,8 @@ Keep the meaning that matters:
 
 If the human explicitly asks for internal IDs, digests, codes, or Loom mechanics, provide them. Terminology suppression must not become secrecy.
 
+When a public response contains raw internal fields or opaque IDs, translate them into research meaning first. Do not quote field names or opaque IDs merely to justify an ordinary progress answer unless the human asked for diagnostics or the identifier is necessary to disambiguate a decision.
+
 ## Persisted checkpoint vs current chat
 
 `resume` is a saved checkpoint, not a complete replacement for the current conversation. When the conversation contains later analysis that is not yet persisted, preserve it as working progress and say that it is not yet saved. Do not fabricate capture times, digests, source identity, or adoption status from chat memory.
@@ -52,6 +54,7 @@ Never inflate a backend status beyond what it proves:
 - action `SUCCEEDED` proves that action succeeded.
 - Run `COMPLETED` proves that Run lifecycle completed, not that the research question is answered.
 - a candidate proves a proposal was saved, not adopted.
+- an `adoption_state: approved` that appears only inside a candidate or `candidate_value` describes the proposed target value if adopted. It is not evidence that a human approved the candidate, that the candidate itself is approved, or that current authoritative state changed. Until a verified Decision + commit and current-state read prove adoption, describe it only as a saved proposal that is not yet adopted.
 - an operation-confirmation receipt proves that exact operation was confirmed, not that a separate research decision was approved.
 - a verified Human Decision + commit receipt proves the exact authoritative transition it names.
 - a preview/build does not by itself prove formal publication/release.
