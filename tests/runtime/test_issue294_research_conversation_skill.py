@@ -42,6 +42,12 @@ class ResearchConversationSkillContractTests(unittest.TestCase):
         ):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, skill)
+        self.assertIn("## Candidate interpretation gate", skill)
+        self.assertIn("PROPOSAL_SAVED_NOT_ADOPTED", skill)
+        self.assertIn("determine the semantic candidate state first", skill)
+        self.assertIn("treat candidate-local `adoption_state` as proposed payload", skill)
+        self.assertIn("do not use candidate-local `approved` to choose words", skill)
+        self.assertIn("Do not derive a separate \"candidate approved\" or \"human approved\" stage", skill)
         self.assertIn("If the human explicitly asks for internal IDs", skill)
         self.assertIn("translate them into research meaning first", skill)
         self.assertIn("Do not quote field names or opaque IDs", skill)
