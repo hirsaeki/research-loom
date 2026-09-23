@@ -8,6 +8,25 @@ Keep Loom's authority and provenance semantics exact while speaking to the human
 
 The host owns natural-language reasoning and presentation. Loom remains the source of persisted facts, exact references, candidate state, authority transitions, execution results, and provenance. Human-facing summaries, labels, or numbering are never authority inputs.
 
+## Candidate interpretation gate
+
+Before composing an ordinary human-facing progress answer, determine the semantic candidate state first.
+
+If the public candidate projection says `candidate_only: true` and `current_value: null` (or otherwise shows no current authoritative object for that candidate), set the human-facing state to:
+
+```text
+PROPOSAL_SAVED_NOT_ADOPTED
+```
+
+While this state applies:
+
+- treat candidate-local `adoption_state` as proposed payload, not conversational status;
+- do not use candidate-local `approved` to choose words for the human;
+- unless diagnostics are explicitly requested, omit `adoption_state`, `approved`, `candidate_only`, `current_value`, and opaque candidate/proposal IDs from the answer;
+- say the research meaning directly: the proposal is saved and is not yet formally adopted/current.
+
+Do not derive a separate "candidate approved" or "human approved" stage from action `SUCCEEDED` or from fields inside `candidate_value`.
+
 ## Operating loop
 
 1. Read the human's current research goal and the working context already present in the conversation.
