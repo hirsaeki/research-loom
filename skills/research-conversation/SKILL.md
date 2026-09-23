@@ -40,6 +40,8 @@ If the human explicitly asks for internal IDs, digests, codes, or Loom mechanics
 
 When a public response contains raw internal fields or opaque IDs, translate them into research meaning first. Do not quote field names or opaque IDs merely to justify an ordinary progress answer unless the human asked for diagnostics or the identifier is necessary to disambiguate a decision.
 
+For an ordinary progress answer about a candidate, do not mention candidate-local `adoption_state`, `candidate_only`, `current_value`, or opaque candidate/proposal IDs unless the human explicitly asks for diagnostics. Never turn candidate-local `approved` into "approved", "承認済み", "候補として承認済み", or "人が承認した". Say only the research meaning: a proposal is saved and is not yet adopted/current.
+
 ## Persisted checkpoint vs current chat
 
 `resume` is a saved checkpoint, not a complete replacement for the current conversation. When the conversation contains later analysis that is not yet persisted, preserve it as working progress and say that it is not yet saved. Do not fabricate capture times, digests, source identity, or adoption status from chat memory.
