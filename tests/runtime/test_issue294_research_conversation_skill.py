@@ -47,6 +47,10 @@ class ResearchConversationSkillContractTests(unittest.TestCase):
         self.assertIn("Do not quote field names or opaque IDs", skill)
         self.assertIn("proposed target value if adopted", skill)
         self.assertIn("not evidence that a human approved the candidate", skill)
+        self.assertIn('Never turn candidate-local `approved` into "approved"', skill)
+        self.assertIn('"承認済み"', skill)
+        self.assertIn("a proposal is saved and is not yet adopted/current", skill)
+        self.assertIn("do not mention candidate-local `adoption_state`", skill)
         self.assertIn("not response templates", skill)
 
     def test_public_surface_reference_uses_only_public_operator_paths(self):
