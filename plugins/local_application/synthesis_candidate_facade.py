@@ -7,10 +7,12 @@ from typing import Any, Mapping
 from core.conversation import ConversationRuntimeError
 from core.conversation.validation import WorkConversationValidator
 from core.runtime import canonical_digest
+from plugins.local_conversation_store.resume import state_delta_proposal_for_project
 from plugins.local_conversation_store.synthesis import (
     list_synthesis_candidate_rows,
     load_synthesis_candidate_row,
 )
+from plugins.local_decision_store.resume import decision_request_for_project
 
 from .argument_facade import research_argument_proposal_payload
 from .candidate_projection import build_candidate_projection
@@ -317,6 +319,75 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
             },
             "content": _semantic_content(kind, candidate, obj),
             "candidate_projection": build_candidate_projection(candidate, self._current_state_view()),
+        }
+
+    def show_candidate(self, candidate_id: str) -> Mapping[str, Any]:
+        """Return one exact persisted candidate without rebinding or rewriting it."""
+        if not isinstance(candidate_id, str) or not candidate_id:
+            raise ConversationRuntimeError(
+                "APPLICATION-CANDIDATE-DETAIL-001", "candidate_id is required"
+            )
+        candidate = state_delta_proposal_for_project(
+            self._application.conversation_store,
+            self._project_id,
+            candidate_id,
+        )
+        if candidate is None:
+            raise ConversationRuntimeError(
+                "APPLICATION-CANDIDATE-DETAIL-001", "candidate does not resolve"
+            )
+        return {
+            "status": "OK",
+            "project_id": self._project_id,
+            "candidate_id": candidate_id,
+            "candidate": deepcopy(candidate),
+        }
+
+    def show_human_decision_request(self, request_id: str) -> Mapping[str, Any]:
+        """Return one immutable Decision Request plus separate operational lifecycle data."""
+        if not isinstance(request_id, str) or not request_id:
+            raise ConversationRuntimeError(
+                "APPLICATION-DECISION-DETAIL-001", "request_id is required"
+            )
+        detail = decision_request_for_project(
+            self._application.decision_store,
+            self._project_id,
+            request_id,
+        )
+        if detail is None:
+            raise ConversationRuntimeError(
+                "APPLICATION-DECISION-DETAIL-001", "Human Decision Request does not resolve"
+            )
+        request = detail["request"]
+        source = request.get("source_state_delta_proposal")
+        if not isinstance(source, Mapping):
+            raise ConversationRuntimeError(
+                "APPLICATION-DECISION-DETAIL-001",
+                "Human Decision Request source candidate binding is malformed",
+            )
+        candidate_id = source.get("proposal_id")
+        candidate_digest = source.get("proposal_digest")
+        if not isinstance(candidate_id, str) or not candidate_id:
+            raise ConversationRuntimeError(
+                "APPLICATION-DECISION-DETAIL-001",
+                "Human Decision Request source candidate identity is invalid",
+            )
+        candidate = state_delta_proposal_for_project(
+            self._application.conversation_store,
+            self._project_id,
+            candidate_id,
+        )
+        if candidate is None or candidate.get("proposal_digest") != candidate_digest:
+            raise ConversationRuntimeError(
+                "APPLICATION-DECISION-DETAIL-001",
+                "Human Decision Request source candidate binding does not resolve",
+            )
+        return {
+            "status": "OK",
+            "project_id": self._project_id,
+            "request_id": request_id,
+            "request": deepcopy(request),
+            "operational": deepcopy(detail["operational"]),
         }
 
     def resume_context(self, *, limits: Mapping[str, int] | None = None) -> Mapping[str, Any]:

@@ -154,3 +154,84 @@ def state_delta_proposals_by_ids_for_project(
         candidate = _validated_state_delta(row, project_ref=str(project_ref))
         result[str(candidate["proposal_id"])] = candidate
     return result
+
+
+def state_delta_proposal_for_project(
+    store,
+    project_ref: str,
+    proposal_id: str,
+):
+    """Load one exact persisted candidate without rebinding it to current state."""
+    if not isinstance(proposal_id, str) or not proposal_id:
+        raise ValueError("candidate proposal ID must be a non-empty string")
+    try:
+        with store._lock:
+            row = store._db.execute(
+                "SELECT proposal_id,payload_json FROM state_delta_proposals WHERE proposal_id=?",
+                (proposal_id,),
+            ).fetchone()
+    except sqlite3.Error as exc:
+        raise ConversationRuntimeError(
+            "RESUME-CANDIDATE-001", "StateDeltaProposal lookup is unreadable"
+        ) from exc
+    if row is None:
+        return None
+
+    candidate = _validated_state_delta(row, project_ref=str(project_ref))
+    if candidate.get("candidate_only") is not True:
+        raise ConversationRuntimeError(
+            "RESUME-CANDIDATE-001", "stored StateDeltaProposal is not candidate-only"
+        )
+    if not isinstance(candidate.get("lineage_ref"), str) or not candidate["lineage_ref"]:
+        raise ConversationRuntimeError(
+            "RESUME-CANDIDATE-001", "stored StateDeltaProposal lineage binding is invalid"
+        )
+    if not isinstance(candidate.get("source_refs"), list):
+        raise ConversationRuntimeError(
+            "RESUME-CANDIDATE-001", "stored StateDeltaProposal source_refs are malformed"
+        )
+    if not isinstance(candidate.get("proposed_actions"), list) or not candidate["proposed_actions"]:
+        raise ConversationRuntimeError(
+            "RESUME-CANDIDATE-001", "stored StateDeltaProposal actions are malformed"
+        )
+    if any(
+        not isinstance(action, dict)
+        or not isinstance(action.get("kind"), str)
+        or not isinstance(action.get("payload"), dict)
+        or not isinstance(action.get("decision_refs"), list)
+        or not isinstance(action.get("source_refs"), list)
+        for action in candidate["proposed_actions"]
+    ):
+        raise ConversationRuntimeError(
+            "RESUME-CANDIDATE-001", "stored StateDeltaProposal action structure is invalid"
+        )
+    affected = candidate.get("affected_refs")
+    if not isinstance(affected, list) or any(
+        not isinstance(ref, dict)
+        or not isinstance(ref.get("kind"), str)
+        or not ref["kind"]
+        or not isinstance(ref.get("id"), str)
+        or not ref["id"]
+        for ref in affected
+    ):
+        raise ConversationRuntimeError(
+            "RESUME-CANDIDATE-001", "stored StateDeltaProposal affected_refs are malformed"
+        )
+    if not isinstance(candidate.get("rationale"), str):
+        raise ConversationRuntimeError(
+            "RESUME-CANDIDATE-001", "stored StateDeltaProposal rationale is malformed"
+        )
+    if not isinstance(candidate.get("required_human_decision_kinds"), list):
+        raise ConversationRuntimeError(
+            "RESUME-CANDIDATE-001", "stored StateDeltaProposal decision requirements are malformed"
+        )
+    for field in ("current_snapshot_ref", "current_snapshot_digest"):
+        if not isinstance(candidate.get(field), str) or not candidate[field]:
+            raise ConversationRuntimeError(
+                "RESUME-CANDIDATE-001", "stored StateDeltaProposal snapshot binding is invalid"
+            )
+    if not isinstance(candidate.get("provenance"), dict):
+        raise ConversationRuntimeError(
+            "RESUME-CANDIDATE-001", "stored StateDeltaProposal provenance is malformed"
+        )
+    return candidate

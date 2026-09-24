@@ -19,6 +19,57 @@ _KNOWN_STATUSES = {
 }
 
 
+def _validated_request_row(row, *, project_ref: str):
+    try:
+        request = json.loads(str(row["payload_json"]))
+    except (TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise ConversationRuntimeError(
+            "RESUME-DECISION-001", "stored Human Decision Request is not valid JSON"
+        ) from exc
+    if not isinstance(request, dict):
+        raise ConversationRuntimeError(
+            "RESUME-DECISION-001", "stored Human Decision Request must be an object"
+        )
+    source = request.get("source_state_delta_proposal")
+    if not isinstance(source, dict):
+        raise ConversationRuntimeError(
+            "RESUME-DECISION-001", "stored Human Decision source candidate binding is malformed"
+        )
+    if (
+        str(request.get("request_id") or "") != str(row["request_id"])
+        or str(request.get("request_digest") or "") != str(row["request_digest"])
+        or str(row["project_ref"]) != str(project_ref)
+        or str(request.get("project_ref") or "") != str(project_ref)
+        or str(source.get("proposal_id") or "") != str(row["source_candidate_id"])
+        or str(source.get("proposal_digest") or "") != str(row["source_candidate_digest"])
+    ):
+        raise ConversationRuntimeError(
+            "RESUME-DECISION-001", "stored Human Decision Request identity or binding is invalid"
+        )
+    if any(
+        key in request for key in ("operational_status", "commit_id", "status_detail")
+    ):
+        raise ConversationRuntimeError(
+            "RESUME-DECISION-001",
+            "stored Human Decision Request contains operational fields",
+        )
+    if request_digest(request) != str(row["request_digest"]):
+        raise ConversationRuntimeError(
+            "RESUME-DECISION-001", "stored Human Decision Request digest is invalid"
+        )
+    status = str(row["status"])
+    if status not in _KNOWN_STATUSES:
+        raise ConversationRuntimeError(
+            "RESUME-DECISION-001", "stored Human Decision operational status is invalid"
+        )
+    operational = {
+        "status": status,
+        "commit_id": str(row["commit_id"]) if row["commit_id"] is not None else None,
+        "detail": str(row["detail"]) if row["detail"] is not None else None,
+    }
+    return request, operational
+
+
 def decision_requests_for_project(
     store,
     project_ref: str,
@@ -55,45 +106,41 @@ def decision_requests_for_project(
 
     result = []
     for row in rows:
-        try:
-            request = json.loads(str(row["payload_json"]))
-        except (TypeError, ValueError, json.JSONDecodeError) as exc:
-            raise ConversationRuntimeError(
-                "RESUME-DECISION-001", "stored Human Decision Request is not valid JSON"
-            ) from exc
-        if not isinstance(request, dict):
-            raise ConversationRuntimeError(
-                "RESUME-DECISION-001", "stored Human Decision Request must be an object"
-            )
-        source = request.get("source_state_delta_proposal")
-        if not isinstance(source, dict):
-            raise ConversationRuntimeError(
-                "RESUME-DECISION-001", "stored Human Decision source candidate binding is malformed"
-            )
-        if (
-            str(request.get("request_id") or "") != str(row["request_id"])
-            or str(request.get("request_digest") or "") != str(row["request_digest"])
-            or str(request.get("project_ref") or "") != str(project_ref)
-            or str(source.get("proposal_id") or "") != str(row["source_candidate_id"])
-            or str(source.get("proposal_digest") or "") != str(row["source_candidate_digest"])
-        ):
-            raise ConversationRuntimeError(
-                "RESUME-DECISION-001", "stored Human Decision Request identity or binding is invalid"
-            )
-        if request_digest(request) != str(row["request_digest"]):
-            raise ConversationRuntimeError(
-                "RESUME-DECISION-001", "stored Human Decision Request digest is invalid"
-            )
-        status = str(row["status"])
-        if status not in _KNOWN_STATUSES:
-            raise ConversationRuntimeError(
-                "RESUME-DECISION-001", "stored Human Decision operational status is invalid"
-            )
+        request, operational = _validated_request_row(row, project_ref=str(project_ref))
         projected = deepcopy(request)
-        projected["operational_status"] = status
-        if row["commit_id"] is not None:
-            projected["commit_id"] = str(row["commit_id"])
-        if row["detail"] is not None:
-            projected["status_detail"] = str(row["detail"])
+        projected["operational_status"] = operational["status"]
+        if operational["commit_id"] is not None:
+            projected["commit_id"] = operational["commit_id"]
+        if operational["detail"] is not None:
+            projected["status_detail"] = operational["detail"]
         result.append(projected)
     return tuple(result)
+
+
+def decision_request_for_project(
+    store,
+    project_ref: str,
+    request_id: str,
+):
+    """Load one immutable Decision Request and separate operational lifecycle data."""
+    if not isinstance(request_id, str) or not request_id:
+        raise ValueError("Human Decision request ID must be a non-empty string")
+    try:
+        with store._lock:
+            row = store._db.execute(
+                "SELECT request_id,request_digest,project_ref,source_candidate_id,"
+                "source_candidate_digest,payload_json,status,commit_id,detail "
+                "FROM decision_requests WHERE request_id=?",
+                (request_id,),
+            ).fetchone()
+    except sqlite3.Error as exc:
+        raise ConversationRuntimeError(
+            "RESUME-DECISION-001", "Human Decision Request lookup is unreadable"
+        ) from exc
+    if row is None:
+        return None
+    request, operational = _validated_request_row(row, project_ref=str(project_ref))
+    return {
+        "request": deepcopy(request),
+        "operational": deepcopy(operational),
+    }
