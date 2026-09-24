@@ -55,10 +55,10 @@ jobs:
         run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_*.py' -v
 
 
-  issue91-windows:
-    name: issue91-windows
+  windows-material-recovery:
+    name: windows-material-recovery
     runs-on: windows-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
         with:
@@ -78,18 +78,6 @@ jobs:
         run: uv run --frozen python -m unittest -v tests.runtime.test_issue91_review_fixes.Issue91ReviewFixTests
       - name: Run Issue 91 real Windows file I/O regressions
         run: uv run --frozen python -m unittest -v tests.runtime.test_issue91_review_fixes.Issue91WindowsRealIoTests
-      - name: Run Issue 77 Research Package Windows acceptance
-        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_research_package_*.py' -v
-      - name: Run Issue 133 Research Package ACL acceptance
-        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue133_windows_acl.py' -v
-      - name: Run Issue 80 Writer Composition Windows acceptance
-        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue80_writer_composition.py' -v
-      - name: Run Issue 134 Argument proposal and Writer recovery acceptance
-        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue134_*.py' -v
-      - name: Run Issue 145 historical Finding lineage recovery acceptance
-        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_*finding*recovery*.py' -v
-      - name: Run Issue 148 historical G1 result recovery acceptance
-        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_historical_result_recovery.py' -v
       - name: Run Issue 127 historical material recovery acceptance
         run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_historical_material_recovery*.py' -v
       - name: Run Issue 158 external material health acceptance
@@ -98,10 +86,74 @@ jobs:
         run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue160_execution_store_portability.py' -v
       - name: Run Issue 165 staged material import acceptance
         run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue165_staged_material_import.py' -v
+      - name: Run Issue 171 new material continuation acceptance
+        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue171_new_material_continuation.py' -v
+
+  windows-package-lineage:
+    name: windows-package-lineage
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+      - name: Sync locked Python environment
+        run: uv sync --frozen
+      - name: Run Issue 77 Research Package Windows acceptance
+        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_research_package_*.py' -v
+      - name: Run Issue 133 Research Package ACL acceptance
+        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue133_windows_acl.py' -v
+      - name: Run Issue 134 Argument proposal and Writer recovery acceptance
+        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue134_*.py' -v
+      - name: Run Issue 145 historical Finding lineage recovery acceptance
+        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_*finding*recovery*.py' -v
+      - name: Run Issue 148 historical G1 result recovery acceptance
+        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_historical_result_recovery.py' -v
+
+  windows-writer-publication-a:
+    name: windows-writer-publication-a
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+      - name: Sync locked Python environment
+        run: uv sync --frozen
+      - name: Run Issue 80 Writer Composition Windows acceptance
+        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue80_writer_composition.py' -v
       - name: Run Issue 245 Publication recovery acceptance
         run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue245*.py' -v
       - name: Run Issue 249 Writer continuity recovery acceptance
         run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue249*.py' -v
+      - name: Run Issue 193 Parent Durable Store acceptance
+        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue193_parent_durable_store.py' -v
+
+  windows-writer-publication-b:
+    name: windows-writer-publication-b
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+      - name: Sync locked Python environment
+        run: uv sync --frozen
       - name: Run Issue 250 exact payload repair acceptance
         run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue250*.py' -v
       - name: Run Issue 251 REAL Survey batch acceptance
@@ -112,10 +164,6 @@ jobs:
         run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue254*.py' -v
       - name: Run Issue 248 optional child recovery acceptance
         run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue248*.py' -v
-      - name: Run Issue 193 Parent Durable Store acceptance
-        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue193_parent_durable_store.py' -v
-      - name: Run Issue 171 new material continuation acceptance
-        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue171_new_material_continuation.py' -v
 
   issue128-windows:
     name: issue128-windows
