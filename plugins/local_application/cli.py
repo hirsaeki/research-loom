@@ -83,6 +83,14 @@ def _add_output_json(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--json", action="store_true", help="machine-readable JSON output (always enabled)")
 
 
+def _add_view(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--view",
+        choices=("conversation", "detail"),
+        help="select the public result view; omitted preserves the existing detail contract",
+    )
+
+
 def _add_input_json(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--json",
@@ -123,10 +131,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     status = sub.add_parser("status")
     _add_workspace(status)
+    _add_view(status)
     _add_output_json(status)
 
     resume = sub.add_parser("resume")
     _add_workspace(resume)
+    _add_view(resume)
     _add_output_json(resume)
 
     doctor = sub.add_parser("doctor")
@@ -161,10 +171,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     synthesis_candidate_list.add_argument("--limit", type=int, default=20)
     synthesis_candidate_list.add_argument("--cursor")
+    _add_view(synthesis_candidate_list)
     _add_output_json(synthesis_candidate_list)
     synthesis_candidate_show = synthesis_candidate_sub.add_parser("show")
     _add_workspace(synthesis_candidate_show)
     synthesis_candidate_show.add_argument("--candidate-id", required=True)
+    _add_view(synthesis_candidate_show)
     _add_output_json(synthesis_candidate_show)
 
     candidate = sub.add_parser("candidate")
@@ -179,10 +191,12 @@ def build_parser() -> argparse.ArgumentParser:
     run_show = run_sub.add_parser("show")
     _add_workspace(run_show)
     run_show.add_argument("--run-id", required=True)
+    _add_view(run_show)
     _add_output_json(run_show)
     run_replay = run_sub.add_parser("replay")
     _add_workspace(run_replay)
     run_replay.add_argument("--run-id", required=True)
+    _add_view(run_replay)
     _add_output_json(run_replay)
 
     research_input = sub.add_parser("research-input")
@@ -447,12 +461,14 @@ def build_parser() -> argparse.ArgumentParser:
     action_sub = action.add_subparsers(dest="action_command", required=True)
     submit = action_sub.add_parser("submit")
     _add_workspace(submit)
+    _add_view(submit)
     _add_input_json(submit)
 
     confirmation = sub.add_parser("confirmation")
     confirmation_sub = confirmation.add_subparsers(dest="confirmation_command", required=True)
     confirm = confirmation_sub.add_parser("submit")
     _add_workspace(confirm)
+    _add_view(confirm)
     _add_input_json(confirm)
 
     decision = sub.add_parser("decision")
@@ -463,6 +479,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_output_json(decision_show)
     resolve = decision_sub.add_parser("resolve")
     _add_workspace(resolve)
+    _add_view(resolve)
     _add_input_json(resolve)
 
     external = sub.add_parser("external")
@@ -480,6 +497,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     collect = external_sub.add_parser("collect")
     _add_external_input(collect)
+    _add_view(collect)
 
     materials = external_sub.add_parser("materials")
     materials_sub = materials.add_subparsers(dest="materials_command", required=True)
@@ -588,24 +606,31 @@ def _run(args: argparse.Namespace) -> Mapping[str, Any]:
 
     with LocalApplicationFacade.open_workspace(args.workspace) as facade:
         if args.command == "status":
-            return facade.status()
+            return facade.status(**({"view": args.view} if args.view is not None else {}))
         if args.command == "resume":
-            return facade.resume_context()
+            return facade.resume_context(**({"view": args.view} if args.view is not None else {}))
         if args.command == "actions":
             return facade.list_actions()
         if args.command == "synthesis-candidate":
             if args.synthesis_candidate_command == "list":
                 return facade.list_synthesis_candidates(
-                    kind=args.kind, limit=args.limit, cursor=args.cursor
+                    kind=args.kind, limit=args.limit, cursor=args.cursor,
+                    **({"view": args.view} if args.view is not None else {}),
                 )
             if args.synthesis_candidate_command == "show":
-                return facade.show_synthesis_candidate(args.candidate_id)
+                return facade.show_synthesis_candidate(
+                    args.candidate_id, **({"view": args.view} if args.view is not None else {})
+                )
         if args.command == "candidate" and args.candidate_command == "show":
             return facade.show_candidate(args.candidate_id)
         if args.command == "run" and args.run_command == "show":
-            return facade.show_run(args.run_id)
+            return facade.show_run(
+                args.run_id, **({"view": args.view} if args.view is not None else {})
+            )
         if args.command == "run" and args.run_command == "replay":
-            return facade.replay_completed_desktop_research_run(args.run_id)
+            return facade.replay_completed_desktop_research_run(
+                args.run_id, **({"view": args.view} if args.view is not None else {})
+            )
         if args.command == "research-package":
             if args.research_package_command == "build":
                 return facade.build_research_package(_read_input(args.json_input))
@@ -718,11 +743,17 @@ def _run(args: argparse.Namespace) -> Mapping[str, Any]:
             if args.research_input_command == "recover":
                 return facade.recover_project_input(args.input_id, args.source_file)
         if args.command == "action" and args.action_command == "submit":
-            return facade.submit_action(_read_input(args.json_input))
+            return facade.submit_action(
+                _read_input(args.json_input), **({"view": args.view} if args.view is not None else {})
+            )
         if args.command == "confirmation" and args.confirmation_command == "submit":
-            return facade.submit_confirmation(_read_input(args.json_input))
+            return facade.submit_confirmation(
+                _read_input(args.json_input), **({"view": args.view} if args.view is not None else {})
+            )
         if args.command == "decision" and args.decision_command == "resolve":
-            return facade.resolve_human_decision(_read_input(args.json_input))
+            return facade.resolve_human_decision(
+                _read_input(args.json_input), **({"view": args.view} if args.view is not None else {})
+            )
         if args.command == "decision" and args.decision_command == "show":
             return facade.show_human_decision_request(args.request_id)
         if args.command == "external":
@@ -742,7 +773,11 @@ def _run(args: argparse.Namespace) -> Mapping[str, Any]:
                     _read_input(args.json_input),
                 )
             if args.external_command == "collect":
-                return facade.collect_external(args.run_id, _read_input(args.json_input))
+                return facade.collect_external(
+                    args.run_id,
+                    _read_input(args.json_input),
+                    **({"view": args.view} if args.view is not None else {}),
+                )
             if args.external_command == "materials" and args.materials_command == "stage":
                 return facade.stage_external_material_source(args.source)
             if args.external_command == "materials" and args.materials_command == "import":
