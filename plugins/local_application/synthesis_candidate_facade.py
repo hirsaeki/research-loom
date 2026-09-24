@@ -15,6 +15,22 @@ from plugins.local_conversation_store.synthesis import (
 from plugins.local_decision_store.resume import decision_request_for_project
 
 from .argument_facade import research_argument_proposal_payload
+from .conversation_view import (
+    ConversationViewError,
+    normalize_view,
+    project_action_result,
+    project_collect,
+    project_confirmation_result,
+    project_decision_result,
+    project_replay,
+    project_resume,
+    project_run,
+    project_status,
+    project_synthesis_list,
+    project_synthesis_show,
+    projection_unavailable,
+)
+from .facade import LocalApplicationError
 from .candidate_projection import build_candidate_projection
 from .recommendation_facade import (
     LocalApplicationFacade as _BaseLocalApplicationFacade,
@@ -244,7 +260,9 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
         kind: str | None = None,
         limit: int = 20,
         cursor: str | None = None,
+        view: str | None = None,
     ) -> Mapping[str, Any]:
+        selected = self._public_view(view)
         page = list_synthesis_candidate_rows(
             self._application.conversation_store,
             self._project_id,
@@ -290,7 +308,7 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                 "code": "SYNTHESIS-CANDIDATE-COLLECTION-001",
                 "message": "candidate collection may be incomplete because an unattributable stored proposal is malformed",
             })
-        return {
+        detail = {
             "status": "DEGRADED" if degraded else "OK",
             "project_id": self._project_id,
             "items": items,
@@ -298,8 +316,14 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
             "next_cursor": page["next_cursor"],
             "issues": issues,
         }
+        return detail if selected == "detail" else self._read_projection(
+            detail, project_synthesis_list, operation="synthesis-candidate.list"
+        )
 
-    def show_synthesis_candidate(self, candidate_id: str) -> Mapping[str, Any]:
+    def show_synthesis_candidate(
+        self, candidate_id: str, *, view: str | None = None
+    ) -> Mapping[str, Any]:
+        selected = self._public_view(view)
         row = load_synthesis_candidate_row(self._application.conversation_store, candidate_id)
         if row is None:
             raise ConversationRuntimeError(_ERROR, "synthesis candidate does not resolve")
@@ -307,7 +331,7 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
             row,
             project_id=self._project_id,
         )
-        return {
+        detail = {
             "status": "OK",
             "project_id": self._project_id,
             "candidate_id": str(candidate["proposal_id"]),
@@ -320,6 +344,9 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
             "content": _semantic_content(kind, candidate, obj),
             "candidate_projection": build_candidate_projection(candidate, self._current_state_view()),
         }
+        return detail if selected == "detail" else self._read_projection(
+            detail, project_synthesis_show, operation="synthesis-candidate.show"
+        )
 
     def show_candidate(self, candidate_id: str) -> Mapping[str, Any]:
         """Return one exact persisted candidate without rebinding or rewriting it."""
@@ -390,9 +417,121 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
             "operational": deepcopy(detail["operational"]),
         }
 
-    def resume_context(self, *, limits: Mapping[str, int] | None = None) -> Mapping[str, Any]:
+    @staticmethod
+    def _public_view(view: str | None) -> str:
+        try:
+            return normalize_view(view)
+        except ConversationViewError as exc:
+            raise LocalApplicationError("APPLICATION-VIEW-001", str(exc)) from exc
+
+    @staticmethod
+    def _read_projection(detail: Mapping[str, Any], projector, *, operation: str) -> Mapping[str, Any]:
+        try:
+            return projector(detail)
+        except ConversationViewError as exc:
+            raise LocalApplicationError(
+                "APPLICATION-CONVERSATION-VIEW-001",
+                f"{operation} conversation projection is unavailable: {exc}",
+            ) from exc
+
+    @staticmethod
+    def _after_operation_projection(
+        detail: Mapping[str, Any], projector, *, operation: str, **kwargs: Any
+    ) -> Mapping[str, Any]:
+        try:
+            return projector(detail, **kwargs)
+        except Exception:
+            # The operation has already completed. Never fall back to the raw result and
+            # never make the caller repeat an effect because only presentation failed.
+            return projection_unavailable(
+                status=detail.get("status"),
+                operation=operation,
+                message="Operation completed, but its conversation projection could not be verified.",
+                detail=detail,
+            )
+
+    def submit_action(
+        self, draft_input: Mapping[str, Any], *, view: str | None = None
+    ) -> Mapping[str, Any]:
+        selected = self._public_view(view)
+        detail = super().submit_action(draft_input)
+        if selected == "detail":
+            return detail
+        action_type = draft_input.get("action_type") if isinstance(draft_input, Mapping) else None
+        return self._after_operation_projection(
+            detail,
+            lambda value, **_: project_action_result(
+                value, action_type=str(action_type or ""), state=self._current_state_view()
+            ),
+            operation="action.submit",
+        )
+
+    def submit_confirmation(
+        self, confirmation: Mapping[str, Any], *, view: str | None = None
+    ) -> Mapping[str, Any]:
+        selected = self._public_view(view)
+        detail = super().submit_confirmation(confirmation)
+        if selected == "detail":
+            return detail
+        return self._after_operation_projection(
+            detail, project_confirmation_result, operation="confirmation.submit"
+        )
+
+    def resolve_human_decision(
+        self, response: Mapping[str, Any], *, view: str | None = None
+    ) -> Mapping[str, Any]:
+        selected = self._public_view(view)
+        detail = super().resolve_human_decision(response)
+        if selected == "detail":
+            return detail
+        return self._after_operation_projection(
+            detail, project_decision_result, operation="decision.resolve"
+        )
+
+    def collect_external(
+        self, run_id: str, submission: Mapping[str, Any], *, view: str | None = None
+    ) -> Mapping[str, Any]:
+        selected = self._public_view(view)
+        detail = super().collect_external(run_id, submission)
+        if selected == "detail":
+            return detail
+        return self._after_operation_projection(
+            detail,
+            lambda value, **_: project_collect(value, state=self._current_state_view()),
+            operation="external.collect",
+        )
+
+    def status(self, *, view: str | None = None) -> Mapping[str, Any]:
+        selected = self._public_view(view)
+        detail = super().status()
+        return detail if selected == "detail" else self._read_projection(
+            detail, project_status, operation="status"
+        )
+
+    def show_run(self, run_id: str, *, view: str | None = None) -> Mapping[str, Any]:
+        selected = self._public_view(view)
+        detail = super().show_run(run_id)
+        return detail if selected == "detail" else self._read_projection(
+            detail, project_run, operation="run.show"
+        )
+
+    def replay_completed_desktop_research_run(
+        self, run_id: str, *, view: str | None = None
+    ) -> Mapping[str, Any]:
+        selected = self._public_view(view)
+        detail = super().replay_completed_desktop_research_run(run_id)
+        if selected == "detail":
+            return detail
+        return self._after_operation_projection(
+            detail, project_replay, operation="run.replay"
+        )
+
+    def resume_context(
+        self, *, limits: Mapping[str, int] | None = None, view: str | None = None
+    ) -> Mapping[str, Any]:
+        selected = self._public_view(view)
         result = deepcopy(dict(super().resume_context(limits=limits)))
-        listing = self.list_synthesis_candidates(limit=20)
+        listing = self.list_synthesis_candidates(limit=20, view="detail")
         result["saved_synthesis_candidates"] = {
             "items": [_resume_item(item) for item in listing["items"]],
             "truncated": bool(listing["truncated"]),
@@ -401,4 +540,6 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
         }
         if listing["status"] == "DEGRADED":
             result["status"] = "DEGRADED"
-        return result
+        return result if selected == "detail" else self._read_projection(
+            result, project_resume, operation="resume"
+        )
