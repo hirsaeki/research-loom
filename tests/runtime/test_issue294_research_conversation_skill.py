@@ -42,6 +42,10 @@ class ResearchConversationSkillContractTests(unittest.TestCase):
         ):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, skill)
+        self.assertIn("## Public read selection", skill)
+        self.assertIn('--view conversation', skill)
+        self.assertIn('decision show --request-id', skill)
+        self.assertIn('candidate show --candidate-id', skill)
         self.assertIn("## Candidate interpretation gate", skill)
         self.assertIn("PROPOSAL_SAVED_NOT_ADOPTED", skill)
         self.assertIn("determine the semantic candidate state first", skill)
@@ -62,16 +66,20 @@ class ResearchConversationSkillContractTests(unittest.TestCase):
     def test_public_surface_reference_uses_only_public_operator_paths(self):
         surfaces = (SKILL_ROOT / "references" / "public-surfaces.md").read_text(encoding="utf-8")
         for operation in (
-            "resume --json",
-            "synthesis-candidate list/show",
-            "run show --run-id",
+            "resume --view conversation --json",
+            "status --view conversation --json",
+            "synthesis-candidate list --view conversation --json",
+            "run show --run-id ... --view conversation --json",
+            "action submit --view conversation --json INPUT.json",
+            "decision show --request-id ... --json",
+            "candidate show --candidate-id ... --json",
             "external materials list --json",
             "actions --json",
-            "action submit --json",
         ):
             with self.subTest(operation=operation):
                 self.assertIn(operation, surfaces)
         self.assertIn("Do not make private SQLite", surfaces)
+        self.assertIn("do not invent view arguments", surfaces)
 
     def test_host_bootstrap_is_explicit_and_does_not_claim_auto_discovery(self):
         bootstrap = (SKILL_ROOT / "references" / "host-bootstrap.md").read_text(encoding="utf-8")
@@ -80,6 +88,8 @@ class ResearchConversationSkillContractTests(unittest.TestCase):
         self.assertIn("does not assume", bootstrap)
         self.assertIn("Do not load this skill merely because Codex is editing", bootstrap)
         self.assertIn("Do not assume the `skills/` directory is automatically", bootstrap)
+        self.assertIn("resume --view conversation", bootstrap)
+        self.assertIn("decision show --request-id", bootstrap)
         self.assertIn("No provider SDK", bootstrap)
 
     def test_scenario_pack_contains_all_provider_neutral_semantic_cases(self):
