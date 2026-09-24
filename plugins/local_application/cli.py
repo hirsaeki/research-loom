@@ -167,6 +167,13 @@ def build_parser() -> argparse.ArgumentParser:
     synthesis_candidate_show.add_argument("--candidate-id", required=True)
     _add_output_json(synthesis_candidate_show)
 
+    candidate = sub.add_parser("candidate")
+    candidate_sub = candidate.add_subparsers(dest="candidate_command", required=True)
+    candidate_show = candidate_sub.add_parser("show")
+    _add_workspace(candidate_show)
+    candidate_show.add_argument("--candidate-id", required=True)
+    _add_output_json(candidate_show)
+
     run = sub.add_parser("run")
     run_sub = run.add_subparsers(dest="run_command", required=True)
     run_show = run_sub.add_parser("show")
@@ -450,6 +457,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     decision = sub.add_parser("decision")
     decision_sub = decision.add_subparsers(dest="decision_command", required=True)
+    decision_show = decision_sub.add_parser("show")
+    _add_workspace(decision_show)
+    decision_show.add_argument("--request-id", required=True)
+    _add_output_json(decision_show)
     resolve = decision_sub.add_parser("resolve")
     _add_workspace(resolve)
     _add_input_json(resolve)
@@ -589,6 +600,8 @@ def _run(args: argparse.Namespace) -> Mapping[str, Any]:
                 )
             if args.synthesis_candidate_command == "show":
                 return facade.show_synthesis_candidate(args.candidate_id)
+        if args.command == "candidate" and args.candidate_command == "show":
+            return facade.show_candidate(args.candidate_id)
         if args.command == "run" and args.run_command == "show":
             return facade.show_run(args.run_id)
         if args.command == "run" and args.run_command == "replay":
@@ -710,6 +723,8 @@ def _run(args: argparse.Namespace) -> Mapping[str, Any]:
             return facade.submit_confirmation(_read_input(args.json_input))
         if args.command == "decision" and args.decision_command == "resolve":
             return facade.resolve_human_decision(_read_input(args.json_input))
+        if args.command == "decision" and args.decision_command == "show":
+            return facade.show_human_decision_request(args.request_id)
         if args.command == "external":
             if args.external_command == "attempt" and args.attempt_command == "start":
                 return facade.start_external_retrieval_attempt(
