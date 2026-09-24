@@ -38,12 +38,20 @@ def _validated_request_row(row, *, project_ref: str):
     if (
         str(request.get("request_id") or "") != str(row["request_id"])
         or str(request.get("request_digest") or "") != str(row["request_digest"])
+        or str(row["project_ref"]) != str(project_ref)
         or str(request.get("project_ref") or "") != str(project_ref)
         or str(source.get("proposal_id") or "") != str(row["source_candidate_id"])
         or str(source.get("proposal_digest") or "") != str(row["source_candidate_digest"])
     ):
         raise ConversationRuntimeError(
             "RESUME-DECISION-001", "stored Human Decision Request identity or binding is invalid"
+        )
+    if any(
+        key in request for key in ("operational_status", "commit_id", "status_detail")
+    ):
+        raise ConversationRuntimeError(
+            "RESUME-DECISION-001",
+            "stored Human Decision Request contains operational fields",
         )
     if request_digest(request) != str(row["request_digest"]):
         raise ConversationRuntimeError(

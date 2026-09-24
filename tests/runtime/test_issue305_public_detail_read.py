@@ -282,3 +282,60 @@ class Issue305PublicDetailReadTests(unittest.TestCase):
                 with self.assertRaises(ConversationRuntimeError) as corrupt_request:
                     facade.show_human_decision_request(request_id)
                 assert corrupt_request.exception.code == "RESUME-DECISION-001"
+
+    def test_decision_show_rejects_row_project_binding_corruption(self):
+        with tempfile.TemporaryDirectory() as temp:
+            workspace = _init_workspace(Path(temp))
+            with LocalApplicationFacade.open_workspace(workspace) as facade:
+                proposed = facade.submit_action(_proposal_input())
+                pending = facade.submit_action({
+                    "action_type": "state.apply_candidate",
+                    "payload": {"state_delta_proposal_id": proposed["data"]["state_delta_proposal_id"]},
+                    "actor_id": "HUMAN-RQ",
+                })
+                confirmed = facade.submit_confirmation({
+                    "confirmation_request_id": pending["confirmation_request"]["confirmation_request_id"],
+                    "actor_id": "HUMAN-RQ",
+                })
+                request_id = confirmed["decision_request"]["request_id"]
+                facade._application.decision_store._db.execute(
+                    "UPDATE decision_requests SET project_ref=? WHERE request_id=?",
+                    ("PRJ-FOREIGN", request_id),
+                )
+                with self.assertRaises(ConversationRuntimeError) as corrupt_request:
+                    facade.show_human_decision_request(request_id)
+                assert corrupt_request.exception.code == "RESUME-DECISION-001"
+
+    def test_decision_show_rejects_operational_fields_inside_immutable_payload(self):
+        with tempfile.TemporaryDirectory() as temp:
+            workspace = _init_workspace(Path(temp))
+            with LocalApplicationFacade.open_workspace(workspace) as facade:
+                proposed = facade.submit_action(_proposal_input())
+                pending = facade.submit_action({
+                    "action_type": "state.apply_candidate",
+                    "payload": {"state_delta_proposal_id": proposed["data"]["state_delta_proposal_id"]},
+                    "actor_id": "HUMAN-RQ",
+                })
+                confirmed = facade.submit_confirmation({
+                    "confirmation_request_id": pending["confirmation_request"]["confirmation_request_id"],
+                    "actor_id": "HUMAN-RQ",
+                })
+                request_id = confirmed["decision_request"]["request_id"]
+                row = facade._application.decision_store._db.execute(
+                    "SELECT payload_json FROM decision_requests WHERE request_id=?", (request_id,)
+                ).fetchone()
+                request = json.loads(row["payload_json"])
+                request["operational_status"] = "RESOLVED"
+                request["commit_id"] = "COM-FAKE"
+                request["status_detail"] = "tampered operational projection"
+                # request_digest deliberately remains valid because these fields are excluded
+                # from the canonical digest contract. The persisted immutable payload must
+                # therefore reject them explicitly.
+                assert request_digest(request) == request["request_digest"]
+                facade._application.decision_store._db.execute(
+                    "UPDATE decision_requests SET payload_json=? WHERE request_id=?",
+                    (json.dumps(request, ensure_ascii=False, sort_keys=True, separators=(",", ":")), request_id),
+                )
+                with self.assertRaises(ConversationRuntimeError) as corrupt_request:
+                    facade.show_human_decision_request(request_id)
+                assert corrupt_request.exception.code == "RESUME-DECISION-001"
