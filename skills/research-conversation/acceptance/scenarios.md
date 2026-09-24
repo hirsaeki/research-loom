@@ -2,6 +2,14 @@
 
 The wording may vary. Each scenario is scored by the semantic rubric, not exact phrase matching.
 
+## Public-read source for live probes
+
+S1-S6 and S8 remain provider-neutral semantic fixtures and do not call Loom during the frozen P1 probe. For a live Loom-backed equivalent, ordinary progress input must come from the implemented `conversation` view. S7 is the deliberate diagnostic control: when exact internal values are requested, use frozen exact detail in P1 or an exact public detail read in P2.
+
+The S1 fixture deliberately retains a candidate target with `adoption_state=approved`; changing it to a harmless draft target would weaken the false-adoption test. A live fixture derived from #305/#306 must likewise preserve the canonical target unchanged while the conversation projection omits the raw target envelope.
+
+For an actual approval flow, the host may use a conversation result to identify that a Decision is required, but must read the issued Decision exactly before asking the human to authorize it.
+
 ## S1 — Candidate is not adopted
 
 **Input/context:** a saved candidate has target `adoption_state=approved`, while the current-vs-candidate projection reports no current authoritative object.

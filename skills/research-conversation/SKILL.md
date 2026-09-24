@@ -8,9 +8,21 @@ Keep Loom's authority and provenance semantics exact while speaking to the human
 
 The host owns natural-language reasoning and presentation. Loom remains the source of persisted facts, exact references, candidate state, authority transitions, execution results, and provenance. Human-facing summaries, labels, or numbering are never authority inputs.
 
+## Public read selection
+
+For live Loom-backed research, choose the public result view by purpose instead of consuming the default/detail envelope for every turn.
+
+- **Ordinary progress, resume, discovery, and result checking:** explicitly request `view="conversation"` from the public Facade or `--view conversation` from the CLI on surfaces that support it. This is the normal input to human-facing reasoning.
+- **Before asking for or resolving a Human Decision:** use the exact references from the conversation result to read the issued request with `decision show --request-id ... --json`; read the persisted candidate with `candidate show --candidate-id ... --json` when its full exact target is needed. Review the exact request/target/current context before binding the human answer.
+- **Explicit diagnostics:** use the exact single-item reads above or `view="detail"` / `--view detail` on a supported surface when the human asks for IDs, digests, codes, bindings, or raw status. Explain the values rather than hiding them.
+
+Do not pre-read exact detail on every ordinary turn. Conversely, do not treat the conversation projection as the complete approval packet. If raw detail was inspected earlier in the same session, a later ordinary progress answer must still use a fresh conversation-view read when current Loom state matters; prior raw target fields are not current approval facts.
+
+The `actions` registry, material inventory/detail commands, and domain-specific commands that do not expose a view remain their existing public contracts. Do not invent a `--view` option for them.
+
 ## Candidate interpretation gate
 
-Before composing an ordinary human-facing progress answer, determine the semantic candidate state first.
+For normal live progress, consume the conversation view above. When a frozen acceptance fixture or exact detail is already in context, determine the semantic candidate state first rather than reading candidate-local target fields as current state.
 
 If the public candidate projection says `candidate_only: true` and `current_value: null` (or otherwise shows no current authoritative object for that candidate), set the human-facing state to:
 
@@ -30,13 +42,13 @@ Do not derive a separate "candidate approved" or "human approved" stage from act
 ## Operating loop
 
 1. Read the human's current research goal and the working context already present in the conversation.
-2. At a start, resume, write boundary, or detected conflict, read the smallest relevant public Loom surface. Prefer `resume`; use the bounded list/show operations when detail is needed.
+2. At a start, resume, write boundary, or detected conflict, read the smallest relevant public Loom surface. For normal live progress explicitly select the conversation view (`resume --view conversation`, bounded list/show with `--view conversation`, or the equivalent Facade argument). Read exact detail only at an authority or diagnostic boundary.
 3. Reconcile the persisted checkpoint with current-chat working progress. Do not discard work merely because it has not been persisted yet, and do not promote unpersisted chat work to authoritative research state.
 4. Choose an existing public typed operation. Do not inspect private SQLite files or internal artifact layout as a normal operating path.
 5. After an operation, distinguish operation success, persisted proposal, authoritative adoption, execution completion, retrieval outcome, and publication/release status.
 6. Tell the human what is known, what was saved, what remains uncertain or unpersisted, and what decision is actually required.
-7. Bind a human answer only to the exact issued request and content it answers. Never reuse a vague `OK` for a later request that has not yet been issued.
-8. After an authoritative write, verify the corresponding receipt/current state before saying that the change took effect.
+7. Before asking for a Human Decision, follow the exact `request_id` from the conversation result to `decision show`, and inspect the exact candidate when needed. Bind a human answer only to that issued request, its `request_digest`, actor, disposition, and exact content. Never reuse a vague `OK` for a later request that has not yet been issued.
+8. After an authoritative write, distinguish the commit receipt from current state and perform a fresh public read before saying that the change is current. Use conversation view for ordinary reporting; use detail only when exact binding verification is required.
 
 Do not reread every store on every turn. Recheck at the boundaries above.
 
