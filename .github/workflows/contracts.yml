@@ -72,6 +72,7 @@ jobs:
         env:
           SHARD_INDEX: ${{ matrix.shard }}
           SHARD_TOTAL: 4
+          PYTHONPATH: tests/runtime
         run: |
           mapfile -t runtime_tests < <(find tests/runtime -type f -name 'test_*.py' | sort)
           selected=()
