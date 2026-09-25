@@ -1,5 +1,5 @@
 #!/bin/sh
-'''exec' uv run --frozen python "$0" "$@"
+'''exec' "$(dirname "$0")/.venv/bin/python" "$0" "$@"
 ' '''
 from plugins.local_application.cli import main
 
