@@ -21,7 +21,7 @@ For a human-facing research session driven by Codex or ChatGPT Work, explicitly 
 
 Research Loom requires Python 3.12+ and `uv`. Root `pyproject.toml` and `uv.lock` are the single repository/application dependency contract.
 
-For normal operator use, invoke the repository launcher from the repository root. The launcher owns frozen `uv` execution; callers do not need to select a Python environment.
+For normal harness/host runtime use, provision the root project environment first with `uv sync --frozen` outside the host sandbox, then invoke the repository launcher from the repository root. Runtime launchers execute the pre-synced root `.venv` directly; they do not invoke `uv`, mutate dependencies, or depend on the persistent uv cache.
 
 Windows / PowerShell:
 
@@ -55,7 +55,7 @@ Use `external materials list` to answer which external research materials were a
 
 Ordinary operator workflow should not inspect `execution.db`, other SQLite stores, or artifact/blob directory layout to decide what has been captured. Research Exhibits are separate working analytical artifacts and are not included in the external material inventory.
 
-Structured production input should be supplied through a UTF-8 JSON file rather than relying on stdin. The launchers do not install, download, bootstrap, or upgrade `uv`, and they do not fall back to system Python or another environment when `uv` is unavailable.
+Structured production input should be supplied through a UTF-8 JSON file rather than relying on stdin. Runtime launchers do not install, download, bootstrap, synchronize, or upgrade dependencies; they execute the pre-synced root `.venv` directly and fail closed if it has not been provisioned. They do not fall back to system Python, another environment, or runtime `uv` resolution.
 
 For developer/debug use, the explicit form remains supported:
 

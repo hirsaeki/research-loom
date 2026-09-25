@@ -223,7 +223,7 @@ Attempt events and capture artifacts are persisted before final collection. Ther
 
 ## JSON CLI
 
-The first concrete facade adapter is a structured CLI, not a REPL/TUI. Root `pyproject.toml` and `uv.lock` remain the single repository/application dependency contract. Normal operator use goes through the repository launchers, which always enter `uv run --frozen` and do not define a second dependency environment.
+The first concrete facade adapter is a structured CLI, not a REPL/TUI. Root `pyproject.toml` and `uv.lock` remain the single repository/application dependency contract. Harness/host setup provisions the root `.venv` with `uv sync --frozen` outside the host sandbox. Runtime use goes through the repository launchers, which execute that pre-synced environment directly; runtime therefore does not invoke `uv`, synchronize dependencies, or depend on the persistent uv cache, and no second dependency environment is defined.
 
 Windows / PowerShell:
 
@@ -273,7 +273,7 @@ POSIX:
 ./research-loom external collect --workspace PATH --run-id RUN-ID --json RESULT.json
 ```
 
-Research Loom requires Python 3.12+ and `uv` on `PATH`. The launchers do not install, download, bootstrap, or upgrade `uv`; they do not run an explicit `uv sync`; and they do not fall back to system Python, an active virtual environment, Conda, a repository `.venv`, or another interpreter when `uv` is unavailable. Structured production input should be supplied through a UTF-8 JSON file rather than relying on stdin in Work command environments.
+Research Loom setup requires Python 3.12+ and `uv` on `PATH`. Harness/host setup must provision the root `.venv` before runtime with `uv sync --frozen` outside the host sandbox. The launchers themselves do not invoke `uv` or install, download, bootstrap, synchronize, or upgrade dependencies; they execute the pre-synced root `.venv` directly and fail closed when it is missing. They do not fall back to system Python, an active unrelated virtual environment, Conda, or another interpreter. The root `.venv` is repository-local runtime state and is ignored by Git. Structured production input should be supplied through a UTF-8 JSON file rather than relying on stdin in Work command environments.
 
 The explicit developer/debug invocation remains supported:
 
