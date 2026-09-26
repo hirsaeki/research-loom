@@ -21,6 +21,50 @@ On the public surfaces that support a view, **explicitly select the conversation
 
 Prefer the smallest read that answers the current question. `resume` is not a full audit log, and a bounded/truncated list does not prove older items do not exist. A conversation projection is presentation input, not a replacement canonical document.
 
+## Minimal mutation inputs for the adoption path
+
+These JSON shapes are **host-to-Loom transport contracts**, not wording to show to the human. Use the exact references returned by public Loom operations; do not guess field names, add invented fields, or substitute synonymous disposition words.
+
+To start adoption of an already saved candidate, submit only the exact saved StateDeltaProposal reference in the action payload:
+
+```json
+{
+  "action_type": "state.apply_candidate",
+  "payload": {
+    "state_delta_proposal_id": "<exact saved candidate_id>"
+  },
+  "actor_id": "<human actor id>"
+}
+```
+
+Use this through `action submit --view conversation --json INPUT.json`. The `state_delta_proposal_id` is the public candidate/proposal reference returned by the save operation. Do not replace it with the research-object ID, a display number, or a reconstructed target. Decision references are derived by Loom and are not caller input to this action.
+
+When Loom returns `CONFIRMATION_REQUIRED`, continue only that issued operation confirmation. The confirmation input accepts `confirmation_request_id` and optional `actor_id`; do not add action/candidate/decision fields:
+
+```json
+{
+  "confirmation_request_id": "<exact issued confirmation_request_id>",
+  "actor_id": "<human actor id>"
+}
+```
+
+Use this through `confirmation submit --view conversation --json INPUT.json`. When the human actor is already known for the flow, preserve that exact actor identity rather than inventing a new one.
+
+When Loom returns `HUMAN_DECISION_REQUIRED`, first read the immutable request with `decision show --request-id ... --json` and review its exact target/current context. The minimal Decision resolve input is exactly:
+
+```json
+{
+  "request_id": "<exact issued request_id>",
+  "request_digest": "<exact issued request_digest>",
+  "disposition": "approve_exact",
+  "actor_id": "<exact request human_actor_id>"
+}
+```
+
+The supported `disposition` values are `approve_exact`, `decline`, and `request_revision`. Do not substitute `approve`, `APPROVE`, `adopt`, or other synonyms. `approve_exact` approves exactly the issued request packet; changing only part of it requires the revision path instead.
+
+After `decision resolve --view conversation --json INPUT.json`, perform a fresh conversation-view `status` or `resume` read before describing the change as current. The exact input fields above are authority mechanics; ordinary human-facing progress should still use research meaning rather than exposing these opaque fields unless diagnostics are requested.
+
 ## Exact approval and diagnostic detail
 
 Use exact detail only when its precision is required.
