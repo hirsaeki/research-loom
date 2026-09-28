@@ -84,12 +84,27 @@ class MiscoProfileMigrationLedgerTests(unittest.TestCase):
             self.assertTrue(any(x == prefix or x.startswith(prefix) for x in ids))
 
     def test_project_sources_remain_project_scoped(self):
-        classes = {x["class"] for x in self.project}
-        self.assertIn("project-attention", classes); self.assertIn("project-knowledge", classes)
+        expected = set("""
+MANIFEST-ATTENTION_PUBLICATION_MAP MANIFEST-PROJECT_KNOWLEDGE MANIFEST-PUBLICATION_SOURCE_PACK
+ATTENTION-1-MAP ATTENTION-2-CHAPTER-LEVEL-ATTENTION ATTENTION-3-SECTION-LEVEL-DISTILLED-MAP
+ATTENTION-1 ATTENTION-2 ATTENTION-3 ATTENTION-4 ATTENTION-5 ATTENTION-6 ATTENTION-7 ATTENTION-8 ATTENTION-4-MAP-UPDATE-RULE
+FEEDBACK-PROJECT-KNOWLEDGE-V0-1 FEEDBACK-1 FEEDBACK-2 FEEDBACK-L29 FEEDBACK-L36 FEEDBACK-3 FEEDBACK-4-HOME-CHAPTER
+FEEDBACK-SURVEY FEEDBACK-DELPHI FEEDBACK-5-7-CASE FEEDBACK-CASE-PROPOSITION-MODEL-REFINEMENT-MATRIX FEEDBACK-L135
+FEEDBACK-6-6-7 FEEDBACK-6-DELPHI-SCENARIO FEEDBACK-7-CASE FEEDBACK-7-8 FEEDBACK-8-MISCO FEEDBACK-9 FEEDBACK-L212
+FEEDBACK-L220 FEEDBACK-L223 FEEDBACK-10 FEEDBACK-11-VIRTUAL FEEDBACK-L262 FEEDBACK-GATE-REVIEW-BRIEF FEEDBACK-12
+FEEDBACK-13-C10-C13 FEEDBACK-C10-G10-VALIDATION FEEDBACK-C11-G11-SYNTHESIS FEEDBACK-C12-WRITING FEEDBACK-C13-QA
+FEEDBACK-14-DESIGN-FEEDBACK FEEDBACK-FB-01-READER-FACING-REPORT-GOVERNANCE-SEPARATION FEEDBACK-FB-02-ARGUMENT-CHAIN-VISIBILITY
+FEEDBACK-FB-03-METHOD-RESULT-SCATTERING FEEDBACK-FB-04-CASE-REFINEMENT-VISIBILITY FEEDBACK-FB-05-CITATION-PRESENTATION
+FEEDBACK-FB-06-HEADING-DEPTH FEEDBACK-FB-07-SYNTHETIC-DISCLAIMER-OVEREXPOSURE FEEDBACK-15-VIRTUAL-RUN-ORCHESTRATOR
+""".split())
+        self.assertEqual({x["id"] for x in self.project}, expected)
         feedback = [x for x in self.project if x["class"] == "project-knowledge"]
         self.assertTrue(feedback); self.assertTrue(all(x["issue"] == 336 and "non-canonical" in x.get("boundary", "") for x in feedback))
 
     def test_audit_review_and_synthetic_material_are_not_runtime_policy(self):
+        for source in source_rows(self.index):
+            if source["authority"] in {"provenance_only", "decision_or_review_provenance", "audit_only"}:
+                self.assertNotEqual(source["role"], "clean_runtime_source", source["path"])
         self.assertTrue(all(not x["runtime"] for x in self.support if x["class"] in {"audit-provenance", "human-review", "legacy-consumer"}))
         self.assertTrue(all(not x["runtime_authority"] for x in self.writer if x["class"] == "synthetic-example-spec"))
 
