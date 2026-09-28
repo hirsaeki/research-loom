@@ -96,4 +96,8 @@ A conforming implementation must bind the actual resolved constraints, satisfy t
 
 `.github/workflows/contracts.yml` runs all of these checks as the stable `contract-checks` GitHub Actions workflow.
 
-Concrete MISCO Profiles, organization-specific source-quality defaults/matrices, Project Config/Research Attention, Writer/Outline/Manuscript runtime behavior, Publication rendering/citation/template behavior, persistence/export/publish behavior, general runtime resolution, and research/manuscript/release package wire formats remain out of scope.
+Organization-specific source-quality defaults/matrices, Project Config/Research Attention migration, consumer-side Writer/Outline/Manuscript evaluation, Publication rendering/citation/template execution, and research/manuscript/release package wire formats remain outside this contract document. Production MISCO rule delivery now reuses the same resolver and EPS contract rather than introducing a second Profile system.
+
+## Verified Profile resources
+
+`profile-manifest.schema.json` permits relative resource declarations. Production resolution requires a SHA-256 pin, keeps the target inside canonical `profiles/`, rejects missing/symlinked/out-of-bound or modified resources, normalizes CRLF to LF consistently with manifest pins, and embeds UTF-8 resource text plus provenance in EPS `effective_resources`. The EPS field is optional at schema level for compatibility with historical fixtures that predate resource delivery.

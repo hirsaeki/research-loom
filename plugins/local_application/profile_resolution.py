@@ -20,10 +20,15 @@ EPS_SCHEMA = ROOT / "profiles/contracts/effective-profile-set.schema.json"
 CORE_INVARIANTS = ROOT / "core/validators/non-overridable-invariants.yaml"
 STRENGTHENING_REGISTRY = ROOT / "profiles/contracts/invariant-strengthening-validators.yaml"
 NARRATIVE_SEMANTICS = ROOT / "profiles/contracts/narrative-semantics.yaml"
+RESEARCH_QUALITY_POLICY = ROOT / "profiles/contracts/research-quality-policy.yaml"
 CORE_CONTRACTS = {"research_contract": "0.1.0", "invariant_contract": "0.1.0"}
 TYPE_RANK = {name: i for i, name in enumerate(("research", "organization", "narrative", "publication"))}
 MAX_PROFILE_MANIFESTS = 128
 MAX_PROFILE_RESOLUTION_STATES = 10_000
+MAX_PROFILE_RESOURCES = 32
+MAX_PROFILE_RESOURCE_BYTES = 1_048_576
+MAX_EFFECTIVE_RESOURCES = 128
+MAX_EFFECTIVE_RESOURCE_BYTES = 8_388_608
 _COMPARATOR = re.compile(r"^(>=|>|<=|<|=)(\d+\.\d+\.\d+)$")
 
 
@@ -110,8 +115,9 @@ def _flatten_requests(config: Mapping[str, Any]) -> list[dict[str, Any]]:
 def _unique_strings(value: Any, allowed: set[str]) -> bool:
     return (
         isinstance(value, list)
+        and all(isinstance(item, str) for item in value)
         and len(value) == len(set(value))
-        and all(isinstance(item, str) and item in allowed for item in value)
+        and all(item in allowed for item in value)
     )
 
 
@@ -161,6 +167,31 @@ def _validate_manifest_semantics(manifest: Mapping[str, Any]) -> None:
         CORE_CONTRACTS["invariant_contract"], str(compat["invariant_contract"])
     ):
         raise LocalWorkspaceError("PROFILE-CORE-COMPAT-001", "Profile is incompatible with current Core contracts")
+
+    research_contract = yaml.safe_load(RESEARCH_QUALITY_POLICY.read_text(encoding="utf-8"))
+    research_paths = {item["path"]: item for item in research_contract["constraint_paths"]}
+    research_vocabularies = research_contract["vocabularies"]
+    for constraint in manifest.get("constraints", []):
+        path = str(constraint["path"])
+        if not path.startswith("research_quality."):
+            continue
+        if manifest["profile_type"] != "research":
+            raise LocalWorkspaceError("PROFILE-RESEARCH-QUALITY-OWNER-001", "research_quality.* constraints are owned by Research Profiles")
+        spec = research_paths.get(path)
+        if spec is None:
+            raise LocalWorkspaceError("PROFILE-RESEARCH-QUALITY-PATH-001", f"unknown canonical Research quality path {path}")
+        if constraint["merge_strategy"] != spec["merge_strategy"]:
+            raise LocalWorkspaceError("PROFILE-RESEARCH-QUALITY-MERGE-001", f"wrong merge strategy for {path}")
+        value = constraint["value"]
+        if spec["value_shape"] == "enum_set":
+            if not _unique_strings(value, set(research_vocabularies[spec["vocabulary"]])):
+                raise LocalWorkspaceError("PROFILE-RESEARCH-QUALITY-VALUE-001", f"Research quality vocabulary violation at {path}")
+        elif spec["value_shape"] == "integer":
+            minimum = int(spec.get("minimum", 0))
+            if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
+                raise LocalWorkspaceError("PROFILE-RESEARCH-QUALITY-VALUE-001", f"Research quality threshold violation at {path}")
+        else:
+            raise LocalWorkspaceError("PROFILE-RESEARCH-QUALITY-VALUE-001", f"unsupported Research quality value shape at {path}")
 
     narrative_contract = yaml.safe_load(NARRATIVE_SEMANTICS.read_text(encoding="utf-8"))
     narrative_paths = {item["path"]: item for item in narrative_contract["constraint_paths"]}
@@ -500,6 +531,78 @@ def _compose_constraints(selected) -> list[dict[str, Any]]:
     return result
 
 
+def _normalized_resource_bytes(path: Path) -> bytes:
+    try:
+        return path.read_bytes().replace(b"\r\n", b"\n")
+    except OSError as exc:
+        raise LocalWorkspaceError("PROFILE-RESOURCE-READ-001", f"cannot read Profile resource {path}") from exc
+
+
+def _effective_resources(selected) -> list[dict[str, Any]]:
+    profile_root = (ROOT / "profiles").resolve()
+    grouped: dict[tuple[str, str, str], dict[str, Any]] = {}
+    resource_count = 0
+    resource_bytes = 0
+    for candidate in selected.values():
+        manifest = candidate["manifest"]
+        manifest_path = Path(candidate["path"])
+        declarations = list(manifest.get("resources", []))
+        if len(declarations) > MAX_PROFILE_RESOURCES:
+            raise LocalWorkspaceError("PROFILE-RESOURCE-BOUND-001", "Profile declares too many resources")
+        resource_count += len(declarations)
+        if resource_count > MAX_EFFECTIVE_RESOURCES:
+            raise LocalWorkspaceError("PROFILE-RESOURCE-BOUND-001", "Effective Profile Set declares too many resources")
+        for declaration in declarations:
+            declared_path = str(declaration["path"])
+            raw_path = manifest_path.parent / declared_path
+            if raw_path.is_symlink():
+                raise LocalWorkspaceError("PROFILE-RESOURCE-SOURCE-001", "Profile resource may not be a symlink")
+            try:
+                path = raw_path.resolve(strict=True)
+                path.relative_to(profile_root)
+                byte_size = path.stat().st_size
+            except (OSError, ValueError) as exc:
+                raise LocalWorkspaceError("PROFILE-RESOURCE-SOURCE-001", "Profile resource must exist inside canonical profiles/") from exc
+            if byte_size > MAX_PROFILE_RESOURCE_BYTES:
+                raise LocalWorkspaceError("PROFILE-RESOURCE-BOUND-001", f"Profile resource exceeds size bound: {declared_path}")
+            resource_bytes += byte_size
+            if resource_bytes > MAX_EFFECTIVE_RESOURCE_BYTES:
+                raise LocalWorkspaceError("PROFILE-RESOURCE-BOUND-001", "Effective Profile Set resources exceed size bound")
+            expected = declaration.get("sha256")
+            if not isinstance(expected, str):
+                raise LocalWorkspaceError("PROFILE-RESOURCE-DIGEST-001", "production Profile resources require a sha256 pin")
+            payload = _normalized_resource_bytes(path)
+            actual = hashlib.sha256(payload).hexdigest()
+            if actual != expected:
+                raise LocalWorkspaceError("PROFILE-RESOURCE-DIGEST-001", f"Profile resource digest mismatch: {declared_path}")
+            try:
+                content = payload.decode("utf-8")
+            except UnicodeDecodeError as exc:
+                raise LocalWorkspaceError("PROFILE-RESOURCE-ENCODING-001", "production Profile resources must be UTF-8 text") from exc
+            canonical_path = path.relative_to(profile_root).as_posix()
+            role = str(declaration["role"])
+            key = (canonical_path, role, actual)
+            source = {**_pin(candidate), "declared_path": declared_path}
+            item = grouped.setdefault(
+                key,
+                {
+                    "path": canonical_path,
+                    "role": role,
+                    "sha256": actual,
+                    "byte_length": len(payload),
+                    "content": content,
+                    "provenance": [],
+                },
+            )
+            if source not in item["provenance"]:
+                item["provenance"].append(source)
+    result = list(grouped.values())
+    for item in result:
+        item["provenance"].sort(key=lambda source: (TYPE_RANK[source["profile_type"]], source["profile_id"], _semver(source["profile_version"]), source["manifest_sha256"], source["declared_path"]))
+    result.sort(key=lambda item: (item["path"], item["role"], item["sha256"]))
+    return result
+
+
 def _effective_invariants(selected) -> list[dict[str, Any]]:
     registry = yaml.safe_load(CORE_INVARIANTS.read_text(encoding="utf-8"))
     strengthenings: dict[str, list[dict[str, Any]]] = {}
@@ -583,6 +686,7 @@ def resolve_effective_profile_set(
     effective_profiles, selected = _resolve_selected(candidates, requests)
     effective_constraints = _compose_constraints(selected)
     _validate_effective_narrative(effective_constraints)
+    effective_resources = _effective_resources(selected)
     eps = {
         "schema_version": "0.1.0",
         "core_contracts": deepcopy(CORE_CONTRACTS),
@@ -603,6 +707,8 @@ def resolve_effective_profile_set(
         "effective_constraints": effective_constraints,
         "core_invariants": _effective_invariants(selected),
     }
+    if effective_resources:
+        eps["effective_resources"] = effective_resources
     _validate_schema(eps, EPS_SCHEMA, "WORKSPACE-PROFILE-SET-SCHEMA-001")
     return eps
 
