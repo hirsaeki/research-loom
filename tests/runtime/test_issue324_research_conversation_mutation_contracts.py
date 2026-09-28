@@ -24,6 +24,11 @@ class Issue324ResearchConversationMutationContractTests(unittest.TestCase):
         self.assertIn('"request_id": "<exact issued request_id>"', surfaces)
         self.assertIn('"request_digest": "<exact issued request_digest>"', surfaces)
         self.assertIn('"actor_id": "<exact request human_actor_id>"', surfaces)
+        self.assertIn("`actor_id` is optional on this public action transport", surfaces)
+        self.assertIn("when omitted, the local public Facade/CLI uses `local-human`", surfaces)
+        self.assertIn("`actor_id` is optional here too", surfaces)
+        self.assertIn("Decision resolve requires `actor_id`", surfaces)
+        self.assertIn("copy the exact `human_actor_id` from `decision show`", surfaces)
         for disposition in ("approve_exact", "decline", "request_revision"):
             self.assertIn(disposition, surfaces)
         for unsupported in ("`approve`", "`APPROVE`", "`adopt`"):
@@ -46,7 +51,6 @@ class Issue324ResearchConversationMutationContractTests(unittest.TestCase):
                         "payload": {
                             "state_delta_proposal_id": candidate["candidate_id"],
                         },
-                        "actor_id": "HUMAN-RQ",
                     },
                     view="conversation",
                 )
@@ -57,7 +61,6 @@ class Issue324ResearchConversationMutationContractTests(unittest.TestCase):
                         "confirmation_request_id": applied["confirmation_required"][
                             "confirmation_request_id"
                         ],
-                        "actor_id": "HUMAN-RQ",
                     },
                     view="conversation",
                 )
@@ -67,7 +70,7 @@ class Issue324ResearchConversationMutationContractTests(unittest.TestCase):
                 exact = facade.show_human_decision_request(decision_ref["request_id"])
                 request = exact["request"]
                 self.assertEqual(request["request_digest"], decision_ref["request_digest"])
-                self.assertEqual(request["human_actor_id"], "HUMAN-RQ")
+                self.assertEqual(request["human_actor_id"], "local-human")
 
                 resolved = facade.resolve_human_decision(
                     {

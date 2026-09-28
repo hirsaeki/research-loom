@@ -32,23 +32,21 @@ To start adoption of an already saved candidate, submit only the exact saved Sta
   "action_type": "state.apply_candidate",
   "payload": {
     "state_delta_proposal_id": "<exact saved candidate_id>"
-  },
-  "actor_id": "<human actor id>"
+  }
 }
 ```
 
-Use this through `action submit --view conversation --json INPUT.json`. The `state_delta_proposal_id` is the public candidate/proposal reference returned by the save operation. Do not replace it with the research-object ID, a display number, or a reconstructed target. Decision references are derived by Loom and are not caller input to this action.
+Use this through `action submit --view conversation --json INPUT.json`. The `state_delta_proposal_id` is the public candidate/proposal reference returned by the save operation. Do not replace it with the research-object ID, a display number, or a reconstructed target. Decision references are derived by Loom and are not caller input to this action. `actor_id` is optional on this public action transport; when omitted, the local public Facade/CLI uses `local-human`. If a flow explicitly supplies another human actor identity, preserve that exact identity through its confirmation and later use the issued Decision request as the authority source for the resolve actor.
 
 When Loom returns `CONFIRMATION_REQUIRED`, continue only that issued operation confirmation. The confirmation input accepts `confirmation_request_id` and optional `actor_id`; do not add action/candidate/decision fields:
 
 ```json
 {
-  "confirmation_request_id": "<exact issued confirmation_request_id>",
-  "actor_id": "<human actor id>"
+  "confirmation_request_id": "<exact issued confirmation_request_id>"
 }
 ```
 
-Use this through `confirmation submit --view conversation --json INPUT.json`. When the human actor is already known for the flow, preserve that exact actor identity rather than inventing a new one.
+Use this through `confirmation submit --view conversation --json INPUT.json`. `actor_id` is optional here too; when omitted, the local public Facade/CLI uses `local-human`. When an explicit human actor was already chosen for the flow, preserve that exact actor identity rather than inventing a new one.
 
 When Loom returns `HUMAN_DECISION_REQUIRED`, first read the immutable request with `decision show --request-id ... --json` and review its exact target/current context. The minimal Decision resolve input is exactly:
 
@@ -61,7 +59,7 @@ When Loom returns `HUMAN_DECISION_REQUIRED`, first read the immutable request wi
 }
 ```
 
-The supported `disposition` values are `approve_exact`, `decline`, and `request_revision`. Do not substitute `approve`, `APPROVE`, `adopt`, or other synonyms. `approve_exact` approves exactly the issued request packet; changing only part of it requires the revision path instead.
+The supported `disposition` values are `approve_exact`, `decline`, and `request_revision`. Do not substitute `approve`, `APPROVE`, `adopt`, or other synonyms. `approve_exact` approves exactly the issued request packet; changing only part of it requires the revision path instead. Unlike action/confirmation transport, Decision resolve requires `actor_id`; copy the exact `human_actor_id` from `decision show` instead of guessing it. If earlier action/confirmation calls used the default identity, the issued request will carry `local-human`.
 
 After `decision resolve --view conversation --json INPUT.json`, perform a fresh conversation-view `status` or `resume` read before describing the change as current. The exact input fields above are authority mechanics; ordinary human-facing progress should still use research meaning rather than exposing these opaque fields unless diagnostics are requested.
 
