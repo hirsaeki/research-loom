@@ -302,6 +302,12 @@ def str_list(v:Any,field:str,maximum:int)->list[str]:
 def profile_pins(eps:Mapping[str,Any])->list[dict[str,Any]]:
     return [{"profile_type":str(x["profile_type"]),"profile_id":str(x["profile_id"]),"profile_version":str(x["profile_version"]),"content_digest":"sha256:"+str(x["manifest_sha256"])} for x in eps.get("effective_profiles",[])]
 
+def profile_resources(eps:Mapping[str,Any])->list[dict[str,Any]]:
+    resources=eps.get("effective_resources",[])
+    if not isinstance(resources,list) or any(not isinstance(x,Mapping) for x in resources):
+        raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-PROFILE-001","Effective Profile Set resources are invalid")
+    return [deepcopy(dict(x)) for x in resources]
+
 def brief(config:Mapping[str,Any],override:Mapping[str,Any]|None)->dict[str,Any]:
     src=deepcopy(dict(override)) if override is not None else deepcopy(dict(config.get("communication_brief",{}))); audience=src.get("audience") or []; message=src.get("core_message") or src.get("purpose")
     if not isinstance(audience,list) or not audience or any(not isinstance(x,str) or not x for x in audience): raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INPUT-001","Communication Brief audience is required")

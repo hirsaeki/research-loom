@@ -8,7 +8,7 @@ This ledger fixes the migration boundary for #332–#337. It does **not** change
 
 ## 1. Inventory result
 
-The ledger pins 44 source files by SHA-256 and classifies the relevant content into project/publication/support plus six bounded Writer shards:
+The ledger pins 44 source files by SHA-256 at the Issue #331 baseline and classifies the relevant content into project/publication/support plus bounded Writer shards. Legacy source/approval material is expected to remain byte-identical; rows that describe the then-current resolver/contracts are **historical baseline pins**, so later migration work may evolve those current-system files without rewriting #331 provenance:
 
 - `project.json`: all three legacy manifest entries, the Research Attention / initial publication map headings, and the non-canonical Virtual Run feedback headings.
 - `writer-01.json` … `writer-06.json`: the approved Writer-facing runtime rules, input contract, rhetorical patterns, negative narrative guards, terminology firewall, editorial QA, assembly views, and synthetic example specifications.

@@ -4,19 +4,63 @@ Declarative, composable policy separated by concern:
 
 - `research/` — methodology and research-quality rules
 - `organization/` — organization/domain constraints and terminology
-- `narrative/` — argument and semantic composition patterns
+- `narrative/` — argument/semantic composition plus Writer-facing rule delivery
 - `publication/` — output, citation, template, rendering, and release rules
 
-PR 4 establishes the implementation-neutral Profile-system contracts while keeping concrete profiles deferred:
+The canonical contracts live under `contracts/`:
 
-- [`contracts/profile-manifest.schema.json`](contracts/profile-manifest.schema.json) — common Profile envelope, versioning, Core compatibility, `extends`, `requires`, constraints, and invariant strengthenings
-- [`contracts/composition-semantics.yaml`](contracts/composition-semantics.yaml) — deterministic composition and hard-conflict semantics
-- [`contracts/effective-profile-set.schema.json`](contracts/effective-profile-set.schema.json) — resolved `effective_profiles` / `effective_constraints` with provenance
-- [`fixtures/`](fixtures/) — synthetic valid/invalid contract fixtures
-- [`../docs/architecture/profile-contract-convergence.md`](../docs/architecture/profile-contract-convergence.md) — legacy/inventory comparison and convergence decisions
+- `profile-manifest.schema.json` — common Profile envelope, versioning, Core compatibility, `extends`, `requires`, constraints, invariant strengthenings, and resource declarations
+- `composition-semantics.yaml` — deterministic composition and hard-conflict semantics
+- `effective-profile-set.schema.json` — resolved `effective_profiles`, `effective_constraints`, optional verified `effective_resources`, and provenance
+- `research-quality-policy.*` / `narrative-semantics.*` — closed canonical vocabularies for those Profile namespaces
+- `fixtures/` — **synthetic** contract fixtures only; their concrete values are not production defaults
+
+## Production MISCO Profiles
+
+Issue #332 adds only the production Profiles justified by the #331 migration ledger:
+
+- `narrative/misco/profile.json` — instantiates the minimal canonical Narrative definitions required by the Research Package boundary and delivers the Human-approved clean Writer/Narrative rule asset.
+- `publication/misco/profile.json` — delivers the Human-approved clean Publication rule asset and `requires` the Writer/Narrative Profile.
+
+There is deliberately no empty MISCO Research or Organization Profile. The #331 inventory found no reusable MISCO Research/Organization values with authority independent of project-specific Attention/feedback, and the synthetic Research fixtures explicitly are not defaults. Concrete Research/Organization policy must therefore be added only when an authoritative reusable value exists; project RQ, method choices, provisional chapter placement, and runtime state do not belong here.
+
+The legacy `research-profile/` tree remains migration/reference material. Production resolution must not read it to recover rule text.
+
+## Resource delivery
+
+A manifest resource is resolved relative to its manifest, must remain inside canonical `profiles/`, must carry a SHA-256 pin for production resolution, and must be UTF-8 text. The production resolver verifies the pin and copies the normalized text plus provenance into `effective_resources` in the Effective Profile Set (EPS). This makes Workspace history and detached EPS inputs self-contained. Research Package 0.2.0 also copies the selected `effective_resources` beside its Profile pins, so detached Writer/Publication work does not need the current checkout or legacy tree to recover selected rule text.
+
+Layer B audit material, Layer C Human Review material, and synthetic few-shot examples are not production resources.
+
+## Composition
 
 `extends` is same-profile-type inheritance. Cross-type dependencies use `requires`; `requires` never creates override precedence. Cross-category last-write-wins is forbidden: ambiguous collisions are errors.
 
 Core non-overridable invariants remain the semantic floor. Profiles may preserve or explicitly strengthen them but may not disable, weaken, reinterpret, or replace them.
 
-Concrete MISCO profiles, concrete research-quality/source-quality rules, Project Config, Writer/Publication behavior, persistence/export/publish behavior, and a runtime resolver remain outside this convergence step.
+## Minimal resolution example
+
+For an existing Workspace, a profile-generation request can select the production Publication Profile (which pulls the Writer/Narrative Profile transitively):
+
+```json
+{
+  "profile_manifest_files": [
+    "profiles/narrative/misco/profile.json",
+    "profiles/publication/misco/profile.json"
+  ],
+  "request_replacements": [
+    {
+      "from": {"profile_id":"OLD_PUBLICATION","profile_type":"publication","version":"1.0.0"},
+      "to": {"profile_id":"misco.publication","profile_type":"publication","version":"1.0.0"}
+    }
+  ]
+}
+```
+
+Then use the normal production path:
+
+```bash
+./research-loom profile resolve --workspace WORKSPACE --output OUT --json request.json
+```
+
+The resulting `effective-profile-set.json` exposes the selected profile/version, manifest pins, effective constraints, verified rule resources with bodies, and their provenance. Consumer-specific evaluation remains the responsibility of Research/Writer/Publication application layers; the presence of a resource in the EPS is not by itself an “applied” or “passed” result.

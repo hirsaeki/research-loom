@@ -4,6 +4,8 @@
 
 ## Repository status
 
+Production MISCO Profile migration now uses the same resolver and EPS contract; the legacy `research-profile/` tree remains migration/reference material and is not runtime authority.
+
 The canonical production path has converged through PR26: Core research semantics and Profiles/Project Config, Capability ABI and Research Method contracts, Desktop Research external execution, lineage/recovery, production State transitions and SQLite persistence, execution/artifact/resource persistence, Work Conversation coordination, and the Human Decision Gate with atomic Decision-bound commits are connected end to end.
 
 PR27 adds the production-local operator boundary: fresh local workspace bootstrap/reopen, exact Project Config + Effective Profile Set binding, a transport-neutral application facade, and a machine-oriented JSON CLI. ChatGPT Desktop App Work is the first intended human-facing consumer, but Work/ChatGPT semantics are not part of the Harness itself.

@@ -46,11 +46,20 @@ class MiscoProfileMigrationLedgerTests(unittest.TestCase):
         self.assertEqual(self.index["baseline"]["commit"], "1ea6ad38fcf09eab24e44aa7e5bb4b6afec90578")
         self.assertTrue(all((LEDGER / n).is_file() for n in self.index["shards"]))
 
-    def test_pinned_sources_match_repository_bytes(self):
+    def test_pinned_legacy_sources_match_repository_bytes_and_current_refs_remain_historical(self):
         seen = set()
+        historical_roles = {
+            "current_profile_contract", "canonical_research_quality", "canonical_narrative",
+            "convergence_record", "runtime_resolver", "runtime_validation",
+        }
         for row in source_rows(self.index):
             self.assertNotIn(row["path"], seen); seen.add(row["path"])
             path = ROOT / row["path"]
+            self.assertTrue(path.is_file(), row["path"])
+            if row["role"] in historical_roles:
+                # #331 pinned the then-current implementation as migration evidence.
+                # Later migration issues may evolve those files without rewriting that historical pin.
+                continue
             self.assertEqual("sha256:" + hashlib.sha256(path.read_bytes()).hexdigest(), row["sha256"])
             self.assertEqual(path.stat().st_size, row["bytes"])
 
