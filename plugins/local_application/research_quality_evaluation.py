@@ -197,7 +197,8 @@ def normalize_input(value: Mapping[str, Any]) -> dict[str, Any]:
         status = item.get("status")
         rationale = item.get("rationale")
         if (
-            status not in _ORGANIZATION_STATUS
+            not isinstance(status, str)
+            or status not in _ORGANIZATION_STATUS
             or not isinstance(rationale, str)
             or not rationale.strip()
             or len(rationale) > _MAX_RATIONALE_CHARS

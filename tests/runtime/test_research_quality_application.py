@@ -12,7 +12,11 @@ import yaml
 
 from plugins.local_application import LocalApplicationFacade
 from plugins.local_application.profile_resolution import resolve_effective_profile_set
-from plugins.local_application.research_quality_evaluation import evaluate, normalize_input
+from plugins.local_application.research_quality_evaluation import (
+    ResearchQualityEvaluationError,
+    evaluate,
+    normalize_input,
+)
 from runtime_fixtures import seed_state
 from tests.runtime.test_external_desktop_research_intake import adopt_rq, bootstrap_config, run_cli
 
@@ -247,6 +251,17 @@ class ResearchQualityApplicationTests(unittest.TestCase):
         row = _result_by_path(result)["research_quality.counter_review.required_lenses"]
         self.assertEqual(row["status"], "violation")
         self.assertIn("RESEARCH-QUALITY-COUNTER-REVIEW-001", row["diagnostic_codes"])
+
+    def test_organization_assessment_rejects_non_string_status_as_input_error(self):
+        value = _semantic_input()
+        value["organization_assessments"]["organization.fixture.handling_rule"] = {
+            "status": [],
+            "basis": _basis("RQ-1"),
+            "rationale": "Invalid non-string status must be normalized to an input error.",
+        }
+        with self.assertRaises(ResearchQualityEvaluationError) as caught:
+            normalize_input(value)
+        self.assertEqual(caught.exception.code, "APPLICATION-RESEARCH-QUALITY-INPUT-001")
 
     def test_organization_semantics_require_explicit_host_or_human_assessment(self):
         org = {"path": "organization.fixture.handling_rule", "value": ["fixture"]}
