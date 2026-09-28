@@ -1,0 +1,69 @@
+contract_version: 0.1.0
+object_type: research_quality_application_mapping
+purpose: >-
+  Bind the closed research_quality.* Profile catalog to the production
+  research-quality evaluator without creating a second quality-policy model.
+public_entrypoint: research-quality evaluate
+consumer: plugins.local_application.research_quality_evaluation.evaluate
+result_record:
+  kind: research_exhibit
+  capture_origin: research_quality_evaluator
+  authority_effect: none
+semantic_assessment_boundary:
+  classification_truth_verified: false
+  missing_assessment_status: unevaluated
+  rule: >-
+    Source tier/role, Evidence directness/support scope, Claim family, method
+    family, causal inference basis, overlap accounting, remaining information
+    value, and Organization-specific semantic judgments must be supplied with
+    explicit provenance. Their presence is not proof that the judgment is true.
+organization_constraints:
+  evaluation_mode: host_or_human_assessment
+  missing_assessment_status: unevaluated
+  result_record: research_exhibit
+  authority_effect: none
+constraints:
+  - path: research_quality.source.forbidden_as_sole_material_support_tiers
+    evaluation_mode: machine_check_on_explicit_assessment
+  - path: research_quality.source.cannot_resolve_material_gap_tiers
+    evaluation_mode: machine_check_on_explicit_assessment
+  - path: research_quality.source.low_confidence.allowed_support_scopes
+    evaluation_mode: machine_check_on_explicit_assessment
+  - path: research_quality.source.low_trust.allowed_support_scopes
+    evaluation_mode: machine_check_on_explicit_assessment
+  - path: research_quality.source.company_primary.allowed_support_scopes
+    evaluation_mode: machine_check_on_explicit_assessment
+  - path: research_quality.evidence.material_support.required_verification_statuses
+    evaluation_mode: machine_check_on_core_state
+  - path: research_quality.evidence.claim_support.allowed_directness
+    evaluation_mode: machine_check_on_explicit_assessment
+  - path: research_quality.evidence.indirect_support.requirements
+    evaluation_mode: machine_check_on_explicit_assessment
+  - path: research_quality.evidence.independence.required_claim_families
+    evaluation_mode: machine_check_on_explicit_assessment
+  - path: research_quality.evidence.independence.requirements
+    evaluation_mode: machine_check_on_explicit_assessment_and_core_state
+  - path: research_quality.claim.independent_effect.allowed_support_scopes
+    evaluation_mode: machine_check_on_explicit_assessment
+  - path: research_quality.claim.causal.allowed_support_scopes
+    evaluation_mode: machine_check_on_explicit_assessment
+  - path: research_quality.claim.causal.prohibited_inference_bases
+    evaluation_mode: machine_check_on_explicit_assessment
+  - path: research_quality.finding.required_qualifier_fields
+    evaluation_mode: machine_check_on_core_state
+  - path: research_quality.counter_review.required_lenses
+    evaluation_mode: machine_check_on_core_state
+  - path: research_quality.counter_review.blocking_severities
+    evaluation_mode: machine_check_on_core_state
+  - path: research_quality.evidence_sufficiency.required_checks
+    evaluation_mode: machine_check_on_explicit_assessment
+  - path: research_quality.methods.protocol_required_for_families
+    evaluation_mode: machine_check_on_explicit_assessment_and_core_state
+  - path: research_quality.methods.limitations_required_for_families
+    evaluation_mode: machine_check_on_explicit_assessment_and_core_state
+  - path: research_quality.gates.required
+    evaluation_mode: aggregate_of_configured_quality_checks
+  - path: research_quality.thresholds.material_finding.min_supporting_evidence_count
+    evaluation_mode: machine_check_on_core_state
+  - path: research_quality.thresholds.material_finding.min_independent_evidence_groups
+    evaluation_mode: machine_check_on_core_state

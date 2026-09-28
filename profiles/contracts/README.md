@@ -10,6 +10,7 @@ PR 4 establishes the Profile-system contract above the Core semantic floor defin
 - `invariant-strengthening-validators.yaml` — authoritative binding between Core invariant IDs and versioned Profile-strengthening validators/forms.
 - `research-quality-policy.schema.json` — structural contract for the canonical Research quality-policy catalog.
 - `research-quality-policy.yaml` — Research-owned quality vocabulary, typed constraint paths, monotone merge semantics, quality-gate meanings, and stable error codes.
+- `research-quality-application.yaml` — production application map from every closed Research quality path to its machine/Core/Host evaluation boundary and immutable result record.
 - `narrative-semantics.schema.json` — structural contract for the canonical Narrative semantics catalog.
 - `narrative-semantics.yaml` — Narrative-owned semantic stages, partial-order dependencies, section purposes, preservation/connection rules, non-normative hints, and stable error codes.
 
@@ -61,7 +62,7 @@ The contract deliberately separates semantic rules from numeric thresholds:
 - semantic requirements use `union` to add requirements/prohibitions or `intersection` to narrow allowed sets;
 - numeric thresholds live only under `research_quality.thresholds.*` and use `max` or `min`.
 
-The catalog defines Profile-level assessment vocabulary such as source quality tier, Evidence directness/support scope, Claim family, method family, and quality gates without adding those as new Core fields. Core invariants remain unchanged. A future runtime may derive the assessment labels, but PR 6 does not define that runtime representation.
+The catalog defines Profile-level assessment vocabulary such as source quality tier, Evidence directness/support scope, Claim family, method family, and quality gates without adding those as new Core fields. Core invariants remain unchanged. Production quality evaluation does not infer these semantic labels from names or prose: `research-quality evaluate` requires explicit assessments with provenance and records `unevaluated` when a required judgment is absent. `research-quality-application.yaml` fixes the consumer boundary for every closed path.
 
 The generic fixture under `profiles/fixtures/research-quality/` demonstrates source/evidence admissibility, verification, independence, causal support, Finding limitations/boundary conditions, Counter Review, evidence sufficiency, method-family requirements, and quality gates. It is synthetic and contains no MISCO, organization, narrative, publication, or Project Config rules.
 
@@ -92,7 +93,7 @@ A conforming implementation must bind the actual resolved constraints, satisfy t
 
 ## Executable contract tests
 
-`tests/contracts/test_profile_contracts.py` remains the PR 4 Profile-system oracle. `tests/contracts/test_research_quality_policy.py` / `research_quality_oracle.py` add fixture-only executable semantics for PR 6. `tests/contracts/test_narrative_semantics.py` / `narrative_semantic_oracle.py` add fixture-only executable semantics for PR 7, including structured identity/ref/cycle checks and projection regressions for preservation, authority, connections, and non-normative hints. None of these are production resolvers or research/Writer validators.
+`tests/contracts/test_profile_contracts.py` remains the PR 4 Profile-system oracle. `tests/contracts/test_research_quality_policy.py` / `research_quality_oracle.py` remain fixture-only executable semantics for PR 6; production application is separately implemented by `plugins/local_application/research_quality_evaluation.py` and the `research-quality evaluate` public boundary. `tests/contracts/test_narrative_semantics.py` / `narrative_semantic_oracle.py` remain fixture-only semantics for PR 7. The fixture oracles are not production resolvers or research/Writer validators.
 
 `.github/workflows/contracts.yml` runs all of these checks as the stable `contract-checks` GitHub Actions workflow.
 
