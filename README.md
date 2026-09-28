@@ -36,6 +36,7 @@ Windows / PowerShell:
 .\research-loom.cmd run show --workspace PATH --run-id RUN-ID --json
 .\research-loom.cmd external materials list --workspace PATH
 .\research-loom.cmd external materials list --workspace PATH --json
+.\research-loom.cmd research-quality evaluate --workspace PATH --json QUALITY-INPUT.json
 .\research-loom.cmd action submit --workspace PATH --json TEMP-INPUT.json
 ```
 
@@ -50,6 +51,7 @@ POSIX:
 ./research-loom run show --workspace PATH --run-id RUN-ID --json
 ./research-loom external materials list --workspace PATH
 ./research-loom external materials list --workspace PATH --json
+./research-loom research-quality evaluate --workspace PATH --json QUALITY-INPUT.json
 ./research-loom action submit --workspace PATH --json TEMP-INPUT.json
 ```
 

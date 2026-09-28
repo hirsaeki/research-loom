@@ -241,6 +241,14 @@ def build_parser() -> argparse.ArgumentParser:
     exhibit_show.add_argument("--exhibit-id", required=True)
     _add_output_json(exhibit_show)
 
+    research_quality = sub.add_parser("research-quality")
+    research_quality_sub = research_quality.add_subparsers(
+        dest="research_quality_command", required=True
+    )
+    research_quality_evaluate = research_quality_sub.add_parser("evaluate")
+    _add_workspace(research_quality_evaluate)
+    _add_input_json(research_quality_evaluate)
+
     research_package = sub.add_parser("research-package")
     research_package_sub = research_package.add_subparsers(dest="research_package_command", required=True)
     research_package_build = research_package_sub.add_parser("build")
@@ -671,6 +679,8 @@ def _run(args: argparse.Namespace) -> Mapping[str, Any]:
                 return facade.list_exhibits(rq_id=args.rq_id)
             if args.exhibit_command == "show":
                 return facade.show_exhibit(args.exhibit_id)
+        if args.command == "research-quality" and args.research_quality_command == "evaluate":
+            return facade.evaluate_research_quality(_read_input(args.json_input))
         if args.command == "publication":
             if args.publication_command == "preview":
                 return facade.build_publication_preview(args.composition_id, args.revision_id)
