@@ -9,10 +9,12 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import rfc8785
 
 from plugins.local_application import LocalWorkspace
+import plugins.local_application.profile_resolution as profile_resolution
 from plugins.local_application.profile_resolution import resolve_effective_profile_set
 from plugins.local_application.research_package_format import profile_resources
 from plugins.local_application.workspace import LocalWorkspaceError
@@ -134,6 +136,58 @@ class MiscoProductionProfileTests(unittest.TestCase):
             with self.assertRaises(LocalWorkspaceError) as raised:
                 resolve_effective_profile_set(bad, [path])
             self.assertEqual(raised.exception.code, "PROFILE-RESEARCH-QUALITY-PATH-001")
+
+    def test_research_quality_enum_set_rejects_non_string_json_without_type_error(self):
+        with tempfile.TemporaryDirectory(dir=ROOT / "profiles/research") as temp:
+            path = Path(temp) / "profile.json"
+            manifest = json.loads(RESEARCH_FIXTURE.read_text(encoding="utf-8"))
+            manifest["profile_id"] = "misco.invalid-research-quality-value"
+            enum_constraint = next(item for item in manifest["constraints"] if isinstance(item["value"], list))
+            enum_constraint["value"] = [{}]
+            path.write_text(json.dumps(manifest), encoding="utf-8")
+            bad = {"profile_requests": {"research": [{"profile_id": manifest["profile_id"], "profile_type": "research", "version": "1.0.0"}], "organization": [], "narrative": [], "publication": []}}
+            with self.assertRaises(LocalWorkspaceError) as raised:
+                resolve_effective_profile_set(bad, [path])
+            self.assertEqual(raised.exception.code, "PROFILE-RESEARCH-QUALITY-VALUE-001")
+
+    def test_duplicate_resource_declaration_deduplicates_provenance(self):
+        with tempfile.TemporaryDirectory(dir=ROOT / "profiles/narrative") as temp:
+            base = Path(temp)
+            (base / "resources").mkdir()
+            (base / "resources/writer-clean-rules.json").write_bytes(WRITER_ASSET.read_bytes())
+            manifest = json.loads(WRITER_MANIFEST.read_text(encoding="utf-8"))
+            manifest["profile_id"] = "misco.writer-duplicate-resource"
+            manifest["resources"] = manifest["resources"] * 2
+            path = base / "profile.json"
+            path.write_text(json.dumps(manifest, ensure_ascii=False), encoding="utf-8")
+            config = {"profile_requests": {"research": [], "organization": [], "narrative": [{"profile_id": manifest["profile_id"], "profile_type": "narrative", "version": "1.0.0"}], "publication": []}}
+            eps = resolve_effective_profile_set(config, [path])
+            self.assertEqual(len(eps["effective_resources"]), 1)
+            self.assertEqual(len(eps["effective_resources"][0]["provenance"]), 1)
+
+    def test_resource_bounds_fail_before_unbounded_reads(self):
+        with patch.object(profile_resolution, "MAX_PROFILE_RESOURCE_BYTES", 1):
+            with self.assertRaises(LocalWorkspaceError) as raised:
+                resolve_effective_profile_set(
+                    {"profile_requests": {"research": [], "organization": [], "narrative": [{"profile_id": "misco.writer", "profile_type": "narrative", "version": "1.0.0"}], "publication": []}},
+                    [WRITER_MANIFEST],
+                )
+        self.assertEqual(raised.exception.code, "PROFILE-RESOURCE-BOUND-001")
+
+        with tempfile.TemporaryDirectory(dir=ROOT / "profiles/narrative") as temp:
+            base = Path(temp)
+            (base / "resources").mkdir()
+            (base / "resources/writer-clean-rules.json").write_bytes(WRITER_ASSET.read_bytes())
+            manifest = json.loads(WRITER_MANIFEST.read_text(encoding="utf-8"))
+            manifest["profile_id"] = "misco.writer-too-many-resources"
+            manifest["resources"] = manifest["resources"] * 2
+            path = base / "profile.json"
+            path.write_text(json.dumps(manifest, ensure_ascii=False), encoding="utf-8")
+            config = {"profile_requests": {"research": [], "organization": [], "narrative": [{"profile_id": manifest["profile_id"], "profile_type": "narrative", "version": "1.0.0"}], "publication": []}}
+            with patch.object(profile_resolution, "MAX_PROFILE_RESOURCES", 1):
+                with self.assertRaises(LocalWorkspaceError) as raised:
+                    resolve_effective_profile_set(config, [path])
+            self.assertEqual(raised.exception.code, "PROFILE-RESOURCE-BOUND-001")
 
     def test_research_package_handoff_projection_keeps_rule_bodies_and_pins(self):
         eps = resolve_effective_profile_set(config_for_publication(), [WRITER_MANIFEST, PUBLICATION_MANIFEST])

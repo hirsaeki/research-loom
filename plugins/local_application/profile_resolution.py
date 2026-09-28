@@ -25,6 +25,10 @@ CORE_CONTRACTS = {"research_contract": "0.1.0", "invariant_contract": "0.1.0"}
 TYPE_RANK = {name: i for i, name in enumerate(("research", "organization", "narrative", "publication"))}
 MAX_PROFILE_MANIFESTS = 128
 MAX_PROFILE_RESOLUTION_STATES = 10_000
+MAX_PROFILE_RESOURCES = 32
+MAX_PROFILE_RESOURCE_BYTES = 1_048_576
+MAX_EFFECTIVE_RESOURCES = 128
+MAX_EFFECTIVE_RESOURCE_BYTES = 8_388_608
 _COMPARATOR = re.compile(r"^(>=|>|<=|<|=)(\d+\.\d+\.\d+)$")
 
 
@@ -111,8 +115,9 @@ def _flatten_requests(config: Mapping[str, Any]) -> list[dict[str, Any]]:
 def _unique_strings(value: Any, allowed: set[str]) -> bool:
     return (
         isinstance(value, list)
+        and all(isinstance(item, str) for item in value)
         and len(value) == len(set(value))
-        and all(isinstance(item, str) and item in allowed for item in value)
+        and all(item in allowed for item in value)
     )
 
 
@@ -536,10 +541,18 @@ def _normalized_resource_bytes(path: Path) -> bytes:
 def _effective_resources(selected) -> list[dict[str, Any]]:
     profile_root = (ROOT / "profiles").resolve()
     grouped: dict[tuple[str, str, str], dict[str, Any]] = {}
+    resource_count = 0
+    resource_bytes = 0
     for candidate in selected.values():
         manifest = candidate["manifest"]
         manifest_path = Path(candidate["path"])
-        for declaration in manifest.get("resources", []):
+        declarations = list(manifest.get("resources", []))
+        if len(declarations) > MAX_PROFILE_RESOURCES:
+            raise LocalWorkspaceError("PROFILE-RESOURCE-BOUND-001", "Profile declares too many resources")
+        resource_count += len(declarations)
+        if resource_count > MAX_EFFECTIVE_RESOURCES:
+            raise LocalWorkspaceError("PROFILE-RESOURCE-BOUND-001", "Effective Profile Set declares too many resources")
+        for declaration in declarations:
             declared_path = str(declaration["path"])
             raw_path = manifest_path.parent / declared_path
             if raw_path.is_symlink():
@@ -547,8 +560,14 @@ def _effective_resources(selected) -> list[dict[str, Any]]:
             try:
                 path = raw_path.resolve(strict=True)
                 path.relative_to(profile_root)
+                byte_size = path.stat().st_size
             except (OSError, ValueError) as exc:
                 raise LocalWorkspaceError("PROFILE-RESOURCE-SOURCE-001", "Profile resource must exist inside canonical profiles/") from exc
+            if byte_size > MAX_PROFILE_RESOURCE_BYTES:
+                raise LocalWorkspaceError("PROFILE-RESOURCE-BOUND-001", f"Profile resource exceeds size bound: {declared_path}")
+            resource_bytes += byte_size
+            if resource_bytes > MAX_EFFECTIVE_RESOURCE_BYTES:
+                raise LocalWorkspaceError("PROFILE-RESOURCE-BOUND-001", "Effective Profile Set resources exceed size bound")
             expected = declaration.get("sha256")
             if not isinstance(expected, str):
                 raise LocalWorkspaceError("PROFILE-RESOURCE-DIGEST-001", "production Profile resources require a sha256 pin")
@@ -575,7 +594,8 @@ def _effective_resources(selected) -> list[dict[str, Any]]:
                     "provenance": [],
                 },
             )
-            item["provenance"].append(source)
+            if source not in item["provenance"]:
+                item["provenance"].append(source)
     result = list(grouped.values())
     for item in result:
         item["provenance"].sort(key=lambda source: (TYPE_RANK[source["profile_type"]], source["profile_id"], _semver(source["profile_version"]), source["manifest_sha256"], source["declared_path"]))
