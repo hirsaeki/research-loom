@@ -189,6 +189,22 @@ class MiscoProductionProfileTests(unittest.TestCase):
                     resolve_effective_profile_set(config, [path])
             self.assertEqual(raised.exception.code, "PROFILE-RESOURCE-BOUND-001")
 
+        with patch.object(profile_resolution, "MAX_EFFECTIVE_RESOURCES", 1):
+            with patch.object(profile_resolution, "_normalized_resource_bytes", wraps=profile_resolution._normalized_resource_bytes) as reader:
+                with self.assertRaises(LocalWorkspaceError) as raised:
+                    resolve_effective_profile_set(config_for_publication(), [WRITER_MANIFEST, PUBLICATION_MANIFEST])
+        self.assertEqual(raised.exception.code, "PROFILE-RESOURCE-BOUND-001")
+        self.assertEqual(reader.call_count, 1)
+
+        with patch.object(profile_resolution, "MAX_EFFECTIVE_RESOURCE_BYTES", 1):
+            with patch.object(profile_resolution, "_normalized_resource_bytes", side_effect=AssertionError("resource body must not be read past the effective byte bound")):
+                with self.assertRaises(LocalWorkspaceError) as raised:
+                    resolve_effective_profile_set(
+                        {"profile_requests": {"research": [], "organization": [], "narrative": [{"profile_id": "misco.writer", "profile_type": "narrative", "version": "1.0.0"}], "publication": []}},
+                        [WRITER_MANIFEST],
+                    )
+        self.assertEqual(raised.exception.code, "PROFILE-RESOURCE-BOUND-001")
+
     def test_research_package_handoff_projection_keeps_rule_bodies_and_pins(self):
         eps = resolve_effective_profile_set(config_for_publication(), [WRITER_MANIFEST, PUBLICATION_MANIFEST])
         projected = profile_resources(eps)
