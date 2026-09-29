@@ -76,7 +76,18 @@ Profile carries **only** the already-active `CORE-TRACE-001` exact-locator
 strengthening. It does not import synthetic fixture Research-quality defaults
 and is not selected by fresh production projects.
 
-Then use the existing public flow:
+Then use the existing public flow. For the actual local acceptance, prefer the checked-in deterministic PowerShell probe so the before/after reads, target inspection, advancement and invariance checks are captured without manually copying IDs:
+
+```powershell
+.\projects\misco-ai-2026\Invoke-Probe2ProfileMigration.ps1 `
+  -ExpectedHead <40-character-main-HEAD>
+```
+
+The script defaults to `%TEMP%\misco-ai-2026-probe2`, requires a clean checkout and the provisioned `.venv`, fails closed unless the repository HEAD exactly matches `-ExpectedHead`, verifies the checked-in resolve-request digest, records only public CLI reads, resolves and inspects the exact target generation, performs `profile advance`, then reopens through new CLI processes. It writes `before/`, `target-generation/`, `after/`, per-command stdout/stderr, and `probe-result.json` under `%TEMP%\research-loom-probe2-misco-migration-<HEAD>`. Evidence is never overwritten: a repeat run uses the next `-rerun-NN` directory. If the Workspace already exposes the exact production target, the script reconstructs that target from public Profile history and requires `profile advance` to return `NOOP`, matching the idempotent previous Probe style.
+
+It automatically verifies that project semantics, Research Snapshot, authoritative/candidate RQs, active/effective Attention, materials, research inputs, Exhibits, historical Research Packages and Writer compositions are unchanged; the target contains only the continuity Research Profile plus production Writer/Publication; the first application adds exactly one append-only advancement event while an exact rerun adds none; and the migration source generation remains readable. The script never edits Workspace JSON/SQLite and never re-intakes existing authoritative Loom research.
+
+The underlying public commands remain:
 
 ```text
 research-loom profile resolve --workspace WORKSPACE --output TARGET --json projects/misco-ai-2026/probe2-profile-resolve.json
