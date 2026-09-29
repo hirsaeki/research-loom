@@ -2,7 +2,7 @@
 
 The optional third argument to the public Publication preview operation follows `core/packages/writer-publication/publication-application.schema.json`.
 
-For `misco.publication@1.2.0`, the current formal specification and reader-facing full-URL policy are already delivered as pinned Profile resources. A normal production MISCO run therefore does not invent or re-enter those values as loose runtime defaults.
+For `misco.publication@1.3.0`, the current formal specification and reader-facing full-URL policy are already delivered as pinned Profile resources. A normal production MISCO run therefore does not invent or re-enter those values as loose runtime defaults.
 
 An explicit `formal_spec_profile` or `url_display_profile` is accepted only when it exactly matches the selected Profile resource. A different value is an authority conflict; change the authoritative Profile/resource under a new version instead of overriding it at runtime.
 

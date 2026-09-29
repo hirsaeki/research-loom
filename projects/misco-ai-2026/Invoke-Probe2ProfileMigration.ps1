@@ -357,7 +357,7 @@ try {
     $repoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
     $script:Launcher = Join-Path $repoRoot 'research-loom.cmd'
     $resolveRequest = Join-Path $repoRoot 'projects\misco-ai-2026\probe2-profile-resolve.json'
-    $expectedResolveRequestSha256 = 'f7e201d4fbb2401a4d5e484f35241910d9fda0238b013f379dad6159c1634d36'
+    $expectedResolveRequestSha256 = '1d898e051aa3483437d1a8aea47e5896bf32b2c328a16b80e4bee02bfd3b3b5b'
 
     $defaultWorkspace = [System.IO.Path]::GetFullPath((Join-Path $env:TEMP 'misco-ai-2026-probe2'))
     $Workspace = [System.IO.Path]::GetFullPath($Workspace)
@@ -426,12 +426,12 @@ try {
 
     $expectedTargetRequests = @(
         'narrative|misco.writer|1.1.0',
-        'publication|misco.publication|1.2.0',
+        'publication|misco.publication|1.3.0',
         'research|misco.workspace-continuity.exact-locator|1.0.0'
     ) | Sort-Object
     $expectedTargetProfiles = @(
         'narrative|misco.writer|1.1.0',
-        'publication|misco.publication|1.2.0',
+        'publication|misco.publication|1.3.0',
         'research|misco.workspace-continuity.exact-locator|1.0.0'
     ) | Sort-Object
 

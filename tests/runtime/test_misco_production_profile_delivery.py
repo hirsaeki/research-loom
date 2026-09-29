@@ -26,7 +26,7 @@ class MiscoProductionProfileDeliveryTests(ResearchPackageAcceptanceSupport):
             "organization": [],
             "narrative": [],
             "publication": [
-                {"profile_id": "misco.publication", "profile_type": "publication", "version": "1.2.0"}
+                {"profile_id": "misco.publication", "profile_type": "publication", "version": "1.3.0"}
             ],
         }
         config.pop("configuration_digest", None)
