@@ -22,6 +22,30 @@ class MiscoProfileMigrationClosureTests(unittest.TestCase):
             for path in row["evidence"]:
                 self.assertTrue((ROOT / path).is_file(), f"{class_id}: missing {path}")
 
+    def test_all_245_ledger_rows_map_to_a_final_closure_class(self):
+        ledger = json.loads(LEDGER.read_text(encoding="utf-8"))
+        closure = json.loads(CLOSURE.read_text(encoding="utf-8"))
+        ledger_root = LEDGER.parent
+        rows = []
+        for shard_name in ledger["shards"]:
+            shard = json.loads((ledger_root / shard_name).read_text(encoding="utf-8"))
+            if not isinstance(shard, dict) or "rules" not in shard:
+                continue
+            columns = shard["columns"]
+            class_index = columns.index("class")
+            id_index = columns.index("id")
+            for row in shard["rules"]:
+                rows.append((row[id_index], row[class_index], shard_name))
+
+        expected = sum(
+            ledger["counts"][key]
+            for key in ("project_rules", "writer_items", "publication_items", "support_items")
+        )
+        self.assertEqual(expected, 245)
+        self.assertEqual(len(rows), expected)
+        for rule_id, class_id, shard_name in rows:
+            self.assertIn(class_id, closure["rule_classes"], f"{shard_name}:{rule_id}")
+
     def test_legacy_project_knowledge_is_validation_only_not_fresh_runtime_input(self):
         closure = json.loads(CLOSURE.read_text(encoding="utf-8"))
         project_knowledge = closure["rule_classes"]["project-knowledge"]
