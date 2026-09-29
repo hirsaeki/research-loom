@@ -545,9 +545,70 @@ class WriterRoundTripService:
         refs.add(str(package["package_id"]))
         return refs
 
+    @staticmethod
+    def _writer_review_plan(scope: Mapping[str, Any]) -> dict[str, set[str]]:
+        section_input = scope.get("section_input")
+        if not isinstance(section_input, Mapping):
+            return {}
+        delivery = section_input.get("writer_profile")
+        if delivery is None:
+            return {}
+        if not isinstance(delivery, Mapping) or not isinstance(delivery.get("review_plan"), list):
+            raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-PROFILE-REVIEW-001", "Writer Profile review plan is malformed")
+        result: dict[str, set[str]] = {}
+        for row in delivery["review_plan"]:
+            if not isinstance(row, Mapping) or not isinstance(row.get("review_id"), str) or not isinstance(row.get("rule_ids"), list):
+                raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-PROFILE-REVIEW-001", "Writer Profile review plan is malformed")
+            review_id = str(row["review_id"])
+            rule_ids = {str(rule_id) for rule_id in row["rule_ids"] if isinstance(rule_id, str) and rule_id}
+            if not review_id or not rule_ids or review_id in result:
+                raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-PROFILE-REVIEW-001", "Writer Profile review plan contains an invalid group")
+            result[review_id] = rule_ids
+        return result
+
+    @staticmethod
+    def _validate_profile_review(draft: Mapping[str, Any], scope: Mapping[str, Any]) -> set[str]:
+        plan = WriterRoundTripService._writer_review_plan(scope)
+        reviews = draft.get("profile_review", [])
+        if not plan:
+            if reviews:
+                raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-PROFILE-REVIEW-001", "Writer response reports Profile review without delivered Writer rules")
+            return set()
+        if not isinstance(reviews, list):
+            raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-PROFILE-REVIEW-001", "Writer response must report the delivered Profile review plan")
+        by_id: dict[str, Mapping[str, Any]] = {}
+        for row in reviews:
+            if not isinstance(row, Mapping) or not isinstance(row.get("review_id"), str):
+                raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-PROFILE-REVIEW-001", "Writer Profile review entry is malformed")
+            review_id = str(row["review_id"])
+            if review_id in by_id:
+                raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-PROFILE-REVIEW-001", f"duplicate Writer Profile review group: {review_id}")
+            by_id[review_id] = row
+        if set(by_id) != set(plan):
+            missing = sorted(set(plan) - set(by_id)); extra = sorted(set(by_id) - set(plan))
+            raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-PROFILE-REVIEW-001", f"Writer Profile review groups do not match delivered plan; missing={missing}, extra={extra}")
+        violations: set[str] = set()
+        for review_id, expected_rule_ids in plan.items():
+            row = by_id[review_id]
+            actual_rule_ids = {str(x) for x in row.get("rule_ids", []) if isinstance(x, str)}
+            violated_rule_ids = {str(x) for x in row.get("violated_rule_ids", []) if isinstance(x, str)}
+            if actual_rule_ids != expected_rule_ids:
+                raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-PROFILE-REVIEW-001", f"Writer Profile review does not cover exact rules for {review_id}")
+            if not violated_rule_ids <= expected_rule_ids:
+                raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-PROFILE-REVIEW-001", f"Writer Profile review names unavailable rules for {review_id}")
+            outcome = str(row.get("outcome"))
+            if outcome in {"violation", "mixed"}:
+                if not violated_rule_ids:
+                    raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-PROFILE-REVIEW-001", f"Writer Profile review {review_id} reports a violation without rule IDs")
+                violations.update(violated_rule_ids)
+            elif violated_rule_ids:
+                raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-PROFILE-REVIEW-001", f"Writer Profile review {review_id} lists violated rules for non-violation outcome")
+        return violations
+
     def _validate_response_semantics(self, response: Mapping[str, Any], receipt: Mapping[str, Any], package: Mapping[str, Any]) -> None:
         section_scope = {str(row["section_id"]): row for row in receipt["sections"]}
         response_ids: set[str] = set()
+        violations_by_section: dict[str, set[str]] = {}
         for draft in response["sections"]:
             section_id = str(draft["section_id"])
             if section_id in response_ids:
@@ -571,7 +632,9 @@ class WriterRoundTripService:
                     raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-REFERENCE-001", f"Writer response citation Source is unavailable: {source}")
                 if locator is not None and str(locator) not in citation_scope[source]:
                     raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-REFERENCE-001", f"Writer response citation locator is unavailable: {locator}")
+            violations_by_section[section_id] = self._validate_profile_review(draft, scope)
         known_refs = self._known_package_refs(package)
+        feedback_rule_ids_by_section: dict[str, set[str]] = {}
         for issue in response.get("feedback", []):
             target_type = issue["target_type"]
             target_id = str(issue["target_id"])
@@ -584,6 +647,18 @@ class WriterRoundTripService:
             unknown_support = sorted(set(map(str, issue.get("supporting_package_refs", []))) - known_refs)
             if unknown_support:
                 raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-REFERENCE-001", "Writer feedback references material outside the pinned Research Package: " + ", ".join(unknown_support))
+            profile_rule_ids = {str(x) for x in issue.get("profile_rule_ids", []) if isinstance(x, str)}
+            if profile_rule_ids:
+                if target_type != "section":
+                    raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-PROFILE-REVIEW-001", "Profile rule feedback must target a section")
+                allowed = violations_by_section.get(target_id, set())
+                if not profile_rule_ids <= allowed:
+                    raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-PROFILE-REVIEW-001", "Writing Feedback names Profile rules not reported as violated for the section")
+                feedback_rule_ids_by_section.setdefault(target_id, set()).update(profile_rule_ids)
+        for section_id, violated_rule_ids in violations_by_section.items():
+            missing = sorted(violated_rule_ids - feedback_rule_ids_by_section.get(section_id, set()))
+            if missing:
+                raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-PROFILE-REVIEW-001", "Writer Profile violations require Writing Feedback for exact rule IDs: " + ", ".join(missing))
 
     def import_response(self, value: Mapping[str, Any]) -> Mapping[str, Any]:
         if not isinstance(value, Mapping):
@@ -670,6 +745,7 @@ class WriterRoundTripService:
                     "content_digest": _sha256_text(str(draft["content"])),
                     "citations": deepcopy(list(draft.get("citations", []))),
                     "exhibit_refs": deepcopy(list(draft.get("exhibit_refs", []))),
+                    **({"profile_review": deepcopy(list(draft["profile_review"]))} if "profile_review" in draft else {}),
                     "origin_revision_id": revision_id,
                 }
                 sections.append(row)

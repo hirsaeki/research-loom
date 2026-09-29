@@ -2,8 +2,8 @@
   "schema_version": "0.1.0",
   "profile_id": "misco.writer",
   "profile_type": "narrative",
-  "profile_version": "1.0.0",
-  "description": "Production MISCO Writer/Narrative profile. It instantiates the minimal canonical Narrative projection required by Research Package 0.2.0 and delivers the Human-approved clean Layer A Writer rules without creating research decisions.",
+  "profile_version": "1.1.0",
+  "description": "Production MISCO Writer/Narrative profile. It instantiates the minimal canonical Narrative projection required by Research Package 0.2.0 and delivers the Human-approved clean Layer A Writer rules plus their detached source text without creating research decisions.",
   "core_compatibility": {
     "research_contract": ">=0.1.0 <0.2.0",
     "invariant_contract": ">=0.1.0 <0.2.0"
@@ -192,6 +192,11 @@
       "path": "resources/writer-clean-rules.json",
       "role": "WRITER_RULES",
       "sha256": "c6e642a238cfddec693b8d594f840462975e1e97d95e011605dca1c15509eb38"
+    },
+    {
+      "path": "resources/writer-clean-source-documents.json",
+      "role": "WRITER_SOURCE_DOCUMENTS",
+      "sha256": "4194adcb86c0eb0dddbf1622a405498d8622e6a25e0cf38273fa1938c7c26010"
     }
   ]
 }

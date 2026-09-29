@@ -23,6 +23,7 @@ ROOT = Path(__file__).resolve().parents[2]
 WRITER_MANIFEST = ROOT / "profiles/narrative/misco/profile.json"
 PUBLICATION_MANIFEST = ROOT / "profiles/publication/misco/profile.json"
 WRITER_ASSET = ROOT / "profiles/narrative/misco/resources/writer-clean-rules.json"
+WRITER_SOURCE_ASSET = ROOT / "profiles/narrative/misco/resources/writer-clean-source-documents.json"
 PUBLICATION_ASSET = ROOT / "profiles/publication/misco/resources/publication-clean-rules.json"
 PROJECT_FIXTURE = ROOT / "projects/fixtures/valid/generic-project-config.json"
 RESEARCH_FIXTURE = ROOT / "profiles/fixtures/research-quality/valid/generic-research-quality.profile.json"
@@ -35,7 +36,7 @@ def config_for_publication() -> dict:
             "organization": [],
             "narrative": [],
             "publication": [
-                {"profile_id": "misco.publication", "profile_type": "publication", "version": "1.0.0"}
+                {"profile_id": "misco.publication", "profile_type": "publication", "version": "1.0.1"}
             ],
         }
     }
@@ -65,10 +66,10 @@ class MiscoProductionProfileTests(unittest.TestCase):
             self.assertEqual(expected, encoded)
         self.assertEqual(
             [(x["profile_type"], x["profile_id"], x["profile_version"]) for x in eps["effective_profiles"]],
-            [("narrative", "misco.writer", "1.0.0"), ("publication", "misco.publication", "1.0.0")],
+            [("narrative", "misco.writer", "1.1.0"), ("publication", "misco.publication", "1.0.1")],
         )
         resources = {x["role"]: x for x in eps["effective_resources"]}
-        self.assertEqual(set(resources), {"WRITER_RULES", "PUBLICATION_RULES"})
+        self.assertEqual(set(resources), {"WRITER_RULES", "WRITER_SOURCE_DOCUMENTS", "PUBLICATION_RULES"})
         for resource in resources.values():
             self.assertEqual(hashlib.sha256(resource["content"].encode()).hexdigest(), resource["sha256"])
             self.assertEqual(len(resource["content"].encode()), resource["byte_length"])
@@ -91,6 +92,26 @@ class MiscoProductionProfileTests(unittest.TestCase):
             self.assertTrue((ROOT / item["source"]["path"]).is_file(), item["id"])
         self.assertTrue(all("Layer_B" not in item["source"]["path"] and "Layer_C" not in item["source"]["path"] for item in writer["items"] + publication["items"]))
         self.assertNotIn("synthetic-example-spec", {item["class"] for item in writer["items"]})
+        source_asset = json.loads(WRITER_SOURCE_ASSET.read_text(encoding="utf-8"))
+        source_documents = {row["path"]: row for row in source_asset["source_documents"]}
+        self.assertEqual(set(source_documents), {item["source"]["path"] for item in writer["items"]})
+        self.assertEqual(source_asset["document_count"], 8)
+        expected_writer_ids_by_source = {}
+        for item in writer["items"]:
+            expected_writer_ids_by_source.setdefault(item["source"]["path"], set()).add(item["id"])
+        self.assertEqual(
+            {rule_id for row in source_documents.values() for rule_id in row["writer_rule_ids"]},
+            {item["id"] for item in writer["items"]},
+        )
+        for source_path, row in source_documents.items():
+            self.assertEqual(set(row["writer_rule_ids"]), expected_writer_ids_by_source[source_path])
+            raw = (ROOT / source_path).read_bytes().replace(b"\r\n", b"\n")
+            self.assertEqual(row["content"].encode("utf-8"), raw)
+            self.assertEqual(row["byte_length"], len(raw))
+            self.assertEqual(row["sha256"], hashlib.sha256(raw).hexdigest())
+            self.assertNotIn("09_SYNTHETIC_FEWSHOT_SPECIFICATION", source_path)
+            self.assertNotIn("Layer_B", source_path)
+            self.assertNotIn("Layer_C", source_path)
         self.assertEqual(
             {x["id"] for x in publication["missing_inputs"]},
             {"INPUT-FORMAL-SPEC", "INPUT-URL-DISPLAY", "INPUT-RESEARCH-GROUP-TYPE", "INPUT-PERMISSION"},
@@ -102,11 +123,12 @@ class MiscoProductionProfileTests(unittest.TestCase):
             (base / "resources").mkdir()
             body = WRITER_ASSET.read_text(encoding="utf-8") + " "
             (base / "resources/writer-clean-rules.json").write_text(body, encoding="utf-8")
+            (base / "resources/writer-clean-source-documents.json").write_bytes(WRITER_SOURCE_ASSET.read_bytes())
             manifest = json.loads(WRITER_MANIFEST.read_text(encoding="utf-8"))
             manifest["profile_id"] = "misco.writer-ablation"
             path = base / "profile.json"
             path.write_text(json.dumps(manifest, ensure_ascii=False), encoding="utf-8")
-            config = {"profile_requests": {"research": [], "organization": [], "narrative": [{"profile_id": "misco.writer-ablation", "profile_type": "narrative", "version": "1.0.0"}], "publication": []}}
+            config = {"profile_requests": {"research": [], "organization": [], "narrative": [{"profile_id": "misco.writer-ablation", "profile_type": "narrative", "version": "1.1.0"}], "publication": []}}
             with self.assertRaises(LocalWorkspaceError) as raised:
                 resolve_effective_profile_set(config, [path])
             self.assertEqual(raised.exception.code, "PROFILE-RESOURCE-DIGEST-001")
@@ -118,7 +140,7 @@ class MiscoProductionProfileTests(unittest.TestCase):
             manifest["profile_id"] = "misco.writer-missing-resource"
             path = base / "profile.json"
             path.write_text(json.dumps(manifest, ensure_ascii=False), encoding="utf-8")
-            config = {"profile_requests": {"research": [], "organization": [], "narrative": [{"profile_id": "misco.writer-missing-resource", "profile_type": "narrative", "version": "1.0.0"}], "publication": []}}
+            config = {"profile_requests": {"research": [], "organization": [], "narrative": [{"profile_id": "misco.writer-missing-resource", "profile_type": "narrative", "version": "1.1.0"}], "publication": []}}
             with self.assertRaises(LocalWorkspaceError) as raised:
                 resolve_effective_profile_set(config, [path])
             self.assertEqual(raised.exception.code, "PROFILE-RESOURCE-SOURCE-001")
@@ -155,21 +177,22 @@ class MiscoProductionProfileTests(unittest.TestCase):
             base = Path(temp)
             (base / "resources").mkdir()
             (base / "resources/writer-clean-rules.json").write_bytes(WRITER_ASSET.read_bytes())
+            (base / "resources/writer-clean-source-documents.json").write_bytes(WRITER_SOURCE_ASSET.read_bytes())
             manifest = json.loads(WRITER_MANIFEST.read_text(encoding="utf-8"))
             manifest["profile_id"] = "misco.writer-duplicate-resource"
             manifest["resources"] = manifest["resources"] * 2
             path = base / "profile.json"
             path.write_text(json.dumps(manifest, ensure_ascii=False), encoding="utf-8")
-            config = {"profile_requests": {"research": [], "organization": [], "narrative": [{"profile_id": manifest["profile_id"], "profile_type": "narrative", "version": "1.0.0"}], "publication": []}}
+            config = {"profile_requests": {"research": [], "organization": [], "narrative": [{"profile_id": manifest["profile_id"], "profile_type": "narrative", "version": "1.1.0"}], "publication": []}}
             eps = resolve_effective_profile_set(config, [path])
-            self.assertEqual(len(eps["effective_resources"]), 1)
-            self.assertEqual(len(eps["effective_resources"][0]["provenance"]), 1)
+            self.assertEqual(len(eps["effective_resources"]), 2)
+            self.assertTrue(all(len(row["provenance"]) == 1 for row in eps["effective_resources"]))
 
     def test_resource_bounds_fail_before_unbounded_reads(self):
         with patch.object(profile_resolution, "MAX_PROFILE_RESOURCE_BYTES", 1):
             with self.assertRaises(LocalWorkspaceError) as raised:
                 resolve_effective_profile_set(
-                    {"profile_requests": {"research": [], "organization": [], "narrative": [{"profile_id": "misco.writer", "profile_type": "narrative", "version": "1.0.0"}], "publication": []}},
+                    {"profile_requests": {"research": [], "organization": [], "narrative": [{"profile_id": "misco.writer", "profile_type": "narrative", "version": "1.1.0"}], "publication": []}},
                     [WRITER_MANIFEST],
                 )
         self.assertEqual(raised.exception.code, "PROFILE-RESOURCE-BOUND-001")
@@ -178,12 +201,13 @@ class MiscoProductionProfileTests(unittest.TestCase):
             base = Path(temp)
             (base / "resources").mkdir()
             (base / "resources/writer-clean-rules.json").write_bytes(WRITER_ASSET.read_bytes())
+            (base / "resources/writer-clean-source-documents.json").write_bytes(WRITER_SOURCE_ASSET.read_bytes())
             manifest = json.loads(WRITER_MANIFEST.read_text(encoding="utf-8"))
             manifest["profile_id"] = "misco.writer-too-many-resources"
             manifest["resources"] = manifest["resources"] * 2
             path = base / "profile.json"
             path.write_text(json.dumps(manifest, ensure_ascii=False), encoding="utf-8")
-            config = {"profile_requests": {"research": [], "organization": [], "narrative": [{"profile_id": manifest["profile_id"], "profile_type": "narrative", "version": "1.0.0"}], "publication": []}}
+            config = {"profile_requests": {"research": [], "organization": [], "narrative": [{"profile_id": manifest["profile_id"], "profile_type": "narrative", "version": "1.1.0"}], "publication": []}}
             with patch.object(profile_resolution, "MAX_PROFILE_RESOURCES", 1):
                 with self.assertRaises(LocalWorkspaceError) as raised:
                     resolve_effective_profile_set(config, [path])
@@ -200,7 +224,7 @@ class MiscoProductionProfileTests(unittest.TestCase):
             with patch.object(profile_resolution, "_normalized_resource_bytes", side_effect=AssertionError("resource body must not be read past the effective byte bound")):
                 with self.assertRaises(LocalWorkspaceError) as raised:
                     resolve_effective_profile_set(
-                        {"profile_requests": {"research": [], "organization": [], "narrative": [{"profile_id": "misco.writer", "profile_type": "narrative", "version": "1.0.0"}], "publication": []}},
+                        {"profile_requests": {"research": [], "organization": [], "narrative": [{"profile_id": "misco.writer", "profile_type": "narrative", "version": "1.1.0"}], "publication": []}},
                         [WRITER_MANIFEST],
                     )
         self.assertEqual(raised.exception.code, "PROFILE-RESOURCE-BOUND-001")
@@ -210,7 +234,7 @@ class MiscoProductionProfileTests(unittest.TestCase):
         projected = profile_resources(eps)
         self.assertEqual(projected, eps["effective_resources"])
         self.assertIsNot(projected, eps["effective_resources"])
-        self.assertEqual({x["role"] for x in projected}, {"WRITER_RULES", "PUBLICATION_RULES"})
+        self.assertEqual({x["role"] for x in projected}, {"WRITER_RULES", "WRITER_SOURCE_DOCUMENTS", "PUBLICATION_RULES"})
         self.assertTrue(all(x["content"] for x in projected))
         self.assertTrue(all(x["provenance"] for x in projected))
 
@@ -227,14 +251,14 @@ class MiscoProductionProfileTests(unittest.TestCase):
             opened.close()
             with LocalWorkspace.open(workspace) as reopened:
                 resources = reopened.effective_profile_set["effective_resources"]
-                self.assertEqual({x["role"] for x in resources}, {"WRITER_RULES", "PUBLICATION_RULES"})
+                self.assertEqual({x["role"] for x in resources}, {"WRITER_RULES", "WRITER_SOURCE_DOCUMENTS", "PUBLICATION_RULES"})
                 self.assertTrue(all(x["content"] for x in resources))
             detached = root / "detached.json"
             detached.write_text(json.dumps(eps, ensure_ascii=False), encoding="utf-8")
             code = (
                 "import json,sys; x=json.load(open(sys.argv[1],encoding='utf-8')); "
                 "r={i['role']:i for i in x['effective_resources']}; "
-                "assert set(r)=={'WRITER_RULES','PUBLICATION_RULES'}; "
+                "assert set(r)=={'WRITER_RULES','WRITER_SOURCE_DOCUMENTS','PUBLICATION_RULES'}; "
                 "assert all(i['content'] for i in r.values())"
             )
             result = subprocess.run([sys.executable, "-c", code, str(detached)], cwd=root, capture_output=True, text=True)
