@@ -198,9 +198,9 @@ def _publication_policy(package: Mapping[str, Any], profile: Mapping[str, Any], 
     editorial = inputs.get("editorial_review")
     missing = []
     if profile.get("profile_id") == "misco.publication":
-        if not isinstance(formal, Mapping):
+        if not isinstance(formal, Mapping) or not isinstance(formal.get("research_group_type_required"), bool):
             missing.append("INPUT-FORMAL-SPEC")
-        elif formal.get("research_group_type_required") and not group_type:
+        elif formal["research_group_type_required"] and not group_type:
             missing.append("INPUT-RESEARCH-GROUP-TYPE")
         sources = package.get("resolved_content", {}).get("research_objects", [])
         has_reader_url = any(
@@ -448,6 +448,7 @@ class PublicationReleaseService:
         citation_numbers: dict[str, int] = {}
         locators_by_source: dict[str, list[str]] = {}
         citation_refs_by_section: dict[str, list[str]] = {}
+        citation_ref_sets_by_section: dict[str, set[str]] = {}
         locators_by_section_source: dict[tuple[str, str], list[str]] = {}
         issues: list[dict[str, Any]] = []
         issue_keys: set[tuple[str, str, str | None]] = set()
@@ -470,7 +471,9 @@ class PublicationReleaseService:
                 if source_ref not in citation_numbers:
                     citation_numbers[source_ref] = len(citation_numbers) + 1
                 section_refs = citation_refs_by_section.setdefault(section_id, [])
-                if source_ref not in section_refs:
+                section_ref_set = citation_ref_sets_by_section.setdefault(section_id, set())
+                if source_ref not in section_ref_set:
+                    section_ref_set.add(source_ref)
                     section_refs.append(source_ref)
                 locator = citation.get("locator_ref")
                 if locator:
@@ -544,8 +547,6 @@ class PublicationReleaseService:
                 number = citation_numbers[source_ref]
                 source = sources[source_ref]
                 locators = locators_by_section_source.get((section_id, source_ref), [])
-                if not locators:
-                    locators = locators_by_source.get(source_ref, [])
                 rendered = self._citation_label(source, locators[0] if locators else None, policy)
                 entry = resolve_text(f"[{number}] {rendered}", section_id)
                 md.append(entry)

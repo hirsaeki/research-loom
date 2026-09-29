@@ -12,7 +12,9 @@ import rfc8785
 
 from plugins.local_application import LocalApplicationError
 from plugins.local_application.profile_resolution import resolve_effective_profile_set
-from plugins.local_application.publication_docx import W, docx_bytes
+from plugins.local_application.publication_input import inspect_inputs
+from plugins.local_application.publication_release_service import _publication_policy
+from plugins.local_application.publication_docx import W, WP, docx_bytes
 from test_misco_writer_profile_application import MiscoWriterProfileApplicationTests, WRITER_MANIFEST
 import test_external_desktop_research_intake as intake
 
@@ -206,6 +208,70 @@ class MiscoPublicationProfileApplicationTests(MiscoWriterProfileApplicationTests
             left_pg = left_doc.find(f".//{{{W}}}pgMar")
             right_pg = right_doc.find(f".//{{{W}}}pgMar")
             self.assertNotEqual(left_pg.get(f"{{{W}}}top"), right_pg.get(f"{{{W}}}top"))
+
+
+    def test_review_formal_contract_requires_research_group_type_flag(self):
+        schema = json.loads((ROOT / "core/packages/writer-publication/publication-application.schema.json").read_text(encoding="utf-8"))
+        self.assertIn(
+            "research_group_type_required",
+            schema["properties"]["formal_spec_profile"]["required"],
+        )
+
+    def test_review_section_reference_does_not_reuse_locator_from_another_section(self):
+        facade, _case, composition, imported = self._prepared_publication()
+        try:
+            inspection = inspect_inputs(facade, composition["composition_id"], imported["revision_id"])
+            first = inspection["revision"]["sections"][0]["citations"][0]
+            source_ref = first["source_ref"]
+            first_locator = first["locator_ref"]
+            inspection["revision"]["sections"][1]["citations"] = [
+                {"source_ref": source_ref, "locator_ref": None}
+            ]
+            package = inspection["source_package_document"]
+            for row in package.get("resolved_content", {}).get("research_objects", []):
+                if isinstance(row, dict) and row.get("id") == source_ref:
+                    row["canonical_locator"] = "https://example.test/source-a"
+            service = facade._publication_release_service()
+            profile = service._profile_pin(package)
+            inspection["publication_policy"] = _publication_policy(
+                package, profile, self._application_inputs()
+            )
+            markdown, _docx, _issues, _checks = service._render(inspection)
+            text = markdown.decode("utf-8")
+            second_heading = composition["sections"][1].get("heading") or composition["sections"][1].get("generated_heading") or "SEC-VALIDATE"
+            if isinstance(second_heading, dict):
+                second_heading = second_heading.get("text")
+            second = text[text.index(f"## {second_heading}"):]
+            self.assertIn("https://example.test/source-a", second)
+            self.assertNotIn(str(first_locator), second)
+        finally:
+            facade.close()
+
+    def test_review_formal_content_width_bounds_table_and_image(self):
+        from test_issue256_native_publication import fixture_png
+
+        formal = json.loads(
+            (ROOT / "profiles/publication/misco/resources/publication-formal-spec.json").read_text(encoding="utf-8")
+        )["formal_spec_profile"]
+        layout = formal["docx_layout"]
+        content_width = layout["page_width_twips"] - layout["margin_left_twips"] - layout["margin_right_twips"]
+        png = fixture_png()
+        table = {
+            "ref": "EX-WIDTH-T", "caption": "Table width", "kind": "table",
+            "rows": [["a", "b"], ["1", "2"]], "provenance": {},
+        }
+        image = {
+            "ref": "EX-WIDTH-I", "caption": "Figure width", "kind": "image",
+            "data": png, "width": 2000, "height": 200,
+            "asset_digest": "sha256:" + hashlib.sha256(png).hexdigest(), "provenance": {},
+        }
+        data = docx_bytes([("exhibit", table), ("exhibit", image)], layout)
+        with zipfile.ZipFile(io.BytesIO(data)) as archive:
+            document = ET.fromstring(archive.read("word/document.xml"))
+            table_width = document.find(f".//{{{W}}}tblW")
+            extent = document.find(f".//{{{WP}}}extent")
+            self.assertEqual(int(table_width.get(f"{{{W}}}w")), content_width)
+            self.assertLessEqual(int(extent.get("cx")), content_width * 635)
 
     def test_e3_table_caption_above_and_figure_caption_below_in_native_docx(self):
         import io

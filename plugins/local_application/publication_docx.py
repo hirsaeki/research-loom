@@ -64,10 +64,10 @@ def _paragraph(
     return f'<w:p><w:pPr><w:pStyle w:val="{style}"/>{indent}</w:pPr>{start}<w:r><w:t xml:space="preserve">{runs}</w:t></w:r>{end}</w:p>'
 
 
-def _table(rows: list[list[str]]) -> str:
-    width = 9360 // len(rows[0])
+def _table(rows: list[list[str]], total_width_twips: int = 9360) -> str:
+    width = max(1, total_width_twips // len(rows[0]))
     borders = ''.join(f'<w:{side} w:val="single" w:sz="4" w:color="auto"/>' for side in ("top", "left", "bottom", "right", "insideH", "insideV"))
-    result = ['<w:tbl><w:tblPr><w:tblW w:w="9360" w:type="dxa"/><w:tblLayout w:type="fixed"/>',
+    result = [f'<w:tbl><w:tblPr><w:tblW w:w="{total_width_twips}" w:type="dxa"/><w:tblLayout w:type="fixed"/>',
               f'<w:tblBorders>{borders}</w:tblBorders>',
               '<w:tblCellMar><w:top w:w="80" w:type="dxa"/><w:left w:w="80" w:type="dxa"/><w:bottom w:w="80" w:type="dxa"/><w:right w:w="80" w:type="dxa"/></w:tblCellMar></w:tblPr>',
               '<w:tblGrid>' + ''.join(f'<w:gridCol w:w="{width}"/>' for _ in rows[0]) + '</w:tblGrid>']
@@ -79,9 +79,9 @@ def _table(rows: list[list[str]]) -> str:
     return ''.join(result) + '</w:tbl>'
 
 
-def _image(block: dict[str, Any], index: int) -> str:
+def _image(block: dict[str, Any], index: int, max_width_emu: int = 5943600) -> str:
     width, height = block["width"] * 9525, block["height"] * 9525  # 96dpi, preserve aspect ratio.
-    scale = min(1, 5943600 / width, 5029200 / height)
+    scale = min(1, max_width_emu / width, 5029200 / height)
     width, height = max(1, int(width * scale)), max(1, int(height * scale))
     desc = quoteattr(block["caption"])
     return (f'<w:p><w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0">'
@@ -107,6 +107,14 @@ def _provenance(lines: list[tuple[str, Any]]) -> list[dict[str, Any]]:
 
 def docx_bytes(lines: list[tuple[str, Any]], layout: dict[str, Any] | None = None) -> bytes:
     layout = dict(layout or {})
+    page_width = int(layout.get('page_width_twips', 12240))
+    page_height = int(layout.get('page_height_twips', 15840))
+    margin_top = int(layout.get('margin_top_twips', 1440))
+    margin_right = int(layout.get('margin_right_twips', 1440))
+    margin_bottom = int(layout.get('margin_bottom_twips', 1440))
+    margin_left = int(layout.get('margin_left_twips', 1440))
+    content_width_twips = max(1, page_width - margin_left - margin_right)
+    content_width_emu = content_width_twips * 635
     body = []
     images = {}
     relationships = [f'<Relationship Id="rIdStyles" Type="{R}/styles" Target="styles.xml"/>',
@@ -126,9 +134,9 @@ def docx_bytes(lines: list[tuple[str, Any]], layout: dict[str, Any] | None = Non
         caption = _paragraph(block["caption"], "caption", (index, _bookmark(block["ref"])))
         if block["kind"] == "table":
             body.append(caption)
-            body.append(_table(block["rows"]))
+            body.append(_table(block["rows"], content_width_twips))
         elif block["kind"] == "image":
-            body.append(_image(block, index))
+            body.append(_image(block, index, content_width_emu))
             body.append(caption)
             name = f'media/image-{index}.png'
             images['word/' + name] = block['data']
@@ -137,12 +145,6 @@ def docx_bytes(lines: list[tuple[str, Any]], layout: dict[str, Any] | None = Non
             body.append(_paragraph(f'[Unavailable exhibit: {block["code"]}. Preserve the source and supply a supported representation under a new identity.]'))
         if block.get("note"):
             body.append(_paragraph(block["note"], "source_caption"))
-    page_width = int(layout.get('page_width_twips', 12240))
-    page_height = int(layout.get('page_height_twips', 15840))
-    margin_top = int(layout.get('margin_top_twips', 1440))
-    margin_right = int(layout.get('margin_right_twips', 1440))
-    margin_bottom = int(layout.get('margin_bottom_twips', 1440))
-    margin_left = int(layout.get('margin_left_twips', 1440))
     header_margin = int(layout.get('header_margin_twips', 720))
     footer_margin = int(layout.get('footer_margin_twips', 720))
     grid = ''

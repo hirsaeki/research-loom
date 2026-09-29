@@ -9,7 +9,7 @@
     "schema_version":{"const":"0.1.0"},
     "formal_spec_profile":{
       "type":"object","additionalProperties":false,
-      "required":["profile_id","profile_version","source","docx_layout","reference_list_placement"],
+      "required":["profile_id","profile_version","source","docx_layout","reference_list_placement","research_group_type_required"],
       "properties":{
         "profile_id":{"type":"string","minLength":1,"maxLength":256},
         "profile_version":{"type":"string","minLength":1,"maxLength":64},
