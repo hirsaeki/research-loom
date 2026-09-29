@@ -1,0 +1,33 @@
+{
+  "schema_version": "0.1.0",
+  "profile_id": "misco.workspace-continuity.exact-locator",
+  "profile_type": "research",
+  "profile_version": "1.0.0",
+  "description": "Migration-only continuity Profile. It preserves an already-active CORE-TRACE-001 exact-locator strengthening when an older fixture-bound Workspace advances to production MISCO Writer/Publication Profiles. It is not a fresh-project Research-quality default.",
+  "core_compatibility": {
+    "research_contract": ">=0.1.0 <0.2.0",
+    "invariant_contract": ">=0.1.0 <0.2.0"
+  },
+  "constraints": [
+    {
+      "id": "MISCO-CONTINUITY-TRACE-001",
+      "path": "evidence.capture.locator_precision",
+      "merge_strategy": "must_equal",
+      "value": "exact",
+      "rationale": "Carry forward only the exact-locator Core strengthening already active in the historical Workspace; do not import synthetic fixture Research-quality defaults."
+    }
+  ],
+  "core_invariant_strengthenings": [
+    {
+      "invariant_id": "CORE-TRACE-001",
+      "effect": "strengthen",
+      "constraint_ids": ["MISCO-CONTINUITY-TRACE-001"],
+      "validator_binding": {
+        "validator_id": "core.trace.evidence-source",
+        "validator_version": "0.1.0",
+        "form_id": "exact-locator"
+      },
+      "rationale": "Profile advancement must not weaken an already-active Core strengthening."
+    }
+  ]
+}

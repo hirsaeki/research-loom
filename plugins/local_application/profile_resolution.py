@@ -253,8 +253,13 @@ def _validate_manifest_semantics(manifest: Mapping[str, Any]) -> None:
                         break
         if matched_form is None or matched_validator is None:
             raise LocalWorkspaceError("PROFILE-CORE-STRENGTHENING-001", "Profile strengthening is not registered")
-        prefix = matched_validator.get("applicability", {}).get("profile_id_prefix")
-        if isinstance(prefix, str) and not str(manifest["profile_id"]).startswith(prefix):
+        applicability = matched_validator.get("applicability", {})
+        prefix = applicability.get("profile_id_prefix")
+        prefixes = applicability.get("profile_id_prefixes")
+        profile_id = str(manifest["profile_id"])
+        if isinstance(prefix, str) and not profile_id.startswith(prefix):
+            raise LocalWorkspaceError("PROFILE-CORE-STRENGTHENING-001", "Profile strengthening is outside the registered applicability")
+        if isinstance(prefixes, list) and (not prefixes or any(not isinstance(item, str) or not item for item in prefixes) or not any(profile_id.startswith(item) for item in prefixes)):
             raise LocalWorkspaceError("PROFILE-CORE-STRENGTHENING-001", "Profile strengthening is outside the registered applicability")
         referenced = []
         for constraint_id in strengthening["constraint_ids"]:
@@ -716,6 +721,7 @@ def resolve_effective_profile_set(
 def target_project_config(
     current: Mapping[str, Any],
     replacements: Iterable[Mapping[str, Any]],
+    additions: Iterable[Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
     target = deepcopy(dict(current))
     changed = False
@@ -733,6 +739,21 @@ def target_project_config(
             raise LocalWorkspaceError("PROFILE-ADVANCE-REQUEST-001", "request replacement source must match exactly once")
         items[matches[0]] = deepcopy(dict(new))
         changed = changed or dict(old) != dict(new)
+    for addition in additions:
+        if not isinstance(addition, Mapping):
+            raise LocalWorkspaceError("PROFILE-ADVANCE-REQUEST-001", "request addition must be an object")
+        item = deepcopy(dict(addition))
+        profile_type = str(item.get("profile_type", ""))
+        profile_id = str(item.get("profile_id", ""))
+        if profile_type not in ("research", "organization", "narrative", "publication") or not profile_id:
+            raise LocalWorkspaceError("PROFILE-ADVANCE-REQUEST-001", "request addition must identify a supported Profile type and id")
+        items = target["profile_requests"][profile_type]
+        if item in items:
+            continue
+        if any(str(existing.get("profile_id")) == profile_id for existing in items):
+            raise LocalWorkspaceError("PROFILE-ADVANCE-REQUEST-001", "request addition collides with an existing Profile id")
+        items.append(item)
+        changed = True
     if changed:
         prior_digest = str(current["configuration_digest"])
         derived = target["provenance"].setdefault("derived_from_configuration_digests", [])

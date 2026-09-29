@@ -307,13 +307,16 @@ def prepare_profile_generation(workspace: str | Path, request: Mapping[str, Any]
     root = _assert_safe_workspace_root(Path(workspace))
     manifest_files = request.get("profile_manifest_files")
     replacements = request.get("request_replacements", [])
+    additions = request.get("request_additions", [])
     if not isinstance(manifest_files, list) or not all(isinstance(item, str) for item in manifest_files):
         raise LocalWorkspaceError("PROFILE-RESOLVE-INPUT-001", "profile_manifest_files must be a list of file paths")
     if not isinstance(replacements, list) or not all(isinstance(item, Mapping) for item in replacements):
         raise LocalWorkspaceError("PROFILE-RESOLVE-INPUT-001", "request_replacements must be a list")
+    if not isinstance(additions, list) or not all(isinstance(item, Mapping) for item in additions):
+        raise LocalWorkspaceError("PROFILE-RESOLVE-INPUT-001", "request_additions must be a list")
     with LocalWorkspace.open(root) as opened:
         current = deepcopy(dict(opened.project_config))
-    target_config = target_project_config(current, replacements)
+    target_config = target_project_config(current, replacements, additions)
     _schema_validate(target_config, PROJECT_CONFIG_SCHEMA, "WORKSPACE-PROJECT-CONFIG-SCHEMA-001")
     _validate_project_semantics(target_config)
     _validate_target_project_delta(current, target_config)

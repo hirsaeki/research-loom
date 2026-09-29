@@ -111,6 +111,14 @@ research-loom resume --workspace WORKSPACE --json
 
 If the current direct requests already admit a newer compatible Profile version, `request_replacements` may be empty. In that route the Project Config document/digest remains exact and only the EPS binding advances.
 
+`request_additions` may also be supplied when an existing Workspace must add one explicit direct Profile request during the same bounded generation change. It is intentionally not a general Project Config editor: additions are validated as Profile requirements, an exact existing request is idempotent, and the same Profile key with a different request is rejected. All non-Profile Project Config semantics remain protected by the same advancement delta guard.
+
+### MISCO production migration after Issue #336
+
+A fresh `MISCO-AI-2026` Workspace uses `projects/misco-ai-2026/project-config.json` and does not select synthetic fixture Profiles. The historical Probe2 Workspace is different: it already contains durable research under `PRJ-1 / Fixture project` and an active `CORE-TRACE-001` exact-locator strengthening. Issue #336 therefore does **not** rename that Workspace or weaken the invariant. Its target replaces only the fixture Narrative/Publication direct requests with `misco.writer@1.1.0` / `misco.publication@1.2.0` and adds the migration-only `misco.workspace-continuity.exact-locator@1.0.0` Research request. The registered exact-locator form is narrowly applicable to `fixture.*` and `misco.workspace-continuity.*`; this does not create a general MISCO Research default.
+
+The concrete operator request and fresh-start procedure are documented in `projects/misco-ai-2026/README.md`.
+
 ## Validation boundary
 
 Advancement fails before commit when any of the following is observed:

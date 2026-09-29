@@ -1,0 +1,40 @@
+{
+  "profile_manifest_files": [
+    "profiles/research/misco-workspace-continuity/profile.json",
+    "profiles/narrative/misco/profile.json",
+    "profiles/publication/misco/profile.json"
+  ],
+  "request_replacements": [
+    {
+      "from": {
+        "profile_id": "fixture.generic-narrative",
+        "profile_type": "narrative",
+        "version": "1.0.0"
+      },
+      "to": {
+        "profile_id": "misco.writer",
+        "profile_type": "narrative",
+        "version": "1.1.0"
+      }
+    },
+    {
+      "from": {
+        "profile_id": "fixture.publication",
+        "profile_type": "publication",
+        "version": "1.0.0"
+      },
+      "to": {
+        "profile_id": "misco.publication",
+        "profile_type": "publication",
+        "version": "1.2.0"
+      }
+    }
+  ],
+  "request_additions": [
+    {
+      "profile_id": "misco.workspace-continuity.exact-locator",
+      "profile_type": "research",
+      "version": "1.0.0"
+    }
+  ]
+}
