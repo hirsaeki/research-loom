@@ -1,0 +1,160 @@
+{
+  "schema_version": "0.1.0",
+  "issue": 337,
+  "source_ledger": "docs/migration/misco-profile-migration-ledger/index.json",
+  "rule_classes": {
+    "manifest-routing": {
+      "disposition": "migrated",
+      "target": "profiles/* production manifests and resolver/EPS delivery",
+      "consumer": "production Profile resolver",
+      "evidence": [
+        "tests/contracts/test_misco_production_profiles.py",
+        "tests/runtime/test_misco_production_profile_delivery.py"
+      ]
+    },
+    "project-attention": {
+      "disposition": "migrated",
+      "target": "projects/misco-ai-2026 Project Config guidance plus public Research Attention lifecycle",
+      "consumer": "Project Config / Research Attention",
+      "evidence": [
+        "tests/contracts/test_misco_production_project.py",
+        "tests/runtime/test_misco_project_migration.py"
+      ]
+    },
+    "project-knowledge": {
+      "disposition": "validation_only",
+      "target": "migration validation only; formal transfer uses intake/capture -> candidate -> Human Decision",
+      "consumer": "none in fresh production runtime",
+      "evidence": [
+        "tests/contracts/test_misco_production_project.py",
+        "docs/architecture/misco-integrated-acceptance.md"
+      ]
+    },
+    "writer-transform": {
+      "disposition": "migrated",
+      "target": "misco.writer Profile resources / Writer Skill",
+      "consumer": "Writer round-trip",
+      "evidence": ["tests/runtime/test_misco_writer_profile_application.py"]
+    },
+    "writer-qa-boundary": {
+      "disposition": "migrated",
+      "target": "misco.writer review plan / Writer Skill",
+      "consumer": "Writer host review and Writing Feedback",
+      "evidence": ["tests/runtime/test_misco_writer_profile_application.py"]
+    },
+    "writer-pattern": {
+      "disposition": "migrated",
+      "target": "misco.writer clean rule resources",
+      "consumer": "Writer host",
+      "evidence": ["tests/runtime/test_misco_writer_profile_application.py"]
+    },
+    "narrative-guard": {
+      "disposition": "migrated",
+      "target": "misco.writer Narrative constraints and clean rules",
+      "consumer": "composition validator / Writer host",
+      "evidence": ["tests/runtime/test_misco_writer_profile_application.py"]
+    },
+    "writer-input-contract": {
+      "disposition": "migrated",
+      "target": "Writer detached input contract and delivered Profile resources",
+      "consumer": "Writer round-trip",
+      "evidence": ["tests/runtime/test_misco_writer_profile_application.py"]
+    },
+    "writer-terminology": {
+      "disposition": "migrated",
+      "target": "misco.writer terminology/rendering clean rules",
+      "consumer": "Writer host review",
+      "evidence": ["tests/runtime/test_misco_writer_profile_application.py"]
+    },
+    "writer-editorial-qa": {
+      "disposition": "migrated",
+      "target": "Writer review plan / Writing Feedback boundary",
+      "consumer": "Writer host / human QA",
+      "evidence": ["tests/runtime/test_misco_writer_profile_application.py"]
+    },
+    "writer-assembly-view": {
+      "disposition": "migrated",
+      "target": "Writer Skill and detached section input",
+      "consumer": "external Writer host",
+      "evidence": ["tests/runtime/test_misco_writer_profile_application.py"]
+    },
+    "publication-formal": {
+      "disposition": "migrated",
+      "target": "misco.publication@1.2.0 formal-spec / URL resources",
+      "consumer": "Publication renderer / release validator",
+      "evidence": ["tests/runtime/test_misco_publication_profile_application.py"]
+    },
+    "publication-formal-view": {
+      "disposition": "migrated",
+      "target": "Publication Skill / preview and QA",
+      "consumer": "Publication host / human QA",
+      "evidence": ["tests/runtime/test_misco_publication_profile_application.py"]
+    },
+    "synthetic-example-spec": {
+      "disposition": "test_only",
+      "target": "tests/examples only; excluded from production Profile resources",
+      "consumer": "test fixtures only",
+      "evidence": ["tests/runtime/test_misco_writer_profile_application.py"]
+    },
+    "audit-provenance": {
+      "disposition": "preserved_audit_only",
+      "target": "legacy/source-pack provenance and migration ledger",
+      "consumer": "audit / migration closure",
+      "evidence": [
+        "tests/contracts/test_misco_profile_migration_ledger.py",
+        "docs/migration/misco-profile-migration-ledger/index.json"
+      ]
+    },
+    "human-review": {
+      "disposition": "preserved_human_boundary",
+      "target": "Human Decision provenance / Writer-Publication human QA",
+      "consumer": "human reviewer",
+      "evidence": [
+        "tests/runtime/test_misco_writer_profile_application.py",
+        "tests/runtime/test_misco_publication_profile_application.py"
+      ]
+    },
+    "legacy-consumer": {
+      "disposition": "reference_only",
+      "target": "legacy tree remains migration/reference material",
+      "consumer": "none in production runtime",
+      "evidence": [
+        "README.md",
+        "tests/runtime/test_misco_production_profile_delivery.py"
+      ]
+    },
+    "current-protection": {
+      "disposition": "preserved",
+      "target": "canonical Core/Profile authority and provenance guards",
+      "consumer": "current runtime",
+      "evidence": [
+        "tests/contracts/test_profile_contracts.py",
+        "tests/runtime/test_misco_project_migration.py"
+      ]
+    }
+  },
+  "missing_inputs": {
+    "INPUT-FORMAL-SPEC": {
+      "status": "resolved",
+      "evidence": "misco.publication@1.2.0 / #335"
+    },
+    "INPUT-URL-DISPLAY": {
+      "status": "resolved",
+      "evidence": "Human Decision: long URLs are displayed in full in references / #335"
+    },
+    "INPUT-RESEARCH-GROUP-TYPE": {
+      "status": "not_required_by_current_formal_profile",
+      "evidence": "misco.formal-spec.2024-11-12 pins research_group_type_required=false"
+    },
+    "INPUT-PERMISSION": {
+      "status": "conditional_runtime_input",
+      "evidence": "affected non-public/interview/internal material remains release-blocked until explicit permission input"
+    }
+  },
+  "live_gates": {
+    "existing_workspace_operator_reprobe": "pending",
+    "codex_live_acceptance": "pending",
+    "chatgpt_work_live_acceptance": "pending",
+    "publication_visual_inspection": "passed_in_335"
+  }
+}
