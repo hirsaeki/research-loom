@@ -2,9 +2,9 @@
   "schema_version": "0.1.0",
   "config_version": "1.0.0",
   "project": {
-    "project_id": "MISCO-AI-2026",
-    "title": "MISCO AI研究",
-    "objective": "AIの能力が進展する不確実な状況において、企業活動にはどのような変化が生じ得るのか。その変化をMISCO企業の事業・組織・制約に照合したとき、どの業務・意思決定をどの程度AIに委ね、人間の役割、ガバナンス、人材、投資を短期・中期・長期でどのように再設計すべきか。"
+    "project_id": "misco-m3-2026",
+    "title": "AIの進化とそれがもたらすMISCO企業への影響",
+    "objective": "AIの能力進展を単なる未来予測で終わらせず、企業活動への影響を一般論とMISCO固有文脈に分け、AIへの委任、人間の役割、ガバナンス、人材、投資について条件付きの実行判断へ接続する。"
   },
   "scope": {
     "in_scope": [
@@ -20,7 +20,7 @@
     "seeds": [
       {
         "seed_id": "RQ-SEED-MISCO-FRESH-START",
-        "text": "現在のMISCO AI研究の目的・範囲に対して、最初に検証すべき研究問いは何か。",
+        "text": "現在の「AIの進化とそれがもたらすMISCO企業への影響」の目的・範囲に対して、最初に検証すべき研究問いは何か。",
         "rationale": "Fresh-start bootstrap seed derived from the current production project objective; it is not copied from legacy/probe research state."
       }
     ]
@@ -39,9 +39,9 @@
   },
   "communication_brief": {
     "audience": [
-      "MISCO AI研究の読者"
+      "MISCO研究会の読者"
     ],
-    "core_message": "AIの能力が進展する不確実な状況において、企業活動にはどのような変化が生じ得るのか。その変化をMISCO企業の事業・組織・制約に照合したとき、どの業務・意思決定をどの程度AIに委ね、人間の役割、ガバナンス、人材、投資を短期・中期・長期でどのように再設計すべきか。"
+    "core_message": "AI能力進展を一般論とMISCO固有文脈に分け、AIへの委任、人間の役割、ガバナンス、人材、投資の条件付き実行判断へ接続する。"
   },
   "research_attention": [],
   "project_constraints": {
@@ -94,5 +94,5 @@
       "misco.publication@1.2.0 transitively requires misco.writer@1.1.0; no invented MISCO Research/Organization Profile is selected."
     ]
   },
-  "configuration_digest": "sha256:9af73fc5506c6b0c7203a97779009a13881cf0c3e61a90531d5e660cd2dd4b7d"
+  "configuration_digest": "sha256:80707473dbf3e53d5b8e8425559b84870a1ca0e4e7cad9542b21f2bbd472b8ad"
 }
