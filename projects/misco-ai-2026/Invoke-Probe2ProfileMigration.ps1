@@ -58,7 +58,7 @@ function Write-JsonFile {
         [Parameter(Mandatory = $true)][string]$Path,
         [Parameter(Mandatory = $true)]$Value
     )
-    $json = $Value | ConvertTo-Json -Depth 100
+    $json = ConvertTo-Json -InputObject $Value -Depth 100
     Write-Utf8NoBom -Path $Path -Text ($json + [Environment]::NewLine)
 }
 
@@ -69,7 +69,7 @@ function Read-JsonFile {
 
 function Get-NormalizedJson {
     param($Value)
-    return ($Value | ConvertTo-Json -Depth 100 -Compress)
+    return (ConvertTo-Json -InputObject $Value -Depth 100 -Compress)
 }
 
 function Add-Pass {
@@ -414,9 +414,9 @@ try {
 
     Assert-Equal -Name 'source project id is the intended historical Probe2 project' -Expected $ExpectedProjectId -Actual $before.Resume.Value.project.project_id
     Assert-Equal -Name 'source project title is unchanged historical Probe2 title' -Expected $ExpectedProjectTitle -Actual $before.Resume.Value.project.title
-    Assert-True -Name 'no pending confirmations before migration' -Condition (@($before.Status.Value.pending_confirmations).Count -eq 0) -Actual @($before.Status.Value.pending_confirmations).Count
-    Assert-True -Name 'no pending Human Decisions before migration' -Condition (@($before.Status.Value.pending_human_decisions).Count -eq 0) -Actual @($before.Status.Value.pending_human_decisions).Count
-    Assert-True -Name 'no pending Runs before migration' -Condition (@($before.Status.Value.pending_runs).Count -eq 0) -Actual @($before.Status.Value.pending_runs).Count
+    Assert-True -Name 'no pending confirmations before migration' -Condition (@($before.Status.Value.pending_confirmations).Count -eq 0) -Actual (@($before.Status.Value.pending_confirmations).Count)
+    Assert-True -Name 'no pending Human Decisions before migration' -Condition (@($before.Status.Value.pending_human_decisions).Count -eq 0) -Actual (@($before.Status.Value.pending_human_decisions).Count)
+    Assert-True -Name 'no pending Runs before migration' -Condition (@($before.Status.Value.pending_runs).Count -eq 0) -Actual (@($before.Status.Value.pending_runs).Count)
 
     $script:ProbeResult.run_start_binding = [ordered]@{
         project_config_digest = $before.History.Value.current.project_config_digest
@@ -546,7 +546,7 @@ try {
     Assert-Equal -Name 'post-migration status binding matches target EPS' -Expected $resolution.target_effective_profile_set_digest -Actual $after.Status.Value.bindings.effective_profile_set.digest
     Assert-Equal -Name 'post-migration resume binding matches target EPS' -Expected $resolution.target_effective_profile_set_digest -Actual $after.Resume.Value.research_state.bindings.effective_profile_set.digest
     if ($script:ProbeResult.mode -eq 'ADVANCE') {
-        Assert-True -Name 'exactly one profile advancement event was appended' -Condition (@($after.History.Value.events).Count -eq (@($before.History.Value.events).Count + 1)) -Actual @($after.History.Value.events).Count
+        Assert-True -Name 'exactly one profile advancement event was appended' -Condition (@($after.History.Value.events).Count -eq (@($before.History.Value.events).Count + 1)) -Actual (@($after.History.Value.events).Count)
         $probeEvents = @(
             $after.History.Value.events | Where-Object {
                 $_.origin -eq 'issue-336-f7-local-probe' -and
@@ -562,7 +562,7 @@ try {
         Assert-Equal -Name 'advance response event matches persisted advancement event' -Expected $advance.Value.event_id -Actual $event.event_id
     }
     else {
-        Assert-Equal -Name 'NOOP rerun appends no profile advancement event' -Expected @($before.History.Value.events).Count -Actual @($after.History.Value.events).Count
+        Assert-Equal -Name 'NOOP rerun appends no profile advancement event' -Expected (@($before.History.Value.events).Count) -Actual (@($after.History.Value.events).Count)
         $probeEvents = @(
             $after.History.Value.events | Where-Object {
                 $_.new_binding.project_config_digest -eq $after.History.Value.current.project_config_digest -and
