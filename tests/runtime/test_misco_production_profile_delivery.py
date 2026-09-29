@@ -26,7 +26,7 @@ class MiscoProductionProfileDeliveryTests(ResearchPackageAcceptanceSupport):
             "organization": [],
             "narrative": [],
             "publication": [
-                {"profile_id": "misco.publication", "profile_type": "publication", "version": "1.0.0"}
+                {"profile_id": "misco.publication", "profile_type": "publication", "version": "1.0.1"}
             ],
         }
         config.pop("configuration_digest", None)
@@ -42,7 +42,7 @@ class MiscoProductionProfileDeliveryTests(ResearchPackageAcceptanceSupport):
         facade, case = self._build()
         package = facade._research_package_service().show(case["package_id"])["package"]
         resources = package["effective_profile_set"]["effective_resources"]
-        self.assertEqual({x["role"] for x in resources}, {"WRITER_RULES", "PUBLICATION_RULES"})
+        self.assertEqual({x["role"] for x in resources}, {"WRITER_RULES", "WRITER_SOURCE_DOCUMENTS", "PUBLICATION_RULES"})
         self.assertTrue(all(x["content"] and x["provenance"] for x in resources))
 
         export_dir = self.root / "detached-package"
@@ -53,7 +53,7 @@ class MiscoProductionProfileDeliveryTests(ResearchPackageAcceptanceSupport):
         code = (
             "import json,sys; p=json.load(open(sys.argv[1],encoding='utf-8')); "
             "r={x['role']:x for x in p['effective_profile_set']['effective_resources']}; "
-            "assert set(r)=={'WRITER_RULES','PUBLICATION_RULES'}; "
+            "assert set(r)=={'WRITER_RULES','WRITER_SOURCE_DOCUMENTS','PUBLICATION_RULES'}; "
             "assert all(x['content'] for x in r.values())"
         )
         result = subprocess.run([sys.executable, "-c", code, str(package_path)], cwd=self.root, capture_output=True, text=True)

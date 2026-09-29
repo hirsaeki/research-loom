@@ -79,6 +79,90 @@ def _profile_constraint_map(package: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+def _profile_key(value: Mapping[str, Any], *, digest_field: str) -> tuple[str, str, str, str] | None:
+    profile_type = value.get("profile_type")
+    profile_id = value.get("profile_id")
+    profile_version = value.get("profile_version")
+    digest = value.get(digest_field)
+    if not all(isinstance(item, str) and item for item in (profile_type, profile_id, profile_version, digest)):
+        return None
+    return (str(profile_type), str(profile_id), str(profile_version), str(digest).removeprefix("sha256:"))
+
+
+def _writer_profile_delivery(package: Mapping[str, Any]) -> Mapping[str, Any] | None:
+    effective = package.get("effective_profile_set", {})
+    if not isinstance(effective, Mapping):
+        return None
+    resources = effective.get("effective_resources", [])
+    pins = effective.get("profile_pins", [])
+    if not isinstance(resources, list) or not isinstance(pins, list):
+        raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-PROFILE-001", "Research Package Profile delivery is malformed")
+    rule_resources = [
+        row for row in resources
+        if isinstance(row, Mapping) and row.get("role") == "WRITER_RULES"
+    ]
+    if not rule_resources:
+        return None
+
+    source_profile_keys: set[tuple[str, str, str, str]] = set()
+    rules_by_class: dict[str, set[str]] = {}
+    seen_rule_ids: set[str] = set()
+    for resource in rule_resources:
+        provenance = resource.get("provenance", [])
+        if not isinstance(provenance, list):
+            raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-PROFILE-001", "Writer Profile resource provenance is malformed")
+        for source in provenance:
+            if isinstance(source, Mapping):
+                key = _profile_key(source, digest_field="manifest_sha256")
+                if key is not None:
+                    source_profile_keys.add(key)
+        try:
+            body = json.loads(str(resource["content"]))
+        except (KeyError, TypeError, json.JSONDecodeError) as exc:
+            raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-PROFILE-001", "WRITER_RULES resource is not valid JSON") from exc
+        items = body.get("items") if isinstance(body, Mapping) else None
+        if not isinstance(items, list):
+            raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-PROFILE-001", "WRITER_RULES resource has no item inventory")
+        for item in items:
+            if not isinstance(item, Mapping) or not isinstance(item.get("id"), str) or not isinstance(item.get("class"), str):
+                raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-PROFILE-001", "WRITER_RULES item inventory is malformed")
+            rule_id = str(item["id"]); rule_class = str(item["class"])
+            if rule_id in seen_rule_ids:
+                raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-PROFILE-001", f"duplicate Writer rule identity: {rule_id}")
+            seen_rule_ids.add(rule_id)
+            rules_by_class.setdefault(rule_class, set()).add(rule_id)
+    if not source_profile_keys or not seen_rule_ids:
+        raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-PROFILE-001", "Writer Profile delivery lacks pinned rules")
+
+    delivered_resources = []
+    for resource in resources:
+        if not isinstance(resource, Mapping) or not str(resource.get("role", "")).startswith("WRITER_"):
+            continue
+        provenance = resource.get("provenance", [])
+        if any(
+            isinstance(source, Mapping)
+            and _profile_key(source, digest_field="manifest_sha256") in source_profile_keys
+            for source in provenance if isinstance(provenance, list)
+        ):
+            delivered_resources.append(deepcopy(dict(resource)))
+    delivered_pins = [
+        deepcopy(dict(pin)) for pin in pins
+        if isinstance(pin, Mapping) and _profile_key(pin, digest_field="content_digest") in source_profile_keys
+    ]
+    if not delivered_pins or not delivered_resources:
+        raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-PROFILE-001", "Writer Profile pins/resources no longer match")
+    review_plan = [
+        {"review_id": rule_class, "rule_ids": sorted(rule_ids)}
+        for rule_class, rule_ids in sorted(rules_by_class.items())
+    ]
+    return {
+        "profile_pins": delivered_pins,
+        "resources": delivered_resources,
+        "review_plan": review_plan,
+        "rule_count": len(seen_rule_ids),
+    }
+
+
 def _package_ref_sets(package: Mapping[str, Any]) -> dict[str, set[str]]:
     content = package.get("content", {})
     source_refs = content.get("source_refs", []) if isinstance(content, Mapping) else []
@@ -990,6 +1074,7 @@ class WriterCompositionService:
             }
             for x in ordered
         ]
+        writer_profile = _writer_profile_delivery(package)
         input_doc = {
             "schema_version": SCHEMA_VERSION,
             "object_type": "section_writer_input",
@@ -1030,6 +1115,7 @@ class WriterCompositionService:
             "resolved_profile_constraints": deepcopy(
                 package.get("resolved_profiles", {}).get("effective_constraints", [])
             ),
+            **({"writer_profile": writer_profile} if writer_profile is not None else {}),
             "authority_boundary": {
                 "evidence_verification_performed": False,
                 "finding_adoption_performed": False,

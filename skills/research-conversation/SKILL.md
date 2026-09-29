@@ -104,6 +104,10 @@ For multiple pending items, identify the target by short research content rather
 
 Retain stale/expired/content-change checks and exact Decision binding. Do not block unrelated candidate-only research merely because another Decision is pending.
 
+## Routing to writing
+
+When the human asks to move from research into manuscript drafting or revision, first fix the Research Package and explicitly selected Writer Composition through the public Loom surfaces. Then load `../writer/SKILL.md` and hand off only the detached Writer input. Do not draft from private Research State, choose a different Profile version inside the Writer, or treat manuscript import as research adoption. If the selected section still has unresolved research needs, carry them into the Writer input/Feedback path rather than silently resolving them in prose.
+
 ## References
 
 - `references/public-surfaces.md` — which public Loom reads to use and what they prove.

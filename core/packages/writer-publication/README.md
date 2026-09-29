@@ -21,6 +21,8 @@ For self-contained `0.2.0` packages, `source_research_snapshot.execution_mode` r
 
 Writing Feedback is not Evidence. It may propose missing-evidence or ambiguity follow-up but cannot edit Findings or Research State directly.
 
+Selected section input may also carry a `writer_profile` delivery block when the pinned EPS contains Writer resources. It includes exact Profile pins, verified `WRITER_*` resource bodies, and a deterministic review plan. Writer round-trip responses may record `profile_review`; `unevaluated` is distinct from PASS, and declared rule violations must be linked to section Writing Feedback by exact rule ID. Backend validation proves delivery/review coverage and immutable revision lineage, not prose quality or research validity.
+
 ## Manuscript Package
 
 `manuscript-package.schema.json` is the canonical Writer -> Publication boundary. It carries source package/snapshot pins, Writer identity/version, profile pins, outline pins, ordered sections, content/citation/exhibit references, audit summary, unresolved writing issues, and provenance.
