@@ -31,12 +31,12 @@ class MiscoFreshProjectRuntimeTests(unittest.TestCase):
             effective_profiles = [(x["profile_type"], x["profile_id"]) for x in opened.effective_profile_set["effective_profiles"]]
             opened.close()
             with LocalApplicationFacade.open_workspace(workspace) as facade:
-                self.assertEqual(facade.project_id, "MISCO-AI-2026")
+                self.assertEqual(facade.project_id, "misco-m3-2026")
                 state = facade._application.state_repository.load_state_view(
                     facade.project_id,
                     facade._application.state_repository.load_active_lineage_ref(facade.project_id),
                 )
-                self.assertEqual(state.project_config["project"]["title"], "MISCO AI研究")
+                self.assertEqual(state.project_config["project"]["title"], "AIの進化とそれがもたらすMISCO企業への影響")
                 self.assertEqual(state.project_config["research_questions"]["references"], [])
                 self.assertEqual(len(state.project_config["research_questions"]["seeds"]), 1)
                 self.assertEqual(state.project_config["research_questions"]["seeds"][0]["seed_id"], "RQ-SEED-MISCO-FRESH-START")
@@ -74,7 +74,7 @@ class MiscoFreshProjectRuntimeTests(unittest.TestCase):
                     reopened._application.state_repository.load_active_lineage_ref(reopened.project_id),
                 )
                 self.assertEqual(state.latest_object("research_question", rq_id)["adoption_state"], "approved")
-                self.assertEqual(reopened.status()["project_id"], "MISCO-AI-2026")
+                self.assertEqual(reopened.status()["project_id"], "misco-m3-2026")
 
 
 class MiscoExistingWorkspaceMigrationTests(ResearchPackageAcceptanceSupport):

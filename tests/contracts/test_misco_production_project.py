@@ -65,8 +65,8 @@ class MiscoProductionProjectContractTests(unittest.TestCase):
 
     def test_fresh_config_contains_no_legacy_research_state_or_virtual_feedback(self):
         config = json.loads(PROJECT_CONFIG.read_text(encoding="utf-8"))
-        self.assertEqual(config["project"]["project_id"], "MISCO-AI-2026")
-        self.assertEqual(config["project"]["title"], "MISCO AI研究")
+        self.assertEqual(config["project"]["project_id"], "misco-m3-2026")
+        self.assertEqual(config["project"]["title"], "AIの進化とそれがもたらすMISCO企業への影響")
         self.assertEqual(config["research_questions"]["references"], [])
         self.assertEqual(len(config["research_questions"]["seeds"]), 1)
         self.assertEqual(config["research_questions"]["seeds"][0]["seed_id"], "RQ-SEED-MISCO-FRESH-START")

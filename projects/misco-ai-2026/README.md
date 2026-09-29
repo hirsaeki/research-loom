@@ -1,13 +1,14 @@
-# MISCO AI研究 — production project configuration
+# AIの進化とそれがもたらすMISCO企業への影響 — production project configuration
 
 Issue #336 separates a fresh production project from the historical `probe2`
 Workspace. The two are intentionally **not** renamed into one another.
 
 ## Fresh start
 
-`project-config.json` is the production Project Config for a new MISCO AI
-research Workspace. It contains the project identity, public project objective /
-scope, a fresh bootstrap RQ seed, and the production Publication request. It
+`project-config.json` is the production Project Config for the MISCO M3 2026
+research project (`misco-m3-2026`, 「AIの進化とそれがもたらすMISCO企業への影響」).
+It contains the approved project identity, public project objective / scope, a
+fresh bootstrap RQ seed, and the production Publication request. It
 contains **no legacy/probe RQ**, Evidence, Finding, material, prior virtual-run
 feedback, or other legacy/probe research state.
 

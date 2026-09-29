@@ -71,7 +71,7 @@ class MiscoIntegratedAcceptanceTests(ResearchPackageAcceptanceSupport):
     def test_g1_mid_research_checkpoint_can_round_trip_writer_preview_and_return_to_research(self):
         facade, case, composition, input_doc, _output = self._build_round_trip()
         try:
-            self.assertEqual(facade.project_id, "MISCO-AI-2026")
+            self.assertEqual(facade.project_id, "misco-m3-2026")
             package = facade.show_research_package(case["package_id"])["package"]
             pins = {
                 (row["profile_type"], row["profile_id"], row["profile_version"])
@@ -149,7 +149,7 @@ class MiscoIntegratedAcceptanceTests(ResearchPackageAcceptanceSupport):
             shown = reopened.inspect_writer_round_trip(composition["composition_id"], second["revision_id"])
             self.assertEqual(shown["revision"]["revision_id"], second["revision_id"])
             self.assertEqual(reopened.show_publication_preview(preview["build_id"])["build"]["build_id"], preview["build_id"])
-            self.assertEqual(reopened.status()["project_id"], "MISCO-AI-2026")
+            self.assertEqual(reopened.status()["project_id"], "misco-m3-2026")
 
 
 if __name__ == "__main__":

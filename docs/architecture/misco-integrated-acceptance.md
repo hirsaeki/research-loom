@@ -47,7 +47,7 @@ The checkpoint/output meanings remain distinct:
 - external release remains a separate Human Decision.
 
 `tests/runtime/test_misco_integrated_acceptance.py` exercises this loop with the
-checked-in production `MISCO-AI-2026` Project Config / EPS and deterministic
+checked-in production `misco-m3-2026` Project Config / EPS and deterministic
 synthetic current-workspace material. It builds a Package, selects a two-section
 composition, imports a two-section Writer response, revises only one section,
 builds a formal Publication preview, verifies release remains unavailable
