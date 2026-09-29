@@ -28,6 +28,13 @@ SERVICE_VERSION = "0.2.0"
 MAX_SECTIONS = 128
 MAX_OUTPUT_BYTES = 16 * 1024 * 1024
 _XREF = re.compile(r"\[\[(section|exhibit|citation):([^\]]+)\]\]")
+_APPLICATION_SCHEMA = (
+    Path(__file__).resolve().parents[2]
+    / "core"
+    / "packages"
+    / "writer-publication"
+    / "publication-application.schema.json"
+)
 _PREVIEW_SCHEMA = (
     Path(__file__).resolve().parents[2]
     / "core"
@@ -109,6 +116,118 @@ def _validate_preview_manifest(value: Mapping[str, Any]) -> None:
             "APPLICATION-PUBLICATION-SCHEMA-001",
             f"canonical Publication preview manifest is invalid at {path}: {first.message}",
         )
+
+
+def _validate_publication_inputs(value: Mapping[str, Any] | None) -> dict[str, Any]:
+    normalized = {"schema_version": SCHEMA_VERSION} if value is None else deepcopy(dict(value))
+    schema = json.loads(_APPLICATION_SCHEMA.read_text(encoding="utf-8"))
+    errors = sorted(
+        Draft202012Validator(schema, format_checker=FormatChecker()).iter_errors(normalized),
+        key=lambda error: tuple(str(item) for item in error.absolute_path),
+    )
+    if errors:
+        first = errors[0]
+        path = ".".join(str(item) for item in first.absolute_path) or "<root>"
+        raise LocalApplicationError(
+            "APPLICATION-PUBLICATION-INPUT-001",
+            f"Publication application input is invalid at {path}: {first.message}",
+        )
+    for key in ("formal_spec_profile", "url_display_profile"):
+        item = normalized.get(key)
+        if isinstance(item, Mapping):
+            source = item.get("source", {})
+            digest = str(source.get("source_digest", ""))
+            if not digest.startswith("sha256:") or len(digest) != 71:
+                raise LocalApplicationError("APPLICATION-PUBLICATION-INPUT-001", f"{key} source_digest is invalid")
+    return normalized
+
+
+def _resource_rows(package: Mapping[str, Any], profile: Mapping[str, Any]) -> list[dict[str, Any]]:
+    resources = package.get("effective_profile_set", {}).get("effective_resources", [])
+    selected = []
+    for row in resources:
+        if not isinstance(row, Mapping) or not str(row.get("role", "")).startswith("PUBLICATION_"):
+            continue
+        provenance = row.get("provenance", [])
+        if any(
+            isinstance(src, Mapping)
+            and src.get("profile_type") == "publication"
+            and src.get("profile_id") == profile.get("profile_id")
+            and src.get("profile_version") == profile.get("profile_version")
+            for src in provenance
+        ):
+            selected.append(deepcopy(dict(row)))
+    return selected
+
+
+def _publication_policy(package: Mapping[str, Any], profile: Mapping[str, Any], inputs: Mapping[str, Any]) -> dict[str, Any]:
+    resources = _resource_rows(package, profile)
+    by_role = {str(row.get("role")): row for row in resources}
+    rules_row = by_role.get("PUBLICATION_RULES")
+    source_row = by_role.get("PUBLICATION_SOURCE_DOCUMENTS")
+    if profile.get("profile_id") == "misco.publication" and (rules_row is None or source_row is None):
+        raise LocalApplicationError(
+            "APPLICATION-PUBLICATION-PROFILE-001",
+            "MISCO Publication requires verified rule and Layer A source-document resources",
+        )
+    rules = json.loads(rules_row["content"]) if rules_row else {"items": [], "missing_inputs": []}
+    formal = inputs.get("formal_spec_profile")
+    url_profile = inputs.get("url_display_profile")
+    group_type = inputs.get("research_group_type")
+    permissions = inputs.get("permissions", [])
+    editorial = inputs.get("editorial_review")
+    missing = []
+    if profile.get("profile_id") == "misco.publication":
+        if not isinstance(formal, Mapping):
+            missing.append("INPUT-FORMAL-SPEC")
+        elif formal.get("research_group_type_required") and not group_type:
+            missing.append("INPUT-RESEARCH-GROUP-TYPE")
+        sources = package.get("resolved_content", {}).get("research_objects", [])
+        has_reader_url = any(
+            isinstance(row, Mapping)
+            and row.get("kind") == "source"
+            and str(row.get("canonical_locator") or "").startswith(("http://", "https://"))
+            for row in sources
+        )
+        if has_reader_url and not isinstance(url_profile, Mapping):
+            missing.append("INPUT-URL-DISPLAY")
+        required_permissions = {
+            str(row.get("id"))
+            for row in sources
+            if isinstance(row, Mapping)
+            and row.get("kind") == "source"
+            and str(row.get("access_classification") or row.get("source_classification") or "").lower()
+            in {"internal", "non-public", "confidential", "interview"}
+        }
+        permission_by_source = {str(row.get("source_ref")): row for row in permissions if isinstance(row, Mapping)}
+        if any(ref not in permission_by_source or not permission_by_source[ref].get("publication_allowed") for ref in required_permissions):
+            missing.append("INPUT-PERMISSION")
+    if profile.get("profile_id") == "misco.publication" and isinstance(editorial, Mapping):
+        editorial_rows = {str(row.get("check_id")): row for row in editorial.get("checks", []) if isinstance(row, Mapping)}
+        overall = editorial_rows.get("misco-editorial-qa")
+        if overall is None:
+            raise LocalApplicationError(
+                "APPLICATION-PUBLICATION-INPUT-001",
+                "MISCO editorial review must include misco-editorial-qa",
+            )
+    return {
+        "rules": {
+            "role": rules_row.get("role") if rules_row else None,
+            "sha256": rules_row.get("sha256") if rules_row else None,
+            "rule_ids": sorted(str(item["id"]) for item in rules.get("items", []) if isinstance(item, Mapping) and item.get("id")),
+        },
+        "source_documents": {
+            "role": source_row.get("role") if source_row else None,
+            "sha256": source_row.get("sha256") if source_row else None,
+        },
+        "formal_spec_profile": deepcopy(formal),
+        "url_display_profile": deepcopy(url_profile),
+        "research_group_type": group_type,
+        "permissions": deepcopy(list(permissions)),
+        "editorial_review": deepcopy(editorial),
+        "missing_inputs": missing,
+        "release_blocked": bool(missing),
+    }
 
 
 def _verify_docx_bytes(data: bytes) -> bool:
@@ -232,12 +351,23 @@ class PublicationReleaseService:
         }
 
     @staticmethod
-    def _citation_label(source: Mapping[str, Any], locator: str | None) -> str:
+    def _citation_label(source: Mapping[str, Any], locator: str | None, policy: Mapping[str, Any]) -> str:
         title = str(source.get("title") or source.get("name") or source.get("id") or "Source")
         canonical = str(source.get("canonical_locator") or "")
-        bits = [title]
-        if canonical:
-            bits.append(canonical)
+        url_profile = policy.get("url_display_profile")
+        if canonical.startswith(("http://", "https://")) and isinstance(url_profile, Mapping):
+            template = str(url_profile.get("template", ""))
+            rendered = template.replace("{title}", title).replace("{url}", canonical)
+            if "{" in rendered or "}" in rendered:
+                raise LocalApplicationError(
+                    "APPLICATION-PUBLICATION-INPUT-001",
+                    "URL display template contains unsupported placeholders",
+                )
+            bits = [rendered]
+        else:
+            bits = [title]
+            if canonical:
+                bits.append(canonical)
         if locator and locator != canonical:
             bits.append(str(locator))
         return " — ".join(bits)
@@ -256,6 +386,7 @@ class PublicationReleaseService:
     def _render(
         self, inspection: Mapping[str, Any]
     ) -> tuple[bytes, bytes, list[dict[str, Any]], dict[str, str]]:
+        policy = inspection.get("publication_policy", {})
         package = inspection["source_package_document"]
         revision = inspection["revision"]
         composition = inspection["composition"]
@@ -425,7 +556,7 @@ class PublicationReleaseService:
             ):
                 source = sources[source_ref]
                 locators = locators_by_source.get(source_ref, [])
-                rendered = self._citation_label(source, locators[0] if locators else None)
+                rendered = self._citation_label(source, locators[0] if locators else None, policy)
                 entry = resolve_text(f"[{number}] {rendered}", "references")
                 md.append(entry)
                 docx_lines.append(("body", entry))
@@ -434,6 +565,11 @@ class PublicationReleaseService:
         feedback = revision.get("writing_feedback", {}).get("issues", [])
         if feedback:
             add_issue("WRITING_FEEDBACK_OPEN", str(len(feedback)), None, False)
+        formal = policy.get("formal_spec_profile")
+        if isinstance(formal, Mapping) and formal.get("reference_list_placement") != "end_of_document":
+            add_issue("PUBLICATION_FORMAL_VALUE_UNSUPPORTED", str(formal.get("reference_list_placement")), None, True)
+        for missing in policy.get("missing_inputs", []):
+            add_issue("PUBLICATION_FORMAL_INPUT_MISSING", str(missing), None, True)
 
         blocking_issues = [item for item in issues if item["blocking"]]
         if blocking_issues:
@@ -448,13 +584,15 @@ class PublicationReleaseService:
         if blocking_issues:
             docx_lines.append(("body", layout_note))
         markdown = ("\n".join(md).rstrip() + "\n").encode("utf-8")
-        docx = _docx_bytes(docx_lines)
+        formal = policy.get("formal_spec_profile")
+        layout = dict(formal.get("docx_layout", {})) if isinstance(formal, Mapping) else None
+        docx = _docx_bytes(docx_lines, layout)
         if len(markdown) + len(docx) > MAX_OUTPUT_BYTES:
             raise LocalApplicationError(
                 "APPLICATION-PUBLICATION-BOUND-001",
                 "Publication outputs exceed supported aggregate size",
             )
-        if not _verify_docx_bytes(docx) or not verify_native_docx(docx, docx_lines):
+        if not _verify_docx_bytes(docx) or not verify_native_docx(docx, docx_lines, layout):
             raise LocalApplicationError(
                 "APPLICATION-PUBLICATION-RENDER-001",
                 "generated DOCX failed native structure/content verification",
@@ -472,6 +610,13 @@ class PublicationReleaseService:
             "render_verification": "failed" if blocking_issues else "passed",
             "layout_verification": "warning",
             "writing_feedback": "warning" if feedback else "passed",
+            "formal_specification": "failed" if policy.get("missing_inputs") or any(item["code"] == "PUBLICATION_FORMAL_VALUE_UNSUPPORTED" for item in issues) else "passed",
+            "editorial_qa": (
+                "warning" if not isinstance(policy.get("editorial_review"), Mapping)
+                else "failed" if any(row.get("status") == "failed" for row in policy["editorial_review"].get("checks", []))
+                else "warning" if any(row.get("status") in {"warning", "unevaluated"} for row in policy["editorial_review"].get("checks", []))
+                else "passed"
+            ),
         }
         return markdown, docx, issues, checks
 
@@ -494,6 +639,8 @@ class PublicationReleaseService:
             "render_verification": {item["code"] for item in issues if item["blocking"]},
             "layout_verification": set(),
             "writing_feedback": {"WRITING_FEEDBACK_OPEN"},
+            "formal_specification": {"PUBLICATION_FORMAL_INPUT_MISSING", "PUBLICATION_FORMAL_VALUE_UNSUPPORTED"},
+            "editorial_qa": set(),
         }
         result = []
         for check_id, status in checks.items():
@@ -522,6 +669,7 @@ class PublicationReleaseService:
         docx: bytes,
         issues: list[Mapping[str, Any]],
         checks: Mapping[str, str],
+        policy: Mapping[str, Any],
     ) -> dict[str, Any]:
         generated_at = str(
             revision.get("created_at")
@@ -587,6 +735,7 @@ class PublicationReleaseService:
         docx: bytes,
         issues: list[Mapping[str, Any]],
         checks: Mapping[str, str],
+        policy: Mapping[str, Any],
     ) -> dict[str, Any]:
         receipt: dict[str, Any] = {
             "schema_version": SCHEMA_VERSION,
@@ -605,6 +754,7 @@ class PublicationReleaseService:
                 "research_snapshot": deepcopy(package["source_research_snapshot"]),
             },
             "publication_profile": deepcopy(dict(profile)),
+            "publication_policy": deepcopy(dict(policy)),
             "outputs": [
                 {
                     "format": "markdown",
@@ -698,13 +848,17 @@ class PublicationReleaseService:
         return receipt, manifest, target
 
     def build_preview(
-        self, composition_id: str, revision_id: str | None = None
+        self, composition_id: str, revision_id: str | None = None,
+        publication_inputs: Mapping[str, Any] | None = None,
     ) -> Mapping[str, Any]:
+        publication_inputs = _validate_publication_inputs(publication_inputs)
         inspection = inspect_inputs(self.facade, composition_id, revision_id)
         package = inspection["source_package_document"]
         inspection["exhibit_blocks"] = prepare_exhibits(inspection, self.workspace)
         profile = self._profile_pin(package)
+        policy = _publication_policy(package, profile, publication_inputs)
         revision = inspection["revision"]
+        inspection["publication_policy"] = policy
         build_key = {
             "manuscript_revision_id": revision["revision_id"],
             "manuscript_revision_digest": revision["revision_digest"],
@@ -714,6 +868,8 @@ class PublicationReleaseService:
             "template_pin": _TEMPLATE_PIN,
             "style_map_pin": _STYLE_MAP_PIN,
             "renderer": _RENDERER,
+            "publication_inputs": publication_inputs,
+            "publication_policy": policy,
             "render_inputs": render_input_digest(inspection["exhibit_blocks"], inspection["visual_diagnostics"]),
         }
         key_digest = _sha(_canonical_bytes(build_key))
@@ -743,6 +899,7 @@ class PublicationReleaseService:
                 docx=docx,
                 issues=issues,
                 checks=checks,
+                policy=policy,
             )
             build_receipt = self._build_receipt(
                 build_id=build_id,
@@ -756,6 +913,7 @@ class PublicationReleaseService:
                 docx=docx,
                 issues=issues,
                 checks=checks,
+                policy=policy,
             )
             self.root.mkdir(parents=True, exist_ok=True)
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -798,9 +956,10 @@ class PublicationReleaseService:
     ) -> bool:
         if preview.get("source_epistemic_status") != "EMPIRICAL_RESEARCH_STATE":
             return False
-        if any(build["verification"].get(key) != "passed" for key in (
-            "citation_resolution", "exhibit_resolution", "cross_reference_resolution", "render_verification",
-        )):
+        required_checks = ["citation_resolution", "exhibit_resolution", "cross_reference_resolution", "render_verification"]
+        if build.get("publication_profile", {}).get("profile_id") == "misco.publication":
+            required_checks.extend(["formal_specification", "editorial_qa"])
+        if any(build["verification"].get(key) != "passed" for key in required_checks):
             return False
         return not any(
             value == "failed"
@@ -822,11 +981,12 @@ class PublicationReleaseService:
             "source_manuscript": build["source_manuscript"],
             "snapshot_binding": build["research_provenance"]["research_snapshot"],
             "publication_profile": build["publication_profile"],
+            "publication_policy_digest": _sha(_canonical_bytes(build.get("publication_policy", {}))),
             "output_binding": {
                 "format": "docx", "digest": formal["digest"], "size": formal["size"],
             },
             "allowed_dispositions": ["approve_release"],
-            **({"required_human_review": "Inspect every rendered page, including table cells, images, captions, reference targets and layout, before approving these exact output bytes."}
+            **({"required_human_review": "Inspect every rendered page, including table cells, images, captions, reference targets, layout, and the delivered Publication editorial/formal rules before approving these exact output bytes."}
                if "layout_verification" in build["verification"] else {}),
         }
 
@@ -872,6 +1032,7 @@ class PublicationReleaseService:
             "source_manuscript": build["source_manuscript"],
             "research_provenance": build["research_provenance"],
             "publication_profile": build["publication_profile"],
+            "publication_policy_digest": _sha(_canonical_bytes(build.get("publication_policy", {}))),
             "output": {
                 "relative_path": "artifact.docx",
                 "artifact_reference": f"publication/releases/{release_id}/artifact.docx",
@@ -1207,6 +1368,7 @@ class PublicationReleaseService:
                     "source_manuscript": deepcopy(build["source_manuscript"]),
                     "research_provenance": deepcopy(build["research_provenance"]),
                     "publication_profile": deepcopy(build["publication_profile"]),
+                    "publication_policy_digest": _sha(_canonical_bytes(build.get("publication_policy", {}))),
                     "output": {
                         "relative_path": "artifact.docx",
                         "artifact_reference": f"publication/releases/{release_id}/artifact.docx",

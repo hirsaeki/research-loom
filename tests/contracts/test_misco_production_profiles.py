@@ -36,7 +36,7 @@ def config_for_publication() -> dict:
             "organization": [],
             "narrative": [],
             "publication": [
-                {"profile_id": "misco.publication", "profile_type": "publication", "version": "1.0.1"}
+                {"profile_id": "misco.publication", "profile_type": "publication", "version": "1.1.0"}
             ],
         }
     }
@@ -66,10 +66,10 @@ class MiscoProductionProfileTests(unittest.TestCase):
             self.assertEqual(expected, encoded)
         self.assertEqual(
             [(x["profile_type"], x["profile_id"], x["profile_version"]) for x in eps["effective_profiles"]],
-            [("narrative", "misco.writer", "1.1.0"), ("publication", "misco.publication", "1.0.1")],
+            [("narrative", "misco.writer", "1.1.0"), ("publication", "misco.publication", "1.1.0")],
         )
         resources = {x["role"]: x for x in eps["effective_resources"]}
-        self.assertEqual(set(resources), {"WRITER_RULES", "WRITER_SOURCE_DOCUMENTS", "PUBLICATION_RULES"})
+        self.assertEqual(set(resources), {"WRITER_RULES", "WRITER_SOURCE_DOCUMENTS", "PUBLICATION_RULES", "PUBLICATION_SOURCE_DOCUMENTS"})
         for resource in resources.values():
             self.assertEqual(hashlib.sha256(resource["content"].encode()).hexdigest(), resource["sha256"])
             self.assertEqual(len(resource["content"].encode()), resource["byte_length"])
@@ -218,7 +218,7 @@ class MiscoProductionProfileTests(unittest.TestCase):
                 with self.assertRaises(LocalWorkspaceError) as raised:
                     resolve_effective_profile_set(config_for_publication(), [WRITER_MANIFEST, PUBLICATION_MANIFEST])
         self.assertEqual(raised.exception.code, "PROFILE-RESOURCE-BOUND-001")
-        self.assertEqual(reader.call_count, 1)
+        self.assertEqual(reader.call_count, 0)
 
         with patch.object(profile_resolution, "MAX_EFFECTIVE_RESOURCE_BYTES", 1):
             with patch.object(profile_resolution, "_normalized_resource_bytes", side_effect=AssertionError("resource body must not be read past the effective byte bound")):
@@ -234,7 +234,7 @@ class MiscoProductionProfileTests(unittest.TestCase):
         projected = profile_resources(eps)
         self.assertEqual(projected, eps["effective_resources"])
         self.assertIsNot(projected, eps["effective_resources"])
-        self.assertEqual({x["role"] for x in projected}, {"WRITER_RULES", "WRITER_SOURCE_DOCUMENTS", "PUBLICATION_RULES"})
+        self.assertEqual({x["role"] for x in projected}, {"WRITER_RULES", "WRITER_SOURCE_DOCUMENTS", "PUBLICATION_RULES", "PUBLICATION_SOURCE_DOCUMENTS"})
         self.assertTrue(all(x["content"] for x in projected))
         self.assertTrue(all(x["provenance"] for x in projected))
 
@@ -251,14 +251,14 @@ class MiscoProductionProfileTests(unittest.TestCase):
             opened.close()
             with LocalWorkspace.open(workspace) as reopened:
                 resources = reopened.effective_profile_set["effective_resources"]
-                self.assertEqual({x["role"] for x in resources}, {"WRITER_RULES", "WRITER_SOURCE_DOCUMENTS", "PUBLICATION_RULES"})
+                self.assertEqual({x["role"] for x in resources}, {"WRITER_RULES", "WRITER_SOURCE_DOCUMENTS", "PUBLICATION_RULES", "PUBLICATION_SOURCE_DOCUMENTS"})
                 self.assertTrue(all(x["content"] for x in resources))
             detached = root / "detached.json"
             detached.write_text(json.dumps(eps, ensure_ascii=False), encoding="utf-8")
             code = (
                 "import json,sys; x=json.load(open(sys.argv[1],encoding='utf-8')); "
                 "r={i['role']:i for i in x['effective_resources']}; "
-                "assert set(r)=={'WRITER_RULES','WRITER_SOURCE_DOCUMENTS','PUBLICATION_RULES'}; "
+                "assert set(r)=={'WRITER_RULES','WRITER_SOURCE_DOCUMENTS','PUBLICATION_RULES','PUBLICATION_SOURCE_DOCUMENTS'}; "
                 "assert all(i['content'] for i in r.values())"
             )
             result = subprocess.run([sys.executable, "-c", code, str(detached)], cwd=root, capture_output=True, text=True)

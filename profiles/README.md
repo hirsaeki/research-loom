@@ -20,7 +20,7 @@ The canonical contracts live under `contracts/`:
 Issue #332 introduced only the production Profiles justified by the #331 migration ledger; Issue #334 completes detached Writer rule-text/review delivery without adding invented Research/Organization defaults:
 
 - `narrative/misco/profile.json` (`misco.writer@1.1.0`) — instantiates the minimal canonical Narrative definitions required by the Research Package boundary and delivers the Human-approved clean Writer/Narrative rule inventory plus the eight approved Layer A source documents needed by a detached Writer host.
-- `publication/misco/profile.json` (`misco.publication@1.0.1`) — delivers the Human-approved clean Publication rule asset and `requires` `misco.writer>=1.1.0 <2.0.0`.
+- `publication/misco/profile.json` (`misco.publication@1.1.0`) — delivers the Human-approved clean Publication rule inventory plus six approved Layer A source documents and `requires` `misco.writer>=1.1.0 <2.0.0`; concrete formal values remain separate explicit runtime inputs.
 
 There is deliberately no empty MISCO Research or Organization Profile. The #331 inventory found no reusable MISCO Research/Organization values with authority independent of project-specific Attention/feedback, and the synthetic Research fixtures explicitly are not defaults. Concrete Research/Organization policy must therefore be added only when an authoritative reusable value exists; project RQ, method choices, provisional chapter placement, and runtime state do not belong here.
 
@@ -51,7 +51,7 @@ For an existing Workspace, a profile-generation request can select the productio
   "request_replacements": [
     {
       "from": {"profile_id":"OLD_PUBLICATION","profile_type":"publication","version":"1.0.0"},
-      "to": {"profile_id":"misco.publication","profile_type":"publication","version":"1.0.1"}
+      "to": {"profile_id":"misco.publication","profile_type":"publication","version":"1.1.0"}
     }
   ]
 }

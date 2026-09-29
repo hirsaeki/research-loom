@@ -28,13 +28,14 @@ def _text(text: str) -> str:
     return escape(text.replace("\r\n", "\n").replace("\r", "\n"))
 
 
-def _paragraph(text: str, role: str = "body", bookmark: tuple[int, str] | None = None) -> str:
+def _paragraph(text: str, role: str = "body", bookmark: tuple[int, str] | None = None, first_line_indent_twips: int = 0) -> str:
     style = {"title": "Title", "heading": "Heading1", "heading2": "Heading2", "cell": "TableText", "header": "TableHeader"}.get(role, "Normal")
     runs = "</w:t><w:br/><w:t xml:space=\"preserve\">".join(_text(text).split("\n"))
     runs = runs.replace("\t", '</w:t><w:tab/><w:t xml:space="preserve">')
     start = f'<w:bookmarkStart w:id="{bookmark[0]}" w:name="{bookmark[1]}"/>' if bookmark else ""
     end = f'<w:bookmarkEnd w:id="{bookmark[0]}"/>' if bookmark else ""
-    return f'<w:p><w:pPr><w:pStyle w:val="{style}"/></w:pPr>{start}<w:r><w:t xml:space="preserve">{runs}</w:t></w:r>{end}</w:p>'
+    indent = f'<w:ind w:firstLine="{first_line_indent_twips}"/>' if role == 'body' and first_line_indent_twips else ''
+    return f'<w:p><w:pPr><w:pStyle w:val="{style}"/>{indent}</w:pPr>{start}<w:r><w:t xml:space="preserve">{runs}</w:t></w:r>{end}</w:p>'
 
 
 def _table(rows: list[list[str]]) -> str:
@@ -78,7 +79,8 @@ def _provenance(lines: list[tuple[str, Any]]) -> list[dict[str, Any]]:
             for role, block in lines if role == "exhibit"]
 
 
-def docx_bytes(lines: list[tuple[str, Any]]) -> bytes:
+def docx_bytes(lines: list[tuple[str, Any]], layout: dict[str, Any] | None = None) -> bytes:
+    layout = dict(layout or {})
     body = []
     images = {}
     relationships = [f'<Relationship Id="rIdStyles" Type="{R}/styles" Target="styles.xml"/>',
@@ -86,14 +88,16 @@ def docx_bytes(lines: list[tuple[str, Any]]) -> bytes:
     index = 0
     for role, block in lines:
         if role != "exhibit":
-            body.append(_paragraph(block, role))
+            body.append(_paragraph(block, role, first_line_indent_twips=int(layout.get('first_line_indent_twips', 0))))
             continue
         index += 1
-        body.append(_paragraph(block["caption"], "heading2", (index, _bookmark(block["ref"]))))
+        caption = _paragraph(block["caption"], "heading2", (index, _bookmark(block["ref"])))
         if block["kind"] == "table":
+            body.append(caption)
             body.append(_table(block["rows"]))
         elif block["kind"] == "image":
             body.append(_image(block, index))
+            body.append(caption)
             name = f'media/image-{index}.png'
             images['word/' + name] = block['data']
             relationships.append(f'<Relationship Id="rIdImage{index}" Type="{R}/image" Target="{name}"/>')
@@ -101,12 +105,31 @@ def docx_bytes(lines: list[tuple[str, Any]]) -> bytes:
             body.append(_paragraph(f'[Unavailable exhibit: {block["code"]}. Preserve the source and supply a supported representation under a new identity.]'))
         if block.get("note"):
             body.append(_paragraph(block["note"], "cell"))
+    page_width = int(layout.get('page_width_twips', 12240))
+    page_height = int(layout.get('page_height_twips', 15840))
+    margin_top = int(layout.get('margin_top_twips', 1440))
+    margin_right = int(layout.get('margin_right_twips', 1440))
+    margin_bottom = int(layout.get('margin_bottom_twips', 1440))
+    margin_left = int(layout.get('margin_left_twips', 1440))
     document = (f'<w:document xmlns:w="{W}" xmlns:r="{R}" xmlns:a="{A}" xmlns:wp="{WP}" xmlns:pic="{PIC}"><w:body>' + ''.join(body)
-                + '<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/></w:sectPr></w:body></w:document>')
-    styles = [f'<w:styles xmlns:w="{W}"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:sz w:val="22"/></w:rPr></w:rPrDefault></w:docDefaults>']
-    for name, size, bold in [("Normal", 22, False), ("Title", 34, True), ("Heading1", 28, True), ("Heading2", 22, True), ("TableText", 18, False), ("TableHeader", 18, True)]:
+                + f'<w:sectPr><w:pgSz w:w="{page_width}" w:h="{page_height}"/><w:pgMar w:top="{margin_top}" w:right="{margin_right}" w:bottom="{margin_bottom}" w:left="{margin_left}"/></w:sectPr></w:body></w:document>')
+    body_font = str(layout.get('body_font', 'Arial'))
+    heading_font = str(layout.get('heading_font', body_font))
+    title_font = str(layout.get('title_font', heading_font))
+    table_font = str(layout.get('table_font', body_font))
+    body_size = int(layout.get('body_size_half_points', 22))
+    styles = [f'<w:styles xmlns:w="{W}"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="{escape(body_font)}" w:hAnsi="{escape(body_font)}"/><w:sz w:val="{body_size}"/></w:rPr></w:rPrDefault></w:docDefaults>']
+    style_rows = [
+        ("Normal", body_size, False, body_font),
+        ("Title", int(layout.get('title_size_half_points', 34)), True, title_font),
+        ("Heading1", int(layout.get('heading1_size_half_points', 28)), True, heading_font),
+        ("Heading2", int(layout.get('heading2_size_half_points', 22)), True, heading_font),
+        ("TableText", int(layout.get('table_body_size_half_points', 18)), False, table_font),
+        ("TableHeader", int(layout.get('table_header_size_half_points', 18)), True, table_font),
+    ]
+    for name, size, bold, font in style_rows:
         keep = '<w:keepNext/>' if name in {"Title", "Heading1", "Heading2"} else ''
-        styles.append(f'<w:style w:type="paragraph" w:styleId="{name}"><w:name w:val="{name}"/><w:pPr>{keep}<w:spacing w:after="80"/></w:pPr><w:rPr><w:sz w:val="{size}"/>' + ('<w:b/>' if bold else '') + '</w:rPr></w:style>')
+        styles.append(f'<w:style w:type="paragraph" w:styleId="{name}"><w:name w:val="{name}"/><w:pPr>{keep}<w:spacing w:after="80"/></w:pPr><w:rPr><w:rFonts w:ascii="{escape(font)}" w:hAnsi="{escape(font)}"/><w:sz w:val="{size}"/>' + ('<w:b/>' if bold else '') + '</w:rPr></w:style>')
     types = ('<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
              '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
              '<Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/>'
@@ -131,13 +154,35 @@ def _paragraph_text(node: ET.Element) -> str:
     return ''.join(child.text or '' if child.tag == f'{{{W}}}t' else '\n' if child.tag == f'{{{W}}}br' else '\t' if child.tag == f'{{{W}}}tab' else '' for child in node.iter())
 
 
-def verify_native_docx(data: bytes, lines: list[tuple[str, Any]]) -> bool:
+def verify_native_docx(data: bytes, lines: list[tuple[str, Any]], layout: dict[str, Any] | None = None) -> bool:
     """Inspect the generated archive independently of serialization logic."""
     try:
         with zipfile.ZipFile(io.BytesIO(data)) as archive:
             doc = ET.fromstring(archive.read('word/document.xml'))
             body = doc.find(f'{{{W}}}body')
             if body is None:
+                return False
+            layout = dict(layout or {})
+            sect = body.find(f'{{{W}}}sectPr')
+            if sect is None:
+                return False
+            pg_sz = sect.find(f'{{{W}}}pgSz')
+            pg_mar = sect.find(f'{{{W}}}pgMar')
+            if pg_sz is None or pg_mar is None:
+                return False
+            expected_page = {
+                'w': int(layout.get('page_width_twips', 12240)),
+                'h': int(layout.get('page_height_twips', 15840)),
+            }
+            expected_margins = {
+                'top': int(layout.get('margin_top_twips', 1440)),
+                'right': int(layout.get('margin_right_twips', 1440)),
+                'bottom': int(layout.get('margin_bottom_twips', 1440)),
+                'left': int(layout.get('margin_left_twips', 1440)),
+            }
+            if any(int(pg_sz.get(f'{{{W}}}{key}', '-1')) != value for key, value in expected_page.items()):
+                return False
+            if any(int(pg_mar.get(f'{{{W}}}{key}', '-1')) != value for key, value in expected_margins.items()):
                 return False
             children = [node for node in body if node.tag != f'{{{W}}}sectPr']
             relations = {r.attrib['Id']: r.attrib for r in ET.fromstring(archive.read('word/_rels/document.xml.rels'))}
@@ -161,14 +206,13 @@ def verify_native_docx(data: bytes, lines: list[tuple[str, Any]]) -> bool:
                     continue
 
                 block = value
-                caption = take('p')
-                if _paragraph_text(caption) != normalized(block['caption']):
-                    return False
-                bookmarks = caption.findall(f'.//{{{W}}}bookmarkStart')
-                if len(bookmarks) != 1 or bookmarks[0].get(f'{{{W}}}name') != _bookmark(block['ref']):
-                    return False
-
                 if block['kind'] == 'table':
+                    caption = take('p')
+                    if _paragraph_text(caption) != normalized(block['caption']):
+                        return False
+                    bookmarks = caption.findall(f'.//{{{W}}}bookmarkStart')
+                    if len(bookmarks) != 1 or bookmarks[0].get(f'{{{W}}}name') != _bookmark(block['ref']):
+                        return False
                     table = take('tbl')
                     rows = [[_paragraph_text(cell) for cell in row.findall(f'{{{W}}}tc')] for row in table.findall(f'{{{W}}}tr')]
                     expected = [[normalized(cell) for cell in row] for row in block['rows']]
@@ -185,6 +229,12 @@ def verify_native_docx(data: bytes, lines: list[tuple[str, Any]]) -> bool:
                         return False
                     payload = archive.read('word/' + relation['Target'])
                     if payload != block['data'] or 'sha256:' + hashlib.sha256(payload).hexdigest() != block['asset_digest']:
+                        return False
+                    caption = take('p')
+                    if _paragraph_text(caption) != normalized(block['caption']):
+                        return False
+                    bookmarks = caption.findall(f'.//{{{W}}}bookmarkStart')
+                    if len(bookmarks) != 1 or bookmarks[0].get(f'{{{W}}}name') != _bookmark(block['ref']):
                         return False
                 else:
                     unavailable = take('p')
