@@ -24,6 +24,8 @@ Issue #332 introduced only the production Profiles justified by the #331 migrati
 
 There is deliberately no empty MISCO Research or Organization Profile. The #331 inventory found no reusable MISCO Research/Organization values with authority independent of project-specific Attention/feedback, and the synthetic Research fixtures explicitly are not defaults. Concrete Research/Organization policy must therefore be added only when an authoritative reusable value exists; project RQ, method choices, provisional chapter placement, and runtime state do not belong here.
 
+`research/misco-workspace-continuity/profile.json` is the one exception in shape but not in policy: it is a **migration-only continuity Profile**, not a fresh-project MISCO Research Profile. It carries only the `CORE-TRACE-001` exact-locator strengthening that an older fixture-bound Workspace already had, so Profile advancement does not weaken Core while removing synthetic Writer/Publication Profiles. Fresh MISCO projects do not select it, and it contains no methodology, source-quality, threshold, or method-choice defaults.
+
 The legacy `research-profile/` tree remains migration/reference material. Production resolution must not read it to recover rule text.
 
 ## Resource delivery

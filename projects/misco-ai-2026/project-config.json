@@ -1,0 +1,98 @@
+{
+  "schema_version": "0.1.0",
+  "config_version": "1.0.0",
+  "project": {
+    "project_id": "MISCO-AI-2026",
+    "title": "MISCO AI研究",
+    "objective": "AIの能力が進展する不確実な状況において、企業活動にはどのような変化が生じ得るのか。その変化をMISCO企業の事業・組織・制約に照合したとき、どの業務・意思決定をどの程度AIに委ね、人間の役割、ガバナンス、人材、投資を短期・中期・長期でどのように再設計すべきか。"
+  },
+  "scope": {
+    "in_scope": [
+      "生成AI・AIエージェント・AGI・ASIの能力変化と、データ・ツール・権限・監視・停止機構を含む実運用上の自律性。",
+      "AI能力進展が企業価値、競争優位、業務、意思決定、リスク、責任、人間の役割へ与える一般的影響。",
+      "MISCO各社の事業、業務、顧客接点、データ、人材、規制、既存施策への適用上の機会・脅威・課題。",
+      "AIへの委譲範囲と自律度、人間の保持・監督・停止責任、ガバナンス、人材、データ基盤、投資、評価指標の設計。"
+    ],
+    "out_of_scope": []
+  },
+  "research_questions": {
+    "references": [],
+    "seeds": [
+      {
+        "seed_id": "RQ-SEED-MISCO-FRESH-START",
+        "text": "現在のMISCO AI研究の目的・範囲に対して、最初に検証すべき研究問いは何か。",
+        "rationale": "Fresh-start bootstrap seed derived from the current production project objective; it is not copied from legacy/probe research state."
+      }
+    ]
+  },
+  "profile_requests": {
+    "research": [],
+    "organization": [],
+    "narrative": [],
+    "publication": [
+      {
+        "profile_id": "misco.publication",
+        "profile_type": "publication",
+        "version": "1.2.0"
+      }
+    ]
+  },
+  "communication_brief": {
+    "audience": [
+      "MISCO AI研究の読者"
+    ],
+    "core_message": "AIの能力が進展する不確実な状況において、企業活動にはどのような変化が生じ得るのか。その変化をMISCO企業の事業・組織・制約に照合したとき、どの業務・意思決定をどの程度AIに委ね、人間の役割、ガバナンス、人材、投資を短期・中期・長期でどのように再設計すべきか。"
+  },
+  "research_attention": [],
+  "project_constraints": {
+    "requirements": [
+      {
+        "guard_id": "MISCO-ATTENTION-DISPOSITION",
+        "statement": "研究中に検討対象から黙って消してはならない論点は、不要・対象外とする場合に理由を残す。"
+      }
+    ],
+    "prohibitions": [
+      {
+        "guard_id": "MISCO-NO-METHOD-FROM-OUTLINE",
+        "statement": "Initial Publication Mapが方法選択を起動してはならない。"
+      },
+      {
+        "guard_id": "MISCO-FEEDBACK-NONCANONICAL",
+        "statement": "前走VIRTUAL RUN feedbackを研究設計正本、Human Decision、Decision Log、Change Logの代替としない。"
+      }
+    ],
+    "must_not_claim": [
+      {
+        "guard_id": "MISCO-NO-FINDING-DISTORTION",
+        "statement": "Research Findingを章構成へ合わせて歪めてはならない。"
+      },
+      {
+        "guard_id": "MISCO-NO-SYNTHETIC-EMPIRICAL",
+        "statement": "合成Survey・合成Delphi・合成Finding等をEMPIRICALへ昇格させない。"
+      }
+    ]
+  },
+  "resource_references": [
+    {
+      "reference_id": "REF-MISCO-ATTENTION-MAP",
+      "reference_type": "input",
+      "locator": "research-profile/maps/research_attention_and_initial_publication_map.md",
+      "digest": "sha256:d4c39092cd3dcb2f7fa6176e9e1467355a56b18edcf5bb1d3fbcdef98d45f21e",
+      "purpose": "Legacy Human-approved guidance candidate for Research Attention and provisional publication routing; not Evidence and not method authority."
+    }
+  ],
+  "capability_hints": [],
+  "provenance": {
+    "source_reference_ids": [
+      "REF-MISCO-ATTENTION-MAP"
+    ],
+    "derived_from_configuration_digests": [],
+    "notes": [
+      "Fresh-start configuration contains no legacy/probe Research Question, Evidence, Finding, material, or virtual-run feedback data.",
+      "Legacy-only research data is migration-validation input only; formal transfer into a new Loom Workspace must use intake/capture -> candidate -> Human Decision.",
+      "No Research Attention candidate is auto-activated by init; use the public Attention lifecycle after human review.",
+      "misco.publication@1.2.0 transitively requires misco.writer@1.1.0; no invented MISCO Research/Organization Profile is selected."
+    ]
+  },
+  "configuration_digest": "sha256:9af73fc5506c6b0c7203a97779009a13881cf0c3e61a90531d5e660cd2dd4b7d"
+}

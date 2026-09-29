@@ -10,7 +10,7 @@ semantics:
   form_mismatch: PROFILE-CORE-STRENGTHENING-001
   validator_result_required: true
   validator_result_fail_closed: true
-  fixture_only_bindings_are_not_profile_policy: true
+  registered_bindings_are_not_implicit_profile_policy: true
   note: >-
     The registry defines the authoritative semantic connection point. It does not
     prescribe validator implementation language, resolver architecture, a
@@ -21,12 +21,14 @@ invariants:
     validators:
       - validator_id: core.trace.evidence-source
         validator_version: 0.1.0
-        scope: contract_fixture_only
+        scope: registered_profile_binding
         applicability:
-          profile_id_prefix: fixture.
+          profile_id_prefixes:
+            - fixture.
+            - misco.workspace-continuity.
         approved_forms:
           - form_id: exact-locator
-            scope: contract_fixture_only
+            scope: registered_profile_binding
             required_constraints:
               - path: evidence.capture.locator_precision
                 merge_strategy: must_equal

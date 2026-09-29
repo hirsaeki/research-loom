@@ -87,7 +87,7 @@ The synthetic generic fixture under `profiles/fixtures/narrative/` branches afte
 
 `effect: strengthen` is a **claim**, never proof. Each claim must carry a `validator_binding` with validator ID, validator version, and form ID. That four-part binding with `invariant_id` must resolve in `invariant-strengthening-validators.yaml`.
 
-The registry is authoritative for which validators/forms exist. It currently registers one synthetic contract fixture form for `CORE-TRACE-001`; every other Core invariant explicitly has `no_registered_forms` and therefore fails closed for Profile strengthening in contract `0.1.0`.
+The registry is authoritative for which validators/forms exist. It currently registers one `CORE-TRACE-001` exact-locator form. Its applicability is deliberately narrow: synthetic `fixture.*` contract coverage plus `misco.workspace-continuity.*` migration-only Profiles that preserve an already-active strengthening while an existing Workspace leaves fixture-bound Writer/Publication Profiles. This does not make exact-locator a default MISCO Research policy. Every other Core invariant explicitly has `no_registered_forms` and therefore fails closed for Profile strengthening in contract `0.1.0`.
 
 A conforming implementation must bind the actual resolved constraints, satisfy the registered form, preserve the original Core predicate unchanged, and obtain a positive result from the bound invariant-specific validator before emitting `status: strengthened`. Missing, mismatched, unavailable, or inconclusive validation is `PROFILE-CORE-STRENGTHENING-001`. The registry defines the connection point and proof obligations without prescribing a resolver implementation or theorem prover.
 
