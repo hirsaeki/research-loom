@@ -1,0 +1,20 @@
+{
+  "asset_id": "misco.publication-url-display",
+  "asset_version": "1.0.0",
+  "authority": "Human Decision recorded for Issue #335 on 2026-09-29",
+  "decision": "長いURLも参考文献には原則全文表示する。",
+  "prohibitions": [
+    "Do not shorten, elide, or replace the canonical URL with an arbitrary link label in the MISCO default rendering."
+  ],
+  "schema_version": "0.1.0",
+  "url_display_profile": {
+    "profile_id": "misco.url-display.full-url",
+    "profile_version": "1.0.0",
+    "source": {
+      "approval_ref": "Human Decision 2026-09-29: 長いURLも参考文献には原則全文表示する。",
+      "source_digest": "sha256:3eb4934dce6273220442ef9d703187690c13dbf3e7a611728068a505a9237629",
+      "source_ref": "https://github.com/hirsaeki/research-loom/issues/335#issuecomment-5884711812"
+    },
+    "template": "{title} {url}"
+  }
+}

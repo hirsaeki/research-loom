@@ -218,8 +218,11 @@ class LocalApplicationFacade:
         from plugins.local_application.publication_release_service import PublicationReleaseService
         return PublicationReleaseService(self)
 
-    def build_publication_preview(self, composition_id: str, revision_id: str | None = None) -> Mapping[str, Any]:
-        return self._publication_release_service().build_preview(composition_id, revision_id)
+    def build_publication_preview(
+        self, composition_id: str, revision_id: str | None = None,
+        publication_inputs: Mapping[str, Any] | None = None,
+    ) -> Mapping[str, Any]:
+        return self._publication_release_service().build_preview(composition_id, revision_id, publication_inputs)
 
     def show_publication_preview(self, build_id: str) -> Mapping[str, Any]:
         return self._publication_release_service().show_preview(build_id)

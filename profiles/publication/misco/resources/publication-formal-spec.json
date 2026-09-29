@@ -1,0 +1,109 @@
+{
+  "asset_id": "misco.publication-formal-spec",
+  "asset_version": "1.0.0",
+  "authority": "MISCO研究会報告書作成要領(2024-11-12) and referenced formal attachments supplied by the user on 2026-09-29",
+  "formal_spec_profile": {
+    "docx_layout": {
+      "body_font": "ＭＳ 明朝",
+      "body_latin_font": "Century",
+      "body_size_half_points": 21,
+      "caption_font": "ＭＳ ゴシック",
+      "caption_latin_font": "Century",
+      "caption_size_half_points": 18,
+      "doc_grid_char_space": 3430,
+      "doc_grid_line_pitch_twips": 335,
+      "first_line_indent_twips": 227,
+      "footer_margin_twips": 992,
+      "header_margin_twips": 851,
+      "heading1_size_half_points": 28,
+      "heading2_size_half_points": 24,
+      "heading_font": "ＭＳ ゴシック",
+      "heading_latin_font": "Century",
+      "margin_bottom_twips": 1418,
+      "margin_left_twips": 1418,
+      "margin_right_twips": 1418,
+      "margin_top_twips": 1701,
+      "page_height_twips": 16838,
+      "page_width_twips": 11906,
+      "reference_hanging_twips": 454,
+      "reference_left_indent_twips": 227,
+      "table_body_size_half_points": 21,
+      "table_font": "ＭＳ 明朝",
+      "table_header_size_half_points": 21,
+      "table_latin_font": "Century",
+      "title_font": "ＭＳ ゴシック",
+      "title_latin_font": "Century",
+      "title_size_half_points": 48
+    },
+    "profile_id": "misco.formal-spec.2024-11-12",
+    "profile_version": "1.0.0",
+    "reference_list_heading": "＜参考文献＞",
+    "reference_list_placement": "end_of_each_section",
+    "research_group_type_required": false,
+    "source": {
+      "approval_ref": "MISCO研究会報告書作成要領(2024-11-12) + referenced attachments; supplied by user 2026-09-29",
+      "source_digest": "sha256:10e91d2ba7b9fa1f2f6eeede18baf623a8428d8db45995053b9494b26efb4e6c",
+      "source_ref": "external-input://misco_doc_spec.zip"
+    }
+  },
+  "human_qa_rules": [
+    "MISCO outer/front/back matter branching and blank-page/opening-page rules",
+    "50-60 page editorial target and 2-page abstract target",
+    "dearu style and terminology consistency",
+    "rights, interview/company disclosure and source adequacy",
+    "visual page-by-page inspection before release"
+  ],
+  "machine_applied_rules": [
+    "A4 page size and formal margins/header/footer values",
+    "formal body/heading/title/table East Asian and Latin fonts and sizes",
+    "one-character first-line indentation using the supplied Word template value",
+    "40-line/character-grid parameters pinned from the supplied Word template",
+    "table caption above; figure caption below",
+    "section-local reference lists and full reader-facing URLs"
+  ],
+  "schema_version": "0.1.0",
+  "source_archive": {
+    "bytes": 607255,
+    "handling": "External formal-spec original; repository stores only exact digests and extracted approved application values.",
+    "name": "misco_doc_spec.zip",
+    "repository_copy": false,
+    "sha256": "10e91d2ba7b9fa1f2f6eeede18baf623a8428d8db45995053b9494b26efb4e6c"
+  },
+  "source_members": [
+    {
+      "locator": "1.1 / 1.6 / 1.7",
+      "name": "MISCO研究会報告書作成要領.md",
+      "sha256": "53b0bf8a39bef10c2fdcfd7b9450c9cda25ab5dad6bade6f9405d890fb7a0193"
+    },
+    {
+      "locator": "2-2; 2-3(8),(9),(12),(13)",
+      "name": "業際研報告書作成マニュアル-2020年10月改訂版.doc",
+      "sha256": "306e2b220743eeb353f075274a97aa0b10b373eac934dec772fc398e162ec5c4"
+    },
+    {
+      "locator": "見出し字配り仕様 / 説明",
+      "name": "[添付1]業際研報告書見出し段落フォント仕様-2017年10月版.xls",
+      "sha256": "b4d744bd1767e0579b2b9f1d1745bfb6a105eb513c539e766191658c578ec448"
+    },
+    {
+      "locator": "表紙・背表紙のレイアウト",
+      "name": "[添付2]業際研報告書表紙表記仕様-2013年10月改定版.ppt",
+      "sha256": "733f430882cacad1a21e216d07867a5280dccfb3d6067d61cba9f530e2e94ce0"
+    },
+    {
+      "locator": "word/document.xml sectPr; Word styles",
+      "name": "[添付3]業際研報告書 字配り(テンプレート)-2017年10月版.docx",
+      "sha256": "2a1c2ddeb6590836f860fb5110daf9a1c906624e1712c7457b87c5ba860910c9"
+    },
+    {
+      "locator": "表紙用途・部数仕様",
+      "name": "MISCO報告書表紙表記仕様(添付5).doc",
+      "sha256": "a507f345de35ed5cc5763271153e09cf1ee0ee0f040df4ba088ddd63fff6947f"
+    },
+    {
+      "locator": "3.引用について",
+      "name": "MISCO論文作成上の注意点.docx",
+      "sha256": "9041c81cf06f454ee8d174761bdfb0e8fe28941216734262ad1e898677b9ffa3"
+    }
+  ]
+}

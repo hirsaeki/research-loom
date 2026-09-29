@@ -25,6 +25,8 @@ PUBLICATION_MANIFEST = ROOT / "profiles/publication/misco/profile.json"
 WRITER_ASSET = ROOT / "profiles/narrative/misco/resources/writer-clean-rules.json"
 WRITER_SOURCE_ASSET = ROOT / "profiles/narrative/misco/resources/writer-clean-source-documents.json"
 PUBLICATION_ASSET = ROOT / "profiles/publication/misco/resources/publication-clean-rules.json"
+PUBLICATION_FORMAL_SPEC = ROOT / "profiles/publication/misco/resources/publication-formal-spec.json"
+PUBLICATION_URL_DISPLAY = ROOT / "profiles/publication/misco/resources/publication-url-display.json"
 PROJECT_FIXTURE = ROOT / "projects/fixtures/valid/generic-project-config.json"
 RESEARCH_FIXTURE = ROOT / "profiles/fixtures/research-quality/valid/generic-research-quality.profile.json"
 
@@ -36,7 +38,7 @@ def config_for_publication() -> dict:
             "organization": [],
             "narrative": [],
             "publication": [
-                {"profile_id": "misco.publication", "profile_type": "publication", "version": "1.0.1"}
+                {"profile_id": "misco.publication", "profile_type": "publication", "version": "1.2.0"}
             ],
         }
     }
@@ -66,10 +68,10 @@ class MiscoProductionProfileTests(unittest.TestCase):
             self.assertEqual(expected, encoded)
         self.assertEqual(
             [(x["profile_type"], x["profile_id"], x["profile_version"]) for x in eps["effective_profiles"]],
-            [("narrative", "misco.writer", "1.1.0"), ("publication", "misco.publication", "1.0.1")],
+            [("narrative", "misco.writer", "1.1.0"), ("publication", "misco.publication", "1.2.0")],
         )
         resources = {x["role"]: x for x in eps["effective_resources"]}
-        self.assertEqual(set(resources), {"WRITER_RULES", "WRITER_SOURCE_DOCUMENTS", "PUBLICATION_RULES"})
+        self.assertEqual(set(resources), {"WRITER_RULES", "WRITER_SOURCE_DOCUMENTS", "PUBLICATION_RULES", "PUBLICATION_SOURCE_DOCUMENTS", "PUBLICATION_FORMAL_SPEC", "PUBLICATION_URL_DISPLAY"})
         for resource in resources.values():
             self.assertEqual(hashlib.sha256(resource["content"].encode()).hexdigest(), resource["sha256"])
             self.assertEqual(len(resource["content"].encode()), resource["byte_length"])
@@ -115,6 +117,29 @@ class MiscoProductionProfileTests(unittest.TestCase):
         self.assertEqual(
             {x["id"] for x in publication["missing_inputs"]},
             {"INPUT-FORMAL-SPEC", "INPUT-URL-DISPLAY", "INPUT-RESEARCH-GROUP-TYPE", "INPUT-PERMISSION"},
+        )
+
+    def test_publication_formal_and_url_resources_are_pinned_to_supplied_authority(self):
+        formal = json.loads(PUBLICATION_FORMAL_SPEC.read_text(encoding="utf-8"))
+        profile = formal["formal_spec_profile"]
+        self.assertEqual(formal["source_archive"]["sha256"], "10e91d2ba7b9fa1f2f6eeede18baf623a8428d8db45995053b9494b26efb4e6c")
+        self.assertFalse(formal["source_archive"]["repository_copy"])
+        self.assertEqual(len(formal["source_members"]), 7)
+        self.assertEqual(profile["reference_list_placement"], "end_of_each_section")
+        self.assertEqual(profile["reference_list_heading"], "＜参考文献＞")
+        self.assertEqual(profile["docx_layout"]["page_width_twips"], 11906)
+        self.assertEqual(profile["docx_layout"]["margin_top_twips"], 1701)
+        self.assertEqual(profile["docx_layout"]["body_font"], "ＭＳ 明朝")
+        self.assertEqual(profile["docx_layout"]["body_latin_font"], "Century")
+        self.assertEqual(profile["docx_layout"]["heading_font"], "ＭＳ ゴシック")
+        self.assertEqual(profile["docx_layout"]["doc_grid_line_pitch_twips"], 335)
+
+        url = json.loads(PUBLICATION_URL_DISPLAY.read_text(encoding="utf-8"))
+        self.assertEqual(url["decision"], "長いURLも参考文献には原則全文表示する。")
+        self.assertEqual(url["url_display_profile"]["template"], "{title} {url}")
+        self.assertEqual(
+            url["url_display_profile"]["source"]["source_digest"],
+            "sha256:3eb4934dce6273220442ef9d703187690c13dbf3e7a611728068a505a9237629",
         )
 
     def test_resource_digest_ablation_rejects_same_manifest_identity_with_modified_body(self):
@@ -218,7 +243,7 @@ class MiscoProductionProfileTests(unittest.TestCase):
                 with self.assertRaises(LocalWorkspaceError) as raised:
                     resolve_effective_profile_set(config_for_publication(), [WRITER_MANIFEST, PUBLICATION_MANIFEST])
         self.assertEqual(raised.exception.code, "PROFILE-RESOURCE-BOUND-001")
-        self.assertEqual(reader.call_count, 1)
+        self.assertEqual(reader.call_count, 0)
 
         with patch.object(profile_resolution, "MAX_EFFECTIVE_RESOURCE_BYTES", 1):
             with patch.object(profile_resolution, "_normalized_resource_bytes", side_effect=AssertionError("resource body must not be read past the effective byte bound")):
@@ -234,7 +259,7 @@ class MiscoProductionProfileTests(unittest.TestCase):
         projected = profile_resources(eps)
         self.assertEqual(projected, eps["effective_resources"])
         self.assertIsNot(projected, eps["effective_resources"])
-        self.assertEqual({x["role"] for x in projected}, {"WRITER_RULES", "WRITER_SOURCE_DOCUMENTS", "PUBLICATION_RULES"})
+        self.assertEqual({x["role"] for x in projected}, {"WRITER_RULES", "WRITER_SOURCE_DOCUMENTS", "PUBLICATION_RULES", "PUBLICATION_SOURCE_DOCUMENTS", "PUBLICATION_FORMAL_SPEC", "PUBLICATION_URL_DISPLAY"})
         self.assertTrue(all(x["content"] for x in projected))
         self.assertTrue(all(x["provenance"] for x in projected))
 
@@ -251,14 +276,14 @@ class MiscoProductionProfileTests(unittest.TestCase):
             opened.close()
             with LocalWorkspace.open(workspace) as reopened:
                 resources = reopened.effective_profile_set["effective_resources"]
-                self.assertEqual({x["role"] for x in resources}, {"WRITER_RULES", "WRITER_SOURCE_DOCUMENTS", "PUBLICATION_RULES"})
+                self.assertEqual({x["role"] for x in resources}, {"WRITER_RULES", "WRITER_SOURCE_DOCUMENTS", "PUBLICATION_RULES", "PUBLICATION_SOURCE_DOCUMENTS", "PUBLICATION_FORMAL_SPEC", "PUBLICATION_URL_DISPLAY"})
                 self.assertTrue(all(x["content"] for x in resources))
             detached = root / "detached.json"
             detached.write_text(json.dumps(eps, ensure_ascii=False), encoding="utf-8")
             code = (
                 "import json,sys; x=json.load(open(sys.argv[1],encoding='utf-8')); "
                 "r={i['role']:i for i in x['effective_resources']}; "
-                "assert set(r)=={'WRITER_RULES','WRITER_SOURCE_DOCUMENTS','PUBLICATION_RULES'}; "
+                "assert set(r)=={'WRITER_RULES','WRITER_SOURCE_DOCUMENTS','PUBLICATION_RULES','PUBLICATION_SOURCE_DOCUMENTS','PUBLICATION_FORMAL_SPEC','PUBLICATION_URL_DISPLAY'}; "
                 "assert all(i['content'] for i in r.values())"
             )
             result = subprocess.run([sys.executable, "-c", code, str(detached)], cwd=root, capture_output=True, text=True)
