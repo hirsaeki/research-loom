@@ -165,14 +165,34 @@ def _publication_policy(package: Mapping[str, Any], profile: Mapping[str, Any], 
     by_role = {str(row.get("role")): row for row in resources}
     rules_row = by_role.get("PUBLICATION_RULES")
     source_row = by_role.get("PUBLICATION_SOURCE_DOCUMENTS")
-    if profile.get("profile_id") == "misco.publication" and (rules_row is None or source_row is None):
+    formal_row = by_role.get("PUBLICATION_FORMAL_SPEC")
+    url_row = by_role.get("PUBLICATION_URL_DISPLAY")
+    if profile.get("profile_id") == "misco.publication" and any(
+        row is None for row in (rules_row, source_row, formal_row, url_row)
+    ):
         raise LocalApplicationError(
             "APPLICATION-PUBLICATION-PROFILE-001",
-            "MISCO Publication requires verified rule and Layer A source-document resources",
+            "MISCO Publication requires verified rule, source-document, formal-spec, and URL-display resources",
         )
     rules = json.loads(rules_row["content"]) if rules_row else {"items": [], "missing_inputs": []}
-    formal = inputs.get("formal_spec_profile")
-    url_profile = inputs.get("url_display_profile")
+    formal_resource = json.loads(formal_row["content"]) if formal_row else {}
+    url_resource = json.loads(url_row["content"]) if url_row else {}
+    pinned_formal = formal_resource.get("formal_spec_profile")
+    pinned_url_profile = url_resource.get("url_display_profile")
+    explicit_formal = inputs.get("formal_spec_profile")
+    explicit_url_profile = inputs.get("url_display_profile")
+    if isinstance(explicit_formal, Mapping) and isinstance(pinned_formal, Mapping) and dict(explicit_formal) != dict(pinned_formal):
+        raise LocalApplicationError(
+            "APPLICATION-PUBLICATION-PROFILE-001",
+            "explicit formal_spec_profile conflicts with the pinned MISCO Publication formal-spec resource",
+        )
+    if isinstance(explicit_url_profile, Mapping) and isinstance(pinned_url_profile, Mapping) and dict(explicit_url_profile) != dict(pinned_url_profile):
+        raise LocalApplicationError(
+            "APPLICATION-PUBLICATION-PROFILE-001",
+            "explicit url_display_profile conflicts with the pinned MISCO Publication URL-display resource",
+        )
+    formal = explicit_formal if isinstance(explicit_formal, Mapping) else pinned_formal
+    url_profile = explicit_url_profile if isinstance(explicit_url_profile, Mapping) else pinned_url_profile
     group_type = inputs.get("research_group_type")
     permissions = inputs.get("permissions", [])
     editorial = inputs.get("editorial_review")
@@ -219,6 +239,14 @@ def _publication_policy(package: Mapping[str, Any], profile: Mapping[str, Any], 
         "source_documents": {
             "role": source_row.get("role") if source_row else None,
             "sha256": source_row.get("sha256") if source_row else None,
+        },
+        "formal_spec_resource": {
+            "role": formal_row.get("role") if formal_row else None,
+            "sha256": formal_row.get("sha256") if formal_row else None,
+        },
+        "url_display_resource": {
+            "role": url_row.get("role") if url_row else None,
+            "sha256": url_row.get("sha256") if url_row else None,
         },
         "formal_spec_profile": deepcopy(formal),
         "url_display_profile": deepcopy(url_profile),
@@ -419,6 +447,8 @@ class PublicationReleaseService:
         exhibit_numbers: dict[str, tuple[str, int]] = {}
         citation_numbers: dict[str, int] = {}
         locators_by_source: dict[str, list[str]] = {}
+        citation_refs_by_section: dict[str, list[str]] = {}
+        locators_by_section_source: dict[tuple[str, str], list[str]] = {}
         issues: list[dict[str, Any]] = []
         issue_keys: set[tuple[str, str, str | None]] = set()
 
@@ -439,12 +469,18 @@ class PublicationReleaseService:
                     continue
                 if source_ref not in citation_numbers:
                     citation_numbers[source_ref] = len(citation_numbers) + 1
+                section_refs = citation_refs_by_section.setdefault(section_id, [])
+                if source_ref not in section_refs:
+                    section_refs.append(source_ref)
                 locator = citation.get("locator_ref")
                 if locator:
                     bucket = locators_by_source.setdefault(source_ref, [])
                     locator_value = str(locator)
                     if locator_value not in bucket:
                         bucket.append(locator_value)
+                    section_bucket = locators_by_section_source.setdefault((section_id, source_ref), [])
+                    if locator_value not in section_bucket:
+                        section_bucket.append(locator_value)
             for exhibit_ref_value in section.get("exhibit_refs", []):
                 exhibit_ref = str(exhibit_ref_value)
                 exhibit = exhibits.get(exhibit_ref)
@@ -495,6 +531,27 @@ class PublicationReleaseService:
         md: list[str] = [f"# {title}", ""]
         docx_lines: list[tuple[str, Any]] = [("title", title)]
         rendered_exhibits: set[str] = set()
+        formal = policy.get("formal_spec_profile")
+        reference_placement = str(formal.get("reference_list_placement")) if isinstance(formal, Mapping) else "end_of_document"
+        reference_heading = str(formal.get("reference_list_heading") or "References") if isinstance(formal, Mapping) else "References"
+
+        def append_reference_list(section_id: str, source_refs: list[str]) -> None:
+            if not source_refs:
+                return
+            md.extend([f"### {reference_heading}", ""])
+            docx_lines.append(("reference_heading", reference_heading))
+            for source_ref in source_refs:
+                number = citation_numbers[source_ref]
+                source = sources[source_ref]
+                locators = locators_by_section_source.get((section_id, source_ref), [])
+                if not locators:
+                    locators = locators_by_source.get(source_ref, [])
+                rendered = self._citation_label(source, locators[0] if locators else None, policy)
+                entry = resolve_text(f"[{number}] {rendered}", section_id)
+                md.append(entry)
+                docx_lines.append(("reference", entry))
+            md.append("")
+
         for section in sections:
             sid = str(section["section_id"])
             heading = resolve_text(heading_by_section.get(sid, sid), sid)
@@ -547,10 +604,12 @@ class PublicationReleaseService:
                     preview_text = f"[UNAVAILABLE: {block['code']}. Preserve the source and supply a supported exact representation.]"
                 md.extend([f"**{caption}**", "", preview_text, ""])
                 docx_lines.append(("exhibit", block))
+            if reference_placement == "end_of_each_section":
+                append_reference_list(sid, citation_refs_by_section.get(sid, []))
 
-        if citation_numbers:
-            md.extend(["## References", ""])
-            docx_lines.append(("heading", "References"))
+        if citation_numbers and reference_placement == "end_of_document":
+            md.extend([f"## {reference_heading}", ""])
+            docx_lines.append(("reference_heading", reference_heading))
             for source_ref, number in sorted(
                 citation_numbers.items(), key=lambda item: item[1]
             ):
@@ -559,14 +618,14 @@ class PublicationReleaseService:
                 rendered = self._citation_label(source, locators[0] if locators else None, policy)
                 entry = resolve_text(f"[{number}] {rendered}", "references")
                 md.append(entry)
-                docx_lines.append(("body", entry))
+                docx_lines.append(("reference", entry))
             md.append("")
 
         feedback = revision.get("writing_feedback", {}).get("issues", [])
         if feedback:
             add_issue("WRITING_FEEDBACK_OPEN", str(len(feedback)), None, False)
         formal = policy.get("formal_spec_profile")
-        if isinstance(formal, Mapping) and formal.get("reference_list_placement") != "end_of_document":
+        if isinstance(formal, Mapping) and formal.get("reference_list_placement") not in {"end_of_document", "end_of_each_section"}:
             add_issue("PUBLICATION_FORMAL_VALUE_UNSUPPORTED", str(formal.get("reference_list_placement")), None, True)
         for missing in policy.get("missing_inputs", []):
             add_issue("PUBLICATION_FORMAL_INPUT_MISSING", str(missing), None, True)

@@ -34,11 +34,25 @@
             "table_font":{"$ref":"#/$defs/font_name"},
             "table_body_size_half_points":{"type":"integer","minimum":8,"maximum":144},
             "table_header_size_half_points":{"type":"integer","minimum":8,"maximum":144},
-            "first_line_indent_twips":{"type":"integer","minimum":0,"maximum":10000}
+            "first_line_indent_twips":{"type":"integer","minimum":0,"maximum":10000},
+            "header_margin_twips":{"type":"integer","minimum":0,"maximum":20000},
+            "footer_margin_twips":{"type":"integer","minimum":0,"maximum":20000},
+            "doc_grid_line_pitch_twips":{"type":"integer","minimum":1,"maximum":10000},
+            "doc_grid_char_space":{"type":"integer","minimum":-100000,"maximum":100000},
+            "body_latin_font":{"$ref":"#/$defs/font_name"},
+            "heading_latin_font":{"$ref":"#/$defs/font_name"},
+            "title_latin_font":{"$ref":"#/$defs/font_name"},
+            "table_latin_font":{"$ref":"#/$defs/font_name"},
+            "caption_font":{"$ref":"#/$defs/font_name"},
+            "caption_latin_font":{"$ref":"#/$defs/font_name"},
+            "caption_size_half_points":{"type":"integer","minimum":8,"maximum":144},
+            "reference_left_indent_twips":{"type":"integer","minimum":0,"maximum":10000},
+            "reference_hanging_twips":{"type":"integer","minimum":0,"maximum":10000}
           }
         },
-        "reference_list_placement":{"type":"string","minLength":1,"maxLength":128},
-        "research_group_type_required":{"type":"boolean"}
+        "reference_list_placement":{"enum":["end_of_document","end_of_each_section"]},
+        "research_group_type_required":{"type":"boolean"},
+        "reference_list_heading":{"type":"string","minLength":1,"maxLength":128}
       }
     },
     "url_display_profile":{

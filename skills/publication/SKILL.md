@@ -5,22 +5,25 @@ Use this Skill only after a Writer manuscript revision and its Research Package/
 ## Public workflow
 
 1. Build a Publication preview from the selected Writer composition/revision through the public application operation.
-2. Read the selected Publication Profile resources delivered in the Research Package. For MISCO these are `PUBLICATION_RULES` and `PUBLICATION_SOURCE_DOCUMENTS`; do not read the legacy `research-profile/` tree at runtime.
-3. Supply only explicit formal inputs that have an authoritative source/approval pin. Never infer page settings, fonts, indentation, bibliography placement, URL display, research-group type, or permission state from examples or historical papers.
+2. Read the selected Publication Profile resources delivered in the Research Package. For MISCO these are `PUBLICATION_RULES`, `PUBLICATION_SOURCE_DOCUMENTS`, `PUBLICATION_FORMAL_SPEC`, and `PUBLICATION_URL_DISPLAY`; do not read the legacy `research-profile/` tree or external originals at runtime.
+3. Use the selected Profile resources as authority for pinned formal layout and URL display. Supply runtime inputs only for genuinely project/material/review-specific values with authoritative provenance. Never infer research-group type, permission state, or editorial approval from examples or historical papers.
 4. Inspect the preview/build receipt. A generated DOCX is only a preview until machine checks, required editorial QA, rendered-page review, and the bound human release decision are complete.
 5. If a release request is allowed, inspect the exact rendered bytes named by that request before approving. Release approval applies only to that exact preview/output binding.
 
 ## MISCO formal-input boundary
 
-`misco.publication` may require:
+`misco.publication@1.2.0` already pins:
 
 - `formal_spec_profile` — current MISCO formal specification values and source/approval pin;
-- `url_display_profile` — the separately human-approved reader-facing URL display rule;
-- `research_group_type` — only when the formal specification branches on it;
+- `url_display_profile` — the Human-approved rule to display long URLs in full in references.
+
+Application-specific inputs may still require:
+
+- `research_group_type` — only when the outer formal structure branches on it;
 - `permissions` — only for affected non-public/interview/internal material;
 - `editorial_review` — explicit Human/Host review of the approved Publication editorial rules.
 
-When a required input is missing, keep the preview visibly diagnostic and treat formal conformance as failed. Do not substitute built-in renderer defaults for MISCO conformance. Those defaults exist only so a preview can still be inspected.
+When a required conditional application input is missing, keep the affected check visibly unresolved and block only the operation that needs it. Do not substitute built-in renderer defaults or inferred permissions/approval for MISCO conformance.
 
 ## Authority and preservation
 

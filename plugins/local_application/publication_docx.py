@@ -28,13 +28,39 @@ def _text(text: str) -> str:
     return escape(text.replace("\r\n", "\n").replace("\r", "\n"))
 
 
-def _paragraph(text: str, role: str = "body", bookmark: tuple[int, str] | None = None, first_line_indent_twips: int = 0) -> str:
-    style = {"title": "Title", "heading": "Heading1", "heading2": "Heading2", "cell": "TableText", "header": "TableHeader"}.get(role, "Normal")
+def _paragraph(
+    text: str,
+    role: str = "body",
+    bookmark: tuple[int, str] | None = None,
+    first_line_indent_twips: int = 0,
+    reference_left_indent_twips: int = 0,
+    reference_hanging_twips: int = 0,
+) -> str:
+    style = {
+        "title": "Title",
+        "heading": "Heading1",
+        "heading2": "Heading2",
+        "caption": "Caption",
+        "source_caption": "SourceCaption",
+        "reference_heading": "ReferenceHeading",
+        "reference": "Reference",
+        "cell": "TableText",
+        "header": "TableHeader",
+    }.get(role, "Normal")
     runs = "</w:t><w:br/><w:t xml:space=\"preserve\">".join(_text(text).split("\n"))
     runs = runs.replace("\t", '</w:t><w:tab/><w:t xml:space="preserve">')
     start = f'<w:bookmarkStart w:id="{bookmark[0]}" w:name="{bookmark[1]}"/>' if bookmark else ""
     end = f'<w:bookmarkEnd w:id="{bookmark[0]}"/>' if bookmark else ""
-    indent = f'<w:ind w:firstLine="{first_line_indent_twips}"/>' if role == 'body' and first_line_indent_twips else ''
+    indent = ''
+    if role == 'body' and first_line_indent_twips:
+        indent = f'<w:ind w:firstLine="{first_line_indent_twips}"/>'
+    elif role == 'reference' and (reference_left_indent_twips or reference_hanging_twips):
+        attrs = []
+        if reference_left_indent_twips:
+            attrs.append(f'w:left="{reference_left_indent_twips}"')
+        if reference_hanging_twips:
+            attrs.append(f'w:hanging="{reference_hanging_twips}"')
+        indent = '<w:ind ' + ' '.join(attrs) + '/>'
     return f'<w:p><w:pPr><w:pStyle w:val="{style}"/>{indent}</w:pPr>{start}<w:r><w:t xml:space="preserve">{runs}</w:t></w:r>{end}</w:p>'
 
 
@@ -88,10 +114,16 @@ def docx_bytes(lines: list[tuple[str, Any]], layout: dict[str, Any] | None = Non
     index = 0
     for role, block in lines:
         if role != "exhibit":
-            body.append(_paragraph(block, role, first_line_indent_twips=int(layout.get('first_line_indent_twips', 0))))
+            body.append(_paragraph(
+                block,
+                role,
+                first_line_indent_twips=int(layout.get('first_line_indent_twips', 0)),
+                reference_left_indent_twips=int(layout.get('reference_left_indent_twips', 0)),
+                reference_hanging_twips=int(layout.get('reference_hanging_twips', 0)),
+            ))
             continue
         index += 1
-        caption = _paragraph(block["caption"], "heading2", (index, _bookmark(block["ref"])))
+        caption = _paragraph(block["caption"], "caption", (index, _bookmark(block["ref"])))
         if block["kind"] == "table":
             body.append(caption)
             body.append(_table(block["rows"]))
@@ -104,32 +136,50 @@ def docx_bytes(lines: list[tuple[str, Any]], layout: dict[str, Any] | None = Non
         else:
             body.append(_paragraph(f'[Unavailable exhibit: {block["code"]}. Preserve the source and supply a supported representation under a new identity.]'))
         if block.get("note"):
-            body.append(_paragraph(block["note"], "cell"))
+            body.append(_paragraph(block["note"], "source_caption"))
     page_width = int(layout.get('page_width_twips', 12240))
     page_height = int(layout.get('page_height_twips', 15840))
     margin_top = int(layout.get('margin_top_twips', 1440))
     margin_right = int(layout.get('margin_right_twips', 1440))
     margin_bottom = int(layout.get('margin_bottom_twips', 1440))
     margin_left = int(layout.get('margin_left_twips', 1440))
+    header_margin = int(layout.get('header_margin_twips', 720))
+    footer_margin = int(layout.get('footer_margin_twips', 720))
+    grid = ''
+    if layout.get('doc_grid_line_pitch_twips') is not None or layout.get('doc_grid_char_space') is not None:
+        line_pitch = int(layout.get('doc_grid_line_pitch_twips', 360))
+        char_space = int(layout.get('doc_grid_char_space', 0))
+        grid = f'<w:docGrid w:type="linesAndChars" w:linePitch="{line_pitch}" w:charSpace="{char_space}"/>'
     document = (f'<w:document xmlns:w="{W}" xmlns:r="{R}" xmlns:a="{A}" xmlns:wp="{WP}" xmlns:pic="{PIC}"><w:body>' + ''.join(body)
-                + f'<w:sectPr><w:pgSz w:w="{page_width}" w:h="{page_height}"/><w:pgMar w:top="{margin_top}" w:right="{margin_right}" w:bottom="{margin_bottom}" w:left="{margin_left}"/></w:sectPr></w:body></w:document>')
+                + f'<w:sectPr><w:pgSz w:w="{page_width}" w:h="{page_height}"/><w:pgMar w:top="{margin_top}" w:right="{margin_right}" w:bottom="{margin_bottom}" w:left="{margin_left}" w:header="{header_margin}" w:footer="{footer_margin}"/>{grid}</w:sectPr></w:body></w:document>')
     body_font = str(layout.get('body_font', 'Arial'))
+    body_latin_font = str(layout.get('body_latin_font', body_font))
     heading_font = str(layout.get('heading_font', body_font))
+    heading_latin_font = str(layout.get('heading_latin_font', heading_font))
     title_font = str(layout.get('title_font', heading_font))
+    title_latin_font = str(layout.get('title_latin_font', title_font))
     table_font = str(layout.get('table_font', body_font))
+    table_latin_font = str(layout.get('table_latin_font', table_font))
+    caption_font = str(layout.get('caption_font', heading_font))
+    caption_latin_font = str(layout.get('caption_latin_font', heading_latin_font))
     body_size = int(layout.get('body_size_half_points', 22))
-    styles = [f'<w:styles xmlns:w="{W}"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="{escape(body_font)}" w:hAnsi="{escape(body_font)}"/><w:sz w:val="{body_size}"/></w:rPr></w:rPrDefault></w:docDefaults>']
+    styles = [f'<w:styles xmlns:w="{W}"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="{escape(body_latin_font)}" w:hAnsi="{escape(body_latin_font)}" w:eastAsia="{escape(body_font)}"/><w:sz w:val="{body_size}"/></w:rPr></w:rPrDefault></w:docDefaults>']
     style_rows = [
-        ("Normal", body_size, False, body_font),
-        ("Title", int(layout.get('title_size_half_points', 34)), True, title_font),
-        ("Heading1", int(layout.get('heading1_size_half_points', 28)), True, heading_font),
-        ("Heading2", int(layout.get('heading2_size_half_points', 22)), True, heading_font),
-        ("TableText", int(layout.get('table_body_size_half_points', 18)), False, table_font),
-        ("TableHeader", int(layout.get('table_header_size_half_points', 18)), True, table_font),
+        ("Normal", body_size, False, body_font, body_latin_font, None),
+        ("Title", int(layout.get('title_size_half_points', 34)), True, title_font, title_latin_font, "center"),
+        ("Heading1", int(layout.get('heading1_size_half_points', 28)), True, heading_font, heading_latin_font, None),
+        ("Heading2", int(layout.get('heading2_size_half_points', 22)), True, heading_font, heading_latin_font, None),
+        ("Caption", int(layout.get('caption_size_half_points', 18)), True, caption_font, caption_latin_font, "center"),
+        ("SourceCaption", int(layout.get('caption_size_half_points', 18)), False, caption_font, caption_latin_font, "center"),
+        ("ReferenceHeading", body_size, False, body_font, body_latin_font, None),
+        ("Reference", body_size, False, body_font, body_latin_font, None),
+        ("TableText", int(layout.get('table_body_size_half_points', 18)), False, table_font, table_latin_font, None),
+        ("TableHeader", int(layout.get('table_header_size_half_points', 18)), True, table_font, table_latin_font, None),
     ]
-    for name, size, bold, font in style_rows:
+    for name, size, bold, font, latin_font, alignment in style_rows:
         keep = '<w:keepNext/>' if name in {"Title", "Heading1", "Heading2"} else ''
-        styles.append(f'<w:style w:type="paragraph" w:styleId="{name}"><w:name w:val="{name}"/><w:pPr>{keep}<w:spacing w:after="80"/></w:pPr><w:rPr><w:rFonts w:ascii="{escape(font)}" w:hAnsi="{escape(font)}"/><w:sz w:val="{size}"/>' + ('<w:b/>' if bold else '') + '</w:rPr></w:style>')
+        jc = f'<w:jc w:val="{alignment}"/>' if alignment else ''
+        styles.append(f'<w:style w:type="paragraph" w:styleId="{name}"><w:name w:val="{name}"/><w:pPr>{keep}{jc}<w:spacing w:after="0"/></w:pPr><w:rPr><w:rFonts w:ascii="{escape(latin_font)}" w:hAnsi="{escape(latin_font)}" w:eastAsia="{escape(font)}"/><w:sz w:val="{size}"/>' + ('<w:b/>' if bold else '') + '</w:rPr></w:style>')
     types = ('<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
              '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
              '<Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/>'
@@ -179,11 +229,21 @@ def verify_native_docx(data: bytes, lines: list[tuple[str, Any]], layout: dict[s
                 'right': int(layout.get('margin_right_twips', 1440)),
                 'bottom': int(layout.get('margin_bottom_twips', 1440)),
                 'left': int(layout.get('margin_left_twips', 1440)),
+                'header': int(layout.get('header_margin_twips', 720)),
+                'footer': int(layout.get('footer_margin_twips', 720)),
             }
             if any(int(pg_sz.get(f'{{{W}}}{key}', '-1')) != value for key, value in expected_page.items()):
                 return False
             if any(int(pg_mar.get(f'{{{W}}}{key}', '-1')) != value for key, value in expected_margins.items()):
                 return False
+            if layout.get('doc_grid_line_pitch_twips') is not None or layout.get('doc_grid_char_space') is not None:
+                grid = sect.find(f'{{{W}}}docGrid')
+                if grid is None:
+                    return False
+                if int(grid.get(f'{{{W}}}linePitch', '-1')) != int(layout.get('doc_grid_line_pitch_twips', 360)):
+                    return False
+                if int(grid.get(f'{{{W}}}charSpace', '-999999')) != int(layout.get('doc_grid_char_space', 0)):
+                    return False
             children = [node for node in body if node.tag != f'{{{W}}}sectPr']
             relations = {r.attrib['Id']: r.attrib for r in ET.fromstring(archive.read('word/_rels/document.xml.rels'))}
             cursor = 0

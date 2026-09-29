@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 import hashlib
+import io
 import json
 from pathlib import Path
 import zipfile
@@ -11,16 +12,12 @@ import rfc8785
 
 from plugins.local_application import LocalApplicationError
 from plugins.local_application.profile_resolution import resolve_effective_profile_set
-from plugins.local_application.publication_docx import W
+from plugins.local_application.publication_docx import W, docx_bytes
 from test_misco_writer_profile_application import MiscoWriterProfileApplicationTests, WRITER_MANIFEST
 import test_external_desktop_research_intake as intake
 
 ROOT = Path(__file__).resolve().parents[2]
 PUBLICATION_MANIFEST = ROOT / "profiles/publication/misco/profile.json"
-
-
-def _sha_text(value: str) -> str:
-    return "sha256:" + hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
 class MiscoPublicationProfileApplicationTests(MiscoWriterProfileApplicationTests):
@@ -33,7 +30,7 @@ class MiscoPublicationProfileApplicationTests(MiscoWriterProfileApplicationTests
                 {"profile_id": "misco.writer", "profile_type": "narrative", "version": "1.1.0"}
             ],
             "publication": [
-                {"profile_id": "misco.publication", "profile_type": "publication", "version": "1.1.0"}
+                {"profile_id": "misco.publication", "profile_type": "publication", "version": "1.2.0"}
             ],
         }
         config.pop("configuration_digest", None)
@@ -53,6 +50,7 @@ class MiscoPublicationProfileApplicationTests(MiscoWriterProfileApplicationTests
             "source_ref": scope["source_ref"],
             "locator_ref": scope["locators"][0],
         }]
+        response["sections"][0]["content"] += f" [[citation:{scope['source_ref']}]]"
         imported = facade.import_writer_response(response)
         return facade, case, composition, imported
 
@@ -67,50 +65,8 @@ class MiscoPublicationProfileApplicationTests(MiscoWriterProfileApplicationTests
 
     @staticmethod
     def _application_inputs():
-        formal_source = "synthetic formal specification for Issue 335 acceptance only"
-        url_source = "synthetic URL display approval for Issue 335 acceptance only"
         return {
             "schema_version": "0.1.0",
-            "formal_spec_profile": {
-                "profile_id": "synthetic.misco.formal-spec",
-                "profile_version": "0.0.1",
-                "source": {
-                    "source_ref": "synthetic-test://formal-spec",
-                    "source_digest": _sha_text(formal_source),
-                    "approval_ref": "SYNTHETIC_TEST_ONLY/ISSUE-335",
-                },
-                "docx_layout": {
-                    "page_width_twips": 11906,
-                    "page_height_twips": 16838,
-                    "margin_top_twips": 1200,
-                    "margin_right_twips": 1300,
-                    "margin_bottom_twips": 1400,
-                    "margin_left_twips": 1500,
-                    "body_font": "SyntheticBodyFont",
-                    "body_size_half_points": 21,
-                    "heading_font": "SyntheticHeadingFont",
-                    "heading1_size_half_points": 29,
-                    "heading2_size_half_points": 23,
-                    "title_font": "SyntheticTitleFont",
-                    "title_size_half_points": 35,
-                    "table_font": "SyntheticTableFont",
-                    "table_body_size_half_points": 19,
-                    "table_header_size_half_points": 20,
-                    "first_line_indent_twips": 420,
-                },
-                "reference_list_placement": "end_of_document",
-                "research_group_type_required": False,
-            },
-            "url_display_profile": {
-                "profile_id": "synthetic.misco.url-display",
-                "profile_version": "0.0.1",
-                "source": {
-                    "source_ref": "synthetic-test://url-display",
-                    "source_digest": _sha_text(url_source),
-                    "approval_ref": "SYNTHETIC_TEST_ONLY/ISSUE-335",
-                },
-                "template": "{title} <{url}>",
-            },
             "editorial_review": {
                 "reviewer_id": "synthetic-human-335",
                 "reviewed_at": "2026-09-29T00:00:00Z",
@@ -124,28 +80,28 @@ class MiscoPublicationProfileApplicationTests(MiscoWriterProfileApplicationTests
             },
         }
 
-    def test_e1_e2_missing_formal_inputs_are_visible_preview_and_block_release(self):
+    def test_e1_e2_pinned_formal_inputs_apply_but_preview_without_editorial_review_is_not_release_approval(self):
         facade, _case, composition, imported = self._prepared_publication()
         try:
             built = facade.build_publication_preview(composition["composition_id"], imported["revision_id"])
             build = built["build"]
             self.assertEqual(build["publication_profile"]["profile_id"], "misco.publication")
-            self.assertEqual(build["publication_profile"]["profile_version"], "1.1.0")
-            self.assertEqual(build["verification"]["formal_specification"], "failed")
+            self.assertEqual(build["publication_profile"]["profile_version"], "1.2.0")
+            self.assertEqual(build["verification"]["formal_specification"], "passed")
             self.assertEqual(build["verification"]["editorial_qa"], "warning")
-            self.assertIn("INPUT-FORMAL-SPEC", build["publication_policy"]["missing_inputs"])
-            self.assertIn("INPUT-URL-DISPLAY", build["publication_policy"]["missing_inputs"])
-            self.assertTrue(build["publication_policy"]["release_blocked"])
-            self.assertTrue(any(x["code"] == "PUBLICATION_FORMAL_INPUT_MISSING" for x in build["issues"]))
+            self.assertEqual(build["publication_policy"]["missing_inputs"], [])
+            self.assertFalse(build["publication_policy"]["release_blocked"])
+            self.assertEqual(build["publication_policy"]["formal_spec_profile"]["profile_id"], "misco.formal-spec.2024-11-12")
+            self.assertEqual(build["publication_policy"]["url_display_profile"]["profile_id"], "misco.url-display.full-url")
             shown = facade.show_publication_preview(build["build_id"])
-            self.assertIn("Publication diagnostics — release blocked", shown["preview_markdown"])
+            self.assertNotIn("Publication diagnostics — release blocked", shown["preview_markdown"])
             with self.assertRaises(LocalApplicationError) as raised:
                 facade.request_publication_release(build["build_id"], "human-335")
             self.assertEqual(raised.exception.code, "APPLICATION-PUBLICATION-RELEASE-CHECK-001")
         finally:
             facade.close()
 
-    def test_e1_e3_explicit_synthetic_formal_input_changes_actual_docx_and_url_display(self):
+    def test_e1_e3_pinned_production_formal_spec_changes_actual_docx_and_uses_full_urls_per_section(self):
         facade, _case, composition, imported = self._prepared_publication()
         try:
             inputs = self._application_inputs()
@@ -159,22 +115,41 @@ class MiscoPublicationProfileApplicationTests(MiscoWriterProfileApplicationTests
             self.assertEqual(len(build["publication_policy"]["rules"]["rule_ids"]), 23)
             self.assertEqual(build["publication_policy"]["rules"]["role"], "PUBLICATION_RULES")
             self.assertEqual(build["publication_policy"]["source_documents"]["role"], "PUBLICATION_SOURCE_DOCUMENTS")
+            self.assertEqual(build["publication_policy"]["formal_spec_resource"]["role"], "PUBLICATION_FORMAL_SPEC")
+            self.assertEqual(build["publication_policy"]["url_display_resource"]["role"], "PUBLICATION_URL_DISPLAY")
 
             shown = facade.show_publication_preview(build["build_id"])
             root = Path(shown["output_root"])
-            self.assertIn("<https://example.test/source-a#section-1>", shown["preview_markdown"])
+            self.assertIn("https://example.test/source-a", shown["preview_markdown"])
+            self.assertEqual(shown["preview_markdown"].count("### ＜参考文献＞"), 1)
+            second_heading = composition["sections"][1].get("heading") or composition["sections"][1].get("generated_heading") or "SEC-VALIDATE"
+            if isinstance(second_heading, dict):
+                second_heading = second_heading.get("text")
+            self.assertLess(
+                shown["preview_markdown"].index("### ＜参考文献＞"),
+                shown["preview_markdown"].index(f"## {second_heading}"),
+            )
             with zipfile.ZipFile(root / "formal.docx") as archive:
                 document = ET.fromstring(archive.read("word/document.xml"))
                 body = document.find(f"{{{W}}}body")
                 sect = body.find(f"{{{W}}}sectPr")
                 pg = sect.find(f"{{{W}}}pgSz")
                 mar = sect.find(f"{{{W}}}pgMar")
+                grid = sect.find(f"{{{W}}}docGrid")
                 self.assertEqual(pg.get(f"{{{W}}}w"), "11906")
                 self.assertEqual(pg.get(f"{{{W}}}h"), "16838")
-                self.assertEqual(mar.get(f"{{{W}}}left"), "1500")
+                self.assertEqual(mar.get(f"{{{W}}}top"), "1701")
+                self.assertEqual(mar.get(f"{{{W}}}left"), "1418")
+                self.assertEqual(mar.get(f"{{{W}}}header"), "851")
+                self.assertEqual(mar.get(f"{{{W}}}footer"), "992")
+                self.assertEqual(grid.get(f"{{{W}}}linePitch"), "335")
+                self.assertEqual(grid.get(f"{{{W}}}charSpace"), "3430")
                 styles = archive.read("word/styles.xml").decode("utf-8")
-                self.assertIn("SyntheticBodyFont", styles)
-                self.assertIn("SyntheticHeadingFont", styles)
+                self.assertIn("ＭＳ 明朝", styles)
+                self.assertIn("ＭＳ ゴシック", styles)
+                self.assertIn("Century", styles)
+                doc_text = "".join(t.text or "" for t in body.findall(f".//{{{W}}}t"))
+                self.assertEqual(doc_text.count("＜参考文献＞"), 1)
 
             request = facade.request_publication_release(build["build_id"], "human-335")["decision_request"]
             self.assertEqual(
@@ -190,16 +165,16 @@ class MiscoPublicationProfileApplicationTests(MiscoWriterProfileApplicationTests
         finally:
             facade.close()
 
-    def test_e2_unsupported_formal_value_is_diagnostic_not_silent_last_write_wins(self):
+    def test_e2_conflicting_explicit_formal_value_is_rejected_not_silent_last_write_wins(self):
         facade, _case, composition, imported = self._prepared_publication()
         try:
             inputs = self._application_inputs()
-            inputs["formal_spec_profile"]["reference_list_placement"] = "before_appendices"
-            built = facade.build_publication_preview(composition["composition_id"], imported["revision_id"], inputs)
-            self.assertEqual(built["build"]["verification"]["formal_specification"], "failed")
-            self.assertTrue(any(x["code"] == "PUBLICATION_FORMAL_VALUE_UNSUPPORTED" for x in built["build"]["issues"]))
-            with self.assertRaises(LocalApplicationError):
-                facade.request_publication_release(built["build"]["build_id"], "human-335")
+            pinned = json.loads((ROOT / "profiles/publication/misco/resources/publication-formal-spec.json").read_text(encoding="utf-8"))["formal_spec_profile"]
+            inputs["formal_spec_profile"] = deepcopy(pinned)
+            inputs["formal_spec_profile"]["docx_layout"]["margin_left_twips"] += 1
+            with self.assertRaises(LocalApplicationError) as raised:
+                facade.build_publication_preview(composition["composition_id"], imported["revision_id"], inputs)
+            self.assertEqual(raised.exception.code, "APPLICATION-PUBLICATION-PROFILE-001")
         finally:
             facade.close()
 
@@ -216,20 +191,21 @@ class MiscoPublicationProfileApplicationTests(MiscoWriterProfileApplicationTests
         finally:
             facade.close()
 
-    def test_ablation_same_manuscript_without_formal_input_changes_diagnostic_and_build_identity(self):
-        facade, _case, composition, imported = self._prepared_publication()
-        try:
-            blocked = facade.build_publication_preview(composition["composition_id"], imported["revision_id"])
-            supplied = facade.build_publication_preview(composition["composition_id"], imported["revision_id"], self._application_inputs())
-            self.assertNotEqual(blocked["build"]["build_id"], supplied["build"]["build_id"])
-            self.assertEqual(blocked["build"]["verification"]["formal_specification"], "failed")
-            self.assertEqual(supplied["build"]["verification"]["formal_specification"], "passed")
-            self.assertEqual(
-                blocked["build"]["source_manuscript"]["revision_digest"],
-                supplied["build"]["source_manuscript"]["revision_digest"],
-            )
-        finally:
-            facade.close()
+    def test_ablation_formal_layout_changes_output_not_manuscript_text(self):
+        layout = json.loads((ROOT / "profiles/publication/misco/resources/publication-formal-spec.json").read_text(encoding="utf-8"))["formal_spec_profile"]["docx_layout"]
+        lines = [("title", "同一原稿"), ("body", "本文の意味・数値・出典bindingは不変。")]
+        control = docx_bytes(lines)
+        applied = docx_bytes(lines, layout)
+        self.assertNotEqual(hashlib.sha256(control).digest(), hashlib.sha256(applied).digest())
+        with zipfile.ZipFile(io.BytesIO(control)) as left, zipfile.ZipFile(io.BytesIO(applied)) as right:
+            left_doc = ET.fromstring(left.read("word/document.xml"))
+            right_doc = ET.fromstring(right.read("word/document.xml"))
+            left_text = "".join(t.text or "" for t in left_doc.findall(f".//{{{W}}}t"))
+            right_text = "".join(t.text or "" for t in right_doc.findall(f".//{{{W}}}t"))
+            self.assertEqual(left_text, right_text)
+            left_pg = left_doc.find(f".//{{{W}}}pgMar")
+            right_pg = right_doc.find(f".//{{{W}}}pgMar")
+            self.assertNotEqual(left_pg.get(f"{{{W}}}top"), right_pg.get(f"{{{W}}}top"))
 
     def test_e3_table_caption_above_and_figure_caption_below_in_native_docx(self):
         import io

@@ -2,8 +2,16 @@
 
 The optional third argument to the public Publication preview operation follows `core/packages/writer-publication/publication-application.schema.json`.
 
-For a production MISCO run, values must come from the actual current formal source/approval. The schema is an input carrier, not authority by itself.
+For `misco.publication@1.2.0`, the current formal specification and reader-facing full-URL policy are already delivered as pinned Profile resources. A normal production MISCO run therefore does not invent or re-enter those values as loose runtime defaults.
 
-If no MISCO formal specification is available, omit it. The renderer may still create a diagnostic preview using its built-in deterministic defaults, but the build receipt records `formal_specification: failed` and release remains blocked.
+An explicit `formal_spec_profile` or `url_display_profile` is accepted only when it exactly matches the selected Profile resource. A different value is an authority conflict; change the authoritative Profile/resource under a new version instead of overriding it at runtime.
 
-Tests may use values explicitly marked `SYNTHETIC_TEST_ONLY` to prove wiring/rendering behavior. Such values are not MISCO defaults and do not establish production conformance.
+Application inputs remain the carrier for information that is genuinely project/material/review specific, including:
+
+- `research_group_type` when an outer-structure rule requires it;
+- `permissions` for affected non-public/interview/internal material;
+- `editorial_review` for the explicit Human/Host editorial QA result.
+
+Missing conditional inputs block only the formal/release operation that needs them. They do not make renderer defaults authoritative and do not stop unrelated Research or Writer work.
+
+Tests may use explicitly synthetic inputs where a non-production path needs to prove contract mechanics, but synthetic values are never promoted to MISCO production authority.
