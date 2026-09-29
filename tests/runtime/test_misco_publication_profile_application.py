@@ -32,7 +32,7 @@ class MiscoPublicationProfileApplicationTests(MiscoWriterProfileApplicationTests
                 {"profile_id": "misco.writer", "profile_type": "narrative", "version": "1.1.0"}
             ],
             "publication": [
-                {"profile_id": "misco.publication", "profile_type": "publication", "version": "1.2.0"}
+                {"profile_id": "misco.publication", "profile_type": "publication", "version": "1.3.0"}
             ],
         }
         config.pop("configuration_digest", None)
@@ -88,12 +88,13 @@ class MiscoPublicationProfileApplicationTests(MiscoWriterProfileApplicationTests
             built = facade.build_publication_preview(composition["composition_id"], imported["revision_id"])
             build = built["build"]
             self.assertEqual(build["publication_profile"]["profile_id"], "misco.publication")
-            self.assertEqual(build["publication_profile"]["profile_version"], "1.2.0")
+            self.assertEqual(build["publication_profile"]["profile_version"], "1.3.0")
             self.assertEqual(build["verification"]["formal_specification"], "passed")
             self.assertEqual(build["verification"]["editorial_qa"], "warning")
             self.assertEqual(build["publication_policy"]["missing_inputs"], [])
             self.assertFalse(build["publication_policy"]["release_blocked"])
             self.assertEqual(build["publication_policy"]["formal_spec_profile"]["profile_id"], "misco.formal-spec.2024-11-12")
+            self.assertEqual(build["publication_policy"]["formal_spec_profile"]["profile_version"], "1.1.0")
             self.assertEqual(build["publication_policy"]["url_display_profile"]["profile_id"], "misco.url-display.full-url")
             shown = facade.show_publication_preview(build["build_id"])
             self.assertNotIn("Publication diagnostics — release blocked", shown["preview_markdown"])

@@ -30,7 +30,7 @@ class MiscoProductionProjectContractTests(unittest.TestCase):
         self.assertEqual(actual, expected)
         self.assertEqual(
             [(x["profile_type"], x["profile_id"], x["profile_version"]) for x in actual["effective_profiles"]],
-            [("narrative", "misco.writer", "1.1.0"), ("publication", "misco.publication", "1.2.0")],
+            [("narrative", "misco.writer", "1.1.0"), ("publication", "misco.publication", "1.3.0")],
         )
         self.assertFalse(any(str(x["profile_id"]).startswith("fixture.") for x in actual["effective_profiles"]))
 

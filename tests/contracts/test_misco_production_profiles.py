@@ -38,7 +38,7 @@ def config_for_publication() -> dict:
             "organization": [],
             "narrative": [],
             "publication": [
-                {"profile_id": "misco.publication", "profile_type": "publication", "version": "1.2.0"}
+                {"profile_id": "misco.publication", "profile_type": "publication", "version": "1.3.0"}
             ],
         }
     }
@@ -68,7 +68,7 @@ class MiscoProductionProfileTests(unittest.TestCase):
             self.assertEqual(expected, encoded)
         self.assertEqual(
             [(x["profile_type"], x["profile_id"], x["profile_version"]) for x in eps["effective_profiles"]],
-            [("narrative", "misco.writer", "1.1.0"), ("publication", "misco.publication", "1.2.0")],
+            [("narrative", "misco.writer", "1.1.0"), ("publication", "misco.publication", "1.3.0")],
         )
         resources = {x["role"]: x for x in eps["effective_resources"]}
         self.assertEqual(set(resources), {"WRITER_RULES", "WRITER_SOURCE_DOCUMENTS", "PUBLICATION_RULES", "PUBLICATION_SOURCE_DOCUMENTS", "PUBLICATION_FORMAL_SPEC", "PUBLICATION_URL_DISPLAY"})
@@ -122,9 +122,18 @@ class MiscoProductionProfileTests(unittest.TestCase):
     def test_publication_formal_and_url_resources_are_pinned_to_supplied_authority(self):
         formal = json.loads(PUBLICATION_FORMAL_SPEC.read_text(encoding="utf-8"))
         profile = formal["formal_spec_profile"]
-        self.assertEqual(formal["source_archive"]["sha256"], "10e91d2ba7b9fa1f2f6eeede18baf623a8428d8db45995053b9494b26efb4e6c")
+        self.assertEqual(formal["asset_version"], "1.1.0")
+        self.assertEqual(profile["profile_version"], "1.1.0")
+        self.assertEqual(formal["source_archive"]["sha256"], "c5cc608e7a90499a46ed929b120c4a4e09111de00ebdecc57d8e3d20dd7d1439")
         self.assertFalse(formal["source_archive"]["repository_copy"])
-        self.assertEqual(len(formal["source_members"]), 7)
+        self.assertEqual(len(formal["source_members"]), 8)
+        members = {row["name"]: row for row in formal["source_members"]}
+        self.assertEqual(members["MISCO報告書表紙表記仕様(添付5).ppt"]["sha256"], "f3c2eb78e2eca55b27c81fc9d78de2aaecbef9688a98580995853eefdf165721")
+        self.assertEqual(members["[添付4]業際研報告書用途・配付先・作成部数一覧-2017年10月版a.doc"]["sha256"], "a507f345de35ed5cc5763271153e09cf1ee0ee0f040df4ba088ddd63fff6947f")
+        self.assertEqual(members["[添付2]業際研報告書表紙表記仕様-2013年10月改定版.ppt"]["sha256"], "a6845bb2aadb4eb8459620173e33bd00905e664aa8d1c59d7603ee682d27da46")
+        self.assertNotIn("MISCO報告書表紙表記仕様(添付5).doc", members)
+        self.assertTrue(any("MISCO-specific cover/front/spine" in rule for rule in formal["human_qa_rules"]))
+        self.assertFalse(any("cover/front/spine" in rule for rule in formal["machine_applied_rules"]))
         self.assertEqual(profile["reference_list_placement"], "end_of_each_section")
         self.assertEqual(profile["reference_list_heading"], "＜参考文献＞")
         self.assertEqual(profile["docx_layout"]["page_width_twips"], 11906)

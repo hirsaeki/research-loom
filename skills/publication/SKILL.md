@@ -12,7 +12,7 @@ Use this Skill only after a Writer manuscript revision and its Research Package/
 
 ## MISCO formal-input boundary
 
-`misco.publication@1.2.0` already pins:
+`misco.publication@1.3.0` already pins:
 
 - `formal_spec_profile` — current MISCO formal specification values and source/approval pin;
 - `url_display_profile` — the Human-approved rule to display long URLs in full in references.

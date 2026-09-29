@@ -1,7 +1,7 @@
 {
   "asset_id": "misco.publication-formal-spec",
-  "asset_version": "1.0.0",
-  "authority": "MISCO研究会報告書作成要領(2024-11-12) and referenced formal attachments supplied by the user on 2026-09-29",
+  "asset_version": "1.1.0",
+  "authority": "MISCO（三井情報システム協議会）報告書作成要領 and referenced formal attachments; corrected archive supplied by the user on 2026-09-30",
   "formal_spec_profile": {
     "docx_layout": {
       "body_font": "ＭＳ 明朝",
@@ -36,18 +36,20 @@
       "title_size_half_points": 48
     },
     "profile_id": "misco.formal-spec.2024-11-12",
-    "profile_version": "1.0.0",
+    "profile_version": "1.1.0",
     "reference_list_heading": "＜参考文献＞",
     "reference_list_placement": "end_of_each_section",
     "research_group_type_required": false,
     "source": {
-      "approval_ref": "MISCO研究会報告書作成要領(2024-11-12) + referenced attachments; supplied by user 2026-09-29",
-      "source_digest": "sha256:10e91d2ba7b9fa1f2f6eeede18baf623a8428d8db45995053b9494b26efb4e6c",
-      "source_ref": "external-input://misco_doc_spec.zip"
+      "approval_ref": "Corrected MISCO formal-spec archive supplied by user 2026-09-30; report-writing requirements and referenced attachments",
+      "source_digest": "sha256:c5cc608e7a90499a46ed929b120c4a4e09111de00ebdecc57d8e3d20dd7d1439",
+      "source_ref": "external-input://misco_doc_spec-corrected-2026-09-30.zip"
     }
   },
   "human_qa_rules": [
+    "MISCO-specific cover/front/spine labels, typography and placement from MISCO報告書表紙表記仕様(添付5)",
     "MISCO outer/front/back matter branching and blank-page/opening-page rules",
+    "Report use/distribution/copy-count instructions from [添付4] remain operator/Human logistics rather than renderer defaults",
     "50-60 page editorial target and 2-page abstract target",
     "dearu style and terminology consistency",
     "rights, interview/company disclosure and source adequacy",
@@ -63,16 +65,16 @@
   ],
   "schema_version": "0.1.0",
   "source_archive": {
-    "bytes": 607255,
-    "handling": "External formal-spec original; repository stores only exact digests and extracted approved application values.",
-    "name": "misco_doc_spec.zip",
+    "bytes": 340040,
+    "handling": "External corrected formal-spec original; repository stores only exact digests and extracted approved application values.",
+    "name": "misco_doc_spec (2).zip",
     "repository_copy": false,
-    "sha256": "10e91d2ba7b9fa1f2f6eeede18baf623a8428d8db45995053b9494b26efb4e6c"
+    "sha256": "c5cc608e7a90499a46ed929b120c4a4e09111de00ebdecc57d8e3d20dd7d1439"
   },
   "source_members": [
     {
       "locator": "1.1 / 1.6 / 1.7",
-      "name": "MISCO研究会報告書作成要領.md",
+      "name": "MISCO（三井情報システム協議会） - 報告書作成要領.md",
       "sha256": "53b0bf8a39bef10c2fdcfd7b9450c9cda25ab5dad6bade6f9405d890fb7a0193"
     },
     {
@@ -86,9 +88,9 @@
       "sha256": "b4d744bd1767e0579b2b9f1d1745bfb6a105eb513c539e766191658c578ec448"
     },
     {
-      "locator": "表紙・背表紙のレイアウト",
+      "locator": "業際研 表紙・背表紙のレイアウト",
       "name": "[添付2]業際研報告書表紙表記仕様-2013年10月改定版.ppt",
-      "sha256": "733f430882cacad1a21e216d07867a5280dccfb3d6067d61cba9f530e2e94ce0"
+      "sha256": "a6845bb2aadb4eb8459620173e33bd00905e664aa8d1c59d7603ee682d27da46"
     },
     {
       "locator": "word/document.xml sectPr; Word styles",
@@ -96,9 +98,14 @@
       "sha256": "2a1c2ddeb6590836f860fb5110daf9a1c906624e1712c7457b87c5ba860910c9"
     },
     {
-      "locator": "表紙用途・部数仕様",
-      "name": "MISCO報告書表紙表記仕様(添付5).doc",
+      "locator": "用途・配付先・作成部数一覧",
+      "name": "[添付4]業際研報告書用途・配付先・作成部数一覧-2017年10月版a.doc",
       "sha256": "a507f345de35ed5cc5763271153e09cf1ee0ee0f040df4ba088ddd63fff6947f"
+    },
+    {
+      "locator": "MISCO 表紙・背表紙のレイアウト / 表紙例",
+      "name": "MISCO報告書表紙表記仕様(添付5).ppt",
+      "sha256": "f3c2eb78e2eca55b27c81fc9d78de2aaecbef9688a98580995853eefdf165721"
     },
     {
       "locator": "3.引用について",

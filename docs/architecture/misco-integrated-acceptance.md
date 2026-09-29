@@ -84,7 +84,7 @@ what was unknown at that time. Final status is recorded here instead:
 
 | Ledger input | Final status |
 | --- | --- |
-| `INPUT-FORMAL-SPEC` | resolved in #335 from the user-supplied current MISCO / 業際研 formal originals; exact archive/member digests and machine-applied values are pinned by `misco.publication@1.2.0` |
+| `INPUT-FORMAL-SPEC` | resolved in #335 from the corrected 2026-09-30 MISCO / 業際研 formal archive; exact 8-member archive pins and unchanged machine-applied body values are pinned by `misco.publication@1.3.0` |
 | `INPUT-URL-DISPLAY` | resolved by Human Decision: long URLs are, in principle, displayed in full in references; canonical locators remain preserved |
 | `INPUT-RESEARCH-GROUP-TYPE` | current formal profile pins `research_group_type_required=false`; no value is guessed. A future formal profile that requires it must obtain an explicit runtime value |
 | `INPUT-PERMISSION` | remains material-conditional. Publication of affected non-public/interview/internal material is blocked without explicit permission/anonymization/original-review input; it is not a blocker for unrelated research or preview work |

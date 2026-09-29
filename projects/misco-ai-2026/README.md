@@ -18,7 +18,7 @@ from any legacy/probe RQ. A new Workspace creates/adopts its actual RQs through
 the normal public candidate -> confirmation -> Human Decision path. Historical
 probe2 RQ IDs or text are not a bootstrap mechanism.
 
-The Project Config directly requests only `misco.publication@1.2.0`.
+The Project Config directly requests only `misco.publication@1.3.0`.
 `misco.writer@1.1.0` is selected transitively by the production resolver. There
 is no invented MISCO Research/Organization Profile.
 

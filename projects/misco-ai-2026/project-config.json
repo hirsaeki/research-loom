@@ -33,7 +33,7 @@
       {
         "profile_id": "misco.publication",
         "profile_type": "publication",
-        "version": "1.2.0"
+        "version": "1.3.0"
       }
     ]
   },
@@ -91,8 +91,8 @@
       "Fresh-start configuration contains no legacy/probe Research Question, Evidence, Finding, material, or virtual-run feedback data.",
       "Legacy-only research data is migration-validation input only; formal transfer into a new Loom Workspace must use intake/capture -> candidate -> Human Decision.",
       "No Research Attention candidate is auto-activated by init; use the public Attention lifecycle after human review.",
-      "misco.publication@1.2.0 transitively requires misco.writer@1.1.0; no invented MISCO Research/Organization Profile is selected."
+      "misco.publication@1.3.0 transitively requires misco.writer@1.1.0; no invented MISCO Research/Organization Profile is selected."
     ]
   },
-  "configuration_digest": "sha256:80707473dbf3e53d5b8e8425559b84870a1ca0e4e7cad9542b21f2bbd472b8ad"
+  "configuration_digest": "sha256:e1e6419728531ca5c8fd90a57caa5dca56d5c3b5dae26a799d319bc0286b2eff"
 }

@@ -78,7 +78,7 @@ class MiscoIntegratedAcceptanceTests(ResearchPackageAcceptanceSupport):
                 for row in package["effective_profile_set"]["profile_pins"]
             }
             self.assertIn(("narrative", "misco.writer", "1.1.0"), pins)
-            self.assertIn(("publication", "misco.publication", "1.2.0"), pins)
+            self.assertIn(("publication", "misco.publication", "1.3.0"), pins)
 
             state = facade._application.state_repository.load_state_view(
                 facade.project_id,

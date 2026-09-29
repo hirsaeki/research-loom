@@ -4,20 +4,22 @@ Issue #335 connects the production Publication Profile to the existing preview/r
 
 ## Current production boundary
 
-`misco.publication@1.2.0` delivers four verified Publication resources through the normal resolver/Research Package path:
+`misco.publication@1.3.0` delivers four verified Publication resources through the normal resolver/Research Package path:
 
 - `PUBLICATION_RULES` — the #331 Publication migration inventory;
 - `PUBLICATION_SOURCE_DOCUMENTS` — the six Human-approved Layer A source documents needed to interpret those rules without the legacy tree;
-- `PUBLICATION_FORMAL_SPEC` — the current formal-spec application values extracted from the MISCO/業際研 originals supplied on 2026-09-29, with the archive and every source member pinned by SHA-256;
+- `PUBLICATION_FORMAL_SPEC` — the current formal-spec application values extracted from the corrected MISCO/業際研 originals supplied on 2026-09-30, with the archive and every source member pinned by SHA-256;
 - `PUBLICATION_URL_DISPLAY` — the Human Decision for reader-facing URLs: 長いURLも参考文献には原則全文表示する。
 
 The binary formal-spec originals are not copied into the repository. The Profile resource records the exact source archive/member digests, source locators, approved application values, and the boundary between machine-applied values and Human/Host QA. This preserves provenance without turning external originals into a second runtime dependency.
+
+`misco.publication@1.3.0` supersedes `1.2.0` because the corrected archive restores the missing `MISCO報告書表紙表記仕様(添付5).ppt`, records the separate `[添付4]業際研報告書用途・配付先・作成部数一覧-2017年10月版a.doc` under its actual title, and re-pins the corrected `[添付2]` bytes. The body/page/font/grid/reference application values are unchanged; the MISCO-specific cover/spine specification and distribution/copy-count instructions remain Host/Human QA/operator responsibilities rather than renderer defaults. Historical `1.2.0` bindings are not rewritten.
 
 The pinned formal values include the supplied A4 page geometry, margins/header/footer, Word grid values, body/heading/title/table/caption fonts and sizes, first-line/reference indentation, figure/table caption placement, and section-local reference-list convention. Project-specific outer structure, rights/permission decisions, page-count editorial targets, terminology/style judgement, and rendered-page approval remain explicit Human/Host work.
 
 ## Preview versus conformance
 
-The generic renderer still has deterministic defaults for non-MISCO/diagnostic use. `misco.publication@1.2.0`, however, resolves its formal specification and URL display policy from the pinned Profile resources; built-in defaults are not treated as MISCO conformance.
+The generic renderer still has deterministic defaults for non-MISCO/diagnostic use. `misco.publication@1.3.0`, however, resolves its formal specification and URL display policy from the pinned Profile resources; built-in defaults are not treated as MISCO conformance.
 
 An explicit application-level `formal_spec_profile` or `url_display_profile` may be supplied only when it exactly matches the pinned production resource. A differing explicit value is a conflict and fails closed instead of creating last-write-wins authority. Changing a production formal value therefore requires a new authoritative Profile/resource version, not a one-off runtime override.
 
@@ -45,8 +47,8 @@ Acceptance holds the same manuscript content fixed and renders it with and witho
 
 ## Visual smoke check
 
-The pinned production profile was exercised with representative build `PUB-75506a067fb7c8cce12e4634`. Its DOCX was converted with headless LibreOffice, rendered to PNG, and inspected manually. The page showed no clipping, overlap, black boxes, or mojibake; the table caption remained above the table; `＜参考文献＞` and its cited source appeared before the next section; and the reader-facing URL remained present.
+The machine-applied body layout now carried by `misco.publication@1.3.0` is unchanged from `1.2.0`. The representative body-layout smoke was originally exercised with build `PUB-75506a067fb7c8cce12e4634` under `1.2.0`; because the corrected archive changes source provenance and cover/spine Human QA rather than the body layout values, that body smoke remains applicable to the unchanged renderer settings. Its DOCX was converted with headless LibreOffice, rendered to PNG, and inspected manually. The page showed no clipping, overlap, black boxes, or mojibake; the table caption remained above the table; `＜参考文献＞` and its cited source appeared before the next section; and the reader-facing URL remained present.
 
 A second renderer-only check used a deliberately long URL with the same pinned layout. LibreOffice wrapped the full URL across lines without clipping or elision. This confirms the renderer can display the approved full-URL policy rather than requiring a shortening convention. The Linux smoke renderer may substitute unavailable Windows fonts, so exact `ＭＳ 明朝` / `ＭＳ ゴシック` / `Century` font names are verified separately in the generated OOXML; the visual check covers layout/readability rather than Windows font-fidelity certification.
 
-These render checks are distinct from editorial review and release approval. They do not authorize external publication.
+These render checks are distinct from editorial review and release approval. They do not cover the newly restored MISCO cover/spine attachment; that source is a required Human QA input when an actual cover/spine is assembled. They do not authorize external publication.
