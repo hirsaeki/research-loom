@@ -271,7 +271,7 @@ function Seed-ProbeWorkspace {
 
     Write-Host '[setup] Initializing durable Workspace from the pinned 1.2.0 production generation...'
     $init = Invoke-LoomJson -Name 'setup-init' -Arguments @('init','--workspace',$Workspace,'--project-config',$LegacyConfigPath,'--effective-profile-set',$LegacyEpsPath,'--json')
-    Assert-True -Name 'legacy production init succeeded' -Condition ($init.Value.status -eq 'OK') -Actual $init.Value.status
+    Assert-True -Name 'legacy production init succeeded' -Condition ($init.Value.status -eq 'INITIALIZED') -Actual $init.Value.status
 
     $doctor = Invoke-LoomJson -Name 'setup-doctor' -Arguments @('doctor','--workspace',$Workspace,'--json')
     Assert-True -Name 'new durable probe Workspace doctor is OK' -Condition ($doctor.Value.status -eq 'OK') -Actual $doctor.Value.status
