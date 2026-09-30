@@ -91,24 +91,47 @@ what was unknown at that time. Final status is recorded here instead:
 
 ## Real Workspace operator acceptance
 
-CI/synthetic success does not satisfy #336 F7 / #337 G3. On the actual Windows
-Workspace `%TEMP%\\misco-ai-2026-probe2`, record public before/after evidence:
+CI/synthetic success does not satisfy #336 F7 / #337 G3. The original Windows
+Workspace `%TEMP%\misco-ai-2026-probe2` was probed through the checked-in public
+script and failed before Profile resolution because OS temporary-storage cleanup
+had removed required Parent files including `workspace-binding.json` and Research
+State. The remaining child directories/profile fragments are not sufficient to
+reconstruct authoritative Research State, and that historical failure is kept as
+negative live evidence. Do not hand-build missing binding/SQLite state and do not
+claim continuity for that lost Workspace.
 
-1. `status`, `profile history`, active RQ/Attention, selected materials and known
-   package/manuscript/publication bindings;
-2. resolve with `projects/misco-ai-2026/probe2-profile-resolve.json`;
-3. review the generated target Project Config / EPS; do not edit Workspace JSON
-   or SQLite;
-4. run public `profile advance`;
-5. reopen in a fresh process/session and run `status`, `profile history`,
-   Attention status and the relevant existing package/material reads;
-6. confirm old generation/history remains and current binding contains only the
-   intended continuity Research Profile plus production Writer/Publication;
-7. record any incompatible old research as an explicit research/decision gap;
-   do not weaken validation to call it migrated.
+The replacement live migration acceptance is therefore a **durable real local
+Workspace** under an operator-controlled non-TEMP path. Run:
 
-The checked-in request is Profile-only. It does not rename the historical
-`PRJ-1 / Fixture project` or import legacy-only research data.
+```powershell
+.\projects\misco-ai-2026\New-MiscoMigrationProbe.ps1 `
+  -ExpectedHead <40-character-main-HEAD> `
+  -Workspace D:\wsroot\scratch\loom-workspaces\probes\misco-profile-migration
+```
+
+The probe uses only public Loom operations for managed state. It reconstructs the
+exact prior production generation (`misco.publication@1.2.0`) from pinned Git
+history, creates a bounded real Workspace state without inventing Evidence or
+Findings, records public before evidence, advances the Publication request to
+`misco.publication@1.3.0`, reopens, and records public after evidence. Required
+checks include:
+
+1. the same project identity, lineage and Research Snapshot remain current;
+2. the adopted migration RQ remains authoritative;
+3. the active Attention map remains active and an unactivated candidate remains
+   stored/inactive;
+4. the operator-supplied Project Input is unchanged;
+5. the historical Research Package and two-section Writer Composition remain
+   exact and continue to pin their `1.2.0` source generation;
+6. the current archived generation exposes Writer `1.1.0` + Publication `1.3.0`;
+7. the first run appends exactly one Profile advancement event with
+   `research_state_mutation_performed=false`;
+8. an exact rerun returns `NOOP` and appends no event.
+
+The generated `probe-result.json`, `before/`, `after/`, `target-generation/` and
+per-command records are the replacement #336 F7 / #337 G3 operator evidence.
+The original lost TEMP Workspace remains explicitly unresolved historical
+continuity rather than being silently substituted by this replacement probe.
 
 ## Codex / ChatGPT Work live acceptance
 

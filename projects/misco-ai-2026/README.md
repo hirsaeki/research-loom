@@ -88,6 +88,51 @@ The script defaults to `%TEMP%\misco-ai-2026-probe2`, requires a clean checkout 
 
 It automatically verifies that project semantics, Research Snapshot, authoritative/candidate RQs, active/effective Attention, materials, research inputs, Exhibits, historical Research Packages and Writer compositions are unchanged; the target contains only the continuity Research Profile plus production Writer/Publication; the first application adds exactly one append-only advancement event while an exact rerun adds none; and the migration source generation remains readable. The script never edits Workspace JSON/SQLite and never re-intakes existing authoritative Loom research.
 
+### Durable replacement migration acceptance
+
+The original `%TEMP%\misco-ai-2026-probe2` operator Workspace was later found
+to have lost its required Parent files to OS temporary-storage cleanup. That
+loss is retained as negative operator evidence; it is **not** repaired by
+fabricating `workspace-binding.json`, Research State, or other authoritative
+files. `%TEMP%` is therefore not a supported location for an authoritative
+long-lived Loom Workspace.
+
+For the replacement F7/G3 live migration acceptance, use the deterministic
+durable probe:
+
+```powershell
+.\projects\misco-ai-2026\New-MiscoMigrationProbe.ps1 `
+  -ExpectedHead <40-character-main-HEAD> `
+  -Workspace D:\wsroot\scratch\loom-workspaces\probes\misco-profile-migration
+```
+
+The script refuses an OS-TEMP Workspace, requires a clean full-history checkout
+and the provisioned `.venv`, and never edits managed Workspace JSON/SQLite
+directly. On a new durable Workspace it extracts the exact production
+`misco.publication@1.2.0` Project Config/EPS from pinned Git commit
+`f31efa68c56377fedd3216fd506d2807d55194e0`, initializes through the public
+launcher, adopts one bounded migration RQ through confirmation + Human Decision,
+activates one Attention map while retaining a second unactivated candidate,
+registers one operator-supplied Project Input, and builds a Research Package plus
+a two-section Writer Composition whose validation remains intentionally
+incomplete. It does not synthesize Evidence, Findings, external-source retrieval,
+or research conclusions.
+
+The same script then resolves and advances only the Publication Profile request
+from `1.2.0` to `1.3.0`, reopens through new public CLI processes, and verifies
+that project semantics, lineage, Research Snapshot, authoritative RQ, active and
+stale Attention, Project Input, historical Research Package, and Writer
+Composition remain exact. The archived Package must continue to pin the old
+`1.2.0` generation while the current Workspace generation exposes
+`misco.publication@1.3.0`. The first run requires `ADVANCED`; rerunning the exact
+Workspace reconstructs the current target from public Profile history, requires
+`NOOP`, and appends no event. Evidence is written beside the durable Workspace
+under `_evidence/`, never under `%TEMP%`.
+
+The historical `Invoke-Probe2ProfileMigration.ps1` remains useful only if an
+exact complete backup of the original Probe2 Workspace is restored. Its failure
+on the damaged `%TEMP%` directory must not be relabeled as a migration pass.
+
 The underlying public commands remain:
 
 ```text
