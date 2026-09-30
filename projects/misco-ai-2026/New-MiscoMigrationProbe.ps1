@@ -184,7 +184,7 @@ function Invoke-GitText {
         $exitCode = $LASTEXITCODE
     }
     finally { $ErrorActionPreference = $oldPreference }
-    if ($exitCode -ne 0) { throw "git show failed for $Spec: $($lines -join [Environment]::NewLine)" }
+    if ($exitCode -ne 0) { throw "git show failed for ${Spec}: $($lines -join [Environment]::NewLine)" }
     Write-Utf8NoBom -Path $OutputPath -Text (($lines -join [Environment]::NewLine) + [Environment]::NewLine)
 }
 
