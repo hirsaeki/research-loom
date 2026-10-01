@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 import hashlib
 from pathlib import Path
 import shutil
@@ -7,8 +8,48 @@ import tempfile
 import unittest
 
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade
+from tests.runtime.test_external_desktop_research_intake import golden_submission
 from tests.runtime.test_issue91_external_material_content import _prepare
 from tests.runtime.test_research_question_review import _adopt_question, _workspace
+
+
+def _research_result(handoff: dict, extension: dict) -> dict:
+    outputs = deepcopy(handoff["outputs"])
+    capture_ids = [item["capture_id"] for item in outputs.pop("source_captures")]
+    citations = [
+        {
+            key: item[key]
+            for key in (
+                "citation_id",
+                "handoff_output_kind",
+                "handoff_output_id",
+                "capture_id",
+                "excerpt",
+                "excerpt_locator",
+            )
+        }
+        for item in extension["citation_details"]
+    ]
+    links = []
+    for item in extension["search_trace"]["entries"]:
+        link = {
+            "attempt_id": item["trace_entry_id"],
+            "related_handoff_output_ids": deepcopy(item["related_handoff_output_ids"]),
+        }
+        if "notes" in item:
+            link["notes"] = item["notes"]
+        links.append(link)
+    return {
+        "validation": deepcopy(handoff["validation"]),
+        "outputs": outputs,
+        "capture_ids": capture_ids,
+        "citation_details": citations,
+        "search_trace": {"entries": links},
+        "null_results": deepcopy(extension["null_results"]),
+        "evidence_gap_assessments": deepcopy(extension["evidence_gap_assessments"]),
+        "coverage_assessment": deepcopy(extension["coverage_assessment"]),
+        "candidate_next_method_ids": deepcopy(extension["candidate_next_method_ids"]),
+    }
 
 
 class Issue368HostAttachmentIntakeTests(unittest.TestCase):
@@ -103,6 +144,26 @@ class Issue368HostAttachmentIntakeTests(unittest.TestCase):
                 self.assertEqual(
                     run_view["desktop_research"]["retrieval_attempt_summary"]["source_captured"],
                     1,
+                )
+                facade.start_external_retrieval_attempt(run_id, {
+                    "attempt_id": "ATT-2",
+                    "strategy": "bounded counter-source check",
+                    "coverage_dimension_ids": ["COV-COUNTER"],
+                    "query_or_target": "counter-source fixture",
+                    "provider_or_tool": "host_attachment_acceptance",
+                })
+                facade.complete_external_retrieval_attempt(run_id, {
+                    "attempt_id": "ATT-2",
+                    "outcome": "no_relevant_source",
+                })
+                handoff, extension = golden_submission(facade._application, run_id, captured)
+                result_input = _research_result(handoff, extension)
+                preflight = facade.preflight_external(run_id, {"research_result": result_input})
+                self.assertEqual(preflight["status"], "PREFLIGHT_OK")
+                collected = facade.collect_external(run_id, {"research_result": result_input})
+                self.assertEqual(collected["execution_result"]["run"]["status"], "COMPLETED")
+                self.assertTrue(
+                    collected["execution_result"]["state_delta_proposal"]["candidate_only"]
                 )
                 self.assertEqual(
                     facade.resume_context()["research_state"]["snapshot"],
