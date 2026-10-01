@@ -8,6 +8,10 @@ The input keeps its original `input_id`, content digest, registration Snapshot, 
 
 Assume the workspace is already initialized and an authoritative Research Question exists through the normal adoption flow. Read the current public Snapshot first and carry its `snapshot_id` and `content_digest` into registration:
 
+The `file` field may be an absolute path inside the opened workspace or a
+workspace-relative locator. Hosts that materialize conversation attachments should
+prefer the shared `intake/chat/<host-attachment-id>/...` staging convention.
+
 ```bash
 ./research-loom resume --workspace "$WS" --json
 

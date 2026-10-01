@@ -84,8 +84,16 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
         lineage, snapshot_id, snapshot_digest = self._current_binding()
         if value.get("expected_snapshot_id") != snapshot_id or value.get("expected_snapshot_digest") != snapshot_digest:
             raise LocalApplicationError("APPLICATION-PROJECT-INPUT-STALE-001", "project input registration is not bound to the exact current Snapshot")
+        source = Path(path)
+        if not source.is_absolute():
+            if self._workspace_root is None:
+                raise LocalApplicationError(
+                    "APPLICATION-PROJECT-INPUT-FILE-001",
+                    "relative project input files require an opened workspace",
+                )
+            source = self._workspace_root / source
         try:
-            content = read_controlled_file(self._application.execution_store, path, max_bytes=_MAX_BYTES)
+            content = read_controlled_file(self._application.execution_store, source, max_bytes=_MAX_BYTES)
         except (OSError, PermissionError, ValueError, LocalExecutionStoreError) as exc:
             raise LocalApplicationError("APPLICATION-PROJECT-INPUT-FILE-001", "project input file is not an allowed regular workspace file") from exc
         media_type = value.get("media_type")

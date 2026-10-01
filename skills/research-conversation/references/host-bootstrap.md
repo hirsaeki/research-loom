@@ -24,6 +24,65 @@ Do not load this skill merely because Codex is editing, reviewing, testing, or m
 
 In Work mode, explicitly open/read `skills/research-conversation/SKILL.md` from the repository/project before conducting Loom-backed research. Do not assume the `skills/` directory is automatically installed or discovered. Then use Loom through its public CLI/Facade with the same view-selection boundary while Work owns natural-language reasoning and presentation.
 
+## Supplied attachment intake
+
+When the human supplies a file during a research conversation and asks Loom-backed
+research to use it, do not leave the only copy in host/session context.
+
+1. Materialize the host attachment beneath the opened workspace, preferably under
+   `intake/chat/<host-attachment-id>/`. This is staging, not research authority.
+2. Choose the semantic route explicitly from the human's intent.
+3. Use the existing public ingress for that route.
+4. Verify the durable public read before treating the attachment as persisted. The
+   staging file may be removed after that verification.
+
+### Project framing/context
+
+Use `research-input register`. Workspace-relative `file` locators are resolved against
+the opened workspace, so a host does not need to expose an arbitrary absolute host
+path.
+
+```json
+{
+  "file": "intake/chat/ATT-123/project-brief.md",
+  "role": "project_brief",
+  "expected_snapshot_id": "<current snapshot id>",
+  "expected_snapshot_digest": "<current snapshot digest>",
+  "provenance": {
+    "source": "host_attachment",
+    "host_attachment_id": "ATT-123"
+  }
+}
+```
+
+Register through `research-input register`, then verify with `research-input show`.
+This is Project Input provenance, not Evidence.
+
+### Research source
+
+Use the existing Desktop Research flow. The host provides both the exact original and
+a UTF-8 rendition inside the workspace staging directory, starts a bounded retrieval
+attempt against the already prepared RUNNING Run, captures the pair with `external
+capture`, and completes the attempt as `source_captured`. Final research candidates
+still come through `external collect`.
+
+```text
+desktop_research.investigate -> RUNNING Run
+  -> external attempt start
+  -> host materializes original + UTF-8 rendition
+  -> external capture
+  -> external attempt complete(source_captured)
+  -> external collect
+```
+
+If no trustworthy UTF-8 rendition can be produced, do not call a successful capture
+with invented text. Complete the attempt as `failed`, `blocked`, or `unavailable` as
+appropriate and preserve the reason as a gap/coverage limitation.
+
+Do not put raw attachments under `intake/material-sources`; that directory is the
+staging boundary for already-captured portable material imported from another Loom
+workspace.
+
 ## Live acceptance record
 
 A live host probe records: repository HEAD, Skill Git blob, fixture/runbook revision, host, visible model/config, scenario ID, supplied fixture/context, exact public sequence and selected view, any exact-detail lookup performed, actual response, rubric result, and date. No provider SDK, API key, local model server, or LLM judge is part of the repository test dependency.
