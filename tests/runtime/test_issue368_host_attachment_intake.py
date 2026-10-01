@@ -66,7 +66,7 @@ class Issue368HostAttachmentIntakeTests(unittest.TestCase):
             rendition = stage / "report.txt"
             stage.mkdir(parents=True)
             original_bytes = b"%PDF-1.4\nfixture research source\n%%EOF\n"
-            text_bytes = b"fixture research source\n"
+            text_bytes = b"Source A contains the exact supporting excerpt used here.\n"
             original.write_bytes(original_bytes)
             rendition.write_bytes(text_bytes)
 
