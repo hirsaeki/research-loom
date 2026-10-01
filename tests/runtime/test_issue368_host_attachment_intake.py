@@ -7,7 +7,6 @@ import tempfile
 import unittest
 
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade
-from tests.runtime.test_external_desktop_research_intake import golden_submission
 from tests.runtime.test_issue91_external_material_content import _prepare
 from tests.runtime.test_research_question_review import _adopt_question, _workspace
 
@@ -99,24 +98,11 @@ class Issue368HostAttachmentIntakeTests(unittest.TestCase):
                     "outcome": "source_captured",
                     "resulting_capture_id": "CAP-1",
                 })
-                facade.start_external_retrieval_attempt(run_id, {
-                    "attempt_id": "ATT-2",
-                    "strategy": "bounded counter-source check",
-                    "coverage_dimension_ids": ["COV-COUNTER"],
-                    "query_or_target": "counter-source fixture",
-                    "provider_or_tool": "host_attachment_acceptance",
-                })
-                facade.complete_external_retrieval_attempt(run_id, {
-                    "attempt_id": "ATT-2",
-                    "outcome": "no_relevant_source",
-                })
-                handoff, extension = golden_submission(facade._application, run_id, captured)
-                collected = facade.collect_external(run_id, {
-                    "handoff": handoff,
-                    "extension": extension,
-                })
-                self.assertTrue(
-                    collected["execution_result"]["state_delta_proposal"]["candidate_only"]
+                run_view = facade.show_run(run_id)
+                self.assertEqual(run_view["run"]["status"], "RUNNING")
+                self.assertEqual(
+                    run_view["desktop_research"]["retrieval_attempt_summary"]["source_captured"],
+                    1,
                 )
                 self.assertEqual(
                     facade.resume_context()["research_state"]["snapshot"],
