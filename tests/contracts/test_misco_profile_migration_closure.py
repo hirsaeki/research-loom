@@ -63,13 +63,15 @@ class MiscoProfileMigrationClosureTests(unittest.TestCase):
         self.assertEqual(missing["INPUT-RESEARCH-GROUP-TYPE"]["status"], "not_required_by_current_formal_profile")
         self.assertEqual(missing["INPUT-PERMISSION"]["status"], "conditional_runtime_input")
 
-    def test_live_acceptance_is_not_falsely_marked_complete(self):
+    def test_live_acceptance_records_g3_without_falsely_closing_host_uat(self):
         closure = json.loads(CLOSURE.read_text(encoding="utf-8"))
         live = closure["live_gates"]
-        self.assertEqual(live["existing_workspace_operator_reprobe"], "pending")
-        self.assertEqual(live["codex_live_acceptance"], "pending")
-        self.assertEqual(live["chatgpt_work_live_acceptance"], "pending")
-        self.assertEqual(live["publication_visual_inspection"], "passed_in_335")
+        self.assertEqual(live["existing_workspace_operator_reprobe"], "passed_durable_replacement")
+        self.assertEqual(live["live_uat_revision"], "UAT-02R1")
+        self.assertEqual(live["codex_live_acceptance"], "pending_uat_02r1")
+        self.assertEqual(live["chatgpt_work_live_acceptance"], "pending_uat_02r1")
+        self.assertEqual(live["publication_visual_inspection_335"], "passed_for_profile_acceptance")
+        self.assertEqual(live["host_output_human_inspection"], "pending_uat_02r1")
 
 
 if __name__ == "__main__":
