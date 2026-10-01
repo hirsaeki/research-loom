@@ -56,7 +56,7 @@ class Issue368HostAttachmentIntakeTests(unittest.TestCase):
                     "ATT-brief",
                 )
 
-    def test_research_source_attachment_uses_existing_run_capture_collect_and_survives_cleanup(self):
+    def test_research_source_attachment_uses_existing_run_capture_and_survives_cleanup(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             workspace = _workspace(root)
@@ -115,11 +115,11 @@ class Issue368HostAttachmentIntakeTests(unittest.TestCase):
             with LocalApplicationFacade.open_workspace(workspace) as facade:
                 shown = facade.show_external_material(run_id, "CAP-1")
                 self.assertEqual(
-                    shown["capture"]["original_capture"]["content_digest"],
+                    shown["capture"]["original"]["digest"],
                     original_digest,
                 )
                 self.assertEqual(
-                    shown["capture"]["text_rendition"]["content_digest"],
+                    shown["capture"]["renditions"][0]["digest"],
                     text_digest,
                 )
                 self.assertEqual(shown["text_rendition_view"]["content"].encode("utf-8"), text_bytes)
