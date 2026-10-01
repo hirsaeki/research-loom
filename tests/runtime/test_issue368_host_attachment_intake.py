@@ -9,7 +9,7 @@ import unittest
 
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade
 from tests.runtime.test_external_desktop_research_intake import golden_submission
-from tests.runtime.test_issue91_external_material_content import _prepare
+from tests.runtime.test_issue91_external_material_content import _cli, _prepare
 from tests.runtime.test_research_question_review import _adopt_question, _workspace
 
 
@@ -53,7 +53,38 @@ def _research_result(handoff: dict, extension: dict) -> dict:
 
 
 class Issue368HostAttachmentIntakeTests(unittest.TestCase):
-    def test_project_input_attachment_uses_workspace_relative_staging_and_survives_cleanup(self):
+    def test_staging_only_attachment_is_not_registered_before_or_after_cleanup(self):
+        with tempfile.TemporaryDirectory() as temp:
+            workspace = _workspace(Path(temp))
+            stage = workspace / "intake" / "chat" / "ATT-staging-only"
+            with LocalApplicationFacade.open_workspace(workspace) as facade:
+                state_before = facade.resume_context()["research_state"]
+                self.assertEqual(facade.list_project_inputs()["project_inputs"], [])
+                self.assertEqual(facade.list_external_materials()["materials"], [])
+
+                stage.mkdir(parents=True)
+                original = stage / "report.pdf"
+                rendition = stage / "report.txt"
+                original.write_bytes(b"%PDF-1.4\nstaging-only attachment\n%%EOF\n")
+                rendition.write_text("Host-readable attachment text.\n", encoding="utf-8")
+                # Host readability alone is not a call to either Loom ingress.
+                self.assertTrue(original.read_bytes().startswith(b"%PDF-1.4"))
+                self.assertEqual(rendition.read_text(encoding="utf-8"), "Host-readable attachment text.\n")
+                self.assertEqual(facade.list_project_inputs()["project_inputs"], [])
+                self.assertEqual(facade.list_external_materials()["materials"], [])
+                self.assertEqual(facade.resume_context()["research_state"], state_before)
+
+            for remove_staging in (False, True):
+                with self.subTest(staging_removed=remove_staging):
+                    if remove_staging:
+                        shutil.rmtree(stage)
+                    self.assertEqual(stage.exists(), not remove_staging)
+                    with LocalApplicationFacade.open_workspace(workspace) as facade:
+                        self.assertEqual(facade.list_project_inputs()["project_inputs"], [])
+                        self.assertEqual(facade.list_external_materials()["materials"], [])
+                        self.assertEqual(facade.resume_context()["research_state"], state_before)
+
+    def test_project_input_attachment_is_rediscovered_after_staging_cleanup(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             workspace = _workspace(root)
@@ -63,7 +94,8 @@ class Issue368HostAttachmentIntakeTests(unittest.TestCase):
             staged.write_bytes(content)
 
             with LocalApplicationFacade.open_workspace(workspace) as facade:
-                snapshot_before = facade.resume_context()["research_state"]["snapshot"]
+                state_before = facade.resume_context()["research_state"]
+                snapshot_before = state_before["snapshot"]
                 registered = facade.register_project_input({
                     "file": str(staged.relative_to(workspace)),
                     "role": "project_brief",
@@ -88,16 +120,40 @@ class Issue368HostAttachmentIntakeTests(unittest.TestCase):
                 )
 
             shutil.rmtree(staged.parent)
+            self.assertFalse(staged.exists())
+            # A new CLI process receives only the workspace, never the registered ID.
+            listed_process, listed = _cli(
+                "research-input", "list", "--workspace", str(workspace), "--json"
+            )
+            self.assertEqual(listed_process.returncode, 0, listed_process.stderr)
+            self.assertEqual(listed["status"], "OK")
+            self.assertFalse(listed["truncated"])
+            matches = [
+                item for item in listed["project_inputs"]
+                if item["provenance"].get("host_attachment_id") == "ATT-brief"
+            ]
+            self.assertEqual(len(matches), 1)
+            rediscovered = matches[0]
             with LocalApplicationFacade.open_workspace(workspace) as facade:
-                shown = facade.show_project_input(registered["input_id"], format="text")
+                shown = facade.show_project_input(rediscovered["input_id"], format="text")
                 self.assertEqual(shown["content"]["value"].encode("utf-8"), content)
+                self.assertEqual(shown["project_input"], rediscovered)
+                self.assertEqual(
+                    rediscovered["content_digest"], "sha256:" + hashlib.sha256(content).hexdigest()
+                )
                 self.assertEqual(shown["project_input"]["role"], "project_brief")
                 self.assertEqual(
                     shown["project_input"]["provenance"]["host_attachment_id"],
                     "ATT-brief",
                 )
+                self.assertEqual(rediscovered["provenance"]["source"], "host_attachment")
+                self.assertEqual(rediscovered["source_path"], str(staged.relative_to(workspace)))
+                self.assertEqual(rediscovered["lineage_ref"], state_before["active_lineage"])
+                self.assertEqual(rediscovered["snapshot_id"], snapshot_before["snapshot_id"])
+                self.assertEqual(rediscovered["snapshot_digest"], snapshot_before["content_digest"])
+                self.assertEqual(facade.resume_context()["research_state"], state_before)
 
-    def test_research_source_attachment_uses_existing_run_capture_and_survives_cleanup(self):
+    def test_research_source_attachment_is_rediscovered_after_staging_cleanup(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             workspace = _workspace(root)
@@ -169,19 +225,33 @@ class Issue368HostAttachmentIntakeTests(unittest.TestCase):
                     facade.resume_context()["research_state"]["snapshot"],
                     snapshot_before,
                 )
-                original_digest = captured["original_capture"]["content_digest"]
-                text_digest = captured["text_rendition"]["content_digest"]
 
             shutil.rmtree(stage)
+            self.assertFalse(stage.exists())
+            # Discover Run/capture IDs in a new process, without session-local identifiers.
+            listed_process, listed = _cli(
+                "external", "materials", "list", "--workspace", str(workspace), "--json"
+            )
+            self.assertEqual(listed_process.returncode, 0, listed_process.stderr)
+            self.assertEqual(listed["status"], "OK")
+            self.assertFalse(listed["truncated"])
+            matches = [
+                capture for material in listed["materials"] for capture in material["captures"]
+                if capture["provenance"].get("host_attachment_id") == "ATT-source"
+            ]
+            self.assertEqual(len(matches), 1)
+            rediscovered = matches[0]
+            self.assertEqual(rediscovered["original"]["content_health"]["status"], "verified")
+            self.assertEqual(rediscovered["renditions"][0]["content_health"]["status"], "verified")
             with LocalApplicationFacade.open_workspace(workspace) as facade:
-                shown = facade.show_external_material(run_id, "CAP-1")
+                shown = facade.show_external_material(rediscovered["run_id"], rediscovered["capture_id"])
                 self.assertEqual(
                     shown["capture"]["original"]["digest"],
-                    original_digest,
+                    "sha256:" + hashlib.sha256(original_bytes).hexdigest(),
                 )
                 self.assertEqual(
                     shown["capture"]["renditions"][0]["digest"],
-                    text_digest,
+                    "sha256:" + hashlib.sha256(text_bytes).hexdigest(),
                 )
                 self.assertEqual(shown["text_rendition_view"]["content"].encode("utf-8"), text_bytes)
                 self.assertEqual(
@@ -192,6 +262,13 @@ class Issue368HostAttachmentIntakeTests(unittest.TestCase):
                     shown["capture"]["source_locator"],
                     "https://example.test/source-a#section-1",
                 )
+                self.assertEqual(shown["capture"]["provenance"]["source"], "host_attachment")
+                self.assertEqual(shown["capture"]["original_source_filename"], "report.pdf")
+                self.assertEqual(shown["capture"]["text_rendition_source_filename"], "report.txt")
+                self.assertEqual(
+                    facade.show_run(rediscovered["run_id"])["run"]["status"], "COMPLETED"
+                )
+                self.assertEqual(facade.resume_context()["research_state"]["snapshot"], snapshot_before)
 
     def test_missing_rendition_is_recorded_as_failed_attempt_without_capture_or_state_mutation(self):
         with tempfile.TemporaryDirectory() as temp:
