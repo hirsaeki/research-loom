@@ -84,7 +84,7 @@ class Issue368HostAttachmentIntakeTests(unittest.TestCase):
                 captured = facade.capture_external_source(run_id, {
                     "capture_id": "CAP-1",
                     "source_category": "other",
-                    "exact_locator": "attachment:ATT-source/report.pdf",
+                    "exact_locator": "https://example.test/source-a#section-1",
                     "acquired_at": "2026-10-01T00:00:00Z",
                     "original_file": str(original.relative_to(workspace)),
                     "original_media_type": "application/pdf",
@@ -140,6 +140,10 @@ class Issue368HostAttachmentIntakeTests(unittest.TestCase):
                 self.assertEqual(
                     shown["capture"]["provenance"]["host_attachment_id"],
                     "ATT-source",
+                )
+                self.assertEqual(
+                    shown["capture"]["source_locator"],
+                    "https://example.test/source-a#section-1",
                 )
 
     def test_missing_rendition_is_recorded_as_failed_attempt_without_capture_or_state_mutation(self):
