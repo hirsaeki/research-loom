@@ -135,43 +135,95 @@ continuity rather than being silently substituted by this replacement probe.
 
 ## Codex / ChatGPT Work live acceptance
 
-Run the following separately in **Codex** and **ChatGPT Work**. One host's pass
-never substitutes for the other. Use a fresh appropriate Workspace/session for
-each host and record the exact repository HEAD and Profile pins.
+The canonical live-host acceptance is **#337 UAT-02R1**. UAT-01 and UAT-02
+remain diagnostic history only: UAT-01 leaked Loom implementation concepts into
+the human prompts, while UAT-02 left the planning/research boundary ambiguous
+enough that preliminary external research before the fixed source set was a
+reasonable interpretation. Neither run is a G4/G5 PASS record.
 
-1. Load the canonical `skills/research-conversation/` operating contract; load
-   Writer/Publication skills only when the checkpoint reaches those operations.
-2. Start from current operator input or formally intaken material, not from
-   legacy-only research data copied into the Workspace.
-3. Ask the host to explain current research state in ordinary research language.
-   Internal Loom IDs may appear as trace detail when useful but must not be the
-   choices the human is asked to make.
-4. Create/adopt an RQ and gather representative material through public paths.
-5. At an intentionally **incomplete** point, build/verify a Research Package
-   checkpoint, create/select a Narrative composition, produce at least two
-   Writer sections, and revise only one section.
-6. Build a Publication preview using the production formal Profile. Human review
-   must inspect the actual output; preview must not be described as release.
-7. Return to Research from that preview and add/follow up an unresolved research
-   item. Confirm no Writer/Publication action silently adopted new research.
-8. Reopen from a different session/process and explain what is saved,
-   authoritative, pending, manuscript-only, preview-only, and not yet evaluated.
+Run UAT-02R1 separately in **Codex** and **ChatGPT Work**. One host's pass never
+substitutes for the other. Both records must use the same UAT revision and the
+same final implementation HEAD, but separate fresh test sessions/environments.
 
-For each live record preserve: host/model/configuration (private values may be
-`not exposed`), Workspace identity, action sequence, selected Profile/policy
-pins, relevant public outputs/artifacts, human rubric result, and unresolved
-items. A model self-report alone is not a PASS record.
+### Human-language boundary
+
+The human drives the UAT only with ordinary research/writing language. The
+human must not need to know or prescribe Research Loom internals such as Profile
+resolution, Research Package, composition/revision identities, Publication
+preview/build, candidate/authoritative state names, release transitions, opaque
+IDs, digests or CLI operations. Those may appear in retained evaluator evidence,
+but not as concepts the human must understand or select in normal conversation.
+
+The frozen human sequence is:
+
+1. Start the MISCO research question and ask to **plan only**. Explicitly say:
+   `資料を探したり調べたりするのは、次に材料を指定してから始めてください。`
+   The host may inspect local operating/Profile/Skill instructions required to
+   set up the work, but it must not acquire or use external research material yet.
+2. Supply exactly the three fixed research sources from #337 UAT-02R1 (OECD
+   agentic AI, OpenAI agentic-governance practices, METR task-completion time
+   horizons) and ask to use only those materials for this bounded UAT.
+3. Ask for an intermediate research summary that remains explicitly incomplete,
+   keeps at least one unknown, and proceeds to a writing structure.
+4. Ask for at least two manuscript sections from the available material only,
+   leaving unsupported points visibly unsupported.
+5. Ask to revise only section 2 so approval, monitoring and stopping are distinct;
+   add no new facts/sources and do not change section 1.
+6. Ask for a **human-viewable document for pre-submission appearance checking**.
+   Do not use Loom terms. The host must provide a file that actually exists, can
+   be opened, and is available for human visual inspection. A success message or
+   asserted path is insufficient. No submission/publication is authorized.
+7. Ask to return to research and leave one unresolved question as the next item.
+8. In a fresh session/process, ask in ordinary language what is decided, what is
+   still unknown, what writing/output exists, and what should happen next.
+
+The exact Japanese stimuli, fixed source URLs, Hard FAIL rules and G5 human
+rubric are frozen in #337 as UAT-02R1. Do not silently strengthen the human
+prompts with evaluator hints. A necessary protocol change becomes a named UAT
+revision and invalidates earlier runs as PASS evidence.
+
+### Evaluator evidence and failure semantics
+
+For each host preserve host/model/configuration (`not exposed` is acceptable for
+private values), repository HEAD, production Profile/Skill/resource pins, source
+attempts/captures, authority decisions, intermediate checkpoint evidence, both
+pre-revision sections, the one-section revision, the actual human-visible output,
+the unresolved item, fresh-session reconstruction and the human G5 rubric.
+
+A recoverable technical failure is not automatically a semantic failure if the
+host reports it honestly, preserves the attempt and recovers through the normal
+public path. **False success is blocking**: in particular, reporting a preview or
+confirmation document as ready when the referenced file does not exist, cannot
+be opened, or was not actually made available for human inspection is a Hard
+FAIL for that host run.
+
+The human feedback boundary is also fixed:
+
+- **blocking** — authority/provenance error, required Profile/Skill semantic
+  violation, false output success, Loom internals becoming the required human
+  interface, or another defect that makes the ordinary workflow invalid; fix and
+  rerun that host in a fresh UAT environment;
+- **non-blocking** — wording, convenience, presentation or enhancement feedback
+  that does not invalidate G4/G5; record it and track separately when useful.
+
+A model self-report never awards G4/G5 PASS. G5 requires actual human inspection
+of the representative manuscript and confirmation document.
 
 ## Close gate
+
+The durable operator migration re-probe is complete: #336 F7 / #337 G3 passed
+on the real Windows operator path using the replacement durable Workspace. The
+original damaged `%TEMP%` Workspace remains negative historical evidence and is
+not reconstructed or relabeled.
 
 Deterministic CI can establish code/contract behavior, but #337 and Epic #330
 remain open while any of the following is missing or failed:
 
-- actual operator re-probe of the intended existing Loom Workspace;
-- Codex live acceptance;
-- ChatGPT Work live acceptance;
-- required human inspection of representative Writer/Publication output;
-- an unresolved mandatory migration-ledger item.
+- Codex UAT-02R1 live acceptance;
+- ChatGPT Work UAT-02R1 live acceptance;
+- required G5 human inspection of the actual representative manuscript and
+  human-viewable confirmation document for both host records;
+- unresolved blocking UAT feedback or a mandatory migration-ledger item.
 
 Actual external publication/submission is not required for migration closure and
 is not authorized by this runbook.
