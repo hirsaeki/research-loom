@@ -79,6 +79,34 @@ For an ordinary progress answer about a candidate, do not mention candidate-loca
 
 If formal capture is needed for provenance, distinguish "capture this known material formally" from "redo the research from zero".
 
+### Chat/session attachments
+
+An attachment visible to the host is not persisted Loom material merely because the
+host can read it. When the human explicitly wants an attachment used in the research,
+materialize it under the opened workspace (the shared convention is
+`intake/chat/<host-attachment-id>/...`) and route it through an existing public
+ingress before treating it as durable research context.
+
+Choose the route explicitly from the human's intended role; do not infer it from the
+filename, extension, or model judgement alone:
+
+- project framing/context -> `research-input register` with an existing Project Input
+  role;
+- research source -> an already prepared Desktop Research Run, using the existing
+  attempt ledger plus `external capture` and later `external collect`.
+
+For a research source, preserve the exact original bytes and a UTF-8 text rendition.
+If the host cannot produce the rendition, record the retrieval/intake attempt as
+unsuccessful with the reason instead of pretending the original was read as evidence.
+Do not add a second attachment store, import directly into private SQLite/blob paths,
+or reuse `intake/material-sources`, which is reserved for verified cross-workspace
+material import.
+
+Successful Project Input registration or Desktop Research capture owns its durable
+copy. The `intake/chat` staging files may then be removed without changing the saved
+material. Attachment presence alone never adopts Evidence, a Finding, an RQ change,
+or any other authoritative Research State transition.
+
 ## Result interpretation
 
 Never inflate a backend status beyond what it proves:

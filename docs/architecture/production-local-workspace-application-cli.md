@@ -289,6 +289,34 @@ stdout is always one JSON document. Workflow states such as `CONFIRMATION_REQUIR
 
 ChatGPT Desktop App Work is the MVP human-facing consumer. It owns natural-language reasoning and may translate intent into typed action or Exhibit JSON. Work is not an LLM embedded inside the Harness and has no special Research authority.
 
+Files supplied inside a host conversation follow the same rule. A host/session
+attachment is not durable Loom material merely because Work or Codex can read it. If
+the human asks to use the file in the research, the host first materializes it beneath
+the opened workspace. `intake/chat/<host-attachment-id>/...` is the shared staging
+convention; it is ordinary operator-controlled workspace content, not a new durable
+store or authority layer.
+
+The host then chooses one existing semantic ingress explicitly:
+
+- project framing/context -> `research-input register` using an existing typed role;
+- research source -> the existing Desktop Research attempt/capture/collect flow.
+
+Project Input registration accepts either an absolute file inside the controlled
+workspace or a workspace-relative locator. Desktop Research capture continues to use
+workspace-relative original/text-rendition locators. Both paths retain the existing
+regular-file, containment, symlink/reparse and byte-bound checks. Neither path treats
+attachment presence as Evidence, a Finding, an RQ change, or Human authority.
+
+For research sources the original bytes and a UTF-8 text rendition remain distinct.
+If the host cannot produce a trustworthy rendition, it records an unsuccessful
+attempt/reason rather than manufacturing evidence from the original. After successful
+registration/capture, the durable Project Input or Run-bound capture is independent of
+the `intake/chat` staging file.
+
+`intake/material-sources/<stage-id>/execution` remains a different boundary: it stages
+already-persisted portable execution material from another Loom workspace for verified
+cross-workspace import. Raw host attachments are not placed there.
+
 A future MCP, WebMCP, GUI, or other frontend should bind to the same Application Facade. PR35's external intake operations, PR36's Run inspection, and PR37's Exhibit methods are transport-neutral facade methods rather than CLI-only storage operations. No `GenericTransport`, `FrontendProtocol`, HTTP listener, MCP server, PluginHost, AgentRuntime, managed Desktop Research provider, generic arbitrary artifact-upload API, Run history browser, or operational event query language is introduced merely in anticipation of a second transport.
 
 OneDrive / M365 Copilot projection remains a later interchange/publication concern. The local authoritative SQLite database is not a shared synchronization object.
