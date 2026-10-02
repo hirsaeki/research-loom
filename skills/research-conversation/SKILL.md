@@ -132,9 +132,38 @@ For multiple pending items, identify the target by short research content rather
 
 Retain stale/expired/content-change checks and exact Decision binding. Do not block unrelated candidate-only research merely because another Decision is pending.
 
+## Host-native tools are not alternate Loom paths
+
+In a Loom-backed research session, host-native browsing, file editing, Documents, PDF
+rendering, or other convenience tools may help retrieve, inspect, transform, or present
+content. They are **not alternate persistence, provenance, Writer, or Publication paths**.
+A host-visible file is not a saved Loom research material merely because the host can read
+it, and a polished host-generated document is not a Loom manuscript or Publication preview
+merely because it looks complete.
+
+Apply these non-bypass boundaries without exposing Loom mechanics to the human:
+
+- **Before an external research source informs analysis, synthesis, or prose**, route that
+  source through the existing Desktop Research public flow and verify that the captured
+  material is readable through the public material inventory/detail surface. If retrieval or
+  capture cannot be completed truthfully, retain the failed attempt/gap and do not use an
+  unpersisted host copy as though it were Loom research material.
+- **Before manuscript drafting or revision**, fix the Research Package and selected Writer
+  Composition, load the Writer Skill, and use the Writer round-trip. Workspace Markdown or
+  host document files may be scratch/export projections, but they do not replace those
+  canonical stage records.
+- **Before telling the human that a pre-submission/appearance-check document is ready**,
+  build and read the canonical Publication preview. Host-native Documents/PDF/LibreOffice
+  rendering may be used after that as a human-viewable rendering of the bound manuscript/
+  preview, but must not replace the Publication preview operation.
+
+If a required public Loom operation fails or is unavailable, report and retain that failure.
+Do not silently substitute a host-native Markdown, DOCX, PDF, or image workflow and then
+claim the Loom-backed research/writing/publication stage succeeded.
+
 ## Routing to writing
 
-When the human asks to move from research into manuscript drafting or revision, first fix the Research Package and explicitly selected Writer Composition through the public Loom surfaces. Then load `../writer/SKILL.md` and hand off only the detached Writer input. Do not draft from private Research State, choose a different Profile version inside the Writer, or treat manuscript import as research adoption. If the selected section still has unresolved research needs, carry them into the Writer input/Feedback path rather than silently resolving them in prose.
+When the human asks to move from research into manuscript drafting or revision, first fix the Research Package and explicitly selected Writer Composition through the public Loom surfaces. Then load `../writer/SKILL.md` and hand off only the detached Writer input. Even when the host can write or edit workspace files directly, do not treat that convenience path as the manuscript path. Do not draft from private Research State, choose a different Profile version inside the Writer, or treat manuscript import as research adoption. If the selected section still has unresolved research needs, carry them into the Writer input/Feedback path rather than silently resolving them in prose.
 
 ## References
 

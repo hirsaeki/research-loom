@@ -24,6 +24,32 @@ Do not load this skill merely because Codex is editing, reviewing, testing, or m
 
 In Work mode, explicitly open/read `skills/research-conversation/SKILL.md` from the repository/project before conducting Loom-backed research. Do not assume the `skills/` directory is automatically installed or discovered. Then use Loom through its public CLI/Facade with the same view-selection boundary while Work owns natural-language reasoning and presentation.
 
+### Work non-bypass route
+
+Work may use its browser, filesystem, Documents capability, PDF tooling, and other host
+tools as helpers, but those tools do not replace the Loom public operations for a Loom-backed
+research session. Keep the human-facing conversation in ordinary research/writing language
+while following this internal route:
+
+1. **External research material:** prepare/execute the existing Desktop Research path, retain
+   retrieval attempts, capture the exact original + trustworthy UTF-8 rendition, complete the
+   attempt, and collect the result. Before using the source in downstream analysis or prose,
+   verify it through `external materials list --workspace PATH --json` / material detail. A browser-visible or
+   downloaded source that was never captured is still host working context, not persisted Loom
+   research material.
+2. **Research to writing:** before drafting, use the public Research Package and Writer path
+   (`research-package build/show`, `writer-composition capture/select`, then
+   `writer-round-trip export-input/import-response/inspect`) and load `skills/writer/SKILL.md`.
+   Do not replace this with direct Markdown or document-file authoring.
+3. **Appearance check:** before reporting a human-viewable pre-submission document as ready,
+   load `skills/publication/SKILL.md` and use `publication preview` followed by
+   `publication show`. Documents/PDF/LibreOffice may render the already-bound manuscript/preview for human
+   inspection, but they are downstream presentation helpers, not a substitute Publication path.
+
+If a required Loom operation fails, preserve and report that failure. Do not make a direct
+workspace file or host-generated document and call the corresponding Loom-backed stage
+complete merely because the human can open it.
+
 ## Supplied attachment intake
 
 When the human supplies a file during a research conversation and asks Loom-backed
