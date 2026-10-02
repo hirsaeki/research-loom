@@ -21,6 +21,23 @@ On the public surfaces that support a view, **explicitly select the conversation
 
 Prefer the smallest read that answers the current question. `resume` is not a full audit log, and a bounded/truncated list does not prove older items do not exist. A conversation projection is presentation input, not a replacement canonical document.
 
+## Canonical stage-boundary operations
+
+These public operations do not need a conversation/detail view to prove their stage-specific
+state. Host-native files or Documents/PDF output do not substitute for them.
+
+| Boundary | Public surface | What it proves |
+|---|---|---|
+| Captured external research material | `external materials list --json` / material detail | The source bytes/rendition are persisted and inspectable through the Loom material path; browser visibility alone does not prove this |
+| Research checkpoint for writing | `research-package build --workspace PATH --json INPUT.json`, then `research-package show --workspace PATH --package-id ... --json` | A managed Research Package exists with its exact source/Profile bindings |
+| Selected writing structure | `writer-composition capture --workspace PATH --package-id ... --json INPUT.json`, then `writer-composition select ...` | The composition/version/digest used for writing is explicitly selected |
+| Writer handoff and revision | `writer-round-trip export-input ...`, `writer-round-trip import-response ...`, `writer-round-trip inspect ...` | The manuscript revision is bound to the selected Package/Composition rather than a direct workspace-file draft |
+| Pre-submission appearance path | `publication preview --workspace PATH --composition-id ... [--revision-id ...] --json`, then `publication show --workspace PATH --build-id ... --json` | A canonical Publication preview exists; any DOCX/PDF/page rendering is downstream human inspection, not a replacement preview |
+
+If a required operation fails or remains unavailable, keep that stage visibly incomplete. A
+host-generated Markdown, DOCX, PDF, or image may be useful scratch/presentation output but
+must not be reported as successful completion of the missing Loom stage.
+
 ## Minimal mutation inputs for the adoption path
 
 These JSON shapes are **host-to-Loom transport contracts**, not wording to show to the human. Use the exact references returned by public Loom operations; do not guess field names, add invented fields, or substitute synonymous disposition words.
