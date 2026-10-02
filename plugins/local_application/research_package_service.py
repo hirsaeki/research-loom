@@ -103,12 +103,19 @@ class ResearchPackageService:
         self.root.mkdir(parents=True,exist_ok=True); register_optional_path(self.root); pid=safe_component(str(p["package_id"]),"package_id"); target=self.root/pid
         if target.exists(): raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-IMMUTABLE-001","Research Package ID already exists")
         tmp=Path(tempfile.mkdtemp(prefix=".rp-",dir=self.root))
+        committed=False
         try:
             (tmp/"research-package.json").write_text(json.dumps(p,ensure_ascii=False,sort_keys=True,indent=2)+"\n",encoding="utf-8"); (tmp/"research-package.md").write_bytes(md)
             for rel,data,_,_ in attachments:
                 q=tmp/rel; q.parent.mkdir(parents=True,exist_ok=True); q.write_bytes(data)
-            verify_export_root(tmp); os.replace(tmp,target)
+            verify_export_root(tmp); os.replace(tmp,target); committed=True
+            # A renamed Windows staging directory keeps its staging ACL. Reuse the
+            # detached-export normalization so the managed durable tree inherits
+            # the workspace store ACL before another process needs to reopen it.
+            _normalize_windows_export_acl(target)
         except OSError as exc:
+            if committed:
+                shutil.rmtree(target,ignore_errors=True)
             shutil.rmtree(tmp,ignore_errors=True)
             raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-WRITE-001","Research Package persistence failed") from exc
         except Exception:
