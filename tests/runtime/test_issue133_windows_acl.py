@@ -191,19 +191,23 @@ class Issue133WindowsAclTests(ResearchPackageAcceptanceSupport):
     def test_issue379_managed_replace_failure_does_not_delete_competing_package(self):
         facade, case = self._prepare_case()
         marker_holder = {}
+        real_replace = os.replace
 
-        def competing_replace(_src, dst):
+        def competing_package_replace(src, dst):
+            source = Path(src)
             target = Path(dst)
-            target.mkdir()
-            marker = target / "foreign.txt"
-            marker.write_text("foreign-package", encoding="utf-8")
-            marker_holder["marker"] = marker
-            raise OSError("fixture managed replace collision")
+            if source.name.startswith(".rp-") and target.parent.name == "research-packages" and target.name.startswith("RP-"):
+                target.mkdir()
+                marker = target / "foreign.txt"
+                marker.write_text("foreign-package", encoding="utf-8")
+                marker_holder["marker"] = marker
+                raise OSError("fixture managed replace collision")
+            return real_replace(src, dst)
 
         try:
             with patch(
                 "plugins.local_application.research_package_service.os.replace",
-                side_effect=competing_replace,
+                side_effect=competing_package_replace,
             ):
                 with self.assertRaises(LocalApplicationError) as error:
                     facade.build_research_package(case["build_input"])
