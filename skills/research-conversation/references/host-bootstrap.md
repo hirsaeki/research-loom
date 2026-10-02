@@ -34,7 +34,7 @@ while following this internal route:
 1. **External research material:** prepare/execute the existing Desktop Research path, retain
    retrieval attempts, capture the exact original + trustworthy UTF-8 rendition, complete the
    attempt, and collect the result. Before using the source in downstream analysis or prose,
-   verify it through `external materials list --json` / material detail. A browser-visible or
+   verify it through `external materials list --workspace PATH --json` / material detail. A browser-visible or
    downloaded source that was never captured is still host working context, not persisted Loom
    research material.
 2. **Research to writing:** before drafting, use the public Research Package and Writer path
