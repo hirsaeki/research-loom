@@ -135,15 +135,19 @@ continuity rather than being silently substituted by this replacement probe.
 
 ## Codex / ChatGPT Work live acceptance
 
-The canonical live-host acceptance is **#337 UAT-02R1**. UAT-01 and UAT-02
-remain diagnostic history only: UAT-01 leaked Loom implementation concepts into
-the human prompts, while UAT-02 left the planning/research boundary ambiguous
-enough that preliminary external research before the fixed source set was a
-reasonable interpretation. Neither run is a G4/G5 PASS record.
+The canonical live-host acceptance is **#337 UAT-02R3**. UAT-01, UAT-02 and
+UAT-02R1 remain diagnostic history only. UAT-02R2 is also superseded as the final
+protocol because U4 legitimately allowed arbitrary two-or-more manuscript
+sections while U5 incorrectly assumed manuscript sections 1 and 2 existed.
 
-Run UAT-02R1 separately in **Codex** and **ChatGPT Work**. One host's pass never
-substitutes for the other. Both records must use the same UAT revision and the
-same final implementation HEAD, but separate fresh test sessions/environments.
+UAT-02R3 changes **U5 only**. If a UAT-02R2 run completed U1-U4 but had not yet
+executed U5 when R3 was frozen, its exact U1-U4 evidence is a valid R3 prefix and
+the same isolated environment/session lineage may continue from U5. An R2 run
+that already executed U5 cannot be retroactively relabeled as R3.
+
+Run UAT-02R3 separately in **Codex** and **ChatGPT Work**. One host's pass never
+substitutes for the other. Both final records must use the same UAT revision and
+the same resulting implementation semantics, but separate isolated host records.
 
 ### Human-language boundary
 
@@ -156,19 +160,25 @@ but not as concepts the human must understand or select in normal conversation.
 
 The frozen human sequence is:
 
-1. Start the MISCO research question and ask to **plan only**. Explicitly say:
+1. Start this as a **new case** and ask the host, in ordinary language, not to
+   inherit prior research and to prepare a **new work environment for this
+   research**. Then ask to **plan only** and explicitly say:
    `資料を探したり調べたりするのは、次に材料を指定してから始めてください。`
-   The host may inspect local operating/Profile/Skill instructions required to
-   set up the work, but it must not acquire or use external research material yet.
-2. Supply exactly the three fixed research sources from #337 UAT-02R1 (OECD
+   The host must translate that request into a fresh isolated canonical research
+   environment without requiring the human to know the Loom Workspace abstraction.
+   It may inspect local operating/Profile/Skill instructions required to set up
+   the work, but it must not acquire or use external research material yet.
+2. Supply exactly the three fixed research sources from #337 UAT-02R3 (OECD
    agentic AI, OpenAI agentic-governance practices, METR task-completion time
    horizons) and ask to use only those materials for this bounded UAT.
 3. Ask for an intermediate research summary that remains explicitly incomplete,
    keeps at least one unknown, and proceeds to a writing structure.
 4. Ask for at least two manuscript sections from the available material only,
    leaving unsupported points visibly unsupported.
-5. Ask to revise only section 2 so approval, monitoring and stopping are distinct;
-   add no new facts/sources and do not change section 1.
+5. After U4, refer to the ordered sections actually generated in that run. Ask
+   to revise only the **second generated section** so approval, monitoring and
+   stopping are distinct; add no new facts/sources and do not change the **first
+   generated section**. Do not assume those are manuscript sections 1 and 2.
 6. Ask for a **human-viewable document for pre-submission appearance checking**.
    Do not use Loom terms. The host must provide a file that actually exists, can
    be opened, and is available for human visual inspection. A success message or
@@ -178,17 +188,19 @@ The frozen human sequence is:
    still unknown, what writing/output exists, and what should happen next.
 
 The exact Japanese stimuli, fixed source URLs, Hard FAIL rules and G5 human
-rubric are frozen in #337 as UAT-02R1. Do not silently strengthen the human
+rubric are frozen in #337 as UAT-02R3. Do not silently strengthen the human
 prompts with evaluator hints. A necessary protocol change becomes a named UAT
-revision and invalidates earlier runs as PASS evidence.
+revision. Earlier evidence is reusable only when the new revision explicitly
+states a bounded prefix-continuity rule, as R3 does for an R2 run stopped before U5.
 
 ### Evaluator evidence and failure semantics
 
 For each host preserve host/model/configuration (`not exposed` is acceptable for
 private values), repository HEAD, production Profile/Skill/resource pins, source
-attempts/captures, authority decisions, intermediate checkpoint evidence, both
-pre-revision sections, the one-section revision, the actual human-visible output,
-the unresolved item, fresh-session reconstruction and the human G5 rubric.
+attempts/captures, authority decisions, intermediate checkpoint evidence, the
+ordered U4 draft sections, proof that only the second generated section changed,
+the actual human-visible output, the unresolved item, fresh-session reconstruction
+and the human G5 rubric.
 
 A recoverable technical failure is not automatically a semantic failure if the
 host reports it honestly, preserves the attempt and recovers through the normal
@@ -219,8 +231,8 @@ not reconstructed or relabeled.
 Deterministic CI can establish code/contract behavior, but #337 and Epic #330
 remain open while any of the following is missing or failed:
 
-- Codex UAT-02R1 live acceptance;
-- ChatGPT Work UAT-02R1 live acceptance;
+- Codex UAT-02R3 live acceptance;
+- ChatGPT Work UAT-02R3 live acceptance;
 - required G5 human inspection of the actual representative manuscript and
   human-viewable confirmation document for both host records;
 - unresolved blocking UAT feedback or a mandatory migration-ledger item.

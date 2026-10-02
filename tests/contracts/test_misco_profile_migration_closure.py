@@ -67,11 +67,11 @@ class MiscoProfileMigrationClosureTests(unittest.TestCase):
         closure = json.loads(CLOSURE.read_text(encoding="utf-8"))
         live = closure["live_gates"]
         self.assertEqual(live["existing_workspace_operator_reprobe"], "passed_durable_replacement")
-        self.assertEqual(live["live_uat_revision"], "UAT-02R1")
-        self.assertEqual(live["codex_live_acceptance"], "pending_uat_02r1")
-        self.assertEqual(live["chatgpt_work_live_acceptance"], "pending_uat_02r1")
+        self.assertEqual(live["live_uat_revision"], "UAT-02R3")
+        self.assertEqual(live["codex_live_acceptance"], "pending_uat_02r3")
+        self.assertEqual(live["chatgpt_work_live_acceptance"], "pending_uat_02r3")
         self.assertEqual(live["publication_visual_inspection_335"], "passed_for_profile_acceptance")
-        self.assertEqual(live["host_output_human_inspection"], "pending_uat_02r1")
+        self.assertEqual(live["host_output_human_inspection"], "pending_uat_02r3")
 
 
 if __name__ == "__main__":
