@@ -150,6 +150,92 @@ class Issue133WindowsAclTests(ResearchPackageAcceptanceSupport):
             }
         }, sort_keys=True))
 
+    def test_issue379_managed_package_resets_staging_acl_and_is_fresh_process_readable(self):
+        real_mkdtemp = __import__("tempfile").mkdtemp
+        with patch(
+            "plugins.local_application.research_package_service.tempfile.mkdtemp",
+            side_effect=self._restrict_export_temp(real_mkdtemp),
+        ):
+            facade, case = self._build()
+        managed = self.workspace / ".research-loom" / "research-packages" / case["package_id"]
+        try:
+            listed = facade.list_research_packages()["packages"]
+            row = next(item for item in listed if item["package_id"] == case["package_id"])
+            self.assertEqual(row["availability"], "AVAILABLE")
+            shown = facade.show_research_package(case["package_id"])["package"]
+            self.assertEqual(shown["package_digest"], case["digest"])
+        finally:
+            facade.close()
+
+        control = self._normal_acl_control_tree(managed, "managed-control")
+        self._assert_tree_acl_matches_normal_creation(managed, control)
+        self._assert_fresh_process_reads_package(managed)
+        self.assertEqual(verify_export_root(managed)["status"], "VERIFIED")
+
+    def test_issue379_managed_acl_normalization_failure_removes_committed_package(self):
+        facade, case = self._prepare_case()
+        try:
+            with patch(
+                "plugins.local_application.research_package_service._normalize_windows_export_acl",
+                side_effect=OSError("fixture managed ACL reset failure"),
+            ):
+                with self.assertRaises(LocalApplicationError) as error:
+                    facade.build_research_package(case["build_input"])
+            self.assertEqual(error.exception.code, "APPLICATION-RESEARCH-PACKAGE-WRITE-001")
+            packages_root = self.workspace / ".research-loom" / "research-packages"
+            package_dirs = [path for path in packages_root.iterdir() if path.is_dir() and path.name.startswith("RP-")]
+            self.assertEqual(package_dirs, [])
+        finally:
+            facade.close()
+
+    def test_issue379_managed_replace_failure_does_not_delete_competing_package(self):
+        facade, case = self._prepare_case()
+        marker_holder = {}
+        real_replace = os.replace
+
+        def competing_package_replace(src, dst):
+            source = Path(src)
+            target = Path(dst)
+            if source.name.startswith(".rp-") and target.parent.name == "research-packages" and target.name.startswith("RP-"):
+                target.mkdir()
+                marker = target / "foreign.txt"
+                marker.write_text("foreign-package", encoding="utf-8")
+                marker_holder["marker"] = marker
+                raise OSError("fixture managed replace collision")
+            return real_replace(src, dst)
+
+        try:
+            with patch(
+                "plugins.local_application.research_package_service.os.replace",
+                side_effect=competing_package_replace,
+            ):
+                with self.assertRaises(LocalApplicationError) as error:
+                    facade.build_research_package(case["build_input"])
+            self.assertEqual(error.exception.code, "APPLICATION-RESEARCH-PACKAGE-WRITE-001")
+            marker = marker_holder["marker"]
+            self.assertEqual(marker.read_text(encoding="utf-8"), "foreign-package")
+        finally:
+            facade.close()
+
+    def test_issue379_ablation_managed_rename_retains_restrictive_staging_acl_without_normalization(self):
+        real_mkdtemp = __import__("tempfile").mkdtemp
+        with patch(
+            "plugins.local_application.research_package_service.tempfile.mkdtemp",
+            side_effect=self._restrict_export_temp(real_mkdtemp),
+        ), patch(
+            "plugins.local_application.research_package_service._normalize_windows_export_acl",
+            return_value=None,
+        ):
+            facade, case = self._build()
+        managed = self.workspace / ".research-loom" / "research-packages" / case["package_id"]
+        try:
+            self.assertEqual(verify_export_root(managed)["status"], "VERIFIED")
+        finally:
+            facade.close()
+
+        control = self._normal_acl_control_tree(managed, "managed-ablation-control")
+        self.assertTrue(self._tree_acl_differs_from_normal_creation(managed, control))
+
     def test_acl3_acl_normalization_failure_removes_committed_output(self):
         facade, case = self._build()
         output = self.root / "issue133-acl-failure"
