@@ -209,6 +209,13 @@ confirmation document as ready when the referenced file does not exist, cannot
 be opened, or was not actually made available for human inspection is a Hard
 FAIL for that host run.
 
+A host-native file/Documents workflow is also a **blocking bypass** when it replaces a
+required Loom stage: external research material must be captured through the public
+research path before downstream use; writing must be bound through Research Package /
+selected Composition / Writer round-trip; and a human-visible confirmation document must
+follow a canonical Publication preview. A polished Markdown/PDF result does not repair a
+missing Loom stage.
+
 The human feedback boundary is also fixed:
 
 - **blocking** — authority/provenance error, required Profile/Skill semantic
