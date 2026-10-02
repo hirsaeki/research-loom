@@ -25,7 +25,7 @@ class WorkHostNonBypassContractTests(unittest.TestCase):
         bootstrap = (SKILL_ROOT / "references" / "host-bootstrap.md").read_text(encoding="utf-8")
         for phrase in (
             "### Work non-bypass route",
-            "external materials list --json",
+            "external materials list --workspace PATH --json",
             "research-package build/show",
             "writer-composition capture/select",
             "writer-round-trip export-input/import-response/inspect",
