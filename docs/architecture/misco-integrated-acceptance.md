@@ -239,6 +239,8 @@ A fail-closed canonical-stage result does not loosen this rule. If Writer export
 
 The human-language boundary applies to explanations as well as choices. A meaningful Human Decision request may be necessary, but the host must not justify that request by saying that Loom, a Skill, an internal rule/gate, candidate state, digest, or canonical/public path requires it unless the human explicitly asks for diagnostics or implementation mechanics.
 
+This prohibition covers the entire ordinary decision response. A semantically good decision prompt is still a blocking failure if a preamble or postscript volunteers the Skill name/link, quotes an internal binding rule, or says the system requires the decision. The allowed response shape is research meaning + meaningful choices + any human-relevant consequence needed to choose. Exact request-binding mechanics remain evaluator evidence and may be explained only after an explicit diagnostic/mechanics question from the human. The 2026-10-04 R4 Codex run that reached the canonical U2-U7 path but volunteered the Research Conversation Skill / exact-binding rationale at the RQ decision boundary is retained as diagnostic G4 FAIL evidence.
+
 The human feedback boundary is also fixed:
 
 - **blocking** — authority/provenance error, required Profile/Skill semantic

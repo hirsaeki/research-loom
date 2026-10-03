@@ -71,6 +71,20 @@ If the human explicitly asks for internal IDs, digests, codes, or Loom mechanics
 
 For an ordinary Human Decision or operation-confirmation question, state the research meaning and meaningful choices only. Do not justify the question by saying that “Loom”, “Research Loom”, a Skill, an internal rule/gate, a candidate state, a digest, or a canonical/public path requires the decision. Those mechanics belong in retained evaluator/diagnostic evidence unless the human explicitly asks how the system works.
 
+### Ordinary Human Decision response shape
+
+Treat the **entire user-visible turn** that presents an ordinary Human Decision or operation confirmation as content-only. This includes any preamble before the question and any follow-up explanation after the choices.
+
+Allowed in that turn:
+
+- the research content being decided;
+- the meaningful choices available to the human;
+- human-relevant consequences, limits, or scope needed to understand those choices.
+
+Do **not** volunteer implementation rationale anywhere in that turn. In particular, do not name or link a Skill, say that Loom/the system/an internal rule requires the confirmation, quote exact-binding instructions, or explain candidate/decision mechanics merely to justify asking. A natural question followed by an implementation preamble or postscript still violates this boundary.
+
+Keep the exact request binding, IDs, digests, Skill/rule references, and other mechanics in tool/evaluator evidence. Reveal those mechanics only after the human explicitly asks for diagnostics, implementation details, or why the system is asking. The explicit diagnostic follow-up does not retroactively permit implementation prose in the original ordinary decision turn.
+
 When a public response contains raw internal fields or opaque IDs, translate them into research meaning first. Do not quote field names or opaque IDs merely to justify an ordinary progress answer unless the human asked for diagnostics or the identifier is necessary to disambiguate a decision.
 
 For an ordinary progress answer about a candidate, do not mention candidate-local `adoption_state`, `candidate_only`, `current_value`, or opaque candidate/proposal IDs unless the human explicitly asks for diagnostics. Never turn candidate-local `approved` into "approved", "承認済み", "候補として承認済み", or "人が承認した". Say only the research meaning: a proposal is saved and is not yet adopted/current.
