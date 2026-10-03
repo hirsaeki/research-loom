@@ -153,10 +153,10 @@
   },
   "live_gates": {
     "existing_workspace_operator_reprobe": "passed_durable_replacement",
-    "live_uat_revision": "UAT-02R3",
-    "codex_live_acceptance": "pending_uat_02r3",
-    "chatgpt_work_live_acceptance": "pending_uat_02r3",
+    "live_uat_revision": "UAT-02R4",
+    "codex_live_acceptance": "pending_uat_02r4",
+    "chatgpt_work_live_acceptance": "pending_uat_02r4",
     "publication_visual_inspection_335": "passed_for_profile_acceptance",
-    "host_output_human_inspection": "pending_uat_02r3"
+    "host_output_human_inspection": "pending_uat_02r4"
   }
 }
