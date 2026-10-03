@@ -38,6 +38,18 @@ If a required operation fails or remains unavailable, keep that stage visibly in
 host-generated Markdown, DOCX, PDF, or image may be useful scratch/presentation output but
 must not be reported as successful completion of the missing Loom stage.
 
+## Recovering unmet Writer prerequisites
+
+When Writer export fails because the selected Composition has unmet Narrative prerequisites, keep the stage fail-closed and use existing public surfaces to resolve the missing authority. Do not substitute a direct draft.
+
+1. Read the selected Composition with `writer-composition show --workspace PATH --composition-id ... --version ... --json` and inspect its validation diagnostics / `unmet_requires`.
+2. If the required authoritative object already has a saved candidate, inspect that exact candidate and use the ordinary `state.apply_candidate` action/Confirmation/Human Decision path below. Do not infer adoption from candidate payloads or action success.
+3. If an Argument is required and current authoritative support is sufficient, propose it through the existing `research.argument.propose` typed action, then adopt that exact saved candidate through the same authority semantics when adoption is required. Do not recreate a Finding or other authoritative object from workspace prose merely to satisfy Writer.
+4. After any authority change, take a fresh `status --workspace PATH --view conversation --json` or equivalent current-state read, rebuild the Research Package, recapture/reselect the affected Composition, and retry the Writer export.
+5. If the prerequisite cannot be satisfied from current persisted research, leave Writer blocked and tell the human the research meaning of what is missing. A host-native draft is not recovery.
+
+These are internal host/evaluator mechanics. An ordinary human decision question should name the research content and meaningful choices, not the action name, candidate ID, Skill, or Loom rule that implements the decision.
+
 ## Minimal mutation inputs for the adoption path
 
 These JSON shapes are **host-to-Loom transport contracts**, not wording to show to the human. Use the exact references returned by public Loom operations; do not guess field names, add invented fields, or substitute synonymous disposition words.
