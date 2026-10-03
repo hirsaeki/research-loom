@@ -77,6 +77,8 @@ Decision, ask about the research content and choices only; do not explain that L
 or an internal rule requires the decision unless the human explicitly asks for diagnostics or
 implementation mechanics.
 
+For an ordinary decision turn, this restriction applies to the **whole user-visible response**, not only the sentence containing the question. Do not prepend or append a diagnostic rationale such as “the Research Conversation Skill requires this”, a Skill link, an internal exact-binding quotation, or “the system requires confirmation”. The response may contain only the decision's research meaning, meaningful choices, and any human-relevant consequence needed to choose. Keep implementation rationale in retained evaluator/tool evidence. Only a later explicit human request for diagnostics/mechanics unlocks that explanation.
+
 ## Supplied attachment intake
 
 When the human supplies a file during a research conversation and asks Loom-backed
