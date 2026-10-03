@@ -50,6 +50,33 @@ If a required Loom operation fails, preserve and report that failure. Do not mak
 workspace file or host-generated document and call the corresponding Loom-backed stage
 complete merely because the human can open it.
 
+### Work recovery after a canonical stage block
+
+Treat a fail-closed Writer/Publication result as a state to resolve, not a signal to fall back
+to direct authoring. In particular, when Writer export reports unmet Narrative prerequisites:
+
+1. read the selected Composition through the public `writer-composition show` surface and
+   inspect its validation diagnostics / `unmet_requires`;
+2. use only existing public research/authority operations to satisfy the missing prerequisite.
+   A saved Finding/other research candidate may be adopted only through its exact
+   `state.apply_candidate` flow and any issued Confirmation/Human Decision; an Argument is
+   proposed through `research.argument.propose` from current authoritative support and then
+   adopted through the same authority semantics when required;
+3. take a fresh public state read after authority changes, rebuild the Research Package,
+   recapture/reselect the Composition, and retry `writer-round-trip export-input`;
+4. if the prerequisite cannot be satisfied from current persisted research, stop that writing
+   stage honestly. Do not create a direct Markdown/text/Documents draft and continue U4/U5 as
+   though Writer succeeded.
+
+Publication has the same gate: do not claim a successful appearance-check stage unless a
+canonical Writer revision exists and `publication preview` / `publication show` succeeds. A
+direct PDF is not a recovery path for a blocked Writer or Publication operation.
+
+Keep this recovery machinery out of the normal human interface. When asking for a Human
+Decision, ask about the research content and choices only; do not explain that Loom, a Skill,
+or an internal rule requires the decision unless the human explicitly asks for diagnostics or
+implementation mechanics.
+
 ## Supplied attachment intake
 
 When the human supplies a file during a research conversation and asks Loom-backed

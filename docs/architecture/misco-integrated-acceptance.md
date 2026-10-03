@@ -216,6 +216,10 @@ selected Composition / Writer round-trip; and a human-visible confirmation docum
 follow a canonical Publication preview. A polished Markdown/PDF result does not repair a
 missing Loom stage.
 
+A fail-closed canonical-stage result does not loosen this rule. If Writer export or another canonical operation reports unmet prerequisites, the host must satisfy those prerequisites through the existing public authority/state path and retry, or stop the stage honestly. Creating a provisional direct draft and then a PDF does not repair the failed Writer/Publication path, and U5 cannot turn such a bypass draft into valid revision evidence.
+
+The human-language boundary applies to explanations as well as choices. A meaningful Human Decision request may be necessary, but the host must not justify that request by saying that Loom, a Skill, an internal rule/gate, candidate state, digest, or canonical/public path requires it unless the human explicitly asks for diagnostics or implementation mechanics.
+
 The human feedback boundary is also fixed:
 
 - **blocking** — authority/provenance error, required Profile/Skill semantic

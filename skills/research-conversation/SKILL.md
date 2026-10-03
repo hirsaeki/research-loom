@@ -69,6 +69,8 @@ Keep the meaning that matters:
 
 If the human explicitly asks for internal IDs, digests, codes, or Loom mechanics, provide them. Terminology suppression must not become secrecy.
 
+For an ordinary Human Decision or operation-confirmation question, state the research meaning and meaningful choices only. Do not justify the question by saying that “Loom”, “Research Loom”, a Skill, an internal rule/gate, a candidate state, a digest, or a canonical/public path requires the decision. Those mechanics belong in retained evaluator/diagnostic evidence unless the human explicitly asks how the system works.
+
 When a public response contains raw internal fields or opaque IDs, translate them into research meaning first. Do not quote field names or opaque IDs merely to justify an ordinary progress answer unless the human asked for diagnostics or the identifier is necessary to disambiguate a decision.
 
 For an ordinary progress answer about a candidate, do not mention candidate-local `adoption_state`, `candidate_only`, `current_value`, or opaque candidate/proposal IDs unless the human explicitly asks for diagnostics. Never turn candidate-local `approved` into "approved", "承認済み", "候補として承認済み", or "人が承認した". Say only the research meaning: a proposal is saved and is not yet adopted/current.
@@ -160,6 +162,18 @@ Apply these non-bypass boundaries without exposing Loom mechanics to the human:
 If a required public Loom operation fails or is unavailable, report and retain that failure.
 Do not silently substitute a host-native Markdown, DOCX, PDF, or image workflow and then
 claim the Loom-backed research/writing/publication stage succeeded.
+
+### Recover canonical stage prerequisites before retrying
+
+A fail-closed stage result is a boundary to interpret, not permission to route around the stage. When a selected Writer Composition or Writer export reports unmet Narrative prerequisites (for example `WRITER-COMPOSITION-NARRATIVE-UNMET` / `APPLICATION-WRITER-COMPOSITION-NARRATIVE-UNMET`):
+
+1. inspect the exact selected Composition through the public Writer surface and identify its `unmet_requires`;
+2. determine whether current persisted research already has, or has a saved candidate for, the required authoritative Finding / Argument / other research object;
+3. adopt an existing candidate only through its exact `state.apply_candidate` path and any issued Confirmation/Human Decision. If an Argument is required and current authoritative support is sufficient, create it only through `research.argument.propose`, then use the same authority semantics when adoption is required;
+4. after authority actually changes, take a fresh public state read, rebuild the Research Package, recapture/reselect the affected Composition, and retry the Writer round-trip from the canonical path;
+5. if the prerequisite cannot be satisfied from current persisted research, keep the writing stage blocked and explain the research meaning of what is missing. Do not reconstruct authority from workspace prose, chat memory, or a direct draft.
+
+A host-native draft created while the canonical Writer stage is blocked is scratch material only. It cannot become the canonical manuscript revision or the source for a Publication preview. Likewise, no canonical Writer revision means there is no successful canonical Publication result to replace with a directly rendered PDF.
 
 ## Routing to writing
 
