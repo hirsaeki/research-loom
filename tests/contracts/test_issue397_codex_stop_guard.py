@@ -43,8 +43,10 @@ class CodexStopGuardContractTests(unittest.TestCase):
         config = json.loads(HOOK_CONFIG.read_text(encoding="utf-8"))
         stop = config["hooks"]["Stop"]
         self.assertEqual(len(stop), 1)
-        command = stop[0]["hooks"][0]["command"]
-        self.assertEqual(command, "python .codex/hooks/research_conversation_stop_guard.py")
+        self.assertEqual(
+            stop[0]["hooks"][0]["command"],
+            "python .codex/hooks/research_conversation_stop_guard.py",
+        )
         self.assertTrue(HOOK_SCRIPT.is_file())
 
     def test_exact_u2_leak_is_blocked(self):
@@ -86,40 +88,45 @@ class CodexStopGuardContractTests(unittest.TestCase):
         }
         self.assertEqual(guard.evaluate(payload), (False, [], False))
 
-    def test_explicit_diagnostic_request_allows_internal_terms(self):
+    def test_explicit_japanese_diagnostic_request_allows_internal_terms(self):
+        guard = _load_guard()
+        for prompt in (
+            "内部ではどのSkillとパスを使っているの？",
+            "診断を見せて",
+            "フックの仕組みを説明して",
+        ):
+            with self.subTest(prompt=prompt), tempfile.TemporaryDirectory() as tmp:
+                transcript = Path(tmp) / "rollout.jsonl"
+                _write_transcript(transcript, prompt)
+                payload = {
+                    "stop_hook_active": False,
+                    "transcript_path": str(transcript),
+                    "last_assistant_message": "skills/research-conversation/SKILL.md を使っています。",
+                }
+                blocked, labels, diagnostic = guard.evaluate(payload)
+                self.assertFalse(blocked)
+                self.assertTrue(labels)
+                self.assertTrue(diagnostic)
+
+    def test_explicit_english_diagnostic_request_allows_internal_terms(self):
         guard = _load_guard()
         with tempfile.TemporaryDirectory() as tmp:
             transcript = Path(tmp) / "rollout.jsonl"
-            _write_transcript(transcript, "内部ではどのSkillとパスを使っているの？")
+            _write_transcript(transcript, "Show me the hook diagnostics and implementation details, please.")
             payload = {
                 "stop_hook_active": False,
                 "transcript_path": str(transcript),
-                "last_assistant_message": "skills/research-conversation/SKILL.md を使っています。",
+                "last_assistant_message": "The hook uses skills/research-conversation/SKILL.md.",
             }
             blocked, labels, diagnostic = guard.evaluate(payload)
             self.assertFalse(blocked)
             self.assertTrue(labels)
             self.assertTrue(diagnostic)
 
-
-    def test_generic_path_word_does_not_disable_guard(self):
-        guard = _load_guard()
-        with tempfile.TemporaryDirectory() as tmp:
-            transcript = Path(tmp) / "rollout.jsonl"
-            _write_transcript(transcript, "What path should we take to answer this research question?")
-            payload = {
-                "stop_hook_active": False,
-                "transcript_path": str(transcript),
-                "last_assistant_message": "Use skills/research-conversation/SKILL.md for this step.",
-            }
-            blocked, labels, diagnostic = guard.evaluate(payload)
-            self.assertTrue(blocked)
-            self.assertTrue(labels)
-            self.assertFalse(diagnostic)
-
-    def test_generic_debug_or_mechanics_words_do_not_disable_guard(self):
+    def test_generic_words_do_not_disable_guard(self):
         guard = _load_guard()
         for prompt in (
+            "What path should we take to answer this research question?",
             "Should we debug the research methodology before deciding?",
             "Let's discuss the mechanics of stakeholder approval thresholds.",
             "Is this diagnostic framing useful for the research question?",
@@ -137,20 +144,45 @@ class CodexStopGuardContractTests(unittest.TestCase):
                 self.assertTrue(labels)
                 self.assertFalse(diagnostic)
 
-    def test_explicit_english_implementation_diagnostics_allows_internal_terms(self):
+    def test_negated_english_diagnostic_request_does_not_disable_guard(self):
         guard = _load_guard()
-        with tempfile.TemporaryDirectory() as tmp:
-            transcript = Path(tmp) / "rollout.jsonl"
-            _write_transcript(transcript, "Show me the hook diagnostics and implementation details, please.")
-            payload = {
-                "stop_hook_active": False,
-                "transcript_path": str(transcript),
-                "last_assistant_message": "The hook uses skills/research-conversation/SKILL.md.",
-            }
-            blocked, labels, diagnostic = guard.evaluate(payload)
-            self.assertFalse(blocked)
-            self.assertTrue(labels)
-            self.assertTrue(diagnostic)
+        for prompt in (
+            "Do not show me the hook diagnostics.",
+            "Don't explain the implementation details.",
+            "Never display the skill path.",
+        ):
+            with self.subTest(prompt=prompt), tempfile.TemporaryDirectory() as tmp:
+                transcript = Path(tmp) / "rollout.jsonl"
+                _write_transcript(transcript, prompt)
+                payload = {
+                    "stop_hook_active": False,
+                    "transcript_path": str(transcript),
+                    "last_assistant_message": "The hook uses skills/research-conversation/SKILL.md.",
+                }
+                blocked, labels, diagnostic = guard.evaluate(payload)
+                self.assertTrue(blocked)
+                self.assertTrue(labels)
+                self.assertFalse(diagnostic)
+
+    def test_negated_japanese_diagnostic_request_does_not_disable_guard(self):
+        guard = _load_guard()
+        for prompt in (
+            "診断は見せないで",
+            "内部実装は説明しないで",
+            "スキルのパスは表示しないで",
+        ):
+            with self.subTest(prompt=prompt), tempfile.TemporaryDirectory() as tmp:
+                transcript = Path(tmp) / "rollout.jsonl"
+                _write_transcript(transcript, prompt)
+                payload = {
+                    "stop_hook_active": False,
+                    "transcript_path": str(transcript),
+                    "last_assistant_message": "skills/research-conversation/SKILL.md を使っています。",
+                }
+                blocked, labels, diagnostic = guard.evaluate(payload)
+                self.assertTrue(blocked)
+                self.assertTrue(labels)
+                self.assertFalse(diagnostic)
 
     def test_clean_response_does_not_read_transcript(self):
         guard = _load_guard()
