@@ -149,6 +149,8 @@ class CodexStopGuardContractTests(unittest.TestCase):
         for prompt in (
             "Do not show me the hook diagnostics.",
             "Don't explain the implementation details.",
+            "You should not explain the hook diagnostics.",
+            "You shouldn't explain the hook diagnostics.",
             "Never display the skill path.",
         ):
             with self.subTest(prompt=prompt), tempfile.TemporaryDirectory() as tmp:
@@ -163,6 +165,21 @@ class CodexStopGuardContractTests(unittest.TestCase):
                 self.assertTrue(blocked)
                 self.assertTrue(labels)
                 self.assertFalse(diagnostic)
+
+    def test_mixed_negated_and_positive_diagnostic_request_allows_positive_part(self):
+        guard = _load_guard()
+        with tempfile.TemporaryDirectory() as tmp:
+            transcript = Path(tmp) / "rollout.jsonl"
+            _write_transcript(transcript, "Don't show diagnostics, but explain the hook mechanics.")
+            payload = {
+                "stop_hook_active": False,
+                "transcript_path": str(transcript),
+                "last_assistant_message": "The hook uses skills/research-conversation/SKILL.md.",
+            }
+            blocked, labels, diagnostic = guard.evaluate(payload)
+            self.assertFalse(blocked)
+            self.assertTrue(labels)
+            self.assertTrue(diagnostic)
 
     def test_negated_japanese_diagnostic_request_does_not_disable_guard(self):
         guard = _load_guard()

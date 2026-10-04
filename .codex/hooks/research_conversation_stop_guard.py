@@ -61,20 +61,12 @@ _DIAGNOSTIC_REQUEST_PATTERNS: tuple[re.Pattern[str], ...] = (
 )
 
 _ENGLISH_NEGATION_BEFORE_REQUEST = re.compile(
-    r"(?i)(?:\bdo\s+not\b|\bdon['’]?t\b|\bnever\b|\bno\s+need\s+to\b|\bwithout\b)\s*$"
+    r"(?i)(?:\bdo\s+not\b|\bdon['’]?t\b|\bshould\s+not\b|\bshouldn['’]?t\b|"
+    r"\bnever\b|\bno\s+need\s+to\b|\bwithout\b)\s*$"
 )
 
-_NEGATED_DIAGNOSTIC_PATTERNS: tuple[re.Pattern[str], ...] = (
-    re.compile(
-        r"(?i)(?:\bdo\s+not\b|\bdon['’]?t\b|\bnever\b|\bno\s+need\s+to\b)"
-        r".{0,20}(?:show|give|provide|explain|inspect|display|tell)"
-        r".{0,50}(?:diagnostics?|implementation|internal|hook|skill|cli|command|binding|request[_ -]?id)"
-    ),
-    re.compile(
-        r"(?:診断(?:情報|結果|ログ|詳細)?|内部実装|内部の仕組み|フック|hook|スキル|Skill|Loom|CLI|コマンド|内部パス)"
-        r".{0,30}(?:見せ(?:ない|なく|ん)|表示しない|説明しない|教えない|出さない|不要|いらない|要らない|しないで)",
-        re.IGNORECASE,
-    ),
+_JAPANESE_NEGATION_AFTER_REQUEST = re.compile(
+    r"^(?:しない|しなく|しないで|しないよう|不要|いらない|要らない)"
 )
 
 
@@ -153,14 +145,15 @@ def latest_user_prompt(transcript_path: str | None) -> str:
 
 
 def _request_is_negated(prompt: str, match: re.Match[str]) -> bool:
-    prefix = prompt[max(0, match.start() - 24): match.start()]
-    return bool(_ENGLISH_NEGATION_BEFORE_REQUEST.search(prefix))
+    prefix = prompt[max(0, match.start() - 32): match.start()]
+    if _ENGLISH_NEGATION_BEFORE_REQUEST.search(prefix):
+        return True
+    suffix = prompt[match.end(): match.end() + 12]
+    return bool(_JAPANESE_NEGATION_AFTER_REQUEST.search(suffix))
 
 
 def is_explicit_diagnostic_request(prompt: str) -> bool:
     if not prompt:
-        return False
-    if any(pattern.search(prompt) for pattern in _NEGATED_DIAGNOSTIC_PATTERNS):
         return False
     for pattern in _DIAGNOSTIC_REQUEST_PATTERNS:
         for match in pattern.finditer(prompt):
