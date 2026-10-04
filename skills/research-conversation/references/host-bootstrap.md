@@ -87,6 +87,8 @@ implementation mechanics.
 
 For an ordinary decision turn, this restriction applies to the **whole user-visible response**, not only the sentence containing the question. Do not prepend or append a diagnostic rationale such as “the Research Conversation Skill requires this”, a Skill link, an internal exact-binding quotation, or “the system requires confirmation”. The response may contain only the decision's research meaning, meaningful choices, and any human-relevant consequence needed to choose. Keep implementation rationale in retained evaluator/tool evidence. Only a later explicit human request for diagnostics/mechanics unlocks that explanation.
 
+Treat the decision request as a conversational hard stop: after stating the meaningful question/choices and any needed human-relevant consequence, **end the user-visible turn and wait**. Do not visibly continue work or append justification in that same response. Never cite/link `SKILL.md`, `AGENTS.md`, internal runbooks/architecture docs, plugin/tool/command docs, or local source paths as justification, and never quote an internal binding rule as proof that the human must answer.
+
 ## Supplied attachment intake
 
 When the human supplies a file during a research conversation and asks Loom-backed

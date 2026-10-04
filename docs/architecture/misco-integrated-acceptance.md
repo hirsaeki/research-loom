@@ -243,6 +243,8 @@ The same boundary applies to **all ordinary user-visible progress and completion
 
 This prohibition covers the entire ordinary decision response. A semantically good decision prompt is still a blocking failure if a preamble or postscript volunteers the Skill name/link, quotes an internal binding rule, or says the system requires the decision. The allowed response shape is research meaning + meaningful choices + any human-relevant consequence needed to choose. Exact request-binding mechanics remain evaluator evidence and may be explained only after an explicit diagnostic/mechanics question from the human. The 2026-10-04 R4 Codex run that reached the canonical U2-U7 path but volunteered the Research Conversation Skill / exact-binding rationale at the RQ decision boundary is retained as diagnostic G4 FAIL evidence.
 
+An ordinary Human Decision request is also a **hard stop** in the user-visible conversation: once the meaningful question/choices and any needed human-relevant consequence are stated, the host ends that visible turn and waits for the answer. Linking `SKILL.md`, `AGENTS.md`, internal runbooks/architecture docs, plugin/tool/command docs, or a local source path as justification is a blocking G4 failure, as is quoting an internal binding rule such as `Bind a human answer only to that issued request`. The fresh R4 run against `2f73d96d3bcaf686526d5935ee6e293d5a75744e` is retained as blocking G4 FAIL evidence for exactly this pattern: the RQ question itself was ordinary, but the same turn linked `research-conversation/SKILL.md` and quoted the binding rule.
+
 The human feedback boundary is also fixed:
 
 - **blocking** — authority/provenance error, required Profile/Skill semantic
