@@ -34,8 +34,10 @@ _BLOCK_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
 )
 
 _DIAGNOSTIC_PATTERNS: tuple[re.Pattern[str], ...] = (
-    re.compile(r"(?i)\b(?:diagnostic|diagnostics|debug|mechanics|implementation|internal|hook|skill|loom|cli|command|path|digest|request[_ -]?id)\b"),
-    re.compile(r"(?:診断|デバッグ|内部|実装|仕組み|フック|hook|スキル|Skill|Loom|コマンド|CLI|パス|ダイジェスト|request[_ -]?id|どの(?:スキル|Skill|コマンド|パス))", re.IGNORECASE),
+    re.compile(r"(?i)\b(?:diagnostic|diagnostics|debug|mechanics)\b"),
+    re.compile(r"(?i)\bimplementation\s+(?:detail|details|mechanic|mechanics)\b"),
+    re.compile(r"(?i)\b(?:which|what)\s+(?:skill|hook|command|cli|internal\s+path)\b"),
+    re.compile(r"(?:診断|デバッグ|内部(?:実装|の仕組み|ではどの|でどの)|実装(?:詳細|の仕組み)|どの(?:スキル|Skill|フック|hook|コマンド|CLI|内部パス)|仕組み(?:を|は|が))", re.IGNORECASE),
     re.compile(r"(?:なぜ|どうして).{0,40}(?:確認|質問|回答).{0,30}(?:必要|求め|要求)", re.IGNORECASE),
     re.compile(r"(?:確認|質問|回答).{0,40}(?:なぜ|どうして).{0,30}(?:必要|求め|要求)", re.IGNORECASE),
     re.compile(r"(?i)why.{0,40}(?:confirmation|question|answer).{0,30}(?:required|needed)"),
@@ -77,29 +79,43 @@ def _latest_user_prompt_from_value(value: Any) -> list[str]:
     return found
 
 
+def _iter_lines_reverse(path: Path, chunk_size: int = 8192):
+    with path.open("rb") as handle:
+        handle.seek(0, os.SEEK_END)
+        position = handle.tell()
+        remainder = b""
+        while position > 0:
+            size = min(chunk_size, position)
+            position -= size
+            handle.seek(position)
+            chunk = handle.read(size)
+            parts = (chunk + remainder).split(b"\n")
+            remainder = parts[0]
+            for raw in reversed(parts[1:]):
+                if raw.strip():
+                    yield raw.decode("utf-8", errors="replace")
+        if remainder.strip():
+            yield remainder.decode("utf-8", errors="replace")
+
+
 def latest_user_prompt(transcript_path: str | None) -> str:
     if not transcript_path:
         return ""
     path = Path(transcript_path)
     if not path.is_file():
         return ""
-    latest = ""
     try:
-        with path.open("r", encoding="utf-8", errors="replace") as handle:
-            for line in handle:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    value = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                prompts = _latest_user_prompt_from_value(value)
-                if prompts:
-                    latest = prompts[-1]
+        for line in _iter_lines_reverse(path):
+            try:
+                value = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            prompts = _latest_user_prompt_from_value(value)
+            if prompts:
+                return prompts[-1]
     except OSError:
         return ""
-    return latest
+    return ""
 
 
 def is_explicit_diagnostic_request(prompt: str) -> bool:
@@ -117,11 +133,14 @@ def leak_labels(message: str) -> list[str]:
 def evaluate(payload: dict[str, Any]) -> tuple[bool, list[str], bool]:
     message = payload.get("last_assistant_message")
     message = message if isinstance(message, str) else ""
+    labels = leak_labels(message)
+    if not labels:
+        return False, [], False
+    if bool(payload.get("stop_hook_active")):
+        return False, labels, False
     prompt = latest_user_prompt(payload.get("transcript_path"))
     diagnostic = is_explicit_diagnostic_request(prompt)
-    labels = leak_labels(message)
-    should_block = bool(labels) and not diagnostic and not bool(payload.get("stop_hook_active"))
-    return should_block, labels, diagnostic
+    return not diagnostic, labels, diagnostic
 
 
 def _append_probe_log(payload: dict[str, Any], blocked: bool, labels: list[str], diagnostic: bool) -> None:

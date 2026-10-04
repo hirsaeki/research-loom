@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
 HOOK_CONFIG = ROOT / ".codex" / "hooks.json"
@@ -99,6 +100,63 @@ class CodexStopGuardContractTests(unittest.TestCase):
             self.assertFalse(blocked)
             self.assertTrue(labels)
             self.assertTrue(diagnostic)
+
+
+    def test_generic_path_word_does_not_disable_guard(self):
+        guard = _load_guard()
+        with tempfile.TemporaryDirectory() as tmp:
+            transcript = Path(tmp) / "rollout.jsonl"
+            _write_transcript(transcript, "What path should we take to answer this research question?")
+            payload = {
+                "stop_hook_active": False,
+                "transcript_path": str(transcript),
+                "last_assistant_message": "Use skills/research-conversation/SKILL.md for this step.",
+            }
+            blocked, labels, diagnostic = guard.evaluate(payload)
+            self.assertTrue(blocked)
+            self.assertTrue(labels)
+            self.assertFalse(diagnostic)
+
+    def test_clean_response_does_not_read_transcript(self):
+        guard = _load_guard()
+        payload = {
+            "stop_hook_active": False,
+            "transcript_path": "should-not-be-read.jsonl",
+            "last_assistant_message": "指定3資料を確認して、根拠・限界・未解決点を整理します。",
+        }
+        with mock.patch.object(guard, "latest_user_prompt", side_effect=AssertionError("unexpected transcript read")):
+            self.assertEqual(guard.evaluate(payload), (False, [], False))
+
+    def test_latest_user_prompt_scans_from_transcript_tail(self):
+        guard = _load_guard()
+        with tempfile.TemporaryDirectory() as tmp:
+            transcript = Path(tmp) / "rollout.jsonl"
+            older = [
+                {
+                    "type": "response_item",
+                    "payload": {
+                        "type": "message",
+                        "role": "user",
+                        "content": [{"type": "input_text", "text": f"old-{index}"}],
+                    },
+                }
+                for index in range(1000)
+            ]
+            latest = {
+                "type": "response_item",
+                "payload": {
+                    "type": "message",
+                    "role": "user",
+                    "content": [{"type": "input_text", "text": "内部ではどのSkillを使っているの？"}],
+                },
+            }
+            transcript.write_text(
+                "\n".join(json.dumps(item, ensure_ascii=False) for item in [*older, latest]) + "\n",
+                encoding="utf-8",
+            )
+            with mock.patch.object(guard.json, "loads", wraps=guard.json.loads) as loads:
+                self.assertEqual(guard.latest_user_prompt(str(transcript)), "内部ではどのSkillを使っているの？")
+                self.assertEqual(loads.call_count, 1)
 
     def test_stop_hook_active_prevents_rewrite_loop(self):
         guard = _load_guard()
