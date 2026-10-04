@@ -66,7 +66,7 @@ _ENGLISH_NEGATION_BEFORE_REQUEST = re.compile(
 )
 
 _JAPANESE_NEGATION_AFTER_REQUEST = re.compile(
-    r"^(?:しない|しなく|しないで|しないよう|不要|いらない|要らない)"
+    r"^(?:しません|しない|しなく|しないで|しないよう|不要|いらない|要らない)"
 )
 
 

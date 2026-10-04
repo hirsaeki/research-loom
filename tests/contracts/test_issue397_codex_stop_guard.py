@@ -186,6 +186,7 @@ class CodexStopGuardContractTests(unittest.TestCase):
         for prompt in (
             "診断は見せないで",
             "内部実装は説明しないで",
+            "内部実装は説明しません",
             "スキルのパスは表示しないで",
         ):
             with self.subTest(prompt=prompt), tempfile.TemporaryDirectory() as tmp:
