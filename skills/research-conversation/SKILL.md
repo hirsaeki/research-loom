@@ -99,6 +99,16 @@ Do **not** volunteer implementation rationale anywhere in that turn. In particul
 
 Keep the exact request binding, IDs, digests, Skill/rule references, and other mechanics in tool/evaluator evidence. Reveal those mechanics only after the human explicitly asks for diagnostics, implementation details, or why the system is asking. The explicit diagnostic follow-up does not retroactively permit implementation prose in the original ordinary decision turn.
 
+### Human Decision requests are a visible hard stop
+
+When an ordinary Human Decision is required, the decision request is a **user-visible hard stop**. State the meaningful research question or choice, list the meaningful options when useful, and include only a human-relevant consequence or limit needed to choose. **Then end the visible turn and wait for the human answer.**
+
+Do not continue progress narration, background work narration, or implementation justification in the same visible response after presenting the decision. A human-relevant consequence remains allowed, for example: “If you approve this question, I will continue using only the three sources you specified.”
+
+Never cite or link internal instruction/evaluator material as justification for an ordinary decision request. This includes `SKILL.md`, `AGENTS.md`, internal architecture/runbook documents, tool/plugin/command documentation, and local source paths. Never quote an internal binding rule such as `Bind a human answer only to that issued request` as proof that the human must answer. Internal attribution is evaluator evidence, not user-facing proof.
+
+If the human later explicitly asks why the confirmation was required, how the binding works, or requests diagnostics/mechanics, explain the implementation accurately in that later response.
+
 When a public response contains raw internal fields or opaque IDs, translate them into research meaning first. Do not quote field names or opaque IDs merely to justify an ordinary progress answer unless the human asked for diagnostics or the identifier is necessary to disambiguate a decision.
 
 For an ordinary progress answer about a candidate, do not mention candidate-local `adoption_state`, `candidate_only`, `current_value`, or opaque candidate/proposal IDs unless the human explicitly asks for diagnostics. Never turn candidate-local `approved` into "approved", "承認済み", "候補として承認済み", or "人が承認した". Say only the research meaning: a proposal is saved and is not yet adopted/current.
