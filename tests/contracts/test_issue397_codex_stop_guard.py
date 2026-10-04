@@ -117,6 +117,41 @@ class CodexStopGuardContractTests(unittest.TestCase):
             self.assertTrue(labels)
             self.assertFalse(diagnostic)
 
+    def test_generic_debug_or_mechanics_words_do_not_disable_guard(self):
+        guard = _load_guard()
+        for prompt in (
+            "Should we debug the research methodology before deciding?",
+            "Let's discuss the mechanics of stakeholder approval thresholds.",
+            "Is this diagnostic framing useful for the research question?",
+        ):
+            with self.subTest(prompt=prompt), tempfile.TemporaryDirectory() as tmp:
+                transcript = Path(tmp) / "rollout.jsonl"
+                _write_transcript(transcript, prompt)
+                payload = {
+                    "stop_hook_active": False,
+                    "transcript_path": str(transcript),
+                    "last_assistant_message": "Use skills/research-conversation/SKILL.md for this step.",
+                }
+                blocked, labels, diagnostic = guard.evaluate(payload)
+                self.assertTrue(blocked)
+                self.assertTrue(labels)
+                self.assertFalse(diagnostic)
+
+    def test_explicit_english_implementation_diagnostics_allows_internal_terms(self):
+        guard = _load_guard()
+        with tempfile.TemporaryDirectory() as tmp:
+            transcript = Path(tmp) / "rollout.jsonl"
+            _write_transcript(transcript, "Show me the hook diagnostics and implementation details, please.")
+            payload = {
+                "stop_hook_active": False,
+                "transcript_path": str(transcript),
+                "last_assistant_message": "The hook uses skills/research-conversation/SKILL.md.",
+            }
+            blocked, labels, diagnostic = guard.evaluate(payload)
+            self.assertFalse(blocked)
+            self.assertTrue(labels)
+            self.assertTrue(diagnostic)
+
     def test_clean_response_does_not_read_transcript(self):
         guard = _load_guard()
         payload = {

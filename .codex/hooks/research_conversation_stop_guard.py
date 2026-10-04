@@ -34,10 +34,12 @@ _BLOCK_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
 )
 
 _DIAGNOSTIC_PATTERNS: tuple[re.Pattern[str], ...] = (
-    re.compile(r"(?i)\b(?:diagnostic|diagnostics|debug|mechanics)\b"),
-    re.compile(r"(?i)\bimplementation\s+(?:detail|details|mechanic|mechanics)\b"),
+    re.compile(r"(?i)\b(?:show|give|provide|explain|inspect|display|tell\s+me|walk\s+me\s+through)\b.{0,50}\b(?:diagnostics?|debug\s+(?:info|output|logs?)|implementation\s+(?:details?|mechanics)|internal\s+(?:details?|implementation|mechanics)|hook\s+(?:details?|mechanics|config(?:uration)?)|skill\s+(?:name|path|details?)|cli\s+(?:command|details?)|request[_ -]?id|binding\s+(?:details?|mechanics))\b"),
+    re.compile(r"(?i)\b(?:diagnostics?|debug\s+(?:info|output|logs?)|implementation\s+(?:details?|mechanics)|internal\s+(?:details?|implementation|mechanics)|hook\s+(?:details?|mechanics|config(?:uration)?)|skill\s+(?:name|path|details?)|cli\s+(?:command|details?)|request[_ -]?id|binding\s+(?:details?|mechanics))\b.{0,30}\b(?:please|show|give|provide|explain|tell|need|want)\b"),
     re.compile(r"(?i)\b(?:which|what)\s+(?:skill|hook|command|cli|internal\s+path)\b"),
-    re.compile(r"(?:診断|デバッグ|内部(?:実装|の仕組み|ではどの|でどの)|実装(?:詳細|の仕組み)|どの(?:スキル|Skill|フック|hook|コマンド|CLI|内部パス)|仕組み(?:を|は|が))", re.IGNORECASE),
+    re.compile(r"(?i)\bdebug\b.{0,30}\b(?:hook|skill|implementation|internal|cli|command|binding)\b"),
+    re.compile(r"(?i)\bmechanics\s+of\s+(?:the\s+)?(?:hook|skill|implementation|binding|system)\b"),
+    re.compile(r"(?:内部(?:実装|の仕組み|ではどの|でどの)|実装(?:詳細|の仕組み)|どの(?:スキル|Skill|フック|hook|コマンド|CLI|内部パス)|診断(?:情報|結果|ログ|詳細)|(?:内部実装|フック|hook|スキル|Skill|Loom|CLI|コマンド|内部パス).{0,30}(?:教えて|説明|見せて|知りたい|どうなって))", re.IGNORECASE),
     re.compile(r"(?:なぜ|どうして).{0,40}(?:確認|質問|回答).{0,30}(?:必要|求め|要求)", re.IGNORECASE),
     re.compile(r"(?:確認|質問|回答).{0,40}(?:なぜ|どうして).{0,30}(?:必要|求め|要求)", re.IGNORECASE),
     re.compile(r"(?i)why.{0,40}(?:confirmation|question|answer).{0,30}(?:required|needed)"),
