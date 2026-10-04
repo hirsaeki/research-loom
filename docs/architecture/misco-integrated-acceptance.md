@@ -153,6 +153,28 @@ Run UAT-02R4 separately in **Codex** and **ChatGPT Work**. One host's pass never
 substitutes for the other. Both final records must use the same UAT revision and
 the same resulting implementation semantics, but separate isolated host records.
 
+### Codex Stop-hook evidence
+
+Codex has an additional mechanical presentation guard at `.codex/hooks.json` ->
+`.codex/hooks/research_conversation_stop_guard.py`. It inspects the final
+`last_assistant_message` at the Codex `Stop` lifecycle event and blocks ordinary
+user-visible implementation leakage so Codex can rewrite the response in domain
+language. This guard is **Codex-specific**; it is not evidence for ChatGPT Work.
+
+For the final Codex UAT-02R4 record, set `RESEARCH_LOOM_CODEX_HOOK_LOG` to an
+isolated test log path **before starting the fresh Codex session** and retain the
+JSONL log. The log records only hook/session/turn identifiers, block labels and
+whether the diagnostic exemption applied; it does not retain assistant/user
+prose. At least one `Stop` event from the UAT session must be present. If the
+repo-local hook is not discovered, trusted, or fired by the installed Codex
+build, record that as a host-integration blocker and do not award G4 PASS merely
+because repository unit tests passed.
+
+The guard is intentionally bounded: an explicit user request for
+diagnostics/mechanics may allow implementation terms, and `stop_hook_active`
+prevents an infinite rewrite loop. The Skill/host language contract remains
+applicable even when the hook is unavailable.
+
 ### Human-language boundary
 
 The human drives the UAT only with ordinary research/writing language. The
