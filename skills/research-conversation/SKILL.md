@@ -69,6 +69,20 @@ Keep the meaning that matters:
 
 If the human explicitly asks for internal IDs, digests, codes, or Loom mechanics, provide them. Terminology suppression must not become secrecy.
 
+### Ordinary user-visible turns are domain-language only
+
+Apply the human-language boundary to **every ordinary user-visible research, writing, progress, and output-check turn**, not only Human Decision turns. The visible response should describe the domain action or outcome the human cares about, for example: preparing a new research case, checking the specified sources, preserving uncertainty, drafting or revising sections, checking a document's appearance, or explaining what remains unresolved.
+
+Do **not** volunteer implementation narration such as:
+
+- which Skill, Skill path, plugin, CLI command, or host capability will be used;
+- that Research Loom / Loom, a Profile / EPS, Research Package, Composition, Writer round-trip, Publication preview, canonical/public path, or internal rule/gate is being used;
+- opaque IDs, digests, request-binding mechanics, or diagnostic field names merely to explain ordinary progress.
+
+This applies to preambles, progress updates, completion summaries, and transition statements such as "I will use the Writer Skill" or "I will use the Documents/PDF Skill". Translate those mechanics into domain language instead: "I will draft the requested sections from the saved material" or "I will create an appearance-check document and inspect its pages".
+
+Keep exact implementation mechanics in tool traces and evaluator/diagnostic evidence. If the human explicitly asks how the system works, which Skill/tool/path was used, or requests diagnostics, answer accurately. The boundary is presentation, not secrecy.
+
 For an ordinary Human Decision or operation-confirmation question, state the research meaning and meaningful choices only. Do not justify the question by saying that “Loom”, “Research Loom”, a Skill, an internal rule/gate, a candidate state, a digest, or a canonical/public path requires the decision. Those mechanics belong in retained evaluator/diagnostic evidence unless the human explicitly asks how the system works.
 
 ### Ordinary Human Decision response shape
