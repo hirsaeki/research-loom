@@ -29,7 +29,15 @@ In Work mode, explicitly open/read `skills/research-conversation/SKILL.md` from 
 Work may use its browser, filesystem, Documents capability, PDF tooling, and other host
 tools as helpers, but those tools do not replace the Loom public operations for a Loom-backed
 research session. Keep the human-facing conversation in ordinary research/writing language
-while following this internal route:
+while following this internal route. **Do not narrate this route to the human.** Ordinary visible
+progress should name the domain action/outcome (checking the specified sources, drafting the requested
+sections, preparing an appearance-check document), not the Skill, plugin, CLI command, capability,
+Research Package/Composition/Writer/Publication implementation label, or canonical/public path used
+to do it. This applies to preambles, progress updates, and completion summaries. Exact mechanics
+belong in tool/evaluator evidence unless the human explicitly asks for diagnostics or implementation
+details.
+
+Internal route:
 
 1. **External research material:** prepare/execute the existing Desktop Research path, retain
    retrieval attempts, capture the exact original + trustworthy UTF-8 rendition, complete the
