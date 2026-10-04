@@ -19,6 +19,8 @@ New work should converge toward the canonical areas below rather than adding new
 
 For a human-facing research session driven by Codex or ChatGPT Work, explicitly load [`skills/research-conversation/SKILL.md`](skills/research-conversation/SKILL.md). The repository does not assume either host automatically discovers this skill, and repository development/review tasks should not be routed through it.
 
+For Work deployment, see [runtime readiness, durable continuation and file delivery](docs/operations/work-host-runtime.md). Work reuses the existing Application Facade/CLI; a scratch workspace still requires a provisioned runtime and a durable whole-workspace backup before cross-session continuity can be promised.
+
 ## Production CLI
 
 Research Loom requires Python 3.12+ and `uv`. Root `pyproject.toml` and `uv.lock` are the single repository/application dependency contract.
