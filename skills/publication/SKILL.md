@@ -33,6 +33,10 @@ When a required conditional application input is missing, keep the affected chec
 - Keep original source locators/provenance even when a reader-facing URL display profile changes visible formatting.
 - Synthetic examples, Layer B provenance, and Layer C review-support material are not runtime Publication rules.
 
+## Figures requested during preview
+
+When a missing figure, replacement or removal is requested, preserve this preview and return through the existing Research Exhibit/Package/Writer path in `../../docs/operations/late-visual-needs.md`. Resolve the exact build internally; ask the human about research meaning, not Package/Exhibit IDs. Do not fill research gaps during layout. Build a new preview only from the resulting bound Writer revision, and inspect its actual visual pages. Missing assets, source metadata or explanation review stay unresolved and cannot become a release-ready text fallback.
+
 ## QA
 
 Machine checks cover exact pins, native DOCX structure, cross-references, retained image bytes, citation/exhibit resolution, supported formal inputs, and selected deterministic formatting. Human/Host review covers editorial/semantic presentation and actual rendered-page quality.

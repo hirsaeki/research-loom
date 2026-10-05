@@ -213,6 +213,14 @@ A fail-closed stage result is a boundary to interpret, not permission to route a
 
 A host-native draft created while the canonical Writer stage is blocked is scratch material only. It cannot become the canonical manuscript revision or the source for a Publication preview. Likewise, no canonical Writer revision means there is no successful canonical Publication result to replace with a directly rendered PDF.
 
+## Late requests for figures or tables
+
+When the human requests a graph, relationship diagram, replacement or removal during planning, drafting or appearance checking, resolve the affected saved origin and research internally. Read `../../docs/operations/late-visual-needs.md` for the public `exhibit visual-need` / `resume-visual` contracts; do not invent a view option or ask the human to select opaque IDs.
+
+For existing meaning only, retain the visual-need note, capture a source visual, bounded validated chart (`../../docs/operations/research-charts.md`) or generated explanation (`../../docs/operations/generated-explanations.md`), and rebuild through the resume operation. Inspect an actual generated explanation before recording a separate conforming review. For new data, comparison axes, classifications, causality or interpretation, return through ordinary Research intake/authority and ask only about substantive meaning when a Decision is issued.
+
+Select the new source-bound Composition and Writer inputs, revise affected prose and preserve unchanged meaning. Never rebind old revisions to the new Package or insert an unselected image into Publication. Preserve all previous artifacts. On fresh-session resume, read the saved visual-need note and exact public Composition/Writer/preview records alongside normal research progress; explain saved work, unresolved semantic/review needs and preview status in ordinary language. A visual or preview does not establish research completion or release.
+
 ## Routing to writing
 
 When the human asks to move from research into manuscript drafting or revision, first fix the Research Package and explicitly selected Writer Composition through the public Loom surfaces. Then load `../writer/SKILL.md` and hand off only the detached Writer input. Even when the host can write or edit workspace files directly, do not treat that convenience path as the manuscript path. Do not draft from private Research State, choose a different Profile version inside the Writer, or treat manuscript import as research adoption. If the selected section still has unresolved research needs, carry them into the Writer input/Feedback path rather than silently resolving them in prose.
