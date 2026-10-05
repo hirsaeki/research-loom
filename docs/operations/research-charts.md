@@ -67,6 +67,15 @@ be passed off as the chart of the original data. An implementation change needs
 a new renderer generation and new captured output; it must not overwrite history.
 Renderer failure is an error and leaves no successful replacement Exhibit.
 
+Capture additionally loads the actual immutable generation Package and checks
+its exact digest and selected Evidence. Package rebuild repeats that check and
+retains the exact original Package **document** as a pinned JSON attachment (one
+copy per generation Package, within existing attachment bounds). Exported consumer
+verification rechecks its document digest and selected research against the visual
+semantic refs. This is retained generation-context metadata, not a second store or
+a promise to render the old Package without its assets. An invented Package binding
+cannot be accepted through raw Exhibit capture or a later Package build.
+
 Publication integration, formal captions/numbering/rights and visual QA are #408.
 Chart generation is neither manuscript nor release approval. The generation
 operation leaves Research State unchanged and does not rebuild existing Packages.

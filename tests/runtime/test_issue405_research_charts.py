@@ -12,7 +12,8 @@ from plugins.local_application import LocalApplicationFacade, LocalApplicationEr
 from plugins.local_application.research_chart import quantitative_input, validate_chart_spec, validate_chart_exhibit
 from plugins.local_application.research_chart_png import render_chart
 from plugins.local_application.publication_exhibits import png_size
-from plugins.research_visual_semantics import validate_visual_package_bindings
+from plugins.research_visual_semantics import digest, validate_visual_package_bindings
+from plugins.local_application.visual_origin import verify_visual_origin
 from runtime_fixtures import project, rq, source, evidence, seed_state
 from test_research_exhibits import NullResolver, profile_provider, state_signature
 
@@ -80,7 +81,8 @@ class ChartCaptureTests(unittest.TestCase):
         self.app = LocalResearchApplication(Path(temp.name), resolver=NullResolver(), effective_profile_set_provider=profile_provider, seed_state=seed)
         self.addCleanup(self.app.close)
         self.facade = LocalApplicationFacade(self.app, "PRJ-1")
-        self.package = {"package_id": "RP-CHART-FIXTURE", "package_digest": "sha256:"+"1"*64, "content": {"research_question_refs": ["RQ-1"]}, "resolved_content": {"research_objects": [rq(state="approved"), source(), self.evidence]}}
+        self.package = {"package_id": "RP-CHART-FIXTURE", "content": {"research_question_refs": ["RQ-1"]}, "resolved_content": {"research_objects": [rq(state="approved"), source(), self.evidence], "working_material": {"research_exhibits": []}}}
+        self.package["package_digest"] = digest(self.package)
 
     def capture(self, proposer="operator"):
         # Inject an already loaded package at the read boundary; this is unit
@@ -112,6 +114,27 @@ class ChartCaptureTests(unittest.TestCase):
         changed = deepcopy(baseline); changed["content"]["value"]["legend"]["rows"][0][1] = "別分類"
         with self.assertRaises(ValueError): validate_chart_exhibit(changed, [self.evidence])
 
+    def test_generation_package_digest_and_selected_data_cannot_be_forged(self):
+        chart = self.capture()
+        verify_visual_origin(chart, self.package)
+        forged = deepcopy(chart)
+        forged["content"]["value"]["package_binding"]["package_digest"] = "sha256:"+"0"*64
+        with self.assertRaises(ValueError): verify_visual_origin(forged, self.package)
+        origin = deepcopy(self.package)
+        origin["resolved_content"]["research_objects"] = [rq(state="approved"), source()]
+        origin.pop("package_digest"); origin["package_digest"] = digest(origin)
+        forged = deepcopy(chart)
+        forged["content"]["value"]["package_binding"]["package_digest"] = origin["package_digest"]
+        with self.assertRaises(ValueError): verify_visual_origin(forged, origin)
+        semantics = deepcopy(chart["visual_semantics"])
+        semantics = {k: semantics[k] for k in ("visual_class", "semantic_changes", "generator")}
+        semantics["generator"].pop("instruction_digest")
+        payload = {k: deepcopy(chart[k]) for k in ("kind", "title", "purpose", "rq_ids", "source_object_ids")}
+        payload["content"] = {"representation": "json", "value": deepcopy(chart["content"]["value"])}
+        payload["content"]["value"]["package_binding"]["package_digest"] = "sha256:"+"0"*64
+        payload["visual_semantics"] = semantics
+        with patch.object(self.facade, "show_research_package", return_value={"package": self.package}):
+            with self.assertRaises(LocalApplicationError): self.facade.capture_exhibit(payload)
     def test_without_renderer_source_and_spec_provenance_remain(self):
         with patch("plugins.local_application.visual_facade.render_chart", side_effect=ValueError("renderer unavailable")), patch.object(self.facade, "show_research_package", return_value={"package": self.package}):
             with self.assertRaises(LocalApplicationError):

@@ -198,10 +198,15 @@ def validate_resolved_references(package:Mapping[str,Any])->None:
         chart_content = exhibit.get("content", {}).get("value")
         is_chart = isinstance(chart_content, Mapping) and chart_content.get("schema") == "research-generated-chart/v1"
         if is_chart:
-            if not isinstance(generated, Mapping) or set(generated) != {"visual_class", "attachment_path", "media_type", "byte_length", "digest"} or generated.get("visual_class") != "data_visualization" or generated.get("media_type") != "image/png" or generated.get("digest") != chart_content.get("output", {}).get("digest"):
+            if not isinstance(generated, Mapping) or set(generated) != {"visual_class", "attachment_path", "media_type", "byte_length", "digest", "generation_context"} or generated.get("visual_class") != "data_visualization" or generated.get("media_type") != "image/png" or generated.get("digest") != chart_content.get("output", {}).get("digest"):
                 missing.append(f"generated_visual:{exhibit.get('exhibit_id')}")
             else:
                 require_attachment(generated.get("attachment_path"), digest=generated.get("digest"), size=generated.get("byte_length"), media_type="image/png", label=f"generated_visual:{exhibit.get('exhibit_id')}")
+                context = generated.get("generation_context")
+                if not isinstance(context, Mapping) or set(context) != {"attachment_path", "byte_length", "content_digest"}:
+                    missing.append(f"visual_generation_context:{exhibit.get('exhibit_id')}")
+                else:
+                    require_attachment(context.get("attachment_path"), digest=context.get("content_digest"), size=context.get("byte_length"), media_type="application/json", label=f"visual_generation_context:{exhibit.get('exhibit_id')}")
         elif generated is not None:
             missing.append(f"generated_visual:{exhibit.get('exhibit_id')}")
         visual=exhibit.get("visual_target")
@@ -431,4 +436,19 @@ def verify_export_root(root:str|Path, *, _visual_diagnostics:list[dict[str,str]]
     proj=package.get("projections",{}).get("markdown",{})
     if proj.get("path")!="research-package.md" or int(proj.get("byte_length",-1))!=md_size or proj.get("content_digest")!=md_digest: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001","Research Package Markdown integrity mismatch")
     total+=md_size
+    from .visual_origin import verify_visual_origin
+    for exhibit in package.get("resolved_content", {}).get("working_material", {}).get("research_exhibits", []):
+        generated = exhibit.get("generated_visual")
+        if generated is not None:
+            try:
+                context_path = base / generated["generation_context"]["attachment_path"]
+                with context_path.open("rb") as handle:
+                    raw_context = handle.read(MAX_ITEM_BYTES + 1)
+                context_pin = generated["generation_context"]
+                if len(raw_context) > MAX_ITEM_BYTES or len(raw_context) != context_pin["byte_length"] or digest_bytes(raw_context) != context_pin["content_digest"]:
+                    raise ValueError("visual generation context bytes changed")
+                origin = json.loads(raw_context.decode("utf-8"))
+                verify_visual_origin(exhibit, origin)
+            except (OSError, KeyError, TypeError, ValueError) as exc:
+                raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-REFERENCE-001", "invalid visual generation context: " + str(exc)) from exc
     return {"status":"DEGRADED" if _visual_diagnostics else "VERIFIED","package_id":package["package_id"],"package_digest":package["package_digest"],"attachment_count":len(package.get("attachments",[])),"total_verified_bytes":total}

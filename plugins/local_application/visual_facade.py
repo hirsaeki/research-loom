@@ -10,6 +10,7 @@ from .facade import LocalApplicationError
 from .research_quality_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
 from .research_chart import validate_chart_exhibit, validate_chart_spec
 from .research_chart_png import RENDERER_ID, render_chart
+from .visual_origin import verify_visual_origin
 
 
 class LocalApplicationFacade(_BaseLocalApplicationFacade):
@@ -19,7 +20,11 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
         semantics = super()._visual_semantics(value, document, state, store)
         candidate = {**document, **({"visual_semantics": semantics} if semantics is not None else {})}
         try:
-            validate_chart_exhibit(candidate, list(state.effective_objects()))
+            png = validate_chart_exhibit(candidate, list(state.effective_objects()))
+            if png is not None:
+                binding = candidate["content"]["value"]["package_binding"]
+                origin = self.show_research_package(binding["package_id"])["package"]
+                verify_visual_origin(candidate, origin)
         except (TypeError, ValueError, OverflowError) as exc:
             raise LocalApplicationError("APPLICATION-CHART-VALIDATION-001", str(exc)) from exc
         return semantics
