@@ -310,10 +310,14 @@ def build_package(service, value:Mapping[str,Any])->Mapping[str,Any]:
         validate_visual_package_bindings(exhs, selected)
     except (TypeError, ValueError) as exc:
         raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-REFERENCE-001", str(exc)) from exc
+    visual_origins = {}
     for exhibit in exhs:
         png = validate_chart_exhibit(exhibit, selected)
         if png is not None:
-            origin = service._load(exhibit["content"]["value"]["package_binding"]["package_id"])
+            origin_id = exhibit["content"]["value"]["package_binding"]["package_id"]
+            if origin_id not in visual_origins:
+                visual_origins[origin_id] = service._load(origin_id)
+            origin = visual_origins[origin_id]
             try:
                 verify_visual_origin(exhibit, origin)
             except (KeyError, TypeError, ValueError) as exc:
