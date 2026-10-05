@@ -235,9 +235,9 @@ def build_parser() -> argparse.ArgumentParser:
     _add_workspace(exhibit_chart)
     _add_input_json(exhibit_chart)
     for operation in ("explanation", "review-visual"):
-        parser = exhibit_sub.add_parser(operation)
-        _add_workspace(parser)
-        _add_input_json(parser)
+        exhibit_operation = exhibit_sub.add_parser(operation)
+        _add_workspace(exhibit_operation)
+        _add_input_json(exhibit_operation)
 
     exhibit_list = exhibit_sub.add_parser("list")
     _add_workspace(exhibit_list)

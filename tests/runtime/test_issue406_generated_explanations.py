@@ -22,6 +22,15 @@ class GeneratedExplanationTests(unittest.TestCase):
         self.package.pop("package_digest")
         self.package["package_digest"] = digest(self.package)
 
+    def test_visual_cli_routes_preserve_existing_root_commands(self):
+        from plugins.local_application.cli import build_parser
+        parser = build_parser()
+        for command in ("status", "resume"):
+            self.assertEqual(parser.parse_args([command, "--workspace", "W", "--json"]).command, command)
+        for operation in ("chart", "explanation", "review-visual"):
+            args = parser.parse_args(["exhibit", operation, "--workspace", "W", "--json", "input.json"])
+            self.assertEqual((args.command, args.exhibit_command), ("exhibit", operation))
+
     def request(self):
         return {"package_id": self.package["package_id"], "object_ids": ["RQ-1"], "exhibit_ids": [], "request": {"purpose": "Explain the question", "allowed_labels": ["existing question"], "allowed_relations": [], "must_not_add": ["new causal or quantitative claims"]}, "generator": {"identity": "host image model", "version": "not exposed", "instruction": "Draw only the selected research meaning."}, "output_base64": base64.b64encode(fixture_png(2,2)).decode(), "semantic_changes": []}
 
