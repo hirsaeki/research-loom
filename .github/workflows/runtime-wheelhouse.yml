@@ -1,0 +1,91 @@
+name: runtime-wheelhouse
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PYTHONHASHSEED: '0'
+  TZ: UTC
+  LC_ALL: C.UTF-8
+  LANG: C.UTF-8
+
+jobs:
+  build:
+    name: build-linux-x86_64-py312
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+      - name: Export exact locked runtime requirements
+        run: |
+          mkdir -p dist/runtime-wheelhouse/wheels
+          uv export --frozen --no-dev --no-emit-project --format requirements-txt \
+            --output-file dist/runtime-wheelhouse/requirements.txt
+      - name: Download exact wheel-only runtime
+        run: |
+          python -m pip download \
+            --only-binary=:all: \
+            --require-hashes \
+            --dest dist/runtime-wheelhouse/wheels \
+            -r dist/runtime-wheelhouse/requirements.txt
+      - name: Write content manifest
+        run: python scripts/runtime_wheelhouse.py create-manifest --bundle dist/runtime-wheelhouse
+      - name: Verify content manifest
+        run: python scripts/runtime_wheelhouse.py verify --bundle dist/runtime-wheelhouse
+      - name: Upload runtime wheelhouse
+        id: upload
+        uses: actions/upload-artifact@v7
+        with:
+          name: research-loom-runtime-linux-x86_64-py312-${{ github.sha }}
+          path: dist/runtime-wheelhouse
+          if-no-files-found: error
+          retention-days: 14
+      - name: Record artifact identity
+        shell: bash
+        run: |
+          {
+            echo '### Runtime wheelhouse'
+            echo
+            echo '- repository HEAD: `${{ github.sha }}`'
+            echo '- artifact id: `${{ steps.upload.outputs.artifact-id }}`'
+            echo '- artifact digest: `sha256:${{ steps.upload.outputs.artifact-digest }}`'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  offline-smoke:
+    name: offline-install-smoke
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Download exact runtime artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: research-loom-runtime-linux-x86_64-py312-${{ github.sha }}
+          path: dist/runtime-wheelhouse
+      - name: Install without package indexes
+        env:
+          PIP_NO_INDEX: '1'
+        run: python scripts/runtime_wheelhouse.py install --bundle dist/runtime-wheelhouse
+      - name: Smoke production launcher from offline runtime
+        env:
+          PIP_NO_INDEX: '1'
+        run: ./research-loom --help
