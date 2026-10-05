@@ -196,9 +196,10 @@ def validate_resolved_references(package:Mapping[str,Any])->None:
             continue
         generated = exhibit.get("generated_visual")
         chart_content = exhibit.get("content", {}).get("value")
-        is_chart = isinstance(chart_content, Mapping) and chart_content.get("schema") == "research-generated-chart/v1"
-        if is_chart:
-            if not isinstance(generated, Mapping) or set(generated) != {"visual_class", "attachment_path", "media_type", "byte_length", "digest", "generation_context"} or generated.get("visual_class") != "data_visualization" or generated.get("media_type") != "image/png" or generated.get("digest") != chart_content.get("output", {}).get("digest"):
+        is_generated = isinstance(chart_content, Mapping) and chart_content.get("schema") in {"research-generated-chart/v1", "research-generated-explanation/v1"}
+        if is_generated:
+            expected_class = exhibit.get("visual_semantics", {}).get("visual_class")
+            if not isinstance(generated, Mapping) or set(generated) != {"visual_class", "attachment_path", "media_type", "byte_length", "digest", "generation_context"} or generated.get("visual_class") != expected_class or generated.get("media_type") != "image/png" or generated.get("digest") != chart_content.get("output", {}).get("digest"):
                 missing.append(f"generated_visual:{exhibit.get('exhibit_id')}")
             else:
                 require_attachment(generated.get("attachment_path"), digest=generated.get("digest"), size=generated.get("byte_length"), media_type="image/png", label=f"generated_visual:{exhibit.get('exhibit_id')}")

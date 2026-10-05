@@ -7,6 +7,7 @@ import uuid
 import rfc8785
 from plugins.research_visual_semantics import validate_visual_package_bindings
 from .research_chart import validate_chart_exhibit
+from .generated_explanation import validate_explanation
 from .visual_origin import verify_visual_origin
 from core.execution import RunStatus
 from core.runtime import canonical_digest as core_canonical_digest
@@ -313,6 +314,8 @@ def build_package(service, value:Mapping[str,Any])->Mapping[str,Any]:
     visual_origins = {}
     for exhibit in exhs:
         png = validate_chart_exhibit(exhibit, selected)
+        if png is None:
+            png = validate_explanation(exhibit)
         if png is not None:
             origin_id = exhibit["content"]["value"]["package_binding"]["package_id"]
             if origin_id not in visual_origins:
@@ -329,9 +332,9 @@ def build_package(service, value:Mapping[str,Any])->Mapping[str,Any]:
             if not any(a[0] == origin_path for a in attachments):
                 attachments.append((origin_path, origin_bytes, "application/json", "visual_generation_context"))
             path = f"attachments/visuals/{safe_component(exhibit['exhibit_id'], 'exhibit_id')}.png"
-            attachments.append((path, png, "image/png", f"research_chart:{exhibit['exhibit_id']}"))
+            attachments.append((path, png, "image/png", f"generated_visual:{exhibit['exhibit_id']}"))
             exhibit["generated_visual"] = {
-                "visual_class": "data_visualization", "attachment_path": path,
+                "visual_class": exhibit["visual_semantics"]["visual_class"], "attachment_path": path,
                 "media_type": "image/png", "byte_length": len(png), "digest": digest_bytes(png),
                 "generation_context": {"attachment_path": origin_path, "byte_length": len(origin_bytes), "content_digest": digest_bytes(origin_bytes)},
             }
