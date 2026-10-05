@@ -52,6 +52,10 @@ The current MISCO rule inventory maps into eight delivered review groups. Review
 - `writer-assembly-view` — respect assembly/return-to-research conditions; do not turn assembly order into Research authority.
 - `writer-qa-boundary` — send validity/support/causal issues back as Writing Feedback rather than deciding them in prose.
 
+## Figures requested during drafting
+
+If a figure/table would clarify supplied meaning, return to the Host's existing Research Exhibit/Package path described in `../../docs/operations/late-visual-needs.md`. Do not invent new analysis or attach a visual outside the fixed source binding. Let the Host resolve origin/section IDs internally, preserve this revision, and return with newly exported Writer inputs. Reuse unaffected prose only when its meaning and source scope still match; keep required qualifiers and unresolved gaps.
+
 ## Partial revision
 
 When revising one section, base the response on the exact current manuscript revision and return only the changed section. The round-trip service reuses unchanged sections from that exact base; never recreate or silently rewrite them.
