@@ -74,6 +74,8 @@ def validate_visual_package_bindings(exhibits: list, objects: list) -> None:
     object_index = {o["id"]: o for o in objects}
     exhibit_index = {e["exhibit_id"]: e for e in exhibits}
     for exhibit in exhibits:
+        from plugins.local_application.research_chart import validate_chart_exhibit
+        validate_chart_exhibit(exhibit, objects)
         value = exhibit.get("visual_semantics")
         if value is None:
             continue

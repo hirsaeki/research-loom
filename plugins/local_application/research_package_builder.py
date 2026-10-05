@@ -6,6 +6,8 @@ from typing import Any, Mapping
 import uuid
 import rfc8785
 from plugins.research_visual_semantics import validate_visual_package_bindings
+from .research_chart import validate_chart_exhibit
+from .visual_origin import verify_visual_origin
 from core.execution import RunStatus
 from core.runtime import canonical_digest as core_canonical_digest
 from .facade import LocalApplicationError
@@ -308,6 +310,31 @@ def build_package(service, value:Mapping[str,Any])->Mapping[str,Any]:
         validate_visual_package_bindings(exhs, selected)
     except (TypeError, ValueError) as exc:
         raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-REFERENCE-001", str(exc)) from exc
+    visual_origins = {}
+    for exhibit in exhs:
+        png = validate_chart_exhibit(exhibit, selected)
+        if png is not None:
+            origin_id = exhibit["content"]["value"]["package_binding"]["package_id"]
+            if origin_id not in visual_origins:
+                visual_origins[origin_id] = service._load(origin_id)
+            origin = visual_origins[origin_id]
+            try:
+                verify_visual_origin(exhibit, origin)
+            except (KeyError, TypeError, ValueError) as exc:
+                raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-REFERENCE-001", str(exc)) from exc
+            origin_bytes = rfc8785.dumps(origin)
+            if len(origin_bytes) > MAX_ITEM_BYTES:
+                raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-BOUND-001", "visual generation Package document exceeds attachment bound")
+            origin_path = f"attachments/visual-origin/{safe_component(origin['package_id'], 'package_id')}.json"
+            if not any(a[0] == origin_path for a in attachments):
+                attachments.append((origin_path, origin_bytes, "application/json", "visual_generation_context"))
+            path = f"attachments/visuals/{safe_component(exhibit['exhibit_id'], 'exhibit_id')}.png"
+            attachments.append((path, png, "image/png", f"research_chart:{exhibit['exhibit_id']}"))
+            exhibit["generated_visual"] = {
+                "visual_class": "data_visualization", "attachment_path": path,
+                "media_type": "image/png", "byte_length": len(png), "digest": digest_bytes(png),
+                "generation_context": {"attachment_path": origin_path, "byte_length": len(origin_bytes), "content_digest": digest_bytes(origin_bytes)},
+            }
     for iid in str_list(value.get("project_input_ids"),"project_input_ids",MAX_INPUTS):
         shown=service.facade.show_project_input(iid,format="text"); item=shown.get("project_input",{}); content=shown.get("content",{})
         if item.get("project_id")!=service.project_id or item.get("lineage_ref")!=state.active_lineage_ref: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-BINDING-001",f"Project Input belongs to another project/lineage: {iid}")

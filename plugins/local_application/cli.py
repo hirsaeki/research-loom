@@ -231,6 +231,10 @@ def build_parser() -> argparse.ArgumentParser:
     _add_workspace(exhibit_capture)
     _add_input_json(exhibit_capture)
 
+    exhibit_chart = exhibit_sub.add_parser("chart")
+    _add_workspace(exhibit_chart)
+    _add_input_json(exhibit_chart)
+
     exhibit_list = exhibit_sub.add_parser("list")
     _add_workspace(exhibit_list)
     exhibit_list.add_argument("--rq-id")
@@ -673,6 +677,8 @@ def _run(args: argparse.Namespace) -> Mapping[str, Any]:
             if args.writer_round_trip_command == "inspect":
                 return facade.inspect_writer_round_trip(args.composition_id, args.revision_id)
         if args.command == "exhibit":
+            if args.exhibit_command == "chart":
+                return facade.capture_chart_exhibit(_read_input(args.json_input))
             if args.exhibit_command == "capture":
                 return facade.capture_exhibit(_read_input(args.json_input))
             if args.exhibit_command == "list":
