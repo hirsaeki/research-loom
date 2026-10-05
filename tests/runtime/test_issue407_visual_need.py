@@ -10,7 +10,7 @@ class VisualNeedTests(ResearchPackageAcceptanceSupport):
 
     def test_three_origins_resume_after_reopen_preserving_history_and_authority(self):
         facade, case = self._prepared(matrix=True)
-        composition = facade.show_writer_composition(case['composition_id'])['composition']
+        composition = facade.show_writer_composition(case['composition_id'], 1)['composition']
         revision = facade.inspect_writer_round_trip(case['composition_id'])['revision']
         preview = facade.build_publication_preview(case['composition_id'])['build']
         original_package = facade.show_research_package(case['package_id'])['package']
@@ -29,13 +29,12 @@ class VisualNeedTests(ResearchPackageAcceptanceSupport):
             self.assertEqual(resumed['status'], 'RESUMABLE')
             self.assertNotEqual(resumed['package']['package_id'], case['package_id'])
             self.assertNotEqual(resumed['composition']['composition_id'], case['composition_id'])
-            new = facade.show_writer_composition(resumed['composition']['composition_id'])['composition']
-            for field in ('title', 'purpose', 'exhibit_refs', 'research_object_refs'):
-                self.assertEqual(new['sections'][1].get(field), composition['sections'][1].get(field))
+            new = facade.show_writer_composition(resumed['composition']['composition_id'], 1)['composition']
+            self.assertEqual(new['sections'][1], composition['sections'][1])
             self.assertFalse(resumed['release_approval_performed'])
         self.assertEqual(state_signature(facade._application), before)
         self.assertEqual(facade.show_research_package(case['package_id'])['package'], original_package)
-        self.assertEqual(facade.show_writer_composition(case['composition_id'])['composition'], composition)
+        self.assertEqual(facade.show_writer_composition(case['composition_id'], 1)['composition'], composition)
         self.assertEqual(facade.inspect_writer_round_trip(case['composition_id'])['revision'], revision)
         self.assertEqual(facade.show_publication_preview(preview['build_id'])['build'], preview)
 
@@ -52,7 +51,7 @@ class VisualNeedTests(ResearchPackageAcceptanceSupport):
         with self.assertRaises(LocalApplicationError):
             facade.resume_visual_need({'need_id': plain['exhibit']['exhibit_id'], 'exhibit_ids': [case['exhibit_id']], 'section_exhibit_refs': {'SEC-VALIDATE': []}})
         # Omitting rebuild cannot insert an Exhibit absent from the old Package.
-        proposal = deepcopy(facade.show_writer_composition(case['composition_id'])['composition'])
+        proposal = deepcopy(facade.show_writer_composition(case['composition_id'], 1)['composition'])
         proposal['sections'][0]['exhibit_refs'].append(plain['exhibit']['exhibit_id'])
         proposal = {k: proposal[k] for k in ('purpose', 'audience', 'sections')}
         proposal['created_by'] = {'type': 'unit'}; proposal['change_reason'] = 'Attempt stale binding'
@@ -61,9 +60,26 @@ class VisualNeedTests(ResearchPackageAcceptanceSupport):
 
     def test_remove_visual_creates_new_identity_and_keeps_old_revision(self):
         facade, case = self._prepared(matrix=True)
-        composition = facade.show_writer_composition(case['composition_id'])['composition']
+        composition = facade.show_writer_composition(case['composition_id'], 1)['composition']
         need = facade.capture_visual_need({'origin': {'stage': 'narrative', 'composition_id': case['composition_id'], 'composition_version': 1}, 'purpose': 'Use prose instead', 'semantic_changes': [], 'affected_section_ids': ['SEC-FRAME']})
         resumed = facade.resume_visual_need({'need_id': need['exhibit']['exhibit_id'], 'exhibit_ids': [], 'section_exhibit_refs': {'SEC-FRAME': []}})
-        current = facade.show_writer_composition(resumed['composition']['composition_id'])['composition']
+        current = facade.show_writer_composition(resumed['composition']['composition_id'], 1)['composition']
         self.assertEqual(current['sections'][0]['exhibit_refs'], [])
-        self.assertEqual(facade.show_writer_composition(case['composition_id'])['composition'], composition)
+        self.assertEqual(facade.show_writer_composition(case['composition_id'], 1)['composition'], composition)
+
+    def test_pending_explanation_cannot_resume_until_exact_review_is_selected(self):
+        import base64
+        from unittest.mock import patch
+        from test_issue256_native_publication import fixture_png
+        facade, case = self._prepared(matrix=True)
+        need = facade.capture_visual_need({'origin': {'stage': 'narrative', 'composition_id': case['composition_id'], 'composition_version': 1}, 'purpose': 'Explain existing meaning', 'semantic_changes': [], 'affected_section_ids': ['SEC-FRAME']})
+        candidate = facade.capture_explanation_exhibit({'package_id': case['package_id'], 'object_ids': [case['rq_id']], 'exhibit_ids': [], 'request': {'purpose': 'Existing question', 'allowed_labels': ['existing question'], 'allowed_relations': [], 'must_not_add': ['new research meaning']}, 'generator': {'identity': 'unit generator', 'version': '1', 'instruction': 'Use existing meaning only.'}, 'output_base64': base64.b64encode(fixture_png(2,2)).decode(), 'semantic_changes': []})['exhibit']['exhibit_id']
+        request = {'need_id': need['exhibit']['exhibit_id'], 'exhibit_ids': [case['exhibit_id'], candidate], 'section_exhibit_refs': {'SEC-FRAME': [candidate]}}
+        with patch.object(facade, 'build_research_package') as rebuild:
+            with self.assertRaises(LocalApplicationError) as raised: facade.resume_visual_need(request)
+            self.assertEqual(raised.exception.code, 'APPLICATION-VISUAL-REVIEW-REQUIRED')
+            rebuild.assert_not_called()
+        review = facade.capture_visual_review({'candidate_id': candidate, 'disposition': 'existing_meaning_only', 'semantic_changes': [], 'reviewer': {'actor_type': 'host', 'actor_id': 'UNIT-HOST'}, 'rationale': 'Synthetic backend review fixture, not live UAT.'})['exhibit']['exhibit_id']
+        request['exhibit_ids'].append(review)
+        resumed = facade.resume_visual_need(request)
+        self.assertEqual(resumed['status'], 'RESUMABLE')

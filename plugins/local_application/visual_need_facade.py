@@ -109,8 +109,12 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
             semantics = exhibit.get("visual_semantics")
             if isinstance(semantics, Mapping) and semantics["semantic_changes"]:
                 raise LocalApplicationError("APPLICATION-VISUAL-RESEARCH-REQUIRED", "selected visual introduces new research meaning")
-            if validate_explanation(exhibit) is not None and matching_review(exhibit, selected) == "research_required":
-                raise LocalApplicationError("APPLICATION-VISUAL-RESEARCH-REQUIRED", "visual review requires ordinary Research work")
+            if validate_explanation(exhibit) is not None:
+                disposition = matching_review(exhibit, selected)
+                if disposition == "research_required":
+                    raise LocalApplicationError("APPLICATION-VISUAL-RESEARCH-REQUIRED", "visual review requires ordinary Research work")
+                if disposition != "existing_meaning_only":
+                    raise LocalApplicationError("APPLICATION-VISUAL-REVIEW-REQUIRED", "visual requires an explicit existing-meaning review before resume")
         updates = value["section_exhibit_refs"]
         if not isinstance(updates, Mapping) or not set(updates) <= set(need["affected_section_ids"]):
             raise LocalApplicationError("APPLICATION-VISUAL-NEED-001", "only declared affected sections may change")
