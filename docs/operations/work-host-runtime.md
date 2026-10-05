@@ -28,10 +28,32 @@ maintenance does not itself invoke that Skill.
 ## Runtime readiness
 
 For a Work environment with shell access, use the existing POSIX launcher. The
-runtime must already be provisioned from the repository root `pyproject.toml`
-and `uv.lock`, using `uv sync --frozen` in an authorized setup environment outside
-the host sandbox. There is no Work-specific dependency list. A virtual environment
-copied from another machine or filesystem path is not assumed to be portable.
+runtime must match the repository root `pyproject.toml` and `uv.lock`. Do not assume
+that `uv sync --frozen` can run inside the Host sandbox: `--frozen` prevents lock
+updates, but missing wheels still require package-index access.
+
+The supported no-index path is the repository `runtime-wheelhouse` workflow. For
+the exact repository HEAD, that workflow exports the frozen runtime requirements,
+downloads **wheel-only** Linux x86_64 / Python 3.12 artifacts in GitHub Actions,
+records the exact `pyproject.toml`, `uv.lock`, requirements and wheel digests in
+`manifest.json`, uploads the directory as one GitHub Actions artifact, then proves
+that the uploaded/downloaded artifact can construct `.venv` with package indexes
+disabled. This is runtime provisioning only; it does not grant Research authority.
+
+After retrieving and extracting the artifact for the exact checked-out HEAD, run:
+
+```sh
+python3.12 scripts/runtime_wheelhouse.py verify --bundle <runtime-wheelhouse-dir>
+python3.12 scripts/runtime_wheelhouse.py install --bundle <runtime-wheelhouse-dir>
+./research-loom --help
+```
+
+`verify` and `install` fail closed when the repository HEAD, `pyproject.toml`,
+`uv.lock`, target platform/Python, requirements or any wheel does not match the
+manifest. `install` invokes pip with `--no-index` and `--require-hashes`; it never
+falls back to PyPI. An existing `.venv` is not overwritten. There is still no
+Work-specific dependency list, and a virtual environment copied from another
+machine or filesystem path is not assumed to be portable.
 
 In the repository root, before starting research:
 
@@ -122,7 +144,11 @@ On 2026-10-05 JST, repository HEAD
 Python 3.12 was present, but the repository `.venv` and system `jsonschema` were
 absent. Invoking the POSIX launcher exited 127 with `.venv/bin/python: not found`.
 This is a negative readiness observation, not a failed research result and not a
-Work live PASS. Additional dependencies were not installed to run local tests.
+Work live PASS. A later fresh environment reproduced the same missing-root-runtime
+condition and also confirmed that relying on `uv sync --frozen` inside a DNS-blocked
+Host is not sufficient. The wheelhouse path above exists specifically so package
+resolution/download happens outside the Host and the Host performs only verified,
+no-index installation.
 
 After provisioning, #401 requires actual public execution, whole-set transfer and
 reopen, and delivery of an openable canonical preview. #337 additionally requires
