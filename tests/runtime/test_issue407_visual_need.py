@@ -1,12 +1,12 @@
 from copy import deepcopy
 from plugins.local_application import LocalApplicationFacade, LocalApplicationError
 from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-from test_issue256_native_publication import Issue256NativePublicationTests
+import test_issue256_native_publication as native
 from test_research_exhibits import exhibit_payload, state_signature
 
 
 class VisualNeedTests(ResearchPackageAcceptanceSupport):
-    _prepared = Issue256NativePublicationTests._prepared
+    _prepared = native.Issue256NativePublicationTests._prepared
 
     def test_three_origins_resume_after_reopen_preserving_history_and_authority(self):
         facade, case = self._prepared(matrix=True)

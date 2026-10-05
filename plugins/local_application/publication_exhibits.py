@@ -155,6 +155,44 @@ def _asset(root: Path, package: Mapping[str, Any], path: str, digest: str, size:
     return data
 
 
+def _visual_sources(exhibit, package, *, strict=False):
+    """Follow existing research and Exhibit provenance, including represented Findings."""
+    from .research_package_builder import _required_object_refs
+    resolved = package["resolved_content"]
+    objects = {o["id"]: o for o in resolved["research_objects"]}
+    exhibits = {e["exhibit_id"]: e for e in resolved["working_material"]["research_exhibits"]}
+    source_cache = {}; visiting_exhibits = set()
+
+    def object_sources(oid, seen=None):
+        seen = set() if seen is None else seen
+        if oid in seen: return set()
+        seen.add(oid)
+        obj = objects.get(oid)
+        if obj is None: return set()  # legacy working-object labels are not authority
+        if obj["kind"] == "source": return {oid}
+        return set().union(*(object_sources(ref, seen) for _, ref in _required_object_refs(obj)))
+
+    def exhibit_sources(row):
+        eid = row["exhibit_id"]
+        if eid in source_cache: return set(source_cache[eid])
+        if eid in visiting_exhibits: raise ValueError("cyclic visual provenance")
+        visiting_exhibits.add(eid)
+        ids = set().union(*(object_sources(oid) for oid in row["source_object_ids"]))
+        for parent in row["derived_from_exhibit_ids"]:
+            if parent in exhibits: ids.update(exhibit_sources(exhibits[parent]))
+        visual = row.get("visual_target")
+        if visual is not None:
+            capture = next(m["capture"] for m in resolved.get("materials", []) if m["run_id"] == visual["source_run_id"] and m["capture"]["capture_id"] == visual["capture_id"])
+            ids.update(o["id"] for o in objects.values() if o["kind"] == "source" and o.get("content_digest") == visual["source_digest"] and o.get("canonical_locator") in {capture.get("source_locator"), *(capture.get("source_locators") or [])})
+        if strict and (visual is not None or row["source_run_ids"] or row["source_artifact_refs"]) and not ids:
+            raise ValueError("external visual context lacks explicit Source metadata")
+        visiting_exhibits.remove(eid)
+        source_cache[eid] = set(ids)
+        return ids
+
+    return [objects[oid] for oid in sorted(exhibit_sources(exhibit))]
+
+
 def prepare_exhibits(inspection: Mapping[str, Any], workspace: Path) -> dict[str, dict[str, Any]]:
     package = inspection["source_package_document"]
     root = workspace / ".research-loom" / "research-packages" / safe_component(package["package_id"], "package_id")
@@ -168,7 +206,11 @@ def prepare_exhibits(inspection: Mapping[str, Any], workspace: Path) -> dict[str
             asset_cache[key] = _asset(root, package, path, digest, size, media)
         return asset_cache[key]
 
-    for exhibit in package["resolved_content"]["working_material"]["research_exhibits"]:
+    objects = {o["id"]: o for o in package["resolved_content"]["research_objects"]}
+    misco = inspection.get("publication_profile", {}).get("profile_id") == "misco.publication"
+    permissions = inspection.get("publication_policy", {}).get("permissions", [])
+    all_exhibits = package["resolved_content"]["working_material"]["research_exhibits"]
+    for exhibit in all_exhibits:
         ref = exhibit["exhibit_id"]
         if ref not in selected:
             continue
@@ -177,12 +219,66 @@ def prepare_exhibits(inspection: Mapping[str, Any], workspace: Path) -> dict[str
             "derived_from_exhibit_ids", "captured_against",
         )}
         visual = exhibit.get("visual_target")
+        generated = exhibit.get("generated_visual")
+        unavailable_code = "VISUAL_ASSET_UNAVAILABLE" if visual is not None or generated is not None else "UNSUPPORTED_EXHIBIT"
+        semantics = exhibit.get("visual_semantics")
+        if semantics is not None:
+            provenance["visual_semantics"] = deepcopy(semantics)
         try:
-            if visual is not None:
+            if not isinstance(exhibit.get("title"), str) or not exhibit["title"].strip():
+                unavailable_code = "VISUAL_CAPTION_REQUIRED"
+                raise ValueError("visual title is missing")
+            if isinstance(semantics, Mapping) and semantics["semantic_changes"]:
+                unavailable_code = "VISUAL_RESEARCH_REQUIRED"
+                raise ValueError("new meaning requires Research")
+            if generated is not None:
+                from .generated_explanation import matching_review, validate_explanation, REVIEW_SCHEMA
+                from .research_chart import validate_chart_exhibit
+                from .visual_origin import verify_visual_origin
+                expected = validate_chart_exhibit(exhibit, package["resolved_content"]["research_objects"])
+                legend = None
+                value = exhibit["content"]["value"]
+                if expected is None:
+                    expected = validate_explanation(exhibit)
+                    if expected is None:
+                        raise ValueError("unsupported generated visual")
+                    disposition = matching_review(exhibit, all_exhibits)
+                    if disposition != "existing_meaning_only":
+                        unavailable_code = "VISUAL_RESEARCH_REQUIRED" if disposition == "research_required" else "VISUAL_REVIEW_REQUIRED"
+                        raise ValueError("selected explanatory candidate has no conforming review")
+                    provenance["visual_reviews"] = [deepcopy(e) for e in all_exhibits if isinstance(e.get("content", {}).get("value"), Mapping) and e["content"]["value"].get("schema") == REVIEW_SCHEMA and e["content"]["value"].get("candidate_id") == ref]
+                else:
+                    legend = table_rows({"representation": "json", "value": value["legend"]})
+                context = generated["generation_context"]
+                origin = json.loads(asset(context["attachment_path"], context["content_digest"], context["byte_length"], "application/json").decode("utf-8"))
+                verify_visual_origin(exhibit, origin)
+                data = asset(generated["attachment_path"], generated["digest"], generated["byte_length"], generated["media_type"])
+                if data != expected:
+                    raise ValueError("selected PNG differs from generated Exhibit")
+                width, height = png_size(data)
+                unavailable_code = "VISUAL_SOURCE_METADATA_REQUIRED"
+                citation_sources = _visual_sources(exhibit, package, strict=misco)
+                source_ids = {o["id"] for o in citation_sources}
+                if misco and any(any(not isinstance(o.get(k), str) or not o[k].strip() for k in ("title", "publisher_or_author", "publication_or_update_date", "canonical_locator")) for o in citation_sources):
+                    unavailable_code = "VISUAL_SOURCE_METADATA_REQUIRED"
+                    raise ValueError("external data source needs explicit bibliographic metadata")
+                provenance["citation_sources"] = deepcopy(citation_sources)
+                provenance["publication_permissions"] = deepcopy([p for p in permissions if p.get("source_ref") in source_ids])
+                provenance["generated_visual"] = deepcopy(generated)
+                provenance["generation_input"] = {k: deepcopy(v) for k, v in value.items() if k != "output"}
+                provenance["selected_output"] = {k: v for k, v in value["output"].items() if k != "bytes_base64"}
+                result[ref] = {"kind": "image", "data": data, "width": width, "height": height, "provenance": provenance, "asset_digest": generated["digest"], **({"legend_rows": legend} if legend is not None else {})}
+            elif visual is not None:
                 provenance["visual_target"] = deepcopy(visual)
                 capture = next(item["capture"] for item in package["resolved_content"]["materials"]
                                if item["run_id"] == visual["source_run_id"] and item["capture"]["capture_id"] == visual["capture_id"])
                 provenance["source_capture"] = deepcopy(capture)
+                citation_sources = [o for o in objects.values() if o.get("kind") == "source" and o.get("content_digest") == visual["source_digest"] and o.get("canonical_locator") in {capture.get("source_locator"), *(capture.get("source_locators") or [])}]
+                if misco and (len(citation_sources) != 1 or any(not isinstance(citation_sources[0].get(k), str) or not citation_sources[0][k].strip() for k in ("title", "publisher_or_author", "publication_or_update_date"))):
+                    unavailable_code = "VISUAL_SOURCE_METADATA_REQUIRED"
+                    raise ValueError("external visual needs exact Source bibliographic metadata")
+                provenance["citation_sources"] = deepcopy(citation_sources)
+                provenance["publication_permissions"] = deepcopy([p for p in permissions if p.get("source_ref") in {o["id"] for o in citation_sources}])
                 # The original must still verify even when a retained crop is used.
                 original = asset(visual["source_attachment_path"], visual["source_digest"],
                                  visual["source_byte_length"], visual["source_media_type"])
@@ -206,7 +302,7 @@ def prepare_exhibits(inspection: Mapping[str, Any], workspace: Path) -> dict[str
             else:
                 raise ValueError("unsupported Exhibit representation; no implicit text fallback")
         except (LocalApplicationError, OSError, ValueError, KeyError, TypeError, StopIteration):
-            result[ref] = {"kind": "unavailable", "code": "VISUAL_ASSET_UNAVAILABLE" if visual is not None else "UNSUPPORTED_EXHIBIT",
+            result[ref] = {"kind": "unavailable", "code": unavailable_code,
                            "provenance": provenance}
     return result
 

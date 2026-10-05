@@ -101,7 +101,7 @@ def _bookmark(ref: str) -> str:
 
 def _provenance(lines: list[tuple[str, Any]]) -> list[dict[str, Any]]:
     return [{"ref": block["ref"], "caption": block["caption"], "kind": block["kind"],
-             "provenance": block["provenance"], **({"asset_digest": block["asset_digest"]} if block["kind"] == "image" else {})}
+             "provenance": block["provenance"], **({"asset_digest": block["asset_digest"]} if block["kind"] == "image" else {}), **({"legend_rows": block["legend_rows"]} if "legend_rows" in block else {})}
             for role, block in lines if role == "exhibit"]
 
 
@@ -138,6 +138,8 @@ def docx_bytes(lines: list[tuple[str, Any]], layout: dict[str, Any] | None = Non
         elif block["kind"] == "image":
             body.append(_image(block, index, content_width_emu))
             body.append(caption)
+            if "legend_rows" in block:
+                body.append(_table(block["legend_rows"], content_width_twips))
             name = f'media/image-{index}.png'
             images['word/' + name] = block['data']
             relationships.append(f'<Relationship Id="rIdImage{index}" Type="{R}/image" Target="{name}"/>')
@@ -298,6 +300,11 @@ def verify_native_docx(data: bytes, lines: list[tuple[str, Any]], layout: dict[s
                     bookmarks = caption.findall(f'.//{{{W}}}bookmarkStart')
                     if len(bookmarks) != 1 or bookmarks[0].get(f'{{{W}}}name') != _bookmark(block['ref']):
                         return False
+                    if 'legend_rows' in block:
+                        table = take('tbl')
+                        rows = [[_paragraph_text(cell) for cell in row.findall(f'{{{W}}}tc')] for row in table.findall(f'{{{W}}}tr')]
+                        if rows != [[normalized(cell) for cell in row] for row in block['legend_rows']]:
+                            return False
                 else:
                     unavailable = take('p')
                     expected = f'[Unavailable exhibit: {block["code"]}. Preserve the source and supply a supported representation under a new identity.]'
