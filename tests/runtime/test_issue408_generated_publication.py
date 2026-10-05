@@ -13,15 +13,16 @@ from plugins.local_application import LocalApplicationError
 from plugins.local_application.publication_exhibits import prepare_exhibits
 from plugins.local_application.publication_docx import W, A, docx_bytes, verify_native_docx
 from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-from test_issue256_native_publication import Issue256NativePublicationTests, fixture_png
-from test_issue405_research_charts import ChartExhibitTests
+import test_issue256_native_publication as native
+from test_issue256_native_publication import fixture_png
+import test_issue405_research_charts as charts
 import test_issue219_writer_round_trip as writer
 import issue80_writer_composition_suite as compositions
 from test_research_exhibits import state_signature
 
 
 class GeneratedPublicationTests(ResearchPackageAcceptanceSupport):
-    _prepared = Issue256NativePublicationTests._prepared
+    _prepared = native.Issue256NativePublicationTests._prepared
 
     def capture(self, facade, case, png):
         return facade.capture_explanation_exhibit({'package_id': case['package_id'], 'object_ids': [case['rq_id']], 'exhibit_ids': [], 'request': {'purpose': 'Existing question overview', 'allowed_labels': ['existing question'], 'allowed_relations': [], 'must_not_add': ['new research claims']}, 'generator': {'identity': 'synthetic test generator', 'version': '1', 'instruction': 'Use existing meaning only.'}, 'output_base64': base64.b64encode(png).decode(), 'semantic_changes': []})['exhibit']['exhibit_id']
@@ -115,8 +116,8 @@ class GeneratedPublicationTests(ResearchPackageAcceptanceSupport):
 
 
 class ChartNativeLegendTests(unittest.TestCase):
-    setUp = ChartExhibitTests.setUp
-    capture = ChartExhibitTests.capture
+    setUp = charts.ChartCaptureTests.setUp
+    capture = charts.ChartCaptureTests.capture
     # Consumer-level fixture uses the chart unit Package, not live Research/Host UAT.
     def test_chart_consumer_keeps_unicode_native_legend_and_detects_cell_tamper(self):
         chart = self.capture()
@@ -162,3 +163,19 @@ class VisualPermissionTests(unittest.TestCase):
             changed = deepcopy(inputs); changed['permissions'][0][field] = value
             self.assertIn('INPUT-PERMISSION', _publication_policy(package, profile, changed)['missing_inputs'])
         self.assertFalse(_publication_policy(package, {"profile_id": "generic", "profile_version": "1"}, {})['release_blocked'])
+
+    def test_generated_meaning_keeps_transitive_finding_and_exhibit_sources(self):
+        from plugins.local_application.publication_exhibits import _visual_sources
+        source = {'id': 'SRC', 'kind': 'source', 'title': 'Original study'}
+        evidence = {'id': 'EVD', 'kind': 'evidence', 'source_id': 'SRC'}
+        finding = {'id': 'FND', 'kind': 'finding', 'evidence_ids': ['EVD']}
+        parent = {'exhibit_id': 'EX-PARENT', 'source_object_ids': ['FND'], 'derived_from_exhibit_ids': [], 'source_run_ids': ['RUN'], 'source_artifact_refs': ['ART']}
+        candidate = {'exhibit_id': 'EX-GENERATED', 'source_object_ids': [], 'derived_from_exhibit_ids': ['EX-PARENT'], 'source_run_ids': [], 'source_artifact_refs': []}
+        package = {'resolved_content': {'research_objects': [source, evidence, finding], 'working_material': {'research_exhibits': [parent, candidate]}}}
+        self.assertEqual(_visual_sources(candidate, package, strict=True), [source])
+        second = deepcopy(parent); second['exhibit_id'] = 'EX-SECOND'
+        package['resolved_content']['working_material']['research_exhibits'].append(second)
+        candidate['derived_from_exhibit_ids'].append('EX-SECOND')
+        self.assertEqual(_visual_sources(candidate, package, strict=True), [source])
+        parent['source_object_ids'] = []
+        with self.assertRaises(ValueError): _visual_sources(candidate, package, strict=True)

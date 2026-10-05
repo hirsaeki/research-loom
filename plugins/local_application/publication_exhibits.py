@@ -155,6 +155,44 @@ def _asset(root: Path, package: Mapping[str, Any], path: str, digest: str, size:
     return data
 
 
+def _visual_sources(exhibit, package, *, strict=False):
+    """Follow existing research and Exhibit provenance, including represented Findings."""
+    from .research_package_builder import _required_object_refs
+    resolved = package["resolved_content"]
+    objects = {o["id"]: o for o in resolved["research_objects"]}
+    exhibits = {e["exhibit_id"]: e for e in resolved["working_material"]["research_exhibits"]}
+    source_cache = {}; visiting_exhibits = set()
+
+    def object_sources(oid, seen=None):
+        seen = set() if seen is None else seen
+        if oid in seen: return set()
+        seen.add(oid)
+        obj = objects.get(oid)
+        if obj is None: return set()  # legacy working-object labels are not authority
+        if obj["kind"] == "source": return {oid}
+        return set().union(*(object_sources(ref, seen) for _, ref in _required_object_refs(obj)))
+
+    def exhibit_sources(row):
+        eid = row["exhibit_id"]
+        if eid in source_cache: return set(source_cache[eid])
+        if eid in visiting_exhibits: raise ValueError("cyclic visual provenance")
+        visiting_exhibits.add(eid)
+        ids = set().union(*(object_sources(oid) for oid in row["source_object_ids"]))
+        for parent in row["derived_from_exhibit_ids"]:
+            if parent in exhibits: ids.update(exhibit_sources(exhibits[parent]))
+        visual = row.get("visual_target")
+        if visual is not None:
+            capture = next(m["capture"] for m in resolved.get("materials", []) if m["run_id"] == visual["source_run_id"] and m["capture"]["capture_id"] == visual["capture_id"])
+            ids.update(o["id"] for o in objects.values() if o["kind"] == "source" and o.get("content_digest") == visual["source_digest"] and o.get("canonical_locator") in {capture.get("source_locator"), *(capture.get("source_locators") or [])})
+        if strict and (visual is not None or row["source_run_ids"] or row["source_artifact_refs"]) and not ids:
+            raise ValueError("external visual context lacks explicit Source metadata")
+        visiting_exhibits.remove(eid)
+        source_cache[eid] = set(ids)
+        return ids
+
+    return [objects[oid] for oid in sorted(exhibit_sources(exhibit))]
+
+
 def prepare_exhibits(inspection: Mapping[str, Any], workspace: Path) -> dict[str, dict[str, Any]]:
     package = inspection["source_package_document"]
     root = workspace / ".research-loom" / "research-packages" / safe_component(package["package_id"], "package_id")
@@ -218,13 +256,9 @@ def prepare_exhibits(inspection: Mapping[str, Any], workspace: Path) -> dict[str
                 if data != expected:
                     raise ValueError("selected PNG differs from generated Exhibit")
                 width, height = png_size(data)
-                source_ids = set()
-                for semantic_ref in semantics["semantic_refs"]:
-                    obj = objects.get(semantic_ref["id"]) if semantic_ref["kind"] == "research_object" else None
-                    if obj is not None:
-                        if obj["kind"] == "source": source_ids.add(obj["id"])
-                        elif obj.get("source_id"): source_ids.add(obj["source_id"])
-                citation_sources = [objects[sid] for sid in sorted(source_ids)]
+                unavailable_code = "VISUAL_SOURCE_METADATA_REQUIRED"
+                citation_sources = _visual_sources(exhibit, package, strict=misco)
+                source_ids = {o["id"] for o in citation_sources}
                 if misco and any(any(not isinstance(o.get(k), str) or not o[k].strip() for k in ("title", "publisher_or_author", "publication_or_update_date", "canonical_locator")) for o in citation_sources):
                     unavailable_code = "VISUAL_SOURCE_METADATA_REQUIRED"
                     raise ValueError("external data source needs explicit bibliographic metadata")

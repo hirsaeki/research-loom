@@ -231,13 +231,14 @@ class Issue256NativePublicationTests(ResearchPackageAcceptanceSupport):
                 'exhibit_id': ref, 'content_digest': 'sha256:' + ref.lower().replace('-', '0').ljust(64, '0')[:64],
                 'source_run_ids': ['RUN-CACHE'], 'source_artifact_refs': ['RUN-CACHE.CAP-CACHE.original'],
                 'source_object_ids': [], 'derived_from_exhibit_ids': [], 'captured_against': {},
-                'kind': 'graph', 'content': {'representation': 'text', 'value': ref}, 'visual_target': dict(visual),
+                'kind': 'graph', 'title': ref, 'content': {'representation': 'text', 'value': ref}, 'visual_target': dict(visual),
             }
         inspection = {
             'revision': {'sections': [{'exhibit_refs': ['EX-CACHE-1', 'EX-CACHE-2']}]},
             'source_package_document': {
                 'package_id': 'PKG-CACHE', 'attachments': [],
                 'resolved_content': {
+                    'research_objects': [],
                     'materials': [{'run_id': 'RUN-CACHE', 'capture': {'capture_id': 'CAP-CACHE'}}],
                     'working_material': {'research_exhibits': [exhibit('EX-CACHE-1'), exhibit('EX-CACHE-2')]},
                 },
