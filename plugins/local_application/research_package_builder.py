@@ -5,6 +5,7 @@ import json
 from typing import Any, Mapping
 import uuid
 import rfc8785
+from plugins.research_visual_semantics import validate_visual_package_bindings
 from core.execution import RunStatus
 from core.runtime import canonical_digest as core_canonical_digest
 from .facade import LocalApplicationError
@@ -303,6 +304,10 @@ def build_package(service, value:Mapping[str,Any])->Mapping[str,Any]:
         if len(data)>MAX_ITEM_BYTES: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-BOUND-001",f"Research Exhibit exceeds per-item bound: {eid}")
         modes.update(_collect_exhibit_modes(service, ex, state, exhibit_provenance_seen))
         path=f"attachments/exhibits/{safe_component(eid,'exhibit_id')}.{ext}"; attachments.append((path,data,media,f"research_exhibit:{eid}")); exhs.append(_package_visual_target(service, ex, attachments, visual_attachment_paths))
+    try:
+        validate_visual_package_bindings(exhs, selected)
+    except (TypeError, ValueError) as exc:
+        raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-REFERENCE-001", str(exc)) from exc
     for iid in str_list(value.get("project_input_ids"),"project_input_ids",MAX_INPUTS):
         shown=service.facade.show_project_input(iid,format="text"); item=shown.get("project_input",{}); content=shown.get("content",{})
         if item.get("project_id")!=service.project_id or item.get("lineage_ref")!=state.active_lineage_ref: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-BINDING-001",f"Project Input belongs to another project/lineage: {iid}")

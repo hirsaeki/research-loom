@@ -11,6 +11,7 @@ import sqlite3
 from typing import Any, Mapping
 
 import rfc8785
+from plugins.research_visual_semantics import validate_visual_semantics
 
 
 EXHIBIT_STORE_SCHEMA_VERSION = "0.1.0"
@@ -267,7 +268,7 @@ def validate_exhibit_document(value: Mapping[str, Any]) -> None:
         "derived_from_exhibit_ids", "captured_against", "content", "content_digest",
         "provenance",
     }
-    allowed = required | {"visual_target"}
+    allowed = required | {"visual_target", "visual_semantics"}
     if not isinstance(value, Mapping) or set(value) - allowed or not required.issubset(value):
         raise LocalResearchExhibitStoreError(
             "EXHIBIT-DOCUMENT-001", "stored Research Exhibit document shape is invalid"
@@ -295,6 +296,11 @@ def validate_exhibit_document(value: Mapping[str, Any]) -> None:
     _validate_snapshot_binding(value.get("captured_against"))
     if "visual_target" in value:
         validate_visual_target(value.get("visual_target"))
+    if "visual_semantics" in value:
+        try:
+            validate_visual_semantics(value["visual_semantics"], value)
+        except (TypeError, ValueError) as exc:
+            raise LocalResearchExhibitStoreError("EXHIBIT-DOCUMENT-001", str(exc)) from exc
 
     content = value.get("content")
     if not isinstance(content, Mapping) or set(content) != {
@@ -339,6 +345,7 @@ def validate_exhibit_document(value: Mapping[str, Any]) -> None:
 
 def _metadata_from_document(document: Mapping[str, Any]) -> dict[str, Any]:
     return {
+        **({"visual_class": document["visual_semantics"]["visual_class"], "semantic_status": document["visual_semantics"]["semantic_status"]} if "visual_semantics" in document else {}),
         "exhibit_id": str(document["exhibit_id"]),
         "project_id": str(document["project_id"]),
         "kind": str(document["kind"]),
@@ -358,10 +365,15 @@ def _metadata_from_document(document: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _validate_exhibit_metadata(value: Mapping[str, Any]) -> None:
-    if not isinstance(value, Mapping) or set(value) != _METADATA_FIELDS:
+    if not isinstance(value, Mapping) or set(value) not in (_METADATA_FIELDS, _METADATA_FIELDS | {"visual_class", "semantic_status"}):
         raise LocalResearchExhibitStoreError(
             "EXHIBIT-STORE-INTEGRITY-001", "stored Research Exhibit metadata shape is invalid"
         )
+    if "visual_class" in value and (
+        value["visual_class"] not in {"source_visual", "data_visualization", "explanatory_visual"}
+        or value["semantic_status"] not in {"review_required", "research_required"}
+    ):
+        raise LocalResearchExhibitStoreError("EXHIBIT-STORE-INTEGRITY-001", "stored visual semantic metadata is invalid")
     for field in (
         "exhibit_id", "project_id", "kind", "title", "purpose",
         "content_representation", "content_digest", "captured_at", "capture_origin",
