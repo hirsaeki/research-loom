@@ -75,7 +75,15 @@ def validate_visual_package_bindings(exhibits: list, objects: list) -> None:
     exhibit_index = {e["exhibit_id"]: e for e in exhibits}
     for exhibit in exhibits:
         from plugins.local_application.research_chart import validate_chart_exhibit
+        from plugins.local_application.generated_explanation import REVIEW_SCHEMA, matching_review, validate_explanation
         validate_chart_exhibit(exhibit, objects)
+        validate_explanation(exhibit)
+        content = exhibit.get("content", {}).get("value")
+        if isinstance(content, Mapping) and content.get("schema") == REVIEW_SCHEMA:
+            candidate = exhibit_index.get(content.get("candidate_id"))
+            if candidate is None or validate_explanation(candidate) is None:
+                raise ValueError("visual review requires its exact selected explanatory candidate")
+            matching_review(candidate, [exhibit])
         value = exhibit.get("visual_semantics")
         if value is None:
             continue
