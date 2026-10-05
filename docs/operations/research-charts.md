@@ -18,9 +18,21 @@ The Evidence's already-qualified `excerpt` must contain an explicit JSON object:
 ```
 
 Establishing or revising this excerpt belongs to ordinary Research and its existing
-Evidence qualification/revision decisions. The chart operation does not extract
-numbers from prose or approve an extraction. A source's original/capture/locator
-and supporting Evidence remain in the Package's existing reference closure.
+Evidence qualification authority. For current unverified Evidence, the public
+`research.evidence.qualify` action creates one exact, candidate-only verification
+revision. Its payload pins `evidence_id`, current `expected_revision` and
+`expected_digest`, gives the qualification `rationale`, and may supply the exact
+`excerpt` being reviewed. The operation copies source, locator, statement, capture
+binding, Evidence kind/mode and limitations unchanged. It never commits the revision:
+use the existing `state.apply_candidate` -> Confirmation -> Human Decision path, whose
+Core authority validation derives `evidence_qualification / verify`. A verified exact
+retry is a no-op; changing already-verified content is rejected.
+
+The chart operation does not extract numbers from prose or approve an extraction.
+A source's original/capture/locator and supporting Evidence remain in the Package's
+existing reference closure. For charts, the Human review must cover the exact
+structured quantitative excerpt; the later chart validator checks its bounded shape
+and exact values but does not replace that research judgment.
 
 The `exhibit chart` CLI or `capture_chart_exhibit` Facade accepts an existing
 `package_id`, `chart_spec`, optional `generator_identity` and `generator_version`.
