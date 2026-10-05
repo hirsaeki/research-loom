@@ -194,6 +194,16 @@ def validate_resolved_references(package:Mapping[str,Any])->None:
         if not isinstance(exhibit,Mapping):
             missing.append("working_material.research_exhibits")
             continue
+        generated = exhibit.get("generated_visual")
+        chart_content = exhibit.get("content", {}).get("value")
+        is_chart = isinstance(chart_content, Mapping) and chart_content.get("schema") == "research-generated-chart/v1"
+        if is_chart:
+            if not isinstance(generated, Mapping) or set(generated) != {"visual_class", "attachment_path", "media_type", "byte_length", "digest"} or generated.get("visual_class") != "data_visualization" or generated.get("media_type") != "image/png" or generated.get("digest") != chart_content.get("output", {}).get("digest"):
+                missing.append(f"generated_visual:{exhibit.get('exhibit_id')}")
+            else:
+                require_attachment(generated.get("attachment_path"), digest=generated.get("digest"), size=generated.get("byte_length"), media_type="image/png", label=f"generated_visual:{exhibit.get('exhibit_id')}")
+        elif generated is not None:
+            missing.append(f"generated_visual:{exhibit.get('exhibit_id')}")
         visual=exhibit.get("visual_target")
         if visual is None:
             continue

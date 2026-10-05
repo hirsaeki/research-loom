@@ -6,6 +6,7 @@ from typing import Any, Mapping
 import uuid
 import rfc8785
 from plugins.research_visual_semantics import validate_visual_package_bindings
+from .research_chart import validate_chart_exhibit
 from core.execution import RunStatus
 from core.runtime import canonical_digest as core_canonical_digest
 from .facade import LocalApplicationError
@@ -308,6 +309,15 @@ def build_package(service, value:Mapping[str,Any])->Mapping[str,Any]:
         validate_visual_package_bindings(exhs, selected)
     except (TypeError, ValueError) as exc:
         raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-REFERENCE-001", str(exc)) from exc
+    for exhibit in exhs:
+        png = validate_chart_exhibit(exhibit, selected)
+        if png is not None:
+            path = f"attachments/visuals/{safe_component(exhibit['exhibit_id'], 'exhibit_id')}.png"
+            attachments.append((path, png, "image/png", f"research_chart:{exhibit['exhibit_id']}"))
+            exhibit["generated_visual"] = {
+                "visual_class": "data_visualization", "attachment_path": path,
+                "media_type": "image/png", "byte_length": len(png), "digest": digest_bytes(png),
+            }
     for iid in str_list(value.get("project_input_ids"),"project_input_ids",MAX_INPUTS):
         shown=service.facade.show_project_input(iid,format="text"); item=shown.get("project_input",{}); content=shown.get("content",{})
         if item.get("project_id")!=service.project_id or item.get("lineage_ref")!=state.active_lineage_ref: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-BINDING-001",f"Project Input belongs to another project/lineage: {iid}")
