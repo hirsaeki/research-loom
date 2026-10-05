@@ -1,4 +1,5 @@
 from copy import deepcopy
+import inspect
 import json
 from pathlib import Path
 import tempfile
@@ -116,6 +117,7 @@ class EvidenceQualificationTests(unittest.TestCase):
     def test_action_registry_exposes_candidate_only_public_ingress(self):
         row = next(x for x in self.facade.list_actions()["actions"] if x["action_type"] == "research.evidence.qualify")
         self.assertEqual((row["effect"], row["route_category"], row["confirmation_required"]), ("read_only", "harness_service", False))
+        self.assertIn("view", inspect.signature(type(self.facade).submit_action).parameters)
 
 
 if __name__ == "__main__":

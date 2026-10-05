@@ -213,9 +213,11 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
         self._ensure_evidence_qualification_action()
         return super().list_actions()
 
-    def submit_action(self, draft_input: Mapping[str, Any]) -> Mapping[str, Any]:
+    def submit_action(
+        self, draft_input: Mapping[str, Any], *, view: str | None = None
+    ) -> Mapping[str, Any]:
         self._ensure_evidence_qualification_action()
-        return super().submit_action(draft_input)
+        return super().submit_action(draft_input, view=view)
 
     def _ensure_evidence_qualification_action(self) -> None:
         coordinator = self._application.coordinator
