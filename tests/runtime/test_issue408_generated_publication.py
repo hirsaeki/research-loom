@@ -96,7 +96,8 @@ class GeneratedPublicationTests(ResearchPackageAcceptanceSupport):
         eid = self.capture(facade, case, fixture_png(2,2)); review = self.review(facade, eid)
         built, _, _, _ = self.preview(facade, case, [case['exhibit_id'], eid, review], [eid])
         cid = built['build']['source_manuscript']['composition_id']
-        inspected = facade.inspect_writer_round_trip(cid)
+        from plugins.local_application.publication_input import inspect_inputs
+        inspected = inspect_inputs(facade, cid, None)
         original = prepare_exhibits(inspected, self.workspace)
         changed = deepcopy(inspected)
         target = next(e for e in changed['source_package_document']['resolved_content']['working_material']['research_exhibits'] if e['exhibit_id'] == eid)
@@ -157,7 +158,15 @@ class VisualPermissionTests(unittest.TestCase):
         from plugins.local_application.publication_release_service import _publication_policy
         package = {"resolved_content": {"research_objects": [{"id": "SRC-INTERNAL", "kind": "source", "source_type": "interview", "canonical_locator": "internal://interview"}]}}
         profile = {"profile_id": "misco.publication", "profile_version": "1.3.0"}
-        inputs = {"formal_spec_profile": {"research_group_type_required": False}, "permissions": [{"source_ref": "SRC-INTERNAL", "publication_allowed": True, "company_disclosure": "allowed", "original_reviewed": True, "approval_ref": "Synthetic fixture"}]}
+        profile_root = Path(__file__).resolve().parents[2] / 'profiles/publication/misco'
+        manifest = json.loads((profile_root / 'profile.json').read_text())
+        resources = []
+        for resource in manifest['resources']:
+            content = (profile_root / resource['path']).read_bytes()
+            self.assertEqual(hashlib.sha256(content).hexdigest(), resource['sha256'])
+            resources.append({'role': resource['role'], 'sha256': resource['sha256'], 'content': content.decode(), 'provenance': [{'profile_type': 'publication', **profile}]})
+        package['effective_profile_set'] = {'effective_resources': resources}
+        inputs = {"permissions": [{"source_ref": "SRC-INTERNAL", "publication_allowed": True, "company_disclosure": "allowed", "original_reviewed": True, "approval_ref": "Synthetic fixture"}]}
         self.assertNotIn('INPUT-PERMISSION', _publication_policy(package, profile, inputs)['missing_inputs'])
         for field, value in [('publication_allowed', False), ('original_reviewed', False), ('company_disclosure', 'prohibited')]:
             changed = deepcopy(inputs); changed['permissions'][0][field] = value
