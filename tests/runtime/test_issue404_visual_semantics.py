@@ -103,7 +103,7 @@ class VisualPackageRoundTripTests(ResearchPackageAcceptanceSupport):
     def test_exact_visual_semantics_survive_package_build_export_verify(self):
         facade, case = self._prepare_case()
         try:
-            payload = visual_payload(source_object_ids=[case["rq_id"]])
+            payload = visual_payload(rq_ids=[case["rq_id"]], source_object_ids=[case["rq_id"]])
             eid = facade.capture_exhibit(payload)["exhibit"]["exhibit_id"]
             original = facade.show_exhibit(eid)["exhibit"]
             case["build_input"]["exhibit_ids"].append(eid)
