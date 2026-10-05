@@ -35,7 +35,7 @@ When a required conditional application input is missing, keep the affected chec
 
 ## Figures requested during preview
 
-When a missing figure, replacement or removal is requested, preserve this preview and return through the existing Research Exhibit/Package/Writer path in `../../docs/operations/late-visual-needs.md`. Resolve the exact build internally; ask the human about research meaning, not Package/Exhibit IDs. Do not fill research gaps during layout. Build a new preview only from the resulting bound Writer revision, and inspect its actual visual pages. Missing assets, source metadata or explanation review stay unresolved and cannot become a release-ready text fallback.
+When a missing figure, replacement or removal is requested, preserve this preview and return through the existing Research Exhibit/Package/Writer path in `../../docs/operations/late-visual-needs.md`. Resolve the exact build internally; ask the human about research meaning, not Package/Exhibit IDs. Do not fill research gaps during layout. Build a new preview only from the resulting bound Writer revision, and inspect its actual visual pages. Read `../../docs/operations/generated-publication-visuals.md` when consuming generated visuals. Missing assets, source metadata or explanation review stay unresolved and cannot become a release-ready text fallback.
 
 ## QA
 

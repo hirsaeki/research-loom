@@ -98,8 +98,8 @@ _STYLE_MAP_PIN = _artifact_pin(
 )
 _RENDERER = {
     "renderer_id": "research-loom.deterministic-docx",
-    "renderer_version": SERVICE_VERSION,
-    "tool_digest": _sha(b"research-loom.deterministic-docx@0.2.0;native-table-png;provenance-v1"),
+    "renderer_version": "0.2.1",
+    "tool_digest": _sha(b"research-loom.deterministic-docx@0.2.1;native-table-png-generated-legend;provenance-v2"),
 }
 
 
@@ -216,11 +216,11 @@ def _publication_policy(package: Mapping[str, Any], profile: Mapping[str, Any], 
             for row in sources
             if isinstance(row, Mapping)
             and row.get("kind") == "source"
-            and str(row.get("access_classification") or row.get("source_classification") or "").lower()
+            and str(row.get("access_classification") or row.get("source_classification") or row.get("source_type") or "").lower()
             in {"internal", "non-public", "confidential", "interview"}
         }
         permission_by_source = {str(row.get("source_ref")): row for row in permissions if isinstance(row, Mapping)}
-        if any(ref not in permission_by_source or not permission_by_source[ref].get("publication_allowed") for ref in required_permissions):
+        if any(ref not in permission_by_source or not permission_by_source[ref].get("publication_allowed") or not permission_by_source[ref].get("original_reviewed") or permission_by_source[ref].get("company_disclosure") not in {"allowed", "anonymized"} for ref in required_permissions):
             missing.append("INPUT-PERMISSION")
     if profile.get("profile_id") == "misco.publication" and isinstance(editorial, Mapping):
         editorial_rows = {str(row.get("check_id")): row for row in editorial.get("checks", []) if isinstance(row, Mapping)}
@@ -583,23 +583,40 @@ class PublicationReleaseService:
                     # Markdown remains a preview companion; DOCX has native cells.
                     preview_text = "\n".join("| " + " | ".join(row) + " |" for row in block["rows"])
                 elif block["kind"] == "image":
-                    visual = exhibit["visual_target"]
-                    locator = visual["locator"]
-                    capture = block["provenance"]["source_capture"]
-                    source = (capture.get("source_locators") or [capture.get("source_locator") or visual["capture_id"]])[0]
-                    note = f"Source: {source}; {locator.get('label') or locator['kind']}"
-                    if "page" in locator:
-                        note += f"; page {locator['page']}"
-                    if locator.get("region"):
-                        region = locator["region"]
-                        note += "; region " + ", ".join(f"{key}={region[key]}" for key in ("x", "y", "width", "height")) + f" ({region['unit']})"
-                    derived = visual.get("derived_artifact")
-                    note += f"; retained {derived['derivation_type']}." if derived else "; original image."
-                    content_obj = exhibit.get("content", {})
-                    if content_obj.get("representation") in {"text", "markdown"}:
-                        note += "\n" + str(content_obj.get("value", ""))
-                    block["note"] = resolve_text(note, sid)
+                    if exhibit.get("generated_visual") is not None:
+                        value = exhibit["content"]["value"]
+                        semantics = exhibit["visual_semantics"]
+                        note = "Source: selected verified research data." if "chart_spec" in value else "Represented research: " + "; ".join(value["request"]["allowed_labels"]) + "."
+                        if "chart_spec" in value:
+                            spec = value["chart_spec"]
+                            note += "\n" + spec["caption"]
+                            units = "; ".join(k + "=" + (v if v is not None else "not applicable") for k, v in spec["units"].items())
+                            note += "\nUnits: " + units + "; denominator: " + (spec["denominator"] or "not applicable") + "; period: " + (spec["period"] or "not applicable") + "."
+                        else:
+                            note += "\nRepresentation reviewed against the selected research; no new research conclusion is established by this figure."
+                    else:
+                        visual = exhibit["visual_target"]
+                        locator = visual["locator"]
+                        capture = block["provenance"]["source_capture"]
+                        source = (capture.get("source_locators") or [capture.get("source_locator") or visual["capture_id"]])[0]
+                        note = f"Source: {source}; {locator.get('label') or locator['kind']}"
+                        if "page" in locator:
+                            note += f"; page {locator['page']}"
+                        if locator.get("region"):
+                            region = locator["region"]
+                            note += "; region " + ", ".join(f"{key}={region[key]}" for key in ("x", "y", "width", "height")) + f" ({region['unit']})"
+                        derived = visual.get("derived_artifact")
+                        note += f"; retained {derived['derivation_type']}." if derived else "; original image."
+                        content_obj = exhibit.get("content", {})
+                        if content_obj.get("representation") in {"text", "markdown"}:
+                            note += "\n" + str(content_obj.get("value", ""))
+                    if block["provenance"].get("citation_sources"):
+                        note += "\n" + "\n".join("Source: " + self._citation_label(source, source.get("canonical_locator"), policy) + "; " + str(source.get("publisher_or_author") or "") + "; " + str(source.get("publication_or_update_date") or "") for source in block["provenance"]["citation_sources"])
+                    block["note"] = note if exhibit.get("generated_visual") is not None else resolve_text(note, sid)
                     preview_text = "[Exact retained image is embedded in formal.docx.]\n" + block["note"]
+                    if "legend_rows" in block:
+                        # Exact literals must not be parsed as manuscript reference tokens.
+                        preview_text += "\n" + "\n".join("| " + " | ".join(row) + " |" for row in block["legend_rows"])
                 else:
                     add_issue(block["code"], ref, sid, True)
                     preview_text = f"[UNAVAILABLE: {block['code']}. Preserve the source and supply a supported exact representation.]"
@@ -914,11 +931,12 @@ class PublicationReleaseService:
         publication_inputs = _validate_publication_inputs(publication_inputs)
         inspection = inspect_inputs(self.facade, composition_id, revision_id)
         package = inspection["source_package_document"]
-        inspection["exhibit_blocks"] = prepare_exhibits(inspection, self.workspace)
         profile = self._profile_pin(package)
         policy = _publication_policy(package, profile, publication_inputs)
         revision = inspection["revision"]
         inspection["publication_policy"] = policy
+        inspection["publication_profile"] = profile
+        inspection["exhibit_blocks"] = prepare_exhibits(inspection, self.workspace)
         build_key = {
             "manuscript_revision_id": revision["revision_id"],
             "manuscript_revision_digest": revision["revision_digest"],

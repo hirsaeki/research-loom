@@ -411,6 +411,9 @@ def verify_export_root(root:str|Path, *, _visual_diagnostics:list[dict[str,str]]
                 visual_paths.add(visual["source_attachment_path"])
                 if isinstance(visual.get("derived_artifact"),Mapping):
                     visual_paths.add(visual["derived_artifact"]["attachment_path"])
+            generated=exhibit.get("generated_visual")
+            if isinstance(generated,Mapping):
+                visual_paths.add(generated["attachment_path"])
     total=package_size; seen=set()
     for a in package.get("attachments",[]):
         rel=str(a["path"]); p=Path(rel)
