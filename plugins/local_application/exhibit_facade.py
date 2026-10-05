@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from typing import Any, Mapping
+from plugins.research_visual_semantics import digest, research_object_digest, validate_visual_semantics
 
 from plugins.local_research_exhibit_store import (
     LocalResearchExhibitStore,
@@ -30,6 +31,7 @@ _CAPTURE_FIELDS = {
     "content",
     "visual_target",
     "capture_origin",
+    "visual_semantics",
 }
 _HARNESS_OWNED_FIELDS = {
     "exhibit_id",
@@ -67,6 +69,7 @@ def _string_list(value: Any, field: str, *, required: bool = False) -> list[str]
 
 def _metadata_projection(document: Mapping[str, Any]) -> Mapping[str, Any]:
     return {
+        **({"visual_class": document["visual_semantics"]["visual_class"], "semantic_status": document["visual_semantics"]["semantic_status"]} if "visual_semantics" in document else {}),
         "exhibit_id": str(document["exhibit_id"]),
         "kind": str(document["kind"]),
         "title": str(document["title"]),
@@ -86,6 +89,7 @@ def _metadata_projection(document: Mapping[str, Any]) -> Mapping[str, Any]:
 
 def _stored_metadata_projection(metadata: Mapping[str, Any]) -> Mapping[str, Any]:
     return {
+        **({"visual_class": metadata["visual_class"], "semantic_status": metadata["semantic_status"]} if "visual_class" in metadata else {}),
         "exhibit_id": str(metadata["exhibit_id"]),
         "kind": str(metadata["kind"]),
         "title": str(metadata["title"]),
@@ -328,6 +332,44 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                     f"derived-from Research Exhibit belongs to another project: {exhibit_id}",
                 )
 
+    def _visual_semantics(self, value, document, state, store):
+        if value is None:
+            return None
+        if not isinstance(value, Mapping) or set(value) != {"visual_class", "semantic_changes", "generator"}:
+            raise LocalApplicationError("APPLICATION-EXHIBIT-SEMANTICS-001", "visual_semantics accepts only visual_class, semantic_changes and generator")
+        objects = {str(o.get("id")): o for o in state.effective_objects()}
+        refs = []
+        for oid in document["source_object_ids"]:
+            obj = objects.get(oid)
+            if obj is None or str(obj.get("project_id", self._project_id)) != self._project_id:
+                raise LocalApplicationError("APPLICATION-EXHIBIT-SEMANTICS-001", "visual requires an exact current-project Research Object: " + oid)
+            refs.append({"kind": "research_object", "id": oid, "digest": research_object_digest(obj)})
+        for eid in document["derived_from_exhibit_ids"]:
+            prior = store.load(eid)
+            refs.append({"kind": "exhibit", "id": eid, "digest": prior["content_digest"]})
+        generator = deepcopy(value["generator"])
+        if isinstance(generator, Mapping):
+            if set(generator) != {"identity", "version", "instruction"}:
+                raise LocalApplicationError("APPLICATION-EXHIBIT-SEMANTICS-001", "generator accepts only identity, version and instruction")
+            generator = dict(generator)
+            try:
+                generator["instruction_digest"] = digest(generator["instruction"])
+            except (TypeError, ValueError) as exc:
+                raise LocalApplicationError("APPLICATION-EXHIBIT-SEMANTICS-001", "generation instruction is invalid") from exc
+        normalized = {
+            "visual_class": value["visual_class"],
+            "semantic_refs": refs,
+            "semantic_changes": deepcopy(value["semantic_changes"]),
+            "semantic_status": "research_required" if value["semantic_changes"] else "review_required",
+            "generator": generator,
+            "spec_digest": document["content_digest"],
+        }
+        try:
+            validate_visual_semantics(normalized, document)
+        except (TypeError, ValueError) as exc:
+            raise LocalApplicationError("APPLICATION-EXHIBIT-SEMANTICS-001", str(exc)) from exc
+        return normalized
+
     def capture_exhibit(self, input_value: Mapping[str, Any]) -> Mapping[str, Any]:
         if not isinstance(input_value, Mapping):
             raise LocalApplicationError(
@@ -437,6 +479,9 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
         }
         if visual_target is not None:
             document["visual_target"] = visual_target
+        semantics = self._visual_semantics(input_value.get("visual_semantics"), document, state, store)
+        if semantics is not None:
+            document["visual_semantics"] = semantics
         try:
             store.capture(document)
         except LocalResearchExhibitStoreError as exc:

@@ -5,6 +5,7 @@ from pathlib import Path, PureWindowsPath
 from typing import Any, Mapping
 from jsonschema import Draft202012Validator, FormatChecker
 import rfc8785
+from plugins.research_visual_semantics import validate_visual_package_bindings
 from plugins.local_research_exhibit_store import (
     LocalResearchExhibitStoreError,
     validate_visual_target,
@@ -185,6 +186,10 @@ def validate_resolved_references(package:Mapping[str,Any])->None:
     if not isinstance(exhibits,list):
         missing.append("working_material.research_exhibits")
         exhibits=[]
+    try:
+        validate_visual_package_bindings(exhibits, objects)
+    except (KeyError, TypeError, ValueError) as exc:
+        raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-REFERENCE-001", str(exc)) from exc
     for exhibit in exhibits:
         if not isinstance(exhibit,Mapping):
             missing.append("working_material.research_exhibits")
