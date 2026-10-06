@@ -12,7 +12,7 @@ from .new_material_group_continuation_pdf_provider import (
 )
 
 install_new_material_group_continuation_pdf_provider()
-from .evidence_qualification_facade import LocalApplicationFacade
+from .source_bibliography_facade import LocalApplicationFacade
 from .workspace import LocalWorkspace, LocalWorkspaceError, OpenedLocalWorkspace
 from .writer_composition_service import verify_section_input_root as verify_writer_section_input
 

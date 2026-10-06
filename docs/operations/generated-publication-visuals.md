@@ -13,3 +13,17 @@ MISCO uses the pinned formal typography/layout and existing permission/editorial
 Missing/corrupt declared PNG payloads can produce a diagnostic Publication preview under a different build identity. The normal Package verifier stays strict. Generation metadata, reference closure, original generation Package and all non-image attachments remain strict even in diagnostic mode. A repaired image restores the healthy build identity without overwriting the diagnostic or earlier preview. A changed candidate/Package/Writer input yields a new preview.
 
 The renderer pin is 0.2.1 because generated-image/legend behavior changes exact output. Generic existing native tables and source PNGs retain their behavior. Machine structural/content checks are not page layout or visual readability QA. A build, even one passing these checks, still requires explicit existing release review/approval for its exact bytes.
+
+## Completing retained Source bibliography
+
+When a retained external Source has the exact captured material/locator but lacks
+bibliographic fields required by the selected Publication Profile, use the public
+`research.source.bibliography` action. The request pins the exact current Source
+revision and canonical object digest, supplies only actual `title`,
+`publisher_or_author`, `publication_or_update_date` and optional
+`version_or_revision`, and creates one candidate-only Source revision. It cannot
+change Source identity, type, canonical locator, acquired time, media type or
+content digest. Apply the exact candidate through the existing
+`state.apply_candidate` Confirmation path, then rebuild the affected Research
+Package / Composition / Writer revision / preview. This is bibliographic
+provenance transcription, not new research meaning or a Publication bypass.
