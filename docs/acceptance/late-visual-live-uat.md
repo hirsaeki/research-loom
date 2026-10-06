@@ -25,6 +25,19 @@ Do not script Human answers or report a model self-review as actual visual inspe
 
 ## Human rubric and controls
 
+After #430, at least one actual Host must also run the non-reference chart path:
+validated `research-chart/v1` data/spec -> available Host/native/Data/Python renderer
+-> exact PNG candidate with renderer provenance -> actual visual inspection and
+separate conformance review -> rebuilt Package/Writer/canonical preview. Record
+which Host and renderer were used. Reference CI/replay cannot substitute for this
+live observation. Unavailable Host rendering is NOT RUN, not reference PASS.
+
+Retain the bounded comparison of the same Evidence/spec through reference output,
+Host output with PASS review, Host output without review, and deliberate visual
+mismatch with FAIL review. Only the first two may be healthy Publication figures;
+all retain unchanged Research State/Evidence. Synthetic backend controls remain
+separate from actual image inspection and H1–H10 Human answers.
+
 The actual reviewer records PASS/FAIL and evidence pointers for H1–H10 from #409: natural late requests, no internal-ID burden, authority distinction, chart data/unit consistency, no added explanatory meaning, Research escalation, preserved history, natural formal references/source display, openable visually inspected output, and accurate fresh-session continuity. Until observed, each result is **UNEVALUATED**. Preserve failed observations rather than turning them into warnings or inferred PASS.
 
 | Bounded contrast | Existing backend controls | Required live observation |

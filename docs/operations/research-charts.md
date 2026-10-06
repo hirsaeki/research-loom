@@ -59,7 +59,7 @@ HEAD guard, and raw `exhibit capture` cannot bypass chart/spec/output validation
 
 ## Output and immutable provenance
 
-`research-chart-png/1` emits a deterministic 800×480 RGB PNG using the Python
+The reference/fallback renderer `research-chart-png/1` emits a deterministic 800×480 RGB PNG using the Python
 standard library. Its numerical axes use bounded tick formatting; exact values
 remain in the required native legend. Bar x labels are row ordinals, explicitly
 mapped to original Unicode category labels in that legend. Line/scatter legends
@@ -73,7 +73,7 @@ digest, and category/value legend. Existing JSON-content and Package aggregate
 limits apply. Package rebuild emits the PNG as a separately pinned retained
 attachment in `generated_visual`, retaining the structured Exhibit as well.
 
-Build and consumer validation independently check the input/spec and deterministic
+For the reference path, build and consumer validation independently check the input/spec and deterministic
 output, including its legend. A corrupt image with a recomputed digest still cannot
 be passed off as the chart of the original data. An implementation change needs
 a new renderer generation and new captured output; it must not overwrite history.
@@ -103,3 +103,41 @@ Its injected package read is explicitly unit-level evidence, not Host/live UAT.
 The full Package/Writer/Publication round trip and fresh-host acceptance remain
 separate #408/#409 gates. Local syntax/diff checks are available; dependency-complete
 runtime execution runs in the existing CI shards.
+
+## Host-rendered quantitative charts (#430)
+
+Host/native/Data/Python and other available renderers may produce the PNG. The
+reference renderer remains unchanged for CI, exact replay and fallback. Do not
+ask the researcher to select tooling unless their request requires a specific
+method or reproducibility guarantee.
+
+The same `exhibit chart` JSON operation accepts `package_id`, the unchanged
+`research-chart/v1` `chart_spec`, a `renderer` containing bounded non-empty
+`identity`, `version` (`not exposed` where necessary), and `instruction`, plus
+`output_base64` with the exact bounded PNG. Do not mix this with the reference
+path's proposer fields. Capture reuses the exact current Evidence/spec validator
+and retains a `research-generated-chart/v2` candidate with the spec digest,
+renderer/instruction provenance, generation Package, exact PNG digest and the
+machine-derived legend. It validates PNG encoding/digest, not pixel semantics.
+Raw capture and package/consumer validation enforce the same constraints.
+
+The existing `exhibit review-visual` operation records a separate immutable
+`research-visual-review/v1` note for the exact candidate. Host charts additionally
+require `chart_checks` with `axes`, `series`, `ordering`, and `major_values`, each
+`pass` or `fail`. A Host/Human must inspect the exact PNG against the validated
+data/spec; renderer self-report or a capture receipt is insufficient. Use
+`existing_meaning_only` only when all checks pass and no meaning is added;
+`nonconforming` for visual mismatch; or `research_required` for new research
+meaning. Retain an explicit reviewer and inspection rationale.
+
+Select candidate and review in the rebuilt Package. Missing review yields
+`VISUAL_REVIEW_REQUIRED`, visual FAIL yields `VISUAL_CONFORMANCE_FAILED`, and new
+meaning yields `VISUAL_RESEARCH_REQUIRED`; these are unavailable figures, never
+healthy Publication images. A later PASS cannot erase conflicting FAIL: revise
+the candidate and review its new exact bytes. Regeneration preserves history.
+Normal numbering/caption/source/rights/QA and the exact native legend/data note
+apply independently of renderer. Capture/review grants no Research/release approval.
+
+`test_issue430_host_charts.py` provides synthetic backend controls for reference,
+reviewed Host output, unreviewed output and FAIL output, including tampering,
+immutable regeneration and exact DOCX embedding. These do not satisfy live UAT.

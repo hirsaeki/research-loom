@@ -4,6 +4,15 @@ Publication reuses its existing native table / exact retained PNG consumer for a
 
 A data chart must validate again against selected verified Evidence, its exact original generation Package and retained PNG. The native figure legend contains the exact category/value strings and ordinals; no Unicode labels are inferred from pixels. The adjacent source note preserves chart caption, explicit units, denominator and period. Legend cells and generated source-note literals are not interpreted as manuscript reference-token syntax. Native DOCX verification checks the exact cells as well as PNG bytes, caption placement and cross references.
 
+Publication is independent of the upstream renderer. The unchanged reference
+chart path verifies deterministic replay. A Host-rendered quantitative chart
+instead retains renderer provenance and exact PNG and requires a separate exact
+conforming review covering axes, series, ordering and major values (#430).
+`VISUAL_REVIEW_REQUIRED` and `VISUAL_CONFORMANCE_FAILED` are unavailable figure
+diagnostics, not healthy images. FAIL cannot be overwritten by later PASS; a new
+candidate needs its own review. Both paths retain the same native legend/data
+note, numbering, caption, source, rights and page QA requirements.
+
 An explanatory candidate must have a separate exact selected conforming review note in its rebuilt Package. Pending reviews yield `VISUAL_REVIEW_REQUIRED`; research-changing or conflicting reviews yield `VISUAL_RESEARCH_REQUIRED`. Neither condition silently becomes a valid figure. Declared added meaning on any visual requires Research. Candidate generation and review are operational evidence; neither adopts a Finding nor approves a manuscript/release.
 
 The DOCX's existing provenance record preserves the semantic contract, generation inputs, selected output digest, original Package attachment pin and explanation review notes. It distinguishes generated research-derived images from retained external source visuals. Source visuals retain exact capture/locator/crop provenance and adjacent external source notes.

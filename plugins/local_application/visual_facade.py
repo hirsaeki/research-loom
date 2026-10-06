@@ -8,7 +8,7 @@ from typing import Mapping
 from core.runtime import canonical_digest
 from .facade import LocalApplicationError
 from .research_quality_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
-from .research_chart import validate_chart_exhibit, validate_chart_spec
+from .research_chart import HOST_CHART_SCHEMA, is_host_chart, validate_chart_exhibit, validate_chart_spec
 from .research_chart_png import RENDERER_ID, render_chart
 from .generated_explanation import EXPLANATION_SCHEMA, REVIEW_SCHEMA, matching_review, validate_explanation, validate_request
 from plugins.research_visual_semantics import digest
@@ -85,12 +85,18 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
             raise LocalApplicationError("APPLICATION-EXPLANATION-VALIDATION-001", str(exc)) from exc
 
     def capture_visual_review(self, value):
-        if not isinstance(value, Mapping) or set(value) != {"candidate_id", "disposition", "semantic_changes", "reviewer", "rationale"}:
+        fields = {"candidate_id", "disposition", "semantic_changes", "reviewer", "rationale"}
+        if not isinstance(value, Mapping) or set(value) - (fields | {"chart_checks"}) or not fields <= set(value):
             raise LocalApplicationError("APPLICATION-VISUAL-REVIEW-001", "visual review packet shape is invalid")
         candidate = self.show_exhibit(value["candidate_id"])["exhibit"]
         try:
-            if validate_explanation(candidate) is None:
-                raise ValueError("visual review requires an exact explanatory candidate")
+            host = is_host_chart(candidate)
+            if host:
+                validate_chart_exhibit(candidate, list(self._current_state().effective_objects()))
+            elif validate_explanation(candidate) is None:
+                raise ValueError("visual review requires an exact explanatory or host-chart candidate")
+            if ("chart_checks" in value) != host:
+                raise ValueError("host chart review requires explicit axes/series/ordering/major-values checks")
             content = {
                 "schema": REVIEW_SCHEMA, "candidate_id": candidate["exhibit_id"],
                 "candidate_content_digest": candidate["content_digest"],
@@ -98,6 +104,7 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                 "disposition": value["disposition"], "semantic_changes": value["semantic_changes"],
                 "reviewer": value["reviewer"], "rationale": value["rationale"],
                 "reviewed_at": self._application.clock.now(),
+                **({"chart_checks": dict(value["chart_checks"])} if host else {}),
             }
             matching_review(candidate, [{"derived_from_exhibit_ids": [candidate["exhibit_id"]], "content": {"value": content}}])
             return super().capture_exhibit({
@@ -109,8 +116,11 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
             raise LocalApplicationError("APPLICATION-VISUAL-REVIEW-001", str(exc)) from exc
 
     def capture_chart_exhibit(self, value: Mapping) -> Mapping:
-        if not isinstance(value, Mapping) or set(value) - {"package_id", "chart_spec", "generator_identity", "generator_version"}:
+        if not isinstance(value, Mapping) or set(value) - {"package_id", "chart_spec", "generator_identity", "generator_version", "renderer", "output_base64"}:
             raise LocalApplicationError("APPLICATION-CHART-INPUT-001", "chart request shape is invalid")
+        host = "renderer" in value or "output_base64" in value
+        if host and (not {"renderer", "output_base64"} <= set(value) or {"generator_identity", "generator_version"} & set(value)):
+            raise LocalApplicationError("APPLICATION-CHART-INPUT-001", "host chart requires renderer and exact output, without proposer fields")
         package = self.show_research_package(value.get("package_id"))["package"]
         spec = value.get("chart_spec")
         if not isinstance(spec, Mapping):
@@ -122,14 +132,29 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
             raise LocalApplicationError("APPLICATION-CHART-BINDING-001", "chart requires exact current Evidence selected in the Research Package")
         try:
             validated = validate_chart_spec(spec, evidence)
-            png = render_chart(validated)
+            if host:
+                renderer = value["renderer"]
+                if not isinstance(renderer, Mapping) or set(renderer) != {"identity", "version", "instruction"}:
+                    raise ValueError("renderer requires identity, version and retained instruction")
+                generator = dict(renderer)
+                renderer = {**generator, "instruction_digest": digest(generator["instruction"])}
+                from .generated_explanation import retained_png
+                if not isinstance(value["output_base64"], str) or len(value["output_base64"]) > 1048576:
+                    raise ValueError("host chart output must be bounded base64 PNG")
+                png = base64.b64decode(value["output_base64"], validate=True)
+                retained_png({"media_type": "image/png", "bytes_base64": value["output_base64"], "digest": "sha256:" + hashlib.sha256(png).hexdigest()})
+            else:
+                renderer = RENDERER_ID
+                generator = {"identity": value.get("generator_identity", "operator"), "version": value.get("generator_version", "not exposed"), "instruction": json.dumps(spec, ensure_ascii=False, sort_keys=True, separators=(",", ":"))}
+                png = render_chart(validated)
         except (TypeError, ValueError, OverflowError) as exc:
             raise LocalApplicationError("APPLICATION-CHART-VALIDATION-001", str(exc)) from exc
         legend_rows = [[str(i), str(x), str(y)] for i, (x, y) in enumerate(validated["points"], start=1)]
         content = {
-            "schema": "research-generated-chart/v1", "chart_spec": dict(spec),
+            "schema": HOST_CHART_SCHEMA if host else "research-generated-chart/v1", "chart_spec": dict(spec),
+            **({"chart_spec_digest": canonical_digest(spec)} if host else {}),
             "package_binding": {"package_id": package["package_id"], "package_digest": package["package_digest"]},
-            "renderer": RENDERER_ID,
+            "renderer": renderer,
             "output": {"media_type": "image/png", "bytes_base64": base64.b64encode(png).decode("ascii"), "digest": "sha256:" + hashlib.sha256(png).hexdigest()},
             "legend": {"columns": ["ordinal", spec["x_column"], spec["y_column"]], "rows": legend_rows},
         }
@@ -138,10 +163,10 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
             "rq_ids": list(package["content"]["research_question_refs"]),
             "source_object_ids": [str(evidence["id"])],
             "content": {"representation": "json", "value": content},
-            "capture_origin": "validated_chart_renderer",
+            "capture_origin": "host_rendered_chart" if host else "validated_chart_renderer",
             "visual_semantics": {
                 "visual_class": "data_visualization", "semantic_changes": [],
-                "generator": {"identity": value.get("generator_identity", "operator"), "version": value.get("generator_version", "not exposed"), "instruction": json.dumps(spec, ensure_ascii=False, sort_keys=True, separators=(",", ":"))},
+                "generator": generator,
             },
         })
-        return {**result, "data_validation": "passed", "renderer": RENDERER_ID, "research_state_mutation_performed": False}
+        return {**result, "data_validation": "passed", "renderer": renderer, "visual_conformance": "review_required" if host else "reference_replay", "research_state_mutation_performed": False}
