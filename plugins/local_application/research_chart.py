@@ -12,6 +12,12 @@ from core.runtime import canonical_digest
 
 MAX_POINTS = 128
 CHART_TYPES = frozenset({"bar", "line", "scatter"})
+HOST_CHART_SCHEMA = "research-generated-chart/v2"
+
+
+def is_host_chart(exhibit: Mapping) -> bool:
+    value = exhibit.get("content", {}).get("value")
+    return isinstance(value, Mapping) and value.get("schema") == HOST_CHART_SCHEMA
 
 
 def quantitative_input(evidence: Mapping[str, Any]) -> dict:
@@ -91,10 +97,12 @@ def validate_chart_spec(spec: Any, evidence: Mapping[str, Any]) -> dict:
 
 def validate_chart_exhibit(exhibit: Mapping, objects: list) -> bytes | None:
     value = exhibit.get("content", {}).get("value")
-    if not isinstance(value, Mapping) or value.get("schema") != "research-generated-chart/v1":
+    if not isinstance(value, Mapping) or value.get("schema") not in ("research-generated-chart/v1", HOST_CHART_SCHEMA):
         return None
     from .research_chart_png import RENDERER_ID, render_chart
-    if set(value) != {"schema", "chart_spec", "package_binding", "renderer", "output", "legend"} or value["renderer"] != RENDERER_ID:
+    host = is_host_chart(exhibit)
+    fields = {"schema", "chart_spec", "package_binding", "renderer", "output", "legend"}
+    if set(value) != (fields | {"chart_spec_digest"} if host else fields) or (not host and value["renderer"] != RENDERER_ID):
         raise ValueError("unsupported generated chart contract/renderer")
     semantics = exhibit.get("visual_semantics")
     if not isinstance(semantics, Mapping) or semantics.get("visual_class") != "data_visualization" or semantics.get("semantic_changes") != []:
@@ -106,6 +114,15 @@ def validate_chart_exhibit(exhibit: Mapping, objects: list) -> bytes | None:
     if evidence is None or exhibit.get("source_object_ids") != [evidence["id"]]:
         raise ValueError("chart requires exact selected Evidence provenance")
     validated = validate_chart_spec(spec, evidence)
+    if host:
+        from plugins.research_visual_semantics import digest
+        renderer = value["renderer"]
+        if not isinstance(renderer, Mapping) or set(renderer) != {"identity", "version", "instruction", "instruction_digest"}:
+            raise ValueError("host chart must retain renderer identity/version/instruction")
+        if any(not isinstance(renderer[f], str) or not renderer[f].strip() for f in ("identity", "version", "instruction")) or len(renderer["identity"]) > 256 or len(renderer["version"]) > 256 or len(renderer["instruction"].encode("utf-8")) > 65536:
+            raise ValueError("host chart renderer provenance is invalid")
+        if renderer["identity"] == RENDERER_ID or renderer != semantics.get("generator") or renderer["instruction_digest"] != digest(renderer["instruction"]) or value["chart_spec_digest"] != canonical_digest(spec):
+            raise ValueError("host chart provenance/spec digest mismatch")
     binding = value["package_binding"]
     if not isinstance(binding, Mapping) or set(binding) != {"package_id", "package_digest"} or not isinstance(binding["package_id"], str) or not binding["package_id"].strip() or not isinstance(binding["package_digest"], str) or len(binding["package_digest"]) != 71 or not binding["package_digest"].startswith("sha256:"):
         raise ValueError("chart generation Package binding is incomplete")
@@ -116,8 +133,11 @@ def validate_chart_exhibit(exhibit: Mapping, objects: list) -> bytes | None:
         png = base64.b64decode(output["bytes_base64"], validate=True)
     except (TypeError, ValueError) as exc:
         raise ValueError("generated chart bytes are invalid") from exc
-    if output["digest"] != "sha256:" + hashlib.sha256(png).hexdigest() or png != render_chart(validated):
+    if output["digest"] != "sha256:" + hashlib.sha256(png).hexdigest() or (not host and png != render_chart(validated)):
         raise ValueError("generated chart digest or deterministic rendering differs from bound data/spec")
+    if host:
+        from .publication_exhibits import png_size
+        png_size(png)
     legend = {"columns": ["ordinal", spec["x_column"], spec["y_column"]], "rows": [[str(i), str(x), str(y)] for i, (x, y) in enumerate(validated["points"], start=1)]}
     if value["legend"] != legend:
         raise ValueError("chart category/value legend must correspond exactly to bound data")

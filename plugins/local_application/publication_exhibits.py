@@ -233,7 +233,7 @@ def prepare_exhibits(inspection: Mapping[str, Any], workspace: Path) -> dict[str
                 raise ValueError("new meaning requires Research")
             if generated is not None:
                 from .generated_explanation import matching_review, validate_explanation, REVIEW_SCHEMA
-                from .research_chart import validate_chart_exhibit
+                from .research_chart import is_host_chart, validate_chart_exhibit
                 from .visual_origin import verify_visual_origin
                 expected = validate_chart_exhibit(exhibit, package["resolved_content"]["research_objects"])
                 legend = None
@@ -242,13 +242,14 @@ def prepare_exhibits(inspection: Mapping[str, Any], workspace: Path) -> dict[str
                     expected = validate_explanation(exhibit)
                     if expected is None:
                         raise ValueError("unsupported generated visual")
-                    disposition = matching_review(exhibit, all_exhibits)
-                    if disposition != "existing_meaning_only":
-                        unavailable_code = "VISUAL_RESEARCH_REQUIRED" if disposition == "research_required" else "VISUAL_REVIEW_REQUIRED"
-                        raise ValueError("selected explanatory candidate has no conforming review")
-                    provenance["visual_reviews"] = [deepcopy(e) for e in all_exhibits if isinstance(e.get("content", {}).get("value"), Mapping) and e["content"]["value"].get("schema") == REVIEW_SCHEMA and e["content"]["value"].get("candidate_id") == ref]
                 else:
                     legend = table_rows({"representation": "json", "value": value["legend"]})
+                if value.get("schema") == "research-generated-explanation/v1" or is_host_chart(exhibit):
+                    disposition = matching_review(exhibit, all_exhibits)
+                    if disposition != "existing_meaning_only":
+                        unavailable_code = "VISUAL_RESEARCH_REQUIRED" if disposition == "research_required" else "VISUAL_CONFORMANCE_FAILED" if disposition == "nonconforming" else "VISUAL_REVIEW_REQUIRED"
+                        raise ValueError("selected generated candidate has no conforming review")
+                    provenance["visual_reviews"] = [deepcopy(e) for e in all_exhibits if isinstance(e.get("content", {}).get("value"), Mapping) and e["content"]["value"].get("schema") == REVIEW_SCHEMA and e["content"]["value"].get("candidate_id") == ref]
                 context = generated["generation_context"]
                 origin = json.loads(asset(context["attachment_path"], context["content_digest"], context["byte_length"], "application/json").decode("utf-8"))
                 verify_visual_origin(exhibit, origin)

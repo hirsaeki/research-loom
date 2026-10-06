@@ -57,11 +57,14 @@ def validate_explanation(exhibit):
 def matching_review(candidate, exhibits):
     """Review attestations are explicit operational records, not Research authority."""
     matches = []
+    from .research_chart import is_host_chart
+    chart = is_host_chart(candidate)
     for note in exhibits:
         value = note.get("content", {}).get("value")
         if not isinstance(value, Mapping) or value.get("schema") != REVIEW_SCHEMA or value.get("candidate_id") != candidate["exhibit_id"]:
             continue
-        if set(value) != {"schema", "candidate_id", "candidate_content_digest", "candidate_semantics_digest", "disposition", "semantic_changes", "reviewer", "rationale", "reviewed_at"}:
+        fields = {"schema", "candidate_id", "candidate_content_digest", "candidate_semantics_digest", "disposition", "semantic_changes", "reviewer", "rationale", "reviewed_at"}
+        if set(value) != (fields | {"chart_checks"} if chart else fields):
             raise ValueError("visual review note shape is invalid")
         if note.get("derived_from_exhibit_ids") != [candidate["exhibit_id"]] or value["candidate_content_digest"] != candidate["content_digest"] or value["candidate_semantics_digest"] != digest(candidate["visual_semantics"]):
             raise ValueError("visual review must pin the exact candidate and semantic contract")
@@ -74,8 +77,15 @@ def matching_review(candidate, exhibits):
         changes = value["semantic_changes"]
         if not isinstance(changes, list) or any(not isinstance(s, str) or s not in SEMANTIC_CHANGES for s in changes) or len(changes) != len(set(changes)):
             raise ValueError("visual review semantic changes are invalid")
-        if value["disposition"] not in {"existing_meaning_only", "research_required"} or (value["disposition"] == "existing_meaning_only" and (changes or candidate["visual_semantics"]["semantic_changes"])):
+        allowed = {"existing_meaning_only", "research_required"} | ({"nonconforming"} if chart else set())
+        if value["disposition"] not in allowed or (value["disposition"] == "existing_meaning_only" and (changes or candidate["visual_semantics"]["semantic_changes"])):
             raise ValueError("visual review cannot waive declared research-changing meaning")
+        if chart:
+            checks = value["chart_checks"]
+            if not isinstance(checks, Mapping) or set(checks) != {"axes", "series", "ordering", "major_values"} or any(v not in ("pass", "fail") for v in checks.values()):
+                raise ValueError("chart conformance requires explicit axes/series/ordering/major-values checks")
+            if value["disposition"] == "existing_meaning_only" and any(v != "pass" for v in checks.values()):
+                raise ValueError("chart PASS cannot waive failed conformance checks")
         matches.append(value)
     if not matches:
         return None
@@ -83,4 +93,6 @@ def matching_review(candidate, exhibits):
     # revised candidate, preserving all historical attestations.
     if any(v["disposition"] == "research_required" for v in matches):
         return "research_required"
+    if any(v["disposition"] == "nonconforming" for v in matches):
+        return "nonconforming"
     return "existing_meaning_only"
