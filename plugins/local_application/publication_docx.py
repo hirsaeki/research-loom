@@ -63,6 +63,8 @@ def _paragraph(
             attrs.append(f'w:hanging="{reference_hanging_twips}"')
         indent = '<w:ind ' + ' '.join(attrs) + '/>'
     keep = '<w:keepNext/>' if keep_with_next else ''
+    if role == 'source_caption':
+        keep += '<w:keepLines/>'
     return f'<w:p><w:pPr><w:pStyle w:val="{style}"/>{indent}{keep}</w:pPr>{start}<w:r><w:t xml:space="preserve">{runs}</w:t></w:r>{end}</w:p>'
 
 

@@ -49,6 +49,9 @@ class ReaderPresentationTests(unittest.TestCase):
             self.assertIsNotNone(image.find(f"{{{W}}}pPr/{{{W}}}keepNext"))
             table = document.find(f".//{{{W}}}tbl")
             self.assertTrue(all(p.find(f"{{{W}}}pPr/{{{W}}}keepNext") is not None for p in table.findall(f".//{{{W}}}p")))
+            source_notes = [p for p in document.findall(f".//{{{W}}}p") if p.find(f"{{{W}}}pPr/{{{W}}}pStyle") is not None and p.find(f"{{{W}}}pPr/{{{W}}}pStyle").get(f"{{{W}}}val") == 'SourceCaption']
+            self.assertEqual(len(source_notes), 1)
+            self.assertIsNotNone(source_notes[0].find(f"{{{W}}}pPr/{{{W}}}keepLines"))
 
     def test_generic_labels_and_non_url_locators_remain_available(self):
         inspection = self.inspection()
