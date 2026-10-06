@@ -99,8 +99,8 @@ _STYLE_MAP_PIN = _artifact_pin(
 )
 _RENDERER = {
     "renderer_id": "research-loom.deterministic-docx",
-    "renderer_version": "0.2.2",
-    "tool_digest": _sha(b"research-loom.deterministic-docx@0.2.2;reader-labels-figure-grouping;provenance-v2"),
+    "renderer_version": "0.2.3",
+    "tool_digest": _sha(b"research-loom.deterministic-docx@0.2.3;reader-labels-figure-note-keep-lines;provenance-v2"),
 }
 
 
