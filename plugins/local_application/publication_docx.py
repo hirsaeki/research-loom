@@ -35,6 +35,7 @@ def _paragraph(
     first_line_indent_twips: int = 0,
     reference_left_indent_twips: int = 0,
     reference_hanging_twips: int = 0,
+    keep_with_next: bool = False,
 ) -> str:
     style = {
         "title": "Title",
@@ -61,10 +62,11 @@ def _paragraph(
         if reference_hanging_twips:
             attrs.append(f'w:hanging="{reference_hanging_twips}"')
         indent = '<w:ind ' + ' '.join(attrs) + '/>'
-    return f'<w:p><w:pPr><w:pStyle w:val="{style}"/>{indent}</w:pPr>{start}<w:r><w:t xml:space="preserve">{runs}</w:t></w:r>{end}</w:p>'
+    keep = '<w:keepNext/>' if keep_with_next else ''
+    return f'<w:p><w:pPr><w:pStyle w:val="{style}"/>{indent}{keep}</w:pPr>{start}<w:r><w:t xml:space="preserve">{runs}</w:t></w:r>{end}</w:p>'
 
 
-def _table(rows: list[list[str]], total_width_twips: int = 9360) -> str:
+def _table(rows: list[list[str]], total_width_twips: int = 9360, keep_with_next: bool = False) -> str:
     width = max(1, total_width_twips // len(rows[0]))
     borders = ''.join(f'<w:{side} w:val="single" w:sz="4" w:color="auto"/>' for side in ("top", "left", "bottom", "right", "insideH", "insideV"))
     result = [f'<w:tbl><w:tblPr><w:tblW w:w="{total_width_twips}" w:type="dxa"/><w:tblLayout w:type="fixed"/>',
@@ -72,9 +74,9 @@ def _table(rows: list[list[str]], total_width_twips: int = 9360) -> str:
               '<w:tblCellMar><w:top w:w="80" w:type="dxa"/><w:left w:w="80" w:type="dxa"/><w:bottom w:w="80" w:type="dxa"/><w:right w:w="80" w:type="dxa"/></w:tblCellMar></w:tblPr>',
               '<w:tblGrid>' + ''.join(f'<w:gridCol w:w="{width}"/>' for _ in rows[0]) + '</w:tblGrid>']
     for index, row in enumerate(rows):
-        result.append('<w:tr>' + ('<w:trPr><w:tblHeader/></w:trPr>' if index == 0 else ''))
+        result.append('<w:tr><w:trPr><w:cantSplit/>' + ('<w:tblHeader/>' if index == 0 else '') + '</w:trPr>')
         for cell in row:
-            result.append(f'<w:tc><w:tcPr><w:tcW w:w="{width}" w:type="dxa"/></w:tcPr>' + _paragraph(cell, 'header' if index == 0 else 'cell') + '</w:tc>')
+            result.append(f'<w:tc><w:tcPr><w:tcW w:w="{width}" w:type="dxa"/></w:tcPr>' + _paragraph(cell, 'header' if index == 0 else 'cell', keep_with_next=keep_with_next) + '</w:tc>')
         result.append('</w:tr>')
     return ''.join(result) + '</w:tbl>'
 
@@ -84,7 +86,7 @@ def _image(block: dict[str, Any], index: int, max_width_emu: int = 5943600) -> s
     scale = min(1, max_width_emu / width, 5029200 / height)
     width, height = max(1, int(width * scale)), max(1, int(height * scale))
     desc = quoteattr(block["caption"])
-    return (f'<w:p><w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0">'
+    return (f'<w:p><w:pPr><w:keepNext/></w:pPr><w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0">'
             f'<wp:extent cx="{width}" cy="{height}"/><wp:docPr id="{index}" name="Image {index}" descr={desc}/>'
             '<wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr>'
             f'<a:graphic><a:graphicData uri="{PIC}"><pic:pic>'
@@ -131,7 +133,8 @@ def docx_bytes(lines: list[tuple[str, Any]], layout: dict[str, Any] | None = Non
             ))
             continue
         index += 1
-        caption = _paragraph(block["caption"], "caption", (index, _bookmark(block["ref"])))
+        compact_legend = "legend_rows" in block and len(block["legend_rows"]) <= 8
+        caption = _paragraph(block["caption"], "caption", (index, _bookmark(block["ref"])), keep_with_next=block["kind"] == "table" or compact_legend or bool(block.get("note")))
         if block["kind"] == "table":
             body.append(caption)
             body.append(_table(block["rows"], content_width_twips))
@@ -139,7 +142,7 @@ def docx_bytes(lines: list[tuple[str, Any]], layout: dict[str, Any] | None = Non
             body.append(_image(block, index, content_width_emu))
             body.append(caption)
             if "legend_rows" in block:
-                body.append(_table(block["legend_rows"], content_width_twips))
+                body.append(_table(block["legend_rows"], content_width_twips, keep_with_next=compact_legend and bool(block.get("note"))))
             name = f'media/image-{index}.png'
             images['word/' + name] = block['data']
             relationships.append(f'<Relationship Id="rIdImage{index}" Type="{R}/image" Target="{name}"/>')

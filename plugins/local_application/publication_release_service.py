@@ -12,6 +12,7 @@ from pathlib import Path
 import re
 import shutil
 import tempfile
+from urllib.parse import urldefrag
 from typing import Any, Mapping
 from xml.etree import ElementTree
 import zipfile
@@ -98,8 +99,8 @@ _STYLE_MAP_PIN = _artifact_pin(
 )
 _RENDERER = {
     "renderer_id": "research-loom.deterministic-docx",
-    "renderer_version": "0.2.1",
-    "tool_digest": _sha(b"research-loom.deterministic-docx@0.2.1;native-table-png-generated-legend;provenance-v2"),
+    "renderer_version": "0.2.2",
+    "tool_digest": _sha(b"research-loom.deterministic-docx@0.2.2;reader-labels-figure-grouping;provenance-v2"),
 }
 
 
@@ -382,6 +383,9 @@ class PublicationReleaseService:
     def _citation_label(source: Mapping[str, Any], locator: str | None, policy: Mapping[str, Any]) -> str:
         title = str(source.get("title") or source.get("name") or source.get("id") or "Source")
         canonical = str(source.get("canonical_locator") or "")
+        # A fragment locator refines this URL; it is not a second source URL.
+        if locator and canonical.startswith(("http://", "https://")) and urldefrag(str(locator))[0] == urldefrag(canonical)[0]:
+            canonical = str(locator)
         url_profile = policy.get("url_display_profile")
         if canonical.startswith(("http://", "https://")) and isinstance(url_profile, Mapping):
             template = str(url_profile.get("template", ""))
@@ -415,6 +419,7 @@ class PublicationReleaseService:
         self, inspection: Mapping[str, Any]
     ) -> tuple[bytes, bytes, list[dict[str, Any]], dict[str, str]]:
         policy = inspection.get("publication_policy", {})
+        misco = inspection.get("publication_profile", {}).get("profile_id") == "misco.publication"
         package = inspection["source_package_document"]
         revision = inspection["revision"]
         composition = inspection["composition"]
@@ -494,10 +499,10 @@ class PublicationReleaseService:
                     continue
                 if str(exhibit.get("kind")) in {"table", "matrix"}:
                     table_count += 1
-                    exhibit_numbers[exhibit_ref] = ("Table", table_count)
+                    exhibit_numbers[exhibit_ref] = ("表" if misco else "Table", table_count)
                 else:
                     figure_count += 1
-                    exhibit_numbers[exhibit_ref] = ("Figure", figure_count)
+                    exhibit_numbers[exhibit_ref] = ("図" if misco else "Figure", figure_count)
 
         def replace_token(match: re.Match[str], section_id: str) -> str:
             kind, ref = match.group(1), match.group(2)
@@ -559,14 +564,15 @@ class PublicationReleaseService:
             content = resolve_text(str(section.get("content", "")), sid)
             md.extend([f"## {heading}", "", content, ""])
             docx_lines.extend([("heading", heading), ("body", content)])
+            inline_citations = {match.group(2) for match in _XREF.finditer(str(section.get("content", ""))) if match.group(1) == "citation"}
             structured_citations = []
             for citation in section.get("citations", []):
                 source_ref = str(citation.get("source_ref", ""))
                 number = citation_numbers.get(source_ref)
-                if number is not None:
+                if number is not None and source_ref not in inline_citations:
                     structured_citations.append(f"[{number}]")
             if structured_citations:
-                marker = "Citations: " + ", ".join(dict.fromkeys(structured_citations))
+                marker = ("出典：" if misco else "Citations: ") + ", ".join(dict.fromkeys(structured_citations))
                 md.extend([marker, ""])
                 docx_lines.append(("body", marker))
             for ref_value in section.get("exhibit_refs", []):
@@ -592,6 +598,16 @@ class PublicationReleaseService:
                             note += "\n" + spec["caption"]
                             units = "; ".join(k + "=" + (v if v is not None else "not applicable") for k, v in spec["units"].items())
                             note += "\nUnits: " + units + "; denominator: " + (spec["denominator"] or "not applicable") + "; period: " + (spec["period"] or "not applicable") + "."
+                            if misco:
+                                unit_labels = list(dict.fromkeys(v for v in spec["units"].values() if v is not None))
+                                note = "単位：" + "、".join(unit_labels) + "。"
+                                if spec["caption"] != exhibit.get("title"):
+                                    note = spec["caption"] + "\n" + note
+                                note += "\n対象：" + (spec["denominator"] or "記載なし") + "。対象年：" + (spec["period"] or "記載なし") + "。"
+                                if "legend_rows" in block:
+                                    x_unit, y_unit = spec["units"][spec["x_column"]], spec["units"][spec["y_column"]]
+                                    x_label = "区分" if spec["chart_type"] == "bar" else "横軸の値"
+                                    block["legend_rows"][0] = ["番号", x_label + (f"（{x_unit}）" if x_unit else ""), "値" + (f"（{y_unit}）" if y_unit else "")]
                         else:
                             note += "\nRepresentation reviewed against the selected research; no new research conclusion is established by this figure."
                     else:
@@ -611,7 +627,7 @@ class PublicationReleaseService:
                         if content_obj.get("representation") in {"text", "markdown"}:
                             note += "\n" + str(content_obj.get("value", ""))
                     if block["provenance"].get("citation_sources"):
-                        note += "\n" + "\n".join("Source: " + self._citation_label(source, source.get("canonical_locator"), policy) + "; " + str(source.get("publisher_or_author") or "") + "; " + str(source.get("publication_or_update_date") or "") for source in block["provenance"]["citation_sources"])
+                        note += "\n" + "\n".join(("出典：" if misco else "Source: ") + self._citation_label(source, source.get("canonical_locator"), policy) + "; " + str(source.get("publisher_or_author") or "") + "; " + str(source.get("publication_or_update_date") or "") for source in block["provenance"]["citation_sources"])
                     block["note"] = note if exhibit.get("generated_visual") is not None else resolve_text(note, sid)
                     preview_text = "[Exact retained image is embedded in formal.docx.]\n" + block["note"]
                     if "legend_rows" in block:
