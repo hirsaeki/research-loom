@@ -2,6 +2,7 @@ from copy import deepcopy
 import json
 import unittest
 
+from plugins.local_application.publication_exhibits import prepare_exhibits
 from plugins.local_application.research_package_builder import _research_inventories
 
 
@@ -167,6 +168,32 @@ class Issue438CitationVisualInventoryTests(unittest.TestCase):
             }
             composition = facade.capture_writer_composition(case["package_id"], proposal)["composition"]
             self.assertEqual(composition["sections"][0]["exhibit_bindings"][0]["use_mode"], "adapt")
+        finally:
+            fixture.doCleanups()
+
+
+    def test_publication_provenance_keeps_each_section_source_use_binding(self):
+        fixture = _fixture(_case_type("test_issue256_native_publication", "Issue256NativePublicationTests"))
+        try:
+            facade, case = fixture._prepared(visual=True, derived=True)
+            exhibit = next(
+                row for row in case["package"]["resolved_content"]["working_material"]["research_exhibits"]
+                if row.get("visual_target")
+            )
+            exhibit_id = exhibit["exhibit_id"]
+            inspection = {
+                "source_package_document": case["package"],
+                "revision": {"sections": [{"exhibit_refs": [exhibit_id]}]},
+                "composition": {"sections": [
+                    {"section_id": "SEC-A", "exhibit_bindings": [{"exhibit_id": exhibit_id, "use_mode": "reproduce", "status": "selected"}]},
+                    {"section_id": "SEC-B", "exhibit_bindings": [{"exhibit_id": exhibit_id, "use_mode": "adapt", "status": "selected"}]},
+                ]},
+            }
+            block = prepare_exhibits(inspection, fixture.root)[exhibit_id]
+            self.assertEqual(block["provenance"]["source_use_bindings"], [
+                {"section_id": "SEC-A", "use_mode": "reproduce"},
+                {"section_id": "SEC-B", "use_mode": "adapt"},
+            ])
         finally:
             fixture.doCleanups()
 
