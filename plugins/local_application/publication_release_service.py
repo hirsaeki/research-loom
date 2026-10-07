@@ -464,10 +464,26 @@ class PublicationReleaseService:
                 issue_keys.add(key)
                 issues.append(self._issue(code, ref, section_id, blocking))
 
+        citation_inventory = {
+            str(row.get("evidence_id")): row
+            for row in package.get("inventories", {}).get("citation_inventory", [])
+            if isinstance(row, Mapping) and isinstance(row.get("evidence_id"), str)
+        }
         table_count = 0
         figure_count = 0
         for section in sections:
             section_id = str(section["section_id"])
+            composition_section = next(
+                (row for row in composition.get("sections", []) if str(row.get("section_id")) == section_id),
+                {},
+            )
+            for binding in composition_section.get("citation_bindings", []):
+                if not isinstance(binding, Mapping) or binding.get("status") != "selected":
+                    continue
+                evidence_id = str(binding.get("evidence_id", ""))
+                row = citation_inventory.get(evidence_id)
+                if row is None or not row.get("citation_ready"):
+                    add_issue("UNRESOLVED_CITATION", evidence_id, section_id, True)
             for citation in section.get("citations", []):
                 source_ref = str(citation.get("source_ref", ""))
                 if source_ref not in sources:
