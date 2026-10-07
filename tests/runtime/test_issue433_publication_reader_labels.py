@@ -65,6 +65,25 @@ class ReaderPresentationTests(unittest.TestCase):
         label = PublicationReleaseService._citation_label(source, "page 5", inspection["publication_policy"])
         self.assertIn("https://example.org/study — page 5", label)
 
+    def test_japanese_explanation_notes_keep_meaning_and_exact_png(self):
+        inspection = self.inspection()
+        exhibit = inspection["source_package_document"]["resolved_content"]["working_material"]["research_exhibits"][0]
+        exhibit["title"] = "比較結果・対象・限界"
+        exhibit["content"]["value"] = {"request": {"allowed_labels": ["比較結果", "調査対象", "解釈の限界"]}}
+        inspection["exhibit_blocks"]["EX"].pop("legend_rows")
+        original = deepcopy(inspection)
+        markdown, docx, issues, checks = self.render(inspection)
+        self.assertEqual(issues, [])
+        self.assertEqual(checks["render_verification"], "passed")
+        self.assertIn("図に示す内容：比較結果、調査対象、解釈の限界。", markdown.decode())
+        self.assertNotIn("Represented research:", markdown.decode())
+        self.assertNotIn("Representation reviewed", markdown.decode())
+        with zipfile.ZipFile(io.BytesIO(docx)) as archive:
+            self.assertEqual(archive.read("word/media/image-1.png"), original["exhibit_blocks"]["EX"]["data"])
+            text = archive.read("word/document.xml").decode()
+            self.assertIn("既存の研究内容を整理した図", text)
+        self.assertEqual(inspection, original)
+
 
 if __name__ == "__main__":
     unittest.main()
