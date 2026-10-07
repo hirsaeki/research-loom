@@ -134,6 +134,7 @@ def _research_inventories(selected: list[Mapping[str, Any]], exhibits: list[Mapp
         unresolved = []
         if not source_ids:
             unresolved.append("source_unresolved")
+        # Rights are deliberately not inferred in Research. Publication policy resolves them.
         rights_status = "unresolved"
         unresolved.append("rights_unresolved")
         source_exhibit_inventory.append({
