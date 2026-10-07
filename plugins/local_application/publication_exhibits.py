@@ -197,6 +197,12 @@ def prepare_exhibits(inspection: Mapping[str, Any], workspace: Path) -> dict[str
     package = inspection["source_package_document"]
     root = workspace / ".research-loom" / "research-packages" / safe_component(package["package_id"], "package_id")
     selected = {ref for row in inspection["revision"]["sections"] for ref in row.get("exhibit_refs", [])}
+    use_modes = {
+        str(binding.get("exhibit_id")): str(binding.get("use_mode"))
+        for row in inspection["revision"]["sections"]
+        for binding in row.get("exhibit_bindings", [])
+        if isinstance(binding, Mapping) and binding.get("status") == "selected"
+    }
     result = {}
     asset_cache: dict[tuple[str, str, int, str], bytes] = {}
 
