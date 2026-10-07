@@ -224,6 +224,8 @@ def prepare_exhibits(inspection: Mapping[str, Any], workspace: Path) -> dict[str
             "exhibit_id", "content_digest", "source_run_ids", "source_artifact_refs", "source_object_ids",
             "derived_from_exhibit_ids", "captured_against",
         )}
+        if ref in use_modes:
+            provenance["source_use_mode"] = use_modes[ref]
         visual = exhibit.get("visual_target")
         generated = exhibit.get("generated_visual")
         unavailable_code = "VISUAL_ASSET_UNAVAILABLE" if visual is not None or generated is not None else "UNSUPPORTED_EXHIBIT"
