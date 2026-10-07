@@ -171,7 +171,6 @@ class Issue438CitationVisualInventoryTests(unittest.TestCase):
         finally:
             fixture.doCleanups()
 
-
     def test_publication_provenance_keeps_each_section_source_use_binding(self):
         fixture = _fixture(_case_type("test_issue256_native_publication", "Issue256NativePublicationTests"))
         try:
