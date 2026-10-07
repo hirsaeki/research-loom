@@ -333,8 +333,6 @@ class WriterRoundTripService:
                 {"source_ref": source, "locators": sorted(values)} for source, values in sorted(locators.items())
             ],
             "exhibit_refs": list(contract.get("exhibit_refs", [])),
-            "citation_bindings": deepcopy(list(contract.get("citation_bindings", []))),
-            "exhibit_bindings": deepcopy(list(contract.get("exhibit_bindings", []))),
         }
 
     def _validate_input_context(
@@ -747,8 +745,6 @@ class WriterRoundTripService:
                     "content_digest": _sha256_text(str(draft["content"])),
                     "citations": deepcopy(list(draft.get("citations", []))),
                     "exhibit_refs": deepcopy(list(draft.get("exhibit_refs", []))),
-                    "citation_bindings": deepcopy(list(input_section.get("citation_bindings", []))),
-                    "exhibit_bindings": deepcopy(list(input_section.get("exhibit_bindings", []))),
                     **({"profile_review": deepcopy(list(draft["profile_review"]))} if "profile_review" in draft else {}),
                     "origin_revision_id": revision_id,
                 }
