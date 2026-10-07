@@ -64,6 +64,94 @@ def _validate_selected_reference_closure(selected: list[Mapping[str, Any]]) -> N
         )
 
 
+def _bibliography_readiness(source: Mapping[str, Any]) -> tuple[bool, list[str]]:
+    missing = [
+        field for field in ("title", "publisher_or_author", "publication_or_update_date")
+        if not isinstance(source.get(field), str) or not str(source.get(field)).strip()
+    ]
+    return (not missing, [f"bibliography_missing:{field}" for field in missing])
+
+
+def _research_inventories(selected: list[Mapping[str, Any]], exhibits: list[Mapping[str, Any]], materials: list[Mapping[str, Any]]) -> Mapping[str, Any]:
+    objects = {str(obj.get("id")): obj for obj in selected if isinstance(obj.get("id"), str)}
+    citation_inventory = []
+    for evidence in selected:
+        if evidence.get("kind") != "evidence":
+            continue
+        source_id = str(evidence.get("source_id", ""))
+        source = objects.get(source_id)
+        unresolved = []
+        locator = evidence.get("locator") if isinstance(evidence.get("locator"), str) and evidence.get("locator") else None
+        if locator is None:
+            unresolved.append("locator_missing")
+        bibliography_ready = False
+        if source is None or source.get("kind") != "source":
+            unresolved.append("source_unresolved")
+        else:
+            bibliography_ready, missing = _bibliography_readiness(source)
+            unresolved.extend(missing)
+        verification_status = str(evidence.get("verification_status") or "unspecified")
+        if verification_status != "verified":
+            unresolved.append("evidence_unverified")
+        citation_inventory.append({
+            "evidence_id": str(evidence["id"]),
+            "source_id": source_id,
+            "locator": locator,
+            "bibliography_ready": bibliography_ready,
+            "evidence_role": str(evidence.get("evidence_kind") or "unspecified"),
+            "verification_status": verification_status,
+            "citation_ready": not unresolved,
+            "unresolved_reasons": unresolved,
+        })
+    source_exhibit_inventory = []
+    for exhibit in exhibits:
+        visual = exhibit.get("visual_target")
+        semantics = exhibit.get("visual_semantics")
+        if not isinstance(visual, Mapping) or visual.get("target_type") != "source_visual":
+            continue
+        source_ids = [
+            str(ref) for ref in exhibit.get("source_object_ids", [])
+            if isinstance(ref, str) and objects.get(ref, {}).get("kind") == "source"
+        ]
+        if not source_ids:
+            capture_locators = set()
+            for material in materials:
+                capture = material.get("capture") if isinstance(material, Mapping) else None
+                if (
+                    isinstance(capture, Mapping)
+                    and material.get("run_id") == visual.get("source_run_id")
+                    and capture.get("capture_id") == visual.get("capture_id")
+                ):
+                    for key in ("source_locator", "exact_locator"):
+                        if isinstance(capture.get(key), str):
+                            capture_locators.add(str(capture[key]))
+            source_ids = sorted(
+                str(obj["id"]) for obj in selected
+                if obj.get("kind") == "source"
+                and obj.get("content_digest") == visual.get("source_digest")
+                and (not capture_locators or obj.get("canonical_locator") in capture_locators)
+            )
+        unresolved = []
+        if not source_ids:
+            unresolved.append("source_unresolved")
+        rights_status = "unresolved"
+        unresolved.append("rights_unresolved")
+        source_exhibit_inventory.append({
+            "exhibit_id": str(exhibit["exhibit_id"]),
+            "source_ids": source_ids,
+            "source_run_id": str(visual.get("source_run_id", "")),
+            "capture_id": str(visual.get("capture_id", "")),
+            "locator": deepcopy(dict(visual.get("locator", {}))),
+            "retained_artifact_ref": str((visual.get("derived_artifact") or {}).get("artifact_ref") or visual.get("source_artifact_ref", "")),
+            "retained_digest": str((visual.get("derived_artifact") or {}).get("digest") or visual.get("source_digest", "")),
+            "rights_status": rights_status,
+            "research_ready": bool(visual.get("source_run_id")) and bool(visual.get("capture_id")) and bool(visual.get("source_digest")) and bool(visual.get("source_artifact_ref")) and isinstance(visual.get("locator"), Mapping) and not (isinstance(semantics, Mapping) and semantics.get("semantic_status") == "research_required"),
+            "semantic_status": str(semantics.get("semantic_status")) if isinstance(semantics, Mapping) else "unspecified",
+            "unresolved_reasons": unresolved,
+        })
+    return {"citation_inventory": citation_inventory, "source_exhibit_inventory": source_exhibit_inventory}
+
+
 def _visual_extension(media_type: str) -> str:
     return {
         "application/pdf": "pdf",
@@ -441,7 +529,7 @@ def build_package(service, value:Mapping[str,Any])->Mapping[str,Any]:
     constraints=[deepcopy(dict(x)) for x in eps.get("effective_constraints",[])]; require_resolved_narrative(constraints); sem=NARRATIVE.read_bytes(); attachments.append(("attachments/profile/narrative-semantics.yaml",sem,"application/yaml","canonical_narrative_semantics"))
     source_mode=next(iter(modes),"virtual" if str(snapshot.get("mode","real"))=="virtual" else "real"); virt=source_mode=="virtual"
     source_refs=[{"source_id":str(o["id"]),"citation_capable":bool(o.get("canonical_locator")),"citation_namespace":"supplied_source","locator_refs":[],"metadata_origin":"supplied"} for o in selected if o.get("kind")=="source"]
-    package={"schema_version":SCHEMA_VERSION,"object_type":"research_package","package_id":"RP-"+uuid.uuid4().hex,"package_mode":"preview" if virt else "real","source_epistemic_status":"SYNTHETIC_TEST_ONLY" if virt else "EMPIRICAL_RESEARCH_STATE","preview_only":True,"authoritative_research_freeze":False,"release_eligible":False,"project":{"project_id":service.project_id,"title":str(config.get("project",{}).get("title") or service.project_id)},"project_config_digest":str(state.project_config_digest),"effective_profile_set":{"effective_profile_set_ref":str(state.effective_profile_set_ref),"content_digest":str(state.effective_profile_set_digest),"profile_pins":profile_pins(eps),**({"effective_resources":profile_resources(eps)} if eps.get("effective_resources") else {})},"source_research_snapshot":{"snapshot_id":str(snapshot["id"]),"revision":int(snapshot.get("revision",0)),"content_digest":str(snapshot["content_digest"]),"execution_mode":"virtual" if str(snapshot.get("mode","real"))=="virtual" else "real","lineage_ref":str(state.active_lineage_ref)},"communication_brief":brief(config,None),"content":{"research_question_refs":[rqid],"finding_refs":[str(o["id"]) for o in selected if o.get("kind")=="finding"],"argument_refs":[str(o["id"]) for o in selected if o.get("kind")=="argument"],"contribution_refs":[str(o["id"]) for o in selected if o.get("kind")=="contribution"],"evidence_refs":[str(o["id"]) for o in selected if o.get("kind")=="evidence"],"source_refs":source_refs,"counter_review_refs":[str(o["id"]) for o in selected if o.get("kind")=="counter_review"],"qualifier_refs":[],"limitations":[],"unresolved_evidence_gap_refs":[str(g["gap_id"]) for g in gaps],"research_attention_refs":[]},"narrative_constraints":narrative_refs(constraints),"project_constraints":{"must_not_claim":project_must_not_claim(config)},"publication_requirements":{"requirement_refs":[]},"provenance":{"generated_at":datetime.now(timezone.utc).isoformat().replace("+00:00","Z"),"generator_id":"research-loom.research-package","tool_version":TOOL_VERSION,"input_digests":list(dict.fromkeys([str(snapshot["content_digest"]),str(state.project_config_digest),str(state.effective_profile_set_digest)]+[str(o.get("content_digest")) for o in selected if isinstance(o.get("content_digest"),str)]+[str(r["handoff"].get("handoff_digest")) for r in runs if isinstance(r.get("handoff"),Mapping) and isinstance(r["handoff"].get("handoff_digest"),str)]))},"resolved_profiles":{"effective_constraints":constraints,"narrative_semantics":{"contract_path":"attachments/profile/narrative-semantics.yaml","content_digest":digest_bytes(sem),"byte_length":len(sem)}},"resolved_content":{"research_objects":selected,"working_material":{"run_candidates":runs,"research_exhibits":exhs,"project_inputs":inputs},"materials":materials,"unresolved_gaps":gaps},"attachments":[],"projections":{}}
+    package={"schema_version":SCHEMA_VERSION,"object_type":"research_package","package_id":"RP-"+uuid.uuid4().hex,"package_mode":"preview" if virt else "real","source_epistemic_status":"SYNTHETIC_TEST_ONLY" if virt else "EMPIRICAL_RESEARCH_STATE","preview_only":True,"authoritative_research_freeze":False,"release_eligible":False,"project":{"project_id":service.project_id,"title":str(config.get("project",{}).get("title") or service.project_id)},"project_config_digest":str(state.project_config_digest),"effective_profile_set":{"effective_profile_set_ref":str(state.effective_profile_set_ref),"content_digest":str(state.effective_profile_set_digest),"profile_pins":profile_pins(eps),**({"effective_resources":profile_resources(eps)} if eps.get("effective_resources") else {})},"source_research_snapshot":{"snapshot_id":str(snapshot["id"]),"revision":int(snapshot.get("revision",0)),"content_digest":str(snapshot["content_digest"]),"execution_mode":"virtual" if str(snapshot.get("mode","real"))=="virtual" else "real","lineage_ref":str(state.active_lineage_ref)},"communication_brief":brief(config,None),"content":{"research_question_refs":[rqid],"finding_refs":[str(o["id"]) for o in selected if o.get("kind")=="finding"],"argument_refs":[str(o["id"]) for o in selected if o.get("kind")=="argument"],"contribution_refs":[str(o["id"]) for o in selected if o.get("kind")=="contribution"],"evidence_refs":[str(o["id"]) for o in selected if o.get("kind")=="evidence"],"source_refs":source_refs,"counter_review_refs":[str(o["id"]) for o in selected if o.get("kind")=="counter_review"],"qualifier_refs":[],"limitations":[],"unresolved_evidence_gap_refs":[str(g["gap_id"]) for g in gaps],"research_attention_refs":[]},"narrative_constraints":narrative_refs(constraints),"project_constraints":{"must_not_claim":project_must_not_claim(config)},"publication_requirements":{"requirement_refs":[]},"provenance":{"generated_at":datetime.now(timezone.utc).isoformat().replace("+00:00","Z"),"generator_id":"research-loom.research-package","tool_version":TOOL_VERSION,"input_digests":list(dict.fromkeys([str(snapshot["content_digest"]),str(state.project_config_digest),str(state.effective_profile_set_digest)]+[str(o.get("content_digest")) for o in selected if isinstance(o.get("content_digest"),str)]+[str(r["handoff"].get("handoff_digest")) for r in runs if isinstance(r.get("handoff"),Mapping) and isinstance(r["handoff"].get("handoff_digest"),str)]))},"resolved_profiles":{"effective_constraints":constraints,"narrative_semantics":{"contract_path":"attachments/profile/narrative-semantics.yaml","content_digest":digest_bytes(sem),"byte_length":len(sem)}},"resolved_content":{"research_objects":selected,"working_material":{"run_candidates":runs,"research_exhibits":exhs,"project_inputs":inputs},"materials":materials,"unresolved_gaps":gaps},"inventories":_research_inventories(selected, exhs, materials),"attachments":[],"projections":{}}
     package["content"]["research_question_refs"] = [
         str(obj["id"]) for obj in selected if obj.get("kind") == "research_question"
     ]
