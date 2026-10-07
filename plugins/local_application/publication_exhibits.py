@@ -199,7 +199,7 @@ def prepare_exhibits(inspection: Mapping[str, Any], workspace: Path) -> dict[str
     selected = {ref for row in inspection["revision"]["sections"] for ref in row.get("exhibit_refs", [])}
     use_modes = {
         str(binding.get("exhibit_id")): str(binding.get("use_mode"))
-        for row in inspection["revision"]["sections"]
+        for row in inspection.get("composition", {}).get("sections", [])
         for binding in row.get("exhibit_bindings", [])
         if isinstance(binding, Mapping) and binding.get("status") == "selected"
     }
