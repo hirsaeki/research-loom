@@ -7,8 +7,10 @@ from plugins.desktop_research.normalization import source_id_for_capture
 from plugins.desktop_research.digest import canonical_extension_digest
 from plugins.local_application import LocalApplicationError
 from plugins.local_application.research_package_service import verify_export_root
+from plugins.local_application.research_package_format import validate_resolved_references
 from research_package_acceptance_support import ResearchPackageAcceptanceSupport
 import test_external_desktop_research_intake as intake
+import issue80_writer_composition_suite as compositions
 
 
 class ReusedSourceTests(ResearchPackageAcceptanceSupport):
@@ -72,12 +74,33 @@ class ReusedSourceTests(ResearchPackageAcceptanceSupport):
         output = self.root / "combined-detached"
         facade.export_research_package(package["package_id"], output)
         self.assertEqual(verify_export_root(output)["status"], "VERIFIED")
+        tampered = deepcopy(package)
+        tampered["resolved_content"]["materials"][0]["source_id"] = package["resolved_content"]["materials"][1]["source_id"]
+        with self.assertRaisesRegex(LocalApplicationError, "material.capture_source_id"):
+            validate_resolved_references(tampered)
+        # Follow the public late-visual path, which must retain both selected RQs.
+        with_visual = facade.build_research_package({**value, "exhibit_ids": [case["exhibit_id"]]})["package"]
+        composition_input = compositions.Issue80WriterCompositionTests._proposal(self, case)
+        composition_input["sections"][1]["narrative_stage_refs"] = ["framing"]
+        composition_input["sections"][1]["semantic_purpose_refs"] = ["frame_problem"]
+        composition = facade.capture_writer_composition(with_visual["package_id"], composition_input)["composition"]
+        need = facade.capture_visual_need({"origin": {"stage": "narrative",
+            "composition_id": composition["composition_id"], "composition_version": 1},
+            "purpose": "Use existing prose instead", "semantic_changes": [],
+            "affected_section_ids": ["SEC-FRAME"]})["exhibit"]["exhibit_id"]
+        resumed = facade.resume_visual_need({"need_id": need, "exhibit_ids": [],
+            "section_exhibit_refs": {"SEC-FRAME": []}})
+        self.assertEqual(set(resumed["package"]["rq_ids"]), {case["rq_id"], second_rq})
+        self.assertEqual(facade._current_state_view().current_snapshot, before)
+        self.assertEqual(facade.show_research_package(package["package_id"])["package"], package)
         service = facade._research_package_service()
         objects = {obj["id"]: obj for obj in state.effective_objects()}
         original_id = source_id_for_capture(case["run_id"], "CAP-1")
         original = objects[original_id]
         single = {"snapshot_id": state.current_snapshot["id"], "rq_id": case["rq_id"],
             "run_ids": [case["run_id"]], "materials": [value["materials"][0]]}
+        with self.assertRaisesRegex(LocalApplicationError, "does not resolve to its capture Source"):
+            service.build({**single, "object_ids": [source_id_for_capture(run_id, "CAP-1")]})
         mismatched = {**deepcopy(original), "content_digest": "sha256:" + "0" * 64}
         with patch.object(service, "_objects", return_value={case["rq_id"]: objects[case["rq_id"]], original_id: mismatched}):
             with self.assertRaisesRegex(LocalApplicationError, "does not match verified material"):
@@ -88,6 +111,12 @@ class ReusedSourceTests(ResearchPackageAcceptanceSupport):
                 **{obj["id"]: obj for obj in unrelated}}):
             with self.assertRaisesRegex(LocalApplicationError, "ambiguously resolves"):
                 service.build({**single, "object_ids": [obj["id"] for obj in unrelated]})
+        # A legacy manually supplied Source has no normalized capture identity.
+        # Preserve its existing unambiguous verified-content binding.
+        with patch.object(service, "_objects", return_value={case["rq_id"]: objects[case["rq_id"]],
+                unrelated[0]["id"]: unrelated[0]}):
+            legacy = service.build({**single, "object_ids": [unrelated[0]["id"]]})
+            self.assertEqual(legacy["status"], "BUILT")
 
 
 if __name__ == "__main__":

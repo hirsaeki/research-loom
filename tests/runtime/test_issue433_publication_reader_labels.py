@@ -52,6 +52,12 @@ class ReaderPresentationTests(unittest.TestCase):
             source_notes = [p for p in document.findall(f".//{{{W}}}p") if p.find(f"{{{W}}}pPr/{{{W}}}pStyle") is not None and p.find(f"{{{W}}}pPr/{{{W}}}pStyle").get(f"{{{W}}}val") == 'SourceCaption']
             self.assertEqual(len(source_notes), 1)
             self.assertIsNotNone(source_notes[0].find(f"{{{W}}}pPr/{{{W}}}keepLines"))
+            for paragraph in document.findall(f".//{{{W}}}p"):
+                style = paragraph.find(f"{{{W}}}pPr/{{{W}}}pStyle")
+                if style is not None and style.get(f"{{{W}}}val") == "ReferenceHeading":
+                    self.assertIsNotNone(paragraph.find(f"{{{W}}}pPr/{{{W}}}keepNext"))
+                if style is not None and style.get(f"{{{W}}}val") == "Reference":
+                    self.assertIsNotNone(paragraph.find(f"{{{W}}}pPr/{{{W}}}keepLines"))
 
     def test_generic_labels_and_non_url_locators_remain_available(self):
         inspection = self.inspection()

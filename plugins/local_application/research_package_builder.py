@@ -377,6 +377,14 @@ def build_package(service, value:Mapping[str,Any])->Mapping[str,Any]:
                 "APPLICATION-RESEARCH-PACKAGE-REFERENCE-001",
                 f"selected material ambiguously resolves multiple Sources: {rid}:{cid}",
             )
+        if (
+            source_matches and capture_source_id not in source_matches
+            and service._objects(snapshot, {capture_source_id}).get(capture_source_id) is not None
+        ):
+            raise LocalApplicationError(
+                "APPLICATION-RESEARCH-PACKAGE-REFERENCE-001",
+                f"selected material does not resolve to its capture Source: {rid}:{cid}",
+            )
         path=f"attachments/materials/{safe_component(str(rid),'run_id')}/{safe_component(str(cid),'capture_id')}.txt"
         attachments.append((path,data,"text/plain",f"external_material:{rid}:{cid}"))
         material_row={"run_id":rid,"historical_binding":{"lineage_ref":str(run.lineage_ref),"snapshot_id":str(run.snapshot_ref),"snapshot_digest":str(run.snapshot_digest)},"capture":deepcopy(dict(capture)),"text_rendition":{"encoding":"UTF-8","byte_length":len(data),"content_digest":digest_bytes(data),"attachment_path":path}}
