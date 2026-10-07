@@ -3,6 +3,7 @@ import json
 import unittest
 
 from plugins.local_application.publication_exhibits import prepare_exhibits
+from plugins.local_application.publication_release_service import PublicationReleaseService
 from plugins.local_application.research_package_builder import _research_inventories
 
 
@@ -108,12 +109,17 @@ class Issue438CitationVisualInventoryTests(unittest.TestCase):
             target = proposal["sections"][1]
             target["source_refs"] = [source["id"]]
             target["citation_requirements"] = []
+            # The binding itself selects these objects; callers need not repeat IDs.
+            target["argument_refs"] = []
+            target["evidence_refs"] = []
             target["citation_bindings"] = [{
                 "argument_id": argument_id, "evidence_id": evidence["id"],
                 "citation_role": "primary_support", "status": "selected",
             }]
             composition = facade.capture_writer_composition(built["package_id"], proposal)["composition"]
             section = next(x for x in composition["sections"] if x["section_id"] == "SEC-G1-05")
+            self.assertIn(argument_id, section["argument_refs"])
+            self.assertIn(evidence["id"], section["evidence_refs"])
             self.assertEqual(section["citation_requirements"], [{"source_ref": source["id"], "locator_ref": evidence["locator"]}])
             facade.select_writer_composition(composition["composition_id"], 1, composition["composition_digest"])
             output = fixture.root / "issue438-citation-section"
@@ -139,6 +145,46 @@ class Issue438CitationVisualInventoryTests(unittest.TestCase):
         finally:
             facade.close()
             fixture.doCleanups()
+
+    def test_ready_selected_citation_requires_matching_manuscript_source_and_locator(self):
+        service = PublicationReleaseService.__new__(PublicationReleaseService)
+        inspection = {
+            "source_package_document": {
+                "project": {"title": "Synthetic citation conformance test"},
+                "resolved_content": {"research_objects": [{
+                    "id": "SRC-1", "kind": "source", "title": "Fixture source",
+                    "canonical_locator": "https://example.invalid/source",
+                }]},
+                "inventories": {"citation_inventory": [{
+                    "evidence_id": "EV-1", "source_id": "SRC-1",
+                    "locator": "page 2", "citation_ready": True,
+                }]},
+            },
+            "composition": {"sections": [{
+                "section_id": "SEC-1", "heading": "Bounded claim",
+                "citation_bindings": [{"evidence_id": "EV-1", "status": "selected"}],
+            }]},
+            "revision": {"sections": [{
+                "section_id": "SEC-1", "content": "A bounded fixture claim.",
+                "citations": [], "exhibit_refs": [],
+            }]},
+            "exhibit_blocks": {},
+        }
+        for citations, expected in (
+            ([], "failed"),
+            ([{"source_ref": "SRC-1", "locator_ref": "page 3"}], "failed"),
+            ([{"source_ref": "SRC-OTHER", "locator_ref": "page 2"}], "failed"),
+            ([{"source_ref": "SRC-1", "locator_ref": "page 2"}], "passed"),
+        ):
+            with self.subTest(citations=citations):
+                inspection["revision"]["sections"][0]["citations"] = citations
+                _, _, issues, checks = service._render(inspection)
+                self.assertEqual(checks["citation_resolution"], expected)
+                self.assertEqual(
+                    any(row["code"] == "UNRESOLVED_CITATION" and row["ref"] == "EV-1"
+                        and row["blocking"] for row in issues),
+                    expected == "failed",
+                )
 
     def test_source_exhibit_inventory_and_use_mode_remain_separate_from_citations(self):
         fixture = _fixture(_case_type("test_issue218_visual_evidence", "Issue218VisualEvidenceTests"))
