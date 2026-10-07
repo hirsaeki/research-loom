@@ -6,6 +6,7 @@ from typing import Any, Mapping
 from jsonschema import Draft202012Validator, FormatChecker
 import rfc8785
 from plugins.research_visual_semantics import validate_visual_package_bindings
+from plugins.desktop_research.normalization import source_id_for_capture
 from plugins.local_research_exhibit_store import (
     LocalResearchExhibitStoreError,
     validate_visual_target,
@@ -158,6 +159,9 @@ def validate_resolved_references(package:Mapping[str,Any])->None:
         source_id=material.get("source_id")
         if isinstance(source_id,str):
             source_material_ids.add(source_id)
+            capture_source_id = source_id_for_capture(run_id, capture_id)
+            if capture_source_id in by_id and source_id != capture_source_id:
+                missing.append(f"material.capture_source_id:{run_id}:{capture_id}")
             source=by_id.get(source_id)
             original=capture.get("original",{})
             if not isinstance(original,Mapping): original={}

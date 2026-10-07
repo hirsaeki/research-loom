@@ -14,6 +14,14 @@ implicit source-visual disguise or successful text fallback.
 - `allowed_labels` and `allowed_relations` (literal strings, not a graph DSL);
 - `must_not_add` (explicit forbidden added meaning).
 
+`request.purpose` also becomes the retained Exhibit title and the Publication
+figure caption. Write it as a concise reader-facing title in the manuscript's
+language (for example, `比較結果・調査対象・解釈の限界`). Keep generation commands,
+session authorization and implementation instructions in `generator.instruction`
+and provenance, not in `purpose`. A published title is literal supplied content;
+the renderer must not guess which words to delete. Correct an unsuitable title
+through a new candidate and review, retaining the previous candidate and preview.
+
 Research Object refs must match current selected research; selected Exhibit refs
 remain working material rather than approved facts. The generation input digest
 binds the request, exact semantic refs, generator and instruction. Output PNG
