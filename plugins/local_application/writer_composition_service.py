@@ -725,10 +725,6 @@ class WriterCompositionService:
                     raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-INPUT-001", f"{sid}.exhibit_bindings use_mode/status is invalid")
                 if exhibit_id not in section["exhibit_refs"] or exhibit_id not in source_exhibits:
                     raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-REFERENCE-001", f"section {sid} source Exhibit binding is outside the selected source exhibit inventory")
-                for prior_section in sections:
-                    for prior in prior_section.get("exhibit_bindings", []):
-                        if prior.get("exhibit_id") == exhibit_id and prior.get("use_mode") != use_mode:
-                            raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-REFERENCE-001", f"source Exhibit {exhibit_id} cannot use conflicting modes in one Composition")
                 section["exhibit_bindings"].append({"exhibit_id": exhibit_id, "use_mode": use_mode, "status": "selected"})
             required_kinds = set()
             for stage_id in stage_refs:
