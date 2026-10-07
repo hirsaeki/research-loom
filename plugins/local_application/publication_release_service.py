@@ -473,7 +473,11 @@ class PublicationReleaseService:
         figure_count = 0
         for section in sections:
             section_id = str(section["section_id"])
-            for binding in section.get("citation_bindings", []):
+            composition_section = next(
+                (row for row in composition.get("sections", []) if str(row.get("section_id")) == section_id),
+                {},
+            )
+            for binding in composition_section.get("citation_bindings", []):
                 if not isinstance(binding, Mapping) or binding.get("status") != "selected":
                     continue
                 evidence_id = str(binding.get("evidence_id", ""))
