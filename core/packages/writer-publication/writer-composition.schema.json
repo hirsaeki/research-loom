@@ -270,6 +270,35 @@
             "additionalProperties": false
           }
         },
+        "citation_bindings": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["argument_id", "evidence_id", "citation_role", "status"],
+            "properties": {
+              "argument_id": {"$ref": "#/$defs/id"},
+              "evidence_id": {"$ref": "#/$defs/id"},
+              "citation_role": {"enum": ["primary_support", "corroboration", "background", "counterevidence"]},
+              "status": {"const": "selected"}
+            }
+          }
+        },
+        "exhibit_bindings": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["exhibit_id", "use_mode", "status"],
+            "properties": {
+              "exhibit_id": {"$ref": "#/$defs/id"},
+              "use_mode": {"enum": ["reproduce", "adapt", "derive"]},
+              "status": {"const": "selected"}
+            }
+          }
+        },
         "section_digest": {
           "$ref": "#/$defs/digest"
         },

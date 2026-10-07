@@ -244,6 +244,16 @@ def _known_locators_for_source(package: Mapping[str, Any], source_id: str) -> se
     return result
 
 
+def _citation_inventory(package: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
+    rows = package.get("inventories", {}).get("citation_inventory", [])
+    return {str(row.get("evidence_id")): row for row in rows if isinstance(row, Mapping) and isinstance(row.get("evidence_id"), str)}
+
+
+def _source_exhibit_inventory(package: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
+    rows = package.get("inventories", {}).get("source_exhibit_inventory", [])
+    return {str(row.get("exhibit_id")): row for row in rows if isinstance(row, Mapping) and isinstance(row.get("exhibit_id"), str)}
+
+
 def verify_section_input_root(root: str | Path) -> Mapping[str, Any]:
     root = Path(root)
     payload_path = root / "section-writer-input.json"
@@ -337,6 +347,12 @@ def verify_section_input_root(root: str | Path) -> Mapping[str, Any]:
     material_source_ids = {str(row.get("source_id")) for row in materials.values() if isinstance(row.get("source_id"), str)}
     if not resolved_source_ids <= material_source_ids:
         raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-REFERENCE-001", "detached section omits a required Source body")
+    for binding in section.get("citation_bindings", []):
+        if binding.get("evidence_id") not in objects or binding.get("argument_id") not in objects:
+            raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-REFERENCE-001", "detached citation binding is unresolved")
+    for binding in section.get("exhibit_bindings", []):
+        if binding.get("exhibit_id") not in exhibits:
+            raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-REFERENCE-001", "detached source Exhibit binding is unresolved")
     for citation in section.get("citation_requirements", []):
         source_id = citation.get("source_ref")
         if source_id not in resolved_source_ids:
@@ -666,6 +682,50 @@ class WriterCompositionService:
                 if locator is not None and (not isinstance(locator, str) or locator not in _known_locators_for_source(package, source_id)):
                     raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-REFERENCE-001", f"section {sid} citation references an unavailable locator for Source {source_id}: {locator}")
                 section["citation_requirements"].append({"source_ref": source_id, "locator_ref": locator})
+            citation_bindings = raw.get("citation_bindings", [])
+            if not isinstance(citation_bindings, list) or len(citation_bindings) > MAX_SECTION_REFS:
+                raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-INPUT-001", f"{sid}.citation_bindings must be bounded")
+            section["citation_bindings"] = []
+            inventory = _citation_inventory(package)
+            for binding in citation_bindings:
+                if not isinstance(binding, Mapping) or set(binding) != {"argument_id", "evidence_id", "citation_role", "status"}:
+                    raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-INPUT-001", f"{sid}.citation_bindings entry is invalid")
+                evidence_id = _require_string(binding.get("evidence_id"), "evidence_id")
+                argument_id = _require_string(binding.get("argument_id"), "argument_id")
+                role = str(binding.get("citation_role", ""))
+                if role not in {"primary_support", "corroboration", "background", "counterevidence"} or binding.get("status") != "selected":
+                    raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-INPUT-001", f"{sid}.citation_bindings role/status is invalid")
+                if evidence_id not in refs["evidence_refs"] or argument_id not in refs["argument_refs"] or evidence_id not in inventory:
+                    raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-REFERENCE-001", f"section {sid} citation binding is outside the Research Package selection")
+                argument_obj = objects.get(argument_id, {})
+                row = inventory[evidence_id]
+                if role != "background" and evidence_id not in set(map(str, argument_obj.get("evidence_ids", []))):
+                    raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-REFERENCE-001", f"section {sid} citation binding does not connect the Argument to Evidence")
+                evidence_kind = str(row.get("evidence_role", ""))
+                if role == "counterevidence" and evidence_kind != "counterevidence":
+                    raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-REFERENCE-001", f"section {sid} counterevidence citation role conflicts with Evidence meaning")
+                if role in {"primary_support", "corroboration"} and evidence_kind == "counterevidence":
+                    raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-REFERENCE-001", f"section {sid} supporting citation role conflicts with counterevidence")
+                source_id = str(row["source_id"]); locator = row.get("locator")
+                requirement = {"source_ref": source_id, "locator_ref": locator}
+                if requirement not in section["citation_requirements"]:
+                    section["citation_requirements"].append(requirement)
+                section["citation_bindings"].append({"argument_id": argument_id, "evidence_id": evidence_id, "citation_role": role, "status": "selected"})
+            exhibit_bindings = raw.get("exhibit_bindings", [])
+            if not isinstance(exhibit_bindings, list) or len(exhibit_bindings) > MAX_SECTION_REFS:
+                raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-INPUT-001", f"{sid}.exhibit_bindings must be bounded")
+            section["exhibit_bindings"] = []
+            source_exhibits = _source_exhibit_inventory(package)
+            for binding in exhibit_bindings:
+                if not isinstance(binding, Mapping) or set(binding) != {"exhibit_id", "use_mode", "status"}:
+                    raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-INPUT-001", f"{sid}.exhibit_bindings entry is invalid")
+                exhibit_id = _require_string(binding.get("exhibit_id"), "exhibit_id")
+                use_mode = str(binding.get("use_mode", ""))
+                if use_mode not in {"reproduce", "adapt", "derive"} or binding.get("status") != "selected":
+                    raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-INPUT-001", f"{sid}.exhibit_bindings use_mode/status is invalid")
+                if exhibit_id not in section["exhibit_refs"] or exhibit_id not in source_exhibits:
+                    raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-REFERENCE-001", f"section {sid} source Exhibit binding is outside the selected source exhibit inventory")
+                section["exhibit_bindings"].append({"exhibit_id": exhibit_id, "use_mode": use_mode, "status": "selected"})
             required_kinds = set()
             for stage_id in stage_refs:
                 required_kinds.update(map(str, stages[stage_id].get("requires", [])))
