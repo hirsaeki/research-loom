@@ -99,8 +99,8 @@ _STYLE_MAP_PIN = _artifact_pin(
 )
 _RENDERER = {
     "renderer_id": "research-loom.deterministic-docx",
-    "renderer_version": "0.2.3",
-    "tool_digest": _sha(b"research-loom.deterministic-docx@0.2.3;reader-labels-figure-note-keep-lines;provenance-v2"),
+    "renderer_version": "0.2.5",
+    "tool_digest": _sha(b"research-loom.deterministic-docx@0.2.5;reader-explanation-notes-reference-pagination;provenance-v2"),
 }
 
 
@@ -610,6 +610,9 @@ class PublicationReleaseService:
                                     block["legend_rows"][0] = ["番号", x_label + (f"（{x_unit}）" if x_unit else ""), "値" + (f"（{y_unit}）" if y_unit else "")]
                         else:
                             note += "\nRepresentation reviewed against the selected research; no new research conclusion is established by this figure."
+                            if misco:
+                                note = "図に示す内容：" + "、".join(value["request"]["allowed_labels"]) + "。"
+                                note += "\n既存の研究内容を整理した図であり、新たな研究上の結論を示すものではない。"
                     else:
                         visual = exhibit["visual_target"]
                         locator = visual["locator"]

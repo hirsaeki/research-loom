@@ -6,6 +6,7 @@ from typing import Any, Mapping
 import uuid
 import rfc8785
 from plugins.research_visual_semantics import validate_visual_package_bindings
+from plugins.desktop_research.normalization import source_id_for_capture
 from .research_chart import validate_chart_exhibit
 from .generated_explanation import validate_explanation
 from .visual_origin import verify_visual_origin
@@ -363,10 +364,26 @@ def build_package(service, value:Mapping[str,Any])->Mapping[str,Any]:
             and str(obj.get("canonical_locator", "")) == str(capture.get("source_locator", ""))
             and str(obj.get("content_digest", "")) == str(capture.get("original", {}).get("digest", ""))
         ]
+        capture_source_id = source_id_for_capture(str(rid), str(cid))
+        if capture_source_id in source_matches:
+            source_matches = [capture_source_id]
+        elif any(obj.get("id") == capture_source_id for obj in selected):
+            raise LocalApplicationError(
+                "APPLICATION-RESEARCH-PACKAGE-REFERENCE-001",
+                f"selected capture Source does not match verified material: {rid}:{cid}",
+            )
         if len(source_matches) > 1:
             raise LocalApplicationError(
                 "APPLICATION-RESEARCH-PACKAGE-REFERENCE-001",
                 f"selected material ambiguously resolves multiple Sources: {rid}:{cid}",
+            )
+        if (
+            source_matches and capture_source_id not in source_matches
+            and service._objects(snapshot, {capture_source_id}).get(capture_source_id) is not None
+        ):
+            raise LocalApplicationError(
+                "APPLICATION-RESEARCH-PACKAGE-REFERENCE-001",
+                f"selected material does not resolve to its capture Source: {rid}:{cid}",
             )
         path=f"attachments/materials/{safe_component(str(rid),'run_id')}/{safe_component(str(cid),'capture_id')}.txt"
         attachments.append((path,data,"text/plain",f"external_material:{rid}:{cid}"))
@@ -425,6 +442,9 @@ def build_package(service, value:Mapping[str,Any])->Mapping[str,Any]:
     source_mode=next(iter(modes),"virtual" if str(snapshot.get("mode","real"))=="virtual" else "real"); virt=source_mode=="virtual"
     source_refs=[{"source_id":str(o["id"]),"citation_capable":bool(o.get("canonical_locator")),"citation_namespace":"supplied_source","locator_refs":[],"metadata_origin":"supplied"} for o in selected if o.get("kind")=="source"]
     package={"schema_version":SCHEMA_VERSION,"object_type":"research_package","package_id":"RP-"+uuid.uuid4().hex,"package_mode":"preview" if virt else "real","source_epistemic_status":"SYNTHETIC_TEST_ONLY" if virt else "EMPIRICAL_RESEARCH_STATE","preview_only":True,"authoritative_research_freeze":False,"release_eligible":False,"project":{"project_id":service.project_id,"title":str(config.get("project",{}).get("title") or service.project_id)},"project_config_digest":str(state.project_config_digest),"effective_profile_set":{"effective_profile_set_ref":str(state.effective_profile_set_ref),"content_digest":str(state.effective_profile_set_digest),"profile_pins":profile_pins(eps),**({"effective_resources":profile_resources(eps)} if eps.get("effective_resources") else {})},"source_research_snapshot":{"snapshot_id":str(snapshot["id"]),"revision":int(snapshot.get("revision",0)),"content_digest":str(snapshot["content_digest"]),"execution_mode":"virtual" if str(snapshot.get("mode","real"))=="virtual" else "real","lineage_ref":str(state.active_lineage_ref)},"communication_brief":brief(config,None),"content":{"research_question_refs":[rqid],"finding_refs":[str(o["id"]) for o in selected if o.get("kind")=="finding"],"argument_refs":[str(o["id"]) for o in selected if o.get("kind")=="argument"],"contribution_refs":[str(o["id"]) for o in selected if o.get("kind")=="contribution"],"evidence_refs":[str(o["id"]) for o in selected if o.get("kind")=="evidence"],"source_refs":source_refs,"counter_review_refs":[str(o["id"]) for o in selected if o.get("kind")=="counter_review"],"qualifier_refs":[],"limitations":[],"unresolved_evidence_gap_refs":[str(g["gap_id"]) for g in gaps],"research_attention_refs":[]},"narrative_constraints":narrative_refs(constraints),"project_constraints":{"must_not_claim":project_must_not_claim(config)},"publication_requirements":{"requirement_refs":[]},"provenance":{"generated_at":datetime.now(timezone.utc).isoformat().replace("+00:00","Z"),"generator_id":"research-loom.research-package","tool_version":TOOL_VERSION,"input_digests":list(dict.fromkeys([str(snapshot["content_digest"]),str(state.project_config_digest),str(state.effective_profile_set_digest)]+[str(o.get("content_digest")) for o in selected if isinstance(o.get("content_digest"),str)]+[str(r["handoff"].get("handoff_digest")) for r in runs if isinstance(r.get("handoff"),Mapping) and isinstance(r["handoff"].get("handoff_digest"),str)]))},"resolved_profiles":{"effective_constraints":constraints,"narrative_semantics":{"contract_path":"attachments/profile/narrative-semantics.yaml","content_digest":digest_bytes(sem),"byte_length":len(sem)}},"resolved_content":{"research_objects":selected,"working_material":{"run_candidates":runs,"research_exhibits":exhs,"project_inputs":inputs},"materials":materials,"unresolved_gaps":gaps},"attachments":[],"projections":{}}
+    package["content"]["research_question_refs"] = [
+        str(obj["id"]) for obj in selected if obj.get("kind") == "research_question"
+    ]
     for path,data,media,source in attachments: package["attachments"].append({"path":path,"media_type":media,"byte_length":len(data),"content_digest":digest_bytes(data),"source":source})
     if sum(len(x[1]) for x in attachments)>MAX_TEXT_BYTES: raise LocalApplicationError("APPLICATION-RESEARCH-PACKAGE-BOUND-001","selected attachment content exceeds text bound")
     md=service._markdown(package).encode(); package["projections"]={"markdown":{"path":"research-package.md","byte_length":len(md),"content_digest":digest_bytes(md)}}; package["package_digest"]=digest_json(package)

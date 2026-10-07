@@ -6,7 +6,7 @@ from typing import Any, Mapping
 from core.conversation import ConversationRuntimeError
 from core.runtime import canonical_digest
 
-_SUPPORTED_ACTION_KINDS = {"CREATE_OBJECT", "REVISE_OBJECT"}
+_SUPPORTED_ACTION_KINDS = {"CREATE_OBJECT", "REVISE_OBJECT", "VERIFY_EVIDENCE"}
 _ERROR = "APPLICATION-CANDIDATE-PROJECTION-001"
 
 
@@ -81,6 +81,8 @@ def build_candidate_projection(
         ):
             raise ConversationRuntimeError(_ERROR, "candidate object identity or project is invalid")
         key = (kind, object_id)
+        if action["kind"] == "VERIFY_EVIDENCE" and kind != "evidence":
+            raise ConversationRuntimeError(_ERROR, "Evidence qualification requires an Evidence object")
         if key not in affected_refs:
             raise ConversationRuntimeError(_ERROR, "candidate affected_refs do not bind its object")
         subjects.append({

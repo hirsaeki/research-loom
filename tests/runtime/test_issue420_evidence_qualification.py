@@ -9,6 +9,7 @@ from core.runtime import canonical_digest
 from plugins.local_application import LocalApplicationFacade, LocalResearchApplication
 from plugins.local_application.research_chart import quantitative_input
 from plugins.local_application.facade import LocalApplicationError
+from plugins.local_application.conversation_view import candidate_summary
 from core.conversation import ConversationRuntimeError
 from runtime_fixtures import project, rq, source, evidence, seed_state
 from test_research_exhibits import NullResolver, profile_provider
@@ -118,6 +119,30 @@ class EvidenceQualificationTests(unittest.TestCase):
         row = next(x for x in self.facade.list_actions()["actions"] if x["action_type"] == "research.evidence.qualify")
         self.assertEqual((row["effect"], row["route_category"], row["confirmation_required"]), ("read_only", "harness_service", False))
         self.assertIn("view", inspect.signature(type(self.facade).submit_action).parameters)
+
+    def test_qualification_conversation_preserves_exact_content_without_applying(self):
+        before = deepcopy(self.current())
+        result = self.facade.submit_action({
+            "action_type": "research.evidence.qualify",
+            "payload": {
+                "evidence_id": "EVD-1", "expected_revision": 0,
+                "expected_digest": canonical_digest(before),
+                "rationale": "Review exact captured values and limitations.",
+                "excerpt": self.excerpt,
+            }, "actor_id": "H",
+        }, view="conversation")
+        self.assertNotIn("UNAVAILABLE", json.dumps(result))
+        saved = self.app.conversation_store.load_state_delta_proposal(
+            result["candidate"]["candidate_id"]
+        )
+        summary = candidate_summary(saved, self.facade._current_state_view())
+        content = summary["content"][0]["content"]
+        self.assertEqual(content["excerpt"], self.excerpt)
+        self.assertEqual(content["verification_status"], "verified")
+        self.assertEqual(content["limitations"], before.get("limitations", []))
+        self.assertTrue(summary["current_relation"]["bound_to_current_snapshot"])
+        self.assertFalse(summary["current_relation"]["subjects"][0]["candidate_value_matches_current"])
+        self.assertEqual(self.current(), before)
 
 
 if __name__ == "__main__":

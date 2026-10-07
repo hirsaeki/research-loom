@@ -130,7 +130,7 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
         resolved = package["resolved_content"]; working = resolved["working_material"]
         rebuilt = self.build_research_package({
             "snapshot_id": state.current_snapshot["id"], "rq_id": package["content"]["research_question_refs"][0],
-            "object_ids": [o["id"] for o in objects if o["kind"] != "research_question"],
+            "object_ids": [o["id"] for o in objects],
             "run_ids": [r["run_id"] for r in working["run_candidates"]],
             "exhibit_ids": list(dict.fromkeys([*ids, note["exhibit_id"]])),
             "project_input_ids": [i["metadata"]["input_id"] for i in working["project_inputs"]],

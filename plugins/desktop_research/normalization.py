@@ -54,6 +54,11 @@ def _id(prefix: str, basis: str) -> str:
     return f"{prefix}-{digest}"
 
 
+def source_id_for_capture(run_id: str, capture_id: str) -> str:
+    """Return the existing Source identity for a completed Desktop capture."""
+    return _id("SRC", f"{run_id}:{capture_id}")
+
+
 class DesktopResearchNormalizer:
     """PR20 CapabilityResultNormalizer for canonical Desktop Research."""
 
@@ -186,7 +191,7 @@ class DesktopResearchNormalizer:
             for capture in handoff["outputs"]["source_captures"]:
                 capture_id = str(capture["capture_id"])
                 detail = details[capture_id]
-                source_id = _id("SRC", f"{run.run_id}:{capture_id}")
+                source_id = source_id_for_capture(run.run_id, capture_id)
                 source_ids[capture_id] = source_id
                 propose({
                     "schema_version": "0.1.0",

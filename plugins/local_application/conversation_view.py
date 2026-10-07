@@ -113,6 +113,7 @@ def semantic_object(value: Mapping[str, Any], *, authoritative: bool = False) ->
             "counter_evidence_ids", "boundary_conditions", "limitations", "confidence", "rationale",
             "action_type", "instruction", "reason", "priority", "blocked_by", "source_type",
             "canonical_locator", "content_digest", "media_type", "byte_length", "origin_type",
+            "verification_status", "excerpt", "capture_digest", "evidence_kind", "evidence_mode",
         ):
             _copy_optional(value, key, base)
         return base
