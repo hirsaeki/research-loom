@@ -25,7 +25,8 @@ class Issue438CitationVisualInventoryTests(unittest.TestCase):
             self.assertEqual(row["source_id"], evidence["source_id"])
             self.assertEqual(row["locator"], evidence["locator"])
             self.assertEqual(row["evidence_role"], evidence["evidence_kind"])
-            self.assertEqual(row["citation_ready"], not row["unresolved_reasons"])
+            self.assertIn("evidence_unverified", row["unresolved_reasons"])
+            self.assertFalse(row["citation_ready"])
 
             objects = deepcopy(package["resolved_content"]["research_objects"])
             source = next(o for o in objects if o.get("kind") == "source")
