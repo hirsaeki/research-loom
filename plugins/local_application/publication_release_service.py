@@ -99,8 +99,8 @@ _STYLE_MAP_PIN = _artifact_pin(
 )
 _RENDERER = {
     "renderer_id": "research-loom.deterministic-docx",
-    "renderer_version": "0.2.5",
-    "tool_digest": _sha(b"research-loom.deterministic-docx@0.2.5;reader-explanation-notes-reference-pagination;provenance-v2"),
+    "renderer_version": "0.2.6",
+    "tool_digest": _sha(b"research-loom.deterministic-docx@0.2.6;selected-citation-conformance;provenance-v2"),
 }
 
 
@@ -482,7 +482,13 @@ class PublicationReleaseService:
                     continue
                 evidence_id = str(binding.get("evidence_id", ""))
                 row = citation_inventory.get(evidence_id)
-                if row is None or not row.get("citation_ready"):
+                citation_present = row is not None and any(
+                    isinstance(citation, Mapping)
+                    and citation.get("source_ref") == row.get("source_id")
+                    and citation.get("locator_ref") == row.get("locator")
+                    for citation in section.get("citations", [])
+                )
+                if row is None or not row.get("citation_ready") or not citation_present:
                     add_issue("UNRESOLVED_CITATION", evidence_id, section_id, True)
             for citation in section.get("citations", []):
                 source_ref = str(citation.get("source_ref", ""))

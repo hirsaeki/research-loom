@@ -697,6 +697,9 @@ class WriterCompositionService:
                     raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-INPUT-001", f"{sid}.citation_bindings role/status is invalid")
                 if evidence_id not in refs["evidence_refs"] or argument_id not in refs["argument_refs"] or evidence_id not in inventory:
                     raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-REFERENCE-001", f"section {sid} citation binding is outside the Research Package selection")
+                for field, object_id in (("argument_refs", argument_id), ("evidence_refs", evidence_id)):
+                    if object_id not in section[field]:
+                        section[field].append(object_id)
                 argument_obj = objects.get(argument_id, {})
                 row = inventory[evidence_id]
                 if role != "background" and evidence_id not in set(map(str, argument_obj.get("evidence_ids", []))):
