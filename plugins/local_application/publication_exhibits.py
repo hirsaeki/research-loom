@@ -197,6 +197,12 @@ def prepare_exhibits(inspection: Mapping[str, Any], workspace: Path) -> dict[str
     package = inspection["source_package_document"]
     root = workspace / ".research-loom" / "research-packages" / safe_component(package["package_id"], "package_id")
     selected = {ref for row in inspection["revision"]["sections"] for ref in row.get("exhibit_refs", [])}
+    use_modes = {
+        str(binding.get("exhibit_id")): str(binding.get("use_mode"))
+        for row in inspection.get("composition", {}).get("sections", [])
+        for binding in row.get("exhibit_bindings", [])
+        if isinstance(binding, Mapping) and binding.get("status") == "selected"
+    }
     result = {}
     asset_cache: dict[tuple[str, str, int, str], bytes] = {}
 
@@ -218,6 +224,8 @@ def prepare_exhibits(inspection: Mapping[str, Any], workspace: Path) -> dict[str
             "exhibit_id", "content_digest", "source_run_ids", "source_artifact_refs", "source_object_ids",
             "derived_from_exhibit_ids", "captured_against",
         )}
+        if ref in use_modes:
+            provenance["source_use_mode"] = use_modes[ref]
         visual = exhibit.get("visual_target")
         generated = exhibit.get("generated_visual")
         unavailable_code = "VISUAL_ASSET_UNAVAILABLE" if visual is not None or generated is not None else "UNSUPPORTED_EXHIBIT"
