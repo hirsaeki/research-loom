@@ -268,6 +268,52 @@
         "unresolved_gaps": {"type": "array", "items": {"type": "object"}}
       }
     },
+    "inventories": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["citation_inventory", "source_exhibit_inventory"],
+      "properties": {
+        "citation_inventory": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["evidence_id", "source_id", "locator", "bibliography_ready", "evidence_role", "verification_status", "citation_ready", "unresolved_reasons"],
+            "properties": {
+              "evidence_id": {"$ref": "#/$defs/id"},
+              "source_id": {"$ref": "#/$defs/id"},
+              "locator": {"type": ["string", "null"]},
+              "bibliography_ready": {"type": "boolean"},
+              "evidence_role": {"type": "string", "minLength": 1},
+              "verification_status": {"type": "string", "minLength": 1},
+              "citation_ready": {"type": "boolean"},
+              "unresolved_reasons": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}}
+            }
+          }
+        },
+        "source_exhibit_inventory": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["exhibit_id", "source_ids", "source_run_id", "capture_id", "locator", "retained_artifact_ref", "retained_digest", "rights_status", "research_ready", "semantic_status", "unresolved_reasons"],
+            "properties": {
+              "exhibit_id": {"$ref": "#/$defs/id"},
+              "source_ids": {"$ref": "#/$defs/id_array"},
+              "source_run_id": {"$ref": "#/$defs/id"},
+              "capture_id": {"$ref": "#/$defs/id"},
+              "locator": {"type": "object"},
+              "retained_artifact_ref": {"$ref": "#/$defs/id"},
+              "retained_digest": {"$ref": "#/$defs/digest"},
+              "rights_status": {"enum": ["cleared", "restricted", "unresolved"]},
+              "research_ready": {"type": "boolean"},
+              "semantic_status": {"type": "string", "minLength": 1},
+              "unresolved_reasons": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}}
+            }
+          }
+        }
+      }
+    },
     "attachments": {
       "type": "array",
       "items": {
