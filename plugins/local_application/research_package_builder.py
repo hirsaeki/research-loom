@@ -90,6 +90,8 @@ def _research_inventories(selected: list[Mapping[str, Any]], exhibits: list[Mapp
             bibliography_ready, missing = _bibliography_readiness(source)
             unresolved.extend(missing)
         verification_status = str(evidence.get("verification_status") or "unspecified")
+        if verification_status != "verified":
+            unresolved.append("evidence_unverified")
         citation_inventory.append({
             "evidence_id": str(evidence["id"]),
             "source_id": source_id,
