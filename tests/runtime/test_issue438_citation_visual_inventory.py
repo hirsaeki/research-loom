@@ -34,6 +34,7 @@ class Issue438CitationVisualInventoryTests(unittest.TestCase):
                 "publisher_or_author": "Example institution",
                 "publication_or_update_date": "2026",
             })
+            next(o for o in objects if o.get("kind") == "evidence")["verification_status"] = "verified"
             projected = _research_inventories(objects, [], package["resolved_content"]["materials"])
             ready = next(x for x in projected["citation_inventory"] if x["evidence_id"] == evidence["id"])
             self.assertTrue(ready["bibliography_ready"])
