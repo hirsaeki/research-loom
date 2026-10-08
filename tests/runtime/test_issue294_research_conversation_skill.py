@@ -94,7 +94,7 @@ class ResearchConversationSkillContractTests(unittest.TestCase):
 
     def test_scenario_pack_contains_all_provider_neutral_semantic_cases(self):
         scenarios = (SKILL_ROOT / "acceptance" / "scenarios.md").read_text(encoding="utf-8")
-        for number in range(1, 9):
+        for number in range(1, 11):
             with self.subTest(number=number):
                 self.assertIn(f"## S{number} —", scenarios)
         self.assertEqual(scenarios.count("**Must convey:**"), 8)
