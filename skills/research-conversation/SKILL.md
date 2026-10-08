@@ -113,6 +113,28 @@ When a public response contains raw internal fields or opaque IDs, translate the
 
 For an ordinary progress answer about a candidate, do not mention candidate-local `adoption_state`, `candidate_only`, `current_value`, or opaque candidate/proposal IDs unless the human explicitly asks for diagnostics. Never turn candidate-local `approved` into "approved", "承認済み", "候補として承認済み", or "人が承認した". Say only the research meaning: a proposal is saved and is not yet adopted/current.
 
+### Initial progress and saved work records
+
+The human-language boundary includes researcher-readable Markdown work records, manuscript work status, and interruption reports, not only chat. On the **first save**, put a research-language summary at the beginning, before internal audit details. Preserve exact IDs, codes, diagnostics and operation evidence in a separate internal audit section. Machine-only logs do not require this prose. A later explanatory appendix does not repair a failed first output.
+
+In both the initial chat report and the initial saved record explain: what is done and not done; the verified reason for stopping; what the stop does and does not establish about the research; the worker's next action; and whether a human decision is needed now. Do not assert either sufficiency or insufficiency of analysis without evidence. Do not wait for the human to request a rewrite.
+
+Distinguish only causes supported by inspected evidence, and combine them when needed:
+
+- **Research-content gap:** a verified missing source, validation, or inference needed for a claim. State the affected claim and limitation; do not hide a real gap as paperwork.
+- **Writing-input record gap:** existing analysis has not yet been linked or recorded as formal writing input. Inspect the existing support before proposing additional research.
+- **Authority or operation constraint:** a required permission, confirmation, or operation is unavailable or unresolved. Describe its practical effect separately from research quality.
+
+An `unmet_requires` / `NARRATIVE-UNMET` result alone does not establish a research-content gap. If the cause is undiagnosed, say so and identify the bounded check next. Neither the presence of existing analysis nor a record gap proves that the analysis is sufficient. These are explanation distinctions, not new backend state enums.
+
+Skill citations are not a substitute for this explanation. Unless the human explicitly requests diagnostics, do not cite SKILL.md, internal rules, IDs or status codes as the reason for a stop or permission request. Keep the exact evidence internally.
+
+### Prior-approval delta before another decision
+
+Before asking again, read the exact issued request and relevant saved target as required above. Explain separately: **already adopted content**, **research-content additions or changes**, and **permission for this operation or record**. If the research-content difference is zero, say so explicitly; do not present the same conclusions as needing substantive reassessment. If it is nonzero, describe the specific change and its reservations, rather than just internal object names such as Finding / Argument.
+
+A zero content difference does not supply missing authority. An earlier approval of conclusions cannot resolve an unissued request to adopt a separate writing-support record. Preserve exact Decision/Confirmation binding, stale checks, `state.apply_candidate`, and the formal Writer/Publication paths; never infer permission or auto-apply from a vague earlier “go ahead”. If no request has been issued, explain the pending preparation rather than asking the human to approve an invented request. End an actual decision turn at the question as above.
+
 ## Persisted checkpoint vs current chat
 
 `resume` is a saved checkpoint, not a complete replacement for the current conversation. When the conversation contains later analysis that is not yet persisted, preserve it as working progress and say that it is not yet saved. Do not fabricate capture times, digests, source identity, or adoption status from chat memory.

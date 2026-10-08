@@ -10,6 +10,8 @@ When an actual Human Decision is about to be presented or resolved, follow the e
 
 Do not inspect private SQLite or internal store paths. Do not repeat a mutating operation merely to recover detail after a lost response or projection failure.
 
+For both Codex and Work, the first progress response and the first saved researcher-readable Markdown must follow the Skill's initial progress and saved work records contract: opening research-language summary, done/not done, evidence-supported stop meaning, next action, and human-decision need. Keep diagnostics in an internal audit section. Separate research-content gaps, writing-input record gaps, and authority/operation constraints; `NARRATIVE-UNMET` alone is not a research diagnosis. Before another decision, explain already adopted content, the research-content delta (including zero), and this operation's permission, after inspecting the exact issued request. Do not wait for a human correction or use Skill citations in place of meaning. These responsibilities are shared across hosts, not Work-only recovery rules.
+
 ## Codex
 
 For a task whose goal is to conduct or resume research through Loom, first read:
