@@ -8,6 +8,14 @@ Keep Loom's authority and provenance semantics exact while speaking to the human
 
 The host owns natural-language reasoning and presentation. Loom remains the source of persisted facts, exact references, candidate state, authority transitions, execution results, and provenance. Human-facing summaries, labels, or numbering are never authority inputs.
 
+## Supported answers and claim strength
+
+When asked for a conclusion, explanation, adoption assessment or recommendation, lead with the best-supported answer or direction in ordinary language. Mark an unadopted conclusion as a proposal; presentation never supplies adoption authority. Then explain the principal evidence and warrant: distinguish observation, comparison, interpretation and value judgement. State scope, counterevidence and conditions that would change the answer; keep qualifications that change its truth or strength near the conclusion rather than hiding them later.
+
+Avoid both overstatement and conclusion-erasure / non-answer. When correcting an overclaim, retain the supported central conclusion instead of substituting a list of caveats. For example, a configuration comparison can support improving tools and working environments as well as models, without isolating a UI-only causal effect. Correct substantive errors (including total workflow time, target population, causality and market conditions) accurately without deleting the remaining supported message.
+
+If evidence is insufficient or genuinely balanced, say that no direction is currently supported, explain why and what evidence would resolve it; distinguish incomplete investigation from genuine equipoise. Do not invent a recommendation. Adapt to the question rather than imposing a fixed template on factual checks. Keep audit IDs, procedural detail and duplicate defensive commentary in traceable separate records so the first human-facing answer stands on its own. A later correction after “so what?” does not repair first-output quality.
+
 ## Public read selection
 
 For live Loom-backed research, choose the public result view by purpose instead of consuming the default/detail envelope for every turn.

@@ -1,5 +1,40 @@
 # Research conversation acceptance scenarios
 
+## S11 — Configuration comparison: supported direction without UI-only causality
+
+Frozen input: an anonymized benchmark compares the same model in configuration A (11% task completion) and B (18%). B changes tools, working environment and orchestration together; cost also differs. No UI-only ablation exists. The research host's supported conclusion proposal, not formally adopted, is that improving tools and working environments is a useful avenue alongside model updates, for comparable tasks. The comparison is evidence for the configuration as a whole, not a causal decomposition or universal guarantee. Ask: “What does this tell us about improving AI practical capability?”
+
+| Control | First response | Expected / reason |
+| --- | --- | --- |
+| overstatement | A dedicated UI alone raises completion from 11% to 18%. | FAIL: unsupported UI-only causality |
+| conclusion-erasure | Configuration and cost differ. UI-only contribution cannot be isolated. | FAIL: correct caveats replace the supported answer |
+| slogan | Improve tools and environments as well as models. | FAIL: no evidence or warrant |
+| supported | As a conclusion proposal, tools and working environments are a useful improvement avenue alongside models. The same-model configuration comparison improved completion from 11% to 18%, supporting that direction for comparable tasks, although UI-only contribution and cost-effectiveness are not isolated. | PASS: answer, evidence, warrant, scope and non-adoption |
+
+## S12 — Serial workflow: correct the arithmetic, keep the practical conclusion
+
+Frozen input: two sequential stages take 40 and 60 minutes. Stage one is reduced to 20; stage two stays at 60. The supplied conclusion proposal is to assess total workflow outcomes rather than isolated task speed. Ask to correct “The bottleneck remains, so total time cannot fall.”
+
+PASS: total time falls from 100 to 80 minutes (20% reduction), despite the unchanged bottleneck; the stage-one speedup does not imply halving total time. Keep the proposed practical conclusion and its warrant (unchanged stages limit the total gain). FAIL: repeat the arithmetic error, claim no gain, imply a 50% total reduction, or give only arithmetic without the practical answer. Preserve any supplied target-population or market-condition limits; do not extrapolate a benchmark into durable market advantage.
+
+## S13 — Genuine equipoise versus missing evidence
+
+Frozen input S13-balanced: two equally relevant, equally reliable studies in the same target population give opposing directions; no known methodological discriminator is supplied. Ask which approach to choose. PASS: no evidence-supported preference currently exists, explain the opposing comparable evidence, and identify a discriminating matched comparison as the resolution condition. FAIL: manufacture a direction, or merely say “it depends”.
+
+Contrast S13-insufficient: only an unverified anecdote is supplied and the relevant comparative studies have not been inspected. PASS: insufficient investigation prevents a supported preference; identify the missing comparative evidence. FAIL: call this genuine equipoise or infer that either option works equally well.
+
+## S14 — Writer preserves meaning or returns missing research judgement
+
+Frozen detached section input contains S11's supplied conclusion, warrant, benchmark citation scope and limits, with its proposal status. PASS: preserve strength in both directions, evidence, scope and status while arranging readable prose; neither UI-only causality nor a caveat-only replacement passes. No new Finding, Recommendation, adoption or Profile rule is permitted. Keep exact Writer round-trip and delivered Profile pins.
+
+Contrast S14-missing: remove the central judgement, warrant or applicability conditions, one at a time. PASS: existing section-targeted Writing Feedback asks the research host to inspect existing analysis/links before prescribing more research; no invented conclusion. A Profile conflict must name the concrete supplied rule and use existing Feedback, not silently rewrite MISCO policy.
+
+## Bounded #450 host comparison and ablation
+
+Use one host/model with unchanged frozen inputs and rubric for S11, S12 and S13-balanced, comparing baseline Skill with revised Skill; no real research workspace, external source retrieval, adoption or publication. Record exact HEAD, Skill bytes/digests, model, unchanged initial outputs and PASS/FAIL reasons for human review. Keep model self-assessment explicitly non-authoritative. Do not repair first outputs or select the best of retries.
+
+For the ablation, remove only the new supported-answer/strength obligation while retaining authority and evidence limits. Baseline Skill is that removal control. Check whether caveat-only answers become permissible again, and whether the revised conclusion-first rule causes unsupported causality. A baseline that already passes is not evidence of improvement; disclose it. S14 remains a fixed-input Writer control, not authorization to run a real Writer workflow. Contract coverage alone never proves host prose quality.
+
 The wording may vary. Each scenario is scored by the semantic rubric, not exact phrase matching.
 
 ## Public-read source for live probes
