@@ -10,7 +10,7 @@ from unittest.mock import patch
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade
 from plugins.local_application.cli import main
 from plugins.local_application.item_listing import directory_page
-from plugins.local_application.research_package_format import digest_json, without_digest
+from plugins.local_application.research_package_format import MAX_OUTPUT_BYTES, digest_json, without_digest
 from plugins.local_application.writer_composition_service import _digest_document
 from research_package_acceptance_support import ResearchPackageAcceptanceSupport
 import issue80_writer_composition_suite as issue80
@@ -90,7 +90,9 @@ class Issue254ItemListingTests(ResearchPackageAcceptanceSupport):
             self.assertNotIn('private detail', json.dumps(rows))
             self.assertEqual(rows[case['package_id']]['availability'], 'AVAILABLE')
         original = path.read_bytes()
-        path.write_bytes(b' ' * (16 * 1024 * 1024 + 1))
+        # This limit tracks the detached package bound, not a legacy 16 MiB cap.
+        with path.open("wb") as handle:
+            handle.truncate(MAX_OUTPUT_BYTES + 1)
         rows = {row['package_id']: row for row in facade.list_research_packages()['packages']}
         self.assertEqual(rows['RP-BAD']['diagnostic']['reason'], 'READ_BOUND_EXCEEDED')
         path.write_bytes(original)
