@@ -20,4 +20,4 @@ REAL in-progress packages remain REAL-origin but preview-only and non-release. V
 
 ## Bounds and export safety
 
-Selection count, per-item body size, aggregate text size and total detached output size are bounded. Selected content is never silently truncated. Export refuses existing targets and managed `.research-loom` locations, stages in the destination parent, verifies the staged package, and publishes it atomically; failed output is not treated as success.
+Selection count, per-item body size, aggregate text size and total detached output size are bounded. The current bounds are 512 explicit Research Object IDs, 128 verified source materials, 1 MiB per material text rendition, 64 MiB aggregate attachments, and 128 MiB total detached output. The independent Run/Exhibit/Project Input limits are unchanged. Selected content is never silently truncated. Export refuses existing targets and managed `.research-loom` locations, stages in the destination parent, verifies the staged package, and publishes it atomically; failed output is not treated as success.

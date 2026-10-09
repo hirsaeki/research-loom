@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 from core.execution import CapabilityRunRecord, RunStatus
 from plugins.local_application import LocalApplicationError
+from plugins.local_application.research_package_format import MAX_OUTPUT_BYTES
 from plugins.local_application.research_package_service import verify_export_root
 import test_research_package_acceptance as acceptance
 
@@ -100,7 +101,7 @@ class ResearchPackageReviewFixTests(unittest.TestCase):
         package_path = oversized / "research-package.json"
         with package_path.open("wb") as handle:
             handle.write(b"{}")
-            handle.truncate(16 * 1024 * 1024 + 1)
+            handle.truncate(MAX_OUTPUT_BYTES + 1)
         with self.assertRaises(LocalApplicationError) as error:
             verify_export_root(oversized)
         self.assertEqual(error.exception.code, "APPLICATION-RESEARCH-PACKAGE-BOUND-001")
