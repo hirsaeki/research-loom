@@ -17,6 +17,14 @@ Use this Skill only after Research has produced a fixed Research Package and a W
 - Candidate/working exhibits and synthetic material remain non-authoritative. A piece of text does not become Evidence because it was available to the Writer.
 - Use citations only inside the exported citation scope. Keep necessary source names and technical terms; reader-facing cleanup must not erase research provenance or limitations.
 
+## Preserve conclusions, reasoning and strength
+
+Preserve claim strength in both directions: do not strengthen supplied claims or weaken a supported central conclusion into mere possibility or “it depends”. Where supplied, organize the answer, principal evidence and warrant, and scope so readers understand the research judgement. Keep qualifications that change truth or strength near the conclusion; preserve counterevidence and substantive corrections. Do not replace the answer with caveats, a slogan without reasoning, or duplicate defensive/audit commentary.
+
+If the central research judgement, warrant or applicability conditions are missing, return section-targeted Writing Feedback through the existing round-trip instead of inventing them. Ask the research host to inspect existing analysis and its links first; a missing writing-input connection does not by itself establish a need for additional research. This grants no authority to create Findings, causal claims, generalizations or Recommendations, adopt candidates, or bypass exact Human Decision/Confirmation.
+
+This clarification does not silently amend approved MISCO Writer rules. Keep the exact delivered inventory and pins; report a concrete conflict or missing rule through existing Writing Feedback for a separate regular Profile change.
+
 ## Profile-delivered Writer rules
 
 A section input may contain `writer_profile`. If it is absent, do not invent Profile review. If present:
