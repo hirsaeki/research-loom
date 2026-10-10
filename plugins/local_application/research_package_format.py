@@ -14,8 +14,8 @@ from plugins.local_research_exhibit_store import (
 from .facade import LocalApplicationError
 
 SCHEMA_VERSION="0.2.0"; TOOL_VERSION="0.2.0"
-MAX_OBJECTS=64; MAX_RUNS=16; MAX_EXHIBITS=32; MAX_INPUTS=32; MAX_MATERIALS=32; MAX_PACKAGES=100
-MAX_ITEM_BYTES=1024*1024; MAX_TEXT_BYTES=4*1024*1024; MAX_OUTPUT_BYTES=16*1024*1024
+MAX_OBJECTS=512; MAX_RUNS=16; MAX_EXHIBITS=32; MAX_INPUTS=32; MAX_MATERIALS=128; MAX_PACKAGES=100
+MAX_ITEM_BYTES=1024*1024; MAX_TEXT_BYTES=64*1024*1024; MAX_OUTPUT_BYTES=128*1024*1024
 ALLOWED={"snapshot_id","snapshot_digest","lineage_ref","project_config_digest","effective_profile_set_digest","rq_id","object_ids","run_ids","exhibit_ids","project_input_ids","materials","gap_ids"}
 ROOT=Path(__file__).resolve().parents[2]
 SCHEMA=ROOT/"core/packages/writer-publication/research-package.schema.json"
