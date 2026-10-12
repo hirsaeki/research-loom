@@ -349,7 +349,7 @@ def inspect_formal(data: bytes, report: dict, group: str, layout: dict) -> list[
                 if margins is None or any(margins.get(f'{{{W}}}{key}') != str(layout[field]) for key, field in [('top', 'margin_top_twips'), ('bottom', 'margin_bottom_twips'), ('left', 'margin_left_twips'), ('right', 'margin_right_twips')]):
                     problems.append('margins:' + str(part))
                 grid = section.find('w:docGrid', NS)
-                if grid is None or any(grid.get(f'{{{W}}}{key}') != value for key, value in [('type', 'linesAndChars'), ('linePitch', '342'), ('charSpace', '3430')]):
+                if grid is None or any(grid.get(f'{{{W}}}{key}') != value for key, value in [('type', 'linesAndChars'), ('linePitch', str(layout['doc_grid_line_pitch_twips'])), ('charSpace', str(layout['doc_grid_char_space']))]):
                     problems.append('actual-40-grid:' + str(part))
                 numbered = part in {'body', 'appendix'}
                 footer_ref = section.find('w:footerReference', NS)

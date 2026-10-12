@@ -123,8 +123,8 @@ def coverage_review(coverage: Mapping, policy: Mapping, review: Mapping, pdf_dig
             problems.append('presentation-review-binding')
         else:
             slides = presentation['slides']
-            valid = len(slides) == presentation['slide_count']
-            for index, slide in enumerate(slides, 1):
+            valid = len(slides) == presentation['slide_count'] and len(slides) <= 256
+            for index, slide in enumerate(slides if valid else (), 1):
                 if not isinstance(slide, Mapping) or set(slide) != {'slide', 'status', 'citations_required', 'citations', 'rationale'} or slide['slide'] != index or type(slide['slide']) is not int or slide['status'] != 'passed' or type(slide['citations_required']) is not bool or not isinstance(slide['citations'], list) or len(slide['citations']) > 256 or any(not isinstance(value, str) or not value.strip() or len(value) > 4000 for value in slide['citations']) or not isinstance(slide['rationale'], str) or not slide['rationale'].strip() or len(slide['rationale']) > 4000:
                     valid = False
                 elif slide['citations_required'] and not slide['citations']:

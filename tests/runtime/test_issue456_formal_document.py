@@ -61,6 +61,9 @@ class FormalDocumentTests(unittest.TestCase):
                 with zipfile.ZipFile(io.BytesIO(output)) as archive:
                     parts = {name: archive.read(name) for name in archive.namelist()}
                 document = ET.fromstring(parts['word/document.xml'])
+                for grid in document.findall('.//w:sectPr/w:docGrid', {'w': W}):
+                    self.assertEqual(grid.get(f'{{{W}}}linePitch'), '342')
+                    self.assertEqual(grid.get(f'{{{W}}}charSpace'), '3430')
                 labels = [node.get('{urn:research-loom:publication}part') for node in document.findall('.//w:sectPr', {'w': W})]
                 self.assertEqual('introduction' in labels, group == 'G')
                 self.assertIn('word/footnotes.xml', parts)
@@ -82,6 +85,11 @@ class FormalDocumentTests(unittest.TestCase):
         commissioned = deepcopy(report)
         commissioned.update({'research_kind': 'commissioned', 'department': '検証部会', 'committee': '検証委員会', 'chair': '検証太郎', 'report_number': 'TEST-456'})
         self.assertEqual(inspect_formal(assemble(native, commissioned, 'M', layout), commissioned, 'M', layout), [])
+        historical_layout = {**layout, 'doc_grid_line_pitch_twips': 335}
+        historical_native = docx_bytes(lines, historical_layout)
+        historical_document = assemble(historical_native, report, 'G', historical_layout)
+        self.assertEqual(inspect_formal(historical_document, report, 'G', historical_layout), [])
+        self.assertTrue(inspect_formal(historical_document, report, 'G', layout))
 
     def test_parent_skips_and_unknown_groups_are_rejected(self):
         with self.assertRaises(LocalApplicationError):
@@ -122,6 +130,15 @@ class FormalDocumentTests(unittest.TestCase):
         slides = deepcopy(review)
         slides['presentation_review'] = {'artifact_digest': digest, 'artifact_reference': 'synthetic-slides.pptx', 'software_version': 'PowerPoint 16.0', 'slide_count': 2, 'slides': [{'slide': i, 'status': 'passed', 'citations_required': True, 'citations': ['Synthetic source, publisher, 2026, https://example.test/source'], 'rationale': 'Source visible on this specific slide.'} for i in [1, 2]]}
         self.assertEqual(coverage_review(coverage, presenting, slides, digest, 1)['problems'], [])
+        class NonIterableSlides(list):
+            def __iter__(self):
+                raise AssertionError('Invalid slide counts must be rejected before iteration')
+        oversized = deepcopy(slides)
+        oversized['presentation_review']['slides'] = NonIterableSlides([None] * 257)
+        self.assertIn('presentation-per-slide-citations', coverage_review(coverage, presenting, oversized, digest, 1)['problems'])
+        mismatched = deepcopy(slides)
+        mismatched['presentation_review']['slides'] = NonIterableSlides([None])
+        self.assertIn('presentation-per-slide-citations', coverage_review(coverage, presenting, mismatched, digest, 1)['problems'])
         slides['presentation_review']['slides'][0]['citations'] = []
         self.assertIn('presentation-per-slide-citations', coverage_review(coverage, presenting, slides, digest, 1)['problems'])
         for id_ in ['misco-abstract', 'manual-bibliography', 'misco-editorial-qa']:
