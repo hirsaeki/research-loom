@@ -82,6 +82,9 @@ front/back footers. Human checks cover the actual TOC, note numbering, cover
 positions, meaning, terminology, permissions and conditional original clauses.
 Required N/A, unknown or duplicate IDs, unevaluated/failed rows and missing pages
 cannot pass. A reasoned `should` deviation remains an explicit warning.
+The measured body length outside 50–60 pages requires a warning rationale;
+a blanket PASS for that measured deviation blocks final QA. Formal-report
+mode also requires the coverage Profile, preventing a legacy DOCX-only release.
 
 Finalization stores a new immutable build, leaving the draft intact. A failed
 build is inspectable but cannot be released. A passing final PDF is the exact

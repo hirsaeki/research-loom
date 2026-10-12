@@ -93,7 +93,7 @@
         "template":{"type":"string","minLength":5,"maxLength":1024}
       }
     },
-    "research_group_type":{"anyOf":[{"enum":["G","M",null]},{"type":"string","pattern":"^\\s*$"}]},
+    "research_group_type":{"type":["string","null"],"maxLength":128},
     "permissions":{"type":"array","maxItems":256,"items":{
       "type":"object","additionalProperties":false,
       "required":["source_ref","publication_allowed","company_disclosure","original_reviewed","approval_ref"],

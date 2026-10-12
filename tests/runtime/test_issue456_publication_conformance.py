@@ -31,6 +31,8 @@ class EditorialEvidenceTests(unittest.TestCase):
             self.assertIn('INPUT-PERMISSION', policy['missing_inputs'])
             self.assertTrue(policy['review_conditions']['interview'])
         config = intake.bootstrap_config()
+        with self.assertRaises(LocalApplicationError):
+            _publication_policy(package, profile, {**inputs, 'research_group_type': 'G1'}, config)
         explicit = _publication_policy(package, profile, {**inputs, 'research_group_type': 'G'}, config)
         self.assertIn('INPUT-RESEARCH-GROUP-TYPE-SAVE', explicit['missing_inputs'])
         self.assertEqual(explicit['host_questions'], [])
@@ -39,6 +41,12 @@ class EditorialEvidenceTests(unittest.TestCase):
         self.assertEqual(saved['research_group_type'], 'G')
         self.assertNotIn('INPUT-RESEARCH-GROUP-TYPE', saved['missing_inputs'])
         self.assertEqual(saved['host_questions'], [])
+        other = _publication_policy({'resolved_content': {'research_objects': []}}, {'profile_id': 'other.publication'}, {'research_group_type': 'other-profile-group'}, config)
+        self.assertEqual(other['research_group_type'], 'other-profile-group')
+        self.assertEqual(other['missing_inputs'], [])
+        legacy = deepcopy(package)
+        legacy['effective_profile_set']['effective_resources'] = [row for row in legacy['effective_profile_set']['effective_resources'] if row['role'] != 'PUBLICATION_COVERAGE']
+        self.assertIn('INPUT-FORMAL-COVERAGE', _publication_policy(legacy, profile, inputs, config)['missing_inputs'])
         with self.assertRaises(LocalApplicationError):
             _publication_policy(package, profile, {**inputs, 'research_group_type': 'M'}, config)
 

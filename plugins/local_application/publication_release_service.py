@@ -234,7 +234,7 @@ def _publication_policy(package: Mapping[str, Any], profile: Mapping[str, Any], 
         config_pin = {"config_version": project_config["config_version"], "configuration_digest": project_config["configuration_digest"]}
         if inputs.get("project_config_digest") is not None and inputs["project_config_digest"] != config_pin["configuration_digest"]:
             raise LocalApplicationError("PROJECT-CONFIG-STALE-001", "Publication input targets a different Project Config generation")
-        saved = project_config.get("publication_metadata", {}).get("research_group_type")
+        saved = project_config.get("publication_metadata", {}).get("research_group_type") if profile.get('profile_id') == 'misco.publication' else None
         if isinstance(saved, str) and not saved.strip():
             saved = None
         if saved is not None and group_type is not None and saved != group_type:
@@ -244,6 +244,10 @@ def _publication_policy(package: Mapping[str, Any], profile: Mapping[str, Any], 
     editorial = inputs.get("editorial_review")
     missing = []
     if profile.get("profile_id") == "misco.publication":
+        if document_mode == 'formal_report' and group_type is not None and group_type not in {'G', 'M'}:
+            raise LocalApplicationError('INPUT-RESEARCH-GROUP-TYPE', 'MISCO formal report requires an explicit G or M answer')
+        if document_mode == 'formal_report' and not coverage:
+            missing.append('INPUT-FORMAL-COVERAGE')
         if document_mode == "formal_report" and not isinstance(report, Mapping):
             missing.append("INPUT-FORMAL-REPORT")
         if not isinstance(formal, Mapping) or not isinstance(formal.get("research_group_type_required"), bool):
@@ -1265,7 +1269,7 @@ class PublicationReleaseService:
         review = input_['review']
         if not isinstance(review, Mapping) or set(review) != {'pdf_digest', 'reviewer_id', 'reviewed_at', 'checks', 'pages'}:
             raise LocalApplicationError('PUBLICATION-PDF-INPUT', 'Review requires exact PDF digest, reviewer/time, checks and every page')
-        human = coverage_review(policy['coverage'], policy, review, _sha(payload), machine['page_count'])
+        human = coverage_review(policy['coverage'], policy, review, _sha(payload), machine['page_count'], page_ranges=host['page_ranges'])
         key = _sha(_canonical_bytes({'source_build_digest': source['content_digest'], 'finalization': dict(input_)}))
         final_id = 'PUBPDF-' + key.removeprefix('sha256:')[:24]
         target = self._build_path(final_id)

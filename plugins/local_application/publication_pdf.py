@@ -99,7 +99,7 @@ def inspect_pdf(data: bytes, *, required_text=(), page_ranges=None, expected_par
         raise LocalApplicationError('PUBLICATION-PDF-INVALID', 'PDF parsing failed: ' + str(exc)) from exc
 
 
-def coverage_review(coverage: Mapping, policy: Mapping, review: Mapping, pdf_digest: str, page_count: int):
+def coverage_review(coverage: Mapping, policy: Mapping, review: Mapping, pdf_digest: str, page_count: int, *, page_ranges=None):
     problems = []
     if not isinstance(review, Mapping) or set(review) != {'pdf_digest', 'reviewer_id', 'reviewed_at', 'checks', 'pages'}:
         raise LocalApplicationError('PUBLICATION-PDF-INPUT', 'Review requires exact PDF binding, reviewer, review time, checks and pages')
@@ -141,6 +141,10 @@ def coverage_review(coverage: Mapping, policy: Mapping, review: Mapping, pdf_dig
     for id_ in ['misco-editorial-qa', 'final-pdf-all-pages', 'final-pdf-toc', 'final-pdf-footnotes', 'final-pdf-parity', 'final-pdf-cover']:
         if by_id.get(id_, {}).get('status') != 'passed':
             problems.append('required-check:' + id_)
+    body = page_ranges.get('body') if isinstance(page_ranges, Mapping) else None
+    if isinstance(body, list) and len(body) == 2 and all(type(n) is int for n in body) and body[0] <= body[1]:
+        if not 50 <= body[1] - body[0] + 1 <= 60 and by_id.get('misco-body-length', {}).get('status') != 'warning':
+            problems.append('unrecorded-should-deviation:misco-body-length')
     pages = review.get('pages', [])
     if [row.get('page') for row in pages] != list(range(1, page_count + 1)) or any(row.get('status') != 'passed' or not str(row.get('rationale', '')).strip() for row in pages):
         problems.append('all-page-review-incomplete')

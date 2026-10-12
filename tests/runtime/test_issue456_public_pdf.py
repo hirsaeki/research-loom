@@ -58,6 +58,7 @@ class PublicPdfTests(ResearchPackageAcceptanceSupport):
         review = {'pdf_digest': digest, 'reviewer_id': 'synthetic-reviewer', 'reviewed_at': '2026-10-13T00:00:00Z', 'checks': [], 'pages': [{'page': 1, 'status': 'passed', 'rationale': 'Synthetic page fixture only.'}]}
         for id_ in [item['id'] for item in build['publication_policy']['coverage']['items']] + ['misco-editorial-qa', 'final-pdf-all-pages', 'final-pdf-toc', 'final-pdf-footnotes', 'final-pdf-parity', 'final-pdf-cover']:
             review['checks'].append({'check_id': id_, 'status': 'passed', 'rationale': 'Synthetic exact-binding acceptance only.'})
+        next(row for row in review['checks'] if row['check_id'] == 'misco-body-length').update(status='warning', rationale='Short synthetic persistence fixture, not a substantive research report.')
         return {'pdf_path': 'test.pdf', 'pdf_digest': digest, 'source_docx_digest': docx, 'project_config_digest': build['publication_policy']['project_config_pin']['configuration_digest'], 'host_receipt': {'source_docx_digest': docx, 'pdf_digest': digest, 'software': 'Microsoft Word', 'software_version': '16.0', 'fields_updated': True, 'page_ranges': {'abstract': [1, 1], 'body': [1, 1], 'appendix': [1, 1]}}, 'review': review}
 
     def test_exact_pdf_binding_review_release_and_retry(self):

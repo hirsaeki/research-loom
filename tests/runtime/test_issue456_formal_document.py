@@ -88,8 +88,7 @@ class FormalDocumentTests(unittest.TestCase):
             outline([{'section_id': 's', 'level': 2}], ['s'])
         for value in [None, '', ' ', '\t  ']:
             self.assertEqual(_validate_publication_inputs({'schema_version': '0.1.0', 'research_group_type': value})['research_group_type'], value)
-        with self.assertRaises(LocalApplicationError):
-            _validate_publication_inputs({'schema_version': '0.1.0', 'research_group_type': 'G1'})
+        self.assertEqual(_validate_publication_inputs({'schema_version': '0.1.0', 'research_group_type': 'other-profile-group'})['research_group_type'], 'other-profile-group')
 
     def test_metadata_update_is_small_versioned_and_preserves_research_guards(self):
         current = intake.bootstrap_config()
@@ -113,6 +112,10 @@ class FormalDocumentTests(unittest.TestCase):
         for id_ in ['misco-editorial-qa', 'final-pdf-all-pages', 'final-pdf-toc', 'final-pdf-footnotes', 'final-pdf-parity', 'final-pdf-cover']:
             review['checks'].append({'check_id': id_, 'status': 'passed', 'rationale': 'Synthetic fixture check.'})
         self.assertEqual(coverage_review(coverage, policy, review, digest, 1)['problems'], [])
+        self.assertIn('unrecorded-should-deviation:misco-body-length', coverage_review(coverage, policy, review, digest, 1, page_ranges={'body': [10, 13]})['problems'])
+        deviation = deepcopy(review)
+        next(row for row in deviation['checks'] if row['check_id'] == 'misco-body-length').update(status='warning', rationale='Short synthetic report for rendering acceptance.')
+        self.assertEqual(coverage_review(coverage, policy, deviation, digest, 1, page_ranges={'body': [10, 13]})['problems'], [])
         for id_ in ['misco-abstract', 'manual-bibliography', 'misco-editorial-qa']:
             broken = deepcopy(review)
             next(row for row in broken['checks'] if row['check_id'] == id_)['status'] = 'not_applicable'
