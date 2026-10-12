@@ -94,7 +94,7 @@ inspect every page again. The Host helper refuses existing outputs.
 
 ## Regression evidence
 
-29 Issue #456 tests and 312 contract tests passed. Existing publication (92),
+30 Issue #456 tests and 312 contract tests passed. Existing publication (92),
 Profile advancement (22), Research Package (30) and source bibliography (4)
 tests also passed during implementation. Current-head CI/Kody are the final
 integration review boundary.
@@ -106,3 +106,6 @@ N/A rejection, bibliography exceptions, numbering/source order, exact PDF
 binding, failed PDF blocking, per-slide presentation citations, required
 body-length deviation rationale and immutable approval retry. Mocked PDF PASS
 tests cover persistence only; actual blank PDFs fail the real inspector.
+The 2-chapter × 2-section regression includes two figures and two tables per
+section, a reused exhibit identity and distinct locators from one source;
+rendering leaves all inputs unchanged and preserves the eight image payloads.

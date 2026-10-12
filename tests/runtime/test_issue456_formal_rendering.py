@@ -51,6 +51,45 @@ def representative_inspection(group='G'):
 
 
 class FormalRenderingTests(unittest.TestCase):
+    def test_two_chapters_two_sections_multiple_and_reused_exhibits(self):
+        inspection = representative_inspection()
+        report = inspection['publication_policy']['formal_report']
+        report['structure'].append({'section_id': 's11', 'level': 2})
+        inspection['revision']['sections'].append({'section_id': 's11', 'content': '固定本文。数値123を保持する。', 'citations': [], 'exhibit_refs': []})
+        inspection['composition']['sections'].append({'section_id': 's11', 'heading': '検証事項'})
+        objects = inspection['source_package_document']['resolved_content']
+        originals = deepcopy(objects['working_material']['research_exhibits'])
+        original_blocks = deepcopy(inspection['exhibit_blocks'])
+        for index, sid in enumerate(['s2', 's8', 's10', 's11'], 1):
+            section = next(row for row in inspection['revision']['sections'] if row['section_id'] == sid)
+            section['exhibit_refs'] = []
+            section['citations'] = [{'source_ref': 'SRC-SYNTHETIC', 'locator_ref': f'{50 + index}頁'}, {'source_ref': 'SRC-SYNTHETIC', 'locator_ref': f'{60 + index}頁'}]
+            for exhibit in originals:
+                candidate = deepcopy(exhibit)
+                candidate['exhibit_id'] = sid + '-' + exhibit['exhibit_id']
+                objects['working_material']['research_exhibits'].append(candidate)
+                inspection['exhibit_blocks'][candidate['exhibit_id']] = deepcopy(original_blocks[exhibit['exhibit_id']])
+                section['exhibit_refs'].append(candidate['exhibit_id'])
+        # Reusing an identity keeps its first formal number and literal asset.
+        inspection['revision']['sections'][-1]['exhibit_refs'].append('s2-IMAGE-1')
+        before = deepcopy(inspection)
+        markdown, document, issues, _ = PublicationReleaseService.__new__(PublicationReleaseService)._render(inspection)
+        self.assertEqual(issues, [])
+        self.assertEqual(inspection, before)
+        text = markdown.decode('utf-8')
+        for chapter, section in [(1, 1), (1, 2), (2, 1), (2, 2)]:
+            for kind in ['表', '図']:
+                for ordinal in [1, 2]:
+                    self.assertIn(f'{kind}{chapter}-{section}-{ordinal}', text)
+        self.assertEqual(text.count('### ＜参考文献＞'), 4)
+        self.assertEqual(text.count('**図1-1-1'), 1)
+        for index in range(1, 5):
+            self.assertIn(f'{50 + index}頁；{60 + index}頁', text)
+        with zipfile.ZipFile(io.BytesIO(document)) as archive:
+            images = [archive.read(name) for name in archive.namelist() if name.startswith('word/media/')]
+        self.assertEqual(len(images), 8)
+        self.assertTrue(all(payload == original_blocks['IMAGE-1']['data'] for payload in images))
+
     def test_numbering_source_order_and_references_use_formal_section_scope(self):
         service = PublicationReleaseService.__new__(PublicationReleaseService)
         for group in ['G', 'M']:
