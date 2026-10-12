@@ -17,6 +17,9 @@ _DIGEST_RE = re.compile(r"sha256:[0-9a-f]{64}")
 _BIBLIOGRAPHIC_FIELDS = (
     "title",
     "publisher_or_author",
+    "author",
+    "publisher",
+    "bibliography_exceptions",
     "publication_or_update_date",
     "version_or_revision",
 )
@@ -51,6 +54,12 @@ def research_source_bibliography_payload(payload: Mapping[str, Any]) -> None:
         raise ValueError("research.source.bibliography requires at least one bibliographic field")
     for field in supplied:
         value = payload[field]
+        if field == "bibliography_exceptions":
+            if not isinstance(value, Mapping) or not value or set(value) - {"author", "publisher", "publication_or_update_date"}:
+                raise ValueError("bibliography_exceptions must identify genuinely inapplicable fields")
+            if any(not isinstance(reason, str) or not reason.strip() or len(reason) > _MAX_METADATA_LENGTH for reason in value.values()):
+                raise ValueError("bibliography exceptions need bounded reasons")
+            continue
         if not isinstance(value, str) or not value.strip() or len(value) > _MAX_METADATA_LENGTH:
             raise ValueError(f"{field} must be a bounded non-empty string")
 
@@ -102,7 +111,7 @@ class ResearchSourceBibliographyHandler:
                 "Source bibliography input does not match the current Source revision/digest",
             )
 
-        updates = {field: str(payload[field]) for field in _BIBLIOGRAPHIC_FIELDS if field in payload}
+        updates = {field: deepcopy(payload[field]) for field in _BIBLIOGRAPHIC_FIELDS if field in payload}
         changed = {field: value for field, value in updates.items() if source.get(field) != value}
         if not changed:
             return HarnessServiceResult(

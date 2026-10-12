@@ -65,10 +65,17 @@ def _validate_selected_reference_closure(selected: list[Mapping[str, Any]]) -> N
 
 
 def _bibliography_readiness(source: Mapping[str, Any]) -> tuple[bool, list[str]]:
+    def supplied(field):
+        return isinstance(source.get(field), str) and bool(source[field].strip())
+    exceptions = source.get('bibliography_exceptions', {})
+    def accounted(field):
+        return supplied(field) or isinstance(exceptions.get(field), str) and bool(exceptions[field].strip())
     missing = [
-        field for field in ("title", "publisher_or_author", "publication_or_update_date")
-        if not isinstance(source.get(field), str) or not str(source.get(field)).strip()
+        field for field in ("title", "publication_or_update_date")
+        if not (supplied(field) if field == 'title' else accounted(field))
     ]
+    if not supplied('publisher_or_author') and not (accounted('author') and accounted('publisher')):
+        missing.insert(1 if 'title' in missing else 0, 'publisher_or_author')
     return (not missing, [f"bibliography_missing:{field}" for field in missing])
 
 

@@ -1,0 +1,119 @@
+{
+  "asset_id": "misco.publication-formal-spec",
+  "asset_version": "1.2.0",
+  "authority": "MISCO（三井情報システム協議会）報告書作成要領 and referenced formal attachments; corrected archive supplied by the user on 2026-09-30",
+  "formal_spec_profile": {
+    "docx_layout": {
+      "body_font": "ＭＳ 明朝",
+      "body_latin_font": "Century",
+      "body_size_half_points": 21,
+      "caption_font": "ＭＳ ゴシック",
+      "caption_latin_font": "Century",
+      "caption_size_half_points": 18,
+      "doc_grid_char_space": 3430,
+      "doc_grid_line_pitch_twips": 342,
+      "first_line_indent_twips": 227,
+      "footer_margin_twips": 992,
+      "header_margin_twips": 851,
+      "heading1_size_half_points": 28,
+      "heading2_size_half_points": 24,
+      "heading_font": "ＭＳ ゴシック",
+      "heading_latin_font": "Century",
+      "margin_bottom_twips": 1418,
+      "margin_left_twips": 1418,
+      "margin_right_twips": 1418,
+      "margin_top_twips": 1701,
+      "page_height_twips": 16838,
+      "page_width_twips": 11906,
+      "reference_hanging_twips": 454,
+      "reference_left_indent_twips": 227,
+      "table_body_size_half_points": 21,
+      "table_font": "ＭＳ 明朝",
+      "table_header_size_half_points": 21,
+      "table_latin_font": "Century",
+      "title_font": "ＭＳ ゴシック",
+      "title_latin_font": "Century",
+      "title_size_half_points": 48
+    },
+    "profile_id": "misco.formal-spec.2024-11-12",
+    "profile_version": "1.2.0",
+    "reference_list_heading": "＜参考文献＞",
+    "reference_list_placement": "end_of_each_section",
+    "research_group_type_required": true,
+    "source": {
+      "approval_ref": "Corrected MISCO formal-spec archive supplied by user 2026-09-30; report-writing requirements and referenced attachments",
+      "source_digest": "sha256:c5cc608e7a90499a46ed929b120c4a4e09111de00ebdecc57d8e3d20dd7d1439",
+      "source_ref": "external-input://misco_doc_spec-corrected-2026-09-30.zip"
+    }
+  },
+  "source_interpretations": [
+    "The template's historical linePitch=335 displays LinesPage=40 in Word but actually fits 41 full-width MS Mincho text lines in a dense PDF page. The manual's explicit 40-line requirement takes priority over that example parameter. With A4 height16838 minus top1701/bottom1418, the pitch is floor(13719/40)=342 twips, preserving Word's 40-line setting and 40 actual PDF rows. CharSpace3430 retains 40 full-width characters. Verify actual PDF rows as well as Word PageSetup values. Historical 1.3.0 pins remain unchanged."
+  ],
+  "human_qa_rules": [
+    "MISCO-specific cover/front/spine labels, typography and placement from MISCO報告書表紙表記仕様(添付5)",
+    "MISCO outer/front/back matter branching and blank-page/opening-page rules",
+    "Report use/distribution/copy-count instructions from [添付4] remain operator/Human logistics rather than renderer defaults",
+    "50-60 page body guideline; abstract at most 2 pages; appendix at most 50 pages, measured in the final PDF",
+    "dearu style and terminology consistency",
+    "rights, interview/company disclosure and source adequacy",
+    "visual page-by-page inspection before release"
+  ],
+  "machine_applied_rules": [
+    "A4 page size and formal margins/header/footer values",
+    "formal body/heading/title/table East Asian and Latin fonts and sizes",
+    "one-character first-line indentation using the supplied Word template value",
+    "40-line/character grid reconciled with the manual and actual Word/PDF rendering",
+    "table caption above; figure caption below",
+    "section-local reference lists and full reader-facing URLs"
+  ],
+  "schema_version": "0.1.0",
+  "source_archive": {
+    "bytes": 340040,
+    "handling": "External corrected formal-spec original; repository stores only exact digests and extracted approved application values.",
+    "name": "misco_doc_spec (2).zip",
+    "repository_copy": false,
+    "sha256": "c5cc608e7a90499a46ed929b120c4a4e09111de00ebdecc57d8e3d20dd7d1439"
+  },
+  "source_members": [
+    {
+      "locator": "1.1 / 1.6 / 1.7",
+      "name": "MISCO（三井情報システム協議会） - 報告書作成要領.md",
+      "sha256": "53b0bf8a39bef10c2fdcfd7b9450c9cda25ab5dad6bade6f9405d890fb7a0193"
+    },
+    {
+      "locator": "2-2; 2-3(8),(9),(12),(13)",
+      "name": "業際研報告書作成マニュアル-2020年10月改訂版.doc",
+      "sha256": "306e2b220743eeb353f075274a97aa0b10b373eac934dec772fc398e162ec5c4"
+    },
+    {
+      "locator": "見出し字配り仕様 / 説明",
+      "name": "[添付1]業際研報告書見出し段落フォント仕様-2017年10月版.xls",
+      "sha256": "b4d744bd1767e0579b2b9f1d1745bfb6a105eb513c539e766191658c578ec448"
+    },
+    {
+      "locator": "業際研 表紙・背表紙のレイアウト",
+      "name": "[添付2]業際研報告書表紙表記仕様-2013年10月改定版.ppt",
+      "sha256": "a6845bb2aadb4eb8459620173e33bd00905e664aa8d1c59d7603ee682d27da46"
+    },
+    {
+      "locator": "word/document.xml sectPr; Word styles",
+      "name": "[添付3]業際研報告書 字配り(テンプレート)-2017年10月版.docx",
+      "sha256": "2a1c2ddeb6590836f860fb5110daf9a1c906624e1712c7457b87c5ba860910c9"
+    },
+    {
+      "locator": "用途・配付先・作成部数一覧",
+      "name": "[添付4]業際研報告書用途・配付先・作成部数一覧-2017年10月版a.doc",
+      "sha256": "a507f345de35ed5cc5763271153e09cf1ee0ee0f040df4ba088ddd63fff6947f"
+    },
+    {
+      "locator": "MISCO 表紙・背表紙のレイアウト / 表紙例",
+      "name": "MISCO報告書表紙表記仕様(添付5).ppt",
+      "sha256": "f3c2eb78e2eca55b27c81fc9d78de2aaecbef9688a98580995853eefdf165721"
+    },
+    {
+      "locator": "3.引用について",
+      "name": "MISCO論文作成上の注意点.docx",
+      "sha256": "9041c81cf06f454ee8d174761bdfb0e8fe28941216734262ad1e898677b9ffa3"
+    }
+  ]
+}
