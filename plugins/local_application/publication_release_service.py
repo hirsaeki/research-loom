@@ -1267,7 +1267,7 @@ class PublicationReleaseService:
         expected_parts = [node.get('{urn:research-loom:publication}part') for node in document.iter('{%s}sectPr' % word_ns)]
         machine = inspect_pdf(payload, required_text=required, page_ranges=host['page_ranges'], expected_parts=expected_parts)
         review = input_['review']
-        if not isinstance(review, Mapping) or set(review) != {'pdf_digest', 'reviewer_id', 'reviewed_at', 'checks', 'pages'}:
+        if not isinstance(review, Mapping) or not {'pdf_digest', 'reviewer_id', 'reviewed_at', 'checks', 'pages'} <= set(review) or set(review) - {'pdf_digest', 'reviewer_id', 'reviewed_at', 'checks', 'pages', 'presentation_review'}:
             raise LocalApplicationError('PUBLICATION-PDF-INPUT', 'Review requires exact PDF digest, reviewer/time, checks and every page')
         human = coverage_review(policy['coverage'], policy, review, _sha(payload), machine['page_count'], page_ranges=host['page_ranges'])
         key = _sha(_canonical_bytes({'source_build_digest': source['content_digest'], 'finalization': dict(input_)}))

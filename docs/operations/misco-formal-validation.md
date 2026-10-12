@@ -15,8 +15,8 @@ activities and roster. Word 16.0 updated fields and exported read-only with
 
 | Group | Source DOCX SHA-256 | Final PDF SHA-256 |
 |---|---|---|
-| G | `924293f77cd35b903cd3e505487a85066e5cfb9c31ffba584d7c16e3d708b82f` | `f8fedbc04a30198ac3573f154ee63203a2f0c8c7ed37dc0172525341b044f020` |
-| M | `f7bc2c80795351c99c229f7f3c9786fc26648fad755cfa0c0fa6e502003e6a7a` | `3f123181496c6bfb745a7e01db516d70af401b5c23b7df67022b7cb6ded449da` |
+| G | `a587c8eeac34b192ca5a879ac0f65a0133f3122173c9d72ab016210d95652b05` | `40f52fb5847b90283342255b3ad2b3d2672156748532f0d3169fbacfe031b5f1` |
+| M | `ec8a647847d5806816ec99d5886b8f3861c6f83eef86195f4c80fd4ed4dda9c6` | `f2e749964a26267227406a602c098b7c3574c6634f4b44464d01ffb8ba767b63` |
 
 Both PDFs have 18 A4 pages. Actually drawn text fonts are Century, MS Gothic,
 MS Mincho and MS PGothic. Machine inspection returned no problems. Exported
@@ -40,9 +40,29 @@ blanks. These observations are separate from the machine result:
 | 17–18 | Copyright/disclosure notices then blank back-cover reverse, no footer. |
 
 No missing image, cell, caption, source, note, number, visible clipping or
-replacement font was observed. Independent OOXML tests verify the original
-40×40 grid, margins, fonts/sizes, indentation and cover positions. This short
-fixture cannot visually demonstrate a full 40-character × 40-line page.
+replacement font was observed. Independent OOXML tests verify the manual's
+40×40 grid, margins, fonts/sizes, indentation and cover positions.
+
+A separate dense Japanese probe (`--grid-probe`) repeats 4000 full-width
+MS Mincho glyphs. The historical template pitch of 335 twips reported
+40 lines in Word but exported 41 lines on a full page. At 343 twips Word
+reported 39 lines. The new profile uses 342 twips, the integer floor of the
+13719-twip text height divided by 40: every Word section reports 40 characters
+and 40 lines, and physical page 12 of the dense PDF has exactly 40 lines
+of 40 characters. That page was visually inspected without clipping.
+Dense PDF SHA-256:
+`6190479f22821a42a692b8209b6bb3d34a95a4150a6b9aa1eb0cdba6ed1e8e68`.
+This documented precedence correction applies only to the new profile;
+historical 1.3.0 pins are unchanged.
+
+Actual Word pagination also verified both limit boundaries:
+
+| Probe | Abstract range | Appendix range | Machine result | PDF SHA-256 |
+|---|---|---|---|---|
+| `--boundary-case limits` | 3–4 (2 pages) | 16–65 (50 pages) | No problems | `8ea595c780294330e50dc3c58df58352a9a8244db77f45213c6d9094b050e184` |
+| `--boundary-case over-limit` | 3–5 (3 pages) | 18–68 (51 pages) | `abstract-over-2-pages`, `appendix-over-50-pages` | `740f20353e13ade89101adb068874b595d0d946b37dfabf9b48df94eaaa87cdb` |
+
+These are real exported pages and Host ranges, not mocked page counts.
 
 These fixtures are not approved research or submission-ready reports. Their
 four-page body falls outside 50–60 page guidance; chapter 2 starts on a left
@@ -63,6 +83,12 @@ pwsh.exe -NoProfile -File scripts/render_publication_word.ps1 -SourceDocx <scrat
 uv run --frozen python scripts/verify_misco_word_fixture.py <scratch> --inspect
 ```
 
+Use `--grid-probe` when generating a separate dense grid fixture. Count the
+actual rendered rows/characters as well as checking Word's PageSetup values.
+Use `--boundary-case limits` and `--boundary-case over-limit` in separate new
+directories to reproduce the actual-pagination limit probes with the same
+Word helper and inspector.
+
 Word PDF metadata may change regenerated hashes. Rebind to actual bytes and
 inspect every page again. The Host helper refuses existing outputs.
 
@@ -77,5 +103,6 @@ Single-clause ablations cover font, size, indentation, grid type, paragraph
 role, TOC indent, page/note restart and PDF bookmark/range binding. Public
 tests cover unknown/saved/restarted/stale/conflicting G/M metadata, required
 N/A rejection, bibliography exceptions, numbering/source order, exact PDF
-binding, failed PDF blocking and immutable approval retry. Mocked PDF PASS
+binding, failed PDF blocking, per-slide presentation citations, required
+body-length deviation rationale and immutable approval retry. Mocked PDF PASS
 tests cover persistence only; actual blank PDFs fail the real inspector.

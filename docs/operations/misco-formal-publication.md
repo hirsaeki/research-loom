@@ -98,3 +98,23 @@ checks. Printing requires current operator confirmation; the 2017 184+A+B and
 Interview/non-public source permissions remain source-specific. Saving or
 releasing a PDF records `not_submitted`; sending to a coordinator needs the
 separately authorized destination and actual transmission record.
+
+When `presentation_required` is true, `review.presentation_review` records the
+exact PPTX `artifact_digest` and `artifact_reference`, actual `software_version`,
+`slide_count` and every `slides` row in order. Each row has `slide`, `status`,
+`citations_required`, visible `citations` and concrete `rationale`. The named
+reviewer verifies the referenced bytes and source placement. A cited slide
+without its own citations fails even if the last slide has a reference list;
+a source-free slide records why `citations_required` is false. This is an
+explicit Host/Human review boundary, not an automated PPT renderer or claim
+that the backend parsed the PPTX. The record is retained in the final policy
+and approval digest. Report-only runs need no presentation input.
+
+For printing, the applicable clause rationales identify the current operator,
+record location, destinations, confirmed copies, assigned number, cover paper,
+spine dimensions and schedule. For submission, record the coordinator,
+authorized destination, exact PDF digest, transmission authority and external
+operation record location; release itself remains `not_submitted`. For color,
+identify each affected PDF page, why color is necessary and the grayscale
+inspection outcome. These concrete operator records belong in the applicable
+coverage check rationales, bound to the exact final PDF, not historical defaults.

@@ -22,12 +22,21 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('output_directory', type=Path)
     parser.add_argument('--inspect', action='store_true')
+    parser.add_argument('--grid-probe', action='store_true', help='Add 4000 fixed full-width Japanese glyphs to an isolated body section')
+    parser.add_argument('--boundary-case', choices=['limits', 'over-limit'], help='Generate actual-pagination abstract/appendix boundary probes')
     args = parser.parse_args()
     args.output_directory.mkdir(parents=True, exist_ok=True)
     for group in ['G', 'M']:
         if not args.inspect:
             service = PublicationReleaseService.__new__(PublicationReleaseService)
-            markdown, document, issues, _ = service._render(representative_inspection(group))
+            fixture = representative_inspection(group)
+            if args.grid_probe:
+                fixture['revision']['sections'][7]['content'] += '\n\n' + 'あ' * 4000
+            if args.boundary_case:
+                report = fixture['publication_policy']['formal_report']
+                report['abstract'] = '\n'.join(['経営への提言。境界検証用の合成要旨。'] * (60 if args.boundary_case == 'limits' else 100))
+                report['appendices'][0]['content'] = '\n'.join(['境界検証用の合成付録。数値は変更しない。'] * (1960 if args.boundary_case == 'limits' else 2000))
+            markdown, document, issues, _ = service._render(fixture)
             if issues:
                 raise RuntimeError(issues)
             for extension, data in [('docx', document), ('md', markdown)]:

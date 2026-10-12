@@ -101,7 +101,8 @@ def inspect_pdf(data: bytes, *, required_text=(), page_ranges=None, expected_par
 
 def coverage_review(coverage: Mapping, policy: Mapping, review: Mapping, pdf_digest: str, page_count: int, *, page_ranges=None):
     problems = []
-    if not isinstance(review, Mapping) or set(review) != {'pdf_digest', 'reviewer_id', 'reviewed_at', 'checks', 'pages'}:
+    required_keys = {'pdf_digest', 'reviewer_id', 'reviewed_at', 'checks', 'pages'}
+    if not isinstance(review, Mapping) or not required_keys <= set(review) or set(review) - required_keys - {'presentation_review'}:
         raise LocalApplicationError('PUBLICATION-PDF-INPUT', 'Review requires exact PDF binding, reviewer, review time, checks and pages')
     if not isinstance(review['checks'], list) or len(review['checks']) > 256 or not isinstance(review['pages'], list) or len(review['pages']) > 256:
         raise LocalApplicationError('PUBLICATION-PDF-INPUT', 'Review checks and page evidence must be bounded arrays')
@@ -116,6 +117,20 @@ def coverage_review(coverage: Mapping, policy: Mapping, review: Mapping, pdf_dig
     report = policy.get('formal_report', {})
     sources = policy.get('review_conditions', {})
     flags = {'report': True, 'research_theme': report.get('research_kind') == 'research_theme', 'commissioned': report.get('research_kind') == 'commissioned', 'presentation': report.get('presentation_required', False), 'printing': report.get('printing_required', False), 'submission': report.get('submission_requested', False), 'color': report.get('color_used', False), 'interview': sources.get('interview', False), 'company_information': sources.get('company_information', False)}
+    if flags['presentation']:
+        presentation = review.get('presentation_review')
+        if not isinstance(presentation, Mapping) or set(presentation) != {'artifact_digest', 'artifact_reference', 'software_version', 'slide_count', 'slides'} or not isinstance(presentation['artifact_digest'], str) or not re.fullmatch(r'sha256:[0-9a-f]{64}', presentation['artifact_digest']) or any(not isinstance(presentation[key], str) or not presentation[key].strip() or len(presentation[key]) > 1024 for key in ['artifact_reference', 'software_version']) or type(presentation['slide_count']) is not int or not 1 <= presentation['slide_count'] <= 256 or not isinstance(presentation['slides'], list):
+            problems.append('presentation-review-binding')
+        else:
+            slides = presentation['slides']
+            valid = len(slides) == presentation['slide_count']
+            for index, slide in enumerate(slides, 1):
+                if not isinstance(slide, Mapping) or set(slide) != {'slide', 'status', 'citations_required', 'citations', 'rationale'} or slide['slide'] != index or type(slide['slide']) is not int or slide['status'] != 'passed' or type(slide['citations_required']) is not bool or not isinstance(slide['citations'], list) or len(slide['citations']) > 256 or any(not isinstance(value, str) or not value.strip() or len(value) > 4000 for value in slide['citations']) or not isinstance(slide['rationale'], str) or not slide['rationale'].strip() or len(slide['rationale']) > 4000:
+                    valid = False
+                elif slide['citations_required'] and not slide['citations']:
+                    valid = False
+            if not valid:
+                problems.append('presentation-per-slide-citations')
     rows = review.get('checks', [])
     by_id = {}
     known = {item['id'] for item in coverage['items']} | {'misco-editorial-qa', 'final-pdf-all-pages', 'final-pdf-toc', 'final-pdf-footnotes', 'final-pdf-parity', 'final-pdf-cover'}

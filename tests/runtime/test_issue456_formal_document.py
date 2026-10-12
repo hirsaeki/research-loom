@@ -65,7 +65,7 @@ class FormalDocumentTests(unittest.TestCase):
                 self.assertEqual('introduction' in labels, group == 'G')
                 self.assertIn('word/footnotes.xml', parts)
                 self.assertEqual(len(document.findall('.//w:footnoteReference', {'w': W})), 1)
-                for part, path, attribute in [('word/document.xml', './/w:sectPr/w:pgNumType', 'start'), ('word/document.xml', './/w:sectPr/w:footnotePr/w:numRestart', 'val'), ('word/styles.xml', './/w:style[@w:styleId="FormalFootnote"]/w:rPr/w:sz', 'val'), ('word/styles.xml', './/w:style[@w:styleId="FormalBody6"]/w:pPr/w:ind', 'left'), ('word/styles.xml', './/w:style[@w:styleId="TOC2"]/w:pPr/w:ind', 'left'), ('word/styles.xml', './/w:style[@w:styleId="SourceCaption"]/w:rPr/w:rFonts', 'eastAsia')]:
+                for part, path, attribute in [('word/document.xml', './/w:sectPr/w:pgNumType', 'start'), ('word/document.xml', './/w:sectPr/w:footnotePr/w:numRestart', 'val'), ('word/document.xml', './/w:sectPr/w:docGrid', 'linePitch'), ('word/document.xml', './/w:sectPr/w:docGrid', 'charSpace'), ('word/styles.xml', './/w:style[@w:styleId="FormalFootnote"]/w:rPr/w:sz', 'val'), ('word/styles.xml', './/w:style[@w:styleId="FormalBody6"]/w:pPr/w:ind', 'left'), ('word/styles.xml', './/w:style[@w:styleId="TOC2"]/w:pPr/w:ind', 'left'), ('word/styles.xml', './/w:style[@w:styleId="SourceCaption"]/w:rPr/w:rFonts', 'eastAsia')]:
                     mutated = dict(parts)
                     tree = ET.fromstring(mutated[part])
                     tree.find(path, {'w': W}).set(f'{{{W}}}{attribute}', '9')
@@ -116,6 +116,14 @@ class FormalDocumentTests(unittest.TestCase):
         deviation = deepcopy(review)
         next(row for row in deviation['checks'] if row['check_id'] == 'misco-body-length').update(status='warning', rationale='Short synthetic report for rendering acceptance.')
         self.assertEqual(coverage_review(coverage, policy, deviation, digest, 1, page_ranges={'body': [10, 13]})['problems'], [])
+        presenting = deepcopy(policy)
+        presenting['formal_report']['presentation_required'] = True
+        self.assertIn('presentation-review-binding', coverage_review(coverage, presenting, review, digest, 1)['problems'])
+        slides = deepcopy(review)
+        slides['presentation_review'] = {'artifact_digest': digest, 'artifact_reference': 'synthetic-slides.pptx', 'software_version': 'PowerPoint 16.0', 'slide_count': 2, 'slides': [{'slide': i, 'status': 'passed', 'citations_required': True, 'citations': ['Synthetic source, publisher, 2026, https://example.test/source'], 'rationale': 'Source visible on this specific slide.'} for i in [1, 2]]}
+        self.assertEqual(coverage_review(coverage, presenting, slides, digest, 1)['problems'], [])
+        slides['presentation_review']['slides'][0]['citations'] = []
+        self.assertIn('presentation-per-slide-citations', coverage_review(coverage, presenting, slides, digest, 1)['problems'])
         for id_ in ['misco-abstract', 'manual-bibliography', 'misco-editorial-qa']:
             broken = deepcopy(review)
             next(row for row in broken['checks'] if row['check_id'] == id_)['status'] = 'not_applicable'

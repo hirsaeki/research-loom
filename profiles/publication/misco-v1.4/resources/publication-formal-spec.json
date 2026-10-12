@@ -11,7 +11,7 @@
       "caption_latin_font": "Century",
       "caption_size_half_points": 18,
       "doc_grid_char_space": 3430,
-      "doc_grid_line_pitch_twips": 335,
+      "doc_grid_line_pitch_twips": 342,
       "first_line_indent_twips": 227,
       "footer_margin_twips": 992,
       "header_margin_twips": 851,
@@ -46,6 +46,9 @@
       "source_ref": "external-input://misco_doc_spec-corrected-2026-09-30.zip"
     }
   },
+  "source_interpretations": [
+    "The template's historical linePitch=335 displays LinesPage=40 in Word but actually fits 41 full-width MS Mincho text lines in a dense PDF page. The manual's explicit 40-line requirement takes priority over that example parameter. With A4 height16838 minus top1701/bottom1418, the pitch is floor(13719/40)=342 twips, preserving Word's 40-line setting and 40 actual PDF rows. CharSpace3430 retains 40 full-width characters. Verify actual PDF rows as well as Word PageSetup values. Historical 1.3.0 pins remain unchanged."
+  ],
   "human_qa_rules": [
     "MISCO-specific cover/front/spine labels, typography and placement from MISCO報告書表紙表記仕様(添付5)",
     "MISCO outer/front/back matter branching and blank-page/opening-page rules",
@@ -59,7 +62,7 @@
     "A4 page size and formal margins/header/footer values",
     "formal body/heading/title/table East Asian and Latin fonts and sizes",
     "one-character first-line indentation using the supplied Word template value",
-    "40-line/character-grid parameters pinned from the supplied Word template",
+    "40-line/character grid reconciled with the manual and actual Word/PDF rendering",
     "table caption above; figure caption below",
     "section-local reference lists and full reader-facing URLs"
   ],
