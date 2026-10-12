@@ -270,7 +270,8 @@ def prepare_exhibits(inspection: Mapping[str, Any], workspace: Path) -> dict[str
                 unavailable_code = "VISUAL_SOURCE_METADATA_REQUIRED"
                 citation_sources = _visual_sources(exhibit, package, strict=misco)
                 source_ids = {o["id"] for o in citation_sources}
-                if misco and any(any(not isinstance(o.get(k), str) or not o[k].strip() for k in ("title", "publisher_or_author", "publication_or_update_date", "canonical_locator")) for o in citation_sources):
+                from .research_package_builder import _bibliography_readiness
+                if misco and any(not _bibliography_readiness(o)[0] or not str(o.get('canonical_locator', '')).strip() for o in citation_sources):
                     unavailable_code = "VISUAL_SOURCE_METADATA_REQUIRED"
                     raise ValueError("external data source needs explicit bibliographic metadata")
                 provenance["citation_sources"] = deepcopy(citation_sources)
@@ -285,7 +286,8 @@ def prepare_exhibits(inspection: Mapping[str, Any], workspace: Path) -> dict[str
                                if item["run_id"] == visual["source_run_id"] and item["capture"]["capture_id"] == visual["capture_id"])
                 provenance["source_capture"] = deepcopy(capture)
                 citation_sources = [o for o in objects.values() if o.get("kind") == "source" and o.get("content_digest") == visual["source_digest"] and o.get("canonical_locator") in {capture.get("source_locator"), *(capture.get("source_locators") or [])}]
-                if misco and (len(citation_sources) != 1 or any(not isinstance(citation_sources[0].get(k), str) or not citation_sources[0][k].strip() for k in ("title", "publisher_or_author", "publication_or_update_date"))):
+                from .research_package_builder import _bibliography_readiness
+                if misco and (len(citation_sources) != 1 or not _bibliography_readiness(citation_sources[0])[0]):
                     unavailable_code = "VISUAL_SOURCE_METADATA_REQUIRED"
                     raise ValueError("external visual needs exact Source bibliographic metadata")
                 provenance["citation_sources"] = deepcopy(citation_sources)
@@ -309,6 +311,8 @@ def prepare_exhibits(inspection: Mapping[str, Any], workspace: Path) -> dict[str
                 result[ref] = {"kind": "image", "data": data, "width": width, "height": height,
                                "provenance": provenance, "asset_digest": "sha256:" + hashlib.sha256(data).hexdigest()}
             elif exhibit["kind"] in {"table", "matrix"}:
+                if inspection.get('publication_policy', {}).get('document_mode') == 'formal_report':
+                    provenance['citation_sources'] = deepcopy(_visual_sources(exhibit, package, strict=True))
                 result[ref] = {"kind": "table", "rows": table_rows(exhibit["content"]), "provenance": provenance}
             else:
                 raise ValueError("unsupported Exhibit representation; no implicit text fallback")

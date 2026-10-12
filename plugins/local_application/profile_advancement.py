@@ -46,6 +46,7 @@ GENERATIONS_DIR = "generations"
 EVENTS_DIR = "events"
 PENDING_MARKER = "profile-advancement.pending.json"
 _ADVANCEMENT_NOTE = "Profile generation advancement: direct Profile requests changed mechanically; other project semantics are unchanged."
+_PUBLICATION_METADATA_NOTE = "Publication metadata advancement: explicit research group answer saved; research content is unchanged."
 
 
 
@@ -90,6 +91,17 @@ def _validate_target_project_delta(current: Mapping[str, Any], target: Mapping[s
         raise LocalWorkspaceError("PROFILE-ADVANCE-PROJECT-001", "Profile advancement cannot change project identity")
     current_rest = deepcopy(dict(current))
     target_rest = deepcopy(dict(target))
+    metadata_changed = current.get("publication_metadata", {}) != target.get("publication_metadata", {})
+    if metadata_changed:
+        metadata = target.get("publication_metadata")
+        if not isinstance(metadata, Mapping) or set(metadata) != {"research_group_type"} or metadata.get("research_group_type") not in {"G", "M"}:
+            raise LocalWorkspaceError("INPUT-RESEARCH-GROUP-TYPE", "Publication metadata must contain an explicit G or M answer")
+        major, minor, patch = str(current["config_version"]).split(".")
+        if target.get("config_version") != f"{major}.{minor}.{int(patch) + 1}":
+            raise LocalWorkspaceError("PROFILE-ADVANCE-PROJECT-SEMANTICS-001", "Publication metadata update must advance config_version by one patch")
+        for value in (current_rest, target_rest):
+            value.pop("publication_metadata", None)
+            value.pop("config_version", None)
     for value in (current_rest, target_rest):
         value.pop("configuration_digest", None)
         value.pop("profile_requests", None)
@@ -108,9 +120,12 @@ def _validate_target_project_delta(current: Mapping[str, Any], target: Mapping[s
     old_notes = list(old_prov.get("notes", []))
     new_notes = list(new_prov.get("notes", []))
     requests_changed = current["profile_requests"] != target["profile_requests"]
-    if requests_changed:
+    if requests_changed or metadata_changed:
         expected_derived = old_derived + ([] if current["configuration_digest"] in old_derived else [current["configuration_digest"]])
-        expected_notes = old_notes + ([] if _ADVANCEMENT_NOTE in old_notes else [_ADVANCEMENT_NOTE])
+        expected_notes = list(old_notes)
+        for changed, note in [(requests_changed, _ADVANCEMENT_NOTE), (metadata_changed, _PUBLICATION_METADATA_NOTE)]:
+            if changed and note not in expected_notes:
+                expected_notes.append(note)
         if new_derived != expected_derived or new_notes != expected_notes:
             raise LocalWorkspaceError(
                 "PROFILE-ADVANCE-PROJECT-PROVENANCE-001",
@@ -316,7 +331,13 @@ def prepare_profile_generation(workspace: str | Path, request: Mapping[str, Any]
         raise LocalWorkspaceError("PROFILE-RESOLVE-INPUT-001", "request_additions must be a list")
     with LocalWorkspace.open(root) as opened:
         current = deepcopy(dict(opened.project_config))
-    target_config = target_project_config(current, replacements, additions)
+    metadata = request.get("publication_metadata")
+    if metadata is not None:
+        if not isinstance(metadata, Mapping):
+            raise LocalWorkspaceError("INPUT-RESEARCH-GROUP-TYPE", "publication_metadata must be an object")
+        if request.get("expected_project_config_digest") != current["configuration_digest"]:
+            raise LocalWorkspaceError("PROJECT-CONFIG-STALE-001", "Publication metadata answer must target the current Project Config digest")
+    target_config = target_project_config(current, replacements, additions, publication_metadata=metadata)
     _schema_validate(target_config, PROJECT_CONFIG_SCHEMA, "WORKSPACE-PROJECT-CONFIG-SCHEMA-001")
     _validate_project_semantics(target_config)
     _validate_target_project_delta(current, target_config)

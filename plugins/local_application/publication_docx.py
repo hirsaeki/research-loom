@@ -48,6 +48,8 @@ def _paragraph(
         "cell": "TableText",
         "header": "TableHeader",
     }.get(role, "Normal")
+    if role.startswith('heading') and role[7:].isdigit():
+        style = 'Heading' + role[7:]
     runs = "</w:t><w:br/><w:t xml:space=\"preserve\">".join(_text(text).split("\n"))
     runs = runs.replace("\t", '</w:t><w:tab/><w:t xml:space="preserve">')
     start = f'<w:bookmarkStart w:id="{bookmark[0]}" w:name="{bookmark[1]}"/>' if bookmark else ""
@@ -136,13 +138,21 @@ def docx_bytes(lines: list[tuple[str, Any]], layout: dict[str, Any] | None = Non
             continue
         index += 1
         compact_legend = "legend_rows" in block and len(block["legend_rows"]) <= 8
-        caption = _paragraph(block["caption"], "caption", (index, _bookmark(block["ref"])), keep_with_next=block["kind"] == "table" or compact_legend or bool(block.get("note")))
+        caption = _paragraph(block["caption"], "caption", (index, _bookmark(block["ref"])), keep_with_next=block["kind"] == "table" or compact_legend or bool(block.get("note")) or bool(block.get('source_text')))
         if block["kind"] == "table":
             body.append(caption)
+            if block.get('source_text'):
+                body.append(_paragraph(block['source_text'], 'source_caption', keep_with_next=True))
             body.append(_table(block["rows"], content_width_twips))
+            if block.get('explanatory_note'):
+                body.append(_paragraph(block['explanatory_note'], 'source_caption'))
         elif block["kind"] == "image":
             body.append(_image(block, index, content_width_emu))
+            if block.get('explanatory_note'):
+                body.append(_paragraph(block['explanatory_note'], 'source_caption', keep_with_next=True))
             body.append(caption)
+            if block.get('source_text'):
+                body.append(_paragraph(block['source_text'], 'source_caption'))
             if "legend_rows" in block:
                 body.append(_table(block["legend_rows"], content_width_twips, keep_with_next=compact_legend and bool(block.get("note"))))
             name = f'media/image-{index}.png'
@@ -178,15 +188,26 @@ def docx_bytes(lines: list[tuple[str, Any]], layout: dict[str, Any] | None = Non
         ("Title", int(layout.get('title_size_half_points', 34)), True, title_font, title_latin_font, "center"),
         ("Heading1", int(layout.get('heading1_size_half_points', 28)), True, heading_font, heading_latin_font, None),
         ("Heading2", int(layout.get('heading2_size_half_points', 22)), True, heading_font, heading_latin_font, None),
-        ("Caption", int(layout.get('caption_size_half_points', 18)), True, caption_font, caption_latin_font, "center"),
-        ("SourceCaption", int(layout.get('caption_size_half_points', 18)), False, caption_font, caption_latin_font, "center"),
+        ("Caption", int(layout.get('caption_size_half_points', 18)), True, caption_font, caption_font if layout.get('formal_document') else caption_latin_font, "center"),
+        ("SourceCaption", int(layout.get('caption_size_half_points', 18)), bool(layout.get('formal_document')), caption_font, caption_latin_font, "center"),
         ("ReferenceHeading", body_size, False, body_font, body_latin_font, None),
         ("Reference", body_size, False, body_font, body_latin_font, None),
         ("TableText", int(layout.get('table_body_size_half_points', 18)), False, table_font, table_latin_font, None),
         ("TableHeader", int(layout.get('table_header_size_half_points', 18)), True, table_font, table_latin_font, None),
     ]
+    for level in range(3, 8):
+        style_rows.append((f'Heading{level}', body_size, level == 3, heading_font if level == 3 else body_font, heading_latin_font if level == 3 else body_latin_font, None))
     for name, size, bold, font, latin_font, alignment in style_rows:
-        keep = '<w:keepNext/>' if name in {"Title", "Heading1", "Heading2"} else ''
+        keep = '<w:keepNext/>' if name == 'Title' or name.startswith('Heading') else ''
+        if name.startswith('Heading'):
+            level = int(name[7:])
+            keep += f'<w:outlineLvl w:val="{level - 1}"/>'
+            if layout.get('formal_document'):
+                if level == 1:
+                    keep += '<w:pageBreakBefore/>'
+                if level >= 4:
+                    indent = {4: 227, 5: 680, 6: 907, 7: 1134}[level]
+                    keep += f'<w:ind w:left="{indent}" w:hanging="227"/>'
         jc = f'<w:jc w:val="{alignment}"/>' if alignment else ''
         styles.append(f'<w:style w:type="paragraph" w:styleId="{name}"><w:name w:val="{name}"/><w:pPr>{keep}{jc}<w:spacing w:after="0"/></w:pPr><w:rPr><w:rFonts w:ascii="{escape(latin_font)}" w:hAnsi="{escape(latin_font)}" w:eastAsia="{escape(font)}"/><w:sz w:val="{size}"/>' + ('<w:b/>' if bold else '') + '</w:rPr></w:style>')
     types = ('<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
@@ -249,10 +270,76 @@ def verify_native_docx(data: bytes, lines: list[tuple[str, Any]], layout: dict[s
                 grid = sect.find(f'{{{W}}}docGrid')
                 if grid is None:
                     return False
+                if grid.get(f'{{{W}}}type') != 'linesAndChars':
+                    return False
                 if int(grid.get(f'{{{W}}}linePitch', '-1')) != int(layout.get('doc_grid_line_pitch_twips', 360)):
                     return False
                 if int(grid.get(f'{{{W}}}charSpace', '-999999')) != int(layout.get('doc_grid_char_space', 0)):
                     return False
+            styles = ET.fromstring(archive.read('word/styles.xml'))
+            body_font = str(layout.get('body_font', 'Arial'))
+            heading_font = str(layout.get('heading_font', body_font))
+            title_font = str(layout.get('title_font', heading_font))
+            table_font = str(layout.get('table_font', body_font))
+            caption_font = str(layout.get('caption_font', heading_font))
+            body_latin = str(layout.get('body_latin_font', body_font))
+            heading_latin = str(layout.get('heading_latin_font', heading_font))
+            body_size = int(layout.get('body_size_half_points', 22))
+            expected_styles = {
+                'Normal': (body_font, body_latin, body_size, False, None),
+                'Title': (title_font, str(layout.get('title_latin_font', title_font)), int(layout.get('title_size_half_points', 34)), True, 'center'),
+                'Heading1': (heading_font, heading_latin, int(layout.get('heading1_size_half_points', 28)), True, None),
+                'Heading2': (heading_font, heading_latin, int(layout.get('heading2_size_half_points', 22)), True, None),
+                'Caption': (caption_font, caption_font if layout.get('formal_document') else str(layout.get('caption_latin_font', heading_latin)), int(layout.get('caption_size_half_points', 18)), True, 'center'),
+                'SourceCaption': (caption_font, str(layout.get('caption_latin_font', heading_latin)), int(layout.get('caption_size_half_points', 18)), bool(layout.get('formal_document')), 'center'),
+                'ReferenceHeading': (body_font, body_latin, body_size, False, None),
+                'Reference': (body_font, body_latin, body_size, False, None),
+                'TableText': (table_font, str(layout.get('table_latin_font', table_font)), int(layout.get('table_body_size_half_points', 18)), False, None),
+                'TableHeader': (table_font, str(layout.get('table_latin_font', table_font)), int(layout.get('table_header_size_half_points', 18)), True, None),
+            }
+            for level in range(3, 8):
+                expected_styles[f'Heading{level}'] = (heading_font if level == 3 else body_font, heading_latin if level == 3 else body_latin, body_size, level == 3, None)
+            style_nodes = {node.get(f'{{{W}}}styleId'): node for node in styles.findall(f'{{{W}}}style')}
+            if len(style_nodes) != len(styles.findall(f'{{{W}}}style')):
+                return False
+            for name, (font, latin, size, bold, alignment) in expected_styles.items():
+                node = style_nodes.get(name)
+                if node is None:
+                    return False
+                fonts = node.find(f'{{{W}}}rPr/{{{W}}}rFonts')
+                sz = node.find(f'{{{W}}}rPr/{{{W}}}sz')
+                jc = node.find(f'{{{W}}}pPr/{{{W}}}jc')
+                if fonts is None or sz is None:
+                    return False
+                if any(fonts.get(f'{{{W}}}{key}') != value for key, value in {'ascii': latin, 'hAnsi': latin, 'eastAsia': font}.items()):
+                    return False
+                if sz.get(f'{{{W}}}val') != str(size) or (node.find(f'{{{W}}}rPr/{{{W}}}b') is not None) != bold:
+                    return False
+                if (jc.get(f'{{{W}}}val') if jc is not None else None) != alignment:
+                    return False
+                if name.startswith('Heading'):
+                    level = int(name[-1])
+                    if node.find(f'{{{W}}}pPr/{{{W}}}keepNext') is None:
+                        return False
+                    outline = node.find(f'{{{W}}}pPr/{{{W}}}outlineLvl')
+                    if outline is None or outline.get(f'{{{W}}}val') != str(level - 1):
+                        return False
+                    if layout.get('formal_document'):
+                        if (node.find(f'{{{W}}}pPr/{{{W}}}pageBreakBefore') is not None) != (level == 1):
+                            return False
+                        if level >= 4:
+                            indent = node.find(f'{{{W}}}pPr/{{{W}}}ind')
+                            if indent is None or indent.attrib != {f'{{{W}}}left': str({4: 227, 5: 680, 6: 907, 7: 1134}[level]), f'{{{W}}}hanging': '227'}:
+                                return False
+            defaults = styles.find(f'{{{W}}}docDefaults/{{{W}}}rPrDefault/{{{W}}}rPr')
+            if defaults is None:
+                return False
+            fonts = defaults.find(f'{{{W}}}rFonts')
+            sz = defaults.find(f'{{{W}}}sz')
+            if fonts is None or sz is None or sz.get(f'{{{W}}}val') != str(body_size):
+                return False
+            if any(fonts.get(f'{{{W}}}{key}') != value for key, value in {'ascii': body_latin, 'hAnsi': body_latin, 'eastAsia': body_font}.items()):
+                return False
             children = [node for node in body if node.tag != f'{{{W}}}sectPr']
             relations = {r.attrib['Id']: r.attrib for r in ET.fromstring(archive.read('word/_rels/document.xml.rels'))}
             cursor = 0
@@ -270,7 +357,27 @@ def verify_native_docx(data: bytes, lines: list[tuple[str, Any]], layout: dict[s
 
             for role, value in lines:
                 if role != 'exhibit':
-                    if _paragraph_text(take('p')) != normalized(value):
+                    paragraph = take('p')
+                    if _paragraph_text(paragraph) != normalized(value):
+                        return False
+                    expected_style = {'title': 'Title', 'heading': 'Heading1', 'heading2': 'Heading2', 'caption': 'Caption', 'source_caption': 'SourceCaption', 'reference_heading': 'ReferenceHeading', 'reference': 'Reference', 'cell': 'TableText', 'header': 'TableHeader'}.get(role, 'Normal')
+                    if role.startswith('heading') and role[7:].isdigit():
+                        expected_style = 'Heading' + role[7:]
+                    style = paragraph.find(f'{{{W}}}pPr/{{{W}}}pStyle')
+                    if style is None or style.get(f'{{{W}}}val') != expected_style:
+                        return False
+                    indent = paragraph.find(f'{{{W}}}pPr/{{{W}}}ind')
+                    expected_indent = {}
+                    if role == 'body' and layout.get('first_line_indent_twips', 0):
+                        expected_indent['firstLine'] = str(layout['first_line_indent_twips'])
+                    if role == 'reference':
+                        for key, field in [('left', 'reference_left_indent_twips'), ('hanging', 'reference_hanging_twips')]:
+                            if layout.get(field, 0):
+                                expected_indent[key] = str(layout[field])
+                    if (dict(indent.attrib) if indent is not None else {}) != {f'{{{W}}}{key}': val for key, val in expected_indent.items()}:
+                        return False
+                    # Generated runs must inherit the pinned style without overrides.
+                    if paragraph.find(f'.//{{{W}}}rPr') is not None:
                         return False
                     continue
 
@@ -282,10 +389,14 @@ def verify_native_docx(data: bytes, lines: list[tuple[str, Any]], layout: dict[s
                     bookmarks = caption.findall(f'.//{{{W}}}bookmarkStart')
                     if len(bookmarks) != 1 or bookmarks[0].get(f'{{{W}}}name') != _bookmark(block['ref']):
                         return False
+                    if block.get('source_text') and _paragraph_text(take('p')) != normalized(block['source_text']):
+                        return False
                     table = take('tbl')
                     rows = [[_paragraph_text(cell) for cell in row.findall(f'{{{W}}}tc')] for row in table.findall(f'{{{W}}}tr')]
                     expected = [[normalized(cell) for cell in row] for row in block['rows']]
                     if rows != expected:
+                        return False
+                    if block.get('explanatory_note') and _paragraph_text(take('p')) != normalized(block['explanatory_note']):
                         return False
                 elif block['kind'] == 'image':
                     image = take('p')
@@ -299,11 +410,15 @@ def verify_native_docx(data: bytes, lines: list[tuple[str, Any]], layout: dict[s
                     payload = archive.read('word/' + relation['Target'])
                     if payload != block['data'] or 'sha256:' + hashlib.sha256(payload).hexdigest() != block['asset_digest']:
                         return False
+                    if block.get('explanatory_note') and _paragraph_text(take('p')) != normalized(block['explanatory_note']):
+                        return False
                     caption = take('p')
                     if _paragraph_text(caption) != normalized(block['caption']):
                         return False
                     bookmarks = caption.findall(f'.//{{{W}}}bookmarkStart')
                     if len(bookmarks) != 1 or bookmarks[0].get(f'{{{W}}}name') != _bookmark(block['ref']):
+                        return False
+                    if block.get('source_text') and _paragraph_text(take('p')) != normalized(block['source_text']):
                         return False
                     if 'legend_rows' in block:
                         table = take('tbl')

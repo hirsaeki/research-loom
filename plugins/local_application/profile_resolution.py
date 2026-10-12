@@ -722,6 +722,7 @@ def target_project_config(
     current: Mapping[str, Any],
     replacements: Iterable[Mapping[str, Any]],
     additions: Iterable[Mapping[str, Any]] = (),
+    *, publication_metadata: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     target = deepcopy(dict(current))
     changed = False
@@ -754,15 +755,27 @@ def target_project_config(
             raise LocalWorkspaceError("PROFILE-ADVANCE-REQUEST-001", "request addition collides with an existing Profile id")
         items.append(item)
         changed = True
-    if changed:
+    metadata_changed = publication_metadata is not None and dict(publication_metadata) != current.get("publication_metadata", {})
+    if metadata_changed:
+        if set(publication_metadata) != {"research_group_type"} or publication_metadata.get("research_group_type") not in {"G", "M"}:
+            raise LocalWorkspaceError("INPUT-RESEARCH-GROUP-TYPE", "Publication metadata requires an explicit G or M answer")
+        target["publication_metadata"] = deepcopy(dict(publication_metadata))
+        major, minor, patch = str(current["config_version"]).split(".")
+        target["config_version"] = f"{major}.{minor}.{int(patch) + 1}"
+    if changed or metadata_changed:
         prior_digest = str(current["configuration_digest"])
         derived = target["provenance"].setdefault("derived_from_configuration_digests", [])
         if prior_digest not in derived:
             derived.append(prior_digest)
         notes = target["provenance"].setdefault("notes", [])
-        note = "Profile generation advancement: direct Profile requests changed mechanically; other project semantics are unchanged."
-        if note not in notes:
-            notes.append(note)
+        if changed:
+            note = "Profile generation advancement: direct Profile requests changed mechanically; other project semantics are unchanged."
+            if note not in notes:
+                notes.append(note)
+        if metadata_changed:
+            note = "Publication metadata advancement: explicit research group answer saved; research content is unchanged."
+            if note not in notes:
+                notes.append(note)
         target.pop("configuration_digest", None)
         target["configuration_digest"] = "sha256:" + hashlib.sha256(rfc8785.dumps(target)).hexdigest()
     return target

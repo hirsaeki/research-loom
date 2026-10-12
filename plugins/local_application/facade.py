@@ -227,6 +227,9 @@ class LocalApplicationFacade:
     def show_publication_preview(self, build_id: str) -> Mapping[str, Any]:
         return self._publication_release_service().show_preview(build_id)
 
+    def finalize_publication_pdf(self, build_id: str, input_: Mapping[str, Any]) -> Mapping[str, Any]:
+        return self._publication_release_service().finalize_pdf(build_id, input_)
+
     def request_publication_release(
         self, build_id: str, actor_id: str, *, renewal_of: str | None = None,
     ) -> Mapping[str, Any]:

@@ -99,8 +99,8 @@ _STYLE_MAP_PIN = _artifact_pin(
 )
 _RENDERER = {
     "renderer_id": "research-loom.deterministic-docx",
-    "renderer_version": "0.2.6",
-    "tool_digest": _sha(b"research-loom.deterministic-docx@0.2.6;selected-citation-conformance;provenance-v2"),
+    "renderer_version": "0.3.0",
+    "tool_digest": _sha(b"research-loom.deterministic-docx@0.3.0;misco-formal-sections;exact-pdf-review;provenance-v2"),
 }
 
 
@@ -140,7 +140,14 @@ def _validate_publication_inputs(value: Mapping[str, Any] | None) -> dict[str, A
             digest = str(source.get("source_digest", ""))
             if not digest.startswith("sha256:") or len(digest) != 71:
                 raise LocalApplicationError("APPLICATION-PUBLICATION-INPUT-001", f"{key} source_digest is invalid")
+    permission_ids = [row['source_ref'] for row in normalized.get('permissions', [])]
+    if len(permission_ids) != len(set(permission_ids)):
+        raise LocalApplicationError('APPLICATION-PUBLICATION-INPUT-001', 'Permissions must identify each Source once')
     return normalized
+
+
+def _source_tags(source):
+    return {str(source.get(key, '')).lower() for key in ['access_classification', 'source_classification', 'source_type']}
 
 
 def _resource_rows(package: Mapping[str, Any], profile: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -161,13 +168,35 @@ def _resource_rows(package: Mapping[str, Any], profile: Mapping[str, Any]) -> li
     return selected
 
 
-def _publication_policy(package: Mapping[str, Any], profile: Mapping[str, Any], inputs: Mapping[str, Any]) -> dict[str, Any]:
+def _editorial_status(review: Any, *, misco: bool) -> str:
+    """Preserve incomplete reviews and reject contradictory aggregate evidence."""
+    if not isinstance(review, Mapping):
+        return "warning"
+    rows = review.get("checks", [])
+    ids = [row.get("check_id") for row in rows]
+    if len(ids) != len(set(ids)) or any(row.get("status") == "failed" for row in rows):
+        return "failed"
+    if misco:
+        overall = next((row for row in rows if row.get("check_id") == "misco-editorial-qa"), None)
+        if overall is None or overall.get("status") == "not_applicable":
+            return "failed"
+    if not rows or any(row.get("status") in {"warning", "unevaluated"} for row in rows):
+        return "warning"
+    # An entirely inapplicable review contains no positive conformance evidence.
+    if all(row.get("status") == "not_applicable" for row in rows):
+        return "warning"
+    return "passed"
+
+
+def _publication_policy(package: Mapping[str, Any], profile: Mapping[str, Any], inputs: Mapping[str, Any], project_config: Mapping[str, Any] | None = None) -> dict[str, Any]:
     resources = _resource_rows(package, profile)
     by_role = {str(row.get("role")): row for row in resources}
     rules_row = by_role.get("PUBLICATION_RULES")
     source_row = by_role.get("PUBLICATION_SOURCE_DOCUMENTS")
     formal_row = by_role.get("PUBLICATION_FORMAL_SPEC")
     url_row = by_role.get("PUBLICATION_URL_DISPLAY")
+    coverage_row = by_role.get("PUBLICATION_COVERAGE")
+    coverage = json.loads(coverage_row["content"]) if coverage_row else None
     if profile.get("profile_id") == "misco.publication" and any(
         row is None for row in (rules_row, source_row, formal_row, url_row)
     ):
@@ -195,14 +224,34 @@ def _publication_policy(package: Mapping[str, Any], profile: Mapping[str, Any], 
     formal = explicit_formal if isinstance(explicit_formal, Mapping) else pinned_formal
     url_profile = explicit_url_profile if isinstance(explicit_url_profile, Mapping) else pinned_url_profile
     group_type = inputs.get("research_group_type")
+    if isinstance(group_type, str) and not group_type.strip():
+        group_type = None
+    document_mode = inputs.get("document_mode", "body_preview")
+    report = inputs.get("formal_report")
+    config_pin = None
+    saved = None
+    if project_config is not None:
+        config_pin = {"config_version": project_config["config_version"], "configuration_digest": project_config["configuration_digest"]}
+        if inputs.get("project_config_digest") is not None and inputs["project_config_digest"] != config_pin["configuration_digest"]:
+            raise LocalApplicationError("PROJECT-CONFIG-STALE-001", "Publication input targets a different Project Config generation")
+        saved = project_config.get("publication_metadata", {}).get("research_group_type")
+        if isinstance(saved, str) and not saved.strip():
+            saved = None
+        if saved is not None and group_type is not None and saved != group_type:
+            raise LocalApplicationError("INPUT-RESEARCH-GROUP-TYPE-CONFLICT", "Explicit Publication group conflicts with saved project metadata")
+        group_type = saved or group_type
     permissions = inputs.get("permissions", [])
     editorial = inputs.get("editorial_review")
     missing = []
     if profile.get("profile_id") == "misco.publication":
+        if document_mode == "formal_report" and not isinstance(report, Mapping):
+            missing.append("INPUT-FORMAL-REPORT")
         if not isinstance(formal, Mapping) or not isinstance(formal.get("research_group_type_required"), bool):
             missing.append("INPUT-FORMAL-SPEC")
-        elif formal["research_group_type_required"] and not group_type:
+        elif (formal["research_group_type_required"] or document_mode == "formal_report") and document_mode == "formal_report" and not group_type:
             missing.append("INPUT-RESEARCH-GROUP-TYPE")
+        if coverage and document_mode == 'formal_report' and group_type and saved is None:
+            missing.append('INPUT-RESEARCH-GROUP-TYPE-SAVE')
         sources = package.get("resolved_content", {}).get("research_objects", [])
         has_reader_url = any(
             isinstance(row, Mapping)
@@ -217,8 +266,7 @@ def _publication_policy(package: Mapping[str, Any], profile: Mapping[str, Any], 
             for row in sources
             if isinstance(row, Mapping)
             and row.get("kind") == "source"
-            and str(row.get("access_classification") or row.get("source_classification") or row.get("source_type") or "").lower()
-            in {"internal", "non-public", "confidential", "interview"}
+            and bool(_source_tags(row) & {"internal", "non-public", "confidential", "interview"})
         }
         permission_by_source = {str(row.get("source_ref")): row for row in permissions if isinstance(row, Mapping)}
         if any(ref not in permission_by_source or not permission_by_source[ref].get("publication_allowed") or not permission_by_source[ref].get("original_reviewed") or permission_by_source[ref].get("company_disclosure") not in {"allowed", "anonymized"} for ref in required_permissions):
@@ -252,7 +300,18 @@ def _publication_policy(package: Mapping[str, Any], profile: Mapping[str, Any], 
         "formal_spec_profile": deepcopy(formal),
         "url_display_profile": deepcopy(url_profile),
         "research_group_type": group_type,
+        "project_config_pin": config_pin,
+        "document_mode": document_mode,
+        "conformance_scope": "formal_report" if document_mode == "formal_report" else "partial_body_preview",
+        "coverage": deepcopy(coverage),
+        "formal_report": deepcopy(report),
+        "host_questions": [{"input_id": "INPUT-RESEARCH-GROUP-TYPE", "question": "今回の報告書はG研究会とM研究会のどちらですか？", "save_via": "profile resolve publication_metadata then profile advance"}] if "INPUT-RESEARCH-GROUP-TYPE" in missing else [],
+        "host_actions": [{'input_id': 'INPUT-RESEARCH-GROUP-TYPE-SAVE', 'research_group_type': group_type, 'save_via': 'profile resolve publication_metadata then profile advance', 'expected_project_config_digest': config_pin['configuration_digest'] if config_pin else None}] if 'INPUT-RESEARCH-GROUP-TYPE-SAVE' in missing else [],
         "permissions": deepcopy(list(permissions)),
+        "review_conditions": {
+            "interview": any('interview' in _source_tags(row) for row in package.get('resolved_content', {}).get('research_objects', []) if row.get('kind') == 'source'),
+            "company_information": any(bool(_source_tags(row) & {'internal', 'non-public', 'confidential'}) for row in package.get('resolved_content', {}).get('research_objects', []) if row.get('kind') == 'source'),
+        },
         "editorial_review": deepcopy(editorial),
         "missing_inputs": missing,
         "release_blocked": bool(missing),
@@ -383,6 +442,18 @@ class PublicationReleaseService:
     def _citation_label(source: Mapping[str, Any], locator: str | None, policy: Mapping[str, Any]) -> str:
         title = str(source.get("title") or source.get("name") or source.get("id") or "Source")
         canonical = str(source.get("canonical_locator") or "")
+        if policy.get('document_mode') == 'formal_report':
+            exceptions = source.get('bibliography_exceptions', {})
+            fields = ['author', 'title', 'publisher', 'publication_or_update_date']
+            missing = [key for key in fields if not str(source.get(key) or '').strip() and not (key != 'title' and str(exceptions.get(key) or '').strip())]
+            if missing:
+                raise LocalApplicationError('PUBLICATION-BIBLIOGRAPHY-MISSING', str(source.get('id')) + ': ' + ', '.join(missing))
+            bits = [str(source[key]) for key in fields if str(source.get(key) or '').strip()]
+            if locator and locator != canonical:
+                bits.append(str(locator))
+            if canonical.startswith(('http://', 'https://')) and canonical not in bits:
+                bits.append(canonical)
+            return '、'.join(bits)
         # A fragment locator refines this URL; it is not a second source URL.
         if locator and canonical.startswith(("http://", "https://")) and urldefrag(str(locator))[0] == urldefrag(canonical)[0]:
             canonical = str(locator)
@@ -430,6 +501,12 @@ class PublicationReleaseService:
                 "manuscript section count exceeds Publication bound",
             )
         known_sections = {str(row["section_id"]) for row in sections}
+        report = policy.get('formal_report')
+        formal_report = policy.get('document_mode') == 'formal_report' and isinstance(report, Mapping) and policy.get('research_group_type') in {'G', 'M'}
+        formal_outline = {}
+        if formal_report:
+            from .publication_formal_report import outline
+            formal_outline = outline(report['structure'], [str(row['section_id']) for row in sections])
         heading_by_section: dict[str, str] = {}
         for row in composition.get("sections", []):
             if not isinstance(row, Mapping):
@@ -525,6 +602,13 @@ class PublicationReleaseService:
                 else:
                     figure_count += 1
                     exhibit_numbers[exhibit_ref] = ("図" if misco else "Figure", figure_count)
+                if formal_report:
+                    scope = formal_outline[section_id]
+                    if not scope['section']:
+                        raise LocalApplicationError('PUBLICATION-FORMAL-STRUCTURE-001', 'Figure/table needs an explicit chapter and section scope')
+                    label = exhibit_numbers[exhibit_ref][0]
+                    previous = [number for previous_label, number in exhibit_numbers.values() if previous_label == label and str(number).startswith(f"{scope['chapter']}-{scope['section']}-")]
+                    exhibit_numbers[exhibit_ref] = (label, f"{scope['chapter']}-{scope['section']}-{len(previous) + 1}")
 
         def replace_token(match: re.Match[str], section_id: str) -> str:
             kind, ref = match.group(1), match.group(2)
@@ -539,6 +623,9 @@ class PublicationReleaseService:
                     return f"[unresolved citation:{ref}]"
                 if ref not in citation_numbers:
                     citation_numbers[ref] = len(citation_numbers) + 1
+                if formal_report:
+                    locators = locators_by_section_source.get((section_id, ref), [])
+                    return '（' + self._citation_label(sources[ref], '；'.join(locators) if locators else None, policy) + '）'
                 return f"[{citation_numbers[ref]}]"
             if ref not in exhibit_numbers:
                 add_issue("UNRESOLVED_CROSS_REFERENCE", ref, section_id, True)
@@ -565,7 +652,7 @@ class PublicationReleaseService:
         reference_placement = str(formal.get("reference_list_placement")) if isinstance(formal, Mapping) else "end_of_document"
         reference_heading = str(formal.get("reference_list_heading") or "References") if isinstance(formal, Mapping) else "References"
 
-        def append_reference_list(section_id: str, source_refs: list[str]) -> None:
+        def append_reference_list(section_id: str, source_refs: list[str], scope_ids: list[str] | None = None) -> None:
             if not source_refs:
                 return
             md.extend([f"### {reference_heading}", ""])
@@ -573,26 +660,42 @@ class PublicationReleaseService:
             for source_ref in source_refs:
                 number = citation_numbers[source_ref]
                 source = sources[source_ref]
-                locators = locators_by_section_source.get((section_id, source_ref), [])
-                rendered = self._citation_label(source, locators[0] if locators else None, policy)
+                locators = list(dict.fromkeys(locator for sid in (scope_ids or [section_id]) for locator in locators_by_section_source.get((sid, source_ref), [])))
+                rendered = self._citation_label(source, None if formal_report else (locators[0] if locators else None), policy)
+                if formal_report and locators:
+                    rendered += ' — ' + '；'.join(locators)
                 entry = resolve_text(f"[{number}] {rendered}", section_id)
                 md.append(entry)
                 docx_lines.append(("reference", entry))
             md.append("")
 
-        for section in sections:
+        reference_scope_ids = []
+        for section_index, section in enumerate(sections):
             sid = str(section["section_id"])
+            reference_scope_ids.append(sid)
             heading = resolve_text(heading_by_section.get(sid, sid), sid)
             content = resolve_text(str(section.get("content", "")), sid)
+            role = 'heading'
+            if formal_report:
+                entry = formal_outline[sid]
+                heading = entry['label'] + '　' + heading
+                role = 'heading' + str(entry['level'])
             md.extend([f"## {heading}", "", content, ""])
-            docx_lines.extend([("heading", heading), ("body", content)])
+            docx_lines.append((role, heading))
+            if formal_report and formal_outline[sid]['level'] in {1, 2}:
+                docx_lines.append(('body', ''))
+            for paragraph in re.split(r'\n\s*\n', content) if formal_report else [content]:
+                docx_lines.append(('body', paragraph))
             inline_citations = {match.group(2) for match in _XREF.finditer(str(section.get("content", ""))) if match.group(1) == "citation"}
             structured_citations = []
             for citation in section.get("citations", []):
                 source_ref = str(citation.get("source_ref", ""))
                 number = citation_numbers.get(source_ref)
                 if number is not None and source_ref not in inline_citations:
-                    structured_citations.append(f"[{number}]")
+                    if formal_report:
+                        structured_citations.append(self._citation_label(sources[source_ref], citation.get('locator_ref'), policy))
+                    else:
+                        structured_citations.append(f"[{number}]")
             if structured_citations:
                 marker = ("出典：" if misco else "Citations: ") + ", ".join(dict.fromkeys(structured_citations))
                 md.extend([marker, ""])
@@ -604,7 +707,7 @@ class PublicationReleaseService:
                 rendered_exhibits.add(ref)
                 exhibit = exhibits[ref]
                 label, number = exhibit_numbers[ref]
-                caption = resolve_text(f"{label} {number}. {exhibit.get('title') or ref}", sid)
+                caption = resolve_text(f"{label}{number}　{exhibit.get('title') or ref}" if formal_report else f"{label} {number}. {exhibit.get('title') or ref}", sid)
                 block = {**deepcopy(blocks[ref]), "ref": ref, "caption": caption}
                 if block["kind"] == "table":
                     block["rows"] = [[resolve_text(cell, sid) for cell in row] for row in block["rows"]]
@@ -651,7 +754,7 @@ class PublicationReleaseService:
                         content_obj = exhibit.get("content", {})
                         if content_obj.get("representation") in {"text", "markdown"}:
                             note += "\n" + str(content_obj.get("value", ""))
-                    if block["provenance"].get("citation_sources"):
+                    if block["provenance"].get("citation_sources") and not formal_report:
                         note += "\n" + "\n".join(("出典：" if misco else "Source: ") + self._citation_label(source, source.get("canonical_locator"), policy) + "; " + str(source.get("publisher_or_author") or "") + "; " + str(source.get("publication_or_update_date") or "") for source in block["provenance"]["citation_sources"])
                     block["note"] = note if exhibit.get("generated_visual") is not None else resolve_text(note, sid)
                     preview_text = "[Exact retained image is embedded in formal.docx.]\n" + block["note"]
@@ -661,10 +764,32 @@ class PublicationReleaseService:
                 else:
                     add_issue(block["code"], ref, sid, True)
                     preview_text = f"[UNAVAILABLE: {block['code']}. Preserve the source and supply a supported exact representation.]"
+                if formal_report and block['kind'] in {'image', 'table'}:
+                    citation_sources = block['provenance'].get('citation_sources', [])
+                    if citation_sources:
+                        visual_locator = exhibit.get('visual_target', {}).get('locator', {})
+                        page_locator = str(visual_locator['page']) + '頁' if 'page' in visual_locator else None
+                        block['source_text'] = '（出典）' + '；'.join(self._citation_label(source, page_locator, policy) for source in citation_sources)
+                    else:
+                        add_issue('PUBLICATION_EXHIBIT_SOURCE_MISSING', ref, sid, True)
+                        block['source_text'] = '（出典未確認）'
+                    block['explanatory_note'] = block.pop('note', '')
+                    if block['kind'] == 'image' and exhibit.get('generated_visual') is None:
+                        content_object = exhibit.get('content', {})
+                        block['explanatory_note'] = str(content_object.get('value', '')) if content_object.get('representation') in {'text', 'markdown'} else ''
                 md.extend([f"**{caption}**", "", preview_text, ""])
                 docx_lines.append(("exhibit", block))
             if reference_placement == "end_of_each_section":
-                append_reference_list(sid, citation_refs_by_section.get(sid, []))
+                if formal_report:
+                    current_scope = (formal_outline[sid]['chapter'], formal_outline[sid]['section'])
+                    next_id = str(sections[section_index + 1]['section_id']) if section_index + 1 < len(sections) else None
+                    next_scope = (formal_outline[next_id]['chapter'], formal_outline[next_id]['section']) if next_id else None
+                    if current_scope != next_scope:
+                        refs = list(dict.fromkeys(ref for id_ in reference_scope_ids for ref in citation_refs_by_section.get(id_, [])))
+                        append_reference_list(sid, refs, reference_scope_ids)
+                        reference_scope_ids = []
+                else:
+                    append_reference_list(sid, citation_refs_by_section.get(sid, []))
 
         if citation_numbers and reference_placement == "end_of_document":
             md.extend([f"## {reference_heading}", ""])
@@ -704,6 +829,8 @@ class PublicationReleaseService:
         markdown = ("\n".join(md).rstrip() + "\n").encode("utf-8")
         formal = policy.get("formal_spec_profile")
         layout = dict(formal.get("docx_layout", {})) if isinstance(formal, Mapping) else None
+        if formal_report:
+            layout['formal_document'] = True
         docx = _docx_bytes(docx_lines, layout)
         if len(markdown) + len(docx) > MAX_OUTPUT_BYTES:
             raise LocalApplicationError(
@@ -715,6 +842,14 @@ class PublicationReleaseService:
                 "APPLICATION-PUBLICATION-RENDER-001",
                 "generated DOCX failed native structure/content verification",
             )
+        if formal_report:
+            from .publication_formal_report import assemble, inspect_formal
+            docx = assemble(docx, dict(report), policy['research_group_type'], layout)
+            failures = inspect_formal(docx, dict(report), policy['research_group_type'], layout)
+            if failures:
+                raise LocalApplicationError('PUBLICATION-FORMAL-RENDER-001', '; '.join(failures))
+            if len(markdown) + len(docx) > MAX_OUTPUT_BYTES:
+                raise LocalApplicationError('APPLICATION-PUBLICATION-BOUND-001', 'Formal report outputs exceed the supported aggregate size')
         checks = {
             "citation_resolution": "failed"
             if any(item["code"] == "UNRESOLVED_CITATION" for item in issues)
@@ -728,12 +863,9 @@ class PublicationReleaseService:
             "render_verification": "failed" if blocking_issues else "passed",
             "layout_verification": "warning",
             "writing_feedback": "warning" if feedback else "passed",
-            "formal_specification": "failed" if policy.get("missing_inputs") or any(item["code"] == "PUBLICATION_FORMAL_VALUE_UNSUPPORTED" for item in issues) else "passed",
-            "editorial_qa": (
-                "warning" if not isinstance(policy.get("editorial_review"), Mapping)
-                else "failed" if any(row.get("status") == "failed" for row in policy["editorial_review"].get("checks", []))
-                else "warning" if any(row.get("status") in {"warning", "unevaluated"} for row in policy["editorial_review"].get("checks", []))
-                else "passed"
+            "formal_specification": "failed" if policy.get("missing_inputs") or any(item["code"] == "PUBLICATION_FORMAL_VALUE_UNSUPPORTED" for item in issues) else "warning" if policy.get("coverage") else "passed",
+            "editorial_qa": _editorial_status(
+                policy.get("editorial_review"), misco=misco
             ),
         }
         return markdown, docx, issues, checks
@@ -759,6 +891,8 @@ class PublicationReleaseService:
             "writing_feedback": {"WRITING_FEEDBACK_OPEN"},
             "formal_specification": {"PUBLICATION_FORMAL_INPUT_MISSING", "PUBLICATION_FORMAL_VALUE_UNSUPPORTED"},
             "editorial_qa": set(),
+            "final_pdf_machine": set(),
+            "final_pdf_human": set(),
         }
         result = []
         for check_id, status in checks.items():
@@ -963,6 +1097,12 @@ class PublicationReleaseService:
                 "APPLICATION-PUBLICATION-INTEGRITY-001",
                 "stored Publication DOCX failed structural XML verification",
             )
+        final_pdf = receipt.get('publication_policy', {}).get('final_pdf')
+        if final_pdf:
+            pdf = next((row for row in receipt['outputs'] if row.get('format') == 'pdf'), None)
+            canonical_pdf = next((row for row in manifest['outputs'] if row.get('format') == 'pdf'), None)
+            if pdf is None or canonical_pdf is None or pdf['digest'] != canonical_pdf['output_digest'] or pdf['relative_path'] != canonical_pdf['path'] or pdf['digest'] != final_pdf.get('pdf_digest'):
+                raise LocalApplicationError('APPLICATION-PUBLICATION-INTEGRITY-001', 'Publication final PDF and review/manifest binding does not verify')
         return receipt, manifest, target
 
     def build_preview(
@@ -973,7 +1113,10 @@ class PublicationReleaseService:
         inspection = inspect_inputs(self.facade, composition_id, revision_id)
         package = inspection["source_package_document"]
         profile = self._profile_pin(package)
-        policy = _publication_policy(package, profile, publication_inputs)
+        from .workspace import LocalWorkspace
+        with LocalWorkspace.open(self.workspace) as opened:
+            project_config = deepcopy(dict(opened.project_config))
+        policy = _publication_policy(package, profile, publication_inputs, project_config)
         revision = inspection["revision"]
         inspection["publication_policy"] = policy
         inspection["publication_profile"] = profile
@@ -1069,6 +1212,117 @@ class PublicationReleaseService:
             "research_state_mutation_performed": False,
         }
 
+    def finalize_pdf(self, build_id: str, input_: Mapping[str, Any]) -> Mapping[str, Any]:
+        """Import a Host-rendered PDF into a new immutable, reviewed build."""
+        from .workspace import _safe_locator
+        from .publication_pdf import inspect_pdf, coverage_review
+        from .publication_formal_report import inspect_formal
+        allowed = {'pdf_path', 'pdf_digest', 'source_docx_digest', 'project_config_digest', 'host_receipt', 'review'}
+        if not isinstance(input_, Mapping) or set(input_) != allowed:
+            raise LocalApplicationError('PUBLICATION-PDF-INPUT', 'PDF finalization requires exact output/config bindings, Host receipt and per-output review')
+        source, source_manifest, root = self._load_build(build_id)
+        policy = source.get('publication_policy', {})
+        if policy.get('document_mode') != 'formal_report' or not policy.get('coverage') or policy.get('missing_inputs') or policy.get('final_pdf'):
+            raise LocalApplicationError('PUBLICATION-PDF-INPUT', 'PDF finalization requires a complete MISCO formal-report draft under the coverage Profile')
+        self._require_current_renderer(source_manifest)
+        self._require_current_project_config(source)
+        docx = next(row for row in source['outputs'] if row['format'] == 'docx')
+        if input_['source_docx_digest'] != docx['digest'] or input_['project_config_digest'] != policy['project_config_pin']['configuration_digest']:
+            raise LocalApplicationError('PUBLICATION-PDF-BINDING', 'PDF finalization does not match the pinned DOCX and Project Config')
+        path = _safe_locator(self.workspace, str(input_['pdf_path']))
+        try:
+            if path.stat().st_size > MAX_OUTPUT_BYTES:
+                raise LocalApplicationError('PUBLICATION-PDF-INPUT', 'PDF exceeds the supported bound')
+            payload = path.read_bytes()
+        except OSError as exc:
+            raise LocalApplicationError('PUBLICATION-PDF-INPUT', 'PDF is missing or unreadable') from exc
+        if _sha(payload) != input_['pdf_digest']:
+            raise LocalApplicationError('PUBLICATION-PDF-BINDING', 'PDF digest differs from the exact input binding')
+        host = input_['host_receipt']
+        if not isinstance(host, Mapping) or set(host) != {'source_docx_digest', 'pdf_digest', 'software', 'software_version', 'fields_updated', 'page_ranges'} or host.get('source_docx_digest') != docx['digest'] or host.get('pdf_digest') != _sha(payload) or host.get('software') != 'Microsoft Word' or not str(host.get('software_version', '')).strip() or host.get('fields_updated') is not True:
+            raise LocalApplicationError('PUBLICATION-PDF-BINDING', 'Host receipt must bind the Word rendering with updated fields to these DOCX/PDF bytes')
+        native = (root / docx['relative_path']).read_bytes()
+        failures = inspect_formal(native, policy['formal_report'], policy['research_group_type'], policy['formal_spec_profile']['docx_layout'])
+        if failures:
+            raise LocalApplicationError('PUBLICATION-FORMAL-RENDER-001', '; '.join(failures))
+        with zipfile.ZipFile(io.BytesIO(native)) as archive:
+            document = ElementTree.fromstring(archive.read('word/document.xml'))
+            word_ns = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'
+            required = []
+            for paragraph in document.iter('{%s}p' % word_ns):
+                if len(list(paragraph.iter('{%s}p' % word_ns))) > 1:
+                    continue
+                texts = [t.text or '' for t in paragraph.iter('{%s}t' % word_ns)]
+                if paragraph.find('.//{%s}footnoteReference' % word_ns) is not None:
+                    required.extend(value for value in texts if value != '*')
+                else:
+                    required.append(''.join(texts))
+        required = [value for value in required if value and value != '要更新']
+        for footnote in policy['formal_report'].get('footnotes', []):
+            required.append(footnote['text'])
+        expected_parts = [node.get('{urn:research-loom:publication}part') for node in document.iter('{%s}sectPr' % word_ns)]
+        machine = inspect_pdf(payload, required_text=required, page_ranges=host['page_ranges'], expected_parts=expected_parts)
+        review = input_['review']
+        if not isinstance(review, Mapping) or set(review) != {'pdf_digest', 'reviewer_id', 'reviewed_at', 'checks', 'pages'}:
+            raise LocalApplicationError('PUBLICATION-PDF-INPUT', 'Review requires exact PDF digest, reviewer/time, checks and every page')
+        human = coverage_review(policy['coverage'], policy, review, _sha(payload), machine['page_count'])
+        key = _sha(_canonical_bytes({'source_build_digest': source['content_digest'], 'finalization': dict(input_)}))
+        final_id = 'PUBPDF-' + key.removeprefix('sha256:')[:24]
+        target = self._build_path(final_id)
+        with self._file_lock(final_id):
+            if target.exists():
+                existing, manifest, _ = self._load_build(final_id)
+                return {'status': 'VERIFIED_REUSE', 'build': existing, 'preview_manifest': manifest, 'research_state_mutation_performed': False}
+            receipt = deepcopy(source)
+            manifest = deepcopy(source_manifest)
+            receipt.update({'build_id': final_id, 'build_key_digest': key})
+            receipt['publication_policy']['final_pdf'] = {'source_build_id': build_id, 'source_build_digest': source['content_digest'], 'host_receipt': deepcopy(host), 'machine_inspection': {k: v for k, v in machine.items() if k != 'page_text'}, 'human_review': human, 'pdf_digest': _sha(payload), 'submission_status': 'not_submitted'}
+            receipt['outputs'].append({'format': 'pdf', 'relative_path': 'final.pdf', 'media_type': 'application/pdf', 'size': len(payload), 'digest': _sha(payload)})
+            receipt['verification']['final_pdf_machine'] = 'failed' if machine['problems'] else 'passed'
+            receipt['verification']['final_pdf_human'] = 'failed' if human['problems'] else 'passed'
+            receipt['verification']['formal_specification'] = 'failed' if machine['problems'] or human['problems'] else 'passed'
+            deviations = [row['check_id'] for row in human['applicability'] if row['applicable'] and row['force'] == 'should' and row['review'] and row['review']['status'] == 'warning']
+            receipt['publication_policy']['final_pdf']['documented_deviations'] = deviations
+            if deviations and receipt['verification']['formal_specification'] == 'passed':
+                receipt['verification']['formal_specification'] = 'warning'
+            receipt['verification']['editorial_qa'] = 'failed' if human['problems'] else 'passed'
+            receipt['verification']['layout_verification'] = 'failed' if machine['problems'] or human['problems'] else 'passed'
+            receipt['verification_scope'] = 'Native formal structure/styles and exact PDF size/page counts/text/fonts; individual original-clause checks and every rendered page explicitly reviewed by the named reviewer.'
+            manifest['preview_id'] = final_id
+            manifest['outputs'].append({'format': 'pdf', 'path': 'final.pdf', 'output_digest': _sha(payload), 'input_template_digest': _TEMPLATE_PIN['content_digest'], 'input_style_map_digest': _STYLE_MAP_PIN['content_digest']})
+            manifest['validation_checks'] = self._validation_checks(receipt['verification'], receipt['issues'])
+            manifest['content_digest'] = _digest(manifest, 'content_digest')
+            _validate_preview_manifest(manifest)
+            receipt['preview_manifest_digest'] = manifest['content_digest']
+            receipt['content_digest'] = _digest(receipt, 'content_digest')
+            target.parent.mkdir(parents=True, exist_ok=True)
+            staging = Path(tempfile.mkdtemp(prefix='.' + final_id + '.', dir=target.parent))
+            try:
+                for output in source['outputs']:
+                    (staging / output['relative_path']).write_bytes((root / output['relative_path']).read_bytes())
+                (staging / 'final.pdf').write_bytes(payload)
+                (staging / 'preview-manifest.json').write_bytes(_json_bytes(manifest))
+                (staging / 'build-receipt.json').write_bytes(_json_bytes(receipt))
+                os.rename(staging, target)
+            finally:
+                if staging.exists():
+                    shutil.rmtree(staging, ignore_errors=True)
+        return {'status': 'BUILT', 'build': receipt, 'preview_manifest': manifest, 'research_state_mutation_performed': False}
+
+    def _require_current_project_config(self, build: Mapping[str, Any]) -> None:
+        pin = build.get('publication_policy', {}).get('project_config_pin')
+        if not build.get('publication_policy', {}).get('coverage'):
+            return
+        from .workspace import LocalWorkspace
+        with LocalWorkspace.open(self.workspace) as opened:
+            if not pin or pin['configuration_digest'] != opened.project_config['configuration_digest']:
+                raise LocalApplicationError('PROJECT-CONFIG-STALE-001', 'Publication formal output is bound to an older Project Config')
+
+    @staticmethod
+    def _formal_output(build):
+        format_ = 'pdf' if build.get('publication_policy', {}).get('coverage') else 'docx'
+        return next((row for row in build['outputs'] if row['format'] == format_), None)
+
     @staticmethod
     def _release_checks_pass(
         build: Mapping[str, Any], preview: Mapping[str, Any]
@@ -1078,7 +1332,17 @@ class PublicationReleaseService:
         required_checks = ["citation_resolution", "exhibit_resolution", "cross_reference_resolution", "render_verification"]
         if build.get("publication_profile", {}).get("profile_id") == "misco.publication":
             required_checks.extend(["formal_specification", "editorial_qa"])
-        if any(build["verification"].get(key) != "passed" for key in required_checks):
+        if build.get('publication_policy', {}).get('coverage'):
+            required_checks.extend(['final_pdf_machine', 'final_pdf_human'])
+            if PublicationReleaseService._formal_output(build) is None:
+                return False
+        def accepted(key):
+            value = build['verification'].get(key)
+            if value == 'passed':
+                return True
+            final = build.get('publication_policy', {}).get('final_pdf', {})
+            return key == 'formal_specification' and value == 'warning' and bool(final.get('documented_deviations')) and build['verification'].get('final_pdf_machine') == 'passed' and build['verification'].get('final_pdf_human') == 'passed'
+        if any(not accepted(key) for key in required_checks):
             return False
         return not any(
             value == "failed"
@@ -1089,7 +1353,7 @@ class PublicationReleaseService:
     def _request_binding(
         self, build: Mapping[str, Any], preview: Mapping[str, Any], actor_id: str,
     ) -> dict[str, Any]:
-        formal = next(row for row in build["outputs"] if row["format"] == "docx")
+        formal = self._formal_output(build)
         return {
             "project_ref": self.facade.project_id,
             "human_actor_id": actor_id,
@@ -1102,7 +1366,7 @@ class PublicationReleaseService:
             "publication_profile": build["publication_profile"],
             "publication_policy_digest": _sha(_canonical_bytes(build.get("publication_policy", {}))),
             "output_binding": {
-                "format": "docx", "digest": formal["digest"], "size": formal["size"],
+                "format": formal['format'], "digest": formal["digest"], "size": formal["size"],
             },
             "allowed_dispositions": ["approve_release"],
             **({"required_human_review": "Inspect every rendered page, including table cells, images, captions, reference targets, layout, and the delivered Publication editorial/formal rules before approving these exact output bytes."}
@@ -1139,7 +1403,7 @@ class PublicationReleaseService:
         preview: Mapping[str, Any],
     ) -> None:
         """Verify against the independently approved build, not only self-digests."""
-        formal = next(row for row in build["outputs"] if row["format"] == "docx")
+        formal = self._formal_output(build)
         expected = {
             "schema_version": SCHEMA_VERSION,
             "object_type": "release_manifest",
@@ -1153,8 +1417,8 @@ class PublicationReleaseService:
             "publication_profile": build["publication_profile"],
             "publication_policy_digest": _sha(_canonical_bytes(build.get("publication_policy", {}))),
             "output": {
-                "relative_path": "artifact.docx",
-                "artifact_reference": f"publication/releases/{release_id}/artifact.docx",
+                "relative_path": 'artifact.' + formal['format'],
+                "artifact_reference": f"publication/releases/{release_id}/artifact." + formal['format'],
                 "media_type": formal["media_type"],
                 "size": formal["size"],
                 "digest": formal["digest"],
@@ -1287,6 +1551,7 @@ class PublicationReleaseService:
         shown = self.show_preview(build_id)
         build = shown["build"]
         preview = shown["preview_manifest"]
+        self._require_current_project_config(build)
         if not self._release_checks_pass(build, preview):
             raise LocalApplicationError(
                 "APPLICATION-PUBLICATION-RELEASE-CHECK-001",
@@ -1416,7 +1681,7 @@ class PublicationReleaseService:
                 "APPLICATION-PUBLICATION-RELEASE-DECISION-001",
                 "Publication release request is stale or bound to another build/output",
             )
-        formal = next(row for row in build["outputs"] if row["format"] == "docx")
+        formal = self._formal_output(build)
         decision_id = "PUBRELDEC-" + hashlib.sha256(
             (request["request_digest"] + str(response["actor_id"]) + str(response["disposition"])).encode("utf-8")
         ).hexdigest()[:24]
@@ -1430,9 +1695,9 @@ class PublicationReleaseService:
                 raise LocalApplicationError("APPLICATION-PUBLICATION-INTEGRITY-001", "Publication operation changed its request identity")
             target = self._checked_record_path(self.root / "releases" / release_id)
             manifest_path = self._checked_record_path(target / "release-manifest.json")
-            artifact = self._checked_record_path(target / "artifact.docx")
-            payload = (self._build_path(build_id) / "formal.docx").read_bytes()
-            if len(payload) != int(formal["size"]) or _sha(payload) != formal["digest"] or not _verify_docx_bytes(payload):
+            artifact = self._checked_record_path(target / ('artifact.' + formal['format']))
+            payload = (self._build_path(build_id) / formal['relative_path']).read_bytes()
+            if len(payload) != int(formal["size"]) or _sha(payload) != formal["digest"] or (formal['format'] == 'docx' and not _verify_docx_bytes(payload)):
                 raise LocalApplicationError(
                     "APPLICATION-PUBLICATION-INTEGRITY-001",
                     "stored Publication DOCX does not match its exact approved preview build",
@@ -1469,6 +1734,7 @@ class PublicationReleaseService:
                 self._lost_release_facts()
             else:
                 self._require_current_renderer(preview)
+                self._require_current_project_config(build)
                 decision = {
                     "decision_id": decision_id,
                     "request_id": request["request_id"],
@@ -1489,8 +1755,8 @@ class PublicationReleaseService:
                     "publication_profile": deepcopy(build["publication_profile"]),
                     "publication_policy_digest": _sha(_canonical_bytes(build.get("publication_policy", {}))),
                     "output": {
-                        "relative_path": "artifact.docx",
-                        "artifact_reference": f"publication/releases/{release_id}/artifact.docx",
+                        "relative_path": 'artifact.' + formal['format'],
+                        "artifact_reference": f"publication/releases/{release_id}/artifact." + formal['format'],
                         "media_type": formal["media_type"], "size": len(payload), "digest": _sha(payload),
                     },
                     "verification": deepcopy(build["verification"]),

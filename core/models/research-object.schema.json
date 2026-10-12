@@ -180,6 +180,9 @@
             "media_type": {"type": "string", "minLength": 1},
             "title": {"type": "string"},
             "publisher_or_author": {"type": "string"},
+            "author": {"type": "string"},
+            "publisher": {"type": "string"},
+            "bibliography_exceptions": {"type": "object", "additionalProperties": false, "properties": {"author": {"type": "string", "minLength": 1}, "publisher": {"type": "string", "minLength": 1}, "publication_or_update_date": {"type": "string", "minLength": 1}}},
             "publication_or_update_date": {"type": "string"},
             "version_or_revision": {"type": "string"}
           }

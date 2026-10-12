@@ -345,11 +345,16 @@ def build_parser() -> argparse.ArgumentParser:
     _add_workspace(publication_preview)
     publication_preview.add_argument("--composition-id", required=True)
     publication_preview.add_argument("--revision-id")
+    publication_preview.add_argument("--publication-input", help="JSON Publication inputs, including document mode and explicit review")
     _add_output_json(publication_preview)
     publication_show = publication_sub.add_parser("show")
     _add_workspace(publication_show)
     publication_show.add_argument("--build-id", required=True)
     _add_output_json(publication_show)
+    publication_finalize = publication_sub.add_parser('finalize-pdf')
+    _add_workspace(publication_finalize)
+    publication_finalize.add_argument('--build-id', required=True)
+    _add_input_json(publication_finalize)
     publication_release_request = publication_sub.add_parser("release-request")
     _add_workspace(publication_release_request)
     publication_release_request.add_argument("--build-id", required=True)
@@ -702,9 +707,11 @@ def _run(args: argparse.Namespace) -> Mapping[str, Any]:
             return facade.evaluate_research_quality(_read_input(args.json_input))
         if args.command == "publication":
             if args.publication_command == "preview":
-                return facade.build_publication_preview(args.composition_id, args.revision_id)
+                return facade.build_publication_preview(args.composition_id, args.revision_id, _read_input(args.publication_input) if args.publication_input else None)
             if args.publication_command == "show":
                 return facade.show_publication_preview(args.build_id)
+            if args.publication_command == 'finalize-pdf':
+                return facade.finalize_publication_pdf(args.build_id, _read_input(args.json_input))
             if args.publication_command == "release-request":
                 return facade.request_publication_release(args.build_id, args.actor_id, renewal_of=args.renewal_of)
             if args.publication_command == "release":
