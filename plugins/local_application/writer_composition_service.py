@@ -123,9 +123,22 @@ def _writer_profile_delivery(package: Mapping[str, Any]) -> Mapping[str, Any] | 
         items = body.get("items") if isinstance(body, Mapping) else None
         if not isinstance(items, list):
             raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-PROFILE-001", "WRITER_RULES resource has no item inventory")
+        review_version = body.get("review_contract_version")
+        if review_version is not None and review_version != "1.0.0":
+            raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-PROFILE-001", "unsupported Writer rule review contract")
         for item in items:
             if not isinstance(item, Mapping) or not isinstance(item.get("id"), str) or not isinstance(item.get("class"), str):
                 raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-PROFILE-001", "WRITER_RULES item inventory is malformed")
+            if review_version is not None:
+                review = item.get("review")
+                if (
+                    not isinstance(review, Mapping)
+                    or review.get("check_kind") not in {"structural", "semantic", "editorial"}
+                    or review.get("scope") not in {"section", "document"}
+                    or review.get("normativity") not in {"required", "recommendation", "source_defined"}
+                    or any(not isinstance(review.get(key), str) or not review[key].strip() for key in ("applicability", "violation_action"))
+                ):
+                    raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-PROFILE-001", "Writer rule review metadata is malformed")
             rule_id = str(item["id"]); rule_class = str(item["class"])
             if rule_id in seen_rule_ids:
                 raise LocalApplicationError("APPLICATION-WRITER-COMPOSITION-PROFILE-001", f"duplicate Writer rule identity: {rule_id}")

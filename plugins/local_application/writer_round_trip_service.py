@@ -569,6 +569,7 @@ class WriterRoundTripService:
     @staticmethod
     def _validate_profile_review(draft: Mapping[str, Any], scope: Mapping[str, Any]) -> set[str]:
         plan = WriterRoundTripService._writer_review_plan(scope)
+        metadata = WriterRoundTripService._writer_rule_metadata(scope)
         reviews = draft.get("profile_review", [])
         if not plan:
             if reviews:
@@ -597,6 +598,8 @@ class WriterRoundTripService:
             if not violated_rule_ids <= expected_rule_ids:
                 raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-PROFILE-REVIEW-001", f"Writer Profile review names unavailable rules for {review_id}")
             outcome = str(row.get("outcome"))
+            if metadata:
+                WriterRoundTripService._validate_rule_results(row, expected_rule_ids, metadata)
             if outcome in {"violation", "mixed"}:
                 if not violated_rule_ids:
                     raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-PROFILE-REVIEW-001", f"Writer Profile review {review_id} reports a violation without rule IDs")
@@ -604,6 +607,67 @@ class WriterRoundTripService:
             elif violated_rule_ids:
                 raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-PROFILE-REVIEW-001", f"Writer Profile review {review_id} lists violated rules for non-violation outcome")
         return violations
+
+    @staticmethod
+    def _writer_rule_metadata(scope: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
+        delivery = scope.get("section_input", {}).get("writer_profile", {})
+        result = {}
+        for resource in delivery.get("resources", []):
+            if resource.get("role") != "WRITER_RULES":
+                continue
+            body = json.loads(resource["content"])
+            if body.get("review_contract_version") != "1.0.0":
+                continue
+            for item in body["items"]:
+                result[item["id"]] = item["review"]
+        return result
+
+    @staticmethod
+    def _validate_rule_results(row: Mapping[str, Any], expected_rule_ids: set[str], metadata: Mapping[str, Mapping[str, Any]]) -> None:
+        def refuse(message: str) -> None:
+            raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-PROFILE-REVIEW-001", message)
+
+        results = row.get("rule_results", [])
+        by_id = {item["rule_id"]: item for item in results}
+        if len(by_id) != len(results) or set(by_id) != expected_rule_ids:
+            refuse("Writer rule results must cover exact delivered IDs once")
+        violations = set()
+        outcomes = set()
+        for rule_id, item in by_id.items():
+            review = metadata.get(rule_id)
+            outcome = item["outcome"]
+            outcomes.add(outcome)
+            if not item["rationale"].strip():
+                refuse("Writer rule result needs a content-based rationale")
+            if outcome == "violation":
+                violations.add(rule_id)
+            if review is None:
+                continue
+            if outcome == "not_applicable":
+                if item["applicability"] != "not_applicable" or item["method"] != review["check_kind"]:
+                    refuse("Writer N/A needs evaluated non-applicability and the rule's review method")
+            elif outcome != "unevaluated":
+                if item["applicability"] != "applicable" or item["method"] != review["check_kind"]:
+                    refuse("Writer result cannot replace semantic/editorial review with structural presence")
+            elif item["method"] != "unevaluated":
+                refuse("Unevaluated Writer result must identify its unperformed review")
+            if review["scope"] == "document" and outcome not in {"unevaluated", "not_applicable"}:
+                refuse("Section review cannot establish a document-scoped result")
+        if violations != set(row.get("violated_rule_ids", [])):
+            refuse("Group violations must match rule results")
+        group = row["outcome"]
+        if group == "not_applicable" and outcomes != {"not_applicable"}:
+            refuse("Group N/A requires every rule to be non-applicable")
+        if group == "conformant" and not outcomes <= {"conformant", "not_applicable"}:
+            refuse("Unevaluated or violated rules cannot become group conformance")
+        if group == "conformant" and outcomes == {"not_applicable"}:
+            refuse("All-N/A review cannot become conformance")
+        if group in {"violation", "mixed"} and not violations:
+            refuse("Group violation requires a violated rule result")
+        if group == "mixed" and not outcomes.intersection({"conformant", "not_applicable"}):
+            refuse("Mixed group requires both violated and conformant or non-applicable rules")
+        if group == "unevaluated" and violations:
+            refuse("Group unevaluated cannot conceal declared violations")
 
     def _validate_response_semantics(self, response: Mapping[str, Any], receipt: Mapping[str, Any], package: Mapping[str, Any]) -> None:
         section_scope = {str(row["section_id"]): row for row in receipt["sections"]}
@@ -632,6 +696,15 @@ class WriterRoundTripService:
                     raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-REFERENCE-001", f"Writer response citation Source is unavailable: {source}")
                 if locator is not None and str(locator) not in citation_scope[source]:
                     raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-REFERENCE-001", f"Writer response citation locator is unavailable: {locator}")
+            if self._writer_rule_metadata(scope):
+                citations = draft.get("citations", [])
+                for required in scope["section_input"]["section_contract"].get("citation_requirements", []):
+                    if not any(
+                        item["source_ref"] == required["source_ref"]
+                        and (required.get("locator_ref") is None or item.get("locator_ref") == required["locator_ref"])
+                        for item in citations
+                    ):
+                        raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-REFERENCE-001", "Writer response omits an explicitly required citation: " + str(required["source_ref"]))
             violations_by_section[section_id] = self._validate_profile_review(draft, scope)
         known_refs = self._known_package_refs(package)
         feedback_rule_ids_by_section: dict[str, set[str]] = {}

@@ -88,6 +88,12 @@ are `PROFILE-NARRATIVE-IDENTITY-001`, never last-write-wins. Dangling stage refe
 
 ## Executable specification
 
+The opt-in MISCO Writer 1.2.0 review classification and content-based
+section/document scope are defined in [Writer rule adoption](writer-rule-adoption.md).
+They use the existing Narrative/Writer resources and eight review groups.
+Section routing and exact references do not establish document meaning or
+adopt a research judgment.
+
 The synthetic generic Narrative Profile demonstrates a reusable framing → formation → validation branch with separate synthesis and implication successors. The branch intentionally leaves synthesis and implication unordered to exercise partial-order semantics rather than a total chapter order.
 
 Fixture-only projection cases verify that:

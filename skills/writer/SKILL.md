@@ -31,7 +31,7 @@ A section input may contain `writer_profile`. If it is absent, do not invent Pro
 
 - use the exact `profile_pins`; do not select or compose another Profile version;
 - read every delivered `WRITER_*` resource from the input itself;
-- `WRITER_RULES` supplies the approved rule inventory; `WRITER_SOURCE_DOCUMENTS` supplies the approved Layer A source text referenced by each rule's `source.path` / `locator`;
+- `WRITER_RULES` supplies the selected rule inventory; `WRITER_SOURCE_DOCUMENTS` supplies text referenced by each rule's `source.path` / `locator` and `additional_sources`. Preserve each source's authority: adopted design additions are not original approved Layer A clauses;
 - only the exact IDs in `WRITER_RULES` / `review_plan` are Writer requirements. Each source document lists its `writer_rule_ids`; other clauses that happen to share the same approved source file are context, not additional Writer policy;
 - do not fetch rule text from legacy storage or the network;
 - synthetic few-shot material and Layer B/C audit/review support are not runtime instructions and must not appear in the delivered resources;

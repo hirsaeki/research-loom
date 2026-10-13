@@ -10,6 +10,14 @@ The generic fixture under `../fixtures/narrative/` is synthetic. It demonstrates
 
 ## Production MISCO Writer delivery
 
+`misco/1.2.0/profile.json` is an opt-in version with the same eight review
+groups and 127 IDs. It delivers structural/semantic/editorial classification,
+section/document scope and explicitly adopted design source text. Select
+`misco.writer` version `1.2.0` through normal Profile resolution with that
+manifest; no Workspace or project default is migrated. The unchanged 1.1.0
+manifest remains selectable. See `docs/architecture/writer-rule-adoption.md`
+for correspondence, provenance and the #465/#466/#457 boundaries.
+
 `misco/profile.json` is the production migration carrier for Human-approved MISCO Writer/Narrative clean rules. Version `1.1.0` also carries the normalized UTF-8 content of the eight approved Layer A source documents referenced by its 127 Writer runtime items, so a detached host can review the real rule text without reading the legacy tree. `WRITER_RULES` remains the rule inventory; `WRITER_SOURCE_DOCUMENTS` is source text, not a second rule identity set.
 
 The Profile instantiates only the minimum semantic stage/dependency/purpose/preservation definitions already required by the canonical Research Package boundary; it does not import literal chapters, project Attention, research methods, or synthetic fixture defaults. Synthetic few-shot material and Layer B/C audit/review material remain excluded from runtime delivery. Section Writer input projects the exact Writer Profile pins, both verified resources, and a review plan covering all delivered rule IDs by responsibility class. An import that declares a Profile-rule violation must route the exact violated IDs through section-targeted Writing Feedback; import success itself is not an editorial PASS. Research validity, causal support, adoption, and authoritative-state mutation remain upstream Research/Human responsibilities.
