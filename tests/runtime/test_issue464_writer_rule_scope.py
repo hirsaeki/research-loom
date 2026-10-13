@@ -155,6 +155,19 @@ class Issue464WriterRuleScopeTests(ResearchPackageAcceptanceSupport):
                 item.update(outcome='not_applicable', applicability='not_applicable', method='semantic',
                             rationale='Synthetic definition-only fragment contains no relevant terminology transformation.')
             WriterRoundTripService._validate_profile_review(valid, scope)
+            mixed = deepcopy(valid)
+            row = next(r for r in mixed['profile_review'] if r['review_id'] == 'writer-terminology')
+            row['outcome'] = 'mixed'
+            row['violated_rule_ids'] = list(row['rule_ids'])
+            for item in row['rule_results']:
+                item.update(outcome='violation', applicability='applicable', method='semantic',
+                            rationale='Synthetic terminology review found an internal term in every rule target.')
+            with self.assertRaisesRegex(LocalApplicationError, 'Mixed group requires both'):
+                WriterRoundTripService._validate_profile_review(mixed, scope)
+            retained = row['rule_results'][0]
+            retained.update(outcome='conformant', rationale='This terminology rule was evaluated and satisfied.')
+            row['violated_rule_ids'].remove(retained['rule_id'])
+            WriterRoundTripService._validate_profile_review(mixed, scope)
         finally:
             facade.close()
 

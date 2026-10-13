@@ -664,6 +664,8 @@ class WriterRoundTripService:
             refuse("All-N/A review cannot become conformance")
         if group in {"violation", "mixed"} and not violations:
             refuse("Group violation requires a violated rule result")
+        if group == "mixed" and not outcomes.intersection({"conformant", "not_applicable"}):
+            refuse("Mixed group requires both violated and conformant or non-applicable rules")
         if group == "unevaluated" and violations:
             refuse("Group unevaluated cannot conceal declared violations")
 
