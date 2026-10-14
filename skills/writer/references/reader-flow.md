@@ -40,6 +40,13 @@ Preserve numeric direction, certainty, scope, counterresults and qualifications
 that change the decision near the relevant claim. Remove redundant defensive
 commentary without weakening the answer. Necessary provenance may remain in
 citations, notes or appendices; do not hide important contrary results there.
+Keep decision-changing qualifications concise beside the relevant claim. Place
+detailed study-design explanations, synthetic-material notices and repeated
+caveats in clearly linked notes where the supplied format permits, preserving
+their content and provenance. Let the body advance from findings to the choice;
+do not repeat a disclaimer at each transition. A reader who skips the notes must
+still understand what is proposed, what remains unmeasured and which conditions
+the action must retain. An unknown effect is not an absence of effect.
 New causal, classification or normative judgments return through existing
 section-targeted Writing Feedback. Inspect existing input connections before
 requesting new research.
