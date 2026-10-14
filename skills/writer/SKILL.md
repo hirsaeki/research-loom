@@ -6,7 +6,7 @@ Use this Skill only after Research has produced a fixed Research Package and a W
 
 1. Export the selected sections with `writer-round-trip export-input` (or the equivalent public Facade operation).
 2. Read only the detached `writer-input.json` and its embedded section inputs. Do not inspect private SQLite state, hidden workspace stores, or the legacy `research-profile/` tree to recover missing rules.
-3. Draft each requested section from the supplied research objects/materials, citation scope, unresolved gaps, Narrative constraints, and communication brief.
+3. Draft each requested section from the supplied research objects/materials, citation scope, unresolved gaps, Narrative constraints, and communication brief. Apply `references/reader-flow.md` to give the reader a reason to begin, an advancing understanding through the middle, and a useful answer at the end.
 4. Return a `writer_response` that matches `core/packages/writer-publication/writer-round-trip.schema.json`.
 5. Import through `writer-round-trip import-response`. Treat an imported manuscript revision as an immutable writing artifact, not as research adoption or publication approval.
 
@@ -69,3 +69,6 @@ If a figure/table would clarify supplied meaning, return to the Host's existing 
 When revising one section, base the response on the exact current manuscript revision and return only the changed section. The round-trip service reuses unchanged sections from that exact base; never recreate or silently rewrite them.
 
 See `references/detached-input.md` for the expected detached-input boundary.
+
+See `../../docs/acceptance/writer-reader-quality/comparison.md` for the bounded
+synthetic trial, preserved first outputs and remaining reader-evaluation limits.

@@ -1,0 +1,630 @@
+{
+  "acquisition_bundle": {
+    "artifact_id": "11882684575",
+    "artifact_zip_sha256": "e4c452dd2d5694ad0f66330c9e2ecbde5ae90321540f885412eabd77881de792",
+    "attempt": 1,
+    "full_history_verified": true,
+    "part": {
+      "byte_length": 3456274,
+      "name": "repo.bundle.part-00",
+      "sha256": "65faa505e47ca536225bf1e96b5087a481532184457f4590002503ccf458f40d"
+    },
+    "request_issue": "#469",
+    "run_id": "38542955982",
+    "source_head": "861367bebd07f10f38f1d743bac00cb0e2a91bf8",
+    "source_observation": "parent-provided verified acquisition record"
+  },
+  "authority": "SYNTHETIC_TEST_ONLY",
+  "bootstrap": {
+    "base_head": "861367bebd07f10f38f1d743bac00cb0e2a91bf8",
+    "cases_path": "D:\\wsroot\\scratch\\issue465-467-20261014\\docs\\acceptance\\writer-reader-quality\\cases.json",
+    "cases_sha256": "8f660f45ff9f5b0f2094cd7a1fc33b9e845a7f8a78f5fcc7d11b93438bdbb1a0",
+    "effective_profile_set_digest": "sha256:8c30df04bf31dd12f222fe0b53b9e57ae47ca1df49d9c644daf599f4e47e638e",
+    "production_human_decision_performed": false,
+    "repo_root": "D:\\wsroot\\scratch\\issue465-467-20261014",
+    "writer_profile": {
+      "manifest_sha256": "83503fd9bf27e228f43ac218e0b942ca852b021dbfea33a9cd8f097da8096752",
+      "profile_id": "misco.writer",
+      "profile_version": "1.2.0"
+    }
+  },
+  "cases": [
+    {
+      "authority_boundary": {
+        "evidence_verification_performed": false,
+        "finding_adoption_performed": false,
+        "recommendation_adoption_performed": false,
+        "research_state_mutation_performed": false
+      },
+      "baseline_prose": {
+        "byte_length": 6183,
+        "path": "D:\\wsroot\\scratch\\issue465-467-20261014\\docs\\acceptance\\writer-reader-quality\\outputs\\baseline\\synthetic-diagnostic-duplicate-entry-v1.json",
+        "preserved_copy_path": "D:\\wsroot\\scratch\\writer-reader-quality-run-20261014-v5\\writer-prose\\synthetic-diagnostic-duplicate-entry-v1\\8a1a20165dbc7a8ee6ff55b5bed4fad6a76092a75275166789220c1bc602d07d.json",
+        "sha256": "8a1a20165dbc7a8ee6ff55b5bed4fad6a76092a75275166789220c1bc602d07d"
+      },
+      "case_id": "synthetic-diagnostic-duplicate-entry-v1",
+      "import": {
+        "receipt_path": "D:\\wsroot\\scratch\\writer-reader-quality-run-20261014-v5\\receipts\\synthetic-diagnostic-duplicate-entry-v1\\response-bbab92ceb514-imported-import-001.json",
+        "research_state_mutation_performed": false,
+        "revision_ref": {
+          "revision_digest": "sha256:4884143001e57761676827ad7d1c7e2b433f95d7d532108d852c8441dc279c3a",
+          "revision_id": "WMR-c554b91654d102c14a8a0258-6ef0645848c9400fb4ba001dac984459",
+          "revision_number": 1
+        },
+        "status": "IMPORTED"
+      },
+      "inspection": {
+        "receipt_path": "D:\\wsroot\\scratch\\writer-reader-quality-run-20261014-v5\\receipts\\synthetic-diagnostic-duplicate-entry-v1\\inspection-001.json",
+        "research_snapshot_execution_mode": "virtual",
+        "revision_ref": {
+          "revision_digest": "sha256:4884143001e57761676827ad7d1c7e2b433f95d7d532108d852c8441dc279c3a",
+          "revision_id": "WMR-c554b91654d102c14a8a0258-6ef0645848c9400fb4ba001dac984459",
+          "revision_number": 1
+        },
+        "status": "OK"
+      },
+      "profile_review": {
+        "group_count": 32,
+        "group_outcomes": {
+          "unevaluated": 32
+        },
+        "rule_outcomes": {
+          "unevaluated": 508
+        },
+        "rule_result_count": 508,
+        "semantic_evaluation": "not performed"
+      },
+      "replays": [],
+      "revised_first_output": {
+        "byte_length": 4528,
+        "path": "D:\\wsroot\\scratch\\issue465-467-20261014\\docs\\acceptance\\writer-reader-quality\\outputs\\revised\\synthetic-diagnostic-duplicate-entry-v1.json",
+        "section_ids": [
+          "SEC-FRAMING",
+          "SEC-METHOD",
+          "SEC-RESULTS",
+          "SEC-IMPLICATION"
+        ],
+        "sha256": "17407b2198049dad57ec5ceb1dd52c8d9aec738a4f210b1426dff6a418c11fc3"
+      },
+      "revised_full_import": {
+        "import": {
+          "receipt_path": "D:\\wsroot\\scratch\\writer-reader-quality-run-20261014-v5\\receipts\\synthetic-diagnostic-duplicate-entry-v1\\response-f1a1b4b075b5-imported-import-001.json",
+          "research_state_mutation_performed": false,
+          "reused_section_ids": [],
+          "revision_ref": {
+            "revision_digest": "sha256:45242cf8aa887d6c5947bb92a737ba473a234e4096c323aae2b948093da9a8ef",
+            "revision_id": "WMR-a6b4af5613556642c2fc4039-251ca7e17aab429896ddbec761f6c693",
+            "revision_number": 2
+          },
+          "status": "IMPORTED"
+        },
+        "inspection": {
+          "receipt_path": "D:\\wsroot\\scratch\\writer-reader-quality-run-20261014-v5\\receipts\\synthetic-diagnostic-duplicate-entry-v1\\inspection-002.json",
+          "research_state_mutation_performed": false,
+          "revision_ref": {
+            "revision_digest": "sha256:45242cf8aa887d6c5947bb92a737ba473a234e4096c323aae2b948093da9a8ef",
+            "revision_id": "WMR-a6b4af5613556642c2fc4039-251ca7e17aab429896ddbec761f6c693",
+            "revision_number": 2
+          },
+          "status": "OK"
+        },
+        "profile_review": "all delivered rules marked unevaluated; no semantic review performed",
+        "prose_sha256": "17407b2198049dad57ec5ceb1dd52c8d9aec738a4f210b1426dff6a418c11fc3",
+        "transport_base_revision_ref": {
+          "revision_digest": "sha256:4884143001e57761676827ad7d1c7e2b433f95d7d532108d852c8441dc279c3a",
+          "revision_id": "WMR-c554b91654d102c14a8a0258-6ef0645848c9400fb4ba001dac984459"
+        },
+        "writer_response": {
+          "path": "D:\\wsroot\\scratch\\writer-reader-quality-run-20261014-v5\\writer-responses\\synthetic-diagnostic-duplicate-entry-v1\\f1a1b4b075b58c93ab85fbedc7d7015cb1b25957f81a98ff588896be9c1167ea.json",
+          "prose_content_modified": false,
+          "response_id": "WR-9cc8093e40d9491e0bdd",
+          "semantic_review_performed": false,
+          "sha256": "f1a1b4b075b58c93ab85fbedc7d7015cb1b25957f81a98ff588896be9c1167ea",
+          "wrap_receipt_path": "D:\\wsroot\\scratch\\writer-reader-quality-run-20261014-v5\\receipts\\synthetic-diagnostic-duplicate-entry-v1\\wrap-f1a1b4b075b5-001.json"
+        }
+      },
+      "revised_no_base_attempt": {
+        "error": "Writer response must be based on the exact current manuscript revision",
+        "error_code": "APPLICATION-WRITER-ROUND-TRIP-STALE-001",
+        "interpretation": "public importer required a response based on the exact current manuscript revision; the supplied revised prose was then imported with that transport binding",
+        "receipt_path": "D:\\wsroot\\scratch\\writer-reader-quality-run-20261014-v5\\receipts\\synthetic-diagnostic-duplicate-entry-v1\\response-d6efceca3f43-failure-001.json",
+        "response_sha256": "d6efceca3f43e2f6a775fa3c2cb2170610124ee5c88ae9672960f14cd0813b45",
+        "status": "FAILED"
+      },
+      "source_status_flags": {
+        "authoritative_research_freeze": false,
+        "composition_digest": "sha256:5f33734cdcc18f4d2c6fffc690d504e0dceec056b2946df07c99f3c387fef759",
+        "composition_id": "COMP-9a814e2c2ce145bebd096fde9bd9ca7e",
+        "composition_version": 1,
+        "effective_profile_set_digest": "sha256:8c30df04bf31dd12f222fe0b53b9e57ae47ca1df49d9c644daf599f4e47e638e",
+        "effective_profile_set_ref": "EPS-1",
+        "lineage_ref": "LIN-1",
+        "package_mode": "preview",
+        "preview_only": true,
+        "project_id": "PRJ-WRQ-DUP",
+        "release_eligible": false,
+        "research_package_digest": "sha256:342f6a1c2ccec4d9e0b1b5b0a2f2353a5982ec5d94a3d531c8fe75030be0bf8b",
+        "research_package_id": "RP-edaae3a17e8641e0bcf6c015b5bdd77b",
+        "research_snapshot_digest": "sha256:35163e91c53de0f44119994209d20f397551f3c87fa6d7c2d6d4ec282537578a",
+        "research_snapshot_id": "SNP-WRQ-DUP",
+        "source_epistemic_status": "SYNTHETIC_TEST_ONLY"
+      },
+      "writer_input": {
+        "file_sha256": "adf059271be9b7ac3070ecaa2ec6a4c08bf5e580a6ee5332b4b94690b75eae39",
+        "input_digest": "sha256:8fd7f15c3e12e5cfa5425da6027f165b8028b46ba9979bacd48e7d5734e4c548",
+        "input_id": "WRI-df69e6ba976925c2d80af053",
+        "path": "D:\\wsroot\\scratch\\writer-reader-quality-run-20261014-v5\\inputs\\synthetic-diagnostic-duplicate-entry-v1\\writer-input.json"
+      },
+      "writer_response": {
+        "path": "D:\\wsroot\\scratch\\writer-reader-quality-run-20261014-v5\\writer-responses\\synthetic-diagnostic-duplicate-entry-v1\\bbab92ceb5143a09089ea12e111215fb3d6dc93bf457e8a2491103b107f9a755.json",
+        "prose_content_modified": false,
+        "response_id": "WR-5b1eb9b8730e367595b3",
+        "semantic_review_performed": false,
+        "sha256": "bbab92ceb5143a09089ea12e111215fb3d6dc93bf457e8a2491103b107f9a755",
+        "wrap_receipt": "D:\\wsroot\\scratch\\writer-reader-quality-run-20261014-v5\\receipts\\synthetic-diagnostic-duplicate-entry-v1\\wrap-bbab92ceb514-001.json"
+      }
+    },
+    {
+      "authority_boundary": {
+        "evidence_verification_performed": false,
+        "finding_adoption_performed": false,
+        "recommendation_adoption_performed": false,
+        "research_state_mutation_performed": false
+      },
+      "baseline_prose": {
+        "byte_length": 5457,
+        "path": "D:\\wsroot\\scratch\\issue465-467-20261014\\docs\\acceptance\\writer-reader-quality\\outputs\\baseline\\synthetic-concept-flexible-hours-v1.json",
+        "preserved_copy_path": "D:\\wsroot\\scratch\\writer-reader-quality-run-20261014-v5\\writer-prose\\synthetic-concept-flexible-hours-v1\\46fc975e0c52bed04fe8512ebe349ec693edd60504851715fd85848cd633fd72.json",
+        "sha256": "46fc975e0c52bed04fe8512ebe349ec693edd60504851715fd85848cd633fd72"
+      },
+      "case_id": "synthetic-concept-flexible-hours-v1",
+      "import": {
+        "receipt_path": "D:\\wsroot\\scratch\\writer-reader-quality-run-20261014-v5\\receipts\\synthetic-concept-flexible-hours-v1\\response-06b2f349d179-imported-import-001.json",
+        "research_state_mutation_performed": false,
+        "revision_ref": {
+          "revision_digest": "sha256:91ef3bc283fe47c14713b11b0575f1d46196c1dd752837483161bbc80a0cb494",
+          "revision_id": "WMR-ff0bd546ff83ed4cd912f947-31826149e998445d8ae43ed30eecdead",
+          "revision_number": 1
+        },
+        "status": "IMPORTED"
+      },
+      "inspection": {
+        "receipt_path": "D:\\wsroot\\scratch\\writer-reader-quality-run-20261014-v5\\receipts\\synthetic-concept-flexible-hours-v1\\inspection-001.json",
+        "research_snapshot_execution_mode": "virtual",
+        "revision_ref": {
+          "revision_digest": "sha256:91ef3bc283fe47c14713b11b0575f1d46196c1dd752837483161bbc80a0cb494",
+          "revision_id": "WMR-ff0bd546ff83ed4cd912f947-31826149e998445d8ae43ed30eecdead",
+          "revision_number": 1
+        },
+        "status": "OK"
+      },
+      "profile_review": {
+        "group_count": 32,
+        "group_outcomes": {
+          "unevaluated": 32
+        },
+        "rule_outcomes": {
+          "unevaluated": 508
+        },
+        "rule_result_count": 508,
+        "semantic_evaluation": "not performed"
+      },
+      "replays": [],
+      "revised_first_output": {
+        "byte_length": 4114,
+        "path": "D:\\wsroot\\scratch\\issue465-467-20261014\\docs\\acceptance\\writer-reader-quality\\outputs\\revised\\synthetic-concept-flexible-hours-v1.json",
+        "section_ids": [
+          "SEC-FRAMING",
+          "SEC-METHOD",
+          "SEC-RESULTS",
+          "SEC-IMPLICATION"
+        ],
+        "sha256": "2c42ceb523534b2d5c25c12a3ea451576b16708b427a36c7e01e7362e570b0af"
+      },
+      "revised_full_import": {
+        "import": {
+          "receipt_path": "D:\\wsroot\\scratch\\writer-reader-quality-run-20261014-v5\\receipts\\synthetic-concept-flexible-hours-v1\\response-4fefed52d25f-imported-import-001.json",
+          "research_state_mutation_performed": false,
+          "reused_section_ids": [],
+          "revision_ref": {
+            "revision_digest": "sha256:99ffbac7560ddb1cdaafd605dd38e1d9aea2bed7086057957ec9a7b8b87fbe30",
+            "revision_id": "WMR-68f03d3c1f2e7a639a6a4a54-280d9bf38fb743a3a7cf1f77371eb568",
+            "revision_number": 2
+          },
+          "status": "IMPORTED"
+        },
+        "inspection": {
+          "receipt_path": "D:\\wsroot\\scratch\\writer-reader-quality-run-20261014-v5\\receipts\\synthetic-concept-flexible-hours-v1\\inspection-002.json",
+          "research_state_mutation_performed": false,
+          "revision_ref": {
+            "revision_digest": "sha256:99ffbac7560ddb1cdaafd605dd38e1d9aea2bed7086057957ec9a7b8b87fbe30",
+            "revision_id": "WMR-68f03d3c1f2e7a639a6a4a54-280d9bf38fb743a3a7cf1f77371eb568",
+            "revision_number": 2
+          },
+          "status": "OK"
+        },
+        "profile_review": "all delivered rules marked unevaluated; no semantic review performed",
+        "prose_sha256": "2c42ceb523534b2d5c25c12a3ea451576b16708b427a36c7e01e7362e570b0af",
+        "transport_base_revision_ref": {
+          "revision_digest": "sha256:91ef3bc283fe47c14713b11b0575f1d46196c1dd752837483161bbc80a0cb494",
+          "revision_id": "WMR-ff0bd546ff83ed4cd912f947-31826149e998445d8ae43ed30eecdead"
+        },
+        "writer_response": {
+          "path": "D:\\wsroot\\scratch\\writer-reader-quality-run-20261014-v5\\writer-responses\\synthetic-concept-flexible-hours-v1\\4fefed52d25f878f5201aa5405195b553acf9fe18691194659192583b476d6dc.json",
+          "prose_content_modified": false,
+          "response_id": "WR-945e1ed1dd95e916b95f",
+          "semantic_review_performed": false,
+          "sha256": "4fefed52d25f878f5201aa5405195b553acf9fe18691194659192583b476d6dc",
+          "wrap_receipt_path": "D:\\wsroot\\scratch\\writer-reader-quality-run-20261014-v5\\receipts\\synthetic-concept-flexible-hours-v1\\wrap-4fefed52d25f-001.json"
+        }
+      },
+      "source_status_flags": {
+        "authoritative_research_freeze": false,
+        "composition_digest": "sha256:52d046767938443c6958868f4f63f53b237dffb33569f32282a8609e93f4af87",
+        "composition_id": "COMP-85a57ecea93442fa89f4fd8e95be888b",
+        "composition_version": 1,
+        "effective_profile_set_digest": "sha256:8c30df04bf31dd12f222fe0b53b9e57ae47ca1df49d9c644daf599f4e47e638e",
+        "effective_profile_set_ref": "EPS-1",
+        "lineage_ref": "LIN-1",
+        "package_mode": "preview",
+        "preview_only": true,
+        "project_id": "PRJ-WRQ-CONCEPT",
+        "release_eligible": false,
+        "research_package_digest": "sha256:f1b3445549e6eba5ad7f505a33e017c7dc88fcfbe9e0170872e95a2bd963eb64",
+        "research_package_id": "RP-df2eaec8fd0940b7a2eab679d32ff1a3",
+        "research_snapshot_digest": "sha256:522675f11041afd09c2e7ddccbcdb5e388603e7f1b9f7c6147e524868ac9e8ff",
+        "research_snapshot_id": "SNP-WRQ-CONCEPT",
+        "source_epistemic_status": "SYNTHETIC_TEST_ONLY"
+      },
+      "writer_input": {
+        "file_sha256": "172f7d794bb8301f8cfd20da4ced0af4a5f394df240ec7b7ac7f6d466d402a92",
+        "input_digest": "sha256:ef655ba328def75aad38b3578b12927b49142a000bad78240bae498413188b34",
+        "input_id": "WRI-1a534cc9c98b1e1e7eb0fe07",
+        "path": "D:\\wsroot\\scratch\\writer-reader-quality-run-20261014-v5\\inputs\\synthetic-concept-flexible-hours-v1\\writer-input.json"
+      },
+      "writer_response": {
+        "path": "D:\\wsroot\\scratch\\writer-reader-quality-run-20261014-v5\\writer-responses\\synthetic-concept-flexible-hours-v1\\06b2f349d179fbe7da8c2f17e29de0ae9320c043ecf774d261c355125da7133b.json",
+        "prose_content_modified": false,
+        "response_id": "WR-7156998d7afc48d13a6e",
+        "semantic_review_performed": false,
+        "sha256": "06b2f349d179fbe7da8c2f17e29de0ae9320c043ecf774d261c355125da7133b",
+        "wrap_receipt": "D:\\wsroot\\scratch\\writer-reader-quality-run-20261014-v5\\receipts\\synthetic-concept-flexible-hours-v1\\wrap-06b2f349d179-001.json"
+      }
+    },
+    {
+      "authority_boundary": {
+        "evidence_verification_performed": false,
+        "finding_adoption_performed": false,
+        "recommendation_adoption_performed": false,
+        "research_state_mutation_performed": false
+      },
+      "baseline_prose": {
+        "byte_length": 5684,
+        "path": "D:\\wsroot\\scratch\\issue465-467-20261014\\docs\\acceptance\\writer-reader-quality\\outputs\\baseline\\synthetic-comparison-checklist-a8-6-b4-5-v1.json",
+        "preserved_copy_path": "D:\\wsroot\\scratch\\writer-reader-quality-run-20261014-v5\\writer-prose\\synthetic-comparison-checklist-a8-6-b4-5-v1\\25f46c0b9582efb6791eddcaec57e16a9e563bf81eb0730fe919996b7ea97efe.json",
+        "sha256": "25f46c0b9582efb6791eddcaec57e16a9e563bf81eb0730fe919996b7ea97efe"
+      },
+      "case_id": "synthetic-comparison-checklist-a8-6-b4-5-v1",
+      "host_editorial_followup": {
+        "base_revision_ref": {
+          "revision_digest": "sha256:798ef922f58f7e8463c8a17f2caacc3dd3f12717e0ad4581617511c24e03d716",
+          "revision_id": "WMR-a4055c4110dd78c525f04fff-4ea623bbe8b54560b8091e9a5c946a44"
+        },
+        "classification": "host editorial follow-up; not a generation condition, semantic review, or #466 target-bound review pass",
+        "default_inspection": {
+          "lineage_revision_ids": [
+            "WMR-7040196180f8d0aa2fd4523d-cb4fa3a59b6149a8bb7641e91d4b321b",
+            "WMR-a4055c4110dd78c525f04fff-4ea623bbe8b54560b8091e9a5c946a44",
+            "WMR-73e8ba0e92ebda4eeacac9bd-b47ffe0e51a1456895aefadfb0c2835d",
+            "WMR-c78c018349ca96fd0db50877-cc0c7f1c61e745f6bb4ac96dc3227659"
+          ],
+          "receipt_path": "D:\\wsroot\\scratch\\writer-reader-quality-run-20261014-v5\\receipts\\synthetic-comparison-checklist-a8-6-b4-5-v1\\inspection-005.json",
+          "requested_revision_id": null,
+          "returned_revision_ref": {
+            "revision_digest": "sha256:e037f7a66179ce062e87e28de919e6d1eb25b2551b34714ffa6ef1777b22d61f",
+            "revision_id": "WMR-7040196180f8d0aa2fd4523d-cb4fa3a59b6149a8bb7641e91d4b321b",
+            "revision_number": 4
+          }
+        },
+        "import": {
+          "receipt_path": "D:\\wsroot\\scratch\\writer-reader-quality-run-20261014-v5\\receipts\\synthetic-comparison-checklist-a8-6-b4-5-v1\\response-6ff0919fd5e3-imported-import-001.json",
+          "research_state_mutation_performed": false,
+          "reused_section_ids": [
+            "SEC-FRAMING",
+            "SEC-METHOD",
+            "SEC-RESULTS"
+          ],
+          "revision_ref": {
+            "revision_digest": "sha256:e037f7a66179ce062e87e28de919e6d1eb25b2551b34714ffa6ef1777b22d61f",
+            "revision_id": "WMR-7040196180f8d0aa2fd4523d-cb4fa3a59b6149a8bb7641e91d4b321b",
+            "revision_number": 4
+          },
+          "status": "IMPORTED"
+        },
+        "input": {
+          "byte_length": 1050,
+          "path": "D:\\wsroot\\scratch\\issue465-467-20261014\\docs\\acceptance\\writer-reader-quality\\outputs\\host-edit\\synthetic-comparison-checklist-a8-6-b4-5-v1.json",
+          "sha256": "e19fe8d894fcc09d1cfbc6081d4b53aa1267539f35f3bdb65a7d3fbfab24676f"
+        },
+        "inspection": {
+          "receipt_path": "D:\\wsroot\\scratch\\writer-reader-quality-run-20261014-v5\\receipts\\synthetic-comparison-checklist-a8-6-b4-5-v1\\inspection-006.json",
+          "research_state_mutation_performed": false,
+          "revision_ref": {
+            "revision_digest": "sha256:e037f7a66179ce062e87e28de919e6d1eb25b2551b34714ffa6ef1777b22d61f",
+            "revision_id": "WMR-7040196180f8d0aa2fd4523d-cb4fa3a59b6149a8bb7641e91d4b321b",
+            "revision_number": 4
+          },
+          "status": "OK"
+        },
+        "profile_review": "all delivered rules marked unevaluated; no semantic review performed",
+        "scope": [
+          "SEC-IMPLICATION"
+        ],
+        "superseded_transcription_error_observation": {
+          "cause": "manual revision ID transcription omitted the trailing d in the first hash segment",
+          "receipt_path": "D:\\wsroot\\scratch\\writer-reader-quality-run-20261014-v5\\receipts\\synthetic-comparison-checklist-a8-6-b4-5-v1\\inspection-rev4-failure-observation.json",
+          "runtime_failure": false,
+          "superseded_by_exact_inspection_receipt": "D:\\wsroot\\scratch\\writer-reader-quality-run-20261014-v5\\receipts\\synthetic-comparison-checklist-a8-6-b4-5-v1\\inspection-006.json"
+        },
+        "verification": {
+          "sec_implication_content_sha256": "0d0d61e98ffcdaa42fe7083c812386a53414937a5a3e58b9cde4219b05880dfc",
+          "sec_implication_exact_match_host_edit": true,
+          "unchanged_fields": [
+            "content",
+            "citations",
+            "exhibit_refs",
+            "profile_review"
+          ],
+          "untouched_section_ids": [
+            "SEC-FRAMING",
+            "SEC-METHOD",
+            "SEC-RESULTS"
+          ]
+        },
+        "writer_response": {
+          "path": "D:\\wsroot\\scratch\\writer-reader-quality-run-20261014-v5\\writer-responses\\synthetic-comparison-checklist-a8-6-b4-5-v1\\6ff0919fd5e394fed9522f2bee721c9430372e81f523ed101b9a2453e9cf3100.json",
+          "prose_content_modified": false,
+          "response_id": "WR-cd4418b47c4b17463d6a",
+          "semantic_review_performed": false,
+          "sha256": "6ff0919fd5e394fed9522f2bee721c9430372e81f523ed101b9a2453e9cf3100",
+          "wrap_receipt_path": "D:\\wsroot\\scratch\\writer-reader-quality-run-20261014-v5\\receipts\\synthetic-comparison-checklist-a8-6-b4-5-v1\\wrap-6ff0919fd5e3-001.json"
+        }
+      },
+      "import": {
+        "receipt_path": "D:\\wsroot\\scratch\\writer-reader-quality-run-20261014-v5\\receipts\\synthetic-comparison-checklist-a8-6-b4-5-v1\\response-31682f90e792-imported-import-001.json",
+        "research_state_mutation_performed": false,
+        "revision_ref": {
+          "revision_digest": "sha256:bed84b6bb346e6cf6b69c22bc4ff42117d3513fae1ab2d6f87671415ce767911",
+          "revision_id": "WMR-c78c018349ca96fd0db50877-cc0c7f1c61e745f6bb4ac96dc3227659",
+          "revision_number": 1
+        },
+        "status": "IMPORTED"
+      },
+      "inspection": {
+        "receipt_path": "D:\\wsroot\\scratch\\writer-reader-quality-run-20261014-v5\\receipts\\synthetic-comparison-checklist-a8-6-b4-5-v1\\inspection-001.json",
+        "research_snapshot_execution_mode": "virtual",
+        "revision_ref": {
+          "revision_digest": "sha256:bed84b6bb346e6cf6b69c22bc4ff42117d3513fae1ab2d6f87671415ce767911",
+          "revision_id": "WMR-c78c018349ca96fd0db50877-cc0c7f1c61e745f6bb4ac96dc3227659",
+          "revision_number": 1
+        },
+        "status": "OK"
+      },
+      "partial_revision": {
+        "base_revision_ref": {
+          "revision_digest": "sha256:bed84b6bb346e6cf6b69c22bc4ff42117d3513fae1ab2d6f87671415ce767911",
+          "revision_id": "WMR-c78c018349ca96fd0db50877-cc0c7f1c61e745f6bb4ac96dc3227659"
+        },
+        "import": {
+          "receipt_path": "D:\\wsroot\\scratch\\writer-reader-quality-run-20261014-v5\\receipts\\synthetic-comparison-checklist-a8-6-b4-5-v1\\response-13cef93b434d-imported-import-001.json",
+          "research_state_mutation_performed": false,
+          "reused_section_ids": [
+            "SEC-FRAMING",
+            "SEC-METHOD",
+            "SEC-IMPLICATION"
+          ],
+          "revision_ref": {
+            "revision_digest": "sha256:eda8ff7024d92f0495981a6a1040235604aa7e443f8c295aaa07ad67d546d44f",
+            "revision_id": "WMR-73e8ba0e92ebda4eeacac9bd-b47ffe0e51a1456895aefadfb0c2835d",
+            "revision_number": 2
+          },
+          "status": "IMPORTED"
+        },
+        "input": {
+          "byte_length": 1044,
+          "path": "D:\\wsroot\\scratch\\issue465-467-20261014\\docs\\acceptance\\writer-reader-quality\\outputs\\partial\\synthetic-comparison-checklist-a8-6-b4-5-v1.json",
+          "sha256": "dab9a4027e29a9b0e039680e10775b4554dadeebbcf71c5c760a65e5525bdadd"
+        },
+        "inspection": {
+          "receipt_path": "D:\\wsroot\\scratch\\writer-reader-quality-run-20261014-v5\\receipts\\synthetic-comparison-checklist-a8-6-b4-5-v1\\inspection-002.json",
+          "research_state_mutation_performed": false,
+          "revision_ref": {
+            "revision_digest": "sha256:eda8ff7024d92f0495981a6a1040235604aa7e443f8c295aaa07ad67d546d44f",
+            "revision_id": "WMR-73e8ba0e92ebda4eeacac9bd-b47ffe0e51a1456895aefadfb0c2835d",
+            "revision_number": 2
+          },
+          "status": "OK"
+        },
+        "profile_review": "all delivered rules marked unevaluated; no semantic review performed",
+        "prose_sha256": "dab9a4027e29a9b0e039680e10775b4554dadeebbcf71c5c760a65e5525bdadd",
+        "scope": [
+          "SEC-RESULTS"
+        ],
+        "verification": {
+          "sec_results_content_sha256": "e6b5e83658745b047933f6987c6c7049e0ddfb5293513eb7cdcc4e71706998a5",
+          "sec_results_exact_match_revised_first_output": true,
+          "unchanged_fields": [
+            "content",
+            "citations",
+            "exhibit_refs",
+            "profile_review"
+          ],
+          "untouched_field_sha256": {
+            "SEC-FRAMING": {
+              "citations": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+              "content": "1977ac7a4e54866f0b94b226c042b27989d968a0fb34c01e47170bf2b5b49663",
+              "exhibit_refs": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+              "profile_review": "409d7be4b382f178ec75bca0422a82b0f6f0d8e4444ca4ccd57feb957bbd63dc"
+            },
+            "SEC-IMPLICATION": {
+              "citations": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+              "content": "9c00c85682d4521224bae9374627c8626d84cbb4e0311d98b9ea9c7531c66310",
+              "exhibit_refs": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+              "profile_review": "409d7be4b382f178ec75bca0422a82b0f6f0d8e4444ca4ccd57feb957bbd63dc"
+            },
+            "SEC-METHOD": {
+              "citations": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+              "content": "868bc020e1555eedde0be22b6543e0a538e94da8f0300fe18c0f11c5edec0daf",
+              "exhibit_refs": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+              "profile_review": "409d7be4b382f178ec75bca0422a82b0f6f0d8e4444ca4ccd57feb957bbd63dc"
+            }
+          },
+          "untouched_section_ids": [
+            "SEC-FRAMING",
+            "SEC-METHOD",
+            "SEC-IMPLICATION"
+          ]
+        },
+        "writer_response": {
+          "path": "D:\\wsroot\\scratch\\writer-reader-quality-run-20261014-v5\\writer-responses\\synthetic-comparison-checklist-a8-6-b4-5-v1\\13cef93b434de572cd2025006ae81886da8d8362393a08a6ede3eda2e5af2f89.json",
+          "prose_content_modified": false,
+          "response_id": "WR-9bcd412ec70c2d5cb24e",
+          "semantic_review_performed": false,
+          "sha256": "13cef93b434de572cd2025006ae81886da8d8362393a08a6ede3eda2e5af2f89",
+          "wrap_receipt_path": "D:\\wsroot\\scratch\\writer-reader-quality-run-20261014-v5\\receipts\\synthetic-comparison-checklist-a8-6-b4-5-v1\\wrap-13cef93b434d-001.json"
+        }
+      },
+      "profile_review": {
+        "group_count": 32,
+        "group_outcomes": {
+          "unevaluated": 32
+        },
+        "rule_outcomes": {
+          "unevaluated": 508
+        },
+        "rule_result_count": 508,
+        "semantic_evaluation": "not performed"
+      },
+      "replays": [
+        {
+          "receipt_path": "D:\\wsroot\\scratch\\writer-reader-quality-run-20261014-v5\\receipts\\synthetic-comparison-checklist-a8-6-b4-5-v1\\response-31682f90e792-verified_reuse-replay-001.json",
+          "research_state_mutation_performed": false,
+          "revision_ref": {
+            "revision_digest": "sha256:bed84b6bb346e6cf6b69c22bc4ff42117d3513fae1ab2d6f87671415ce767911",
+            "revision_id": "WMR-c78c018349ca96fd0db50877-cc0c7f1c61e745f6bb4ac96dc3227659",
+            "revision_number": 1
+          },
+          "status": "VERIFIED_REUSE"
+        },
+        {
+          "receipt_path": "D:\\wsroot\\scratch\\writer-reader-quality-run-20261014-v5\\receipts\\synthetic-comparison-checklist-a8-6-b4-5-v1\\response-31682f90e792-verified_reuse-replay-002.json",
+          "research_state_mutation_performed": false,
+          "revision_ref": {
+            "revision_digest": "sha256:bed84b6bb346e6cf6b69c22bc4ff42117d3513fae1ab2d6f87671415ce767911",
+            "revision_id": "WMR-c78c018349ca96fd0db50877-cc0c7f1c61e745f6bb4ac96dc3227659",
+            "revision_number": 1
+          },
+          "status": "VERIFIED_REUSE"
+        }
+      ],
+      "revised_first_output": {
+        "byte_length": 4152,
+        "path": "D:\\wsroot\\scratch\\issue465-467-20261014\\docs\\acceptance\\writer-reader-quality\\outputs\\revised\\synthetic-comparison-checklist-a8-6-b4-5-v1.json",
+        "section_ids": [
+          "SEC-FRAMING",
+          "SEC-METHOD",
+          "SEC-RESULTS",
+          "SEC-IMPLICATION"
+        ],
+        "sha256": "8088ca6c86acd629ba9273e7cf4dafa331fc93edc68da18955893d25321d1f0c"
+      },
+      "revised_full_import": {
+        "import": {
+          "receipt_path": "D:\\wsroot\\scratch\\writer-reader-quality-run-20261014-v5\\receipts\\synthetic-comparison-checklist-a8-6-b4-5-v1\\response-52a623baeae3-imported-import-001.json",
+          "research_state_mutation_performed": false,
+          "reused_section_ids": [],
+          "revision_ref": {
+            "revision_digest": "sha256:798ef922f58f7e8463c8a17f2caacc3dd3f12717e0ad4581617511c24e03d716",
+            "revision_id": "WMR-a4055c4110dd78c525f04fff-4ea623bbe8b54560b8091e9a5c946a44",
+            "revision_number": 3
+          },
+          "status": "IMPORTED"
+        },
+        "inspection": {
+          "receipt_path": "D:\\wsroot\\scratch\\writer-reader-quality-run-20261014-v5\\receipts\\synthetic-comparison-checklist-a8-6-b4-5-v1\\inspection-003.json",
+          "research_state_mutation_performed": false,
+          "revision_ref": {
+            "revision_digest": "sha256:798ef922f58f7e8463c8a17f2caacc3dd3f12717e0ad4581617511c24e03d716",
+            "revision_id": "WMR-a4055c4110dd78c525f04fff-4ea623bbe8b54560b8091e9a5c946a44",
+            "revision_number": 3
+          },
+          "status": "OK"
+        },
+        "profile_review": "all delivered rules marked unevaluated; no semantic review performed",
+        "prose_sha256": "8088ca6c86acd629ba9273e7cf4dafa331fc93edc68da18955893d25321d1f0c",
+        "transport_base_revision_ref": {
+          "revision_digest": "sha256:eda8ff7024d92f0495981a6a1040235604aa7e443f8c295aaa07ad67d546d44f",
+          "revision_id": "WMR-73e8ba0e92ebda4eeacac9bd-b47ffe0e51a1456895aefadfb0c2835d"
+        },
+        "writer_response": {
+          "path": "D:\\wsroot\\scratch\\writer-reader-quality-run-20261014-v5\\writer-responses\\synthetic-comparison-checklist-a8-6-b4-5-v1\\52a623baeae3e7ce35aa2c32a18095b40b373f63956da221aa63fe61dce89879.json",
+          "prose_content_modified": false,
+          "response_id": "WR-2071e9e2fc4f2f8a17b8",
+          "semantic_review_performed": false,
+          "sha256": "52a623baeae3e7ce35aa2c32a18095b40b373f63956da221aa63fe61dce89879",
+          "wrap_receipt_path": "D:\\wsroot\\scratch\\writer-reader-quality-run-20261014-v5\\receipts\\synthetic-comparison-checklist-a8-6-b4-5-v1\\wrap-52a623baeae3-001.json"
+        }
+      },
+      "source_status_flags": {
+        "authoritative_research_freeze": false,
+        "composition_digest": "sha256:aef6eaa103e01e6c81e1e523d488f89c6450d1767fbee43cfbc4bb8cf4ee3549",
+        "composition_id": "COMP-9a58ebbbc3e444b280a5de3d5b5f3428",
+        "composition_version": 1,
+        "effective_profile_set_digest": "sha256:8c30df04bf31dd12f222fe0b53b9e57ae47ca1df49d9c644daf599f4e47e638e",
+        "effective_profile_set_ref": "EPS-1",
+        "lineage_ref": "LIN-1",
+        "package_mode": "preview",
+        "preview_only": true,
+        "project_id": "PRJ-WRQ-COMPARE",
+        "release_eligible": false,
+        "research_package_digest": "sha256:4dc7dfe0e48577bac097b7a037ba10aa477464deb05e0f3d58b6a3cc612d96d2",
+        "research_package_id": "RP-0bbb8af981f2464196e47ba5dd382196",
+        "research_snapshot_digest": "sha256:5474423b8d623f85eff748d7e5d6dcb52c4589feb0d8cdd8f92a6790886e44cc",
+        "research_snapshot_id": "SNP-WRQ-COMPARE",
+        "source_epistemic_status": "SYNTHETIC_TEST_ONLY"
+      },
+      "writer_input": {
+        "file_sha256": "c6ae932e098ed8bfc8de9189cb311936d11ce829ee8abeb324e346719c49650b",
+        "input_digest": "sha256:45d562feee575794f3dcf0ead348cffb08a82672ffbc32a9b5413819d1c71c15",
+        "input_id": "WRI-e99db5ab6569489d13957d00",
+        "path": "D:\\wsroot\\scratch\\writer-reader-quality-run-20261014-v5\\inputs\\synthetic-comparison-checklist-a8-6-b4-5-v1\\writer-input.json"
+      },
+      "writer_response": {
+        "path": "D:\\wsroot\\scratch\\writer-reader-quality-run-20261014-v5\\writer-responses\\synthetic-comparison-checklist-a8-6-b4-5-v1\\31682f90e7923aa73f6fe97b875b502964b688a856fb79df6ddcf20121c00222.json",
+        "prose_content_modified": false,
+        "response_id": "WR-3c4bde1b23dfdf0626b5",
+        "semantic_review_performed": false,
+        "sha256": "31682f90e7923aa73f6fe97b875b502964b688a856fb79df6ddcf20121c00222",
+        "wrap_receipt": "D:\\wsroot\\scratch\\writer-reader-quality-run-20261014-v5\\receipts\\synthetic-comparison-checklist-a8-6-b4-5-v1\\wrap-31682f90e792-001.json"
+      }
+    }
+  ],
+  "created_at": "2026-10-14T09:58:08Z",
+  "detached_inputs_archive": {
+    "contents": "exact v5 public export directory; no stores",
+    "path": "docs/acceptance/writer-reader-quality/detached-inputs.zip",
+    "sha256": "97feb70c80dc8db3843bee509273e53ec43b66c7ce5aa780b86762761303ff71"
+  },
+  "human_reader_evaluation_performed": false,
+  "prose_generation": {
+    "host_model_source": "Host inherited Codex default",
+    "model": null,
+    "model_and_settings_availability": "unavailable",
+    "performed_by_driver": false,
+    "settings": null
+  },
+  "record_type": "writer_reader_quality_run_manifest",
+  "run_root": "D:\\wsroot\\scratch\\writer-reader-quality-run-20261014-v5",
+  "schema_version": "0.1.0",
+  "semantic_pass_claimed": false
+}
