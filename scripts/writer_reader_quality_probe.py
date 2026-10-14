@@ -36,6 +36,7 @@ if str(RUNTIME_FIXTURES) not in sys.path:
 from core.runtime import canonical_digest  # noqa: E402
 from plugins.local_application import LocalApplicationFacade, LocalResearchApplication  # noqa: E402
 from plugins.local_application.profile_resolution import resolve_effective_profile_set  # noqa: E402
+from plugins.local_application.writer_round_trip_service import MAX_RESPONSE_BYTES  # noqa: E402
 from runtime_fixtures import seed_state  # noqa: E402
 
 
@@ -675,7 +676,12 @@ def _wrap_response(args: argparse.Namespace) -> int:
 def _import_response(args: argparse.Namespace) -> int:
     run_root = Path(args.run_root).expanduser().resolve()
     source_path = Path(args.response).expanduser().resolve(strict=True)
-    raw = source_path.read_bytes()
+    if source_path.stat().st_size > MAX_RESPONSE_BYTES:
+        raise SystemExit("response file exceeds the supported size")
+    with source_path.open("rb") as handle:
+        raw = handle.read(MAX_RESPONSE_BYTES + 1)
+    if len(raw) > MAX_RESPONSE_BYTES:
+        raise SystemExit("response file exceeds the supported size")
     response_digest = hashlib.sha256(raw).hexdigest()
     response = json.loads(raw.decode("utf-8"))
     case_id = str(args.case_id)
