@@ -23,15 +23,23 @@ class MinimalDecisionRecoveryTests(unittest.TestCase):
         self.workspace = _init_workspace(Path(self.temp.name))
         with LocalApplicationFacade.open_workspace(self.workspace) as facade:
             proposed = facade.submit_action(_proposal_input())
-            confirmation = facade.submit_action({
-                "action_type": "state.apply_candidate",
-                "payload": {"state_delta_proposal_id": proposed["data"]["state_delta_proposal_id"]},
-                "actor_id": "HUMAN-RQ",
-            })
-            request = facade.submit_confirmation({
-                "confirmation_request_id": confirmation["confirmation_request"]["confirmation_request_id"],
-                "actor_id": "HUMAN-RQ",
-            })["decision_request"]
+            confirmation = facade.submit_action(
+                {
+                    "action_type": "state.apply_candidate",
+                    "payload": {
+                        "state_delta_proposal_id": proposed["data"]["state_delta_proposal_id"]
+                    },
+                    "actor_id": "HUMAN-RQ",
+                }
+            )
+            request = facade.submit_confirmation(
+                {
+                    "confirmation_request_id": confirmation["confirmation_request"][
+                        "confirmation_request_id"
+                    ],
+                    "actor_id": "HUMAN-RQ",
+                }
+            )["decision_request"]
             self.intent = {
                 "request_id": request["request_id"],
                 "request_digest": request["request_digest"],
@@ -50,10 +58,17 @@ class MinimalDecisionRecoveryTests(unittest.TestCase):
                     original(*args, **kwargs)
                 raise OSError("injected interruption")
 
-            target = app.state_transition_service if stage == "before_commit" else app.decision_store
+            target = (
+                app.state_transition_service if stage == "before_commit" else app.decision_store
+            )
             method = "apply" if stage == "before_commit" else "finalize"
-            failure = OSError("injected interruption") if stage == "before_commit" else fail_finalize
-            with patch.object(app.clock, "now", return_value=T1), patch.object(target, method, side_effect=failure):
+            failure = (
+                OSError("injected interruption") if stage == "before_commit" else fail_finalize
+            )
+            with (
+                patch.object(app.clock, "now", return_value=T1),
+                patch.object(target, method, side_effect=failure),
+            ):
                 with self.assertRaisesRegex(OSError, "injected interruption"):
                     facade.resolve_human_decision(self.intent)
             return facade.status()["snapshot"]
@@ -69,20 +84,26 @@ class MinimalDecisionRecoveryTests(unittest.TestCase):
             after = facade.status()["snapshot"]
             self.assertNotEqual(after, self.before)
             repo = facade._application.state_repository
-            state = repo.load_state_view(facade.project_id, repo.load_active_lineage_ref(facade.project_id))
+            state = repo.load_state_view(
+                facade.project_id, repo.load_active_lineage_ref(facade.project_id)
+            )
             decisions = deepcopy(state.decisions)
             if stage != "before_commit":
                 self.assertEqual(after, interrupted_snapshot)
         with LocalApplicationFacade.open_workspace(self.workspace) as facade:
             # A second later replay must return the identical response and receipt,
             # not a second Snapshot, Decision, or approval timestamp.
-            with patch.object(facade._application.clock, "now", return_value="2026-09-21T01:00:00Z"):
+            with patch.object(
+                facade._application.clock, "now", return_value="2026-09-21T01:00:00Z"
+            ):
                 reused = facade.resolve_human_decision(self.intent)
             self.assertEqual(reused["response"], recovered["response"])
             self.assertEqual(reused["commit_receipt"], recovered["commit_receipt"])
             self.assertEqual(facade.status()["snapshot"], after)
             repo = facade._application.state_repository
-            state = repo.load_state_view(facade.project_id, repo.load_active_lineage_ref(facade.project_id))
+            state = repo.load_state_view(
+                facade.project_id, repo.load_active_lineage_ref(facade.project_id)
+            )
             self.assertEqual(state.decisions, decisions)
             # The original full-response public path remains supported.
             exact = facade.resolve_human_decision(recovered["response"])
@@ -134,7 +155,10 @@ class MinimalDecisionRecoveryTests(unittest.TestCase):
             before = facade.status()["snapshot"]
             for corrupt in ("{", "null", "{}", saved.replace(T1, T2)):
                 with self.subTest(corrupt=corrupt[:40]):
-                    store._db.execute("UPDATE decision_responses SET payload_json=? WHERE request_id=?", (corrupt, request_id))
+                    store._db.execute(
+                        "UPDATE decision_responses SET payload_json=? WHERE request_id=?",
+                        (corrupt, request_id),
+                    )
                     with self.assertRaises(LocalApplicationError) as raised:
                         facade.resolve_human_decision(self.intent)
                     self.assertEqual(raised.exception.code, "APPLICATION-DECISION-RECOVERY-001")
@@ -146,21 +170,39 @@ class MinimalDecisionRecoveryTests(unittest.TestCase):
             self.assertEqual(facade.status()["snapshot"], before)
 
     def test_terminal_decline_and_revision_request_reuse_claimed_response(self):
-        for disposition, status in (("decline", "DECLINED"), ("request_revision", "REVISION_REQUESTED")):
+        for disposition, status in (
+            ("decline", "DECLINED"),
+            ("request_revision", "REVISION_REQUESTED"),
+        ):
             with self.subTest(disposition=disposition), tempfile.TemporaryDirectory() as temp:
                 workspace = _init_workspace(Path(temp))
                 with LocalApplicationFacade.open_workspace(workspace) as facade:
                     candidate = facade.submit_action(_proposal_input())
-                    proposal = facade.submit_action({
-                        "action_type": "state.apply_candidate",
-                        "payload": {"state_delta_proposal_id": candidate["data"]["state_delta_proposal_id"]},
-                        "actor_id": "HUMAN-RQ",
-                    })
-                    request = facade.submit_confirmation({
-                        "confirmation_request_id": proposal["confirmation_request"]["confirmation_request_id"],
-                        "actor_id": "HUMAN-RQ",
-                    })["decision_request"]
-                    intent = {**self.intent, "request_id": request["request_id"], "request_digest": request["request_digest"], "disposition": disposition}
+                    proposal = facade.submit_action(
+                        {
+                            "action_type": "state.apply_candidate",
+                            "payload": {
+                                "state_delta_proposal_id": candidate["data"][
+                                    "state_delta_proposal_id"
+                                ]
+                            },
+                            "actor_id": "HUMAN-RQ",
+                        }
+                    )
+                    request = facade.submit_confirmation(
+                        {
+                            "confirmation_request_id": proposal["confirmation_request"][
+                                "confirmation_request_id"
+                            ],
+                            "actor_id": "HUMAN-RQ",
+                        }
+                    )["decision_request"]
+                    intent = {
+                        **self.intent,
+                        "request_id": request["request_id"],
+                        "request_digest": request["request_digest"],
+                        "disposition": disposition,
+                    }
                     before = facade.status()["snapshot"]
                     with patch.object(facade._application.clock, "now", return_value=T1):
                         first = facade.resolve_human_decision(intent)

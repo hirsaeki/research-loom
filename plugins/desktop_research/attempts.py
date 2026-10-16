@@ -210,9 +210,7 @@ def reconstruct_attempts(
             if current is None or current["completed_at"] is not None:
                 raise ValueError("invalid retrieval attempt completion ordering")
             current["outcome"] = str(payload["outcome"])
-            current["failure_or_blocking_reason"] = payload.get(
-                "failure_or_blocking_reason"
-            )
+            current["failure_or_blocking_reason"] = payload.get("failure_or_blocking_reason")
             if payload.get("target_locator") is not None:
                 current["target_locator"] = payload["target_locator"]
             current["resulting_capture_id"] = payload.get("resulting_capture_id")

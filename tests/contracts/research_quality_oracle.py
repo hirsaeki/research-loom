@@ -33,7 +33,9 @@ def catalog_cross_reference_errors(catalog: dict[str, Any]) -> list[str]:
     return errors
 
 
-def research_quality_constraint_error(profile: dict[str, Any], catalog: dict[str, Any]) -> str | None:
+def research_quality_constraint_error(
+    profile: dict[str, Any], catalog: dict[str, Any]
+) -> str | None:
     """Return the first fixture-level Research quality declaration error, if any."""
     catalog_errors = catalog_cross_reference_errors(catalog)
     if catalog_errors:
@@ -90,7 +92,9 @@ def apply_mutations(base: dict[str, Any], mutations: list[dict[str, Any]]) -> di
 
 def _constraints(profile: dict[str, Any]) -> dict[str, Any]:
     """Project a fixture profile's constraint declarations into path/value pairs."""
-    return {constraint["path"]: constraint["value"] for constraint in profile.get("constraints", [])}
+    return {
+        constraint["path"]: constraint["value"] for constraint in profile.get("constraints", [])
+    }
 
 
 def research_quality_state_error(state: dict[str, Any], profile: dict[str, Any]) -> str | None:
@@ -105,10 +109,14 @@ def research_quality_state_error(state: dict[str, Any], profile: dict[str, Any])
 
     # Evidence admissibility: quality tier, verification, directness, and indirect support.
     sole_forbidden = set(c["research_quality.source.forbidden_as_sole_material_support_tiers"])
-    source_tiers = [assessments["sources"][objects[eid]["source_id"]]["quality_tier"] for eid in evidence_ids]
+    source_tiers = [
+        assessments["sources"][objects[eid]["source_id"]]["quality_tier"] for eid in evidence_ids
+    ]
     if source_tiers and all(tier in sole_forbidden for tier in source_tiers):
         return "RESEARCH-QUALITY-EVIDENCE-ADMISSIBILITY-001"
-    allowed_verification = set(c["research_quality.evidence.material_support.required_verification_statuses"])
+    allowed_verification = set(
+        c["research_quality.evidence.material_support.required_verification_statuses"]
+    )
     allowed_directness = set(c["research_quality.evidence.claim_support.allowed_directness"])
     indirect_requirements = set(c["research_quality.evidence.indirect_support.requirements"])
     for eid in evidence_ids:
@@ -118,27 +126,38 @@ def research_quality_state_error(state: dict[str, Any], profile: dict[str, Any])
             return "RESEARCH-QUALITY-EVIDENCE-ADMISSIBILITY-001"
         if assessment["directness"] not in allowed_directness:
             return "RESEARCH-QUALITY-EVIDENCE-ADMISSIBILITY-001"
-        if assessment["directness"] == "indirect" and "explicit_qualification" in indirect_requirements \
-                and not assessment.get("explicit_qualification"):
+        if (
+            assessment["directness"] == "indirect"
+            and "explicit_qualification" in indirect_requirements
+            and not assessment.get("explicit_qualification")
+        ):
             return "RESEARCH-QUALITY-EVIDENCE-ADMISSIBILITY-001"
         tier = assessments["sources"][evidence["source_id"]]["quality_tier"]
         scope = assessment["support_scope"]
-        if tier == "low_confidence" and scope not in set(c["research_quality.source.low_confidence.allowed_support_scopes"]):
+        if tier == "low_confidence" and scope not in set(
+            c["research_quality.source.low_confidence.allowed_support_scopes"]
+        ):
             return "RESEARCH-QUALITY-EVIDENCE-ADMISSIBILITY-001"
-        if tier == "low_trust" and scope not in set(c["research_quality.source.low_trust.allowed_support_scopes"]):
+        if tier == "low_trust" and scope not in set(
+            c["research_quality.source.low_trust.allowed_support_scopes"]
+        ):
             return "RESEARCH-QUALITY-EVIDENCE-ADMISSIBILITY-001"
         role = assessments["sources"][evidence["source_id"]]["source_role"]
-        if role == "company_primary" and scope not in set(c["research_quality.source.company_primary.allowed_support_scopes"]):
+        if role == "company_primary" and scope not in set(
+            c["research_quality.source.company_primary.allowed_support_scopes"]
+        ):
             return "RESEARCH-QUALITY-EVIDENCE-ADMISSIBILITY-001"
 
     claim_assessment = assessments["claims"][claim["id"]]
     claim_family = claim_assessment["claim_family"]
     evidence_scopes = {assessments["evidence"][eid]["support_scope"] for eid in evidence_ids}
     if claim_family == "independent_effect" and not evidence_scopes.issubset(
-            set(c["research_quality.claim.independent_effect.allowed_support_scopes"])):
+        set(c["research_quality.claim.independent_effect.allowed_support_scopes"])
+    ):
         return "RESEARCH-QUALITY-CLAIM-SUPPORT-001"
     if claim_family == "causal" and not evidence_scopes.issubset(
-            set(c["research_quality.claim.causal.allowed_support_scopes"])):
+        set(c["research_quality.claim.causal.allowed_support_scopes"])
+    ):
         return "RESEARCH-QUALITY-CLAIM-SUPPORT-001"
 
     independence_requirements = set(c["research_quality.evidence.independence.requirements"])
@@ -148,13 +167,21 @@ def research_quality_state_error(state: dict[str, Any], profile: dict[str, Any])
         if formation and supporting and supporting.issubset(formation):
             return "RESEARCH-QUALITY-INDEPENDENCE-001"
     if "synthesis_overlap_accounted" in independence_requirements:
-        if any(not assessments["evidence"][eid].get("synthesis_overlap_accounted", False) for eid in evidence_ids):
+        if any(
+            not assessments["evidence"][eid].get("synthesis_overlap_accounted", False)
+            for eid in evidence_ids
+        ):
             return "RESEARCH-QUALITY-INDEPENDENCE-001"
     if claim_family in set(c["research_quality.evidence.independence.required_claim_families"]):
         groups = {objects[eid].get("independence_group") for eid in evidence_ids}
         groups.discard(None)
-        minimum_groups = c["research_quality.thresholds.material_finding.min_independent_evidence_groups"]
-        if "distinct_independence_group" in independence_requirements and len(groups) < minimum_groups:
+        minimum_groups = c[
+            "research_quality.thresholds.material_finding.min_independent_evidence_groups"
+        ]
+        if (
+            "distinct_independence_group" in independence_requirements
+            and len(groups) < minimum_groups
+        ):
             return "RESEARCH-QUALITY-INDEPENDENCE-001"
 
     if claim_family == "causal":
@@ -168,20 +195,33 @@ def research_quality_state_error(state: dict[str, Any], profile: dict[str, Any])
             return "RESEARCH-QUALITY-FINDING-QUALIFICATION-001"
 
     method_family = assessments["methods"][method["id"]]["method_family"]
-    if method_family in set(c["research_quality.methods.protocol_required_for_families"]) and not method.get("protocol_ref"):
+    if method_family in set(
+        c["research_quality.methods.protocol_required_for_families"]
+    ) and not method.get("protocol_ref"):
         return "RESEARCH-QUALITY-METHOD-001"
-    if method_family in set(c["research_quality.methods.limitations_required_for_families"]) and not method.get("limitations"):
+    if method_family in set(
+        c["research_quality.methods.limitations_required_for_families"]
+    ) and not method.get("limitations"):
         return "RESEARCH-QUALITY-METHOD-001"
 
-    reviews = [obj for obj in objects.values() if obj.get("kind") == "counter_review" and obj["target"]["id"] == finding["id"]]
+    reviews = [
+        obj
+        for obj in objects.values()
+        if obj.get("kind") == "counter_review" and obj["target"]["id"] == finding["id"]
+    ]
     required_lenses = set(c["research_quality.counter_review.required_lenses"])
     if not required_lenses.issubset({review.get("review_lens") for review in reviews}):
         return "RESEARCH-QUALITY-COUNTER-REVIEW-001"
     blocking = set(c["research_quality.counter_review.blocking_severities"])
-    if any(review["severity"] in blocking and review["disposition"] == "open" for review in reviews):
+    if any(
+        review["severity"] in blocking and review["disposition"] == "open" for review in reviews
+    ):
         return "RESEARCH-QUALITY-COUNTER-REVIEW-001"
 
-    if len(evidence_ids) < c["research_quality.thresholds.material_finding.min_supporting_evidence_count"]:
+    if (
+        len(evidence_ids)
+        < c["research_quality.thresholds.material_finding.min_supporting_evidence_count"]
+    ):
         return "RESEARCH-QUALITY-SUFFICIENCY-001"
     checks = set(c["research_quality.evidence_sufficiency.required_checks"])
     sufficiency = state["sufficiency"]
@@ -196,7 +236,10 @@ def research_quality_state_error(state: dict[str, Any], profile: dict[str, Any])
         return "RESEARCH-QUALITY-SUFFICIENCY-001"
     if "source_overlap_accounted" in checks and not sufficiency["source_overlap_accounted"]:
         return "RESEARCH-QUALITY-SUFFICIENCY-001"
-    if "remaining_information_value_not_high" in checks and sufficiency["remaining_information_value"] == "high":
+    if (
+        "remaining_information_value_not_high" in checks
+        and sufficiency["remaining_information_value"] == "high"
+    ):
         return "RESEARCH-QUALITY-SUFFICIENCY-001"
 
     for gate in c["research_quality.gates.required"]:

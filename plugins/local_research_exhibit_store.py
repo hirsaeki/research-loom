@@ -121,7 +121,9 @@ def _validate_string_list(value: Any, field: str, *, required: bool = False) -> 
 
 def _validate_snapshot_binding(value: Any) -> None:
     if not isinstance(value, Mapping) or set(value) != {
-        "lineage_ref", "snapshot_ref", "snapshot_digest"
+        "lineage_ref",
+        "snapshot_ref",
+        "snapshot_digest",
     }:
         raise LocalResearchExhibitStoreError(
             "EXHIBIT-DOCUMENT-001", "Research Exhibit snapshot binding is invalid"
@@ -187,9 +189,15 @@ def validate_visual_locator(value: Any) -> None:
                 or item > 1
             ):
                 raise LocalResearchExhibitStoreError(
-                    "EXHIBIT-DOCUMENT-001", f"Research Exhibit visual locator region {field} is invalid"
+                    "EXHIBIT-DOCUMENT-001",
+                    f"Research Exhibit visual locator region {field} is invalid",
                 )
-        if region["width"] <= 0 or region["height"] <= 0 or region["x"] + region["width"] > 1 or region["y"] + region["height"] > 1:
+        if (
+            region["width"] <= 0
+            or region["height"] <= 0
+            or region["x"] + region["width"] > 1
+            or region["y"] + region["height"] > 1
+        ):
             raise LocalResearchExhibitStoreError(
                 "EXHIBIT-DOCUMENT-001", "Research Exhibit visual locator region exceeds page bounds"
             )
@@ -201,11 +209,21 @@ def validate_visual_locator(value: Any) -> None:
 
 def validate_visual_target(value: Any) -> None:
     required = {
-        "target_type", "source_run_id", "capture_id", "source_artifact_ref",
-        "locator", "source_media_type", "source_byte_length", "source_digest",
+        "target_type",
+        "source_run_id",
+        "capture_id",
+        "source_artifact_ref",
+        "locator",
+        "source_media_type",
+        "source_byte_length",
+        "source_digest",
         "derived_artifact",
     }
-    if not isinstance(value, Mapping) or set(value) != required or value.get("target_type") != "source_visual":
+    if (
+        not isinstance(value, Mapping)
+        or set(value) != required
+        or value.get("target_type") != "source_visual"
+    ):
         raise LocalResearchExhibitStoreError(
             "EXHIBIT-DOCUMENT-001", "Research Exhibit visual target shape is invalid"
         )
@@ -232,8 +250,12 @@ def validate_visual_target(value: Any) -> None:
     derived = value.get("derived_artifact")
     if derived is not None:
         expected = {
-            "artifact_ref", "derived_from_artifact_ref", "derivation_type",
-            "media_type", "byte_length", "digest",
+            "artifact_ref",
+            "derived_from_artifact_ref",
+            "derivation_type",
+            "media_type",
+            "byte_length",
+            "digest",
         }
         if not isinstance(derived, Mapping) or set(derived) != expected:
             raise LocalResearchExhibitStoreError(
@@ -243,29 +265,44 @@ def validate_visual_target(value: Any) -> None:
             item = derived.get(field)
             if not isinstance(item, str) or not item.strip():
                 raise LocalResearchExhibitStoreError(
-                    "EXHIBIT-DOCUMENT-001", f"Research Exhibit derived visual artifact {field} is invalid"
+                    "EXHIBIT-DOCUMENT-001",
+                    f"Research Exhibit derived visual artifact {field} is invalid",
                 )
         if derived.get("derived_from_artifact_ref") != value.get("source_artifact_ref"):
             raise LocalResearchExhibitStoreError(
-                "EXHIBIT-DOCUMENT-001", "Research Exhibit derived artifact source binding is invalid"
+                "EXHIBIT-DOCUMENT-001",
+                "Research Exhibit derived artifact source binding is invalid",
             )
         if derived.get("derivation_type") not in {"crop", "table_extraction"}:
             raise LocalResearchExhibitStoreError(
-                "EXHIBIT-DOCUMENT-001", "Research Exhibit derived artifact derivation type is invalid"
+                "EXHIBIT-DOCUMENT-001",
+                "Research Exhibit derived artifact derivation type is invalid",
             )
         derived_size = derived.get("byte_length")
         if isinstance(derived_size, bool) or not isinstance(derived_size, int) or derived_size < 0:
             raise LocalResearchExhibitStoreError(
-                "EXHIBIT-DOCUMENT-001", "Research Exhibit derived visual artifact byte_length is invalid"
+                "EXHIBIT-DOCUMENT-001",
+                "Research Exhibit derived visual artifact byte_length is invalid",
             )
         _validate_digest(derived.get("digest"), "derived artifact digest")
 
 
 def validate_exhibit_document(value: Mapping[str, Any]) -> None:
     required = {
-        "schema_version", "exhibit_id", "project_id", "kind", "title", "purpose",
-        "rq_ids", "source_run_ids", "source_artifact_refs", "source_object_ids",
-        "derived_from_exhibit_ids", "captured_against", "content", "content_digest",
+        "schema_version",
+        "exhibit_id",
+        "project_id",
+        "kind",
+        "title",
+        "purpose",
+        "rq_ids",
+        "source_run_ids",
+        "source_artifact_refs",
+        "source_object_ids",
+        "derived_from_exhibit_ids",
+        "captured_against",
+        "content",
+        "content_digest",
         "provenance",
     }
     allowed = required | {"visual_target", "visual_semantics"}
@@ -289,7 +326,9 @@ def validate_exhibit_document(value: Mapping[str, Any]) -> None:
         )
     _validate_string_list(value.get("rq_ids"), "rq_ids", required=True)
     for field in (
-        "source_run_ids", "source_artifact_refs", "source_object_ids",
+        "source_run_ids",
+        "source_artifact_refs",
+        "source_object_ids",
         "derived_from_exhibit_ids",
     ):
         _validate_string_list(value.get(field), field)
@@ -304,7 +343,9 @@ def validate_exhibit_document(value: Mapping[str, Any]) -> None:
 
     content = value.get("content")
     if not isinstance(content, Mapping) or set(content) != {
-        "representation", "media_type", "value"
+        "representation",
+        "media_type",
+        "value",
     }:
         raise LocalResearchExhibitStoreError(
             "EXHIBIT-DOCUMENT-001", "stored Research Exhibit content shape is invalid"
@@ -329,9 +370,7 @@ def validate_exhibit_document(value: Mapping[str, Any]) -> None:
         )
 
     provenance = value.get("provenance")
-    if not isinstance(provenance, Mapping) or set(provenance) != {
-        "captured_at", "capture_origin"
-    }:
+    if not isinstance(provenance, Mapping) or set(provenance) != {"captured_at", "capture_origin"}:
         raise LocalResearchExhibitStoreError(
             "EXHIBIT-DOCUMENT-001", "Research Exhibit provenance shape is invalid"
         )
@@ -345,7 +384,14 @@ def validate_exhibit_document(value: Mapping[str, Any]) -> None:
 
 def _metadata_from_document(document: Mapping[str, Any]) -> dict[str, Any]:
     return {
-        **({"visual_class": document["visual_semantics"]["visual_class"], "semantic_status": document["visual_semantics"]["semantic_status"]} if "visual_semantics" in document else {}),
+        **(
+            {
+                "visual_class": document["visual_semantics"]["visual_class"],
+                "semantic_status": document["visual_semantics"]["semantic_status"],
+            }
+            if "visual_semantics" in document
+            else {}
+        ),
         "exhibit_id": str(document["exhibit_id"]),
         "project_id": str(document["project_id"]),
         "kind": str(document["kind"]),
@@ -365,7 +411,10 @@ def _metadata_from_document(document: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _validate_exhibit_metadata(value: Mapping[str, Any]) -> None:
-    if not isinstance(value, Mapping) or set(value) not in (_METADATA_FIELDS, _METADATA_FIELDS | {"visual_class", "semantic_status"}):
+    if not isinstance(value, Mapping) or set(value) not in (
+        _METADATA_FIELDS,
+        _METADATA_FIELDS | {"visual_class", "semantic_status"},
+    ):
         raise LocalResearchExhibitStoreError(
             "EXHIBIT-STORE-INTEGRITY-001", "stored Research Exhibit metadata shape is invalid"
         )
@@ -373,10 +422,19 @@ def _validate_exhibit_metadata(value: Mapping[str, Any]) -> None:
         value["visual_class"] not in {"source_visual", "data_visualization", "explanatory_visual"}
         or value["semantic_status"] not in {"review_required", "research_required"}
     ):
-        raise LocalResearchExhibitStoreError("EXHIBIT-STORE-INTEGRITY-001", "stored visual semantic metadata is invalid")
+        raise LocalResearchExhibitStoreError(
+            "EXHIBIT-STORE-INTEGRITY-001", "stored visual semantic metadata is invalid"
+        )
     for field in (
-        "exhibit_id", "project_id", "kind", "title", "purpose",
-        "content_representation", "content_digest", "captured_at", "capture_origin",
+        "exhibit_id",
+        "project_id",
+        "kind",
+        "title",
+        "purpose",
+        "content_representation",
+        "content_digest",
+        "captured_at",
+        "capture_origin",
     ):
         item = value.get(field)
         if not isinstance(item, str) or not item.strip():
@@ -395,7 +453,9 @@ def _validate_exhibit_metadata(value: Mapping[str, Any]) -> None:
         )
     _validate_string_list(value.get("rq_ids"), "rq_ids", required=True)
     for field in (
-        "source_run_ids", "source_artifact_refs", "source_object_ids",
+        "source_run_ids",
+        "source_artifact_refs",
+        "source_object_ids",
         "derived_from_exhibit_ids",
     ):
         _validate_string_list(value.get(field), field)
@@ -457,9 +517,7 @@ class LocalResearchExhibitStore:
 
     def _read_schema_version(self, connection: sqlite3.Connection) -> None:
         try:
-            row = connection.execute(
-                "SELECT schema_version FROM exhibit_store_meta"
-            ).fetchone()
+            row = connection.execute("SELECT schema_version FROM exhibit_store_meta").fetchone()
         except sqlite3.Error as exc:
             raise LocalResearchExhibitStoreError(
                 "EXHIBIT-STORE-SCHEMA-001",
@@ -609,10 +667,13 @@ class LocalResearchExhibitStore:
         connection = self._connect_write()
         try:
             connection.execute("BEGIN IMMEDIATE")
-            if connection.execute(
-                "SELECT 1 FROM research_exhibits WHERE exhibit_id=?",
-                (str(document["exhibit_id"]),),
-            ).fetchone() is not None:
+            if (
+                connection.execute(
+                    "SELECT 1 FROM research_exhibits WHERE exhibit_id=?",
+                    (str(document["exhibit_id"]),),
+                ).fetchone()
+                is not None
+            ):
                 raise LocalResearchExhibitStoreError(
                     "EXHIBIT-IMMUTABLE-001",
                     "Research Exhibit ID already exists; overwrite is forbidden",

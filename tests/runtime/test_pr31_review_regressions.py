@@ -12,7 +12,10 @@ from plugins.local_application.resume import (
     _rq_candidate,
     _validated_limits,
 )
-from plugins.local_attention_resume import _activation_ids_for_map, validate_active_attention_binding
+from plugins.local_attention_resume import (
+    _activation_ids_for_map,
+    validate_active_attention_binding,
+)
 from plugins.local_attention_store import LocalAttentionStoreError, attention_event_digest
 
 
@@ -25,10 +28,12 @@ def _candidate_fixture() -> dict:
         "current_snapshot_ref": "SNAP-1",
         "current_snapshot_digest": "sha256:" + "b" * 64,
         "provenance": {"producer": "research_question.propose@0.1.0"},
-        "proposed_actions": [{
-            "kind": "CREATE_OBJECT",
-            "payload": {"object": {"kind": "research_question", "id": "RQ-1"}},
-        }],
+        "proposed_actions": [
+            {
+                "kind": "CREATE_OBJECT",
+                "payload": {"object": {"kind": "research_question", "id": "RQ-1"}},
+            }
+        ],
         "affected_refs": [{"kind": "research_question", "id": "RQ-1"}],
     }
 
@@ -107,7 +112,10 @@ class PR31ReviewRegressionTests(unittest.TestCase):
             {"project": {"project_id": "PRJ-OTHER", "title": "Other"}},
         )
         for project_config in cases:
-            with self.subTest(project_config=project_config), self.assertRaises(ConversationRuntimeError) as raised:
+            with (
+                self.subTest(project_config=project_config),
+                self.assertRaises(ConversationRuntimeError) as raised,
+            ):
                 _project_projection(project_config, "PRJ-1")
             self.assertEqual(raised.exception.code, "RESUME-PROJECT-001")
 
@@ -134,7 +142,10 @@ class PR31ReviewRegressionTests(unittest.TestCase):
 
     def test_question_projection_converts_missing_identity_or_text_to_structured_error(self):
         for question in ({}, {"id": "RQ-1"}, {"text": "Question?"}):
-            with self.subTest(question=question), self.assertRaises(ConversationRuntimeError) as raised:
+            with (
+                self.subTest(question=question),
+                self.assertRaises(ConversationRuntimeError) as raised,
+            ):
                 _question_projection(question, error_code="RESUME-CANDIDATE-001")
             self.assertEqual(raised.exception.code, "RESUME-CANDIDATE-001")
 
@@ -152,9 +163,10 @@ class PR31ReviewRegressionTests(unittest.TestCase):
                 {"id": "RQ-1", "text": "Question?", "revision": {}},
             )
             for question in questions:
-                with self.subTest(error_code=error_code, question=question), self.assertRaises(
-                    ConversationRuntimeError
-                ) as raised:
+                with (
+                    self.subTest(error_code=error_code, question=question),
+                    self.assertRaises(ConversationRuntimeError) as raised,
+                ):
                     _question_projection(question, error_code=error_code)
                 self.assertEqual(raised.exception.code, error_code)
         self.assertEqual(
@@ -174,11 +186,13 @@ class PR31ReviewRegressionTests(unittest.TestCase):
             self.assertEqual(raised.exception.code, "RESUME-CANDIDATE-001")
 
     def test_attention_activation_history_is_bounded_with_truncation(self):
-        connection = _activation_connection([
-            _activation_event("ACT-1"),
-            _activation_event("ACT-2"),
-            _activation_event("ACT-3"),
-        ])
+        connection = _activation_connection(
+            [
+                _activation_event("ACT-1"),
+                _activation_event("ACT-2"),
+                _activation_event("ACT-3"),
+            ]
+        )
         try:
             activation_ids, truncated = _activation_ids_for_map(
                 connection,

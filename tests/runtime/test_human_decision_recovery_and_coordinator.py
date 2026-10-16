@@ -9,13 +9,20 @@ from core.conversation.testing import MappingResolver, SequenceIdProvider
 from core.decision import HumanDecisionService, make_response
 from core.execution.testing import StaticClock
 from core.runtime import (
-    StateTransitionService, TransitionAction, TransitionKind, canonical_digest,
+    StateTransitionService,
+    TransitionAction,
+    TransitionKind,
+    canonical_digest,
 )
 from core.runtime.testing import InMemoryResearchStateRepository
 from plugins.local_application import LocalResearchApplication
 from plugins.local_decision_store import LocalHumanDecisionStore
 from runtime_fixtures import (
-    SCHEMA_VALIDATOR, finding, project, rq, seed_state,
+    SCHEMA_VALIDATOR,
+    finding,
+    project,
+    rq,
+    seed_state,
 )
 
 
@@ -93,12 +100,15 @@ class HumanDecisionRecoveryTests(unittest.TestCase):
                 clock=CLOCK,
             )
             try:
-                candidate = _candidate(state, [
-                    TransitionAction(
-                        TransitionKind.ADOPT_OBJECT,
-                        {"object": rq(revision=1, state="approved")},
-                    )
-                ])
+                candidate = _candidate(
+                    state,
+                    [
+                        TransitionAction(
+                            TransitionKind.ADOPT_OBJECT,
+                            {"object": rq(revision=1, state="approved")},
+                        )
+                    ],
+                )
                 gate = service.gate_candidate(candidate, state=state, actor=ACTOR)
                 response = make_response(
                     request=gate.decision_request,
@@ -127,12 +137,16 @@ class HumanDecisionRecoveryTests(unittest.TestCase):
         state = seed_state(objects=[project(), rq(state="candidate")])
         repo = InMemoryResearchStateRepository(state)
         transitions = StateTransitionService(repo, schema_validator=SCHEMA_VALIDATOR)
-        candidate = _candidate(state, [
-            TransitionAction(
-                TransitionKind.ADOPT_OBJECT,
-                {"object": rq(revision=1, state="approved")},
-            )
-        ], proposal_id="SDP-SOURCE-BIND")
+        candidate = _candidate(
+            state,
+            [
+                TransitionAction(
+                    TransitionKind.ADOPT_OBJECT,
+                    {"object": rq(revision=1, state="approved")},
+                )
+            ],
+            proposal_id="SDP-SOURCE-BIND",
+        )
         source_bindings = MutableSourceBindings(candidate)
         with tempfile.TemporaryDirectory() as temp:
             store = LocalHumanDecisionStore(f"{temp}/decision.db")
@@ -146,16 +160,21 @@ class HumanDecisionRecoveryTests(unittest.TestCase):
             try:
                 gate = service.gate_candidate(candidate, state=state, actor=ACTOR)
                 source_bindings.candidate = None
-                result = service.resolve(make_response(
-                    request=gate.decision_request,
-                    disposition="approve_exact",
-                    actor_id="HUMAN-1",
-                    responded_at="2026-08-27T05:01:00Z",
-                ))
+                result = service.resolve(
+                    make_response(
+                        request=gate.decision_request,
+                        disposition="approve_exact",
+                        actor_id="HUMAN-1",
+                        responded_at="2026-08-27T05:01:00Z",
+                    )
+                )
                 self.assertEqual(result.status, "STALE")
                 current = repo.load_state_view("PRJ-1", "LIN-1")
                 self.assertEqual(current.decisions, ())
-                self.assertEqual(current.current_snapshot["content_digest"], state.current_snapshot["content_digest"])
+                self.assertEqual(
+                    current.current_snapshot["content_digest"],
+                    state.current_snapshot["content_digest"],
+                )
             finally:
                 store.close()
 
@@ -164,24 +183,33 @@ class HumanDecisionRecoveryTests(unittest.TestCase):
         state = seed_state(objects=objects)
         repo = InMemoryResearchStateRepository(state)
         transitions = StateTransitionService(repo, schema_validator=SCHEMA_VALIDATOR)
-        derived = finding(revision=1, statement="Reconfirmed by explicit Human Decision", state="approved")
-        action = TransitionAction(TransitionKind.APPLY_LINEAGE_PLAN, {
-            "plan_ref": "PLAN-HD",
-            "target_lineage_id": "LIN-HD",
-            "lineage_kind": "exploratory_fork",
-            "baseline_snapshot_ref": state.current_snapshot["id"],
-            "baseline_snapshot_digest": state.current_snapshot["content_digest"],
-            "treatments": [
-                {"object_kind": "project", "source_ref": "PRJ-1", "treatment": "PRESERVE"},
-                {"object_kind": "research_question", "source_ref": "RQ-1", "treatment": "PRESERVE"},
-                {
-                    "object_kind": "finding",
-                    "source_ref": "FND-1",
-                    "treatment": "RECONFIRM",
-                    "derived_object": derived,
-                },
-            ],
-        })
+        derived = finding(
+            revision=1, statement="Reconfirmed by explicit Human Decision", state="approved"
+        )
+        action = TransitionAction(
+            TransitionKind.APPLY_LINEAGE_PLAN,
+            {
+                "plan_ref": "PLAN-HD",
+                "target_lineage_id": "LIN-HD",
+                "lineage_kind": "exploratory_fork",
+                "baseline_snapshot_ref": state.current_snapshot["id"],
+                "baseline_snapshot_digest": state.current_snapshot["content_digest"],
+                "treatments": [
+                    {"object_kind": "project", "source_ref": "PRJ-1", "treatment": "PRESERVE"},
+                    {
+                        "object_kind": "research_question",
+                        "source_ref": "RQ-1",
+                        "treatment": "PRESERVE",
+                    },
+                    {
+                        "object_kind": "finding",
+                        "source_ref": "FND-1",
+                        "treatment": "RECONFIRM",
+                        "derived_object": derived,
+                    },
+                ],
+            },
+        )
         with tempfile.TemporaryDirectory() as temp:
             store = LocalHumanDecisionStore(f"{temp}/decision.db")
             service = HumanDecisionService(
@@ -196,14 +224,19 @@ class HumanDecisionRecoveryTests(unittest.TestCase):
                     state=state,
                     actor=ACTOR,
                 )
-                kinds = {unit["required_decision_kind"] for unit in gate.decision_request["decision_units"]}
+                kinds = {
+                    unit["required_decision_kind"]
+                    for unit in gate.decision_request["decision_units"]
+                }
                 self.assertEqual(kinds, {"lineage_plan", "lineage_reconfirmation"})
-                result = service.resolve(make_response(
-                    request=gate.decision_request,
-                    disposition="approve_exact",
-                    actor_id="HUMAN-1",
-                    responded_at="2026-08-27T05:01:00Z",
-                ))
+                result = service.resolve(
+                    make_response(
+                        request=gate.decision_request,
+                        disposition="approve_exact",
+                        actor_id="HUMAN-1",
+                        responded_at="2026-08-27T05:01:00Z",
+                    )
+                )
                 self.assertEqual(result.status, "RESOLVED")
                 self.assertEqual(
                     result.commit_receipt.applied_typed_actions,
@@ -212,7 +245,8 @@ class HumanDecisionRecoveryTests(unittest.TestCase):
                 child = repo.load_state_view("PRJ-1", "LIN-HD")
                 reconfirmed = child.latest_object("finding", "FND-1")
                 reconfirm_decision = next(
-                    item for item in child.decisions
+                    item
+                    for item in child.decisions
                     if item["decision_kind"] == "lineage_reconfirmation"
                 )
                 self.assertIn(reconfirm_decision["id"], reconfirmed["decision_ids"])
@@ -244,7 +278,11 @@ class HumanDecisionRecoveryTests(unittest.TestCase):
             )
             try:
                 gate = service.gate_candidate(
-                    _candidate(state, [TransitionAction(TransitionKind.CREATE_OBJECT, {"object": claim})], proposal_id="SDP-NO-GATE"),
+                    _candidate(
+                        state,
+                        [TransitionAction(TransitionKind.CREATE_OBJECT, {"object": claim})],
+                        proposal_id="SDP-NO-GATE",
+                    ),
                     state=state,
                     actor=ACTOR,
                 )
@@ -278,12 +316,14 @@ def _profile_provider(project_ref, expected_digest):
     return {
         "schema_version": "0.1.0",
         "core_contracts": {"research_contract": "0.1.0", "invariant_contract": "0.1.0"},
-        "profile_pins": [{
-            "profile_id": "fixture.research",
-            "profile_type": "research",
-            "profile_version": "1.0.0",
-            "manifest_sha256": "1" * 64,
-        }],
+        "profile_pins": [
+            {
+                "profile_id": "fixture.research",
+                "profile_type": "research",
+                "profile_version": "1.0.0",
+                "manifest_sha256": "1" * 64,
+            }
+        ],
         "content_digest": expected_digest,
     }
 
@@ -296,16 +336,36 @@ class PendingDecisionCoordinatorTests(unittest.TestCase):
             snapshot_id="SNP-PENDING-0",
         )
         mapping = {
-            "apply": ActionDraft("state.apply_candidate", {"state_delta_proposal_id": "SDP-PENDING"}),
+            "apply": ActionDraft(
+                "state.apply_candidate", {"state_delta_proposal_id": "SDP-PENDING"}
+            ),
             "run next": ActionDraft("desktop_research.investigate", {"question_id": "RQ-1"}),
-            "abort run": ActionDraft("run.abort", {"run_id": "RUN-D", "reason": "operator cleanup"}),
+            "abort run": ActionDraft(
+                "run.abort", {"run_id": "RUN-D", "reason": "operator cleanup"}
+            ),
             "status": ActionDraft("research.status", {}),
         }
         ids = [
-            "PROP-A", "CONFREQ-A", "CONFREC-A", "ACTREC-A", "CONVTRACE-A",
-            "PROP-D", "CTX-D", "INV-D", "RUN-D", "TRACE-D", "ACTREC-D", "CONVTRACE-D",
-            "PROP-X", "CONFREQ-X", "CONFREC-X", "ACTREC-X", "CONVTRACE-X",
-            "PROP-S", "ACTREC-S", "CONVTRACE-S",
+            "PROP-A",
+            "CONFREQ-A",
+            "CONFREC-A",
+            "ACTREC-A",
+            "CONVTRACE-A",
+            "PROP-D",
+            "CTX-D",
+            "INV-D",
+            "RUN-D",
+            "TRACE-D",
+            "ACTREC-D",
+            "CONVTRACE-D",
+            "PROP-X",
+            "CONFREQ-X",
+            "CONFREC-X",
+            "ACTREC-X",
+            "CONVTRACE-X",
+            "PROP-S",
+            "ACTREC-S",
+            "CONVTRACE-S",
         ]
         with tempfile.TemporaryDirectory() as temp:
             app = LocalResearchApplication(
@@ -328,19 +388,25 @@ class PendingDecisionCoordinatorTests(unittest.TestCase):
                 )
                 app.conversation_store.store_state_delta_proposal("SDP-PENDING", candidate)
 
-                confirmation = app.coordinator.process_input(_input("IN-A", "COMMITTABLE_ACTION", "apply"))
+                confirmation = app.coordinator.process_input(
+                    _input("IN-A", "COMMITTABLE_ACTION", "apply")
+                )
                 self.assertEqual(confirmation.status, "CONFIRMATION_REQUIRED")
-                gated = app.coordinator.process_input(_input(
-                    "IN-C",
-                    "CONFIRMATION",
-                    "yes",
-                    target={"target_type": "confirmation_request", "target_id": "CONFREQ-A"},
-                ))
+                gated = app.coordinator.process_input(
+                    _input(
+                        "IN-C",
+                        "CONFIRMATION",
+                        "yes",
+                        target={"target_type": "confirmation_request", "target_id": "CONFREQ-A"},
+                    )
+                )
                 self.assertTrue(gated.data["decision_required"])
                 request_id = gated.data["decision_request"]["request_id"]
 
                 before = app.state_repository.load_state_view("PRJ-1", "LIN-1")
-                research = app.coordinator.process_input(_input("IN-D", "COMMITTABLE_ACTION", "run next"))
+                research = app.coordinator.process_input(
+                    _input("IN-D", "COMMITTABLE_ACTION", "run next")
+                )
                 self.assertEqual(research.status, "EXECUTION_PREPARED")
                 self.assertEqual(research.prepared_execution.run.run_id, "RUN-D")
                 # Ablation: the former blanket predicate would reject this exact proposal.
@@ -349,22 +415,32 @@ class PendingDecisionCoordinatorTests(unittest.TestCase):
                     and research.proposal["route"]["route_type"] == "capability_invocation"
                 )
                 after = app.state_repository.load_state_view("PRJ-1", "LIN-1")
-                self.assertEqual(after.current_snapshot["content_digest"], before.current_snapshot["content_digest"])
+                self.assertEqual(
+                    after.current_snapshot["content_digest"],
+                    before.current_snapshot["content_digest"],
+                )
                 self.assertEqual(app.execution_store.diagnose_integrity(), ())
 
-                abort_pending = app.coordinator.process_input(_input("IN-X", "COMMITTABLE_ACTION", "abort run"))
+                abort_pending = app.coordinator.process_input(
+                    _input("IN-X", "COMMITTABLE_ACTION", "abort run")
+                )
                 self.assertEqual(abort_pending.status, "CONFIRMATION_REQUIRED")
-                aborted = app.coordinator.process_input(_input(
-                    "IN-XC",
-                    "CONFIRMATION",
-                    "yes",
-                    target={"target_type": "confirmation_request", "target_id": "CONFREQ-X"},
-                ))
+                aborted = app.coordinator.process_input(
+                    _input(
+                        "IN-XC",
+                        "CONFIRMATION",
+                        "yes",
+                        target={"target_type": "confirmation_request", "target_id": "CONFREQ-X"},
+                    )
+                )
                 self.assertEqual(aborted.status, "SUCCEEDED")
                 self.assertEqual(app.execution_store.load_run("RUN-D").status.value, "ABORTED")
                 self.assertFalse(aborted.action_receipt["research_state_mutation_performed"])
                 after_abort = app.state_repository.load_state_view("PRJ-1", "LIN-1")
-                self.assertEqual(after_abort.current_snapshot["content_digest"], before.current_snapshot["content_digest"])
+                self.assertEqual(
+                    after_abort.current_snapshot["content_digest"],
+                    before.current_snapshot["content_digest"],
+                )
 
                 status = app.coordinator.process_input(_input("IN-S", "QUERY", "status"))
                 visible = status.data["pending_human_decisions"]

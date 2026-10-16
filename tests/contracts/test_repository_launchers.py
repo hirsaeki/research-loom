@@ -16,7 +16,7 @@ class RepositoryLauncherContractTests(unittest.TestCase):
         text = POSIX_LAUNCHER.read_text(encoding="utf-8")
         lines = text.splitlines()
         self.assertEqual(lines[0], "#!/bin/sh")
-        self.assertEqual(lines[1], "'''exec' \"$(dirname \"$0\")/.venv/bin/python\" \"$0\" \"$@\"")
+        self.assertEqual(lines[1], '\'\'\'exec\' "$(dirname "$0")/.venv/bin/python" "$0" "$@"')
         self.assertEqual(lines[2], "' '''")
         self.assertNotIn("/usr/bin/env -S", text)
         self.assertNotIn("# /// script", text)

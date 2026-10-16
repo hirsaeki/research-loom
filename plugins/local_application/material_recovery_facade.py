@@ -18,8 +18,6 @@ from .facade import LocalApplicationError
 from .material_content_facade import _artifact_pair_for_capture
 
 
-
-
 _ACTION_TYPE = "desktop_research.material.recover"
 _PAYLOAD_CONTRACT = "desktop-research-material-recovery@0.1.0"
 _ACTION_REGISTRATION_LOCK = RLock()
@@ -42,7 +40,9 @@ def material_recovery_payload(payload: Mapping[str, Any]) -> dict[str, str]:
     if kind not in {"original", "rendition"}:
         raise ValueError("kind must be original or rendition")
     if not isinstance(source_file, str) or not source_file:
-        raise ValueError("source_file must be a non-empty workspace-relative or workspace-contained path")
+        raise ValueError(
+            "source_file must be a non-empty workspace-relative or workspace-contained path"
+        )
     return {
         "run_id": run_id,
         "capture_id": capture_id,
@@ -50,9 +50,8 @@ def material_recovery_payload(payload: Mapping[str, Any]) -> dict[str, str]:
         "source_file": source_file,
     }
 
-def _canonical_artifact_binding_for_capture(
-    store, run_id: str, capture_id: str, kind: str
-):
+
+def _canonical_artifact_binding_for_capture(store, run_id: str, capture_id: str, kind: str):
     extensions = result_extensions_for_run(store, run_id, limit=3)
     if len(extensions) != 1 or not isinstance(extensions[0], Mapping):
         raise LocalExecutionStoreIntegrityError(
@@ -85,9 +84,7 @@ def _canonical_artifact_binding_for_capture(
             "canonical Desktop Research artifact binding is invalid"
         )
     artifacts = [
-        artifact
-        for artifact in store.artifacts_for(run_id)
-        if artifact.artifact_id == artifact_id
+        artifact for artifact in store.artifacts_for(run_id) if artifact.artifact_id == artifact_id
     ]
     if len(artifacts) != 1:
         raise LocalExecutionStoreIntegrityError(
@@ -136,12 +133,16 @@ class HistoricalMaterialRecoveryHandler:
         )
 
 
-def ensure_material_recovery_action(application, project_id: str, workspace_root: Path | None) -> None:
+def ensure_material_recovery_action(
+    application, project_id: str, workspace_root: Path | None
+) -> None:
     coordinator = application.coordinator
     action_registry = coordinator._actions
     service_registry = coordinator._services
     with _ACTION_REGISTRATION_LOCK:
-        existing = {definition.action_type: definition for definition in coordinator.action_definitions()}
+        existing = {
+            definition.action_type: definition for definition in coordinator.action_definitions()
+        }
         definition = existing.get(_ACTION_TYPE)
         if definition is None:
             action_registry.register(
@@ -275,7 +276,13 @@ class HistoricalMaterialRecoveryService:
             "research_state_mutation_performed": False,
             "diagnostic_recorded": diagnostic_recorded,
         }
-        for field in ("previous_status", "quarantine_ref", "recovered_at", "recovery_record", "recovery_record_warning"):
+        for field in (
+            "previous_status",
+            "quarantine_ref",
+            "recovered_at",
+            "recovery_record",
+            "recovery_record_warning",
+        ):
             if field in result:
                 response[field] = result[field]
         if diagnostic_warning is not None:

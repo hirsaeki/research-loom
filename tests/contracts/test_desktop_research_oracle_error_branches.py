@@ -71,9 +71,7 @@ class DesktopResearchOracleErrorBranches(unittest.TestCase):
     def test_rejects_capture_provenance_and_budget_drift(self):
         """Exercise capture provenance and bounded-result budget branches."""
         bad_provenance = deepcopy(self.result_extension)
-        bad_provenance["source_capture_details"][0]["exact_locator"] = (
-            "fixture://source#wrong"
-        )
+        bad_provenance["source_capture_details"][0]["exact_locator"] = "fixture://source#wrong"
         refresh_extension_digest(bad_provenance)
         self.assertEqual(
             "DR-CAPTURE-PROVENANCE-001",
@@ -101,9 +99,7 @@ class DesktopResearchOracleErrorBranches(unittest.TestCase):
     def test_rejects_null_and_evidence_gap_reference_drift(self):
         """Exercise null projection and Evidence Gap assessment branches."""
         bad_null = deepcopy(self.result_extension)
-        bad_null["null_results"][0]["handoff_projection"]["output_id"] = (
-            "OBS-MISSING"
-        )
+        bad_null["null_results"][0]["handoff_projection"]["output_id"] = "OBS-MISSING"
         refresh_extension_digest(bad_null)
         self.assertEqual(
             "DR-NULL-001",

@@ -19,7 +19,9 @@ def _id(prefix: str, basis: str) -> str:
 class SurveyVirtualRunnerNormalizer:
     """Normalize only an operational next-action candidate; never synthetic research content."""
 
-    def supports(self, capability_contract_id: str, function_id: str, contract_version: str) -> bool:
+    def supports(
+        self, capability_contract_id: str, function_id: str, contract_version: str
+    ) -> bool:
         return (capability_contract_id, function_id, contract_version) == (
             "virtual-runner",
             "execute",
@@ -39,8 +41,14 @@ class SurveyVirtualRunnerNormalizer:
         if extension.get("real_execution_started") is not False:
             return ("VR-REAL-ISOLATION-001: Virtual Runner claims REAL execution started",)
         result = extension.get("virtual_runner_result")
-        if not isinstance(result, Mapping) or result.get("candidate_analyses") or result.get("candidate_findings"):
-            return ("VR-EPISTEMIC-FIREWALL-001: Survey production binding must not emit synthetic research findings",)
+        if (
+            not isinstance(result, Mapping)
+            or result.get("candidate_analyses")
+            or result.get("candidate_findings")
+        ):
+            return (
+                "VR-EPISTEMIC-FIREWALL-001: Survey production binding must not emit synthetic research findings",
+            )
         binding = extension.get("handoff_binding")
         if not isinstance(binding, Mapping):
             return ("VR-RESULT-BINDING-001: Handoff binding is missing",)

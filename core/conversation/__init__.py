@@ -18,10 +18,19 @@ from .service import ResearchCoordinator, WorkConversationService
 from .validation import WorkConversationValidator, canonical_digest, with_document_digest
 
 __all__ = [
-    "ActionDefinition", "ActionDraft", "ActionRegistry",
-    "CapabilityActionMaterializerRegistry", "CapabilityDescriptorRegistry",
-    "CapabilityMaterialization", "ConversationRuntimeError", "CoordinatorResult",
-    "HarnessServiceRegistry", "HarnessServiceResult", "ResearchCoordinator",
-    "WorkConversationService", "WorkConversationValidator", "canonical_digest",
+    "ActionDefinition",
+    "ActionDraft",
+    "ActionRegistry",
+    "CapabilityActionMaterializerRegistry",
+    "CapabilityDescriptorRegistry",
+    "CapabilityMaterialization",
+    "ConversationRuntimeError",
+    "CoordinatorResult",
+    "HarnessServiceRegistry",
+    "HarnessServiceResult",
+    "ResearchCoordinator",
+    "WorkConversationService",
+    "WorkConversationValidator",
+    "canonical_digest",
     "with_document_digest",
 ]

@@ -53,8 +53,9 @@ class HistoricalMaterialReacquisitionPypdfProviderTests(unittest.TestCase):
             created.append(process)
             return process
 
-        with patch.object(provider.shutil, "which", return_value="uv"), patch.object(
-            provider.subprocess, "Popen", side_effect=fake_popen
+        with (
+            patch.object(provider.shutil, "which", return_value="uv"),
+            patch.object(provider.subprocess, "Popen", side_effect=fake_popen),
         ):
             result = provider._run_historical_pypdf(
                 b"%PDF-1.7 fixture",
@@ -80,9 +81,11 @@ class HistoricalMaterialReacquisitionPypdfProviderTests(unittest.TestCase):
             pages=[FakePage("page one\nline two"), FakePage("page two")]
         )
         output = io.BytesIO()
-        with patch.dict(sys.modules, {"pypdf": fake_module}), patch.object(
-            sys, "argv", ["-c", "source.pdf", "1024"]
-        ), patch.object(sys, "stdout", SimpleNamespace(buffer=output)):
+        with (
+            patch.dict(sys.modules, {"pypdf": fake_module}),
+            patch.object(sys, "argv", ["-c", "source.pdf", "1024"]),
+            patch.object(sys, "stdout", SimpleNamespace(buffer=output)),
+        ):
             exec(provider._PYPDF_SCRIPT, {})
         self.assertEqual(
             output.getvalue(),
@@ -93,9 +96,11 @@ class HistoricalMaterialReacquisitionPypdfProviderTests(unittest.TestCase):
             pages=[FakePage("x" * 65), FakePage("must-not-be-read")]
         )
         output = io.BytesIO()
-        with patch.dict(sys.modules, {"pypdf": fake_module}), patch.object(
-            sys, "argv", ["-c", "source.pdf", "64"]
-        ), patch.object(sys, "stdout", SimpleNamespace(buffer=output)):
+        with (
+            patch.dict(sys.modules, {"pypdf": fake_module}),
+            patch.object(sys, "argv", ["-c", "source.pdf", "64"]),
+            patch.object(sys, "stdout", SimpleNamespace(buffer=output)),
+        ):
             with self.assertRaises(SystemExit) as raised:
                 exec(provider._PYPDF_SCRIPT, {})
         self.assertEqual(raised.exception.code, provider._PYPDF_BOUND_EXIT)
@@ -113,8 +118,9 @@ class HistoricalMaterialReacquisitionPypdfProviderTests(unittest.TestCase):
             def kill(self):
                 self.returncode = -9
 
-        with patch.object(provider.shutil, "which", return_value="uv"), patch.object(
-            provider.subprocess, "Popen", return_value=FakeProcess()
+        with (
+            patch.object(provider.shutil, "which", return_value="uv"),
+            patch.object(provider.subprocess, "Popen", return_value=FakeProcess()),
         ):
             with self.assertRaisesRegex(
                 base.MaterialReacquisitionRetrievalError,
@@ -126,13 +132,16 @@ class HistoricalMaterialReacquisitionPypdfProviderTests(unittest.TestCase):
                     max_bytes=64,
                 )
 
-        with patch.object(
-            provider,
-            "_run_historical_pypdf",
-            side_effect=base.MaterialReacquisitionRetrievalError(
-                "regenerated rendition exceeds bounded material intake limit"
+        with (
+            patch.object(
+                provider,
+                "_run_historical_pypdf",
+                side_effect=base.MaterialReacquisitionRetrievalError(
+                    "regenerated rendition exceeds bounded material intake limit"
+                ),
             ),
-        ), patch.object(provider, "_BASE_GENERATOR") as fallback:
+            patch.object(provider, "_BASE_GENERATOR") as fallback,
+        ):
             with self.assertRaisesRegex(
                 base.MaterialReacquisitionRetrievalError,
                 "exceeds bounded material intake limit",
@@ -153,11 +162,14 @@ class HistoricalMaterialReacquisitionPypdfProviderTests(unittest.TestCase):
             "pdftotext",
             None,
         )
-        with patch.object(
-            provider,
-            "_run_historical_pypdf",
-            side_effect=base.MaterialReacquisitionRetrievalError("uv unavailable"),
-        ), patch.object(provider, "_BASE_GENERATOR", return_value=fallback_result) as fallback:
+        with (
+            patch.object(
+                provider,
+                "_run_historical_pypdf",
+                side_effect=base.MaterialReacquisitionRetrievalError("uv unavailable"),
+            ),
+            patch.object(provider, "_BASE_GENERATOR", return_value=fallback_result) as fallback,
+        ):
             result = provider._regenerate_text_rendition(
                 b"%PDF-1.7 fixture",
                 "application/pdf",
@@ -254,15 +266,12 @@ class HistoricalMaterialReacquisitionPypdfProviderTests(unittest.TestCase):
             implementation_version="0.2.1",
             provenance=old_child.provenance,
         )
-        with patch.object(base, "_CAPABILITY_VERSION", "0.2.1"), patch.object(
-            base, "_IMPLEMENTATION_VERSION", "0.2.1"
+        with (
+            patch.object(base, "_CAPABILITY_VERSION", "0.2.1"),
+            patch.object(base, "_IMPLEMENTATION_VERSION", "0.2.1"),
         ):
-            self.assertFalse(
-                provider._matches_current_target(old_child, "CAP-1", "rendition")
-            )
-            self.assertTrue(
-                provider._matches_current_target(current_child, "CAP-1", "rendition")
-            )
+            self.assertFalse(provider._matches_current_target(old_child, "CAP-1", "rendition"))
+            self.assertTrue(provider._matches_current_target(current_child, "CAP-1", "rendition"))
 
 
 if __name__ == "__main__":

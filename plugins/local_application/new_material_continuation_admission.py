@@ -154,8 +154,7 @@ def _find_reacquisition_result(application, project_id: str, reacquisition_run_i
     )
     common_provenance_matches = (
         historical.status is RunStatus.COMPLETED
-        and metadata.provenance.get("exact_locator")
-        == result.get("requested_exact_locator")
+        and metadata.provenance.get("exact_locator") == result.get("requested_exact_locator")
         and metadata.provenance.get("acquired_at") == result.get("reacquired_at")
         and metadata.provenance.get("provider") == result.get("provider")
     )

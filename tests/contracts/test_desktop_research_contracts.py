@@ -23,14 +23,9 @@ ROOT = Path(__file__).resolve().parents[2]
 ORACLE_PATH = ROOT / "tests/contracts/desktop_research_oracle.py"
 PKG = ROOT / "core/packages"
 DR = PKG / "desktop-research"
-CONTEXT_PATH = (
-    ROOT
-    / "core/fixtures/capabilities/valid/generic-capability-context-pack.json"
-)
+CONTEXT_PATH = ROOT / "core/fixtures/capabilities/valid/generic-capability-context-pack.json"
 HANDOFF_PATH = ROOT / "core/fixtures/capabilities/valid/generic-capability-handoff.json"
-ROUTING_PATH = (
-    ROOT / "core/fixtures/conversation/valid/desktop-research-routing.json"
-)
+ROUTING_PATH = ROOT / "core/fixtures/conversation/valid/desktop-research-routing.json"
 
 
 def refresh_extension_digest(document):
@@ -335,15 +330,9 @@ class DesktopResearchContracts(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         """Load canonical contracts and construct one cross-document valid chain."""
-        cls.descriptor_schema = json.loads(
-            (PKG / "capability-descriptor.schema.json").read_text()
-        )
-        cls.handoff_schema = json.loads(
-            (PKG / "capability-handoff.schema.json").read_text()
-        )
-        cls.conversation_schema = json.loads(
-            (PKG / "work-conversation.schema.json").read_text()
-        )
+        cls.descriptor_schema = json.loads((PKG / "capability-descriptor.schema.json").read_text())
+        cls.handoff_schema = json.loads((PKG / "capability-handoff.schema.json").read_text())
+        cls.conversation_schema = json.loads((PKG / "work-conversation.schema.json").read_text())
         cls.context_schema = json.loads(
             (DR / "desktop-research-context-extension.schema.json").read_text()
         )
@@ -356,9 +345,7 @@ class DesktopResearchContracts(unittest.TestCase):
         cls.context = json.loads(CONTEXT_PATH.read_text())
         cls.generic_handoff = json.loads(HANDOFF_PATH.read_text())
         cls.routing = json.loads(ROUTING_PATH.read_text())
-        cls.semantics = yaml.safe_load(
-            (DR / "desktop-research-semantics.yaml").read_text()
-        )
+        cls.semantics = yaml.safe_load((DR / "desktop-research-semantics.yaml").read_text())
         cls.context_extension = build_context_extension(cls.context)
         cls.handoff = build_desktop_handoff(
             cls.generic_handoff,
@@ -424,9 +411,7 @@ class DesktopResearchContracts(unittest.TestCase):
             self.result_extension["extension_digest"],
             expected_result_extension_digest(self.result_extension),
         )
-        self.assertIsNone(
-            context_semantic_error(self.context_extension, self.context)
-        )
+        self.assertIsNone(context_semantic_error(self.context_extension, self.context))
         self.assertIsNone(
             result_semantic_error(
                 self.result_extension,
@@ -455,19 +440,14 @@ class DesktopResearchContracts(unittest.TestCase):
             set(function["supported_execution_modes"]),
             {"real", "virtual", "synthetic_test"},
         )
-        self.assertTrue(
-            self.semantics["handoff"]["second_desktop_research_handoff_forbidden"]
-        )
+        self.assertTrue(self.semantics["handoff"]["second_desktop_research_handoff_forbidden"])
 
     def test_context_extension_is_exact_bound_bounded_and_quality_neutral(self):
         """Keep Desktop context bounded without owning PR6 quality policy."""
         bound_ids = {
-            item["reference_id"]
-            for item in self.context_extension["resource_role_bindings"]
+            item["reference_id"] for item in self.context_extension["resource_role_bindings"]
         }
-        context_ids = {
-            item["reference_id"] for item in self.context["resources"]
-        }
+        context_ids = {item["reference_id"] for item in self.context["resources"]}
         self.assertEqual(bound_ids, context_ids)
         self.assertTrue(
             {
@@ -481,9 +461,7 @@ class DesktopResearchContracts(unittest.TestCase):
         self.assertNotIn("quality_tier", serialized)
         self.assertNotIn("source_quality", serialized)
         self.assertFalse(
-            self.semantics["quality_boundary"][
-                "source_type_to_quality_tier_matrix_canonicalized"
-            ]
+            self.semantics["quality_boundary"]["source_type_to_quality_tier_matrix_canonicalized"]
         )
 
     def test_question_candidate_target_is_explicitly_non_authoritative(self):
@@ -553,9 +531,7 @@ class DesktopResearchContracts(unittest.TestCase):
     def test_result_preserves_provenance_negative_search_gap_and_stopping(self):
         """Preserve capture provenance, unsuccessful search, and stop boundaries."""
         citation = self.result_extension["citation_details"][0]
-        rendition = self.result_extension["source_capture_details"][0][
-            "text_rendition"
-        ]
+        rendition = self.result_extension["source_capture_details"][0]["text_rendition"]
         self.assertIn(citation["excerpt"], rendition["inline_text"])
         self.assertFalse(citation["evidence_adoption_performed"])
         self.assertEqual(
@@ -566,9 +542,7 @@ class DesktopResearchContracts(unittest.TestCase):
             self.result_extension["evidence_gap_assessments"][0]["materiality"],
             "material",
         )
-        stop = self.result_extension["coverage_assessment"][
-            "stopping_recommendation"
-        ]
+        stop = self.result_extension["coverage_assessment"]["stopping_recommendation"]
         self.assertFalse(stop["stop_recommended"])
         self.assertFalse(stop["research_completion_claimed"])
         self.assertFalse(stop["human_decision_performed"])
@@ -591,36 +565,32 @@ class DesktopResearchContracts(unittest.TestCase):
         )
 
         missing_output = deepcopy(self.result_extension)
-        missing_output["citation_details"][0][
-            "handoff_output_id"
-        ] = "EVC-MISSING"
+        missing_output["citation_details"][0]["handoff_output_id"] = "EVC-MISSING"
         self.assert_result_semantic_error(
             missing_output,
             "DR-CITATION-001",
         )
 
         bad_unsuccessful = deepcopy(self.result_extension)
-        bad_unsuccessful["search_trace"]["unsuccessful_entry_ids"] = [
-            "STR-MISSING"
-        ]
+        bad_unsuccessful["search_trace"]["unsuccessful_entry_ids"] = ["STR-MISSING"]
         self.assert_result_semantic_error(
             bad_unsuccessful,
             "DR-SEARCH-TRACE-001",
         )
 
         bad_search_dimension = deepcopy(self.result_extension)
-        bad_search_dimension["search_trace"]["entries"][0][
-            "coverage_dimension_ids"
-        ] = ["COV-MISSING"]
+        bad_search_dimension["search_trace"]["entries"][0]["coverage_dimension_ids"] = [
+            "COV-MISSING"
+        ]
         self.assert_result_semantic_error(
             bad_search_dimension,
             "DR-SEARCH-TRACE-001",
         )
 
         bad_coverage_trace = deepcopy(self.result_extension)
-        bad_coverage_trace["coverage_assessment"]["dimensions"][0][
-            "trace_entry_ids"
-        ] = ["STR-MISSING"]
+        bad_coverage_trace["coverage_assessment"]["dimensions"][0]["trace_entry_ids"] = [
+            "STR-MISSING"
+        ]
         self.assert_result_semantic_error(
             bad_coverage_trace,
             "DR-COVERAGE-001",
@@ -636,9 +606,7 @@ class DesktopResearchContracts(unittest.TestCase):
     def test_result_semantics_reject_contradictory_stopping_recommendations(self):
         """Reject stop recommendations blocked by gaps or information value."""
         material_gap = deepcopy(self.result_extension)
-        material_gap["coverage_assessment"]["stopping_recommendation"][
-            "stop_recommended"
-        ] = True
+        material_gap["coverage_assessment"]["stopping_recommendation"]["stop_recommended"] = True
         self.assert_result_semantic_error(
             material_gap,
             "DR-STOP-GAP-001",
@@ -646,18 +614,16 @@ class DesktopResearchContracts(unittest.TestCase):
 
         high_riv = deepcopy(self.result_extension)
         high_riv["evidence_gap_assessments"][0]["materiality"] = "non_material"
-        high_riv["coverage_assessment"]["stopping_recommendation"][
-            "stop_recommended"
-        ] = True
+        high_riv["coverage_assessment"]["stopping_recommendation"]["stop_recommended"] = True
         self.assert_result_semantic_error(
             high_riv,
             "DR-STOP-RIV-001",
         )
 
         source_count_only = deepcopy(self.result_extension)
-        source_count_only["coverage_assessment"]["stopping_recommendation"][
-            "basis"
-        ] = ["source_count"]
+        source_count_only["coverage_assessment"]["stopping_recommendation"]["basis"] = [
+            "source_count"
+        ]
         self.assert_result_semantic_error(
             source_count_only,
             "DR-STOP-BASIS-001",
@@ -696,9 +662,9 @@ class DesktopResearchContracts(unittest.TestCase):
             proposal["proposal_digest"],
             canonical_digest(proposal, "proposal_digest"),
         )
-        expected_payload_digest = "sha256:" + hashlib.sha256(
-            rfc8785.dumps(proposal["action"]["payload"])
-        ).hexdigest()
+        expected_payload_digest = (
+            "sha256:" + hashlib.sha256(rfc8785.dumps(proposal["action"]["payload"])).hexdigest()
+        )
         self.assertEqual(
             proposal["action"]["payload_digest"],
             expected_payload_digest,
@@ -722,9 +688,7 @@ class DesktopResearchContracts(unittest.TestCase):
         quality = self.semantics["quality_boundary"]
         self.assertEqual(quality["source_quality_owned_by"], "research_profile")
         self.assertEqual(quality["causal_support_owned_by"], "research_profile")
-        self.assertFalse(
-            quality["writer_publication_material_is_research_evidence"]
-        )
+        self.assertFalse(quality["writer_publication_material_is_research_evidence"])
         self.assertEqual(
             quality["execution_mode_epistemic_boundary_owned_by"],
             "capability-handoff@0.1.0",

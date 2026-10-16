@@ -4,7 +4,9 @@ from copy import deepcopy
 from unittest.mock import patch
 
 from plugins.local_application import LocalApplicationError
-from plugins.local_application.writer_composition_history_service import WriterCompositionHistoryService
+from plugins.local_application.writer_composition_history_service import (
+    WriterCompositionHistoryService,
+)
 import issue80_writer_composition_suite as issue80
 from research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
@@ -20,12 +22,18 @@ class Issue177WriterHistoryTests(ResearchPackageAcceptanceSupport):
             )["composition"]
             first_digest = current["composition_digest"]
             for revision in range(2, 65):
-                proposal = self._proposal(case, composition_id=current["composition_id"], base=current)
+                proposal = self._proposal(
+                    case, composition_id=current["composition_id"], base=current
+                )
                 proposal["sections"][0]["purpose"] = f"Revision {revision} framing."
-                current = facade.capture_writer_composition(case["package_id"], proposal)["composition"]
+                current = facade.capture_writer_composition(case["package_id"], proposal)[
+                    "composition"
+                ]
             self.assertEqual(current["version"], 64)
 
-            next_proposal = self._proposal(case, composition_id=current["composition_id"], base=current)
+            next_proposal = self._proposal(
+                case, composition_id=current["composition_id"], base=current
+            )
             next_proposal["sections"][0]["purpose"] = "Revision 65 framing."
 
             original_capture = WriterCompositionHistoryService.capture
@@ -44,14 +52,20 @@ class Issue177WriterHistoryTests(ResearchPackageAcceptanceSupport):
                     facade.capture_writer_composition(case["package_id"], next_proposal)
             self.assertEqual(bounded.exception.code, "APPLICATION-WRITER-COMPOSITION-BOUND-001")
 
-            current = facade.capture_writer_composition(case["package_id"], next_proposal)["composition"]
+            current = facade.capture_writer_composition(case["package_id"], next_proposal)[
+                "composition"
+            ]
             self.assertEqual(current["version"], 65)
             self.assertEqual(
-                facade.show_writer_composition(current["composition_id"], 1)["composition"]["composition_digest"],
+                facade.show_writer_composition(current["composition_id"], 1)["composition"][
+                    "composition_digest"
+                ],
                 first_digest,
             )
             self.assertEqual(
-                facade.show_writer_composition(current["composition_id"], 65)["composition"]["base_version"],
+                facade.show_writer_composition(current["composition_id"], 65)["composition"][
+                    "base_version"
+                ],
                 64,
             )
         finally:
@@ -87,14 +101,20 @@ class Issue177WriterHistoryTests(ResearchPackageAcceptanceSupport):
             edit["sections"][0]["purpose"] = "Second version for selection history."
             v2 = facade.capture_writer_composition(case["package_id"], edit)["composition"]
 
-            first = facade.select_writer_composition(v1["composition_id"], 1, v1["composition_digest"])
-            retry = facade.select_writer_composition(v1["composition_id"], 1, v1["composition_digest"])
+            first = facade.select_writer_composition(
+                v1["composition_id"], 1, v1["composition_digest"]
+            )
+            retry = facade.select_writer_composition(
+                v1["composition_id"], 1, v1["composition_digest"]
+            )
             self.assertFalse(first["selection_reused"])
             self.assertTrue(retry["selection_reused"])
             self.assertEqual(retry["selection"], first["selection"])
 
             facade.select_writer_composition(v1["composition_id"], 2, v2["composition_digest"])
-            duplicate_v2 = facade.select_writer_composition(v1["composition_id"], 2, v2["composition_digest"])
+            duplicate_v2 = facade.select_writer_composition(
+                v1["composition_id"], 2, v2["composition_digest"]
+            )
             self.assertTrue(duplicate_v2["selection_reused"])
             facade.select_writer_composition(v1["composition_id"], 1, v1["composition_digest"])
 
@@ -133,7 +153,9 @@ class Issue177WriterHistoryTests(ResearchPackageAcceptanceSupport):
             )
             self.assertTrue(retried["selection_reused"])
             self.assertEqual(
-                facade.show_writer_composition(v1["composition_id"], 2)["selection"]["history_total"],
+                facade.show_writer_composition(v1["composition_id"], 2)["selection"][
+                    "history_total"
+                ],
                 before,
             )
         finally:
@@ -155,8 +177,12 @@ class Issue177WriterHistoryTests(ResearchPackageAcceptanceSupport):
                 facade.capture_writer_composition(case["package_id"], stale)
             self.assertEqual(rejected.exception.code, "APPLICATION-WRITER-COMPOSITION-STALE-001")
 
-            with patch.object(WriterCompositionHistoryService, "_validate_revision_base", return_value=None):
-                invalid = facade.capture_writer_composition(case["package_id"], deepcopy(stale))["composition"]
+            with patch.object(
+                WriterCompositionHistoryService, "_validate_revision_base", return_value=None
+            ):
+                invalid = facade.capture_writer_composition(case["package_id"], deepcopy(stale))[
+                    "composition"
+                ]
             self.assertEqual(invalid["version"], 3)
             self.assertEqual(invalid["base_version"], 1)
             self.assertEqual(invalid["base_digest"], v1["composition_digest"])
@@ -166,6 +192,8 @@ class Issue177WriterHistoryTests(ResearchPackageAcceptanceSupport):
                 facade.capture_writer_composition(case["package_id"], stale)
             # The intentionally invalid committed successor is now detected by
             # continuity-record validation before even exact-replay reuse.
-            self.assertEqual(restored.exception.code, "APPLICATION-WRITER-COMPOSITION-INTEGRITY-001")
+            self.assertEqual(
+                restored.exception.code, "APPLICATION-WRITER-COMPOSITION-INTEGRITY-001"
+            )
         finally:
             facade.close()

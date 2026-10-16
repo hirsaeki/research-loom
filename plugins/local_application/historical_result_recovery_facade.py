@@ -34,9 +34,7 @@ def _recovery_proposal_id(run_id: str, source_digest: str) -> str:
 
 
 def _current_context(application, project_id: str) -> dict[str, str]:
-    lineage_ref, snapshot_id, snapshot_digest = _base._current_binding(
-        application, project_id
-    )
+    lineage_ref, snapshot_id, snapshot_digest = _base._current_binding(application, project_id)
     return {
         "project_ref": project_id,
         "lineage_ref": lineage_ref,
@@ -122,9 +120,7 @@ def _canonical_result(application, project_id: str, run_id: str):
                     failure_class="material_recovery_required",
                     details={
                         "capture_id": capture_id or None,
-                        "artifact_kind": (
-                            "original" if key == "original_capture" else "rendition"
-                        ),
+                        "artifact_kind": ("original" if key == "original_capture" else "rendition"),
                         "artifact_id": artifact_id,
                         "verification_status": diagnosis.get("status"),
                         "expected_digest": diagnosis.get("expected_digest"),
@@ -179,9 +175,7 @@ def _replay_eligible(application, run_id: str) -> bool:
         correlation = application.conversation_store.load_run_correlation(run_id)
         if correlation is None:
             return False
-        proposal = application.conversation_store.load_proposal(
-            str(correlation["proposal_id"])
-        )
+        proposal = application.conversation_store.load_proposal(str(correlation["proposal_id"]))
     except Exception:
         return False
     action = proposal.get("action") if isinstance(proposal, Mapping) else None
@@ -196,9 +190,7 @@ def _replay_eligible(application, run_id: str) -> bool:
 def _classification(application, project_id: str, run_id: str) -> Mapping[str, Any]:
     try:
         requested = _base._eligible_completed_desktop_run(application, project_id, run_id)
-        lineage_ref, snapshot_id, snapshot_digest = _base._current_binding(
-            application, project_id
-        )
+        lineage_ref, snapshot_id, snapshot_digest = _base._current_binding(application, project_id)
         _base._require_requested_current(
             requested,
             project_id=project_id,
@@ -393,15 +385,12 @@ def _recover(application, project_id: str, run_id: str) -> Mapping[str, Any]:
             historical_candidate_lineage_status=classification.get(
                 "historical_candidate_lineage_status"
             ),
-            historical_candidate_count=classification.get(
-                "historical_candidate_count"
-            ),
+            historical_candidate_count=classification.get("historical_candidate_count"),
         )
     raise LocalApplicationError(
         str(classification.get("code") or "APPLICATION-HISTORICAL-RECOVERY-001"),
         str(
-            classification.get("message")
-            or "historical Desktop Research result is not recoverable"
+            classification.get("message") or "historical Desktop Research result is not recoverable"
         ),
     )
 
@@ -457,15 +446,11 @@ class LocalApplicationFacade(_base.LocalApplicationFacade):
             enriched["recovery_code"] = classification.get("code")
             enriched["recovery_message"] = classification.get("message")
             if "failure_details" in classification:
-                enriched["recovery_failure_details"] = deepcopy(
-                    classification["failure_details"]
-                )
+                enriched["recovery_failure_details"] = deepcopy(classification["failure_details"])
         result["finding_recovery"] = enriched
         return result
 
-    def recover_legacy_desktop_research_finding_candidate(
-        self, run_id: str
-    ) -> Mapping[str, Any]:
+    def recover_legacy_desktop_research_finding_candidate(self, run_id: str) -> Mapping[str, Any]:
         return _recover(self._application, self._project_id, run_id)
 
     def _ensure_finding_recovery_action(self) -> None:
@@ -498,9 +483,7 @@ class LocalApplicationFacade(_base.LocalApplicationFacade):
                 or definition.confirmation_required
                 or definition.service_id != _recovery_base._ACTION_TYPE
             ):
-                raise RuntimeError(
-                    "desktop_research.finding.recover action registration conflict"
-                )
+                raise RuntimeError("desktop_research.finding.recover action registration conflict")
             try:
                 service_registry.resolve(_recovery_base._ACTION_TYPE)
             except ConversationRuntimeError as exc:
@@ -508,7 +491,5 @@ class LocalApplicationFacade(_base.LocalApplicationFacade):
                     raise
                 service_registry.register(
                     _recovery_base._ACTION_TYPE,
-                    HistoricalResultRecoveryHandler(
-                        self._application, self._project_id
-                    ),
+                    HistoricalResultRecoveryHandler(self._application, self._project_id),
                 )

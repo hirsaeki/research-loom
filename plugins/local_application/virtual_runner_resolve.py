@@ -104,17 +104,15 @@ def resolve_virtual_inputs(facade, state, record, design_record, payload):
             )
         material_decisions.append(decision_id)
 
-    if (
-        questionnaire.get("approval_status") != "approved"
-        or not questionnaire.get("approval_decision_id")
+    if questionnaire.get("approval_status") != "approved" or not questionnaire.get(
+        "approval_decision_id"
     ):
         raise LocalApplicationError(
             "VR-HUMAN-DECISION-001",
             "Virtual Runner requires the PR40 canonical Instrument to be approved with its decision binding",
         )
-    if (
-        questionnaire.get("material_revision")
-        and not questionnaire.get("material_revision_decision_id")
+    if questionnaire.get("material_revision") and not questionnaire.get(
+        "material_revision_decision_id"
     ):
         raise LocalApplicationError(
             "VR-HUMAN-DECISION-001",
@@ -136,8 +134,7 @@ def resolve_virtual_inputs(facade, state, record, design_record, payload):
         )
     if (
         design_record["captured_against"] != captured
-        or design_record["design"]["content_digest"]
-        != record["design_ref"]["content_digest"]
+        or design_record["design"]["content_digest"] != record["design_ref"]["content_digest"]
     ):
         raise LocalApplicationError(
             "APPLICATION-VIRTUAL-PIN-001",
@@ -170,15 +167,11 @@ def resolve_virtual_inputs(facade, state, record, design_record, payload):
     raw_constraints = state.effective_constraints
     if isinstance(raw_constraints, Mapping):
         effective_constraints = [
-            deepcopy(dict(item))
-            for item in raw_constraints.values()
-            if isinstance(item, Mapping)
+            deepcopy(dict(item)) for item in raw_constraints.values() if isinstance(item, Mapping)
         ]
     else:
         effective_constraints = [
-            deepcopy(dict(item))
-            for item in raw_constraints
-            if isinstance(item, Mapping)
+            deepcopy(dict(item)) for item in raw_constraints if isinstance(item, Mapping)
         ]
     return (
         questionnaire,

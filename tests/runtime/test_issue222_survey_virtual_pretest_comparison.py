@@ -13,7 +13,10 @@ from plugins.local_application.survey_virtual_pretest_inspection import (
 from plugins.local_survey_store import canonical_document_digest
 from plugins.survey_virtual_runner.llm_backend import DeterministicFakeVirtualRespondentBackend
 from tests.runtime.survey_analysis_test_support import analysis_questionnaire
-from tests.runtime.survey_virtual_runner_test_support import SurveyVirtualRunnerTestBase, make_virtual_app
+from tests.runtime.survey_virtual_runner_test_support import (
+    SurveyVirtualRunnerTestBase,
+    make_virtual_app,
+)
 from tests.runtime.test_survey_llm_virtual_respondent import ANSWERS, PROFILES, llm_payload
 from tests.runtime.test_survey_production import instrument_payload, state_signature
 
@@ -25,9 +28,7 @@ class Issue222SurveyVirtualPretestComparisonTests(SurveyVirtualRunnerTestBase):
         branch = questionnaire["questions"][4]["branching"][0]
         assert branch["target_question_id"] == "Q5"
         branch["value"] = "contributor"
-        questionnaire["content_digest"] = canonical_document_digest(
-            questionnaire, "content_digest"
-        )
+        questionnaire["content_digest"] = canonical_document_digest(questionnaire, "content_digest")
         return questionnaire
 
     @staticmethod
@@ -45,12 +46,14 @@ class Issue222SurveyVirtualPretestComparisonTests(SurveyVirtualRunnerTestBase):
         return fixed
 
     @staticmethod
-    def _run(facade: LocalApplicationFacade, questionnaire: dict, *, model_id: str = "gpt-test") -> dict:
+    def _run(
+        facade: LocalApplicationFacade, questionnaire: dict, *, model_id: str = "gpt-test"
+    ) -> dict:
         payload = llm_payload(questionnaire)
         payload["minimum_valid_response_count"] = 1
         payload["llm_backend"]["model_id"] = model_id
-        facade._virtual_respondent_backend = lambda _payload: DeterministicFakeVirtualRespondentBackend(
-            ANSWERS, backend_id="openai_responses"
+        facade._virtual_respondent_backend = lambda _payload: (
+            DeterministicFakeVirtualRespondentBackend(ANSWERS, backend_id="openai_responses")
         )
         return facade.submit_action(
             {
@@ -73,9 +76,7 @@ class Issue222SurveyVirtualPretestComparisonTests(SurveyVirtualRunnerTestBase):
                 self.assertIsNotNone(run_a["aggregate_result"])
 
                 fixed = self._fixed_revision(defective)
-                captured = facade.capture_survey_instrument(
-                    instrument_payload(questionnaire=fixed)
-                )
+                captured = facade.capture_survey_instrument(instrument_payload(questionnaire=fixed))
                 rev_b = facade.show_survey_instrument(
                     captured["instrument_id"], captured["version"]
                 )["instrument"]["questionnaire"]
@@ -84,17 +85,13 @@ class Issue222SurveyVirtualPretestComparisonTests(SurveyVirtualRunnerTestBase):
                 self.assertIsNotNone(run_b["aggregate_result"])
 
                 with self.assertRaises(LocalApplicationError) as same_run:
-                    facade.compare_survey_virtual_pretests(
-                        run_a["run_id"], run_a["run_id"]
-                    )
+                    facade.compare_survey_virtual_pretests(run_a["run_id"], run_a["run_id"])
                 self.assertEqual(
                     same_run.exception.code,
                     "APPLICATION-SURVEY-VIRTUAL-PRETEST-001",
                 )
 
-                compared = facade.compare_survey_virtual_pretests(
-                    run_a["run_id"], run_b["run_id"]
-                )
+                compared = facade.compare_survey_virtual_pretests(run_a["run_id"], run_b["run_id"])
                 self.assertEqual(compared["object_type"], "survey_virtual_pretest_comparison")
                 self.assertEqual(compared["comparability"]["status"], "COMPARABLE")
                 self.assertNotEqual(
@@ -141,9 +138,7 @@ class Issue222SurveyVirtualPretestComparisonTests(SurveyVirtualRunnerTestBase):
                     }
                 )
                 self.assertEqual(routed["status"], "SUCCEEDED")
-                self.assertEqual(
-                    routed["data"]["comparability"]["status"], "COMPARABLE"
-                )
+                self.assertEqual(routed["data"]["comparability"]["status"], "COMPARABLE")
                 self.assertEqual(state_signature(app), before)
             finally:
                 app.close()
@@ -227,16 +222,12 @@ class Issue222SurveyVirtualPretestComparisonTests(SurveyVirtualRunnerTestBase):
             app = make_virtual_app(temp)
             facade = LocalApplicationFacade(app, "PRJ-1")
             try:
-                questionnaire = self._capture(
-                    facade, questionnaire=analysis_questionnaire()
-                )
+                questionnaire = self._capture(facade, questionnaire=analysis_questionnaire())
                 before = state_signature(app)
                 run_a = self._run(facade, questionnaire, model_id="gpt-test-a")
                 run_b = self._run(facade, questionnaire, model_id="gpt-test-b")
 
-                compared = facade.compare_survey_virtual_pretests(
-                    run_a["run_id"], run_b["run_id"]
-                )
+                compared = facade.compare_survey_virtual_pretests(run_a["run_id"], run_b["run_id"])
                 self.assertEqual(compared["comparability"]["status"], "NON_COMPARABLE")
                 self.assertIn(
                     "backend",

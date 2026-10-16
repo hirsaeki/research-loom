@@ -10,7 +10,10 @@ from unittest.mock import patch
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade
 from plugins.local_survey_response_store import LocalSurveyResponseStore
 from tests.runtime.survey_analysis_test_support import analysis_questionnaire
-from tests.runtime.survey_virtual_runner_test_support import SurveyVirtualRunnerTestBase, make_virtual_app
+from tests.runtime.survey_virtual_runner_test_support import (
+    SurveyVirtualRunnerTestBase,
+    make_virtual_app,
+)
 from tests.runtime.test_survey_production import state_signature
 from tests.runtime.test_survey_response_dataset import intake, raw_response
 
@@ -79,14 +82,21 @@ class Issue221RealSurveyIntakeTests(SurveyVirtualRunnerTestBase):
             "instrument_digest": questionnaire["content_digest"],
             "analysis_items": [
                 {"item_id": "APPROVAL-MISS", "analysis_type": "missingness", "question_id": "Q5"},
-                {"item_id": "ACTIONS", "analysis_type": "frequency", "question_id": "Q6", "denominator_rule": "valid_responses"},
+                {
+                    "item_id": "ACTIONS",
+                    "analysis_type": "frequency",
+                    "question_id": "Q6",
+                    "denominator_rule": "valid_responses",
+                },
                 {"item_id": "USEFULNESS", "analysis_type": "scale_summary", "question_id": "Q2"},
                 {"item_id": "NOTES", "analysis_type": "free_text_listing", "question_id": "Q4"},
             ],
         }
         return app, facade, questionnaire, payload
 
-    def test_real_file_flows_through_canonical_dataset_shared_aggregation_and_joined_inspection(self):
+    def test_real_file_flows_through_canonical_dataset_shared_aggregation_and_joined_inspection(
+        self,
+    ):
         with tempfile.TemporaryDirectory() as temp:
             app, facade, questionnaire, payload = self._fixture(temp)
             try:
@@ -95,7 +105,9 @@ class Issue221RealSurveyIntakeTests(SurveyVirtualRunnerTestBase):
                 self.assertEqual(captured["status"], "CAPTURED")
                 self.assertEqual(captured["response_origin"], "real")
                 self.assertEqual(captured["epistemic_status"], "EMPIRICAL")
-                self.assertEqual(captured["instrument_ref"]["content_digest"], questionnaire["content_digest"])
+                self.assertEqual(
+                    captured["instrument_ref"]["content_digest"], questionnaire["content_digest"]
+                )
                 self.assertEqual(captured["accepted_count"], 2)
                 self.assertEqual(captured["rejected_count"], 1)
                 self.assertIn(
@@ -117,7 +129,9 @@ class Issue221RealSurveyIntakeTests(SurveyVirtualRunnerTestBase):
                 self.assertTrue(shown["intake_source"]["intake_file_digest"].startswith("sha256:"))
                 self.assertEqual(shown["accepted_count"], 2)
                 self.assertEqual(shown["rejected_count"], 1)
-                self.assertEqual(shown["aggregate_result"]["population"]["accepted_response_count"], 2)
+                self.assertEqual(
+                    shown["aggregate_result"]["population"]["accepted_response_count"], 2
+                )
                 self.assertEqual(shown["aggregate_result"]["exclusions"]["rejected_count"], 1)
 
                 accepted = {
@@ -126,18 +140,33 @@ class Issue221RealSurveyIntakeTests(SurveyVirtualRunnerTestBase):
                     if row["kind"] == "accepted_response"
                 }
                 contributor = accepted["REAL-B"]["canonical_response"]
-                approval = next(item for item in contributor["answers"] if item["response_key"] == "approval")
-                usefulness = next(item for item in contributor["answers"] if item["response_key"] == "usefulness")
-                actions = next(item for item in contributor["answers"] if item["response_key"] == "actions")
-                notes = next(item for item in contributor["answers"] if item["response_key"] == "notes")
+                approval = next(
+                    item for item in contributor["answers"] if item["response_key"] == "approval"
+                )
+                usefulness = next(
+                    item for item in contributor["answers"] if item["response_key"] == "usefulness"
+                )
+                actions = next(
+                    item for item in contributor["answers"] if item["response_key"] == "actions"
+                )
+                notes = next(
+                    item for item in contributor["answers"] if item["response_key"] == "notes"
+                )
                 self.assertEqual(approval["state"], "not_asked")
                 self.assertEqual(usefulness["state"], "not_asked")
                 self.assertEqual(actions["value"], ["recommend", "execute"])
                 self.assertEqual(notes["value"], "contributor note")
 
-                rejected = next(row for row in shown["responses"] if row["kind"] == "rejected_raw_input")
+                rejected = next(
+                    row for row in shown["responses"] if row["kind"] == "rejected_raw_input"
+                )
                 self.assertEqual(rejected["raw_input"]["response_id"], "SYN-WRONG")
-                self.assertTrue(any(issue["code"] == "SURVEY_RESPONSE_ORIGIN_MISMATCH" for issue in rejected["issues"]))
+                self.assertTrue(
+                    any(
+                        issue["code"] == "SURVEY_RESPONSE_ORIGIN_MISMATCH"
+                        for issue in rejected["issues"]
+                    )
+                )
 
                 aggregate_items = {item["item_id"]: item for item in shown["aggregate_items"]}
                 self.assertEqual(aggregate_items["APPROVAL-MISS"]["counts"]["not_asked"], 1)
@@ -157,7 +186,9 @@ class Issue221RealSurveyIntakeTests(SurveyVirtualRunnerTestBase):
                     facade.show_survey_response_dataset(first["dataset_id"])["dataset"]
                 )
                 second = facade.capture_real_survey_intake(payload)
-                second_dataset = facade.show_survey_response_dataset(second["dataset_id"])["dataset"]
+                second_dataset = facade.show_survey_response_dataset(second["dataset_id"])[
+                    "dataset"
+                ]
                 self.assertEqual(second["status"], "ALREADY_CAPTURED")
                 self.assertEqual(second["dataset_id"], first["dataset_id"])
                 self.assertEqual(second["content_digest"], first["content_digest"])
@@ -200,7 +231,6 @@ class Issue221RealSurveyIntakeTests(SurveyVirtualRunnerTestBase):
             finally:
                 app.close()
 
-
     def test_immutable_first_capture_race_recovers_to_verified_reuse(self):
         with tempfile.TemporaryDirectory() as temp:
             app, facade, _, payload = self._fixture(temp)
@@ -236,7 +266,11 @@ class Issue221RealSurveyIntakeTests(SurveyVirtualRunnerTestBase):
                     shown = facade.show_real_survey_intake(captured["dataset_id"], limit=100)
                 self.assertEqual(len(shown["responses"]), 3)
                 self.assertEqual(
-                    {row["canonical_response"]["response_id"] for row in shown["responses"] if row["kind"] == "accepted_response"},
+                    {
+                        row["canonical_response"]["response_id"]
+                        for row in shown["responses"]
+                        if row["kind"] == "accepted_response"
+                    },
                     {"REAL-A", "REAL-B"},
                 )
             finally:
@@ -272,7 +306,9 @@ class Issue221RealSurveyIntakeTests(SurveyVirtualRunnerTestBase):
                 )
                 self.assertEqual(shown["status"], "SUCCEEDED")
                 self.assertEqual(shown["data"]["dataset"]["dataset_id"], dataset_id)
-                self.assertEqual(shown["data"]["aggregate_result"]["aggregate_result_id"], aggregate_result_id)
+                self.assertEqual(
+                    shown["data"]["aggregate_result"]["aggregate_result_id"], aggregate_result_id
+                )
                 self.assertEqual(shown["data"]["response_origin"], "real")
                 self.assertEqual(shown["data"]["epistemic_status"], "EMPIRICAL")
                 self.assertFalse(shown["data"]["research_state_mutation_performed"])

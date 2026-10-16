@@ -6,7 +6,11 @@ import tempfile
 import unittest
 
 from core.conversation import ConversationRuntimeError
-from plugins.local_application import LocalApplicationError, LocalApplicationFacade, LocalResearchApplication
+from plugins.local_application import (
+    LocalApplicationError,
+    LocalApplicationFacade,
+    LocalResearchApplication,
+)
 from plugins.local_attention_store import attention_map_digest, validate_attention_store_schema
 from runtime_fixtures import project, rq, seed_state
 
@@ -47,11 +51,13 @@ def project_config():
                 "disposition_reason": "Outside the synthetic scope.",
             },
         ],
-        "resource_references": [{
-            "reference_id": "REF-1",
-            "reference_type": "input",
-            "locator": "inputs/fixture.md",
-        }],
+        "resource_references": [
+            {
+                "reference_id": "REF-1",
+                "reference_type": "input",
+                "locator": "inputs/fixture.md",
+            }
+        ],
     }
 
 
@@ -82,10 +88,12 @@ def state_pin(app):
 
 
 def confirm(facade, pending, actor_id="HUMAN-ATT"):
-    return facade.submit_confirmation({
-        "confirmation_request_id": pending["confirmation_request"]["confirmation_request_id"],
-        "actor_id": actor_id,
-    })
+    return facade.submit_confirmation(
+        {
+            "confirmation_request_id": pending["confirmation_request"]["confirmation_request_id"],
+            "actor_id": actor_id,
+        }
+    )
 
 
 class ResearchAttentionLifecycleTests(unittest.TestCase):
@@ -102,14 +110,24 @@ class ResearchAttentionLifecycleTests(unittest.TestCase):
                 self.assertIn("research_attention.activate_candidate", actions)
                 self.assertEqual(actions["research_attention.status"]["effect"], "read_only")
                 self.assertEqual(actions["research_attention.propose"]["effect"], "read_only")
-                self.assertEqual(actions["research_attention.activate_candidate"]["effect"], "state_changing")
-                self.assertTrue(actions["research_attention.activate_candidate"]["confirmation_required"])
+                self.assertEqual(
+                    actions["research_attention.activate_candidate"]["effect"], "state_changing"
+                )
+                self.assertTrue(
+                    actions["research_attention.activate_candidate"]["confirmation_required"]
+                )
 
-                result = facade.submit_action({"action_type": "research_attention.status", "payload": {}})
+                result = facade.submit_action(
+                    {"action_type": "research_attention.status", "payload": {}}
+                )
                 self.assertEqual(result["status"], "SUCCEEDED")
                 self.assertIsNone(result["data"]["active_map"])
-                self.assertEqual(result["data"]["effective_attention"], project_config()["research_attention"])
-                self.assertEqual(result["data"]["baseline"]["items"], project_config()["research_attention"])
+                self.assertEqual(
+                    result["data"]["effective_attention"], project_config()["research_attention"]
+                )
+                self.assertEqual(
+                    result["data"]["baseline"]["items"], project_config()["research_attention"]
+                )
                 self.assertEqual(before, state_pin(app))
                 self.assertFalse((root / "attention.sqlite3").exists())
             finally:
@@ -122,41 +140,55 @@ class ResearchAttentionLifecycleTests(unittest.TestCase):
             try:
                 facade = LocalApplicationFacade(app, "PRJ-1")
                 before = state_pin(app)
-                result = facade.submit_action({
-                    "action_type": "research_attention.propose",
-                    "payload": {
-                        "additions": [{
-                            "statement": "Track a new synthetic cross-cutting implication.",
-                            "rationale": "Keep it as guidance rather than an RQ.",
-                            "source_reference_ids": ["REF-1"],
-                            "related_question_ids": ["RQ-1"],
-                        }],
-                        "dispositions": [{
-                            "attention_id": "ATT-BASE-1",
-                            "disposition": "dropped",
-                            "disposition_reason": "Superseded by the more precise synthetic item.",
-                        }],
-                        "links": [{
-                            "attention_id": "ATT-BASE-2",
-                            "related_question_seed_ids": ["RQ-SEED-1"],
-                        }],
-                    },
-                })
+                result = facade.submit_action(
+                    {
+                        "action_type": "research_attention.propose",
+                        "payload": {
+                            "additions": [
+                                {
+                                    "statement": "Track a new synthetic cross-cutting implication.",
+                                    "rationale": "Keep it as guidance rather than an RQ.",
+                                    "source_reference_ids": ["REF-1"],
+                                    "related_question_ids": ["RQ-1"],
+                                }
+                            ],
+                            "dispositions": [
+                                {
+                                    "attention_id": "ATT-BASE-1",
+                                    "disposition": "dropped",
+                                    "disposition_reason": "Superseded by the more precise synthetic item.",
+                                }
+                            ],
+                            "links": [
+                                {
+                                    "attention_id": "ATT-BASE-2",
+                                    "related_question_seed_ids": ["RQ-SEED-1"],
+                                }
+                            ],
+                        },
+                    }
+                )
                 candidate = result["data"]["attention_map"]
                 self.assertEqual(candidate["map_digest"], attention_map_digest(candidate))
                 self.assertEqual(candidate["base"], {"source": "project_config_baseline"})
                 self.assertEqual(len(candidate["items"]), 3)
                 by_id = {item["attention_id"]: item for item in candidate["items"]}
-                generated = [item for key, item in by_id.items() if key not in {"ATT-BASE-1", "ATT-BASE-2"}]
+                generated = [
+                    item for key, item in by_id.items() if key not in {"ATT-BASE-1", "ATT-BASE-2"}
+                ]
                 self.assertEqual(len(generated), 1)
                 self.assertTrue(generated[0]["attention_id"].startswith("ATT-"))
                 self.assertEqual(generated[0]["disposition"], "active")
                 self.assertEqual(by_id["ATT-BASE-1"]["disposition"], "dropped")
                 self.assertIn("ATT-BASE-2", by_id)
                 self.assertEqual(before, state_pin(app))
-                status = facade.submit_action({"action_type": "research_attention.status", "payload": {}})
+                status = facade.submit_action(
+                    {"action_type": "research_attention.status", "payload": {}}
+                )
                 self.assertIsNone(status["data"]["active_map"])
-                self.assertEqual(status["data"]["effective_attention"], project_config()["research_attention"])
+                self.assertEqual(
+                    status["data"]["effective_attention"], project_config()["research_attention"]
+                )
                 validate_attention_store_schema(root / "attention.sqlite3")
                 map_id = candidate["map_id"]
             finally:
@@ -183,7 +215,9 @@ class ResearchAttentionLifecycleTests(unittest.TestCase):
                 ]
                 for payload in invalid_payloads:
                     with self.assertRaises(LocalApplicationError) as invalid_payload:
-                        facade.submit_action({"action_type": "research_attention.propose", "payload": payload})
+                        facade.submit_action(
+                            {"action_type": "research_attention.propose", "payload": payload}
+                        )
                     self.assertEqual(invalid_payload.exception.code, "APPLICATION-PAYLOAD-001")
 
                 for addition in (
@@ -192,10 +226,12 @@ class ResearchAttentionLifecycleTests(unittest.TestCase):
                     {"statement": "bad RQ", "related_question_ids": ["RQ-X"]},
                 ):
                     with self.assertRaises(ConversationRuntimeError) as invalid_ref:
-                        facade.submit_action({
-                            "action_type": "research_attention.propose",
-                            "payload": {"additions": [addition]},
-                        })
+                        facade.submit_action(
+                            {
+                                "action_type": "research_attention.propose",
+                                "payload": {"additions": [addition]},
+                            }
+                        )
                     self.assertEqual(invalid_ref.exception.code, "ATTENTION-REF-001")
             finally:
                 app.close()
@@ -207,18 +243,28 @@ class ResearchAttentionLifecycleTests(unittest.TestCase):
             try:
                 facade = LocalApplicationFacade(app, "PRJ-1")
                 before = state_pin(app)
-                decisions_before = tuple(app.state_repository.load_state_view("PRJ-1", "LIN-1").decisions)
-                candidate = facade.submit_action({
-                    "action_type": "research_attention.propose",
-                    "payload": {"additions": [{"statement": "Active synthetic guidance."}]},
-                })["data"]["attention_map"]
-                pending = facade.submit_action({
-                    "action_type": "research_attention.activate_candidate",
-                    "payload": {"attention_map_id": candidate["map_id"]},
-                    "actor_id": "HUMAN-ATT",
-                })
+                decisions_before = tuple(
+                    app.state_repository.load_state_view("PRJ-1", "LIN-1").decisions
+                )
+                candidate = facade.submit_action(
+                    {
+                        "action_type": "research_attention.propose",
+                        "payload": {"additions": [{"statement": "Active synthetic guidance."}]},
+                    }
+                )["data"]["attention_map"]
+                pending = facade.submit_action(
+                    {
+                        "action_type": "research_attention.activate_candidate",
+                        "payload": {"attention_map_id": candidate["map_id"]},
+                        "actor_id": "HUMAN-ATT",
+                    }
+                )
                 self.assertEqual(pending["status"], "CONFIRMATION_REQUIRED")
-                self.assertIsNone(facade.submit_action({"action_type": "research_attention.status", "payload": {}})["data"]["active_map"])
+                self.assertIsNone(
+                    facade.submit_action(
+                        {"action_type": "research_attention.status", "payload": {}}
+                    )["data"]["active_map"]
+                )
                 self.assertEqual(before, state_pin(app))
                 request_id = pending["confirmation_request"]["confirmation_request_id"]
             finally:
@@ -227,19 +273,28 @@ class ResearchAttentionLifecycleTests(unittest.TestCase):
             reopened = open_app(root, seed=False)
             try:
                 facade = LocalApplicationFacade(reopened, "PRJ-1")
-                committed = facade.submit_confirmation({
-                    "confirmation_request_id": request_id,
-                    "actor_id": "HUMAN-ATT",
-                })
+                committed = facade.submit_confirmation(
+                    {
+                        "confirmation_request_id": request_id,
+                        "actor_id": "HUMAN-ATT",
+                    }
+                )
                 self.assertEqual(committed["status"], "SUCCEEDED")
                 self.assertFalse(committed["action_receipt"]["research_state_mutation_performed"])
-                status = facade.submit_action({"action_type": "research_attention.status", "payload": {}})
+                status = facade.submit_action(
+                    {"action_type": "research_attention.status", "payload": {}}
+                )
                 self.assertEqual(status["data"]["active_map"]["map_id"], candidate["map_id"])
                 self.assertEqual(status["data"]["effective_attention"], candidate["items"])
                 self.assertEqual(before, state_pin(reopened))
                 state = reopened.state_repository.load_state_view("PRJ-1", "LIN-1")
                 self.assertEqual(tuple(state.decisions), decisions_before)
-                self.assertFalse(any(item.get("kind") in {"attention", "attention_map"} for item in state.effective_objects()))
+                self.assertFalse(
+                    any(
+                        item.get("kind") in {"attention", "attention_map"}
+                        for item in state.effective_objects()
+                    )
+                )
                 self.assertEqual(len(reopened.attention_store.activation_events("PRJ-1")), 1)
             finally:
                 reopened.close()
@@ -249,29 +304,39 @@ class ResearchAttentionLifecycleTests(unittest.TestCase):
             app = open_app(Path(temp))
             try:
                 facade = LocalApplicationFacade(app, "PRJ-1")
-                candidate_a = facade.submit_action({
-                    "action_type": "research_attention.propose",
-                    "payload": {"additions": [{"statement": "Candidate A."}]},
-                })["data"]["attention_map"]
-                candidate_b = facade.submit_action({
-                    "action_type": "research_attention.propose",
-                    "payload": {"additions": [{"statement": "Candidate B."}]},
-                })["data"]["attention_map"]
-                pending_a = facade.submit_action({
-                    "action_type": "research_attention.activate_candidate",
-                    "payload": {"attention_map_id": candidate_a["map_id"]},
-                    "actor_id": "HUMAN-ATT",
-                })
-                pending_b = facade.submit_action({
-                    "action_type": "research_attention.activate_candidate",
-                    "payload": {"attention_map_id": candidate_b["map_id"]},
-                    "actor_id": "HUMAN-ATT",
-                })
+                candidate_a = facade.submit_action(
+                    {
+                        "action_type": "research_attention.propose",
+                        "payload": {"additions": [{"statement": "Candidate A."}]},
+                    }
+                )["data"]["attention_map"]
+                candidate_b = facade.submit_action(
+                    {
+                        "action_type": "research_attention.propose",
+                        "payload": {"additions": [{"statement": "Candidate B."}]},
+                    }
+                )["data"]["attention_map"]
+                pending_a = facade.submit_action(
+                    {
+                        "action_type": "research_attention.activate_candidate",
+                        "payload": {"attention_map_id": candidate_a["map_id"]},
+                        "actor_id": "HUMAN-ATT",
+                    }
+                )
+                pending_b = facade.submit_action(
+                    {
+                        "action_type": "research_attention.activate_candidate",
+                        "payload": {"attention_map_id": candidate_b["map_id"]},
+                        "actor_id": "HUMAN-ATT",
+                    }
+                )
                 self.assertEqual(confirm(facade, pending_a)["status"], "SUCCEEDED")
                 with self.assertRaises(ConversationRuntimeError) as stale:
                     confirm(facade, pending_b)
                 self.assertEqual(stale.exception.code, "ATTENTION-STALE-001")
-                active = facade.submit_action({"action_type": "research_attention.status", "payload": {}})["data"]["active_map"]
+                active = facade.submit_action(
+                    {"action_type": "research_attention.status", "payload": {}}
+                )["data"]["active_map"]
                 self.assertEqual(active["map_id"], candidate_a["map_id"])
                 self.assertEqual(len(app.attention_store.activation_events("PRJ-1")), 1)
                 self.assertIsNotNone(app.attention_store.load_map(candidate_b["map_id"]))
@@ -283,34 +348,56 @@ class ResearchAttentionLifecycleTests(unittest.TestCase):
             app = open_app(Path(temp))
             try:
                 facade = LocalApplicationFacade(app, "PRJ-1")
-                first = facade.submit_action({
-                    "action_type": "desktop_research.investigate",
-                    "payload": {"question_id": "RQ-1"},
-                })
+                first = facade.submit_action(
+                    {
+                        "action_type": "desktop_research.investigate",
+                        "payload": {"question_id": "RQ-1"},
+                    }
+                )
                 first_proposal_id = first["proposal"]["proposal_id"]
-                first_materialization = deepcopy(app.conversation_store.load_materialization(first_proposal_id))
-                self.assertEqual(first_materialization["context_pack"]["research_attention"], project_config()["research_attention"])
+                first_materialization = deepcopy(
+                    app.conversation_store.load_materialization(first_proposal_id)
+                )
+                self.assertEqual(
+                    first_materialization["context_pack"]["research_attention"],
+                    project_config()["research_attention"],
+                )
                 first_digest = first_materialization["context_pack"]["context_pack_digest"]
 
-                candidate = facade.submit_action({
-                    "action_type": "research_attention.propose",
-                    "payload": {"additions": [{"statement": "Projected active guidance."}]},
-                })["data"]["attention_map"]
-                pending = facade.submit_action({
-                    "action_type": "research_attention.activate_candidate",
-                    "payload": {"attention_map_id": candidate["map_id"]},
-                    "actor_id": "HUMAN-ATT",
-                })
+                candidate = facade.submit_action(
+                    {
+                        "action_type": "research_attention.propose",
+                        "payload": {"additions": [{"statement": "Projected active guidance."}]},
+                    }
+                )["data"]["attention_map"]
+                pending = facade.submit_action(
+                    {
+                        "action_type": "research_attention.activate_candidate",
+                        "payload": {"attention_map_id": candidate["map_id"]},
+                        "actor_id": "HUMAN-ATT",
+                    }
+                )
                 self.assertEqual(confirm(facade, pending)["status"], "SUCCEEDED")
 
-                second = facade.submit_action({
-                    "action_type": "desktop_research.investigate",
-                    "payload": {"question_id": "RQ-1"},
-                })
-                second_materialization = app.conversation_store.load_materialization(second["proposal"]["proposal_id"])
-                self.assertEqual(second_materialization["context_pack"]["research_attention"], candidate["items"])
-                self.assertNotEqual(second_materialization["context_pack"]["context_pack_digest"], first_digest)
-                self.assertEqual(app.conversation_store.load_materialization(first_proposal_id), first_materialization)
+                second = facade.submit_action(
+                    {
+                        "action_type": "desktop_research.investigate",
+                        "payload": {"question_id": "RQ-1"},
+                    }
+                )
+                second_materialization = app.conversation_store.load_materialization(
+                    second["proposal"]["proposal_id"]
+                )
+                self.assertEqual(
+                    second_materialization["context_pack"]["research_attention"], candidate["items"]
+                )
+                self.assertNotEqual(
+                    second_materialization["context_pack"]["context_pack_digest"], first_digest
+                )
+                self.assertEqual(
+                    app.conversation_store.load_materialization(first_proposal_id),
+                    first_materialization,
+                )
                 self.assertEqual(first_materialization["context_pack"]["schema_version"], "0.1.0")
             finally:
                 app.close()

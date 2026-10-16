@@ -61,10 +61,7 @@ def _diagnostic_projection(value: Any) -> Any:
         return {"$noncanonical_number": label}
     if isinstance(value, Mapping):
         if all(isinstance(key, str) for key in value):
-            return {
-                str(key): _diagnostic_projection(item)
-                for key, item in value.items()
-            }
+            return {str(key): _diagnostic_projection(item) for key, item in value.items()}
         return {
             "$mapping_entries": [
                 [_diagnostic_projection(key), _diagnostic_projection(item)]
@@ -96,14 +93,18 @@ def preserve_raw_input(value: Any) -> tuple[Any, str, dict[str, Any] | None]:
     except ValueError:
         projected = _diagnostic_projection(value)
         digest = canonical_digest({"noncanonical_raw_input": projected})
-        return projected, digest, {
-            "code": "SURVEY_RESPONSE_MALFORMED",
-            "severity": "error",
-            "message": (
-                "raw input is not RFC8785-canonicalizable; "
-                "a diagnostic projection was preserved"
-            ),
-        }
+        return (
+            projected,
+            digest,
+            {
+                "code": "SURVEY_RESPONSE_MALFORMED",
+                "severity": "error",
+                "message": (
+                    "raw input is not RFC8785-canonicalizable; "
+                    "a diagnostic projection was preserved"
+                ),
+            },
+        )
 
 
 def response_content_digest(document: Mapping[str, Any]) -> str:

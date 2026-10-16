@@ -84,7 +84,11 @@ def _assessment(value: Any, field: str) -> dict[str, Any]:
             f"{field} must contain value, basis, and rationale",
         )
     rationale = value.get("rationale")
-    if not isinstance(rationale, str) or not rationale.strip() or len(rationale) > _MAX_RATIONALE_CHARS:
+    if (
+        not isinstance(rationale, str)
+        or not rationale.strip()
+        or len(rationale) > _MAX_RATIONALE_CHARS
+    ):
         raise ResearchQualityEvaluationError(
             "APPLICATION-RESEARCH-QUALITY-INPUT-001",
             f"{field}.rationale must be a bounded non-empty string",
@@ -309,7 +313,9 @@ def _validate_assessment_vocab(normalized: Mapping[str, Any], policy: Mapping[st
                 elif shape == "bool":
                     valid = isinstance(value, bool)
                 elif shape == "enum_list":
-                    valid = _valid_unique_string_list(value) and all(item in allowed for item in value)
+                    valid = _valid_unique_string_list(value) and all(
+                        item in allowed for item in value
+                    )
                 elif shape == "string_list":
                     valid = _valid_unique_string_list(value)
                 if not valid:
@@ -329,9 +335,13 @@ def _validate_assessment_vocab(normalized: Mapping[str, Any], policy: Mapping[st
         shape = suff_specs.get(field)
         value = item["value"]
         valid = (
-            shape == "bool" and isinstance(value, bool)
-            or shape == "riv" and isinstance(value, str) and value in {"low", "medium", "high", "unknown"}
-            or shape == "string_list" and _valid_unique_string_list(value)
+            shape == "bool"
+            and isinstance(value, bool)
+            or shape == "riv"
+            and isinstance(value, str)
+            and value in {"low", "medium", "high", "unknown"}
+            or shape == "string_list"
+            and _valid_unique_string_list(value)
         )
         if not valid:
             raise ResearchQualityEvaluationError(
@@ -344,11 +354,7 @@ def _constraint_map(state) -> dict[str, Mapping[str, Any]]:
     raw = state.effective_constraints
     if isinstance(raw, Mapping):
         return {str(path): row for path, row in raw.items() if isinstance(row, Mapping)}
-    return {
-        str(row["path"]): row
-        for row in raw
-        if isinstance(row, Mapping) and row.get("path")
-    }
+    return {str(row["path"]): row for row in raw if isinstance(row, Mapping) and row.get("path")}
 
 
 def _target(
@@ -396,7 +402,11 @@ def _validate_basis_object_refs(
     objects: Mapping[tuple[str, str], Mapping[str, Any]], normalized: Mapping[str, Any]
 ) -> None:
     current_ids = {object_id for _kind, object_id in objects}
-    missing = [object_id for object_id in basis_refs(normalized)["object_ids"] if object_id not in current_ids]
+    missing = [
+        object_id
+        for object_id in basis_refs(normalized)["object_ids"]
+        if object_id not in current_ids
+    ]
     if missing:
         raise ResearchQualityEvaluationError(
             "APPLICATION-RESEARCH-QUALITY-PROVENANCE-001",
@@ -426,7 +436,9 @@ def evaluate(state, normalized: Mapping[str, Any]) -> dict[str, Any]:
     claim = _target(objects, "claim", normalized.get("claim_id"), project_id, rq_id)
     method = _target(objects, "method", normalized.get("method_id"), project_id, rq_id)
     constraints = _constraint_map(state)
-    research = {path: row for path, row in constraints.items() if path.startswith("research_quality.")}
+    research = {
+        path: row for path, row in constraints.items() if path.startswith("research_quality.")
+    }
     organization = {
         path: row
         for path, row in constraints.items()
@@ -465,7 +477,9 @@ def evaluate(state, normalized: Mapping[str, Any]) -> dict[str, Any]:
     path = "research_quality.source.forbidden_as_sole_material_support_tiers"
     if path in research:
         if finding is None:
-            emit(path, "unevaluated", "machine_check_on_explicit_assessment", missing=["finding_id"])
+            emit(
+                path, "unevaluated", "machine_check_on_explicit_assessment", missing=["finding_id"]
+            )
         elif not finding_evidence:
             emit(path, "not_applicable", "machine_check_on_explicit_assessment")
         else:
@@ -482,7 +496,12 @@ def evaluate(state, normalized: Mapping[str, Any]) -> dict[str, Any]:
             if missing:
                 emit(path, "unevaluated", "machine_check_on_explicit_assessment", missing=missing)
             elif values and all(value in set(research[path]["value"]) for value in values):
-                emit(path, "violation", "machine_check_on_explicit_assessment", "RESEARCH-QUALITY-EVIDENCE-ADMISSIBILITY-001")
+                emit(
+                    path,
+                    "violation",
+                    "machine_check_on_explicit_assessment",
+                    "RESEARCH-QUALITY-EVIDENCE-ADMISSIBILITY-001",
+                )
             else:
                 emit(path, "conformant", "machine_check_on_explicit_assessment")
 
@@ -490,7 +509,12 @@ def evaluate(state, normalized: Mapping[str, Any]) -> dict[str, Any]:
     if path in research:
         item = assessments["sufficiency"].get("gap_resolution_evidence_ids")
         if item is None:
-            emit(path, "unevaluated", "machine_check_on_explicit_assessment", missing=["sufficiency.gap_resolution_evidence_ids"])
+            emit(
+                path,
+                "unevaluated",
+                "machine_check_on_explicit_assessment",
+                missing=["sufficiency.gap_resolution_evidence_ids"],
+            )
         elif not item["value"]:
             emit(path, "not_applicable", "machine_check_on_explicit_assessment")
         else:
@@ -512,7 +536,12 @@ def evaluate(state, normalized: Mapping[str, Any]) -> dict[str, Any]:
             if missing:
                 emit(path, "unevaluated", "machine_check_on_explicit_assessment", missing=missing)
             elif violation:
-                emit(path, "violation", "machine_check_on_explicit_assessment", "RESEARCH-QUALITY-SUFFICIENCY-001")
+                emit(
+                    path,
+                    "violation",
+                    "machine_check_on_explicit_assessment",
+                    "RESEARCH-QUALITY-SUFFICIENCY-001",
+                )
             else:
                 emit(path, "conformant", "machine_check_on_explicit_assessment")
 
@@ -530,12 +559,16 @@ def evaluate(state, normalized: Mapping[str, Any]) -> dict[str, Any]:
         for evidence_id in all_evidence:
             evidence = objects.get(("evidence", evidence_id))
             source_id = str(evidence.get("source_id")) if evidence else ""
-            ok_tier, quality_tier = _lookup_assessment(assessments, "sources", source_id, "quality_tier")
+            ok_tier, quality_tier = _lookup_assessment(
+                assessments, "sources", source_id, "quality_tier"
+            )
             if not ok_tier:
                 missing.append(f"sources.{source_id}.quality_tier")
                 continue
             if quality_tier == tier:
-                ok_scope, support_scope = _lookup_assessment(assessments, "evidence", evidence_id, "support_scope")
+                ok_scope, support_scope = _lookup_assessment(
+                    assessments, "evidence", evidence_id, "support_scope"
+                )
                 if ok_scope:
                     relevant.append(support_scope)
                 else:
@@ -545,7 +578,12 @@ def evaluate(state, normalized: Mapping[str, Any]) -> dict[str, Any]:
         elif not relevant:
             emit(path, "not_applicable", "machine_check_on_explicit_assessment")
         elif any(value not in set(research[path]["value"]) for value in relevant):
-            emit(path, "violation", "machine_check_on_explicit_assessment", "RESEARCH-QUALITY-EVIDENCE-ADMISSIBILITY-001")
+            emit(
+                path,
+                "violation",
+                "machine_check_on_explicit_assessment",
+                "RESEARCH-QUALITY-EVIDENCE-ADMISSIBILITY-001",
+            )
         else:
             emit(path, "conformant", "machine_check_on_explicit_assessment")
 
@@ -559,12 +597,16 @@ def evaluate(state, normalized: Mapping[str, Any]) -> dict[str, Any]:
             for evidence_id in all_evidence:
                 evidence = objects.get(("evidence", evidence_id))
                 source_id = str(evidence.get("source_id")) if evidence else ""
-                ok_role, source_role = _lookup_assessment(assessments, "sources", source_id, "source_role")
+                ok_role, source_role = _lookup_assessment(
+                    assessments, "sources", source_id, "source_role"
+                )
                 if not ok_role:
                     missing.append(f"sources.{source_id}.source_role")
                     continue
                 if source_role == "company_primary":
-                    ok_scope, support_scope = _lookup_assessment(assessments, "evidence", evidence_id, "support_scope")
+                    ok_scope, support_scope = _lookup_assessment(
+                        assessments, "evidence", evidence_id, "support_scope"
+                    )
                     if ok_scope:
                         relevant.append(support_scope)
                     else:
@@ -574,7 +616,12 @@ def evaluate(state, normalized: Mapping[str, Any]) -> dict[str, Any]:
             elif not relevant:
                 emit(path, "not_applicable", "machine_check_on_explicit_assessment")
             elif any(value not in set(research[path]["value"]) for value in relevant):
-                emit(path, "violation", "machine_check_on_explicit_assessment", "RESEARCH-QUALITY-EVIDENCE-ADMISSIBILITY-001")
+                emit(
+                    path,
+                    "violation",
+                    "machine_check_on_explicit_assessment",
+                    "RESEARCH-QUALITY-EVIDENCE-ADMISSIBILITY-001",
+                )
             else:
                 emit(path, "conformant", "machine_check_on_explicit_assessment")
 
@@ -589,7 +636,12 @@ def evaluate(state, normalized: Mapping[str, Any]) -> dict[str, Any]:
             not in set(research[path]["value"])
             for evidence_id in finding_evidence
         ):
-            emit(path, "violation", "machine_check_on_core_state", "RESEARCH-QUALITY-EVIDENCE-ADMISSIBILITY-001")
+            emit(
+                path,
+                "violation",
+                "machine_check_on_core_state",
+                "RESEARCH-QUALITY-EVIDENCE-ADMISSIBILITY-001",
+            )
         else:
             emit(path, "conformant", "machine_check_on_core_state")
 
@@ -611,7 +663,12 @@ def evaluate(state, normalized: Mapping[str, Any]) -> dict[str, Any]:
             if missing:
                 emit(path, "unevaluated", "machine_check_on_explicit_assessment", missing=missing)
             elif any(value not in set(research[path]["value"]) for value in values):
-                emit(path, "violation", "machine_check_on_explicit_assessment", "RESEARCH-QUALITY-EVIDENCE-ADMISSIBILITY-001")
+                emit(
+                    path,
+                    "violation",
+                    "machine_check_on_explicit_assessment",
+                    "RESEARCH-QUALITY-EVIDENCE-ADMISSIBILITY-001",
+                )
             else:
                 emit(path, "conformant", "machine_check_on_explicit_assessment")
 
@@ -625,7 +682,9 @@ def evaluate(state, normalized: Mapping[str, Any]) -> dict[str, Any]:
             missing: list[str] = []
             indirect: list[str] = []
             for evidence_id in claim_evidence:
-                ok, directness = _lookup_assessment(assessments, "evidence", evidence_id, "directness")
+                ok, directness = _lookup_assessment(
+                    assessments, "evidence", evidence_id, "directness"
+                )
                 if not ok:
                     missing.append(f"evidence.{evidence_id}.directness")
                 elif directness == "indirect":
@@ -638,15 +697,27 @@ def evaluate(state, normalized: Mapping[str, Any]) -> dict[str, Any]:
                 missing_qualifier: list[str] = []
                 violation = False
                 for evidence_id in indirect:
-                    ok, value = _lookup_assessment(assessments, "evidence", evidence_id, "explicit_qualification")
+                    ok, value = _lookup_assessment(
+                        assessments, "evidence", evidence_id, "explicit_qualification"
+                    )
                     if not ok:
                         missing_qualifier.append(f"evidence.{evidence_id}.explicit_qualification")
                     elif not value:
                         violation = True
                 if missing_qualifier:
-                    emit(path, "unevaluated", "machine_check_on_explicit_assessment", missing=missing_qualifier)
+                    emit(
+                        path,
+                        "unevaluated",
+                        "machine_check_on_explicit_assessment",
+                        missing=missing_qualifier,
+                    )
                 elif violation:
-                    emit(path, "violation", "machine_check_on_explicit_assessment", "RESEARCH-QUALITY-EVIDENCE-ADMISSIBILITY-001")
+                    emit(
+                        path,
+                        "violation",
+                        "machine_check_on_explicit_assessment",
+                        "RESEARCH-QUALITY-EVIDENCE-ADMISSIBILITY-001",
+                    )
                 else:
                     emit(path, "conformant", "machine_check_on_explicit_assessment")
             else:
@@ -661,21 +732,41 @@ def evaluate(state, normalized: Mapping[str, Any]) -> dict[str, Any]:
     independence_applies: bool | None = None
     if selector in research:
         if claim is None:
-            emit(selector, "unevaluated", "machine_check_on_explicit_assessment", missing=["claim_id"])
+            emit(
+                selector,
+                "unevaluated",
+                "machine_check_on_explicit_assessment",
+                missing=["claim_id"],
+            )
         elif not claim_family_ok:
-            emit(selector, "unevaluated", "machine_check_on_explicit_assessment", missing=[f"claims.{claim['id']}.claim_family"])
+            emit(
+                selector,
+                "unevaluated",
+                "machine_check_on_explicit_assessment",
+                missing=[f"claims.{claim['id']}.claim_family"],
+            )
         elif claim_family not in set(research[selector]["value"]):
             emit(selector, "not_applicable", "machine_check_on_explicit_assessment")
             independence_applies = False
         else:
-            emit(selector, "conformant", "machine_check_on_explicit_assessment", note="claim family selects independence checks")
+            emit(
+                selector,
+                "conformant",
+                "machine_check_on_explicit_assessment",
+                note="claim family selects independence checks",
+            )
             independence_applies = True
 
     path = "research_quality.evidence.independence.requirements"
     if path in research:
         applies = independence_applies if independence_applies is not None else True
         if claim is None:
-            emit(path, "unevaluated", "machine_check_on_explicit_assessment_and_core_state", missing=["claim_id"])
+            emit(
+                path,
+                "unevaluated",
+                "machine_check_on_explicit_assessment_and_core_state",
+                missing=["claim_id"],
+            )
         elif not applies or not claim_evidence:
             emit(path, "not_applicable", "machine_check_on_explicit_assessment_and_core_state")
         else:
@@ -683,27 +774,44 @@ def evaluate(state, normalized: Mapping[str, Any]) -> dict[str, Any]:
             missing: list[str] = []
             violation = False
             if "distinct_independence_group" in requirements:
-                groups = [objects.get(("evidence", evidence_id), {}).get("independence_group") for evidence_id in claim_evidence]
+                groups = [
+                    objects.get(("evidence", evidence_id), {}).get("independence_group")
+                    for evidence_id in claim_evidence
+                ]
                 violation = any(not group for group in groups) or (
                     len(groups) > 1 and len(set(groups)) != len(groups)
                 )
             if "synthesis_overlap_accounted" in requirements:
                 for evidence_id in claim_evidence:
-                    ok, value = _lookup_assessment(assessments, "evidence", evidence_id, "synthesis_overlap_accounted")
+                    ok, value = _lookup_assessment(
+                        assessments, "evidence", evidence_id, "synthesis_overlap_accounted"
+                    )
                     if not ok:
                         missing.append(f"evidence.{evidence_id}.synthesis_overlap_accounted")
                     elif not value:
                         violation = True
             if "same_evidence_not_self_validate" in requirements:
-                ok, formation = _lookup_assessment(assessments, "claims", str(claim["id"]), "formation_evidence_ids")
+                ok, formation = _lookup_assessment(
+                    assessments, "claims", str(claim["id"]), "formation_evidence_ids"
+                )
                 if not ok:
                     missing.append(f"claims.{claim['id']}.formation_evidence_ids")
                 elif claim_evidence and set(claim_evidence).issubset(set(formation)):
                     violation = True
             if missing:
-                emit(path, "unevaluated", "machine_check_on_explicit_assessment_and_core_state", missing=missing)
+                emit(
+                    path,
+                    "unevaluated",
+                    "machine_check_on_explicit_assessment_and_core_state",
+                    missing=missing,
+                )
             elif violation:
-                emit(path, "violation", "machine_check_on_explicit_assessment_and_core_state", "RESEARCH-QUALITY-INDEPENDENCE-001")
+                emit(
+                    path,
+                    "violation",
+                    "machine_check_on_explicit_assessment_and_core_state",
+                    "RESEARCH-QUALITY-INDEPENDENCE-001",
+                )
             else:
                 emit(path, "conformant", "machine_check_on_explicit_assessment_and_core_state")
 
@@ -716,14 +824,21 @@ def evaluate(state, normalized: Mapping[str, Any]) -> dict[str, Any]:
         if claim is None:
             emit(path, "unevaluated", "machine_check_on_explicit_assessment", missing=["claim_id"])
         elif not claim_family_ok:
-            emit(path, "unevaluated", "machine_check_on_explicit_assessment", missing=[f"claims.{claim['id']}.claim_family"])
+            emit(
+                path,
+                "unevaluated",
+                "machine_check_on_explicit_assessment",
+                missing=[f"claims.{claim['id']}.claim_family"],
+            )
         elif claim_family != family:
             emit(path, "not_applicable", "machine_check_on_explicit_assessment")
         else:
             missing: list[str] = []
             values: list[str] = []
             for evidence_id in claim_evidence:
-                ok, value = _lookup_assessment(assessments, "evidence", evidence_id, "support_scope")
+                ok, value = _lookup_assessment(
+                    assessments, "evidence", evidence_id, "support_scope"
+                )
                 if ok:
                     values.append(value)
                 else:
@@ -731,7 +846,12 @@ def evaluate(state, normalized: Mapping[str, Any]) -> dict[str, Any]:
             if missing:
                 emit(path, "unevaluated", "machine_check_on_explicit_assessment", missing=missing)
             elif any(value not in set(research[path]["value"]) for value in values):
-                emit(path, "violation", "machine_check_on_explicit_assessment", "RESEARCH-QUALITY-CLAIM-SUPPORT-001")
+                emit(
+                    path,
+                    "violation",
+                    "machine_check_on_explicit_assessment",
+                    "RESEARCH-QUALITY-CLAIM-SUPPORT-001",
+                )
             else:
                 emit(path, "conformant", "machine_check_on_explicit_assessment")
 
@@ -740,14 +860,21 @@ def evaluate(state, normalized: Mapping[str, Any]) -> dict[str, Any]:
         if claim is None:
             emit(path, "unevaluated", "machine_check_on_explicit_assessment", missing=["claim_id"])
         elif not claim_family_ok:
-            emit(path, "unevaluated", "machine_check_on_explicit_assessment", missing=[f"claims.{claim['id']}.claim_family"])
+            emit(
+                path,
+                "unevaluated",
+                "machine_check_on_explicit_assessment",
+                missing=[f"claims.{claim['id']}.claim_family"],
+            )
         elif claim_family != "causal":
             emit(path, "not_applicable", "machine_check_on_explicit_assessment")
         else:
             missing: list[str] = []
             violation = False
             for evidence_id in claim_evidence:
-                ok, value = _lookup_assessment(assessments, "evidence", evidence_id, "inference_bases")
+                ok, value = _lookup_assessment(
+                    assessments, "evidence", evidence_id, "inference_bases"
+                )
                 if not ok:
                     missing.append(f"evidence.{evidence_id}.inference_bases")
                 elif set(value).intersection(set(research[path]["value"])):
@@ -755,7 +882,12 @@ def evaluate(state, normalized: Mapping[str, Any]) -> dict[str, Any]:
             if missing:
                 emit(path, "unevaluated", "machine_check_on_explicit_assessment", missing=missing)
             elif violation:
-                emit(path, "violation", "machine_check_on_explicit_assessment", "RESEARCH-QUALITY-CAUSAL-SUPPORT-001")
+                emit(
+                    path,
+                    "violation",
+                    "machine_check_on_explicit_assessment",
+                    "RESEARCH-QUALITY-CAUSAL-SUPPORT-001",
+                )
             else:
                 emit(path, "conformant", "machine_check_on_explicit_assessment")
 
@@ -764,7 +896,12 @@ def evaluate(state, normalized: Mapping[str, Any]) -> dict[str, Any]:
         if finding is None:
             emit(path, "unevaluated", "machine_check_on_core_state", missing=["finding_id"])
         elif any(not finding.get(field) for field in research[path]["value"]):
-            emit(path, "violation", "machine_check_on_core_state", "RESEARCH-QUALITY-FINDING-QUALIFICATION-001")
+            emit(
+                path,
+                "violation",
+                "machine_check_on_core_state",
+                "RESEARCH-QUALITY-FINDING-QUALIFICATION-001",
+            )
         else:
             emit(path, "conformant", "machine_check_on_core_state")
 
@@ -783,8 +920,15 @@ def evaluate(state, normalized: Mapping[str, Any]) -> dict[str, Any]:
     if path in research:
         if finding is None:
             emit(path, "unevaluated", "machine_check_on_core_state", missing=["finding_id"])
-        elif not set(research[path]["value"]).issubset({review.get("review_lens") for review in reviews}):
-            emit(path, "violation", "machine_check_on_core_state", "RESEARCH-QUALITY-COUNTER-REVIEW-001")
+        elif not set(research[path]["value"]).issubset(
+            {review.get("review_lens") for review in reviews}
+        ):
+            emit(
+                path,
+                "violation",
+                "machine_check_on_core_state",
+                "RESEARCH-QUALITY-COUNTER-REVIEW-001",
+            )
         else:
             emit(path, "conformant", "machine_check_on_core_state")
 
@@ -797,7 +941,12 @@ def evaluate(state, normalized: Mapping[str, Any]) -> dict[str, Any]:
             and review.get("disposition") == "open"
             for review in reviews
         ):
-            emit(path, "violation", "machine_check_on_core_state", "RESEARCH-QUALITY-COUNTER-REVIEW-001")
+            emit(
+                path,
+                "violation",
+                "machine_check_on_core_state",
+                "RESEARCH-QUALITY-COUNTER-REVIEW-001",
+            )
         else:
             emit(path, "conformant", "machine_check_on_core_state")
 
@@ -828,7 +977,12 @@ def evaluate(state, normalized: Mapping[str, Any]) -> dict[str, Any]:
         if missing:
             emit(path, "unevaluated", "machine_check_on_explicit_assessment", missing=missing)
         elif violation:
-            emit(path, "violation", "machine_check_on_explicit_assessment", "RESEARCH-QUALITY-SUFFICIENCY-001")
+            emit(
+                path,
+                "violation",
+                "machine_check_on_explicit_assessment",
+                "RESEARCH-QUALITY-SUFFICIENCY-001",
+            )
         else:
             emit(path, "conformant", "machine_check_on_explicit_assessment")
 
@@ -844,13 +998,28 @@ def evaluate(state, normalized: Mapping[str, Any]) -> dict[str, Any]:
         if path not in research:
             continue
         if method is None:
-            emit(path, "unevaluated", "machine_check_on_explicit_assessment_and_core_state", missing=["method_id"])
+            emit(
+                path,
+                "unevaluated",
+                "machine_check_on_explicit_assessment_and_core_state",
+                missing=["method_id"],
+            )
         elif not method_family_ok:
-            emit(path, "unevaluated", "machine_check_on_explicit_assessment_and_core_state", missing=[f"methods.{method['id']}.method_family"])
+            emit(
+                path,
+                "unevaluated",
+                "machine_check_on_explicit_assessment_and_core_state",
+                missing=[f"methods.{method['id']}.method_family"],
+            )
         elif method_family not in set(research[path]["value"]):
             emit(path, "not_applicable", "machine_check_on_explicit_assessment_and_core_state")
         elif not method.get(field):
-            emit(path, "violation", "machine_check_on_explicit_assessment_and_core_state", "RESEARCH-QUALITY-METHOD-001")
+            emit(
+                path,
+                "violation",
+                "machine_check_on_explicit_assessment_and_core_state",
+                "RESEARCH-QUALITY-METHOD-001",
+            )
         else:
             emit(path, "conformant", "machine_check_on_explicit_assessment_and_core_state")
 
@@ -859,7 +1028,9 @@ def evaluate(state, normalized: Mapping[str, Any]) -> dict[str, Any]:
         if finding is None:
             emit(path, "unevaluated", "machine_check_on_core_state", missing=["finding_id"])
         elif len(finding_evidence) < int(research[path]["value"]):
-            emit(path, "violation", "machine_check_on_core_state", "RESEARCH-QUALITY-SUFFICIENCY-001")
+            emit(
+                path, "violation", "machine_check_on_core_state", "RESEARCH-QUALITY-SUFFICIENCY-001"
+            )
         else:
             emit(path, "conformant", "machine_check_on_core_state")
 
@@ -874,7 +1045,12 @@ def evaluate(state, normalized: Mapping[str, Any]) -> dict[str, Any]:
             }
             groups.discard(None)
             if len(groups) < int(research[path]["value"]):
-                emit(path, "violation", "machine_check_on_core_state", "RESEARCH-QUALITY-INDEPENDENCE-001")
+                emit(
+                    path,
+                    "violation",
+                    "machine_check_on_core_state",
+                    "RESEARCH-QUALITY-INDEPENDENCE-001",
+                )
             else:
                 emit(path, "conformant", "machine_check_on_core_state")
 
@@ -925,13 +1101,7 @@ def evaluate(state, normalized: Mapping[str, Any]) -> dict[str, Any]:
                 missing = []
             elif any(row["status"] == "unevaluated" for row in present):
                 status = "unevaluated"
-                missing = sorted(
-                    {
-                        item
-                        for row in present
-                        for item in row["unevaluated_inputs"]
-                    }
-                )
+                missing = sorted({item for row in present for item in row["unevaluated_inputs"]})
             else:
                 status = "conformant"
                 missing = []
@@ -939,7 +1109,9 @@ def evaluate(state, normalized: Mapping[str, Any]) -> dict[str, Any]:
                 {
                     "gate": gate,
                     "status": status,
-                    "diagnostic_codes": ["RESEARCH-QUALITY-GATE-001"] if status == "violation" else [],
+                    "diagnostic_codes": ["RESEARCH-QUALITY-GATE-001"]
+                    if status == "violation"
+                    else [],
                     "unevaluated_inputs": missing,
                 }
             )
@@ -954,13 +1126,7 @@ def evaluate(state, normalized: Mapping[str, Any]) -> dict[str, Any]:
             gate_status,
             "aggregate_of_configured_quality_checks",
             "RESEARCH-QUALITY-GATE-001" if gate_status == "violation" else None,
-            missing=sorted(
-                {
-                    item
-                    for row in gate_results
-                    for item in row["unevaluated_inputs"]
-                }
-            ),
+            missing=sorted({item for row in gate_results for item in row["unevaluated_inputs"]}),
         )
 
     organization_results: list[dict[str, Any]] = []

@@ -68,9 +68,7 @@ def _render_with_pinned_text_budget(
     max_bytes: int,
 ) -> bytes:
     pinned_limit = _TEXT_RENDITION_LIMIT.get()
-    effective_limit = (
-        max_bytes if pinned_limit is None else min(max_bytes, pinned_limit)
-    )
+    effective_limit = max_bytes if pinned_limit is None else min(max_bytes, pinned_limit)
     return _BASE_RENDER(
         original_content,
         media_type,

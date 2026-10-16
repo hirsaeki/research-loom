@@ -18,7 +18,9 @@ def _issue(
     refs: tuple[str, ...] = (),
     retryable: bool = False,
 ) -> ValidationIssue:
-    return ValidationIssue(error_code=code, stage=stage, message=message, affected_refs=refs, retryable=retryable)
+    return ValidationIssue(
+        error_code=code, stage=stage, message=message, affected_refs=refs, retryable=retryable
+    )
 
 
 def _dedupe_issues(issues: Sequence[ValidationIssue]) -> list[ValidationIssue]:

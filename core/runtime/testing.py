@@ -58,13 +58,9 @@ class InMemoryResearchStateRepository:
         if snapshot is None:
             raise KeyError(f"lineage head snapshot {lineage.head_snapshot_ref!r} does not resolve")
         objects = tuple(
-            deepcopy(obj)
-            for _, obj in sorted(self._objects.items(), key=lambda item: item[0])
+            deepcopy(obj) for _, obj in sorted(self._objects.items(), key=lambda item: item[0])
         )
-        decisions = tuple(
-            deepcopy(obj)
-            for _, obj in sorted(self._decisions.items())
-        )
+        decisions = tuple(deepcopy(obj) for _, obj in sorted(self._decisions.items()))
         return StateView(
             project_ref=self._project_ref,
             lineage_ref=lineage_ref,
@@ -89,7 +85,9 @@ class InMemoryResearchStateRepository:
         value = self._snapshots.get(snapshot_ref)
         return deepcopy(value) if value is not None else None
 
-    def load_object_revision(self, kind: str, object_id: str, revision: int) -> Mapping[str, Any] | None:
+    def load_object_revision(
+        self, kind: str, object_id: str, revision: int
+    ) -> Mapping[str, Any] | None:
         value = self._objects.get((kind, object_id, revision))
         return deepcopy(value) if value is not None else None
 
@@ -99,7 +97,9 @@ class InMemoryResearchStateRepository:
         known.update(("research_lineage", lineage_id) for lineage_id in self._lineages)
         return {tuple(ref): tuple(ref) in known for ref in refs}
 
-    def find_commit_by_idempotency_key(self, idempotency_key: str) -> tuple[str, CommitReceipt] | None:
+    def find_commit_by_idempotency_key(
+        self, idempotency_key: str
+    ) -> tuple[str, CommitReceipt] | None:
         return self._commits.get(idempotency_key)
 
     def commit(self, bundle: CommitBundle, *, expected_head_snapshot_digest: str) -> CommitReceipt:
@@ -113,15 +113,22 @@ class InMemoryResearchStateRepository:
             prior_digest, prior_receipt = existing_commit
             if prior_digest == bundle.request_digest:
                 return prior_receipt
-            raise IdempotencyConflictError("idempotency key collides with a different committed request")
+            raise IdempotencyConflictError(
+                "idempotency key collides with a different committed request"
+            )
 
         source_lineage = self._lineages.get(bundle.lineage_ref)
         if source_lineage is None:
             raise AtomicCommitError(f"source lineage {bundle.lineage_ref!r} does not resolve")
         if source_lineage.head_snapshot_digest != expected_head_snapshot_digest:
             raise StaleHeadError("Research Lineage HEAD changed before atomic commit")
-        if source_lineage.head_snapshot_ref != bundle.previous_snapshot_ref or source_lineage.head_snapshot_digest != bundle.previous_snapshot_digest:
-            raise StaleHeadError("CommitBundle previous Snapshot no longer matches Research Lineage HEAD")
+        if (
+            source_lineage.head_snapshot_ref != bundle.previous_snapshot_ref
+            or source_lineage.head_snapshot_digest != bundle.previous_snapshot_digest
+        ):
+            raise StaleHeadError(
+                "CommitBundle previous Snapshot no longer matches Research Lineage HEAD"
+            )
 
         staged_objects = deepcopy(self._objects)
         staged_snapshots = deepcopy(self._snapshots)
@@ -148,7 +155,9 @@ class InMemoryResearchStateRepository:
         if bundle.new_snapshot is not None:
             snapshot_id = str(bundle.new_snapshot["id"])
             if snapshot_id in staged_snapshots:
-                raise AtomicCommitError(f"immutable Snapshot identity already exists: {snapshot_id}")
+                raise AtomicCommitError(
+                    f"immutable Snapshot identity already exists: {snapshot_id}"
+                )
             staged_snapshots[snapshot_id] = deepcopy(dict(bundle.new_snapshot))
             staged_objects[_object_key(bundle.new_snapshot)] = deepcopy(dict(bundle.new_snapshot))
 
@@ -160,7 +169,9 @@ class InMemoryResearchStateRepository:
             if lineage.lineage_id in staged_lineages:
                 raise AtomicCommitError(f"lineage identity already exists: {lineage.lineage_id}")
             if lineage.head_snapshot_ref not in staged_snapshots:
-                raise AtomicCommitError("new lineage HEAD snapshot must be in the same atomic bundle")
+                raise AtomicCommitError(
+                    "new lineage HEAD snapshot must be in the same atomic bundle"
+                )
             staged_lineages[lineage.lineage_id] = lineage
 
         if bundle.active_lineage_update is not None:
@@ -192,14 +203,22 @@ class InMemoryResearchStateRepository:
     def debug_state(self) -> Mapping[str, Any]:
         """Stable test snapshot used only to assert all-or-nothing behavior."""
         return {
-            "objects": sorted((key, canonical_digest(value)) for key, value in self._objects.items()),
-            "snapshots": sorted((key, canonical_digest(value)) for key, value in self._snapshots.items()),
-            "decisions": sorted((key, canonical_digest(value)) for key, value in self._decisions.items()),
+            "objects": sorted(
+                (key, canonical_digest(value)) for key, value in self._objects.items()
+            ),
+            "snapshots": sorted(
+                (key, canonical_digest(value)) for key, value in self._snapshots.items()
+            ),
+            "decisions": sorted(
+                (key, canonical_digest(value)) for key, value in self._decisions.items()
+            ),
             "lineages": sorted((key, asdict(value)) for key, value in self._lineages.items()),
             "active": self._active_lineage_ref,
             "used_decisions": sorted(self._used_decision_ids),
             "adoptions": sorted(self._adoption_refs),
-            "audits": sorted((key, canonical_digest(value)) for key, value in self._audit_events.items()),
+            "audits": sorted(
+                (key, canonical_digest(value)) for key, value in self._audit_events.items()
+            ),
             "commits": sorted((key, value[0]) for key, value in self._commits.items()),
         }
 

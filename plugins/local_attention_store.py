@@ -135,9 +135,7 @@ _REQUIRED_FOREIGN_KEYS = {
 
 def _read_schema_version(connection: sqlite3.Connection) -> str:
     try:
-        row = connection.execute(
-            "SELECT schema_version FROM attention_store_meta"
-        ).fetchone()
+        row = connection.execute("SELECT schema_version FROM attention_store_meta").fetchone()
     except sqlite3.Error as exc:
         raise LocalAttentionStoreError(
             "ATTENTION-STORE-SCHEMA-001", "Attention store schema is missing or incompatible"
@@ -196,9 +194,7 @@ def validate_attention_store_schema(path: str | Path) -> None:
             required = set(_REQUIRED_COLUMNS)
             present = {
                 str(row[0])
-                for row in connection.execute(
-                    "SELECT name FROM sqlite_master WHERE type='table'"
-                )
+                for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")
             }
             if not required <= present:
                 raise LocalAttentionStoreError(
@@ -296,7 +292,8 @@ class LocalAttentionStore:
             validate_attention_map(value)
             if value["map_id"] != row["map_id"] or value["map_digest"] != row["map_digest"]:
                 raise LocalAttentionStoreError(
-                    "ATTENTION-STORE-INTEGRITY-001", "active Attention pointer does not match stored map"
+                    "ATTENTION-STORE-INTEGRITY-001",
+                    "active Attention pointer does not match stored map",
                 )
             return {
                 "map_id": str(row["map_id"]),
@@ -320,7 +317,8 @@ class LocalAttentionStore:
                 ).fetchone()
                 if existing is not None:
                     raise LocalAttentionStoreError(
-                        "ATTENTION-MAP-IMMUTABLE-001", "Attention Map ID already exists; overwrite is forbidden"
+                        "ATTENTION-MAP-IMMUTABLE-001",
+                        "Attention Map ID already exists; overwrite is forbidden",
                     )
                 connection.execute(
                     "INSERT INTO attention_maps(map_id, project_id, map_digest, document_json) VALUES (?,?,?,?)",
@@ -357,7 +355,9 @@ class LocalAttentionStore:
                 )
             document = json.loads(str(row["document_json"]))
             validate_attention_map(document)
-            if str(row["project_id"]) != str(project_id) or document["project_id"] != str(project_id):
+            if str(row["project_id"]) != str(project_id) or document["project_id"] != str(
+                project_id
+            ):
                 raise LocalAttentionStoreError(
                     "ATTENTION-MAP-PROJECT-001", "Attention Map belongs to a different project"
                 )
@@ -397,7 +397,9 @@ class LocalAttentionStore:
                 "activated_at": str(activated_at),
             }
             event["event_digest"] = attention_event_digest(event)
-            event_json = json.dumps(event, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+            event_json = json.dumps(
+                event, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+            )
             connection.execute(
                 """
                 INSERT INTO attention_activation_events(
@@ -405,8 +407,13 @@ class LocalAttentionStore:
                 ) VALUES (?,?,?,?,?,?,?)
                 """,
                 (
-                    str(activation_id), str(project_id), str(document["map_id"]),
-                    str(document["map_digest"]), str(activated_at), str(event["event_digest"]), event_json,
+                    str(activation_id),
+                    str(project_id),
+                    str(document["map_id"]),
+                    str(document["map_digest"]),
+                    str(activated_at),
+                    str(event["event_digest"]),
+                    event_json,
                 ),
             )
             connection.execute(
@@ -418,7 +425,12 @@ class LocalAttentionStore:
                     map_digest=excluded.map_digest,
                     activation_id=excluded.activation_id
                 """,
-                (str(project_id), str(document["map_id"]), str(document["map_digest"]), str(activation_id)),
+                (
+                    str(project_id),
+                    str(document["map_id"]),
+                    str(document["map_digest"]),
+                    str(activation_id),
+                ),
             )
             connection.commit()
             return event

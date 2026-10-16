@@ -35,7 +35,9 @@ def _write_transcript(path: Path, user_prompt: str) -> None:
             },
         },
     ]
-    path.write_text("\n".join(json.dumps(item, ensure_ascii=False) for item in items) + "\n", encoding="utf-8")
+    path.write_text(
+        "\n".join(json.dumps(item, ensure_ascii=False) for item in items) + "\n", encoding="utf-8"
+    )
 
 
 class CodexStopGuardContractTests(unittest.TestCase):
@@ -112,7 +114,9 @@ class CodexStopGuardContractTests(unittest.TestCase):
         guard = _load_guard()
         with tempfile.TemporaryDirectory() as tmp:
             transcript = Path(tmp) / "rollout.jsonl"
-            _write_transcript(transcript, "Show me the hook diagnostics and implementation details, please.")
+            _write_transcript(
+                transcript, "Show me the hook diagnostics and implementation details, please."
+            )
             payload = {
                 "stop_hook_active": False,
                 "transcript_path": str(transcript),
@@ -209,7 +213,9 @@ class CodexStopGuardContractTests(unittest.TestCase):
             "transcript_path": "should-not-be-read.jsonl",
             "last_assistant_message": "指定3資料を確認して、根拠・限界・未解決点を整理します。",
         }
-        with mock.patch.object(guard, "latest_user_prompt", side_effect=AssertionError("unexpected transcript read")):
+        with mock.patch.object(
+            guard, "latest_user_prompt", side_effect=AssertionError("unexpected transcript read")
+        ):
             self.assertEqual(guard.evaluate(payload), (False, [], False))
 
     def test_latest_user_prompt_scans_from_transcript_tail(self):
@@ -232,7 +238,9 @@ class CodexStopGuardContractTests(unittest.TestCase):
                 "payload": {
                     "type": "message",
                     "role": "user",
-                    "content": [{"type": "input_text", "text": "内部ではどのSkillを使っているの？"}],
+                    "content": [
+                        {"type": "input_text", "text": "内部ではどのSkillを使っているの？"}
+                    ],
                 },
             }
             transcript.write_text(
@@ -240,7 +248,9 @@ class CodexStopGuardContractTests(unittest.TestCase):
                 encoding="utf-8",
             )
             with mock.patch.object(guard.json, "loads", wraps=guard.json.loads) as loads:
-                self.assertEqual(guard.latest_user_prompt(str(transcript)), "内部ではどのSkillを使っているの？")
+                self.assertEqual(
+                    guard.latest_user_prompt(str(transcript)), "内部ではどのSkillを使っているの？"
+                )
                 self.assertEqual(loads.call_count, 1)
 
     def test_stop_hook_active_prevents_rewrite_loop(self):
@@ -255,7 +265,9 @@ class CodexStopGuardContractTests(unittest.TestCase):
         self.assertFalse(diagnostic)
 
     def test_uat_requires_live_codex_hook_evidence(self):
-        runbook = (ROOT / "docs" / "architecture" / "misco-integrated-acceptance.md").read_text(encoding="utf-8")
+        runbook = (ROOT / "docs" / "architecture" / "misco-integrated-acceptance.md").read_text(
+            encoding="utf-8"
+        )
         for phrase in (
             "### Codex Stop-hook evidence",
             "RESEARCH_LOOM_CODEX_HOOK_LOG",

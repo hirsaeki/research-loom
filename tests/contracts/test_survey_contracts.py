@@ -45,22 +45,35 @@ class SurveyContracts(unittest.TestCase):
         Draft202012Validator.check_schema(self.schema)
         Draft202012Validator.check_schema(self.design_schema)
         semantics = yaml.safe_load((SV / "survey-semantics.yaml").read_text(encoding="utf-8"))
-        self.assertEqual(semantics["capability"]["research_method_contract"], "research-method@0.1.0")
+        self.assertEqual(
+            semantics["capability"]["research_method_contract"], "research-method@0.1.0"
+        )
         self.assertFalse(semantics["capability"]["pr9_context_or_handoff_redefined"])
         self.assertFalse(semantics["instrument"]["questionnaire_is_core_method"])
         self.assertFalse(semantics["instrument"]["generation_is_instrument_approval"])
         self.assertFalse(semantics["execution"]["response_is_verified_evidence"])
         self.assertFalse(semantics["analysis"]["aggregate_or_statistic_is_finding"])
         self.assertFalse(semantics["routing"]["survey_selects_next_method"])
-        self.assertFalse(semantics["epistemic_boundary"]["synthetic_respondent_or_persona_generation_defined_here"])
+        self.assertFalse(
+            semantics["epistemic_boundary"][
+                "synthetic_respondent_or_persona_generation_defined_here"
+            ]
+        )
         self.assertEqual(len({e["id"] for e in semantics["errors"]}), len(semantics["errors"]))
 
     def test_descriptor_binds_pr12_functions_pr9_wire_and_digest(self):
-        self.assertEqual(list(Draft202012Validator(self.descriptor_schema).iter_errors(self.descriptor)), [])
+        self.assertEqual(
+            list(Draft202012Validator(self.descriptor_schema).iter_errors(self.descriptor)), []
+        )
         self.assertEqual(descriptor_error(self.descriptor), None)
-        self.assertEqual(self.descriptor["descriptor_digest"], canonical_digest(self.descriptor, "descriptor_digest"))
+        self.assertEqual(
+            self.descriptor["descriptor_digest"],
+            canonical_digest(self.descriptor, "descriptor_digest"),
+        )
         functions = {f["function_id"]: f for f in self.descriptor["declared_functions"]}
-        self.assertEqual(set(functions), {"method_design", "instrument_design", "execute", "analyze"})
+        self.assertEqual(
+            set(functions), {"method_design", "instrument_design", "execute", "analyze"}
+        )
         for function in functions.values():
             self.assertEqual(function["input_contract"], "capability-context-pack@0.1.0")
             self.assertEqual(function["output_contract"], "capability-handoff@0.1.0")
@@ -79,10 +92,15 @@ class SurveyContracts(unittest.TestCase):
         questionnaire = self.fixtures["questionnaire"]
         self.assertEqual(list(self._validator().iter_errors(questionnaire)), [])
         self.assertEqual(questionnaire_error(questionnaire), None)
-        self.assertEqual(questionnaire["content_digest"], canonical_digest(questionnaire, "content_digest"))
+        self.assertEqual(
+            questionnaire["content_digest"], canonical_digest(questionnaire, "content_digest")
+        )
         ids = [q["question_id"] for q in questionnaire["questions"]]
         self.assertEqual(len(ids), len(set(ids)))
-        self.assertEqual({q["question_type"] for q in questionnaire["questions"]}, {"single_choice", "scale", "numeric", "free_text"})
+        self.assertEqual(
+            {q["question_type"] for q in questionnaire["questions"]},
+            {"single_choice", "scale", "numeric", "free_text"},
+        )
         self.assertTrue(all(any(q["traceability"].values()) for q in questionnaire["questions"]))
         self.assertEqual(questionnaire["approval_status"], "approved")
         self.assertIn("approval_decision_id", questionnaire)
@@ -100,7 +118,9 @@ class SurveyContracts(unittest.TestCase):
         changed_design = deepcopy(design)
         changed_design["target_population"]["definition"] = "Changed design after context pinning."
         refresh(changed_design, "content_digest")
-        self.assertEqual(context_error(context, changed_design, questionnaire, "real"), "SV-CONTEXT-BINDING-001")
+        self.assertEqual(
+            context_error(context, changed_design, questionnaire, "real"), "SV-CONTEXT-BINDING-001"
+        )
 
         candidate = deepcopy(questionnaire)
         candidate["approval_status"] = "candidate"
@@ -110,14 +130,20 @@ class SurveyContracts(unittest.TestCase):
         candidate_context["questionnaire_ref"]["content_digest"] = candidate["content_digest"]
         candidate_context["questionnaire_decision_ids"] = []
         refresh(candidate_context, "extension_digest")
-        self.assertEqual(context_error(candidate_context, design, candidate, "real"), "SV-REAL-EXECUTION-001")
+        self.assertEqual(
+            context_error(candidate_context, design, candidate, "real"), "SV-REAL-EXECUTION-001"
+        )
         missing_decision = deepcopy(context)
         missing_decision["questionnaire_decision_ids"] = []
         refresh(missing_decision, "extension_digest")
-        self.assertEqual(context_error(missing_decision, design, questionnaire, "real"), "SV-REAL-EXECUTION-001")
+        self.assertEqual(
+            context_error(missing_decision, design, questionnaire, "real"), "SV-REAL-EXECUTION-001"
+        )
         stale = deepcopy(context)
         stale["duplicate_response_policy"] = "manual_review"
-        self.assertEqual(context_error(stale, design, questionnaire, "real"), "SV-CONTEXT-DIGEST-001")
+        self.assertEqual(
+            context_error(stale, design, questionnaire, "real"), "SV-CONTEXT-DIGEST-001"
+        )
 
     def test_real_execution_keeps_nonresponse_sufficiency_and_datetime_boundary(self):
         design = self.fixtures["design"]
@@ -141,7 +167,9 @@ class SurveyContracts(unittest.TestCase):
         errors = list(self._validator().iter_errors(invalid_time))
 
         def contains_format(error):
-            return error.validator == "format" or any(contains_format(child) for child in error.context)
+            return error.validator == "format" or any(
+                contains_format(child) for child in error.context
+            )
 
         self.assertTrue(any(contains_format(error) for error in errors), errors)
         stale = deepcopy(result)
@@ -174,7 +202,9 @@ class SurveyContracts(unittest.TestCase):
         wrong_synthetic = deepcopy(synthetic)
         wrong_synthetic["responses"][0]["epistemic_mode"] = "empirical"
         refresh(wrong_synthetic, "extension_digest")
-        self.assertEqual(result_error(wrong_synthetic, "synthetic_test", design), "SV-EPISTEMIC-MODE-001")
+        self.assertEqual(
+            result_error(wrong_synthetic, "synthetic_test", design), "SV-EPISTEMIC-MODE-001"
+        )
 
         virtual = deepcopy(synthetic)
         virtual["responses"][0]["epistemic_mode"] = "virtual"
@@ -204,7 +234,10 @@ class SurveyContracts(unittest.TestCase):
         self.assertEqual(result_error(result, "real", design), None)
         self.assertTrue(result["item_summaries"])
         for item in result["item_summaries"]:
-            self.assertEqual(item["denominator_count"], item["answered_count"] + item["missing_count"] + item["excluded_count"])
+            self.assertEqual(
+                item["denominator_count"],
+                item["answered_count"] + item["missing_count"] + item["excluded_count"],
+            )
         self.assertTrue(result["aggregation_provenance_ref"])
         self.assertTrue(result["subgroup_provenance_refs"])
         self.assertTrue(result["free_text_coding_refs"])
@@ -212,15 +245,22 @@ class SurveyContracts(unittest.TestCase):
         bad_denominator = deepcopy(result)
         bad_denominator["item_summaries"][0]["denominator_count"] += 1
         refresh(bad_denominator, "extension_digest")
-        self.assertEqual(result_error(bad_denominator, "real", design), "SV-ANALYSIS-DENOMINATOR-001")
+        self.assertEqual(
+            result_error(bad_denominator, "real", design), "SV-ANALYSIS-DENOMINATOR-001"
+        )
 
     def test_pr10_routing_keeps_pr9_invocation_and_human_decision_boundary(self):
         proposal = self.routing["action_proposal"]
-        validator = Draft202012Validator(self.conversation_schema, format_checker=self.format_checker)
+        validator = Draft202012Validator(
+            self.conversation_schema, format_checker=self.format_checker
+        )
         self.assertEqual(list(validator.iter_errors(proposal)), [])
         self.assertEqual(proposal["route"]["invocation_contract"], "capability-invocation@0.1.0")
         self.assertEqual(proposal["route"]["capability"]["function_id"], "execute")
-        self.assertEqual(proposal["route"]["capability"]["descriptor_digest"], self.descriptor["descriptor_digest"])
+        self.assertEqual(
+            proposal["route"]["capability"]["descriptor_digest"],
+            self.descriptor["descriptor_digest"],
+        )
         self.assertEqual(proposal["route"]["execution_mode"], "real")
         self.assertTrue(proposal["human_decision_boundary"]["required"])
         self.assertFalse(proposal["human_decision_boundary"]["confirmation_is_human_decision"])

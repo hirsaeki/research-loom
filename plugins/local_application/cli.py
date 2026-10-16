@@ -18,7 +18,9 @@ from plugins.local_attention_store import LocalAttentionStoreError, validate_att
 
 
 def _emit(value: Mapping[str, Any]) -> None:
-    sys.stdout.write(json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n")
+    sys.stdout.write(
+        json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n"
+    )
 
 
 def _terminal_safe(value: Any) -> str:
@@ -41,13 +43,9 @@ def _emit_external_materials_human(value: Mapping[str, Any]) -> None:
         )
         runs = ", ".join(_terminal_safe(item) for item in material.get("run_ids") or [])
         renditions = material.get("renditions") or []
-        rendition_ids = ", ".join(
-            _terminal_safe(item.get("artifact_id")) for item in renditions
-        )
+        rendition_ids = ", ".join(_terminal_safe(item.get("artifact_id")) for item in renditions)
         sys.stdout.write(f"\n{index}. {label}\n")
-        sys.stdout.write(
-            f"   Digest: {_terminal_safe(material.get('original_digest'))}\n"
-        )
+        sys.stdout.write(f"   Digest: {_terminal_safe(material.get('original_digest'))}\n")
         sys.stdout.write(f"   Runs: {runs}\n")
         sys.stdout.write(
             "   Original: "
@@ -58,8 +56,7 @@ def _emit_external_materials_human(value: Mapping[str, Any]) -> None:
         sys.stdout.write(f"   Rendition: {rendition_ids}\n")
     if value.get("truncated"):
         sys.stdout.write(
-            "\nMore materials available. Next cursor: "
-            f"{_terminal_safe(value.get('next_cursor'))}\n"
+            f"\nMore materials available. Next cursor: {_terminal_safe(value.get('next_cursor'))}\n"
         )
 
 
@@ -80,7 +77,9 @@ def _add_workspace(parser: argparse.ArgumentParser) -> None:
 
 
 def _add_output_json(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--json", action="store_true", help="machine-readable JSON output (always enabled)")
+    parser.add_argument(
+        "--json", action="store_true", help="machine-readable JSON output (always enabled)"
+    )
 
 
 def _add_view(parser: argparse.ArgumentParser) -> None:
@@ -166,9 +165,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     synthesis_candidate_list = synthesis_candidate_sub.add_parser("list")
     _add_workspace(synthesis_candidate_list)
-    synthesis_candidate_list.add_argument(
-        "--kind", choices=("recommendation", "argument")
-    )
+    synthesis_candidate_list.add_argument("--kind", choices=("recommendation", "argument"))
     synthesis_candidate_list.add_argument("--limit", type=int, default=20)
     synthesis_candidate_list.add_argument("--cursor")
     _add_view(synthesis_candidate_list)
@@ -239,7 +236,6 @@ def build_parser() -> argparse.ArgumentParser:
         _add_workspace(exhibit_operation)
         _add_input_json(exhibit_operation)
 
-
     exhibit_list = exhibit_sub.add_parser("list")
     _add_workspace(exhibit_list)
     exhibit_list.add_argument("--rq-id")
@@ -259,7 +255,9 @@ def build_parser() -> argparse.ArgumentParser:
     _add_input_json(research_quality_evaluate)
 
     research_package = sub.add_parser("research-package")
-    research_package_sub = research_package.add_subparsers(dest="research_package_command", required=True)
+    research_package_sub = research_package.add_subparsers(
+        dest="research_package_command", required=True
+    )
     research_package_build = research_package_sub.add_parser("build")
     _add_workspace(research_package_build)
     _add_input_json(research_package_build)
@@ -282,7 +280,9 @@ def build_parser() -> argparse.ArgumentParser:
     _add_output_json(research_package_verify)
 
     writer_composition = sub.add_parser("writer-composition")
-    writer_composition_sub = writer_composition.add_subparsers(dest="writer_composition_command", required=True)
+    writer_composition_sub = writer_composition.add_subparsers(
+        dest="writer_composition_command", required=True
+    )
     wc_capture = writer_composition_sub.add_parser("capture")
     _add_workspace(wc_capture)
     wc_capture.add_argument("--package-id", required=True)
@@ -323,7 +323,9 @@ def build_parser() -> argparse.ArgumentParser:
     _add_output_json(wc_section)
 
     writer_round_trip = sub.add_parser("writer-round-trip")
-    writer_round_trip_sub = writer_round_trip.add_subparsers(dest="writer_round_trip_command", required=True)
+    writer_round_trip_sub = writer_round_trip.add_subparsers(
+        dest="writer_round_trip_command", required=True
+    )
     wrt_export = writer_round_trip_sub.add_parser("export-input")
     _add_workspace(wrt_export)
     wrt_export.add_argument("--composition-id", required=True)
@@ -348,21 +350,26 @@ def build_parser() -> argparse.ArgumentParser:
     _add_workspace(publication_preview)
     publication_preview.add_argument("--composition-id", required=True)
     publication_preview.add_argument("--revision-id")
-    publication_preview.add_argument("--publication-input", help="JSON Publication inputs, including document mode and explicit review")
+    publication_preview.add_argument(
+        "--publication-input",
+        help="JSON Publication inputs, including document mode and explicit review",
+    )
     _add_output_json(publication_preview)
     publication_show = publication_sub.add_parser("show")
     _add_workspace(publication_show)
     publication_show.add_argument("--build-id", required=True)
     _add_output_json(publication_show)
-    publication_finalize = publication_sub.add_parser('finalize-pdf')
+    publication_finalize = publication_sub.add_parser("finalize-pdf")
     _add_workspace(publication_finalize)
-    publication_finalize.add_argument('--build-id', required=True)
+    publication_finalize.add_argument("--build-id", required=True)
     _add_input_json(publication_finalize)
     publication_release_request = publication_sub.add_parser("release-request")
     _add_workspace(publication_release_request)
     publication_release_request.add_argument("--build-id", required=True)
     publication_release_request.add_argument("--actor-id", required=True)
-    publication_release_request.add_argument("--renewal-of", help="Old request ID for an explicit new approval")
+    publication_release_request.add_argument(
+        "--renewal-of", help="Old request ID for an explicit new approval"
+    )
     _add_output_json(publication_release_request)
     publication_release = publication_sub.add_parser("release")
     _add_workspace(publication_release)
@@ -384,7 +391,9 @@ def build_parser() -> argparse.ArgumentParser:
     _add_output_json(survey_design_show)
 
     survey_instrument = survey_sub.add_parser("instrument")
-    survey_instrument_sub = survey_instrument.add_subparsers(dest="survey_instrument_command", required=True)
+    survey_instrument_sub = survey_instrument.add_subparsers(
+        dest="survey_instrument_command", required=True
+    )
     survey_instrument_capture = survey_instrument_sub.add_parser("capture")
     _add_workspace(survey_instrument_capture)
     _add_input_json(survey_instrument_capture)
@@ -415,7 +424,9 @@ def build_parser() -> argparse.ArgumentParser:
     _add_output_json(delphi_design_show)
 
     delphi_instrument = delphi_sub.add_parser("instrument")
-    delphi_instrument_sub = delphi_instrument.add_subparsers(dest="delphi_instrument_command", required=True)
+    delphi_instrument_sub = delphi_instrument.add_subparsers(
+        dest="delphi_instrument_command", required=True
+    )
     delphi_instrument_capture = delphi_instrument_sub.add_parser("capture")
     _add_workspace(delphi_instrument_capture)
     _add_input_json(delphi_instrument_capture)
@@ -451,7 +462,9 @@ def build_parser() -> argparse.ArgumentParser:
     _add_output_json(delphi_round_recalculate)
 
     delphi_feedback = delphi_sub.add_parser("feedback")
-    delphi_feedback_sub = delphi_feedback.add_subparsers(dest="delphi_feedback_command", required=True)
+    delphi_feedback_sub = delphi_feedback.add_subparsers(
+        dest="delphi_feedback_command", required=True
+    )
     delphi_feedback_build = delphi_feedback_sub.add_parser("build")
     _add_workspace(delphi_feedback_build)
     delphi_feedback_build.add_argument("--round-result-id", required=True)
@@ -470,7 +483,9 @@ def build_parser() -> argparse.ArgumentParser:
     _add_output_json(delphi_inspect)
 
     delphi_stopping = delphi_sub.add_parser("stopping")
-    delphi_stopping_sub = delphi_stopping.add_subparsers(dest="delphi_stopping_command", required=True)
+    delphi_stopping_sub = delphi_stopping.add_subparsers(
+        dest="delphi_stopping_command", required=True
+    )
     delphi_stopping_build = delphi_stopping_sub.add_parser("build")
     _add_workspace(delphi_stopping_build)
     delphi_stopping_build.add_argument("--panel-id", required=True)
@@ -570,7 +585,9 @@ def build_parser() -> argparse.ArgumentParser:
     materials_export.add_argument("--run-id", required=True)
     materials_export.add_argument("--capture-id", required=True)
     materials_export.add_argument("--kind", choices=("original", "rendition"), required=True)
-    materials_export.add_argument("--output", required=True, help="new output file; existing paths are never overwritten")
+    materials_export.add_argument(
+        "--output", required=True, help="new output file; existing paths are never overwritten"
+    )
     _add_output_json(materials_export)
 
     return parser
@@ -580,13 +597,17 @@ def _doctor_with_optional_attention(workspace: str | Path) -> Mapping[str, Any]:
     result = deepcopy(dict(LocalApplicationFacade.doctor_workspace(workspace)))
     if result.get("status") != "OK":
         return result
-    attention_path = Path(workspace).expanduser().resolve(strict=False) / ".research-loom" / ATTENTION_STORE_NAME
+    attention_path = (
+        Path(workspace).expanduser().resolve(strict=False) / ".research-loom" / ATTENTION_STORE_NAME
+    )
     if not attention_path.exists():
-        result.setdefault("checks", []).append({
-            "check": "attention_store",
-            "status": "OK",
-            "mode": "baseline_only",
-        })
+        result.setdefault("checks", []).append(
+            {
+                "check": "attention_store",
+                "status": "OK",
+                "mode": "baseline_only",
+            }
+        )
         return result
     try:
         validate_attention_store_schema(attention_path)
@@ -608,6 +629,7 @@ def _run(args: argparse.Namespace) -> Mapping[str, Any]:
 
     if args.command == "init-finish":
         from .workspace_initialization import finish_initialization
+
         return finish_initialization(args.workspace, args.expected_binding_digest)
 
     if args.command == "doctor":
@@ -615,6 +637,7 @@ def _run(args: argparse.Namespace) -> Mapping[str, Any]:
 
     if args.command == "research-package" and args.research_package_command == "verify":
         from plugins.local_application.research_package_service import verify_export_root
+
         return verify_export_root(args.input)
 
     if args.command == "profile":
@@ -639,7 +662,9 @@ def _run(args: argparse.Namespace) -> Mapping[str, Any]:
         if args.command == "synthesis-candidate":
             if args.synthesis_candidate_command == "list":
                 return facade.list_synthesis_candidates(
-                    kind=args.kind, limit=args.limit, cursor=args.cursor,
+                    kind=args.kind,
+                    limit=args.limit,
+                    cursor=args.cursor,
                     **({"view": args.view} if args.view is not None else {}),
                 )
             if args.synthesis_candidate_command == "show":
@@ -667,19 +692,29 @@ def _run(args: argparse.Namespace) -> Mapping[str, Any]:
                 return facade.export_research_package(args.package_id, args.output)
         if args.command == "writer-composition":
             if args.writer_composition_command == "capture":
-                return facade.capture_writer_composition(args.package_id, _read_input(args.json_input))
+                return facade.capture_writer_composition(
+                    args.package_id, _read_input(args.json_input)
+                )
             if args.writer_composition_command == "list":
                 return facade.list_writer_compositions(limit=args.limit, cursor=args.cursor)
             if args.writer_composition_command == "show":
                 return facade.show_writer_composition(args.composition_id, args.version)
             if args.writer_composition_command == "diff":
-                return facade.diff_writer_composition(args.composition_id, args.from_version, args.to_version)
+                return facade.diff_writer_composition(
+                    args.composition_id, args.from_version, args.to_version
+                )
             if args.writer_composition_command == "export":
-                return facade.export_writer_composition(args.composition_id, args.version, args.output)
+                return facade.export_writer_composition(
+                    args.composition_id, args.version, args.output
+                )
             if args.writer_composition_command == "select":
-                return facade.select_writer_composition(args.composition_id, args.version, args.digest)
+                return facade.select_writer_composition(
+                    args.composition_id, args.version, args.digest
+                )
             if args.writer_composition_command == "section-input":
-                return facade.export_writer_section_input(args.composition_id, args.section_id, args.output)
+                return facade.export_writer_section_input(
+                    args.composition_id, args.section_id, args.output
+                )
         if args.command == "writer-round-trip":
             if args.writer_round_trip_command == "export-input":
                 return facade.export_writer_round_trip_input(
@@ -712,13 +747,19 @@ def _run(args: argparse.Namespace) -> Mapping[str, Any]:
             return facade.evaluate_research_quality(_read_input(args.json_input))
         if args.command == "publication":
             if args.publication_command == "preview":
-                return facade.build_publication_preview(args.composition_id, args.revision_id, _read_input(args.publication_input) if args.publication_input else None)
+                return facade.build_publication_preview(
+                    args.composition_id,
+                    args.revision_id,
+                    _read_input(args.publication_input) if args.publication_input else None,
+                )
             if args.publication_command == "show":
                 return facade.show_publication_preview(args.build_id)
-            if args.publication_command == 'finalize-pdf':
+            if args.publication_command == "finalize-pdf":
                 return facade.finalize_publication_pdf(args.build_id, _read_input(args.json_input))
             if args.publication_command == "release-request":
-                return facade.request_publication_release(args.build_id, args.actor_id, renewal_of=args.renewal_of)
+                return facade.request_publication_release(
+                    args.build_id, args.actor_id, renewal_of=args.renewal_of
+                )
             if args.publication_command == "release":
                 return facade.release_publication(args.build_id, _read_input(args.json_input))
         if args.command == "delphi":
@@ -751,10 +792,14 @@ def _run(args: argparse.Namespace) -> Mapping[str, Any]:
                 if args.delphi_feedback_command == "show":
                     return facade.show_delphi_feedback(args.feedback_id)
             if args.delphi_command == "inspect":
-                return facade.inspect_delphi_panel(args.panel_id, limit=args.limit, offset=args.offset)
+                return facade.inspect_delphi_panel(
+                    args.panel_id, limit=args.limit, offset=args.offset
+                )
             if args.delphi_command == "stopping":
                 if args.delphi_stopping_command == "build":
-                    return facade.build_delphi_stopping_candidate(args.panel_id, round_result_id=args.round_result_id, version=args.version)
+                    return facade.build_delphi_stopping_candidate(
+                        args.panel_id, round_result_id=args.round_result_id, version=args.version
+                    )
                 if args.delphi_stopping_command == "show":
                     return facade.show_delphi_stopping_candidate(args.stopping_candidate_id)
         if args.command == "survey":
@@ -785,15 +830,18 @@ def _run(args: argparse.Namespace) -> Mapping[str, Any]:
                 return facade.recover_project_input(args.input_id, args.source_file)
         if args.command == "action" and args.action_command == "submit":
             return facade.submit_action(
-                _read_input(args.json_input), **({"view": args.view} if args.view is not None else {})
+                _read_input(args.json_input),
+                **({"view": args.view} if args.view is not None else {}),
             )
         if args.command == "confirmation" and args.confirmation_command == "submit":
             return facade.submit_confirmation(
-                _read_input(args.json_input), **({"view": args.view} if args.view is not None else {})
+                _read_input(args.json_input),
+                **({"view": args.view} if args.view is not None else {}),
             )
         if args.command == "decision" and args.decision_command == "resolve":
             return facade.resolve_human_decision(
-                _read_input(args.json_input), **({"view": args.view} if args.view is not None else {})
+                _read_input(args.json_input),
+                **({"view": args.view} if args.view is not None else {}),
             )
         if args.command == "decision" and args.decision_command == "show":
             return facade.show_human_decision_request(args.request_id)
@@ -864,17 +912,28 @@ def main(argv: list[str] | None = None) -> int:
         else:
             _emit(result)
         return 1 if result.get("status") == "ERROR" else 0
-    except (LocalWorkspaceError, LocalApplicationError, ConversationRuntimeError, HumanDecisionError, OptionalDurableStoreError, LocalDelphiStoreError) as exc:
-        _emit({
-            "status": "ERROR",
-            "issues": [{"code": str(exc.code), "message": str(exc.message)}],
-        })
+    except (
+        LocalWorkspaceError,
+        LocalApplicationError,
+        ConversationRuntimeError,
+        HumanDecisionError,
+        OptionalDurableStoreError,
+        LocalDelphiStoreError,
+    ) as exc:
+        _emit(
+            {
+                "status": "ERROR",
+                "issues": [{"code": str(exc.code), "message": str(exc.message)}],
+            }
+        )
         return 2
     except Exception as exc:
-        _emit({
-            "status": "ERROR",
-            "issues": [{"code": "APPLICATION-UNEXPECTED-001", "message": str(exc)}],
-        })
+        _emit(
+            {
+                "status": "ERROR",
+                "issues": [{"code": "APPLICATION-UNEXPECTED-001", "message": str(exc)}],
+            }
+        )
         return 3
 
 

@@ -69,7 +69,9 @@ class Issue368HostAttachmentIntakeTests(unittest.TestCase):
                 rendition.write_text("Host-readable attachment text.\n", encoding="utf-8")
                 # Host readability alone is not a call to either Loom ingress.
                 self.assertTrue(original.read_bytes().startswith(b"%PDF-1.4"))
-                self.assertEqual(rendition.read_text(encoding="utf-8"), "Host-readable attachment text.\n")
+                self.assertEqual(
+                    rendition.read_text(encoding="utf-8"), "Host-readable attachment text.\n"
+                )
                 self.assertEqual(facade.list_project_inputs()["project_inputs"], [])
                 self.assertEqual(facade.list_external_materials()["materials"], [])
                 self.assertEqual(facade.resume_context()["research_state"], state_before)
@@ -96,16 +98,18 @@ class Issue368HostAttachmentIntakeTests(unittest.TestCase):
             with LocalApplicationFacade.open_workspace(workspace) as facade:
                 state_before = facade.resume_context()["research_state"]
                 snapshot_before = state_before["snapshot"]
-                registered = facade.register_project_input({
-                    "file": str(staged.relative_to(workspace)),
-                    "role": "project_brief",
-                    "expected_snapshot_id": snapshot_before["snapshot_id"],
-                    "expected_snapshot_digest": snapshot_before["content_digest"],
-                    "provenance": {
-                        "source": "host_attachment",
-                        "host_attachment_id": "ATT-brief",
-                    },
-                })["project_input"]
+                registered = facade.register_project_input(
+                    {
+                        "file": str(staged.relative_to(workspace)),
+                        "role": "project_brief",
+                        "expected_snapshot_id": snapshot_before["snapshot_id"],
+                        "expected_snapshot_digest": snapshot_before["content_digest"],
+                        "provenance": {
+                            "source": "host_attachment",
+                            "host_attachment_id": "ATT-brief",
+                        },
+                    }
+                )["project_input"]
                 self.assertEqual(
                     registered["content_digest"],
                     "sha256:" + hashlib.sha256(content).hexdigest(),
@@ -129,7 +133,8 @@ class Issue368HostAttachmentIntakeTests(unittest.TestCase):
             self.assertEqual(listed["status"], "OK")
             self.assertFalse(listed["truncated"])
             matches = [
-                item for item in listed["project_inputs"]
+                item
+                for item in listed["project_inputs"]
                 if item["provenance"].get("host_attachment_id") == "ATT-brief"
             ]
             self.assertEqual(len(matches), 1)
@@ -170,48 +175,63 @@ class Issue368HostAttachmentIntakeTests(unittest.TestCase):
                 question_id = _adopt_question(facade, "Issue 368 source intake")
                 snapshot_before = facade.resume_context()["research_state"]["snapshot"]
                 run_id = _prepare(facade, question_id)
-                facade.start_external_retrieval_attempt(run_id, {
-                    "attempt_id": "ATT-1",
-                    "strategy": "explicit host attachment intake",
-                    "coverage_dimension_ids": ["COV-SUPPORT"],
-                    "query_or_target": "attachment:ATT-source",
-                    "provider_or_tool": "host_attachment",
-                })
-                captured = facade.capture_external_source(run_id, {
-                    "capture_id": "CAP-1",
-                    "source_category": "other",
-                    "exact_locator": "https://example.test/source-a#section-1",
-                    "acquired_at": "2026-10-01T00:00:00Z",
-                    "original_file": str(original.relative_to(workspace)),
-                    "original_media_type": "application/pdf",
-                    "text_rendition_file": str(rendition.relative_to(workspace)),
-                    "provenance": {
-                        "source": "host_attachment",
-                        "host_attachment_id": "ATT-source",
+                facade.start_external_retrieval_attempt(
+                    run_id,
+                    {
+                        "attempt_id": "ATT-1",
+                        "strategy": "explicit host attachment intake",
+                        "coverage_dimension_ids": ["COV-SUPPORT"],
+                        "query_or_target": "attachment:ATT-source",
+                        "provider_or_tool": "host_attachment",
                     },
-                })["capture"]
-                facade.complete_external_retrieval_attempt(run_id, {
-                    "attempt_id": "ATT-1",
-                    "outcome": "source_captured",
-                    "resulting_capture_id": "CAP-1",
-                })
+                )
+                captured = facade.capture_external_source(
+                    run_id,
+                    {
+                        "capture_id": "CAP-1",
+                        "source_category": "other",
+                        "exact_locator": "https://example.test/source-a#section-1",
+                        "acquired_at": "2026-10-01T00:00:00Z",
+                        "original_file": str(original.relative_to(workspace)),
+                        "original_media_type": "application/pdf",
+                        "text_rendition_file": str(rendition.relative_to(workspace)),
+                        "provenance": {
+                            "source": "host_attachment",
+                            "host_attachment_id": "ATT-source",
+                        },
+                    },
+                )["capture"]
+                facade.complete_external_retrieval_attempt(
+                    run_id,
+                    {
+                        "attempt_id": "ATT-1",
+                        "outcome": "source_captured",
+                        "resulting_capture_id": "CAP-1",
+                    },
+                )
                 run_view = facade.show_run(run_id)
                 self.assertEqual(run_view["run"]["status"], "RUNNING")
                 self.assertEqual(
                     run_view["desktop_research"]["retrieval_attempt_summary"]["source_captured"],
                     1,
                 )
-                facade.start_external_retrieval_attempt(run_id, {
-                    "attempt_id": "ATT-2",
-                    "strategy": "bounded counter-source check",
-                    "coverage_dimension_ids": ["COV-COUNTER"],
-                    "query_or_target": "counter-source fixture",
-                    "provider_or_tool": "host_attachment_acceptance",
-                })
-                facade.complete_external_retrieval_attempt(run_id, {
-                    "attempt_id": "ATT-2",
-                    "outcome": "no_relevant_source",
-                })
+                facade.start_external_retrieval_attempt(
+                    run_id,
+                    {
+                        "attempt_id": "ATT-2",
+                        "strategy": "bounded counter-source check",
+                        "coverage_dimension_ids": ["COV-COUNTER"],
+                        "query_or_target": "counter-source fixture",
+                        "provider_or_tool": "host_attachment_acceptance",
+                    },
+                )
+                facade.complete_external_retrieval_attempt(
+                    run_id,
+                    {
+                        "attempt_id": "ATT-2",
+                        "outcome": "no_relevant_source",
+                    },
+                )
                 handoff, extension = golden_submission(facade._application, run_id, captured)
                 result_input = _research_result(handoff, extension)
                 preflight = facade.preflight_external(run_id, {"research_result": result_input})
@@ -236,7 +256,9 @@ class Issue368HostAttachmentIntakeTests(unittest.TestCase):
             self.assertEqual(listed["status"], "OK")
             self.assertFalse(listed["truncated"])
             matches = [
-                capture for material in listed["materials"] for capture in material["captures"]
+                capture
+                for material in listed["materials"]
+                for capture in material["captures"]
                 if capture["provenance"].get("host_attachment_id") == "ATT-source"
             ]
             self.assertEqual(len(matches), 1)
@@ -244,7 +266,9 @@ class Issue368HostAttachmentIntakeTests(unittest.TestCase):
             self.assertEqual(rediscovered["original"]["content_health"]["status"], "verified")
             self.assertEqual(rediscovered["renditions"][0]["content_health"]["status"], "verified")
             with LocalApplicationFacade.open_workspace(workspace) as facade:
-                shown = facade.show_external_material(rediscovered["run_id"], rediscovered["capture_id"])
+                shown = facade.show_external_material(
+                    rediscovered["run_id"], rediscovered["capture_id"]
+                )
                 self.assertEqual(
                     shown["capture"]["original"]["digest"],
                     "sha256:" + hashlib.sha256(original_bytes).hexdigest(),
@@ -253,7 +277,9 @@ class Issue368HostAttachmentIntakeTests(unittest.TestCase):
                     shown["capture"]["renditions"][0]["digest"],
                     "sha256:" + hashlib.sha256(text_bytes).hexdigest(),
                 )
-                self.assertEqual(shown["text_rendition_view"]["content"].encode("utf-8"), text_bytes)
+                self.assertEqual(
+                    shown["text_rendition_view"]["content"].encode("utf-8"), text_bytes
+                )
                 self.assertEqual(
                     shown["capture"]["provenance"]["host_attachment_id"],
                     "ATT-source",
@@ -268,9 +294,13 @@ class Issue368HostAttachmentIntakeTests(unittest.TestCase):
                 self.assertEqual(
                     facade.show_run(rediscovered["run_id"])["run"]["status"], "COMPLETED"
                 )
-                self.assertEqual(facade.resume_context()["research_state"]["snapshot"], snapshot_before)
+                self.assertEqual(
+                    facade.resume_context()["research_state"]["snapshot"], snapshot_before
+                )
 
-    def test_missing_rendition_is_recorded_as_failed_attempt_without_capture_or_state_mutation(self):
+    def test_missing_rendition_is_recorded_as_failed_attempt_without_capture_or_state_mutation(
+        self,
+    ):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             workspace = _workspace(root)
@@ -283,31 +313,42 @@ class Issue368HostAttachmentIntakeTests(unittest.TestCase):
                 question_id = _adopt_question(facade, "Issue 368 unavailable rendition")
                 snapshot_before = facade.resume_context()["research_state"]["snapshot"]
                 run_id = _prepare(facade, question_id)
-                facade.start_external_retrieval_attempt(run_id, {
-                    "attempt_id": "ATT-NO-TEXT",
-                    "strategy": "explicit host attachment intake",
-                    "coverage_dimension_ids": ["COV-SUPPORT"],
-                    "query_or_target": "attachment:ATT-unreadable",
-                    "provider_or_tool": "host_attachment",
-                })
+                facade.start_external_retrieval_attempt(
+                    run_id,
+                    {
+                        "attempt_id": "ATT-NO-TEXT",
+                        "strategy": "explicit host attachment intake",
+                        "coverage_dimension_ids": ["COV-SUPPORT"],
+                        "query_or_target": "attachment:ATT-unreadable",
+                        "provider_or_tool": "host_attachment",
+                    },
+                )
                 with self.assertRaises(LocalApplicationError) as missing:
-                    facade.capture_external_source(run_id, {
-                        "capture_id": "CAP-NO-TEXT",
-                        "source_category": "other",
-                        "exact_locator": "attachment:ATT-unreadable/scan.pdf",
-                        "acquired_at": "2026-10-01T00:00:00Z",
-                        "original_file": str(original.relative_to(workspace)),
-                        "original_media_type": "application/pdf",
-                        "text_rendition_file": "intake/chat/ATT-unreadable/scan.txt",
-                    })
+                    facade.capture_external_source(
+                        run_id,
+                        {
+                            "capture_id": "CAP-NO-TEXT",
+                            "source_category": "other",
+                            "exact_locator": "attachment:ATT-unreadable/scan.pdf",
+                            "acquired_at": "2026-10-01T00:00:00Z",
+                            "original_file": str(original.relative_to(workspace)),
+                            "original_media_type": "application/pdf",
+                            "text_rendition_file": "intake/chat/ATT-unreadable/scan.txt",
+                        },
+                    )
                 self.assertEqual(missing.exception.code, "APPLICATION-EXTERNAL-FILE-002")
-                facade.complete_external_retrieval_attempt(run_id, {
-                    "attempt_id": "ATT-NO-TEXT",
-                    "outcome": "failed",
-                    "failure_or_blocking_reason": "host could not produce a UTF-8 text rendition",
-                })
+                facade.complete_external_retrieval_attempt(
+                    run_id,
+                    {
+                        "attempt_id": "ATT-NO-TEXT",
+                        "outcome": "failed",
+                        "failure_or_blocking_reason": "host could not produce a UTF-8 text rendition",
+                    },
+                )
                 shown = facade.show_run(run_id)
-                self.assertEqual(shown["desktop_research"]["retrieval_attempt_summary"]["failed"], 1)
+                self.assertEqual(
+                    shown["desktop_research"]["retrieval_attempt_summary"]["failed"], 1
+                )
                 self.assertEqual(shown["artifacts"], [])
                 self.assertEqual(
                     facade.resume_context()["research_state"]["snapshot"],
@@ -329,26 +370,31 @@ class Issue368HostAttachmentIntakeTests(unittest.TestCase):
             with LocalApplicationFacade.open_workspace(workspace) as facade:
                 question_id = _adopt_question(facade, "Issue 368 explicit routing")
                 snapshot = facade.resume_context()["research_state"]["snapshot"]
-                project_input = facade.register_project_input({
-                    "file": str(original.relative_to(workspace)),
-                    "role": "project_brief",
-                    "media_type": "application/pdf",
-                    "expected_snapshot_id": snapshot["snapshot_id"],
-                    "expected_snapshot_digest": snapshot["content_digest"],
-                    "provenance": {"route": "project_input"},
-                })["project_input"]
+                project_input = facade.register_project_input(
+                    {
+                        "file": str(original.relative_to(workspace)),
+                        "role": "project_brief",
+                        "media_type": "application/pdf",
+                        "expected_snapshot_id": snapshot["snapshot_id"],
+                        "expected_snapshot_digest": snapshot["content_digest"],
+                        "provenance": {"route": "project_input"},
+                    }
+                )["project_input"]
 
                 run_id = _prepare(facade, question_id)
-                captured = facade.capture_external_source(run_id, {
-                    "capture_id": "CAP-AMBIGUOUS",
-                    "source_category": "other",
-                    "exact_locator": "attachment:ATT-ambiguous/ambiguous.pdf",
-                    "acquired_at": "2026-10-01T00:00:00Z",
-                    "original_file": str(original.relative_to(workspace)),
-                    "original_media_type": "application/pdf",
-                    "text_rendition_file": str(rendition.relative_to(workspace)),
-                    "provenance": {"route": "research_source"},
-                })["capture"]
+                captured = facade.capture_external_source(
+                    run_id,
+                    {
+                        "capture_id": "CAP-AMBIGUOUS",
+                        "source_category": "other",
+                        "exact_locator": "attachment:ATT-ambiguous/ambiguous.pdf",
+                        "acquired_at": "2026-10-01T00:00:00Z",
+                        "original_file": str(original.relative_to(workspace)),
+                        "original_media_type": "application/pdf",
+                        "text_rendition_file": str(rendition.relative_to(workspace)),
+                        "provenance": {"route": "research_source"},
+                    },
+                )["capture"]
                 self.assertEqual(
                     project_input["content_digest"],
                     captured["original_capture"]["content_digest"],
@@ -360,12 +406,14 @@ class Issue368HostAttachmentIntakeTests(unittest.TestCase):
                 outside = root / "outside.txt"
                 outside.write_text("outside", encoding="utf-8")
                 with self.assertRaises(LocalApplicationError) as traversal:
-                    facade.register_project_input({
-                        "file": "../outside.txt",
-                        "role": "other",
-                        "expected_snapshot_id": snapshot["snapshot_id"],
-                        "expected_snapshot_digest": snapshot["content_digest"],
-                    })
+                    facade.register_project_input(
+                        {
+                            "file": "../outside.txt",
+                            "role": "other",
+                            "expected_snapshot_id": snapshot["snapshot_id"],
+                            "expected_snapshot_digest": snapshot["content_digest"],
+                        }
+                    )
                 self.assertEqual(traversal.exception.code, "APPLICATION-PROJECT-INPUT-FILE-001")
 
 

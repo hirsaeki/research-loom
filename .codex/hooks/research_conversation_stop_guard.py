@@ -26,7 +26,10 @@ _BLOCK_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("research-package", re.compile(r"(?i)\bResearch Package\b")),
     ("writer-round-trip", re.compile(r"(?i)\bWriter round[- ]trip\b")),
     ("publication-preview", re.compile(r"(?i)\bPublication preview\b")),
-    ("named-skill", re.compile(r"(?i)(?:Writer|Documents?|PDF|research[- ]conversation)\s*(?:Skill|スキル)\b")),
+    (
+        "named-skill",
+        re.compile(r"(?i)(?:Writer|Documents?|PDF|research[- ]conversation)\s*(?:Skill|スキル)\b"),
+    ),
     ("internal-skill-path", re.compile(r"(?i)(?:^|[/\\])skills?[/\\][^\s\])>]+[/\\]SKILL\.md\b")),
     ("canonical-public-path", re.compile(r"(?i)\b(?:canonical|public)\s*(?:/|-)\s*path\b")),
 )
@@ -45,8 +48,12 @@ _DIAGNOSTIC_REQUEST_PATTERNS: tuple[re.Pattern[str], ...] = (
         r".{0,30}\b(?:please|show|give|provide|explain|tell|need|want)\b"
     ),
     re.compile(r"(?i)\b(?:which|what)\s+(?:skill|hook|command|cli|internal\s+path)\b"),
-    re.compile(r"(?:内部では|内部で)?どの(?:スキル|Skill|フック|hook|コマンド|CLI|内部パス)", re.IGNORECASE),
-    re.compile(r"(?i)\bdebug\b.{0,30}\b(?:hook|skill|implementation|internal|cli|command|binding)\b"),
+    re.compile(
+        r"(?:内部では|内部で)?どの(?:スキル|Skill|フック|hook|コマンド|CLI|内部パス)", re.IGNORECASE
+    ),
+    re.compile(
+        r"(?i)\bdebug\b.{0,30}\b(?:hook|skill|implementation|internal|cli|command|binding)\b"
+    ),
     re.compile(r"(?i)\bmechanics\s+of\s+(?:the\s+)?(?:hook|skill|implementation|binding|system)\b"),
     re.compile(
         r"(?:内部(?:実装|の仕組み|ではどの|でどの)|実装(?:詳細|の仕組み)|"
@@ -55,8 +62,12 @@ _DIAGNOSTIC_REQUEST_PATTERNS: tuple[re.Pattern[str], ...] = (
         r".{0,30}(?:教えて|説明(?:して)?|見せて|表示(?:して)?|知りたい|どうなって)",
         re.IGNORECASE,
     ),
-    re.compile(r"(?:なぜ|どうして).{0,40}(?:確認|質問|回答).{0,30}(?:必要|求め|要求)", re.IGNORECASE),
-    re.compile(r"(?:確認|質問|回答).{0,40}(?:なぜ|どうして).{0,30}(?:必要|求め|要求)", re.IGNORECASE),
+    re.compile(
+        r"(?:なぜ|どうして).{0,40}(?:確認|質問|回答).{0,30}(?:必要|求め|要求)", re.IGNORECASE
+    ),
+    re.compile(
+        r"(?:確認|質問|回答).{0,40}(?:なぜ|どうして).{0,30}(?:必要|求め|要求)", re.IGNORECASE
+    ),
     re.compile(r"(?i)why.{0,40}(?:confirmation|question|answer).{0,30}(?:required|needed)"),
 )
 
@@ -145,10 +156,10 @@ def latest_user_prompt(transcript_path: str | None) -> str:
 
 
 def _request_is_negated(prompt: str, match: re.Match[str]) -> bool:
-    prefix = prompt[max(0, match.start() - 32): match.start()]
+    prefix = prompt[max(0, match.start() - 32) : match.start()]
     if _ENGLISH_NEGATION_BEFORE_REQUEST.search(prefix):
         return True
-    suffix = prompt[match.end(): match.end() + 12]
+    suffix = prompt[match.end() : match.end() + 12]
     return bool(_JAPANESE_NEGATION_AFTER_REQUEST.search(suffix))
 
 
@@ -181,7 +192,9 @@ def evaluate(payload: dict[str, Any]) -> tuple[bool, list[str], bool]:
     return not diagnostic, labels, diagnostic
 
 
-def _append_probe_log(payload: dict[str, Any], blocked: bool, labels: list[str], diagnostic: bool) -> None:
+def _append_probe_log(
+    payload: dict[str, Any], blocked: bool, labels: list[str], diagnostic: bool
+) -> None:
     target = os.environ.get("RESEARCH_LOOM_CODEX_HOOK_LOG")
     if not target:
         return

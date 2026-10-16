@@ -12,7 +12,9 @@ class WriterParagraphRoleContractTests(unittest.TestCase):
         writer = (ROOT / "skills/writer/SKILL.md").read_text(encoding="utf-8")
         host = (ROOT / "skills/research-conversation/SKILL.md").read_text(encoding="utf-8")
         self.assertIn("Each paragraph must advance one question, claim or contrast", writer)
-        self.assertIn("Coexistence of an argument and a qualification is not itself a violation", writer)
+        self.assertIn(
+            "Coexistence of an argument and a qualification is not itself a violation", writer
+        )
         self.assertIn("not a new Profile rule ID or a runtime gate", writer)
         self.assertIn("request a concrete edit", host)
         self.assertIn("necessary qualifications and supplied contrasts", host)
@@ -27,7 +29,9 @@ class WriterParagraphRoleContractTests(unittest.TestCase):
             "Delete or consolidate repetition",
             "the exact paragraph, the competing jobs and the edit",
             "not detect the problem merely by counting caveat words",
-            "Allowed qualification:", "Allowed contrast:", "Revise competing roles:",
+            "Allowed qualification:",
+            "Allowed contrast:",
+            "Revise competing roles:",
             "not complete manuscripts or evidence of reader",
             "Do not force an argument/counterargument chapter order",
             "new Profile IDs, automatic prose classifier or semantic PASS",

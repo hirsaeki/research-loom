@@ -6,7 +6,9 @@ from unittest.mock import patch
 
 from core.runtime import canonical_digest
 from plugins.local_application import LocalApplicationError
-from plugins.local_application import historical_result_recovery_facade as historical_result_recovery
+from plugins.local_application import (
+    historical_result_recovery_facade as historical_result_recovery,
+)
 from research_package_acceptance_support import ResearchPackageAcceptanceSupport
 from test_finding_candidate_recovery import FindingCandidateRecoveryTests
 
@@ -31,19 +33,17 @@ class Issue151AmbiguousCanonicalRecoveryTests(ResearchPackageAcceptanceSupport):
         try:
             diagnosis = facade.show_run(case["run_id"])["finding_recovery"]
             self.assertEqual(diagnosis["recovery_class"], "proposal_rematerializable")
-            self.assertEqual(
-                diagnosis["recovery_route"], "canonical_result_rematerialization"
-            )
-            self.assertEqual(
-                diagnosis["historical_candidate_lineage_status"], "ambiguous"
-            )
+            self.assertEqual(diagnosis["recovery_route"], "canonical_result_rematerialization")
+            self.assertEqual(diagnosis["historical_candidate_lineage_status"], "ambiguous")
             self.assertEqual(diagnosis["historical_candidate_count"], "multiple")
 
-            action = facade.submit_action({
-                "action_type": "desktop_research.finding.recover",
-                "payload": {"run_id": case["run_id"]},
-                "actor_id": "HUMAN-ISSUE151",
-            })
+            action = facade.submit_action(
+                {
+                    "action_type": "desktop_research.finding.recover",
+                    "payload": {"run_id": case["run_id"]},
+                    "actor_id": "HUMAN-ISSUE151",
+                }
+            )
             self.assertEqual(action["status"], "SUCCEEDED")
             recovered = action["data"]
             self.assertEqual(recovered["route"], "canonical_result_rematerialization")
@@ -52,9 +52,7 @@ class Issue151AmbiguousCanonicalRecoveryTests(ResearchPackageAcceptanceSupport):
             )
             recovery = proposal["provenance"]["historical_recovery"]
             self.assertEqual(recovery["recovery_source"], "canonical_result")
-            self.assertEqual(
-                recovery["historical_candidate_lineage_status"], "ambiguous"
-            )
+            self.assertEqual(recovery["historical_candidate_lineage_status"], "ambiguous")
             self.assertEqual(recovery["historical_candidate_count"], "multiple")
             self.assertNotIn("historical_proposal_id", recovery)
             self.assertEqual(
@@ -85,9 +83,9 @@ class Issue151AmbiguousCanonicalRecoveryTests(ResearchPackageAcceptanceSupport):
                 (case["run_id"],),
             ).fetchone()
             extension = json.loads(str(row["payload_json"]))
-            extension["source_capture_details"][0]["original_capture"][
-                "content_reference"
-            ] = "ART-MISSING"
+            extension["source_capture_details"][0]["original_capture"]["content_reference"] = (
+                "ART-MISSING"
+            )
             db.execute(
                 "UPDATE execution_documents SET payload_json=? "
                 "WHERE document_type='extension' AND run_id=?",
@@ -115,9 +113,7 @@ class Issue151AmbiguousCanonicalRecoveryTests(ResearchPackageAcceptanceSupport):
                 "plugins.local_application.historical_result_recovery_facade._canonical_result",
                 return_value=verified_canonical,
             ):
-                ablated = facade.recover_legacy_desktop_research_finding_candidate(
-                    case["run_id"]
-                )
+                ablated = facade.recover_legacy_desktop_research_finding_candidate(case["run_id"])
             self.assertEqual(ablated["route"], "canonical_result_rematerialization")
         finally:
             facade.close()
@@ -128,9 +124,7 @@ class Issue151AmbiguousCanonicalRecoveryTests(ResearchPackageAcceptanceSupport):
             self._legacyize(facade, case["proposal"])
             diagnosis = facade.show_run(case["run_id"])["finding_recovery"]
             self.assertEqual(diagnosis["recovery_route"], "persisted_candidate_recovery")
-            recovered = facade.recover_legacy_desktop_research_finding_candidate(
-                case["run_id"]
-            )
+            recovered = facade.recover_legacy_desktop_research_finding_candidate(case["run_id"])
             self.assertEqual(recovered["producer_relation"], "exact_run")
         finally:
             facade.close()

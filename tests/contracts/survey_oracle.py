@@ -33,9 +33,13 @@ def questionnaire_error(questionnaire):
     question_ids = [item.get("question_id") for item in questionnaire.get("questions", [])]
     if len(question_ids) != len(set(question_ids)):
         return "SV-QUESTIONNAIRE-IDENTITY-001"
-    if questionnaire.get("approval_status") == "approved" and not questionnaire.get("approval_decision_id"):
+    if questionnaire.get("approval_status") == "approved" and not questionnaire.get(
+        "approval_decision_id"
+    ):
         return "SV-QUESTIONNAIRE-APPROVAL-001"
-    if questionnaire.get("material_revision") and not questionnaire.get("material_revision_decision_id"):
+    if questionnaire.get("material_revision") and not questionnaire.get(
+        "material_revision_decision_id"
+    ):
         return "SV-QUESTIONNAIRE-APPROVAL-001"
     for change in questionnaire.get("revision_changes", []):
         if change.get("change_kind") in {"wording", "scale"} and change.get("material") is not True:
@@ -89,14 +93,25 @@ def result_error(result, execution_mode, design):
     for response in result.get("responses", []):
         if response.get("verified_evidence_claimed") is not False:
             return "SV-RESPONSE-EVIDENCE-001"
-        if expected_epistemic_mode is not None and response.get("epistemic_mode") != expected_epistemic_mode:
+        if (
+            expected_epistemic_mode is not None
+            and response.get("epistemic_mode") != expected_epistemic_mode
+        ):
             return "SV-EPISTEMIC-MODE-001"
-        if response.get("eligibility_status") == "excluded" and not response.get("exclusion_reason"):
+        if response.get("eligibility_status") == "excluded" and not response.get(
+            "exclusion_reason"
+        ):
             return "SV-DISPOSITION-001"
     disposition = result.get("sample_disposition", {})
-    if disposition.get("response_count") != disposition.get("completed_count", 0) + disposition.get("partial_count", 0):
+    if disposition.get("response_count") != disposition.get("completed_count", 0) + disposition.get(
+        "partial_count", 0
+    ):
         return "SV-DISPOSITION-001"
-    if disposition.get("partial_count", 0) or disposition.get("nonresponse_count", 0) or disposition.get("dropout_count", 0):
+    if (
+        disposition.get("partial_count", 0)
+        or disposition.get("nonresponse_count", 0)
+        or disposition.get("dropout_count", 0)
+    ):
         if result.get("missing_data_preserved") is not True:
             return "SV-MISSINGNESS-001"
 
@@ -107,10 +122,18 @@ def result_error(result, execution_mode, design):
             return "SV-TARGET-SAMPLE-001"
 
     for item in result.get("item_summaries", []):
-        if item.get("denominator_count") != item.get("answered_count", 0) + item.get("missing_count", 0) + item.get("excluded_count", 0):
+        if item.get("denominator_count") != item.get("answered_count", 0) + item.get(
+            "missing_count", 0
+        ) + item.get("excluded_count", 0):
             return "SV-ANALYSIS-DENOMINATOR-001"
-    if result.get("aggregate_is_finding") is not False or result.get("finding_adoption_performed") is not False:
+    if (
+        result.get("aggregate_is_finding") is not False
+        or result.get("finding_adoption_performed") is not False
+    ):
         return "SV-ANALYSIS-AUTHORITY-001"
-    if result.get("target_sample_achieved") and result.get("research_sufficiency_claimed") is not False:
+    if (
+        result.get("target_sample_achieved")
+        and result.get("research_sufficiency_claimed") is not False
+    ):
         return "SV-SUFFICIENCY-001"
     return None

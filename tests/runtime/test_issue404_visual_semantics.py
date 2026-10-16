@@ -4,7 +4,10 @@ import tempfile
 import unittest
 
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade
-from plugins.local_research_exhibit_store import LocalResearchExhibitStore, LocalResearchExhibitStoreError
+from plugins.local_research_exhibit_store import (
+    LocalResearchExhibitStore,
+    LocalResearchExhibitStoreError,
+)
 from plugins.research_visual_semantics import validate_visual_package_bindings
 from test_research_exhibits import make_app, exhibit_payload, state_signature
 from research_package_acceptance_support import ResearchPackageAcceptanceSupport
@@ -12,11 +15,18 @@ from research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 def visual_payload(**changes):
     payload = exhibit_payload(
-        kind="graph", source_object_ids=["RQ-1"], representation="json",
+        kind="graph",
+        source_object_ids=["RQ-1"],
+        representation="json",
         value={"labels": ["existing question"], "relations": []},
         visual_semantics={
-            "visual_class": "explanatory_visual", "semantic_changes": [],
-            "generator": {"identity": "host", "version": "not exposed", "instruction": "Represent the existing question without adding conclusions."},
+            "visual_class": "explanatory_visual",
+            "semantic_changes": [],
+            "generator": {
+                "identity": "host",
+                "version": "not exposed",
+                "instruction": "Represent the existing question without adding conclusions.",
+            },
         },
     )
     payload.update(changes)
@@ -62,8 +72,12 @@ class VisualSemanticsTests(unittest.TestCase):
     def test_new_meaning_requires_research_even_when_generator_claims_conformance(self):
         payload = visual_payload()
         payload["visual_semantics"]["semantic_changes"] = ["causality"]
-        payload["visual_semantics"]["generator"]["instruction"] = "No new meaning (model self-report)"
-        self.assertEqual(self.capture(payload)["visual_semantics"]["semantic_status"], "research_required")
+        payload["visual_semantics"]["generator"]["instruction"] = (
+            "No new meaning (model self-report)"
+        )
+        self.assertEqual(
+            self.capture(payload)["visual_semantics"]["semantic_status"], "research_required"
+        )
         payload["visual_semantics"]["semantic_status"] = "approved"
         with self.assertRaises(LocalApplicationError):
             self.capture(payload)
@@ -113,9 +127,14 @@ class VisualPackageRoundTripTests(ResearchPackageAcceptanceSupport):
             facade.export_research_package(package_id, output)
             from plugins.local_application.research_package_format import verify_export_root
             import json
+
             self.assertEqual(verify_export_root(output)["status"], "VERIFIED")
             package = json.loads((output / "research-package.json").read_text())
-            saved = next(e for e in package["resolved_content"]["working_material"]["research_exhibits"] if e["exhibit_id"] == eid)
+            saved = next(
+                e
+                for e in package["resolved_content"]["working_material"]["research_exhibits"]
+                if e["exhibit_id"] == eid
+            )
             self.assertEqual(saved["visual_semantics"], original["visual_semantics"])
         finally:
             facade.close()

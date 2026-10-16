@@ -3,6 +3,7 @@
 Callers own metadata/authority and controlled intake. This module only preserves
 bad payload bytes and installs a verified replacement; it never repairs metadata.
 """
+
 from __future__ import annotations
 
 from contextlib import contextmanager
@@ -19,9 +20,14 @@ from typing import Callable, Iterator
 import uuid
 
 
-REPAIRABLE = frozenset({
-    "content_missing", "digest_mismatch", "size_mismatch", "digest_and_size_mismatch",
-})
+REPAIRABLE = frozenset(
+    {
+        "content_missing",
+        "digest_mismatch",
+        "size_mismatch",
+        "digest_and_size_mismatch",
+    }
+)
 
 
 class PayloadRepairError(RuntimeError):
@@ -49,7 +55,9 @@ def checked_path(root: Path, path: Path) -> Path:
         if stat.S_ISLNK(value.st_mode) or getattr(value, "st_file_attributes", 0) & 0x400:
             raise PayloadRepairError("payload path contains a link or reparse point")
         final = index == len(parts)
-        if (final and not stat.S_ISREG(value.st_mode)) or (not final and not stat.S_ISDIR(value.st_mode)):
+        if (final and not stat.S_ISREG(value.st_mode)) or (
+            not final and not stat.S_ISDIR(value.st_mode)
+        ):
             raise PayloadRepairError("payload path is not a regular file/directory")
         if not final:
             current = current / parts[index]
@@ -58,8 +66,12 @@ def checked_path(root: Path, path: Path) -> Path:
 
 def inspect_payload(path: Path, digest: str, size: int) -> dict[str, object]:
     """Bound hashing by the expected size; an oversized bad file is not loaded."""
-    base = {"expected_digest": digest, "expected_size": size,
-            "actual_digest": None, "actual_size": None}
+    base = {
+        "expected_digest": digest,
+        "expected_size": size,
+        "actual_digest": None,
+        "actual_size": None,
+    }
     try:
         with path.open("rb") as stream:
             opened = os.fstat(stream.fileno())
@@ -118,17 +130,21 @@ def payload_lock(root: Path, target: Path, *, timeout: float = 5.0) -> Iterator[
             try:
                 if os.name == "nt":
                     import msvcrt
+
                     handle.seek(0)
                     msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
                 else:
                     import fcntl
+
                     fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
                 break
             except OSError as exc:
                 if exc.errno not in (errno.EACCES, errno.EAGAIN, errno.EDEADLK):
                     raise
                 if time.monotonic() >= deadline:
-                    raise PayloadRepairError("content-addressed payload repair is busy; retry later") from exc
+                    raise PayloadRepairError(
+                        "content-addressed payload repair is busy; retry later"
+                    ) from exc
                 time.sleep(0.05)
         try:
             yield
@@ -141,8 +157,13 @@ def payload_lock(root: Path, target: Path, *, timeout: float = 5.0) -> Iterator[
 
 
 def install_exact_payload(
-    root: Path, target: Path, staged: Path, digest: str, size: int,
-    *, verify: Callable[[Path, str, int], None],
+    root: Path,
+    target: Path,
+    staged: Path,
+    digest: str,
+    size: int,
+    *,
+    verify: Callable[[Path, str, int], None],
 ) -> dict[str, object]:
     """Install under a blob lock; the caller removes its controlled staging file.
 
@@ -158,10 +179,16 @@ def install_exact_payload(
         # Validate actual staged bytes even when the target needs no repair.
         verify(staged, digest, size)
         if before["status"] == "verified":
-            return {"status": "ALREADY_VERIFIED", "content_created": False,
-                    "previous_status": "verified", "quarantine_ref": None}
+            return {
+                "status": "ALREADY_VERIFIED",
+                "content_created": False,
+                "previous_status": "verified",
+                "quarantine_ref": None,
+            }
         if before["status"] not in REPAIRABLE:
-            raise PayloadRepairError("payload is unreadable or its locator is unsafe; restore access/metadata first")
+            raise PayloadRepairError(
+                "payload is unreadable or its locator is unsafe; restore access/metadata first"
+            )
         target.parent.mkdir(parents=True, exist_ok=True)
         checked_path(root, target)
         quarantine_ref = None
@@ -180,16 +207,29 @@ def install_exact_payload(
                 os.link(staged, target)
             except FileExistsError:
                 verify(target, digest, size)
-                return {"status": "ALREADY_VERIFIED", "content_created": False,
-                        "previous_status": before["status"], "quarantine_ref": None}
+                return {
+                    "status": "ALREADY_VERIFIED",
+                    "content_created": False,
+                    "previous_status": before["status"],
+                    "quarantine_ref": None,
+                }
         _fsync_directory(target.parent)
         verify(target, digest, size)
-        result = {"status": "RESTORED" if before["status"] == "content_missing" else "REPAIRED",
-                  "content_created": True, "previous_status": before["status"],
-                  "quarantine_ref": quarantine_ref,
-                  "recovered_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")}
-        record = {"schema": "exact-payload-repair/v1", "target": target.relative_to(root).as_posix(),
-                  "digest": digest, "byte_length": size, "before": before, **result}
+        result = {
+            "status": "RESTORED" if before["status"] == "content_missing" else "REPAIRED",
+            "content_created": True,
+            "previous_status": before["status"],
+            "quarantine_ref": quarantine_ref,
+            "recovered_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        }
+        record = {
+            "schema": "exact-payload-repair/v1",
+            "target": target.relative_to(root).as_posix(),
+            "digest": digest,
+            "byte_length": size,
+            "before": before,
+            **result,
+        }
         temporary = None
         fd = None
         try:
@@ -200,14 +240,18 @@ def install_exact_payload(
             stream = os.fdopen(fd, "wb")
             fd = None
             with stream:
-                stream.write((json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n").encode())
+                stream.write(
+                    (json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n").encode()
+                )
                 stream.flush()
                 os.fsync(stream.fileno())
             os.replace(temporary, receipt)
             _fsync_directory(receipt.parent)
             result["recovery_record"] = receipt.relative_to(root).as_posix()
         except (OSError, PayloadRepairError):
-            result["recovery_record_warning"] = "payload verified; repair receipt could not be persisted"
+            result["recovery_record_warning"] = (
+                "payload verified; repair receipt could not be persisted"
+            )
         finally:
             if fd is not None:
                 os.close(fd)

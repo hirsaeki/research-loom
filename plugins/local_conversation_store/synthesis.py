@@ -30,11 +30,13 @@ def _cursor_rowid(store, cursor: str, *, project_ref: str, producers: tuple[str,
     if row is None:
         raise ConversationRuntimeError(_CURSOR_ERROR, "synthesis candidate cursor does not resolve")
     try:
-        valid = int(store._db.execute(
-            "SELECT json_valid(?)", (str(row["payload_json"]),)
-        ).fetchone()[0])
+        valid = int(
+            store._db.execute("SELECT json_valid(?)", (str(row["payload_json"]),)).fetchone()[0]
+        )
     except sqlite3.Error as exc:
-        raise ConversationRuntimeError(_CURSOR_ERROR, "synthesis candidate cursor is unreadable") from exc
+        raise ConversationRuntimeError(
+            _CURSOR_ERROR, "synthesis candidate cursor is unreadable"
+        ) from exc
     if valid != 1:
         raise ConversationRuntimeError(_CURSOR_ERROR, "synthesis candidate cursor is unreadable")
     payload = str(row["payload_json"])
@@ -49,7 +51,9 @@ def _cursor_rowid(store, cursor: str, *, project_ref: str, producers: tuple[str,
         (payload, str(project_ref), payload, payload, *producers),
     ).fetchone()
     if bound is None:
-        raise ConversationRuntimeError(_CURSOR_ERROR, "synthesis candidate cursor is outside the requested collection")
+        raise ConversationRuntimeError(
+            _CURSOR_ERROR, "synthesis candidate cursor is outside the requested collection"
+        )
     return int(row["rowid"])
 
 
@@ -67,14 +71,18 @@ def list_synthesis_candidate_rows(
     producers = _producer_filter(kind)
     try:
         with store._lock:
-            malformed = store._db.execute(
-                "SELECT 1 FROM state_delta_proposals "
-                "WHERE json_valid(payload_json)=0 LIMIT 1"
-            ).fetchone() is not None
+            malformed = (
+                store._db.execute(
+                    "SELECT 1 FROM state_delta_proposals WHERE json_valid(payload_json)=0 LIMIT 1"
+                ).fetchone()
+                is not None
+            )
             cursor_rowid = None
             if cursor is not None:
                 if not isinstance(cursor, str) or not cursor:
-                    raise ConversationRuntimeError(_CURSOR_ERROR, "synthesis candidate cursor is invalid")
+                    raise ConversationRuntimeError(
+                        _CURSOR_ERROR, "synthesis candidate cursor is invalid"
+                    )
                 cursor_rowid = _cursor_rowid(
                     store, cursor, project_ref=str(project_ref), producers=producers
                 )
@@ -86,8 +94,9 @@ def list_synthesis_candidate_rows(
                 if cursor_rowid is not None:
                     params.append(cursor_rowid)
                 params.append(limit + 1)
-                rows.extend(store._db.execute(
-                    f"""
+                rows.extend(
+                    store._db.execute(
+                        f"""
                     SELECT s.rowid,s.proposal_id,s.payload_json,d.payload_json AS source_payload_json
                     FROM state_delta_proposals s
                     LEFT JOIN documents d
@@ -101,12 +110,15 @@ def list_synthesis_candidate_rows(
                     ORDER BY s.rowid DESC
                     LIMIT ?
                     """,
-                    tuple(params),
-                ).fetchall())
+                        tuple(params),
+                    ).fetchall()
+                )
     except ConversationRuntimeError:
         raise
     except sqlite3.Error as exc:
-        raise ConversationRuntimeError(_ERROR, "synthesis candidate collection is unreadable") from exc
+        raise ConversationRuntimeError(
+            _ERROR, "synthesis candidate collection is unreadable"
+        ) from exc
 
     rows.sort(key=lambda row: int(row["rowid"]), reverse=True)
     page_probe = rows[: limit + 1]

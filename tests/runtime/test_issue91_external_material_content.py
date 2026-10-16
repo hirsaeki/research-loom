@@ -31,11 +31,15 @@ def _cli(*args: str) -> tuple[subprocess.CompletedProcess[str], dict | None]:
     return completed, value
 
 
-def _prepare(facade: LocalApplicationFacade, question_id: str, *, policy: dict | None = None) -> str:
+def _prepare(
+    facade: LocalApplicationFacade, question_id: str, *, policy: dict | None = None
+) -> str:
     payload = {"question_id": question_id, "purpose": "Issue 91 public material acceptance."}
     if policy is not None:
         payload["desktop_policy"] = policy
-    return facade.submit_action({"action_type": "desktop_research.investigate", "payload": payload})["run_id"]
+    return facade.submit_action(
+        {"action_type": "desktop_research.investigate", "payload": payload}
+    )["run_id"]
 
 
 def _capture(
@@ -54,27 +58,36 @@ def _capture(
     text.parent.mkdir(parents=True, exist_ok=True)
     raw.write_bytes(original)
     text.write_bytes(rendition)
-    facade.start_external_retrieval_attempt(run_id, {
-        "attempt_id": f"ATT-{capture_id}",
-        "strategy": "local acceptance fixture",
-        "coverage_dimension_ids": ["COV-SUPPORT"],
-        "query_or_target": f"fixture:{capture_id}",
-    })
-    captured = facade.capture_external_source(run_id, {
-        "capture_id": capture_id,
-        "source_category": "other",
-        "exact_locator": f"https://example.test/{capture_id.lower()}#source",
-        "acquired_at": "2026-09-06T00:00:00Z",
-        "original_file": str(raw.relative_to(workspace)),
-        "original_media_type": "application/octet-stream",
-        "text_rendition_file": str(text.relative_to(workspace)),
-        "provenance": {"fixture": "issue-91"},
-    })["capture"]
-    facade.complete_external_retrieval_attempt(run_id, {
-        "attempt_id": f"ATT-{capture_id}",
-        "outcome": "source_captured",
-        "resulting_capture_id": capture_id,
-    })
+    facade.start_external_retrieval_attempt(
+        run_id,
+        {
+            "attempt_id": f"ATT-{capture_id}",
+            "strategy": "local acceptance fixture",
+            "coverage_dimension_ids": ["COV-SUPPORT"],
+            "query_or_target": f"fixture:{capture_id}",
+        },
+    )
+    captured = facade.capture_external_source(
+        run_id,
+        {
+            "capture_id": capture_id,
+            "source_category": "other",
+            "exact_locator": f"https://example.test/{capture_id.lower()}#source",
+            "acquired_at": "2026-09-06T00:00:00Z",
+            "original_file": str(raw.relative_to(workspace)),
+            "original_media_type": "application/octet-stream",
+            "text_rendition_file": str(text.relative_to(workspace)),
+            "provenance": {"fixture": "issue-91"},
+        },
+    )["capture"]
+    facade.complete_external_retrieval_attempt(
+        run_id,
+        {
+            "attempt_id": f"ATT-{capture_id}",
+            "outcome": "source_captured",
+            "resulting_capture_id": capture_id,
+        },
+    )
     return captured, raw, text
 
 
@@ -97,7 +110,8 @@ class Issue91ExternalMaterialContentTests(unittest.TestCase):
                 before_attempts = before["desktop_research"]["retrieval_attempt_summary"]["total"]
                 original_digest = captured["original_capture"]["content_digest"]
                 rendition_digest = captured["text_rendition"]["content_digest"]
-            raw.unlink(); text.unlink()
+            raw.unlink()
+            text.unlink()
 
             listed_process, listed = _cli(
                 "external", "materials", "list", "--workspace", str(workspace), "--json"
@@ -107,8 +121,16 @@ class Issue91ExternalMaterialContentTests(unittest.TestCase):
             self.assertEqual((capture["run_id"], capture["capture_id"]), (run_id, "CAP-C1"))
 
             shown_process, shown = _cli(
-                "external", "materials", "show", "--workspace", str(workspace),
-                "--run-id", run_id, "--capture-id", "CAP-C1", "--json",
+                "external",
+                "materials",
+                "show",
+                "--workspace",
+                str(workspace),
+                "--run-id",
+                run_id,
+                "--capture-id",
+                "CAP-C1",
+                "--json",
             )
             self.assertEqual(shown_process.returncode, 0, shown_process.stderr)
             self.assertEqual(shown["text_rendition_view"]["content"].encode("utf-8"), rendition)
@@ -121,9 +143,20 @@ class Issue91ExternalMaterialContentTests(unittest.TestCase):
                 ("rendition", rendition_out, rendition, rendition_digest),
             ):
                 process, exported = _cli(
-                    "external", "materials", "export", "--workspace", str(workspace),
-                    "--run-id", run_id, "--capture-id", "CAP-C1", "--kind", kind,
-                    "--output", str(output), "--json",
+                    "external",
+                    "materials",
+                    "export",
+                    "--workspace",
+                    str(workspace),
+                    "--run-id",
+                    run_id,
+                    "--capture-id",
+                    "CAP-C1",
+                    "--kind",
+                    kind,
+                    "--output",
+                    str(output),
+                    "--json",
                 )
                 self.assertEqual(process.returncode, 0, process.stderr)
                 self.assertEqual(output.read_bytes(), expected)
@@ -132,7 +165,9 @@ class Issue91ExternalMaterialContentTests(unittest.TestCase):
 
             with LocalApplicationFacade.open_workspace(workspace) as facade:
                 after = facade.show_run(run_id)
-                self.assertEqual(facade.resume_context()["research_state"]["snapshot"], snapshot_before)
+                self.assertEqual(
+                    facade.resume_context()["research_state"]["snapshot"], snapshot_before
+                )
                 self.assertEqual(after["run"]["status"], before["run"]["status"])
                 self.assertEqual(len(after["artifacts"]), before_artifacts)
                 self.assertEqual(
@@ -142,7 +177,8 @@ class Issue91ExternalMaterialContentTests(unittest.TestCase):
 
     def test_c2_large_original_exports_exact_bytes_and_show_marks_truncation(self):
         with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp); workspace = _workspace(root)
+            root = Path(temp)
+            workspace = _workspace(root)
             with LocalApplicationFacade.open_workspace(workspace) as facade:
                 question_id = _adopt_question(facade, "Issue 91 C2")
                 facade._application.execution_store.config = LocalExecutionStoreConfig(
@@ -164,20 +200,21 @@ class Issue91ExternalMaterialContentTests(unittest.TestCase):
                 self.assertTrue(shown["text_rendition_view"]["truncated"])
                 self.assertEqual(shown["text_rendition_view"]["content"], "0123456")
                 output = root / "large.bin"
-                facade.export_external_material(run_id, "CAP-C2", kind="original", output_file=output)
+                facade.export_external_material(
+                    run_id, "CAP-C2", kind="original", output_file=output
+                )
                 self.assertEqual(output.read_bytes(), original)
                 rendition_out = root / "large-rendition.txt"
                 exported = facade.export_external_material(
                     run_id, "CAP-C2", kind="rendition", output_file=rendition_out
                 )
                 self.assertEqual(rendition_out.read_bytes(), rendition)
-                self.assertEqual(
-                    exported["digest"], captured["text_rendition"]["content_digest"]
-                )
+                self.assertEqual(exported["digest"], captured["text_rendition"]["content_digest"])
 
     def test_c3_explicit_capture_selects_version_and_cli_requires_capture_id(self):
         with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp); workspace = _workspace(root)
+            root = Path(temp)
+            workspace = _workspace(root)
             with LocalApplicationFacade.open_workspace(workspace) as facade:
                 question_id = _adopt_question(facade, "Issue 91 C3")
                 run_a = _prepare(facade, question_id)
@@ -198,31 +235,38 @@ class Issue91ExternalMaterialContentTests(unittest.TestCase):
                 )
                 out_a = root / "rendition-a.txt"
                 out_b = root / "rendition-b.txt"
-                facade.export_external_material(
-                    run_a, "CAP-A", kind="rendition", output_file=out_a
-                )
-                facade.export_external_material(
-                    run_b, "CAP-B", kind="rendition", output_file=out_b
-                )
+                facade.export_external_material(run_a, "CAP-A", kind="rendition", output_file=out_a)
+                facade.export_external_material(run_b, "CAP-B", kind="rendition", output_file=out_b)
                 self.assertEqual(out_a.read_bytes(), b"rendition-A")
                 self.assertEqual(out_b.read_bytes(), b"rendition-B")
                 self.assertNotEqual(out_a.read_bytes(), out_b.read_bytes())
             process, result = _cli(
-                "external", "materials", "show", "--workspace", str(workspace),
-                "--run-id", run_a, "--json",
+                "external",
+                "materials",
+                "show",
+                "--workspace",
+                str(workspace),
+                "--run-id",
+                run_a,
+                "--json",
             )
             self.assertNotEqual(process.returncode, 0)
             self.assertIn("--capture-id", result["issues"][0]["message"])
 
     def test_c4_same_size_corruption_missing_pair_wrong_pair_and_foreign_ids_fail_closed(self):
         with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp); workspace = _workspace(root)
+            root = Path(temp)
+            workspace = _workspace(root)
             with LocalApplicationFacade.open_workspace(workspace) as facade:
                 question_id = _adopt_question(facade, "Issue 91 C4")
                 run_id = _prepare(facade, question_id)
-                _capture(facade, workspace, run_id, "CAP-C4", b"original-C4", b"rendition-C4", name="c4")
+                _capture(
+                    facade, workspace, run_id, "CAP-C4", b"original-C4", b"rendition-C4", name="c4"
+                )
                 store = facade._application.execution_store
-                original = next(a for a in store.artifacts_for(run_id) if a.role.endswith("original_capture"))
+                original = next(
+                    a for a in store.artifacts_for(run_id) if a.role.endswith("original_capture")
+                )
                 blob = store._locator_path(original.storage_locator, original.digest)
                 saved = blob.read_bytes()
                 blob.write_bytes(bytes([saved[0] ^ 1]) + saved[1:])
@@ -252,12 +296,12 @@ class Issue91ExternalMaterialContentTests(unittest.TestCase):
                     )
                     store._connection.commit()
 
-                rendition = next(a for a in store.artifacts_for(run_id) if a.role.endswith("text_rendition"))
+                rendition = next(
+                    a for a in store.artifacts_for(run_id) if a.role.endswith("text_rendition")
+                )
                 rendition_blob = store._locator_path(rendition.storage_locator, rendition.digest)
                 rendition_saved = rendition_blob.read_bytes()
-                rendition_blob.write_bytes(
-                    bytes([rendition_saved[0] ^ 1]) + rendition_saved[1:]
-                )
+                rendition_blob.write_bytes(bytes([rendition_saved[0] ^ 1]) + rendition_saved[1:])
                 with self.assertRaises(LocalApplicationError) as rendition_corrupt:
                     facade.show_external_material(run_id, "CAP-C4")
                 self.assertEqual(
@@ -274,7 +318,8 @@ class Issue91ExternalMaterialContentTests(unittest.TestCase):
                 rendition_blob.write_bytes(rendition_saved)
 
                 good_prov = dict(rendition.provenance)
-                bad_prov = dict(good_prov); bad_prov["parent_artifact_refs"] = ["ART-wrong"]
+                bad_prov = dict(good_prov)
+                bad_prov["parent_artifact_refs"] = ["ART-wrong"]
                 with store._lock:
                     store._connection.execute(
                         "UPDATE execution_artifacts SET provenance_json=? WHERE artifact_id=?",
@@ -319,13 +364,13 @@ class Issue91ExternalMaterialContentTests(unittest.TestCase):
 
     def test_c5_terminal_capture_remains_readable_but_attempt_only_has_no_content(self):
         with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp); workspace = _workspace(root)
+            root = Path(temp)
+            workspace = _workspace(root)
             with LocalApplicationFacade.open_workspace(workspace) as facade:
                 question_id = _adopt_question(facade, "Issue 91 C5")
                 run_id = _prepare(facade, question_id)
                 _capture(
-                    facade, workspace, run_id, "CAP-C5",
-                    b"terminal", b"terminal text", name="c5"
+                    facade, workspace, run_id, "CAP-C5", b"terminal", b"terminal text", name="c5"
                 )
                 before = facade.show_run(run_id)
                 failed = facade.collect_external(
@@ -358,33 +403,43 @@ class Issue91ExternalMaterialContentTests(unittest.TestCase):
                 self.assertEqual(len(after["artifacts"]), len(before["artifacts"]))
 
                 attempt_only = _prepare(reopened, question_id)
-                reopened.start_external_retrieval_attempt(attempt_only, {
-                    "attempt_id": "ATT-ONLY", "strategy": "none",
-                    "coverage_dimension_ids": ["COV-SUPPORT"]
-                })
-                reopened.complete_external_retrieval_attempt(attempt_only, {
-                    "attempt_id": "ATT-ONLY", "outcome": "no_relevant_source"
-                })
+                reopened.start_external_retrieval_attempt(
+                    attempt_only,
+                    {
+                        "attempt_id": "ATT-ONLY",
+                        "strategy": "none",
+                        "coverage_dimension_ids": ["COV-SUPPORT"],
+                    },
+                )
+                reopened.complete_external_retrieval_attempt(
+                    attempt_only, {"attempt_id": "ATT-ONLY", "outcome": "no_relevant_source"}
+                )
                 with self.assertRaises(LocalApplicationError) as missing:
                     reopened.show_external_material(attempt_only, "CAP-none")
                 self.assertEqual(missing.exception.code, "APPLICATION-MATERIAL-404")
 
     def test_c6_export_never_overwrites_or_writes_managed_state(self):
         with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp); workspace = _workspace(root)
+            root = Path(temp)
+            workspace = _workspace(root)
             with LocalApplicationFacade.open_workspace(workspace) as facade:
                 question_id = _adopt_question(facade, "Issue 91 C6")
                 run_id = _prepare(facade, question_id)
                 _capture(facade, workspace, run_id, "CAP-C6", b"original", b"text", name="c6")
-                existing = root / "existing.bin"; existing.write_bytes(b"user data")
+                existing = root / "existing.bin"
+                existing.write_bytes(b"user data")
                 with self.assertRaises(LocalApplicationError) as overwrite:
-                    facade.export_external_material(run_id, "CAP-C6", kind="original", output_file=existing)
+                    facade.export_external_material(
+                        run_id, "CAP-C6", kind="original", output_file=existing
+                    )
                 self.assertEqual(overwrite.exception.code, "APPLICATION-MATERIAL-EXPORT-001")
                 self.assertEqual(existing.read_bytes(), b"user data")
 
                 managed = workspace / ".research-loom" / "do-not-write.bin"
                 with self.assertRaises(LocalApplicationError) as internal:
-                    facade.export_external_material(run_id, "CAP-C6", kind="original", output_file=managed)
+                    facade.export_external_material(
+                        run_id, "CAP-C6", kind="original", output_file=managed
+                    )
                 self.assertEqual(internal.exception.code, "APPLICATION-MATERIAL-EXPORT-001")
                 self.assertFalse(managed.exists())
 
@@ -435,13 +490,16 @@ class Issue91ExternalMaterialContentTests(unittest.TestCase):
 
     def test_ablation_digest_guard_is_the_control_for_same_size_corruption(self):
         with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp); workspace = _workspace(root)
+            root = Path(temp)
+            workspace = _workspace(root)
             with LocalApplicationFacade.open_workspace(workspace) as facade:
                 question_id = _adopt_question(facade, "Issue 91 ablation")
                 run_id = _prepare(facade, question_id)
                 _capture(facade, workspace, run_id, "CAP-ABL", b"original", b"text", name="abl")
                 store = facade._application.execution_store
-                original = next(a for a in store.artifacts_for(run_id) if a.role.endswith("original_capture"))
+                original = next(
+                    a for a in store.artifacts_for(run_id) if a.role.endswith("original_capture")
+                )
                 blob = store._locator_path(original.storage_locator, original.digest)
                 content = blob.read_bytes()
                 corrupted = bytes([content[0] ^ 1]) + content[1:]

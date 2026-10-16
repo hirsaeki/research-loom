@@ -12,7 +12,9 @@ import issue80_writer_composition_suite as writer_comp_support
 
 class Issue219WriterRoundTripTests(ResearchPackageAcceptanceSupport):
     def _build_round_trip(self):
-        facade, case = writer_comp_support.Issue80WriterCompositionTests._build_complete_support_package(self)
+        facade, case = (
+            writer_comp_support.Issue80WriterCompositionTests._build_complete_support_package(self)
+        )
         proposal = writer_comp_support.Issue80WriterCompositionTests._proposal(self, case)
         proposal["sections"][1]["narrative_stage_refs"] = ["framing"]
         proposal["sections"][1]["semantic_purpose_refs"] = ["frame_problem"]
@@ -109,7 +111,9 @@ class Issue219WriterRoundTripTests(ResearchPackageAcceptanceSupport):
                 with patch.object(
                     WriterRoundTripService,
                     "_load_latest_revision",
-                    side_effect=AssertionError("healthy head must avoid full revision history scans"),
+                    side_effect=AssertionError(
+                        "healthy head must avoid full revision history scans"
+                    ),
                 ):
                     retry = facade.import_writer_response(deepcopy(response))
             self.assertEqual(first["status"], "IMPORTED")
@@ -136,7 +140,9 @@ class Issue219WriterRoundTripTests(ResearchPackageAcceptanceSupport):
                 input_doc["sections"][0]["section_input"]["section_input_digest"],
             )
             self.assertTrue(
-                shown["writer_input"]["sections"][0]["section_input"]["resolved_profile_constraints"]
+                shown["writer_input"]["sections"][0]["section_input"][
+                    "resolved_profile_constraints"
+                ]
             )
             self.assertTrue(shown["effective_constraints"])
             self.assertEqual(len(shown["revision"]["sections"]), 2)
@@ -154,17 +160,22 @@ class Issue219WriterRoundTripTests(ResearchPackageAcceptanceSupport):
                 composition["composition_id"], first["revision_id"]
             )
             original_bytes = revision_path.read_bytes()
-            base = {"revision_id": first["revision_id"], "revision_digest": first["revision_digest"]}
+            base = {
+                "revision_id": first["revision_id"],
+                "revision_digest": first["revision_digest"],
+            }
             changed = self._response(
                 input_doc,
                 response_id="WR-2",
                 base=base,
-                sections=[{
-                    "section_id": "SEC-FRAME",
-                    "content": "Revised framing only; validation is intentionally reused.",
-                    "citations": [],
-                    "exhibit_refs": list(input_doc["sections"][0]["exhibit_refs"]),
-                }],
+                sections=[
+                    {
+                        "section_id": "SEC-FRAME",
+                        "content": "Revised framing only; validation is intentionally reused.",
+                        "citations": [],
+                        "exhibit_refs": list(input_doc["sections"][0]["exhibit_refs"]),
+                    }
+                ],
                 feedback=[],
             )
             second = facade.import_writer_response(changed)
@@ -192,9 +203,7 @@ class Issue219WriterRoundTripTests(ResearchPackageAcceptanceSupport):
                 sections["SEC-VALIDATE"]["content_digest"],
                 first_sections["SEC-VALIDATE"]["content_digest"],
             )
-            self.assertEqual(
-                sections["SEC-VALIDATE"]["origin_revision_id"], first["revision_id"]
-            )
+            self.assertEqual(sections["SEC-VALIDATE"]["origin_revision_id"], first["revision_id"])
             self.assertEqual(sections["SEC-FRAME"]["origin_revision_id"], second["revision_id"])
             self.assertEqual(
                 [row["revision_id"] for row in joined["revision_lineage"]],
@@ -215,12 +224,14 @@ class Issue219WriterRoundTripTests(ResearchPackageAcceptanceSupport):
                 input_doc,
                 response_id="WR-HEAD-RECOVERY",
                 base=base,
-                sections=[{
-                    "section_id": "SEC-FRAME",
-                    "content": "Revision persisted before the simulated head write failure.",
-                    "citations": [],
-                    "exhibit_refs": list(input_doc["sections"][0]["exhibit_refs"]),
-                }],
+                sections=[
+                    {
+                        "section_id": "SEC-FRAME",
+                        "content": "Revision persisted before the simulated head write failure.",
+                        "citations": [],
+                        "exhibit_refs": list(input_doc["sections"][0]["exhibit_refs"]),
+                    }
+                ],
                 feedback=[],
             )
             with patch.object(
@@ -233,16 +244,12 @@ class Issue219WriterRoundTripTests(ResearchPackageAcceptanceSupport):
             ):
                 with self.assertRaises(LocalApplicationError) as error:
                     facade.import_writer_response(changed)
-            self.assertEqual(
-                error.exception.code, "APPLICATION-WRITER-ROUND-TRIP-WRITE-001"
-            )
+            self.assertEqual(error.exception.code, "APPLICATION-WRITER-ROUND-TRIP-WRITE-001")
 
             recovered = facade.import_writer_response(deepcopy(changed))
             self.assertEqual(recovered["status"], "VERIFIED_REUSE")
             self.assertEqual(recovered["revision_number"], 2)
-            head = facade._writer_round_trip_service()._head(
-                composition["composition_id"]
-            )
+            head = facade._writer_round_trip_service()._head(composition["composition_id"])
             self.assertEqual(head["revision_id"], recovered["revision_id"])
             self.assertEqual(head["revision_digest"], recovered["revision_digest"])
         finally:
@@ -253,27 +260,20 @@ class Issue219WriterRoundTripTests(ResearchPackageAcceptanceSupport):
         try:
             imported = facade.import_writer_response(self._response(input_doc))
             service = facade._writer_round_trip_service()
-            path = service._revision_path(
-                composition["composition_id"], imported["revision_id"]
-            )
+            path = service._revision_path(composition["composition_id"], imported["revision_id"])
             tampered = json.loads(path.read_text(encoding="utf-8"))
             tampered["source"]["composition_id"] = "WCP-TAMPERED"
             from plugins.local_application.writer_composition_service import _digest_document
-            tampered["revision_digest"] = _digest_document(
-                tampered, "revision_digest"
-            )
+
+            tampered["revision_digest"] = _digest_document(tampered, "revision_digest")
             path.write_text(
                 json.dumps(tampered, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
                 encoding="utf-8",
             )
 
             with self.assertRaises(LocalApplicationError) as error:
-                service._load_revision(
-                    composition["composition_id"], imported["revision_id"]
-                )
-            self.assertEqual(
-                error.exception.code, "APPLICATION-WRITER-ROUND-TRIP-INTEGRITY-001"
-            )
+                service._load_revision(composition["composition_id"], imported["revision_id"])
+            self.assertEqual(error.exception.code, "APPLICATION-WRITER-ROUND-TRIP-INTEGRITY-001")
         finally:
             facade.close()
 
@@ -285,18 +285,30 @@ class Issue219WriterRoundTripTests(ResearchPackageAcceptanceSupport):
             tampered = json.loads(receipt_path.read_text(encoding="utf-8"))
             tampered["source"]["research_package_digest"] = "sha256:" + "0" * 64
             from plugins.local_application.writer_composition_service import _digest_document
+
             tampered["input_digest"] = _digest_document(tampered, "input_digest")
-            receipt_path.write_text(json.dumps(tampered, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+            receipt_path.write_text(
+                json.dumps(tampered, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
+                encoding="utf-8",
+            )
             response = self._response(tampered)
             with self.assertRaises(LocalApplicationError) as error:
                 facade.import_writer_response(response)
             self.assertEqual(error.exception.code, "APPLICATION-WRITER-ROUND-TRIP-PIN-001")
 
             # Ablation: without the exact context guard, the same response attaches to a tampered receipt.
-            with patch.object(WriterRoundTripService, "_validate_input_context", return_value=(
-                facade._writer_composition_service()._load_version(composition["composition_id"], 1),
-                facade.show_research_package(input_doc["source"]["research_package_id"])["package"],
-            )):
+            with patch.object(
+                WriterRoundTripService,
+                "_validate_input_context",
+                return_value=(
+                    facade._writer_composition_service()._load_version(
+                        composition["composition_id"], 1
+                    ),
+                    facade.show_research_package(input_doc["source"]["research_package_id"])[
+                        "package"
+                    ],
+                ),
+            ):
                 imported = facade.import_writer_response(response)
             self.assertEqual(imported["status"], "IMPORTED")
         finally:
@@ -310,6 +322,7 @@ class Issue219WriterRoundTripTests(ResearchPackageAcceptanceSupport):
             tampered = json.loads(receipt_path.read_text(encoding="utf-8"))
             tampered["sections"][0]["citation_scope"] = []
             from plugins.local_application.writer_composition_service import _digest_document
+
             tampered["input_digest"] = _digest_document(tampered, "input_digest")
             receipt_path.write_text(
                 json.dumps(tampered, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
@@ -333,12 +346,9 @@ class Issue219WriterRoundTripTests(ResearchPackageAcceptanceSupport):
             embedded["resolved_material_refs"] = []
             embedded["resolved_materials"] = []
             from plugins.local_application.writer_composition_service import _digest_document
-            embedded["section_input_digest"] = _digest_document(
-                embedded, "section_input_digest"
-            )
-            tampered["sections"][0]["section_input_digest"] = embedded[
-                "section_input_digest"
-            ]
+
+            embedded["section_input_digest"] = _digest_document(embedded, "section_input_digest")
+            tampered["sections"][0]["section_input_digest"] = embedded["section_input_digest"]
             tampered["input_digest"] = _digest_document(tampered, "input_digest")
             receipt_path.write_text(
                 json.dumps(tampered, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
@@ -362,9 +372,7 @@ class Issue219WriterRoundTripTests(ResearchPackageAcceptanceSupport):
                     facade.export_writer_round_trip_input(
                         composition["composition_id"], ["SEC-FRAME"], output
                     )
-                self.assertEqual(
-                    error.exception.code, "APPLICATION-WRITER-ROUND-TRIP-EXPORT-001"
-                )
+                self.assertEqual(error.exception.code, "APPLICATION-WRITER-ROUND-TRIP-EXPORT-001")
                 self.assertFalse(output.exists())
 
             # The lock file remains as a harmless marker; only the OS lock owns exclusion.
@@ -389,9 +397,7 @@ class Issue219WriterRoundTripTests(ResearchPackageAcceptanceSupport):
                     facade.export_writer_round_trip_input(
                         composition["composition_id"], ["SEC-FRAME"], output
                     )
-            self.assertEqual(
-                error.exception.code, "APPLICATION-WRITER-ROUND-TRIP-BOUND-001"
-            )
+            self.assertEqual(error.exception.code, "APPLICATION-WRITER-ROUND-TRIP-BOUND-001")
             self.assertFalse(output.exists())
 
             # A failed bounded export must not poison the destination.
@@ -409,25 +415,34 @@ class Issue219WriterRoundTripTests(ResearchPackageAcceptanceSupport):
             proposal = writer_comp_support.Issue80WriterCompositionTests._proposal(
                 self, case, composition_id=composition["composition_id"], base=composition
             )
-            proposal["sections"][0]["purpose"] = "Changed outline purpose requiring a fresh draft set."
+            proposal["sections"][0]["purpose"] = (
+                "Changed outline purpose requiring a fresh draft set."
+            )
             proposal["sections"][1]["narrative_stage_refs"] = ["framing"]
             proposal["sections"][1]["semantic_purpose_refs"] = ["frame_problem"]
             v2 = facade.capture_writer_composition(case["package_id"], proposal)["composition"]
             facade.select_writer_composition(v2["composition_id"], 2, v2["composition_digest"])
             out = self.root / "writer-round-trip-v2"
-            facade.export_writer_round_trip_input(v2["composition_id"], ["SEC-FRAME", "SEC-VALIDATE"], out)
+            facade.export_writer_round_trip_input(
+                v2["composition_id"], ["SEC-FRAME", "SEC-VALIDATE"], out
+            )
             input_v2 = json.loads((out / "writer-input.json").read_text(encoding="utf-8"))
-            base = {"revision_id": first["revision_id"], "revision_digest": first["revision_digest"]}
+            base = {
+                "revision_id": first["revision_id"],
+                "revision_digest": first["revision_digest"],
+            }
             partial = self._response(
                 input_v2,
                 response_id="WR-V2-PARTIAL",
                 base=base,
-                sections=[{
-                    "section_id": "SEC-FRAME",
-                    "content": "Only one section for a changed outline.",
-                    "citations": [],
-                    "exhibit_refs": list(input_v2["sections"][0]["exhibit_refs"]),
-                }],
+                sections=[
+                    {
+                        "section_id": "SEC-FRAME",
+                        "content": "Only one section for a changed outline.",
+                        "citations": [],
+                        "exhibit_refs": list(input_v2["sections"][0]["exhibit_refs"]),
+                    }
+                ],
                 feedback=[],
             )
             with self.assertRaises(LocalApplicationError) as error:
@@ -436,12 +451,14 @@ class Issue219WriterRoundTripTests(ResearchPackageAcceptanceSupport):
 
             complete = deepcopy(partial)
             complete["response_id"] = "WR-V2-COMPLETE"
-            complete["sections"].append({
-                "section_id": "SEC-VALIDATE",
-                "content": "Fresh validation draft under the changed outline.",
-                "citations": [],
-                "exhibit_refs": [],
-            })
+            complete["sections"].append(
+                {
+                    "section_id": "SEC-VALIDATE",
+                    "content": "Fresh validation draft under the changed outline.",
+                    "citations": [],
+                    "exhibit_refs": [],
+                }
+            )
             imported = facade.import_writer_response(complete)
             self.assertEqual(imported["status"], "IMPORTED")
             self.assertEqual(imported["reused_section_ids"], [])

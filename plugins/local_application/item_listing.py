@@ -1,4 +1,5 @@
 """Read-only keyset paging and bounded diagnostics for saved-item inventories."""
+
 from __future__ import annotations
 
 import base64
@@ -15,37 +16,69 @@ from .facade import LocalApplicationError
 from .research_package_format import safe_component
 
 
-ITEM_ERRORS = (LocalApplicationError, OSError, UnicodeError, ValueError,
-               KeyError, TypeError, OverflowError, RecursionError)
+ITEM_ERRORS = (
+    LocalApplicationError,
+    OSError,
+    UnicodeError,
+    ValueError,
+    KeyError,
+    TypeError,
+    OverflowError,
+    RecursionError,
+)
 
 
-def directory_page(root: Path, *, project_id: str, kind: str, limit: int,
-                   maximum: int, cursor: str | None,
-                   skip_prefix: str | None = None) -> tuple[list[Path], str | None]:
+def directory_page(
+    root: Path,
+    *,
+    project_id: str,
+    kind: str,
+    limit: int,
+    maximum: int,
+    cursor: str | None,
+    skip_prefix: str | None = None,
+) -> tuple[list[Path], str | None]:
     """Scan names in O(n) time, retaining O(limit) names and no off-page content.
 
     Live keyset order is not a snapshot: insertions before the cursor require a
     fresh traversal. The cursor is a navigation token, not an authorization.
     """
     if type(limit) is not int or not 1 <= limit <= maximum:
-        raise LocalApplicationError("APPLICATION-LIST-INPUT-001", f"limit must be between 1 and {maximum}")
-    binding = {"v": 1, "kind": kind, "project_id": project_id,
-               "root": hashlib.sha256(os.fsencode(root.absolute())).hexdigest()}
+        raise LocalApplicationError(
+            "APPLICATION-LIST-INPUT-001", f"limit must be between 1 and {maximum}"
+        )
+    binding = {
+        "v": 1,
+        "kind": kind,
+        "project_id": project_id,
+        "root": hashlib.sha256(os.fsencode(root.absolute())).hexdigest(),
+    }
     after = ""
     if cursor is not None:
         try:
             if not isinstance(cursor, str) or not cursor or len(cursor) > 2048:
                 raise ValueError("invalid cursor")
-            value = json.loads(base64.b64decode(cursor.encode("ascii"), altchars=b"-_", validate=True))
+            value = json.loads(
+                base64.b64decode(cursor.encode("ascii"), altchars=b"-_", validate=True)
+            )
             if not isinstance(value, dict) or set(value) != {*binding, "after"}:
                 raise ValueError("invalid cursor shape")
             if any(value[key] != expected for key, expected in binding.items()):
                 raise ValueError("cursor belongs to another inventory")
             after = value["after"]
-            if not isinstance(after, str) or not after or len(after) > 255 or "/" in after or "\x00" in after:
+            if (
+                not isinstance(after, str)
+                or not after
+                or len(after) > 255
+                or "/" in after
+                or "\x00" in after
+            ):
                 raise ValueError("invalid cursor identity")
         except (ValueError, TypeError, UnicodeError, binascii.Error, RecursionError) as exc:
-            raise LocalApplicationError("APPLICATION-LIST-CURSOR-001", "invalid cursor or different project/inventory; restart without a cursor") from exc
+            raise LocalApplicationError(
+                "APPLICATION-LIST-CURSOR-001",
+                "invalid cursor or different project/inventory; restart without a cursor",
+            ) from exc
 
     def names(entries):
         for entry in entries:
@@ -65,21 +98,30 @@ def directory_page(root: Path, *, project_id: str, kind: str, limit: int,
     except FileNotFoundError:
         selected = []
     except OSError as exc:
-        raise LocalApplicationError("APPLICATION-LIST-READ-001", "inventory directory is inaccessible; resolve permissions/I/O or restore the exact store") from exc
+        raise LocalApplicationError(
+            "APPLICATION-LIST-READ-001",
+            "inventory directory is inaccessible; resolve permissions/I/O or restore the exact store",
+        ) from exc
     has_more = len(selected) > limit
     selected = selected[:limit]
     next_cursor = None
     if has_more:
-        next_cursor = base64.urlsafe_b64encode(json.dumps(
-            {**binding, "after": selected[-1]}, separators=(",", ":"), ensure_ascii=True,
-        ).encode("ascii")).decode("ascii")
+        next_cursor = base64.urlsafe_b64encode(
+            json.dumps(
+                {**binding, "after": selected[-1]},
+                separators=(",", ":"),
+                ensure_ascii=True,
+            ).encode("ascii")
+        ).decode("ascii")
     return [root / name for name in selected], next_cursor
 
 
 def _require_unlinked(path: Path) -> None:
     for part in (path, *path.parents):
         if part.is_symlink() or (hasattr(part, "is_junction") and part.is_junction()):
-            raise LocalApplicationError("APPLICATION-LIST-UNSAFE-PATH-001", "linked inventory paths are not read")
+            raise LocalApplicationError(
+                "APPLICATION-LIST-UNSAFE-PATH-001", "linked inventory paths are not read"
+            )
 
 
 def read_mapping(path: Path, maximum: int) -> Mapping[str, Any]:
@@ -87,18 +129,28 @@ def read_mapping(path: Path, maximum: int) -> Mapping[str, Any]:
     _require_unlinked(path)
     info = path.stat()
     if not stat.S_ISREG(info.st_mode):
-        raise LocalApplicationError("APPLICATION-LIST-METADATA-001", "item metadata is not a regular file")
+        raise LocalApplicationError(
+            "APPLICATION-LIST-METADATA-001", "item metadata is not a regular file"
+        )
     if info.st_size > maximum:
-        raise LocalApplicationError("APPLICATION-LIST-BOUND-001", "item metadata exceeds the read bound")
+        raise LocalApplicationError(
+            "APPLICATION-LIST-BOUND-001", "item metadata exceeds the read bound"
+        )
     with path.open("rb") as handle:
         raw = handle.read(maximum + 1)
     if len(raw) > maximum:
-        raise LocalApplicationError("APPLICATION-LIST-BOUND-001", "item metadata exceeds the read bound")
+        raise LocalApplicationError(
+            "APPLICATION-LIST-BOUND-001", "item metadata exceeds the read bound"
+        )
     if len(raw) != info.st_size:
-        raise LocalApplicationError("APPLICATION-LIST-CHANGED-001", "item metadata changed during the read; retry")
+        raise LocalApplicationError(
+            "APPLICATION-LIST-CHANGED-001", "item metadata changed during the read; retry"
+        )
     value = json.loads(raw.decode("utf-8"))
     if not isinstance(value, dict):
-        raise LocalApplicationError("APPLICATION-LIST-METADATA-001", "item metadata must be an object")
+        raise LocalApplicationError(
+            "APPLICATION-LIST-METADATA-001", "item metadata must be an object"
+        )
     return value
 
 
@@ -129,8 +181,12 @@ def unavailable(identity_field: str, identity: str, exc: Exception) -> dict[str,
     action = "Preserve this item. Resolve access/I/O or restore exact retained bytes, then retry. Use a new identity for rebuilt material."
     if reason == "READ_BOUND_EXCEEDED":
         action = "The inventory read bound was exceeded, not proof of corruption. Preserve the bytes; use explicit known-ID inspection with appropriate resources."
-    row: dict[str, Any] = {"availability": "UNAVAILABLE", "identity_source": "directory_name",
-        "project_scope": "UNVERIFIED", "diagnostic": {"code": code, "reason": reason, "next_action": action}}
+    row: dict[str, Any] = {
+        "availability": "UNAVAILABLE",
+        "identity_source": "directory_name",
+        "project_scope": "UNVERIFIED",
+        "diagnostic": {"code": code, "reason": reason, "next_action": action},
+    }
     try:
         safe_component(identity, identity_field)
         if len(identity) > 255 or not identity.isprintable():

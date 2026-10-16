@@ -84,9 +84,7 @@ def descriptor_semantic_error(descriptor):
     if descriptor["descriptor_digest"] != expected_descriptor_digest(descriptor):
         return "CAP-DESCRIPTOR-DIGEST-001"
 
-    function_ids = [
-        function["function_id"] for function in descriptor["declared_functions"]
-    ]
+    function_ids = [function["function_id"] for function in descriptor["declared_functions"]]
     if _has_duplicates(function_ids):
         return "CAP-DESCRIPTOR-IDENTITY-001"
 
@@ -101,13 +99,9 @@ def context_semantic_error(
         return "CAP-CONTEXT-DIGEST-001"
 
     reference_ids = [resource["reference_id"] for resource in context["resources"]]
-    attention_ids = [
-        attention["attention_id"] for attention in context["research_attention"]
-    ]
+    attention_ids = [attention["attention_id"] for attention in context["research_attention"]]
     guard_ids = _flatten_guard_ids(context["project_constraints"])
-    constraint_paths = [
-        constraint["path"] for constraint in context["effective_constraints"]
-    ]
+    constraint_paths = [constraint["path"] for constraint in context["effective_constraints"]]
     if any(
         _has_duplicates(values)
         for values in (
@@ -122,9 +116,7 @@ def context_semantic_error(
     bounds = context["bounds"]
     actual = {
         "max_questions": len(context["question_ids"]),
-        "max_research_object_references": len(
-            context["research_object_references"]
-        ),
+        "max_research_object_references": len(context["research_object_references"]),
         "max_resources": len(context["resources"]),
         "max_attention_items": len(context["research_attention"]),
         "max_project_guards": sum(
@@ -149,9 +141,9 @@ def context_semantic_error(
     if effective_pin["schema_version"] != effective_profile_set["schema_version"]:
         return "CAP-PIN-001"
 
-    expected_effective_digest = "sha256:" + hashlib.sha256(
-        rfc8785.dumps(effective_profile_set)
-    ).hexdigest()
+    expected_effective_digest = (
+        "sha256:" + hashlib.sha256(rfc8785.dumps(effective_profile_set)).hexdigest()
+    )
     if effective_pin["content_digest"] != expected_effective_digest:
         return "CAP-PIN-001"
 
@@ -161,9 +153,7 @@ def context_semantic_error(
     expected_profile_pins = [
         _profile_pin(profile) for profile in effective_profile_set["effective_profiles"]
     ]
-    if _canonical(effective_pin["profile_pins"]) != _canonical(
-        expected_profile_pins
-    ):
+    if _canonical(effective_pin["profile_pins"]) != _canonical(expected_profile_pins):
         return "CAP-PIN-001"
 
     if _canonical(context["research_attention"]) != _canonical(
@@ -181,16 +171,11 @@ def context_semantic_error(
     ):
         return "CAP-CONTEXT-BINDING-001"
 
-    questions = {
-        item["question_id"]
-        for item in project_config["research_questions"]["references"]
-    }
+    questions = {item["question_id"] for item in project_config["research_questions"]["references"]}
     if not set(context["question_ids"]).issubset(questions):
         return "CAP-CONTEXT-BINDING-001"
 
-    index = {
-        (obj["kind"], obj["id"], obj["revision"]): obj for obj in core_objects
-    }
+    index = {(obj["kind"], obj["id"], obj["revision"]): obj for obj in core_objects}
     for ref in context["research_object_references"]:
         if (ref["kind"], ref["id"], ref["revision"]) not in index:
             return "CAP-CONTEXT-BINDING-001"
@@ -206,15 +191,12 @@ def context_semantic_error(
     if snapshot is None:
         return "CAP-PIN-001"
 
-    expected_snapshot_digest = "sha256:" + hashlib.sha256(
-        rfc8785.dumps(snapshot)
-    ).hexdigest()
+    expected_snapshot_digest = "sha256:" + hashlib.sha256(rfc8785.dumps(snapshot)).hexdigest()
     if snapshot_pin["content_digest"] != expected_snapshot_digest:
         return "CAP-PIN-001"
 
     configured = {
-        resource["reference_id"]: resource
-        for resource in project_config["resource_references"]
+        resource["reference_id"]: resource for resource in project_config["resource_references"]
     }
     for resource in context["resources"]:
         source = configured.get(resource["reference_id"])
@@ -256,8 +238,7 @@ def invocation_semantic_error(invocation, descriptor, context):
     )
     if (
         function is None
-        or invocation["execution_mode"]
-        not in function["supported_execution_modes"]
+        or invocation["execution_mode"] not in function["supported_execution_modes"]
     ):
         return "CAP-DESCRIPTOR-BINDING-001"
 
@@ -280,12 +261,8 @@ def invocation_semantic_error(invocation, descriptor, context):
     ):
         return "CAP-AUTH-001"
 
-    context_reference_ids = {
-        resource["reference_id"] for resource in context["resources"]
-    }
-    if not context_reference_ids.issubset(
-        set(authorization["resource_reference_ids"])
-    ):
+    context_reference_ids = {resource["reference_id"] for resource in context["resources"]}
+    if not context_reference_ids.issubset(set(authorization["resource_reference_ids"])):
         return "CAP-AUTH-001"
 
 
@@ -294,10 +271,7 @@ def _resource_index(context):
 
 
 def _capture_index(handoff):
-    return {
-        capture["capture_id"]: capture
-        for capture in handoff["outputs"]["source_captures"]
-    }
+    return {capture["capture_id"]: capture for capture in handoff["outputs"]["source_captures"]}
 
 
 def _basis_is_evidence_eligible(basis, context, handoff):
@@ -331,8 +305,7 @@ def handoff_semantic_error(handoff, invocation, context):
         return "CAP-PIN-001"
 
     if (
-        _canonical(handoff["capability"])
-        != _canonical(invocation["capability"])
+        _canonical(handoff["capability"]) != _canonical(invocation["capability"])
         or handoff["execution_mode"] != invocation["execution_mode"]
     ):
         return "CAP-DESCRIPTOR-BINDING-001"
@@ -340,12 +313,8 @@ def handoff_semantic_error(handoff, invocation, context):
     expected_pins = {
         "invocation_digest": invocation["invocation_digest"],
         "context_pack_digest": context["context_pack_digest"],
-        "project_config_digest": context["pins"]["project_config"][
-            "configuration_digest"
-        ],
-        "effective_profile_set_digest": context["pins"]["effective_profile_set"][
-            "content_digest"
-        ],
+        "project_config_digest": context["pins"]["project_config"]["configuration_digest"],
+        "effective_profile_set_digest": context["pins"]["effective_profile_set"]["content_digest"],
         "research_snapshot": context["pins"]["research_snapshot"],
     }
     if _canonical(handoff["input_pins"]) != _canonical(expected_pins):
@@ -387,9 +356,7 @@ def handoff_semantic_error(handoff, invocation, context):
         "candidate_next_methods": "proposal_id",
     }
     output_ids = [
-        item[field]
-        for collection, field in fields.items()
-        for item in outputs[collection]
+        item[field] for collection, field in fields.items() for item in outputs[collection]
     ]
     if _has_duplicates(output_ids):
         return "CAP-HANDOFF-IDENTITY-001"
@@ -406,37 +373,24 @@ def handoff_semantic_error(handoff, invocation, context):
             ):
                 return "CAP-HANDOFF-REF-001"
 
-    evidence_ids = {
-        item["evidence_candidate_id"] for item in outputs["evidence_candidates"]
-    }
-    counterevidence_ids = {
-        item["counterevidence_id"] for item in outputs["counterevidence"]
-    }
+    evidence_ids = {item["evidence_candidate_id"] for item in outputs["evidence_candidates"]}
+    counterevidence_ids = {item["counterevidence_id"] for item in outputs["counterevidence"]}
     question_ids = set(context["question_ids"])
     all_output_ids = set(output_ids)
 
     for observation in outputs["observations"]:
-        if not set(observation.get("evidence_candidate_ids", [])).issubset(
-            evidence_ids
-        ):
+        if not set(observation.get("evidence_candidate_ids", [])).issubset(evidence_ids):
             return "CAP-HANDOFF-REF-001"
 
     for finding in outputs["candidate_findings"]:
         if (
             not set(finding["question_ids"]).issubset(question_ids)
-            or not set(finding["supporting_evidence_candidate_ids"]).issubset(
-                evidence_ids
-            )
-            or not set(finding["counterevidence_candidate_ids"]).issubset(
-                counterevidence_ids
-            )
+            or not set(finding["supporting_evidence_candidate_ids"]).issubset(evidence_ids)
+            or not set(finding["counterevidence_candidate_ids"]).issubset(counterevidence_ids)
         ):
             return "CAP-HANDOFF-REF-001"
 
-    if any(
-        not set(gap["question_ids"]).issubset(question_ids)
-        for gap in outputs["evidence_gaps"]
-    ):
+    if any(not set(gap["question_ids"]).issubset(question_ids) for gap in outputs["evidence_gaps"]):
         return "CAP-HANDOFF-REF-001"
 
     if any(
@@ -456,9 +410,7 @@ def handoff_semantic_error(handoff, invocation, context):
     ):
         return "CAP-MODE-001"
 
-    evidence_bearing_outputs = (
-        outputs["evidence_candidates"] + outputs["counterevidence"]
-    )
+    evidence_bearing_outputs = outputs["evidence_candidates"] + outputs["counterevidence"]
     if any(
         not _basis_is_evidence_eligible(item["source_basis"], context, handoff)
         for item in evidence_bearing_outputs
@@ -466,12 +418,8 @@ def handoff_semantic_error(handoff, invocation, context):
         return "CAP-RESOURCE-001"
 
     validation = handoff["validation"]
-    if (
-        validation["status"] == "valid"
-        and validation["issues"]
-    ) or (
-        validation["status"] in {"partial", "rejected"}
-        and not validation["issues"]
+    if (validation["status"] == "valid" and validation["issues"]) or (
+        validation["status"] in {"partial", "rejected"} and not validation["issues"]
     ):
         return "CAP-HANDOFF-VALIDATION-001"
 

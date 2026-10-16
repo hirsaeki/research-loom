@@ -17,10 +17,14 @@ class Issue324ResearchConversationMutationContractTests(unittest.TestCase):
         skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
         surfaces = (SKILL_ROOT / "references" / "public-surfaces.md").read_text(encoding="utf-8")
 
-        self.assertIn("minimal transport inputs documented in `references/public-surfaces.md`", skill)
+        self.assertIn(
+            "minimal transport inputs documented in `references/public-surfaces.md`", skill
+        )
         self.assertIn('"action_type": "state.apply_candidate"', surfaces)
         self.assertIn('"state_delta_proposal_id": "<exact saved candidate_id>"', surfaces)
-        self.assertIn('"confirmation_request_id": "<exact issued confirmation_request_id>"', surfaces)
+        self.assertIn(
+            '"confirmation_request_id": "<exact issued confirmation_request_id>"', surfaces
+        )
         self.assertIn('"request_id": "<exact issued request_id>"', surfaces)
         self.assertIn('"request_digest": "<exact issued request_digest>"', surfaces)
         self.assertIn('"actor_id": "<exact request human_actor_id>"', surfaces)

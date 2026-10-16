@@ -48,8 +48,7 @@ class DesktopResearchRetentionTests(unittest.TestCase):
 
                 artifacts = app.execution_store.artifacts_for(run_id)
                 original = next(
-                    item for item in artifacts
-                    if item.role == "desktop_research.original_capture"
+                    item for item in artifacts if item.role == "desktop_research.original_capture"
                 )
                 self.assertEqual(original.size, len(original_bytes))
                 self.assertEqual(
@@ -215,11 +214,14 @@ class DesktopResearchRetentionTests(unittest.TestCase):
             app, facade = helper.make_facade(root)
             try:
                 run_id = helper.prepare(facade)["run_id"]
-                facade.start_external_retrieval_attempt(run_id, {
-                    "attempt_id": "ATT-1",
-                    "strategy": "support search",
-                    "coverage_dimension_ids": ["COV-SUPPORT"],
-                })
+                facade.start_external_retrieval_attempt(
+                    run_id,
+                    {
+                        "attempt_id": "ATT-1",
+                        "strategy": "support search",
+                        "coverage_dimension_ids": ["COV-SUPPORT"],
+                    },
+                )
                 raw = root / "captures/raw/source-a.html"
                 text = root / "captures/text/source-a.txt"
                 raw.parent.mkdir(parents=True, exist_ok=True)
@@ -228,29 +230,41 @@ class DesktopResearchRetentionTests(unittest.TestCase):
                 text_bytes = b"Source A contains the exact supporting\nexcerpt used here."
                 raw.write_bytes(original_bytes)
                 text.write_bytes(text_bytes)
-                captured = facade.capture_external_source(run_id, {
-                    "capture_id": "CAP-1",
-                    "source_category": "other",
-                    "exact_locator": "https://example.test/source-a#section-1",
-                    "acquired_at": "2026-08-31T00:00:00Z",
-                    "original_file": "captures/raw/source-a.html",
-                    "original_media_type": "text/html",
-                    "text_rendition_file": "captures/text/source-a.txt",
-                })["capture"]
-                facade.complete_external_retrieval_attempt(run_id, {
-                    "attempt_id": "ATT-1",
-                    "outcome": "source_captured",
-                    "resulting_capture_id": "CAP-1",
-                })
-                facade.start_external_retrieval_attempt(run_id, {
-                    "attempt_id": "ATT-2",
-                    "strategy": "counter search",
-                    "coverage_dimension_ids": ["COV-COUNTER"],
-                })
-                facade.complete_external_retrieval_attempt(run_id, {
-                    "attempt_id": "ATT-2",
-                    "outcome": "no_relevant_source",
-                })
+                captured = facade.capture_external_source(
+                    run_id,
+                    {
+                        "capture_id": "CAP-1",
+                        "source_category": "other",
+                        "exact_locator": "https://example.test/source-a#section-1",
+                        "acquired_at": "2026-08-31T00:00:00Z",
+                        "original_file": "captures/raw/source-a.html",
+                        "original_media_type": "text/html",
+                        "text_rendition_file": "captures/text/source-a.txt",
+                    },
+                )["capture"]
+                facade.complete_external_retrieval_attempt(
+                    run_id,
+                    {
+                        "attempt_id": "ATT-1",
+                        "outcome": "source_captured",
+                        "resulting_capture_id": "CAP-1",
+                    },
+                )
+                facade.start_external_retrieval_attempt(
+                    run_id,
+                    {
+                        "attempt_id": "ATT-2",
+                        "strategy": "counter search",
+                        "coverage_dimension_ids": ["COV-COUNTER"],
+                    },
+                )
+                facade.complete_external_retrieval_attempt(
+                    run_id,
+                    {
+                        "attempt_id": "ATT-2",
+                        "outcome": "no_relevant_source",
+                    },
+                )
                 before = app.state_repository.load_state_view("PRJ-1", "LIN-1").current_snapshot
                 handoff, extension = golden_submission(app, run_id, captured)
                 raw_excerpt = extension["citation_details"][0]["excerpt"]
@@ -269,7 +283,9 @@ class DesktopResearchRetentionTests(unittest.TestCase):
                 )
                 proposal = result["execution_result"]["state_delta_proposal"]
                 after = app.state_repository.load_state_view("PRJ-1", "LIN-1").current_snapshot
-                dimensions = proposal["provenance"]["desktop_research"]["coverage_assessment"]["dimensions"]
+                dimensions = proposal["provenance"]["desktop_research"]["coverage_assessment"][
+                    "dimensions"
+                ]
                 counter = next(item for item in dimensions if item["dimension_id"] == "COV-COUNTER")
                 self.assertEqual(counter["status"], "unknown")
                 self.assertTrue(proposal["candidate_only"])
@@ -280,10 +296,18 @@ class DesktopResearchRetentionTests(unittest.TestCase):
                 )
                 self.assertEqual(captured["text_rendition"]["content_digest"], text_digest)
                 artifacts = app.execution_store.artifacts_for(run_id)
-                original = next(item for item in artifacts if item.role == "desktop_research.original_capture")
-                rendition = next(item for item in artifacts if item.role == "desktop_research.text_rendition")
-                self.assertEqual(app.execution_store.load_artifact(original.artifact_id).content, original_bytes)
-                self.assertEqual(app.execution_store.load_artifact(rendition.artifact_id).content, text_bytes)
+                original = next(
+                    item for item in artifacts if item.role == "desktop_research.original_capture"
+                )
+                rendition = next(
+                    item for item in artifacts if item.role == "desktop_research.text_rendition"
+                )
+                self.assertEqual(
+                    app.execution_store.load_artifact(original.artifact_id).content, original_bytes
+                )
+                self.assertEqual(
+                    app.execution_store.load_artifact(rendition.artifact_id).content, text_bytes
+                )
                 self.assertEqual(
                     (before["id"], before["content_digest"]),
                     (after["id"], after["content_digest"]),
@@ -318,8 +342,12 @@ class DesktopResearchRetentionTests(unittest.TestCase):
             self.assertIn("DR-COVERAGE-001", coverage_codes)
 
             bad_citation = dict(extension)
-            bad_citation["citation_details"] = [dict(item) for item in extension["citation_details"]]
-            bad_citation["citation_details"][0]["excerpt"] = "substantially different supporting excerpt"
+            bad_citation["citation_details"] = [
+                dict(item) for item in extension["citation_details"]
+            ]
+            bad_citation["citation_details"][0]["excerpt"] = (
+                "substantially different supporting excerpt"
+            )
             refresh(bad_citation, "extension_digest")
             citation_codes = validator.validate(
                 handoff,

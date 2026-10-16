@@ -6,7 +6,13 @@ from threading import RLock
 from typing import Any, Mapping
 
 from core.conversation import ActionDefinition, ConversationRuntimeError, HarnessServiceResult
-from core.runtime import ObjectRef, StateDeltaProposal, TransitionAction, TransitionKind, canonical_digest
+from core.runtime import (
+    ObjectRef,
+    StateDeltaProposal,
+    TransitionAction,
+    TransitionKind,
+    canonical_digest,
+)
 
 from .evidence_qualification_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
 
@@ -29,7 +35,13 @@ _MAX_METADATA_LENGTH = 4_096
 
 
 def research_source_bibliography_payload(payload: Mapping[str, Any]) -> None:
-    allowed = {"source_id", "expected_revision", "expected_digest", "rationale", *_BIBLIOGRAPHIC_FIELDS}
+    allowed = {
+        "source_id",
+        "expected_revision",
+        "expected_digest",
+        "rationale",
+        *_BIBLIOGRAPHIC_FIELDS,
+    }
     if not isinstance(payload, Mapping) or set(payload) - allowed:
         raise ValueError("research.source.bibliography contains unknown fields")
     required = {"source_id", "expected_revision", "expected_digest", "rationale"}
@@ -47,7 +59,11 @@ def research_source_bibliography_payload(payload: Mapping[str, Any]) -> None:
     if not isinstance(digest, str) or _DIGEST_RE.fullmatch(digest) is None:
         raise ValueError("expected_digest must be a canonical sha256 digest")
     rationale = payload.get("rationale")
-    if not isinstance(rationale, str) or not rationale.strip() or len(rationale) > _MAX_RATIONALE_LENGTH:
+    if (
+        not isinstance(rationale, str)
+        or not rationale.strip()
+        or len(rationale) > _MAX_RATIONALE_LENGTH
+    ):
         raise ValueError("rationale must be a bounded non-empty string")
     supplied = [field for field in _BIBLIOGRAPHIC_FIELDS if field in payload]
     if not supplied:
@@ -55,9 +71,20 @@ def research_source_bibliography_payload(payload: Mapping[str, Any]) -> None:
     for field in supplied:
         value = payload[field]
         if field == "bibliography_exceptions":
-            if not isinstance(value, Mapping) or not value or set(value) - {"author", "publisher", "publication_or_update_date"}:
-                raise ValueError("bibliography_exceptions must identify genuinely inapplicable fields")
-            if any(not isinstance(reason, str) or not reason.strip() or len(reason) > _MAX_METADATA_LENGTH for reason in value.values()):
+            if (
+                not isinstance(value, Mapping)
+                or not value
+                or set(value) - {"author", "publisher", "publication_or_update_date"}
+            ):
+                raise ValueError(
+                    "bibliography_exceptions must identify genuinely inapplicable fields"
+                )
+            if any(
+                not isinstance(reason, str)
+                or not reason.strip()
+                or len(reason) > _MAX_METADATA_LENGTH
+                for reason in value.values()
+            ):
                 raise ValueError("bibliography exceptions need bounded reasons")
             continue
         if not isinstance(value, str) or not value.strip() or len(value) > _MAX_METADATA_LENGTH:
@@ -111,7 +138,9 @@ class ResearchSourceBibliographyHandler:
                 "Source bibliography input does not match the current Source revision/digest",
             )
 
-        updates = {field: deepcopy(payload[field]) for field in _BIBLIOGRAPHIC_FIELDS if field in payload}
+        updates = {
+            field: deepcopy(payload[field]) for field in _BIBLIOGRAPHIC_FIELDS if field in payload
+        }
         changed = {field: value for field, value in updates.items() if source.get(field) != value}
         if not changed:
             return HarnessServiceResult(

@@ -22,20 +22,29 @@ def _run_cli(argv):
 def _submit_recovery(workspace, *, run_id: str, capture_id: str, kind: str, source_file: str):
     action_path = Path(workspace) / f"material-recovery-review-{kind}.json"
     action_path.write_text(
-        json.dumps({
-            "action_type": "desktop_research.material.recover",
-            "payload": {
-                "run_id": run_id,
-                "capture_id": capture_id,
-                "kind": kind,
-                "source_file": source_file,
-            },
-        }),
+        json.dumps(
+            {
+                "action_type": "desktop_research.material.recover",
+                "payload": {
+                    "run_id": run_id,
+                    "capture_id": capture_id,
+                    "kind": kind,
+                    "source_file": source_file,
+                },
+            }
+        ),
         encoding="utf-8",
     )
-    return _run_cli([
-        "action", "submit", "--workspace", workspace, "--json", action_path,
-    ])
+    return _run_cli(
+        [
+            "action",
+            "submit",
+            "--workspace",
+            workspace,
+            "--json",
+            action_path,
+        ]
+    )
 
 
 class HistoricalMaterialRecoveryReviewFixTests(ResearchPackageAcceptanceSupport):
@@ -68,10 +77,17 @@ class HistoricalMaterialRecoveryReviewFixTests(ResearchPackageAcceptanceSupport)
                 "diagnose_artifact_content",
                 side_effect=AssertionError("second content scan"),
             ):
-                code, shown = _run_cli([
-                    "run", "show", "--workspace", self.workspace,
-                    "--run-id", case["run_id"], "--json",
-                ])
+                code, shown = _run_cli(
+                    [
+                        "run",
+                        "show",
+                        "--workspace",
+                        self.workspace,
+                        "--run-id",
+                        case["run_id"],
+                        "--json",
+                    ]
+                )
             self.assertEqual(code, 0)
             failure = shown["finding_recovery"]["recovery_failure_details"]
             self.assertEqual(failure["artifact_id"], rendition.artifact_id)
@@ -123,10 +139,17 @@ class HistoricalMaterialRecoveryReviewFixTests(ResearchPackageAcceptanceSupport)
             )
             self.assertTrue(managed.exists())
 
-            code, shown = _run_cli([
-                "run", "show", "--workspace", self.workspace,
-                "--run-id", case["run_id"], "--json",
-            ])
+            code, shown = _run_cli(
+                [
+                    "run",
+                    "show",
+                    "--workspace",
+                    self.workspace,
+                    "--run-id",
+                    case["run_id"],
+                    "--json",
+                ]
+            )
             self.assertEqual(code, 0)
             self.assertEqual(
                 shown["finding_recovery"]["recovery_class"],

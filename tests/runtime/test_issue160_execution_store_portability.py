@@ -136,11 +136,7 @@ class PortableExecutionMaterialStoreTests(unittest.TestCase):
                 by_id[self.original.artifact_id].provenance["original_intake_path"],
                 r"C:\old-workspace\intake\source.html",
             )
-            before = sorted(
-                path.relative_to(moved)
-                for path in moved.rglob("*")
-                if path.is_file()
-            )
+            before = sorted(path.relative_to(moved) for path in moved.rglob("*") if path.is_file())
             with self.assertRaises(LocalExecutionStoreError):
                 reopened.put_bytes(
                     _run(),
@@ -150,11 +146,7 @@ class PortableExecutionMaterialStoreTests(unittest.TestCase):
                 )
             with self.assertRaises(LocalExecutionStoreError):
                 reopened.cleanup_staging()
-            after = sorted(
-                path.relative_to(moved)
-                for path in moved.rglob("*")
-                if path.is_file()
-            )
+            after = sorted(path.relative_to(moved) for path in moved.rglob("*") if path.is_file())
             self.assertEqual(before, after)
 
     def test_db_only_copy_is_degraded_but_complete_restore_verifies(self):
@@ -162,9 +154,7 @@ class PortableExecutionMaterialStoreTests(unittest.TestCase):
         db_only.mkdir()
         shutil.copy2(self.source / "execution.db", db_only / "execution.db")
         with open_read_only_execution_store(db_only) as incomplete:
-            diagnosis = incomplete.diagnose_artifact_content(
-                self.original.artifact_id
-            )
+            diagnosis = incomplete.diagnose_artifact_content(self.original.artifact_id)
             self.assertEqual(diagnosis["status"], "content_missing")
             with self.assertRaises(FileNotFoundError):
                 incomplete.load_artifact_verified_once(self.original.artifact_id)
@@ -172,9 +162,7 @@ class PortableExecutionMaterialStoreTests(unittest.TestCase):
         restored = self.root / "restored" / "execution"
         self._copy_without_staging(restored)
         with open_read_only_execution_store(restored) as complete:
-            diagnosis = complete.diagnose_artifact_content(
-                self.original.artifact_id
-            )
+            diagnosis = complete.diagnose_artifact_content(self.original.artifact_id)
             self.assertEqual(diagnosis["status"], "verified")
             self.assertEqual(
                 complete.load_artifact_verified_once(self.original.artifact_id).digest,
@@ -189,9 +177,7 @@ class PortableExecutionMaterialStoreTests(unittest.TestCase):
         blob.write_bytes(b"corrupt")
 
         with open_read_only_execution_store(corrupt) as reopened:
-            diagnosis = reopened.diagnose_artifact_content(
-                self.original.artifact_id
-            )
+            diagnosis = reopened.diagnose_artifact_content(self.original.artifact_id)
             self.assertIn(
                 diagnosis["status"],
                 {"digest_mismatch", "size_mismatch", "digest_and_size_mismatch"},

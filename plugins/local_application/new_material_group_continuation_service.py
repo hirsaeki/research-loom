@@ -27,9 +27,7 @@ _GROUP_RELATION = "new_material_version_group_continuation"
 
 def _group_token(reacquisition_run_ids: tuple[str, ...]) -> str:
     digest = hashlib.sha256(
-        ("new-material-continuation-group\0" + "\0".join(reacquisition_run_ids)).encode(
-            "utf-8"
-        )
+        ("new-material-continuation-group\0" + "\0".join(reacquisition_run_ids)).encode("utf-8")
     ).hexdigest()[:24]
     return f"NMVG-{digest}"
 
@@ -93,11 +91,7 @@ class PairedNewMaterialContinuationService(NewMaterialContinuationService):
 
     def continue_new_versions(self, reacquisition_run_ids: tuple[str, ...]) -> Mapping[str, Any]:
         run_ids = tuple(sorted(reacquisition_run_ids))
-        if (
-            len(run_ids) < 2
-            or len(run_ids) > _GROUP_LIMIT
-            or len(set(run_ids)) != len(run_ids)
-        ):
+        if len(run_ids) < 2 or len(run_ids) > _GROUP_LIMIT or len(set(run_ids)) != len(run_ids):
             raise LocalApplicationError(
                 "APPLICATION-NEW-MATERIAL-CONTINUATION-BINDING-001",
                 "paired continuation requires 2-16 unique reacquisition Runs",
@@ -114,9 +108,7 @@ class PairedNewMaterialContinuationService(NewMaterialContinuationService):
         replacements: dict[str, dict[str, Any]] = {}
         for run_id in run_ids:
             _run, result, artifact, candidate_historical, _original, _capture = (
-                admission._find_reacquisition_result(
-                    self._application, self._project_id, run_id
-                )
+                admission._find_reacquisition_result(self._application, self._project_id, run_id)
             )
             if historical is None:
                 historical = candidate_historical
@@ -180,10 +172,8 @@ class PairedNewMaterialContinuationService(NewMaterialContinuationService):
                 if item.role == role
                 and item.provenance.get("relation") == _GROUP_RELATION
                 and item.provenance.get("continuation_group_id") == _group_token(run_ids)
-                and item.provenance.get("reacquisition_run_id")
-                == entry["reacquisition_run_id"]
-                and item.provenance.get("historical_capture_id")
-                == entry["historical_capture_id"]
+                and item.provenance.get("reacquisition_run_id") == entry["reacquisition_run_id"]
+                and item.provenance.get("historical_capture_id") == entry["historical_capture_id"]
                 and item.provenance.get("reacquired_artifact_id")
                 == entry["new_material_artifact_id"]
                 and item.digest == entry["new_material_digest"]
@@ -302,15 +292,11 @@ class PairedNewMaterialContinuationService(NewMaterialContinuationService):
                 capture_map=capture_map,
                 attempt_map=attempt_map,
             )
-            collected = facade.collect_external(
-                new_run_id, {"research_result": research_result}
-            )
+            collected = facade.collect_external(new_run_id, {"research_result": research_result})
             execution = collected.get("execution_result") or {}
             run_wire = execution.get("run") if isinstance(execution, Mapping) else None
             proposal = (
-                execution.get("state_delta_proposal")
-                if isinstance(execution, Mapping)
-                else None
+                execution.get("state_delta_proposal") if isinstance(execution, Mapping) else None
             )
             if (
                 not isinstance(run_wire, Mapping)
@@ -412,17 +398,13 @@ class PairedNewMaterialContinuationService(NewMaterialContinuationService):
                         old_original.artifact_id
                     ).content
                     original_media_type = old_original.media_type
-                    text_content = store.load_artifact_verified_once(
-                        old_text.artifact_id
-                    ).content
+                    text_content = store.load_artifact_verified_once(old_text.artifact_id).content
                     acquired_at = str(old_capture["acquired_at"])
                 else:
                     matched.add(old_capture_id)
                     result = replacement["result"]
                     artifact = replacement["artifact"]
-                    kind = str(
-                        result.get("new_material_kind") or result.get("kind") or ""
-                    )
+                    kind = str(result.get("new_material_kind") or result.get("kind") or "")
                     if kind == "original":
                         if len(artifact.content) > original_limit:
                             raise LocalApplicationError(
@@ -430,9 +412,7 @@ class PairedNewMaterialContinuationService(NewMaterialContinuationService):
                                 "reacquired original exceeds the pinned capture budget",
                             )
                         original_content = artifact.content
-                        original_media_type = str(
-                            artifact.media_type or old_original.media_type
-                        )
+                        original_media_type = str(artifact.media_type or old_original.media_type)
                         text_content = _render_reacquired_html_rendition(
                             artifact.content,
                             artifact.media_type,
@@ -472,14 +452,10 @@ class PairedNewMaterialContinuationService(NewMaterialContinuationService):
             else:
                 result = replacement["result"]
                 artifact = replacement["artifact"]
-                kind = str(
-                    result.get("new_material_kind") or result.get("kind") or ""
-                )
+                kind = str(result.get("new_material_kind") or result.get("kind") or "")
                 provenance.update(
                     {
-                        "reacquisition_run_id": str(
-                            replacement["reacquisition_run_id"]
-                        ),
+                        "reacquisition_run_id": str(replacement["reacquisition_run_id"]),
                         "reacquired_artifact_id": artifact.reference_id,
                         "reacquired_at": str(result["reacquired_at"]),
                     }
@@ -520,9 +496,7 @@ class PairedNewMaterialContinuationService(NewMaterialContinuationService):
         group_token: str,
         run_ids: tuple[str, ...],
     ) -> dict[str, str]:
-        old_attempts = reconstruct_attempts(
-            self._application.operational_store, historical.run_id
-        )
+        old_attempts = reconstruct_attempts(self._application.operational_store, historical.run_id)
         recorder = DesktopResearchAttemptRecorder(
             new_run,
             self._application.execution_store,
@@ -560,9 +534,7 @@ class PairedNewMaterialContinuationService(NewMaterialContinuationService):
                 failure_or_blocking_reason=attempt.get("failure_or_blocking_reason"),
                 target_locator=attempt.get("target_locator"),
                 resulting_capture_id=(
-                    capture_map[str(old_resulting)]
-                    if old_resulting in capture_map
-                    else None
+                    capture_map[str(old_resulting)] if old_resulting in capture_map else None
                 ),
                 provenance=provenance,
             )

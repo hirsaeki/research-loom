@@ -41,9 +41,7 @@ def _submit_reacquire(workspace, *, run_id: str, capture_id: str, kind: str = "o
         encoding="utf-8",
     )
     try:
-        return _run_cli(
-            ["action", "submit", "--workspace", workspace, "--json", action_path]
-        )
+        return _run_cli(["action", "submit", "--workspace", workspace, "--json", action_path])
     finally:
         action_path.unlink(missing_ok=True)
 
@@ -151,7 +149,8 @@ class HistoricalMaterialReacquisitionTests(ResearchPackageAcceptanceSupport):
                     200,
                 )
 
-            facade.close(); facade = None
+            facade.close()
+            facade = None
             with patch(
                 "plugins.local_application.material_reacquisition_facade._retrieve_exact_locator",
                 side_effect=retrieve,
@@ -170,11 +169,14 @@ class HistoricalMaterialReacquisitionTests(ResearchPackageAcceptanceSupport):
 
             with LocalApplicationFacade.open_workspace(self.workspace) as reopened:
                 self.assertEqual(
-                    reopened._application.execution_store.diagnose_artifact_content(original.artifact_id)["status"],
+                    reopened._application.execution_store.diagnose_artifact_content(
+                        original.artifact_id
+                    )["status"],
                     "verified",
                 )
                 self.assertEqual(
-                    reopened._application.execution_store.load_run(case["run_id"]), historical_before
+                    reopened._application.execution_store.load_run(case["run_id"]),
+                    historical_before,
                 )
                 self.assertEqual(self._snapshot(reopened), state_before)
                 children_before = child_runs_for_parent(
@@ -195,7 +197,9 @@ class HistoricalMaterialReacquisitionTests(ResearchPackageAcceptanceSupport):
             self.assertEqual(repeated["data"]["status"], "ALREADY_VERIFIED")
             with LocalApplicationFacade.open_workspace(self.workspace) as reopened:
                 self.assertEqual(
-                    child_runs_for_parent(reopened._application.execution_store, case["run_id"], limit=100),
+                    child_runs_for_parent(
+                        reopened._application.execution_store, case["run_id"], limit=100
+                    ),
                     children_before,
                 )
         finally:
@@ -209,7 +213,8 @@ class HistoricalMaterialReacquisitionTests(ResearchPackageAcceptanceSupport):
             original = self._missing_original(facade, case)
             state_before = self._snapshot(facade)
             historical_before = facade._application.execution_store.load_run(case["run_id"])
-            facade.close(); facade = None
+            facade.close()
+            facade = None
 
             changed = b"<html>changed source body</html>"
             with patch(
@@ -233,7 +238,10 @@ class HistoricalMaterialReacquisitionTests(ResearchPackageAcceptanceSupport):
 
             with LocalApplicationFacade.open_workspace(self.workspace) as reopened:
                 store = reopened._application.execution_store
-                self.assertEqual(store.diagnose_artifact_content(original.artifact_id)["status"], "content_missing")
+                self.assertEqual(
+                    store.diagnose_artifact_content(original.artifact_id)["status"],
+                    "content_missing",
+                )
                 self.assertEqual(store.load_run(case["run_id"]), historical_before)
                 self.assertEqual(self._snapshot(reopened), state_before)
                 new_artifact = store.load_artifact(data["new_artifact_id"])
@@ -243,15 +251,26 @@ class HistoricalMaterialReacquisitionTests(ResearchPackageAcceptanceSupport):
                 ["run", "show", "--workspace", self.workspace, "--run-id", case["run_id"], "--json"]
             )
             self.assertEqual(code, 0)
-            self.assertEqual(old_run["finding_recovery"]["recovery_class"], "material_recovery_required")
+            self.assertEqual(
+                old_run["finding_recovery"]["recovery_class"], "material_recovery_required"
+            )
             code, child_run = _run_cli(
-                ["run", "show", "--workspace", self.workspace, "--run-id", data["reacquisition_run_id"], "--json"]
+                [
+                    "run",
+                    "show",
+                    "--workspace",
+                    self.workspace,
+                    "--run-id",
+                    data["reacquisition_run_id"],
+                    "--json",
+                ]
             )
             self.assertEqual(code, 0)
             self.assertEqual(child_run["run"]["status"], "COMPLETED")
             self.assertEqual(child_run["artifacts"][0]["digest"], data["actual_digest"])
             self.assertEqual(
-                child_run["artifacts"][0]["provenance"]["historical_artifact_id"], original.artifact_id
+                child_run["artifacts"][0]["provenance"]["historical_artifact_id"],
+                original.artifact_id,
             )
         finally:
             if facade is not None:
@@ -263,7 +282,8 @@ class HistoricalMaterialReacquisitionTests(ResearchPackageAcceptanceSupport):
             self._remove_producer_candidate(facade, case)
             original = self._missing_original(facade, case)
             historical_before = facade._application.execution_store.load_run(case["run_id"])
-            facade.close(); facade = None
+            facade.close()
+            facade = None
             with patch(
                 "plugins.local_application.material_reacquisition_facade._retrieve_exact_locator",
                 side_effect=MaterialReacquisitionRetrievalError("HTTP 403 blocked"),
@@ -278,18 +298,33 @@ class HistoricalMaterialReacquisitionTests(ResearchPackageAcceptanceSupport):
             with LocalApplicationFacade.open_workspace(self.workspace) as reopened:
                 store = reopened._application.execution_store
                 self.assertEqual(store.load_run(case["run_id"]), historical_before)
-                self.assertEqual(store.diagnose_artifact_content(original.artifact_id)["status"], "content_missing")
+                self.assertEqual(
+                    store.diagnose_artifact_content(original.artifact_id)["status"],
+                    "content_missing",
+                )
             code, child_run = _run_cli(
-                ["run", "show", "--workspace", self.workspace, "--run-id", data["reacquisition_run_id"], "--json"]
+                [
+                    "run",
+                    "show",
+                    "--workspace",
+                    self.workspace,
+                    "--run-id",
+                    data["reacquisition_run_id"],
+                    "--json",
+                ]
             )
             self.assertEqual(code, 0)
             self.assertEqual(child_run["run"]["status"], "FAILED")
-            self.assertEqual(child_run["diagnostics"][0]["payload"]["status"], "REACQUISITION_FAILED")
+            self.assertEqual(
+                child_run["diagnostics"][0]["payload"]["status"], "REACQUISITION_FAILED"
+            )
         finally:
             if facade is not None:
                 facade.close()
 
-    def test_mra5_original_then_rendition_exact_reacquisition_reaches_proposal_rematerializable(self):
+    def test_mra5_original_then_rendition_exact_reacquisition_reaches_proposal_rematerializable(
+        self,
+    ):
         facade, case = self._prepare_case()
         try:
             self._remove_producer_candidate(facade, case)
@@ -297,7 +332,8 @@ class HistoricalMaterialReacquisitionTests(ResearchPackageAcceptanceSupport):
             rendition, exact_rendition = self._missing_rendition(facade, case)
             historical_before = facade._application.execution_store.load_run(case["run_id"])
             state_before = self._snapshot(facade)
-            facade.close(); facade = None
+            facade.close()
+            facade = None
 
             with patch(
                 "plugins.local_application.material_reacquisition_facade._retrieve_exact_locator",
@@ -346,8 +382,12 @@ class HistoricalMaterialReacquisitionTests(ResearchPackageAcceptanceSupport):
 
             with LocalApplicationFacade.open_workspace(self.workspace) as reopened:
                 store = reopened._application.execution_store
-                self.assertEqual(store.diagnose_artifact_content(original.artifact_id)["status"], "verified")
-                self.assertEqual(store.diagnose_artifact_content(rendition.artifact_id)["status"], "verified")
+                self.assertEqual(
+                    store.diagnose_artifact_content(original.artifact_id)["status"], "verified"
+                )
+                self.assertEqual(
+                    store.diagnose_artifact_content(rendition.artifact_id)["status"], "verified"
+                )
                 self.assertEqual(store.load_run(case["run_id"]), historical_before)
                 self.assertEqual(self._snapshot(reopened), state_before)
 
@@ -370,19 +410,25 @@ class HistoricalMaterialReacquisitionTests(ResearchPackageAcceptanceSupport):
             rendition, exact_rendition = self._missing_rendition(facade, case)
             state_before = self._snapshot(facade)
             historical_before = facade._application.execution_store.load_run(case["run_id"])
-            facade.close(); facade = None
+            facade.close()
+            facade = None
 
-            with patch(
-                "plugins.local_application.material_reacquisition_facade._retrieve_exact_locator",
-                side_effect=AssertionError("rendition regeneration must reuse the verified historical original"),
-            ), patch(
-                "plugins.local_application.material_reacquisition_facade._regenerate_text_rendition",
-                return_value=RetrievedMaterial(
-                    exact_rendition,
-                    "text/plain",
-                    "https://example.test/source-a#section-1",
-                    "fixture-rendition-generator",
-                    None,
+            with (
+                patch(
+                    "plugins.local_application.material_reacquisition_facade._retrieve_exact_locator",
+                    side_effect=AssertionError(
+                        "rendition regeneration must reuse the verified historical original"
+                    ),
+                ),
+                patch(
+                    "plugins.local_application.material_reacquisition_facade._regenerate_text_rendition",
+                    return_value=RetrievedMaterial(
+                        exact_rendition,
+                        "text/plain",
+                        "https://example.test/source-a#section-1",
+                        "fixture-rendition-generator",
+                        None,
+                    ),
                 ),
             ):
                 code, result = _submit_reacquire(
@@ -435,7 +481,8 @@ class HistoricalMaterialReacquisitionTests(ResearchPackageAcceptanceSupport):
             state_before = self._snapshot(facade)
             historical_before = facade._application.execution_store.load_run(case["run_id"])
             changed = b"Current regenerated rendition differs from historical bytes.\n"
-            facade.close(); facade = None
+            facade.close()
+            facade = None
 
             with patch(
                 "plugins.local_application.material_reacquisition_facade._regenerate_text_rendition",
@@ -500,7 +547,8 @@ class HistoricalMaterialReacquisitionTests(ResearchPackageAcceptanceSupport):
             rendition, _exact_rendition = self._missing_rendition(facade, case)
             historical_before = facade._application.execution_store.load_run(case["run_id"])
             state_before = self._snapshot(facade)
-            facade.close(); facade = None
+            facade.close()
+            facade = None
 
             with patch(
                 "plugins.local_application.material_reacquisition_facade._regenerate_text_rendition",
@@ -536,7 +584,8 @@ class HistoricalMaterialReacquisitionTests(ResearchPackageAcceptanceSupport):
             self._remove_producer_candidate(facade, case)
             original = self._missing_original(facade, case)
             rendition, _exact_rendition = self._missing_rendition(facade, case)
-            facade.close(); facade = None
+            facade.close()
+            facade = None
             with patch(
                 "plugins.local_application.material_reacquisition_facade._regenerate_text_rendition",
                 side_effect=AssertionError("must fail before generation"),
@@ -553,8 +602,14 @@ class HistoricalMaterialReacquisitionTests(ResearchPackageAcceptanceSupport):
             self.assertIn("historical original", data["failure_reason"])
             with LocalApplicationFacade.open_workspace(self.workspace) as reopened:
                 store = reopened._application.execution_store
-                self.assertEqual(store.diagnose_artifact_content(original.artifact_id)["status"], "content_missing")
-                self.assertEqual(store.diagnose_artifact_content(rendition.artifact_id)["status"], "content_missing")
+                self.assertEqual(
+                    store.diagnose_artifact_content(original.artifact_id)["status"],
+                    "content_missing",
+                )
+                self.assertEqual(
+                    store.diagnose_artifact_content(rendition.artifact_id)["status"],
+                    "content_missing",
+                )
         finally:
             if facade is not None:
                 facade.close()
@@ -587,12 +642,15 @@ class HistoricalMaterialReacquisitionTests(ResearchPackageAcceptanceSupport):
             created.append(process)
             return process
 
-        with patch(
-            "plugins.local_application.material_reacquisition_facade.shutil.which",
-            return_value="pdftotext",
-        ), patch(
-            "plugins.local_application.material_reacquisition_facade.subprocess.Popen",
-            side_effect=fake_popen,
+        with (
+            patch(
+                "plugins.local_application.material_reacquisition_facade.shutil.which",
+                return_value="pdftotext",
+            ),
+            patch(
+                "plugins.local_application.material_reacquisition_facade.subprocess.Popen",
+                side_effect=fake_popen,
+            ),
         ):
             result = _regenerate_text_rendition(
                 b"%PDF-1.7 fixture",
@@ -610,13 +668,22 @@ class HistoricalMaterialReacquisitionTests(ResearchPackageAcceptanceSupport):
         try:
             self._remove_producer_candidate(facade, case)
             self._missing_original(facade, case)
-            facade.close(); facade = None
+            facade.close()
+            facade = None
             with patch(
                 "plugins.local_application.material_reacquisition_facade._retrieve_exact_locator",
                 side_effect=AssertionError("run show must never retrieve"),
             ):
                 code, shown = _run_cli(
-                    ["run", "show", "--workspace", self.workspace, "--run-id", case["run_id"], "--json"]
+                    [
+                        "run",
+                        "show",
+                        "--workspace",
+                        self.workspace,
+                        "--run-id",
+                        case["run_id"],
+                        "--json",
+                    ]
                 )
             self.assertEqual(code, 0)
             actions = shown["finding_recovery"]["recovery_failure_details"]["available_actions"]
@@ -633,19 +700,23 @@ class HistoricalMaterialReacquisitionTests(ResearchPackageAcceptanceSupport):
         try:
             self._remove_producer_candidate(facade, case)
             original = self._missing_original(facade, case)
-            facade.close(); facade = None
-            with patch(
-                "plugins.local_application.material_reacquisition_facade._retrieve_exact_locator",
-                return_value=RetrievedMaterial(
-                    b"changed bytes",
-                    "text/html",
-                    "https://example.test/source-a#section-1",
-                    "fake-http",
-                    200,
+            facade.close()
+            facade = None
+            with (
+                patch(
+                    "plugins.local_application.material_reacquisition_facade._retrieve_exact_locator",
+                    return_value=RetrievedMaterial(
+                        b"changed bytes",
+                        "text/html",
+                        "https://example.test/source-a#section-1",
+                        "fake-http",
+                        200,
+                    ),
                 ),
-            ), patch(
-                "plugins.local_application.material_reacquisition_facade._historical_equivalent",
-                return_value=True,
+                patch(
+                    "plugins.local_application.material_reacquisition_facade._historical_equivalent",
+                    return_value=True,
+                ),
             ):
                 code, result = _submit_reacquire(
                     self.workspace, run_id=case["run_id"], capture_id="CAP-1"
@@ -657,7 +728,9 @@ class HistoricalMaterialReacquisitionTests(ResearchPackageAcceptanceSupport):
             self.assertEqual(result["data"]["status"], "REACQUISITION_FAILED")
             with LocalApplicationFacade.open_workspace(self.workspace) as reopened:
                 self.assertEqual(
-                    reopened._application.execution_store.diagnose_artifact_content(original.artifact_id)["status"],
+                    reopened._application.execution_store.diagnose_artifact_content(
+                        original.artifact_id
+                    )["status"],
                     "content_missing",
                 )
         finally:

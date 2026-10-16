@@ -20,7 +20,8 @@ def check_decision_state_receipts(state_path: Path, decision_path: Path, project
         decisions.row_factory = sqlite3.Row
         rows = decisions.execute(
             "SELECT request_id,commit_id,commit_receipt_json FROM decision_requests "
-            "WHERE project_ref=? AND status='RESOLVED' ORDER BY request_id", (project_id,),
+            "WHERE project_ref=? AND status='RESOLVED' ORDER BY request_id",
+            (project_id,),
         )
         state = sqlite3.connect(state_path.resolve().as_uri() + "?mode=ro", uri=True)
         try:
@@ -38,14 +39,21 @@ def check_decision_state_receipts(state_path: Path, decision_path: Path, project
                     if json.loads(commit["receipt_json"]) != receipt:
                         raise ValueError("saved receipt differs from canonical commit receipt")
                     for key in (
-                        "commit_id", "transition_id", "lineage_ref", "idempotency_key",
-                        "bundle_digest", "prior_snapshot_ref", "prior_snapshot_digest",
-                        "new_snapshot_ref", "new_snapshot_digest",
+                        "commit_id",
+                        "transition_id",
+                        "lineage_ref",
+                        "idempotency_key",
+                        "bundle_digest",
+                        "prior_snapshot_ref",
+                        "prior_snapshot_digest",
+                        "new_snapshot_ref",
+                        "new_snapshot_digest",
                     ):
                         if receipt.get(key) != commit[key]:
                             raise ValueError(f"canonical commit {key} does not match receipt")
                     if (
-                        receipt.get("actor") != {"actor_id": commit["actor_id"], "actor_type": commit["actor_type"]}
+                        receipt.get("actor")
+                        != {"actor_id": commit["actor_id"], "actor_type": commit["actor_type"]}
                         or receipt.get("timestamp") != commit["committed_at"]
                     ):
                         raise ValueError("canonical commit actor/time does not match receipt")
@@ -61,7 +69,10 @@ def check_decision_state_receipts(state_path: Path, decision_path: Path, project
                         snapshot = _verified_payload(snapshot_row, project_id)
                         basis = dict(snapshot)
                         basis.pop("content_digest", None)
-                        if snapshot.get("content_digest") != receipt["new_snapshot_digest"] or canonical_digest(basis) != receipt["new_snapshot_digest"]:
+                        if (
+                            snapshot.get("content_digest") != receipt["new_snapshot_digest"]
+                            or canonical_digest(basis) != receipt["new_snapshot_digest"]
+                        ):
                             raise ValueError("canonical Snapshot digest does not match receipt")
                     for decision_ref in receipt["resolving_decision_refs"]:
                         decision_row = state.execute(

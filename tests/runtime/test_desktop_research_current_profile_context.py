@@ -38,55 +38,71 @@ def _write_inputs(root: Path) -> tuple[Path, Path]:
 
 
 def _adopt_research_question(facade: LocalApplicationFacade) -> str:
-    proposed = facade.submit_action({
-        "action_type": "research_question.propose",
-        "payload": {
-            "text": "Which current conditions materially shape the research target?",
-            "acceptance_criteria": ["Relevant current conditions can be compared."],
-            "scope_limits": ["Do not infer beyond the gathered evidence."],
-            "derived_from_seed_ids": ["RQ-SEED-001"],
-        },
-        "actor_id": "HUMAN-PR34",
-    })
+    proposed = facade.submit_action(
+        {
+            "action_type": "research_question.propose",
+            "payload": {
+                "text": "Which current conditions materially shape the research target?",
+                "acceptance_criteria": ["Relevant current conditions can be compared."],
+                "scope_limits": ["Do not infer beyond the gathered evidence."],
+                "derived_from_seed_ids": ["RQ-SEED-001"],
+            },
+            "actor_id": "HUMAN-PR34",
+        }
+    )
     rq_id = proposed["data"]["research_question_candidate"]["id"]
-    pending = facade.submit_action({
-        "action_type": "state.apply_candidate",
-        "payload": {"state_delta_proposal_id": proposed["data"]["state_delta_proposal_id"]},
-        "actor_id": "HUMAN-PR34",
-    })
-    decision = facade.submit_confirmation({
-        "confirmation_request_id": pending["confirmation_request"]["confirmation_request_id"],
-        "actor_id": "HUMAN-PR34",
-    })["decision_request"]
-    resolved = facade.resolve_human_decision({
-        "request_id": decision["request_id"],
-        "request_digest": decision["request_digest"],
-        "disposition": "approve_exact",
-        "actor_id": "HUMAN-PR34",
-    })
+    pending = facade.submit_action(
+        {
+            "action_type": "state.apply_candidate",
+            "payload": {"state_delta_proposal_id": proposed["data"]["state_delta_proposal_id"]},
+            "actor_id": "HUMAN-PR34",
+        }
+    )
+    decision = facade.submit_confirmation(
+        {
+            "confirmation_request_id": pending["confirmation_request"]["confirmation_request_id"],
+            "actor_id": "HUMAN-PR34",
+        }
+    )["decision_request"]
+    resolved = facade.resolve_human_decision(
+        {
+            "request_id": decision["request_id"],
+            "request_digest": decision["request_digest"],
+            "disposition": "approve_exact",
+            "actor_id": "HUMAN-PR34",
+        }
+    )
     assert resolved["status"] == "RESOLVED"
     return rq_id
 
 
 def _activate_attention(facade: LocalApplicationFacade, rq_id: str) -> dict:
-    candidate = facade.submit_action({
-        "action_type": "research_attention.propose",
-        "payload": {
-            "additions": [{
-                "statement": "Keep counterevidence and boundary conditions visible during Desktop Research.",
-                "related_question_ids": [rq_id],
-            }],
-        },
-    })["data"]["attention_map"]
-    pending = facade.submit_action({
-        "action_type": "research_attention.activate_candidate",
-        "payload": {"attention_map_id": candidate["map_id"]},
-        "actor_id": "HUMAN-PR34",
-    })
-    committed = facade.submit_confirmation({
-        "confirmation_request_id": pending["confirmation_request"]["confirmation_request_id"],
-        "actor_id": "HUMAN-PR34",
-    })
+    candidate = facade.submit_action(
+        {
+            "action_type": "research_attention.propose",
+            "payload": {
+                "additions": [
+                    {
+                        "statement": "Keep counterevidence and boundary conditions visible during Desktop Research.",
+                        "related_question_ids": [rq_id],
+                    }
+                ],
+            },
+        }
+    )["data"]["attention_map"]
+    pending = facade.submit_action(
+        {
+            "action_type": "research_attention.activate_candidate",
+            "payload": {"attention_map_id": candidate["map_id"]},
+            "actor_id": "HUMAN-PR34",
+        }
+    )
+    committed = facade.submit_confirmation(
+        {
+            "confirmation_request_id": pending["confirmation_request"]["confirmation_request_id"],
+            "actor_id": "HUMAN-PR34",
+        }
+    )
     assert committed["status"] == "SUCCEEDED"
     return candidate
 
@@ -97,7 +113,9 @@ class CurrentDesktopResearchContextRegressionTests(unittest.TestCase):
             root = Path(temp)
             config_path, profiles_path = _write_inputs(root)
             workspace = root / "workspace"
-            initialized = LocalApplicationFacade.initialize_workspace(workspace, config_path, profiles_path)
+            initialized = LocalApplicationFacade.initialize_workspace(
+                workspace, config_path, profiles_path
+            )
             self.assertEqual(initialized["status"], "INITIALIZED")
 
             with LocalApplicationFacade.open_workspace(workspace) as facade:
@@ -109,22 +127,36 @@ class CurrentDesktopResearchContextRegressionTests(unittest.TestCase):
                 snapshot_before = deepcopy(before.current_snapshot)
                 rq_before = deepcopy(before.latest_object("research_question", rq_id))
                 decisions_before = deepcopy(list(before.decisions))
-                activation_count_before = len(app.attention_store.activation_events(facade.project_id))
+                activation_count_before = len(
+                    app.attention_store.activation_events(facade.project_id)
+                )
 
-                result = facade.submit_action({
-                    "action_type": "desktop_research.investigate",
-                    "payload": {"question_id": rq_id, "purpose": "Investigate the adopted Research Question."},
-                })
+                result = facade.submit_action(
+                    {
+                        "action_type": "desktop_research.investigate",
+                        "payload": {
+                            "question_id": rq_id,
+                            "purpose": "Investigate the adopted Research Question.",
+                        },
+                    }
+                )
 
                 self.assertEqual(result["status"], "CAPABILITY_EXECUTION_PREPARED")
-                materialization = app.conversation_store.load_materialization(result["proposal"]["proposal_id"])
+                materialization = app.conversation_store.load_materialization(
+                    result["proposal"]["proposal_id"]
+                )
                 context = materialization["context_pack"]
                 self.assertEqual(context["question_ids"], [rq_id])
-                self.assertEqual(context["research_object_references"], [{
-                    "kind": "research_question",
-                    "id": rq_id,
-                    "revision": rq_before["revision"],
-                }])
+                self.assertEqual(
+                    context["research_object_references"],
+                    [
+                        {
+                            "kind": "research_question",
+                            "id": rq_id,
+                            "revision": rq_before["revision"],
+                        }
+                    ],
+                )
                 self.assertEqual(context["research_attention"], attention["items"])
 
                 canonical_profiles = json.loads(PROFILE_FIXTURE.read_text(encoding="utf-8"))
@@ -135,13 +167,21 @@ class CurrentDesktopResearchContextRegressionTests(unittest.TestCase):
                 )
                 self.assertEqual(projected["schema_version"], canonical_profiles["schema_version"])
                 self.assertEqual(projected["core_contracts"], canonical_profiles["core_contracts"])
-                self.assertEqual(projected["profile_pins"], [
-                    {
-                        key: profile[key]
-                        for key in ("profile_id", "profile_type", "profile_version", "manifest_sha256")
-                    }
-                    for profile in canonical_profiles["effective_profiles"]
-                ])
+                self.assertEqual(
+                    projected["profile_pins"],
+                    [
+                        {
+                            key: profile[key]
+                            for key in (
+                                "profile_id",
+                                "profile_type",
+                                "profile_version",
+                                "manifest_sha256",
+                            )
+                        }
+                        for profile in canonical_profiles["effective_profiles"]
+                    ],
+                )
                 self.assertEqual(projected["content_digest"], before.effective_profile_set_digest)
 
                 after = app.state_repository.load_state_view(facade.project_id, lineage)
@@ -152,7 +192,9 @@ class CurrentDesktopResearchContextRegressionTests(unittest.TestCase):
                     len(app.attention_store.activation_events(facade.project_id)),
                     activation_count_before,
                 )
-                active = facade.submit_action({"action_type": "research_attention.status", "payload": {}})
+                active = facade.submit_action(
+                    {"action_type": "research_attention.status", "payload": {}}
+                )
                 self.assertEqual(active["data"]["active_map"]["map_id"], attention["map_id"])
 
 

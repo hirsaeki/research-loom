@@ -27,8 +27,7 @@ ROOT = Path(__file__).resolve().parents[2]
 PKG = ROOT / "core/packages/research-lineage"
 FIX = ROOT / "core/fixtures/research-lineage/valid/generic-research-lineage-fixtures.json"
 BINDING_FIX = (
-    ROOT
-    / "core/fixtures/research-lineage/valid/generic-research-package-lineage-binding.json"
+    ROOT / "core/fixtures/research-lineage/valid/generic-research-package-lineage-binding.json"
 )
 CONV = ROOT / "core/fixtures/conversation/valid/research-lineage-routing.json"
 WORK = ROOT / "core/packages/work-conversation.schema.json"
@@ -57,9 +56,7 @@ class ResearchLineageContractsTest(unittest.TestCase):
         cls.sem = yaml.safe_load(
             (PKG / "research-lineage-semantics.yaml").read_text(encoding="utf-8")
         )
-        cls.validator = Draft202012Validator(
-            cls.schema, format_checker=FormatChecker()
-        )
+        cls.validator = Draft202012Validator(cls.schema, format_checker=FormatChecker())
 
     def validate(self, doc: dict) -> None:
         """Validate one canonical lineage object."""
@@ -84,9 +81,9 @@ class ResearchLineageContractsTest(unittest.TestCase):
             self.validate(self.f[key])
 
         Draft202012Validator(self.binding_schema).validate(self.binding)
-        Draft202012Validator(
-            self.work_schema, format_checker=FormatChecker()
-        ).validate(self.route["action_proposal"])
+        Draft202012Validator(self.work_schema, format_checker=FormatChecker()).validate(
+            self.route["action_proposal"]
+        )
 
     def test_error_catalog_exact(self) -> None:
         """Keep semantic error catalog and executable oracle exact."""
@@ -327,9 +324,7 @@ class ResearchLineageContractsTest(unittest.TestCase):
                 "content_digest": "sha256:" + "2" * 64,
             },
         ]
-        self.assertEqual(
-            revision_collision_error(records), "RL-OBJECT-IDENTITY-001"
-        )
+        self.assertEqual(revision_collision_error(records), "RL-OBJECT-IDENTITY-001")
 
     def test_replay_uses_new_runs_contexts_and_handoffs(self) -> None:
         """Replay must stay in-project and allocate new Runs, Context Packs, and Handoffs."""
@@ -386,9 +381,7 @@ class ResearchLineageContractsTest(unittest.TestCase):
         comparison = deepcopy(self.f["lineage_comparison"])
         comparison["read_only"] = False
         refresh(comparison, "comparison_digest")
-        self.assertEqual(
-            comparison_error(comparison), "RL-COMPARISON-READONLY-001"
-        )
+        self.assertEqual(comparison_error(comparison), "RL-COMPARISON-READONLY-001")
 
     def test_writer_publication_downstream_staleness(self) -> None:
         """Keep old packages historical while marking them stale against a new active line."""

@@ -73,9 +73,7 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
         except LocalApplicationError:
             raise
         except ValueError as exc:
-            raise LocalApplicationError(
-                "APPLICATION-EXTERNAL-RUN-STATE-001", str(exc)
-            ) from exc
+            raise LocalApplicationError("APPLICATION-EXTERNAL-RUN-STATE-001", str(exc)) from exc
 
     def _completed_attempts(self, run_id: str):
         try:
@@ -83,7 +81,8 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
         except ValueError as exc:
             raise LocalApplicationError("APPLICATION-EXTERNAL-ATTEMPT-001", str(exc)) from exc
         in_progress = sorted(
-            attempt_id for attempt_id, attempt in attempts.items()
+            attempt_id
+            for attempt_id, attempt in attempts.items()
             if attempt.get("completed_at") is None
         )
         if in_progress:
@@ -111,7 +110,9 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
         return deepcopy(dict(value))
 
     @staticmethod
-    def _enforce_capture_budget(research_result: Mapping[str, Any], context_extension: Mapping[str, Any]):
+    def _enforce_capture_budget(
+        research_result: Mapping[str, Any], context_extension: Mapping[str, Any]
+    ):
         capture_ids = research_result.get("capture_ids")
         if not isinstance(capture_ids, list):
             return

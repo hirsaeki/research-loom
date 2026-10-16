@@ -39,7 +39,9 @@ class VirtualRespondentBackend(Protocol):
 
 
 class VirtualRespondentBackendError(RuntimeError):
-    def __init__(self, code: str, message: str, *, attempts: list[Mapping[str, Any]] | None = None) -> None:
+    def __init__(
+        self, code: str, message: str, *, attempts: list[Mapping[str, Any]] | None = None
+    ) -> None:
         super().__init__(message)
         self.code = code
         self.message = message
@@ -54,7 +56,9 @@ class _HttpResponse:
 
 
 class _UrllibTransport:
-    def post(self, url: str, *, headers: Mapping[str, str], body: bytes, timeout: float) -> _HttpResponse:
+    def post(
+        self, url: str, *, headers: Mapping[str, str], body: bytes, timeout: float
+    ) -> _HttpResponse:
         req = request.Request(url, data=body, headers=dict(headers), method="POST")
         try:
             with request.urlopen(req, timeout=timeout) as response:
@@ -96,7 +100,13 @@ def _response_schema(instrument: Mapping[str, Any]) -> dict[str, Any]:
                         "response_key": {"type": "string", "enum": response_keys},
                         "state": {
                             "type": "string",
-                            "enum": ["answered", "missing", "unknown", "not_applicable", "prefer_not_to_answer"],
+                            "enum": [
+                                "answered",
+                                "missing",
+                                "unknown",
+                                "not_applicable",
+                                "prefer_not_to_answer",
+                            ],
                         },
                         "value": {
                             "anyOf": [
@@ -154,9 +164,15 @@ def _extract_output_text(payload: Mapping[str, Any]) -> str:
         if not isinstance(item, Mapping) or item.get("type") != "message":
             continue
         for content in item.get("content", ()):
-            if isinstance(content, Mapping) and content.get("type") == "output_text" and isinstance(content.get("text"), str):
+            if (
+                isinstance(content, Mapping)
+                and content.get("type") == "output_text"
+                and isinstance(content.get("text"), str)
+            ):
                 return content["text"]
-    raise VirtualRespondentBackendError("MALFORMED_MODEL_OUTPUT", "provider response did not contain output_text")
+    raise VirtualRespondentBackendError(
+        "MALFORMED_MODEL_OUTPUT", "provider response did not contain output_text"
+    )
 
 
 def _sanitized_provider_response(payload: Mapping[str, Any]) -> dict[str, Any]:
@@ -170,16 +186,18 @@ def _sanitized_provider_response(payload: Mapping[str, Any]) -> dict[str, Any]:
     for item in payload.get("output", ()):
         if not isinstance(item, Mapping) or item.get("type") != "message":
             continue
-        result["output"].append({
-            "type": "message",
-            "id": item.get("id"),
-            "status": item.get("status"),
-            "content": [
-                {"type": "output_text", "text": content.get("text")}
-                for content in item.get("content", ())
-                if isinstance(content, Mapping) and content.get("type") == "output_text"
-            ],
-        })
+        result["output"].append(
+            {
+                "type": "message",
+                "id": item.get("id"),
+                "status": item.get("status"),
+                "content": [
+                    {"type": "output_text", "text": content.get("text")}
+                    for content in item.get("content", ())
+                    if isinstance(content, Mapping) and content.get("type") == "output_text"
+                ],
+            }
+        )
     return result
 
 
@@ -215,7 +233,10 @@ class OpenAIResponsesVirtualRespondentBackend:
     ) -> Mapping[str, Any]:
         expected_prompt = prompt_template_pin()
         if dict(prompt_template) != expected_prompt:
-            raise VirtualRespondentBackendError("PROMPT_BINDING_INVALID", "prompt template pin does not match the implemented stable template")
+            raise VirtualRespondentBackendError(
+                "PROMPT_BINDING_INVALID",
+                "prompt template pin does not match the implemented stable template",
+            )
         endpoint = str(generation_config.get("endpoint") or self._endpoint)
         credential_env = str(generation_config.get("credential_env") or self._credential_env)
         if endpoint != self._endpoint or credential_env != self._credential_env:
@@ -243,7 +264,9 @@ class OpenAIResponsesVirtualRespondentBackend:
                 "model": model,
                 "instructions": PROMPT_TEMPLATE,
                 "input": json.dumps(
-                    semantic_input if repair_text is None else {
+                    semantic_input
+                    if repair_text is None
+                    else {
                         "serialization_repair_only": True,
                         "original_semantic_input": semantic_input,
                         "invalid_output": repair_text,
@@ -284,31 +307,81 @@ class OpenAIResponsesVirtualRespondentBackend:
                         timeout=timeout,
                     )
                 except (TimeoutError, socket.timeout) as exc:
-                    attempts.append({"attempt": attempt_no, "kind": "transport", "status": "failed", "code": "REQUEST_TIMEOUT"})
+                    attempts.append(
+                        {
+                            "attempt": attempt_no,
+                            "kind": "transport",
+                            "status": "failed",
+                            "code": "REQUEST_TIMEOUT",
+                        }
+                    )
                     if transport_index >= max_transport_retries:
-                        raise VirtualRespondentBackendError("REQUEST_TIMEOUT", "LLM request timed out", attempts=attempts) from exc
+                        raise VirtualRespondentBackendError(
+                            "REQUEST_TIMEOUT", "LLM request timed out", attempts=attempts
+                        ) from exc
                     continue
                 except OSError as exc:
-                    attempts.append({"attempt": attempt_no, "kind": "transport", "status": "failed", "code": "BACKEND_UNAVAILABLE"})
+                    attempts.append(
+                        {
+                            "attempt": attempt_no,
+                            "kind": "transport",
+                            "status": "failed",
+                            "code": "BACKEND_UNAVAILABLE",
+                        }
+                    )
                     if transport_index >= max_transport_retries:
-                        raise VirtualRespondentBackendError("BACKEND_UNAVAILABLE", str(exc), attempts=attempts) from exc
+                        raise VirtualRespondentBackendError(
+                            "BACKEND_UNAVAILABLE", str(exc), attempts=attempts
+                        ) from exc
                     continue
 
                 if response.status < 200 or response.status >= 300:
                     code = "PROVIDER_ERROR"
-                    attempts.append({"attempt": attempt_no, "kind": "transport", "status": "failed", "code": code, "http_status": response.status})
+                    attempts.append(
+                        {
+                            "attempt": attempt_no,
+                            "kind": "transport",
+                            "status": "failed",
+                            "code": code,
+                            "http_status": response.status,
+                        }
+                    )
                     if response.status >= 500 and transport_index < max_transport_retries:
                         continue
-                    raise VirtualRespondentBackendError(code, f"LLM provider returned HTTP {response.status}", attempts=attempts)
+                    raise VirtualRespondentBackendError(
+                        code, f"LLM provider returned HTTP {response.status}", attempts=attempts
+                    )
                 try:
                     parsed_http = json.loads(response.body.decode("utf-8"))
                 except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-                    attempts.append({"attempt": attempt_no, "kind": "transport", "status": "failed", "code": "MALFORMED_MODEL_OUTPUT"})
-                    raise VirtualRespondentBackendError("MALFORMED_MODEL_OUTPUT", "provider response was not valid JSON", attempts=attempts) from exc
+                    attempts.append(
+                        {
+                            "attempt": attempt_no,
+                            "kind": "transport",
+                            "status": "failed",
+                            "code": "MALFORMED_MODEL_OUTPUT",
+                        }
+                    )
+                    raise VirtualRespondentBackendError(
+                        "MALFORMED_MODEL_OUTPUT",
+                        "provider response was not valid JSON",
+                        attempts=attempts,
+                    ) from exc
                 if not isinstance(parsed_http, Mapping):
-                    raise VirtualRespondentBackendError("MALFORMED_MODEL_OUTPUT", "provider response root was not an object", attempts=attempts)
+                    raise VirtualRespondentBackendError(
+                        "MALFORMED_MODEL_OUTPUT",
+                        "provider response root was not an object",
+                        attempts=attempts,
+                    )
                 response_payload = parsed_http
-                attempts.append({"attempt": attempt_no, "kind": "generation" if repair_index == 0 else "serialization_repair", "status": "succeeded", "provider_request_id": parsed_http.get("id")})
+                attempts.append(
+                    {
+                        "attempt": attempt_no,
+                        "kind": "generation" if repair_index == 0 else "serialization_repair",
+                        "status": "succeeded",
+                        "provider_request_id": parsed_http.get("id"),
+                    }
+                )
                 break
 
             if response_payload is None:  # pragma: no cover - loop either returns or raises.
@@ -320,14 +393,24 @@ class OpenAIResponsesVirtualRespondentBackend:
                 attempts[-1]["structured_output_status"] = "invalid_json"
                 attempts[-1]["failure_reason"] = "structured output was not valid JSON"
                 if repair_index >= max_repair_attempts:
-                    raise VirtualRespondentBackendError("STRUCTURED_OUTPUT_INVALID", "structured model output was invalid JSON after bounded repair", attempts=attempts)
+                    raise VirtualRespondentBackendError(
+                        "STRUCTURED_OUTPUT_INVALID",
+                        "structured model output was invalid JSON after bounded repair",
+                        attempts=attempts,
+                    )
                 repair_text = output_text
                 continue
             if not isinstance(parsed, Mapping) or not isinstance(parsed.get("answers"), list):
                 attempts[-1]["structured_output_status"] = "invalid_shape"
-                attempts[-1]["failure_reason"] = "structured output did not contain an answers array"
+                attempts[-1]["failure_reason"] = (
+                    "structured output did not contain an answers array"
+                )
                 if repair_index >= max_repair_attempts:
-                    raise VirtualRespondentBackendError("STRUCTURED_OUTPUT_INVALID", "structured model output did not contain an answers array", attempts=attempts)
+                    raise VirtualRespondentBackendError(
+                        "STRUCTURED_OUTPUT_INVALID",
+                        "structured model output did not contain an answers array",
+                        attempts=attempts,
+                    )
                 repair_text = output_text
                 continue
             attempts[-1]["structured_output_status"] = "valid"
@@ -341,32 +424,67 @@ class OpenAIResponsesVirtualRespondentBackend:
                 "usage": deepcopy(response_payload.get("usage")),
                 "attempts": attempts,
                 "semantic_input_digest": canonical_digest(semantic_input),
-                "request_digest": canonical_digest({k: v for k, v in body.items() if k != "input"} | {"semantic_input_digest": canonical_digest(semantic_input)}),
+                "request_digest": canonical_digest(
+                    {k: v for k, v in body.items() if k != "input"}
+                    | {"semantic_input_digest": canonical_digest(semantic_input)}
+                ),
             }
-        raise VirtualRespondentBackendError("STRUCTURED_OUTPUT_INVALID", "structured output repair exhausted", attempts=attempts)
+        raise VirtualRespondentBackendError(
+            "STRUCTURED_OUTPUT_INVALID", "structured output repair exhausted", attempts=attempts
+        )
 
 
 class DeterministicFakeVirtualRespondentBackend:
     adapter_version = "1.0.0"
 
-    def __init__(self, answers_by_profile: Mapping[str, Mapping[str, Any]], *, backend_id: str = "deterministic_fake") -> None:
+    def __init__(
+        self,
+        answers_by_profile: Mapping[str, Mapping[str, Any]],
+        *,
+        backend_id: str = "deterministic_fake",
+    ) -> None:
         self.backend_id = backend_id
-        self._answers = {str(key): deepcopy(dict(value)) for key, value in answers_by_profile.items()}
+        self._answers = {
+            str(key): deepcopy(dict(value)) for key, value in answers_by_profile.items()
+        }
 
     def generate_response(self, *, instrument, profile, generation_config, prompt_template):
         del instrument, generation_config, prompt_template
         profile_id = str(profile["profile_id"])
         if profile_id not in self._answers:
-            raise VirtualRespondentBackendError("PROVIDER_ERROR", f"no deterministic answer fixture for {profile_id}")
+            raise VirtualRespondentBackendError(
+                "PROVIDER_ERROR", f"no deterministic answer fixture for {profile_id}"
+            )
         payload = {"answers": deepcopy(dict(self._answers[profile_id]))}
         return {
             "parsed_answer_payload": payload,
-            "provider_response": {"id": f"fake-{profile_id}", "status": "completed", "model": "deterministic-fake", "output": []},
-            "provider_response_digest": canonical_digest({"id": f"fake-{profile_id}", "status": "completed", "model": "deterministic-fake", "output": []}),
+            "provider_response": {
+                "id": f"fake-{profile_id}",
+                "status": "completed",
+                "model": "deterministic-fake",
+                "output": [],
+            },
+            "provider_response_digest": canonical_digest(
+                {
+                    "id": f"fake-{profile_id}",
+                    "status": "completed",
+                    "model": "deterministic-fake",
+                    "output": [],
+                }
+            ),
             "parsed_answer_payload_digest": canonical_digest(payload),
             "provider_request_id": f"fake-{profile_id}",
             "usage": {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0},
-            "attempts": [{"attempt": 1, "kind": "generation", "status": "succeeded", "provider_request_id": f"fake-{profile_id}"}],
+            "attempts": [
+                {
+                    "attempt": 1,
+                    "kind": "generation",
+                    "status": "succeeded",
+                    "provider_request_id": f"fake-{profile_id}",
+                }
+            ],
             "semantic_input_digest": canonical_digest({"profile_id": profile_id}),
-            "request_digest": canonical_digest({"profile_id": profile_id, "backend": self.backend_id}),
+            "request_digest": canonical_digest(
+                {"profile_id": profile_id, "backend": self.backend_id}
+            ),
         }

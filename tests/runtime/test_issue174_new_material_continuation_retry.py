@@ -94,9 +94,7 @@ class Issue174NewMaterialContinuationRetryTests(ResearchPackageAcceptanceSupport
             }
             store = facade._application.execution_store
             self.assertTrue(
-                store.claim_diagnostic_once(
-                    run_id, admission._CONTINUATION_CLAIM_DIAGNOSTIC, claim
-                )
+                store.claim_diagnostic_once(run_id, admission._CONTINUATION_CLAIM_DIAGNOSTIC, claim)
             )
 
             completed = self._continue(facade, run_id)["data"]
@@ -189,10 +187,7 @@ class Issue174NewMaterialContinuationRetryTests(ResearchPackageAcceptanceSupport
             interrupted = {"done": False}
 
             def stop_before_binding(run_id, kind, payload):
-                if (
-                    not interrupted["done"]
-                    and kind == admission._CONTINUATION_BINDING_DIAGNOSTIC
-                ):
+                if not interrupted["done"] and kind == admission._CONTINUATION_BINDING_DIAGNOSTIC:
                     interrupted["done"] = True
                     raise KeyboardInterrupt("fixture process interruption before binding")
                 return original_store(run_id, kind, payload)

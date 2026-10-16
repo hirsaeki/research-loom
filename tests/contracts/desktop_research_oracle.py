@@ -78,10 +78,7 @@ def _is_utc(value: str) -> bool:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
         return False
-    return (
-        parsed.tzinfo is not None
-        and parsed.utcoffset() == timezone.utc.utcoffset(parsed)
-    )
+    return parsed.tzinfo is not None and parsed.utcoffset() == timezone.utc.utcoffset(parsed)
 
 
 def context_semantic_error(
@@ -106,20 +103,15 @@ def context_semantic_error(
         if target["question_id"] not in question_ids:
             return "DR-CONTEXT-BINDING-001"
     else:
-        attention_ids = {
-            item["attention_id"] for item in context_pack["research_attention"]
-        }
-        if (
-            target["source_attention_id"] not in attention_ids
-            or not set(target.get("related_question_ids", [])).issubset(question_ids)
-        ):
+        attention_ids = {item["attention_id"] for item in context_pack["research_attention"]}
+        if target["source_attention_id"] not in attention_ids or not set(
+            target.get("related_question_ids", [])
+        ).issubset(question_ids):
             return "DR-CONTEXT-BINDING-001"
 
     role_bindings = extension["resource_role_bindings"]
     role_reference_ids = [item["reference_id"] for item in role_bindings]
-    dimension_ids = [
-        item["dimension_id"] for item in extension["coverage_dimensions"]
-    ]
+    dimension_ids = [item["dimension_id"] for item in extension["coverage_dimensions"]]
     if _has_duplicates(role_reference_ids) or _has_duplicates(dimension_ids):
         return "DR-CONTEXT-IDENTITY-001"
 
@@ -147,12 +139,8 @@ def context_semantic_error(
             return "DR-CONTEXT-RESOURCE-ROLE-001"
 
     budget = extension["budget"]
-    candidate_source_count = sum(
-        item["role"] == "candidate_source" for item in role_bindings
-    )
-    artifact_count = sum(
-        item["role"] == "research_artifact" for item in role_bindings
-    )
+    candidate_source_count = sum(item["role"] == "candidate_source" for item in role_bindings)
+    artifact_count = sum(item["role"] == "research_artifact" for item in role_bindings)
     if (
         budget["max_candidate_source_resources"] > budget["max_total_resources"]
         or budget["max_artifact_resources"] > budget["max_total_resources"]
@@ -190,8 +178,7 @@ def result_semantic_error(
         or handoff["capability"]["capability_id"] != "desktop-research"
         or handoff["capability"]["function_id"] != "investigate"
         or handoff["project_id"] != context_pack["project_id"]
-        or handoff["input_pins"]["context_pack_digest"]
-        != context_pack["context_pack_digest"]
+        or handoff["input_pins"]["context_pack_digest"] != context_pack["context_pack_digest"]
         or context_extension["context_binding"]["context_pack_digest"]
         != context_pack["context_pack_digest"]
     ):
@@ -211,8 +198,7 @@ def result_semantic_error(
         if (
             detail["source_category"] not in allowed_categories
             or detail["exact_locator"] != capture["locator"]
-            or detail["original_capture"]["content_digest"]
-            != capture["content_digest"]
+            or detail["original_capture"]["content_digest"] != capture["content_digest"]
             or not _is_utc(detail["acquired_at"])
         ):
             return "DR-CAPTURE-PROVENANCE-001"
@@ -229,13 +215,10 @@ def result_semantic_error(
                 return "DR-CAPTURE-PROVENANCE-001"
 
     budget = context_extension["budget"]
-    total_rendition_bytes = sum(
-        item["text_rendition"]["byte_length"] for item in capture_details
-    )
+    total_rendition_bytes = sum(item["text_rendition"]["byte_length"] for item in capture_details)
     if (
         len(capture_details) > budget["max_acquired_source_captures"]
-        or len(extension["search_trace"]["entries"])
-        > budget["max_search_trace_entries"]
+        or len(extension["search_trace"]["entries"]) > budget["max_search_trace_entries"]
         or total_rendition_bytes > budget["max_text_rendition_bytes"]
     ):
         return "DR-CAPTURE-BUDGET-001"
@@ -274,8 +257,7 @@ def result_semantic_error(
         if (
             basis["basis_type"] != "source_capture"
             or basis["capture_id"] != citation["capture_id"]
-            or citation["text_rendition_digest"]
-            != detail["text_rendition"]["content_digest"]
+            or citation["text_rendition_digest"] != detail["text_rendition"]["content_digest"]
             or output["locator"] != citation["excerpt_locator"]
         ):
             return "DR-CITATION-001"
@@ -309,9 +291,7 @@ def result_semantic_error(
     for entry in entries:
         if (
             not set(entry["coverage_dimension_ids"]).issubset(declared_dimensions)
-            or not set(entry["related_handoff_output_ids"]).issubset(
-                handoff_output_ids
-            )
+            or not set(entry["related_handoff_output_ids"]).issubset(handoff_output_ids)
             or not set(entry["source_capture_ids"]).issubset(capture_ids)
         ):
             return "DR-SEARCH-TRACE-001"
@@ -324,8 +304,7 @@ def result_semantic_error(
         projection = null_result["handoff_projection"]
         if (
             not set(null_result["question_ids"]).issubset(question_ids)
-            or (projection["output_kind"], projection["output_id"])
-            not in output_index
+            or (projection["output_kind"], projection["output_id"]) not in output_index
         ):
             return "DR-NULL-001"
 
@@ -363,8 +342,7 @@ def result_semantic_error(
         return "DR-STOP-GAP-001"
     if (
         stop["stop_recommended"]
-        and extension["coverage_assessment"]["remaining_information_value"]["level"]
-        == "high"
+        and extension["coverage_assessment"]["remaining_information_value"]["level"] == "high"
     ):
         return "DR-STOP-RIV-001"
 

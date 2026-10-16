@@ -148,7 +148,11 @@ class VerifiedArtifactReadMixin:
                     "provided recovery bytes do not match persisted artifact digest/size"
                 )
             result = install_exact_payload(
-                self.root, target, temporary, expected_digest, expected_size,
+                self.root,
+                target,
+                temporary,
+                expected_digest,
+                expected_size,
                 verify=self._verify_blob_streaming,
             )
             # Diagnoses are one-read caches, not durable facts; another artifact
@@ -164,7 +168,8 @@ class VerifiedArtifactReadMixin:
                 # Cleanup must not mask a verified effect or the original error.
                 logging.getLogger(__name__).warning(
                     "Recovery staging cleanup failed for %s (%s); inspect staging after restoring access.",
-                    temporary.name, type(cleanup_error).__name__,
+                    temporary.name,
+                    type(cleanup_error).__name__,
                 )
         return {
             **result,

@@ -126,7 +126,9 @@ class SurveyResponseReviewRound2Tests(SurveyVirtualRunnerTestBase):
                 normalized_queries = [query.upper() for query in queries]
                 self.assertFalse(any("COUNT(" in query for query in normalized_queries))
                 self.assertFalse(any("SUM(" in query for query in normalized_queries))
-                self.assertTrue(any("ENTRY_INDEX>=3" in query.replace(" ", "") for query in normalized_queries))
+                self.assertTrue(
+                    any("ENTRY_INDEX>=3" in query.replace(" ", "") for query in normalized_queries)
+                )
             finally:
                 app.close()
 

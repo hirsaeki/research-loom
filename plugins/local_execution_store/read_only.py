@@ -33,9 +33,7 @@ class ReadOnlyLocalExecutionStore(
         if self.config.busy_timeout_ms < 0:
             raise ValueError("busy_timeout_ms must be non-negative")
         if not self.root.is_dir():
-            raise LocalExecutionStoreError(
-                "read-only execution/material store root does not exist"
-            )
+            raise LocalExecutionStoreError("read-only execution/material store root does not exist")
 
         self.blob_root = self.root / "blobs" / "sha256"
         self.staging_root = self.root / "staging"
@@ -59,9 +57,7 @@ class ReadOnlyLocalExecutionStore(
             self._connection.row_factory = sqlite3.Row
             self._connection.execute("PRAGMA foreign_keys = ON")
             self._connection.execute("PRAGMA query_only = ON")
-            self._connection.execute(
-                f"PRAGMA busy_timeout = {int(self.config.busy_timeout_ms)}"
-            )
+            self._connection.execute(f"PRAGMA busy_timeout = {int(self.config.busy_timeout_ms)}")
             self._validate_existing_schema()
         except Exception:
             connection = getattr(self, "_connection", None)
@@ -141,9 +137,7 @@ class ReadOnlyLocalExecutionStore(
         raise self._read_only_error()
 
     def _read_only_error(self) -> LocalExecutionStoreError:
-        return LocalExecutionStoreError(
-            "execution/material source store was opened read-only"
-        )
+        return LocalExecutionStoreError("execution/material source store was opened read-only")
 
     @contextmanager
     def _write_transaction(self) -> Iterator[None]:

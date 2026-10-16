@@ -12,6 +12,7 @@ from .response_support import (
     stable_response_key,
 )
 
+
 class SurveyResponseValidator:
     """Canonical Survey response validation shared by VIRTUAL and future REAL intake."""
 
@@ -34,7 +35,9 @@ class SurveyResponseValidator:
 
         for raw in records:
             if not isinstance(raw, Mapping):
-                issues.append(_issue("SURVEY_RESPONSE_MALFORMED", "response input is not an object"))
+                issues.append(
+                    _issue("SURVEY_RESPONSE_MALFORMED", "response input is not an object")
+                )
                 continue
             response_id = str(raw.get("response_id") or "")
             errors = sorted(
@@ -54,7 +57,13 @@ class SurveyResponseValidator:
                 continue
 
             if response_id in seen_response_ids:
-                issues.append(_issue("SURVEY_RESPONSE_DUPLICATE_RECORD", "response_id is duplicated", response_id=response_id))
+                issues.append(
+                    _issue(
+                        "SURVEY_RESPONSE_DUPLICATE_RECORD",
+                        "response_id is duplicated",
+                        response_id=response_id,
+                    )
+                )
             seen_response_ids.add(response_id)
 
             participant = (str(raw["identity_namespace"]), str(raw["participant_id"]))
@@ -68,7 +77,10 @@ class SurveyResponseValidator:
                 )
             seen_participants.add(participant)
 
-            if expected_epistemic_mode is not None and raw["epistemic_mode"] != expected_epistemic_mode:
+            if (
+                expected_epistemic_mode is not None
+                and raw["epistemic_mode"] != expected_epistemic_mode
+            ):
                 issues.append(
                     _issue(
                         "SURVEY_RESPONSE_EPISTEMIC_FIREWALL",
@@ -76,7 +88,10 @@ class SurveyResponseValidator:
                         response_id=response_id,
                     )
                 )
-            if expected_identity_namespace is not None and raw["identity_namespace"] != expected_identity_namespace:
+            if (
+                expected_identity_namespace is not None
+                and raw["identity_namespace"] != expected_identity_namespace
+            ):
                 issues.append(
                     _issue(
                         "SURVEY_RESPONSE_IDENTITY_FIREWALL",

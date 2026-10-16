@@ -79,29 +79,31 @@ def _resource_flow(run_id: str) -> tuple[Flow, object]:
         media_type="text/plain",
     )
     flow.context = build_context(flow.seed)
-    flow.context["resources"] = [{
-        "reference_id": "REF-SOURCE-1",
-        "reference_type": "source",
-        "object_id": "SRC-1",
-        "digest": record.digest,
-        "locator": record.storage_locator,
-        "access_mode": "read",
-        "evidentiary_use": "candidate_source",
-    }]
+    flow.context["resources"] = [
+        {
+            "reference_id": "REF-SOURCE-1",
+            "reference_type": "source",
+            "object_id": "SRC-1",
+            "digest": record.digest,
+            "locator": record.storage_locator,
+            "access_mode": "read",
+            "evidentiary_use": "candidate_source",
+        }
+    ]
     flow.context["bounds"]["max_resources"] = 1
     refresh(flow.context, "context_pack_digest")
 
     flow.invocation = build_invocation(flow.context, run_id=run_id)
-    flow.invocation["runtime_authorization_evidence"]["resource_reference_ids"] = [
-        "REF-SOURCE-1"
-    ]
+    flow.invocation["runtime_authorization_evidence"]["resource_reference_ids"] = ["REF-SOURCE-1"]
     refresh(flow.invocation, "invocation_digest")
 
     flow.context_extension = build_context_extension(flow.context)
-    flow.context_extension["resource_role_bindings"] = [{
-        "reference_id": "REF-SOURCE-1",
-        "role": "candidate_source",
-    }]
+    flow.context_extension["resource_role_bindings"] = [
+        {
+            "reference_id": "REF-SOURCE-1",
+            "role": "candidate_source",
+        }
+    ]
     flow.context_extension["budget"]["max_total_resources"] = 1
     flow.context_extension["budget"]["max_candidate_source_resources"] = 1
     flow.context_extension = with_context_extension_digest(flow.context_extension)
@@ -118,16 +120,16 @@ def _resource_flow(run_id: str) -> tuple[Flow, object]:
         registry,
         flow.exec_store,
         flow.state_repo,
-        AllowListedAuthorizationProvider((
-            flow.invocation["runtime_authorization_evidence"]["authorization_digest"],
-        )),
+        AllowListedAuthorizationProvider(
+            (flow.invocation["runtime_authorization_evidence"]["authorization_digest"],)
+        ),
         flow.exec_store,
         CapabilityNormalizationBoundary((flow.normalizer,)),
         flow.clock,
         artifact_store=flow.exec_store,
-        context_extension_registry=CapabilityContextExtensionRegistry((
-            DesktopResearchContextValidator(),
-        )),
+        context_extension_registry=CapabilityContextExtensionRegistry(
+            (DesktopResearchContextValidator(),)
+        ),
         context_extension_store=flow.context_store,
     )
     flow.prepared = flow.service.prepare_external(
@@ -156,9 +158,7 @@ def _use_resource_basis(flow: Flow):
     refresh(handoff, "handoff_digest")
     extension["handoff_binding"]["handoff_digest"] = handoff["handoff_digest"]
     extension["citation_details"] = [
-        item
-        for item in extension["citation_details"]
-        if item["handoff_output_id"] != "EVC-1"
+        item for item in extension["citation_details"] if item["handoff_output_id"] != "EVC-1"
     ]
     extension["extension_digest"] = canonical_extension_digest(extension)
     return handoff, extension
@@ -285,10 +285,9 @@ class DesktopResearchProfileProvenanceTests(unittest.TestCase):
             )
             self.assertIsNone(result.state_delta_proposal)
             self.assertTrue(result.issues)
-            self.assertTrue(any(
-                "failed integrity verification" in issue.message
-                for issue in result.issues
-            ))
+            self.assertTrue(
+                any("failed integrity verification" in issue.message for issue in result.issues)
+            )
             self.assertEqual(
                 tuple(tampered.exec_store.artifacts_for(tampered.prepared.run.run_id)),
                 artifacts_before,
@@ -310,22 +309,27 @@ class DesktopResearchProfileProvenanceTests(unittest.TestCase):
 
             with LocalApplicationFacade.open_workspace(workspace) as facade:
                 rq_id = adopt_rq(facade)
-                prepared = facade.submit_action({
-                    "action_type": "desktop_research.investigate",
-                    "payload": {
-                        "question_id": rq_id,
-                        "purpose": "Issue #89 public acceptance.",
-                    },
-                })
+                prepared = facade.submit_action(
+                    {
+                        "action_type": "desktop_research.investigate",
+                        "payload": {
+                            "question_id": rq_id,
+                            "purpose": "Issue #89 public acceptance.",
+                        },
+                    }
+                )
                 run_id = prepared["run_id"]
                 before = facade.status()["snapshot"]
 
-                facade.start_external_retrieval_attempt(run_id, {
-                    "attempt_id": "ATT-1",
-                    "strategy": "support search",
-                    "coverage_dimension_ids": ["COV-SUPPORT"],
-                    "target_locator": "https://example.test/source-a",
-                })
+                facade.start_external_retrieval_attempt(
+                    run_id,
+                    {
+                        "attempt_id": "ATT-1",
+                        "strategy": "support search",
+                        "coverage_dimension_ids": ["COV-SUPPORT"],
+                        "target_locator": "https://example.test/source-a",
+                    },
+                )
                 raw = workspace / "captures/raw/source-a.html"
                 text = workspace / "captures/text/source-a.txt"
                 raw.parent.mkdir(parents=True, exist_ok=True)
@@ -335,30 +339,42 @@ class DesktopResearchProfileProvenanceTests(unittest.TestCase):
                     "Source A contains the exact supporting excerpt used here.",
                     encoding="utf-8",
                 )
-                captured = facade.capture_external_source(run_id, {
-                    "capture_id": "CAP-1",
-                    "source_category": "other",
-                    "exact_locator": "https://example.test/source-a#section-1",
-                    "acquired_at": "2026-08-31T00:00:00Z",
-                    "original_file": "captures/raw/source-a.html",
-                    "original_media_type": "text/html",
-                    "text_rendition_file": "captures/text/source-a.txt",
-                })["capture"]
-                facade.complete_external_retrieval_attempt(run_id, {
-                    "attempt_id": "ATT-1",
-                    "outcome": "source_captured",
-                    "target_locator": "https://example.test/source-a",
-                    "resulting_capture_id": "CAP-1",
-                })
-                facade.start_external_retrieval_attempt(run_id, {
-                    "attempt_id": "ATT-2",
-                    "strategy": "counter search",
-                    "coverage_dimension_ids": ["COV-COUNTER"],
-                })
-                facade.complete_external_retrieval_attempt(run_id, {
-                    "attempt_id": "ATT-2",
-                    "outcome": "no_relevant_source",
-                })
+                captured = facade.capture_external_source(
+                    run_id,
+                    {
+                        "capture_id": "CAP-1",
+                        "source_category": "other",
+                        "exact_locator": "https://example.test/source-a#section-1",
+                        "acquired_at": "2026-08-31T00:00:00Z",
+                        "original_file": "captures/raw/source-a.html",
+                        "original_media_type": "text/html",
+                        "text_rendition_file": "captures/text/source-a.txt",
+                    },
+                )["capture"]
+                facade.complete_external_retrieval_attempt(
+                    run_id,
+                    {
+                        "attempt_id": "ATT-1",
+                        "outcome": "source_captured",
+                        "target_locator": "https://example.test/source-a",
+                        "resulting_capture_id": "CAP-1",
+                    },
+                )
+                facade.start_external_retrieval_attempt(
+                    run_id,
+                    {
+                        "attempt_id": "ATT-2",
+                        "strategy": "counter search",
+                        "coverage_dimension_ids": ["COV-COUNTER"],
+                    },
+                )
+                facade.complete_external_retrieval_attempt(
+                    run_id,
+                    {
+                        "attempt_id": "ATT-2",
+                        "outcome": "no_relevant_source",
+                    },
+                )
 
                 handoff, extension = golden_submission(
                     facade._application,
@@ -367,18 +383,13 @@ class DesktopResearchProfileProvenanceTests(unittest.TestCase):
                 )
                 run = facade._application.execution_store.load_run(run_id)
                 self.assertIsNotNone(run)
-                context = facade._application.execution_store.load_context_pack(
-                    run.context_pack_id
-                )
+                context = facade._application.execution_store.load_context_pack(run.context_pack_id)
                 self.assertIsNotNone(context)
                 handoff["preserved_context"]["effective_constraint_paths"] = [
-                    str(item["path"])
-                    for item in context["effective_constraints"]
+                    str(item["path"]) for item in context["effective_constraints"]
                 ]
                 refresh(handoff, "handoff_digest")
-                extension["handoff_binding"]["handoff_digest"] = handoff[
-                    "handoff_digest"
-                ]
+                extension["handoff_binding"]["handoff_digest"] = handoff["handoff_digest"]
                 extension["extension_digest"] = canonical_extension_digest(extension)
 
                 collected = facade.collect_external(
@@ -404,35 +415,43 @@ class DesktopResearchProfileProvenanceTests(unittest.TestCase):
                     {captured["original_capture"]["content_digest"]},
                 )
 
-                pending = facade.submit_action({
-                    "action_type": "state.apply_candidate",
-                    "payload": {
-                        "state_delta_proposal_id": proposal["proposal_id"],
-                    },
-                    "actor_id": "HUMAN-89",
-                })
+                pending = facade.submit_action(
+                    {
+                        "action_type": "state.apply_candidate",
+                        "payload": {
+                            "state_delta_proposal_id": proposal["proposal_id"],
+                        },
+                        "actor_id": "HUMAN-89",
+                    }
+                )
                 self.assertEqual(pending["status"], "CONFIRMATION_REQUIRED")
-                confirmed = facade.submit_confirmation({
-                    "confirmation_request_id": pending["confirmation_request"][
-                        "confirmation_request_id"
-                    ],
-                    "actor_id": "HUMAN-89",
-                })
+                confirmed = facade.submit_confirmation(
+                    {
+                        "confirmation_request_id": pending["confirmation_request"][
+                            "confirmation_request_id"
+                        ],
+                        "actor_id": "HUMAN-89",
+                    }
+                )
                 self.assertEqual(confirmed["status"], "HUMAN_DECISION_REQUIRED")
                 decision_request = confirmed["decision_request"]
-                resolved = facade.resolve_human_decision({
-                    "request_id": decision_request["request_id"],
-                    "request_digest": decision_request["request_digest"],
-                    "disposition": "approve_exact",
-                    "actor_id": "HUMAN-89",
-                })
+                resolved = facade.resolve_human_decision(
+                    {
+                        "request_id": decision_request["request_id"],
+                        "request_digest": decision_request["request_digest"],
+                        "disposition": "approve_exact",
+                        "actor_id": "HUMAN-89",
+                    }
+                )
                 self.assertEqual(resolved["status"], "RESOLVED")
                 self.assertNotEqual(facade.status()["snapshot"], before)
 
-                status = facade.submit_action({
-                    "action_type": "research.status",
-                    "payload": {"kinds": ["evidence"]},
-                })
+                status = facade.submit_action(
+                    {
+                        "action_type": "research.status",
+                        "payload": {"kinds": ["evidence"]},
+                    }
+                )
                 self.assertEqual(status["status"], "SUCCEEDED")
                 stored_evidence = status["data"]["objects"]
                 self.assertTrue(stored_evidence)

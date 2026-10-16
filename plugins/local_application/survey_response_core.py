@@ -12,9 +12,15 @@ from .survey_validation import input_object, required_string
 
 _STORE_NAME = "survey-response-registry.sqlite3"
 _RESPONSE_FIELDS = {
-    "instrument_id", "instrument_version", "instrument_digest",
-    "response_origin", "epistemic_status", "response",
-    "source_run_id", "source_provenance", "capture_origin",
+    "instrument_id",
+    "instrument_version",
+    "instrument_digest",
+    "response_origin",
+    "epistemic_status",
+    "response",
+    "source_run_id",
+    "source_provenance",
+    "capture_origin",
 }
 _DATASET_FIELDS = (_RESPONSE_FIELDS - {"response"}) | {"responses"}
 
@@ -33,9 +39,7 @@ class SurveyResponseCoreMixin:
                     "Survey response registry requires a local application root",
                 )
             return LocalSurveyResponseStore(Path(root) / _STORE_NAME)
-        return LocalSurveyResponseStore(
-            self._workspace_root / ".research-loom" / _STORE_NAME
-        )
+        return LocalSurveyResponseStore(self._workspace_root / ".research-loom" / _STORE_NAME)
 
     def _resolve_instrument(
         self,

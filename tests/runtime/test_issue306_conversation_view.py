@@ -66,6 +66,7 @@ def _run_cli(argv: list[str]):
     with redirect_stdout(output):
         code = cli_main(argv)
     import json
+
     return code, json.loads(output.getvalue())
 
 
@@ -131,38 +132,69 @@ class Issue306ConversationViewTests(unittest.TestCase):
             with LocalApplicationFacade.open_workspace(_workspace(Path(temp))) as facade:
                 q1 = _adopt_question(facade, "Q1")
                 q2 = _adopt_question(facade, "Q2")
-                keep = facade.submit_action({
-                    "action_type": "research_question.review",
-                    "payload": {"operation": "KEEP", "question_ids": [q1], "rationale": "still valid"},
-                    "actor_id": "H",
-                }, view="conversation")
+                keep = facade.submit_action(
+                    {
+                        "action_type": "research_question.review",
+                        "payload": {
+                            "operation": "KEEP",
+                            "question_ids": [q1],
+                            "rationale": "still valid",
+                        },
+                        "actor_id": "H",
+                    },
+                    view="conversation",
+                )
                 _assert_no_raw_target(self, keep)
                 self.assertNotIn("candidate", keep)
                 self.assertEqual(keep["question_review"]["operation"], "KEEP")
                 self.assertFalse(keep["question_review"]["material_change"])
 
                 payloads = [
-                    {"operation": "REFINE", "question_ids": [q1], "rationale": "narrow", "text": "approved stays in text"},
+                    {
+                        "operation": "REFINE",
+                        "question_ids": [q1],
+                        "rationale": "narrow",
+                        "text": "approved stays in text",
+                    },
                     {"operation": "CLOSE", "question_ids": [q2], "rationale": "answered"},
-                    {"operation": "SPLIT", "question_ids": [q1], "rationale": "two decisions", "questions": [{"text": "Q1a"}, {"text": "Q1b"}]},
-                    {"operation": "MERGE", "question_ids": [q1, q2], "rationale": "same decision", "text": "Merged"},
+                    {
+                        "operation": "SPLIT",
+                        "question_ids": [q1],
+                        "rationale": "two decisions",
+                        "questions": [{"text": "Q1a"}, {"text": "Q1b"}],
+                    },
+                    {
+                        "operation": "MERGE",
+                        "question_ids": [q1, q2],
+                        "rationale": "same decision",
+                        "text": "Merged",
+                    },
                 ]
                 for payload in payloads:
                     with self.subTest(operation=payload["operation"]):
-                        result = facade.submit_action({
-                            "action_type": "research_question.review",
-                            "payload": payload,
-                            "actor_id": "H",
-                        }, view="conversation")
+                        result = facade.submit_action(
+                            {
+                                "action_type": "research_question.review",
+                                "payload": payload,
+                                "actor_id": "H",
+                            },
+                            view="conversation",
+                        )
                         _assert_no_raw_target(self, result)
                         self.assertEqual(
                             result["candidate"]["question_review_operation"], payload["operation"]
                         )
                         self.assertTrue(
-                            all("current_status" not in item["content"] for item in result["candidate"]["content"])
+                            all(
+                                "current_status" not in item["content"]
+                                for item in result["candidate"]["content"]
+                            )
                         )
                 refine = next(
-                    item for item in facade.resume_context(view="conversation")["research_questions"]["candidates"]
+                    item
+                    for item in facade.resume_context(view="conversation")["research_questions"][
+                        "candidates"
+                    ]
                     if item.get("question_review_operation") == "REFINE"
                 )
                 _assert_no_raw_target(self, refine)
@@ -182,7 +214,10 @@ class Issue306ConversationViewTests(unittest.TestCase):
                 shown = facade.show_synthesis_candidate(candidate_id, view="conversation")
                 _assert_no_raw_target(self, listing)
                 _assert_no_raw_target(self, shown)
-                self.assertEqual(shown["content"]["statement"], result["candidate"]["content"][0]["content"]["statement"])
+                self.assertEqual(
+                    shown["content"]["statement"],
+                    result["candidate"]["content"][0]["content"]["statement"],
+                )
             finally:
                 facade.close()
 
@@ -203,19 +238,29 @@ class Issue306ConversationViewTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             workspace = _init_workspace(Path(temp))
             with LocalApplicationFacade.open_workspace(workspace) as facade:
-                candidate = facade.submit_action(_proposal_input(), view="conversation")["candidate"]
-                apply = facade.submit_action({
-                    "action_type": "state.apply_candidate",
-                    "payload": {"state_delta_proposal_id": candidate["candidate_id"]},
-                    "actor_id": "HUMAN-RQ",
-                }, view="conversation")
+                candidate = facade.submit_action(_proposal_input(), view="conversation")[
+                    "candidate"
+                ]
+                apply = facade.submit_action(
+                    {
+                        "action_type": "state.apply_candidate",
+                        "payload": {"state_delta_proposal_id": candidate["candidate_id"]},
+                        "actor_id": "HUMAN-RQ",
+                    },
+                    view="conversation",
+                )
                 _assert_no_raw_target(self, apply)
                 self.assertEqual(apply["status"], "CONFIRMATION_REQUIRED")
 
-                confirmed = facade.submit_confirmation({
-                    "confirmation_request_id": apply["confirmation_required"]["confirmation_request_id"],
-                    "actor_id": "HUMAN-RQ",
-                }, view="conversation")
+                confirmed = facade.submit_confirmation(
+                    {
+                        "confirmation_request_id": apply["confirmation_required"][
+                            "confirmation_request_id"
+                        ],
+                        "actor_id": "HUMAN-RQ",
+                    },
+                    view="conversation",
+                )
                 _assert_no_raw_target(self, confirmed)
                 decision = confirmed["human_decision_required"]
                 self.assertEqual(decision["issued_status"], "PENDING")
@@ -229,15 +274,22 @@ class Issue306ConversationViewTests(unittest.TestCase):
 
                 status = facade.status(view="conversation")
                 _assert_no_raw_target(self, status)
-                pending = next(item for item in status["pending_human_decisions"] if item["request_id"] == decision["request_id"])
+                pending = next(
+                    item
+                    for item in status["pending_human_decisions"]
+                    if item["request_id"] == decision["request_id"]
+                )
                 self.assertEqual(pending["operational_status"], "PENDING")
 
-                resolved = facade.resolve_human_decision({
-                    "request_id": decision["request_id"],
-                    "request_digest": decision["request_digest"],
-                    "disposition": "approve_exact",
-                    "actor_id": "HUMAN-RQ",
-                }, view="conversation")
+                resolved = facade.resolve_human_decision(
+                    {
+                        "request_id": decision["request_id"],
+                        "request_digest": decision["request_digest"],
+                        "disposition": "approve_exact",
+                        "actor_id": "HUMAN-RQ",
+                    },
+                    view="conversation",
+                )
                 _assert_no_raw_target(self, resolved)
                 self.assertEqual(resolved["status"], "RESOLVED")
                 self.assertEqual(resolved["request"]["issued_status"], "PENDING")
@@ -252,27 +304,45 @@ class Issue306ConversationViewTests(unittest.TestCase):
                 _, confirmed = _apply_to_decision(facade, candidate_id)
                 _resolve(facade, confirmed["decision_request"], "approve_exact")
                 row = next(
-                    item for item in facade.resume_context(view="conversation")["research_questions"]["candidates"]
+                    item
+                    for item in facade.resume_context(view="conversation")["research_questions"][
+                        "candidates"
+                    ]
                     if item["candidate_id"] == candidate_id
                 )
                 self.assertFalse(row["current_relation"]["bound_to_current_snapshot"])
-                self.assertTrue(all(item["current_value_present"] for item in row["current_relation"]["subjects"]))
+                self.assertTrue(
+                    all(
+                        item["current_value_present"]
+                        for item in row["current_relation"]["subjects"]
+                    )
+                )
                 self.assertNotIn("adopted", row)
                 self.assertNotIn("approved", row)
 
         with tempfile.TemporaryDirectory() as temp:
             with LocalApplicationFacade.open_workspace(_workspace(Path(temp))) as facade:
                 qid = _adopt_question(facade)
-                refined = facade.submit_action({
-                    "action_type": "research_question.review",
-                    "payload": {"operation": "REFINE", "question_ids": [qid], "rationale": "r", "text": "new revision"},
-                    "actor_id": "H",
-                }, view="conversation")
+                refined = facade.submit_action(
+                    {
+                        "action_type": "research_question.review",
+                        "payload": {
+                            "operation": "REFINE",
+                            "question_ids": [qid],
+                            "rationale": "r",
+                            "text": "new revision",
+                        },
+                        "actor_id": "H",
+                    },
+                    view="conversation",
+                )
                 relation = refined["candidate"]["current_relation"]["subjects"][0]
                 self.assertTrue(relation["current_value_present"])
                 self.assertFalse(relation["candidate_value_matches_current"])
 
-    def test_desktop_research_collect_and_run_views_preserve_research_gaps_without_raw_candidate(self):
+    def test_desktop_research_collect_and_run_views_preserve_research_gaps_without_raw_candidate(
+        self,
+    ):
         helper = external_tests.Issue92ExternalSubmissionPreflightTests()
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -282,10 +352,17 @@ class Issue306ConversationViewTests(unittest.TestCase):
                 before = facade.show_run(run_id, view="conversation")
                 _assert_no_raw_target(self, before)
                 self.assertEqual(before["run"]["execution_mode"], "real")
-                collected = facade.collect_external(run_id, {"research_result": result_input}, view="conversation")
+                collected = facade.collect_external(
+                    run_id, {"research_result": result_input}, view="conversation"
+                )
                 _assert_no_raw_target(self, collected)
                 self.assertTrue(collected["normalized_candidate_available"])
-                self.assertEqual(collected["research_context"]["coverage_assessment"]["stopping_recommendation"]["research_completion_claimed"], False)
+                self.assertEqual(
+                    collected["research_context"]["coverage_assessment"]["stopping_recommendation"][
+                        "research_completion_claimed"
+                    ],
+                    False,
+                )
                 self.assertTrue(collected["research_outputs"]["evidence_gaps"])
                 after = facade.show_run(run_id, view="conversation")
                 _assert_no_raw_target(self, after)
@@ -293,7 +370,6 @@ class Issue306ConversationViewTests(unittest.TestCase):
                 self.assertEqual(after["finding_recovery"]["status"], "NOT_RECOVERABLE")
             finally:
                 facade.close()
-
 
     def test_rejected_or_correctable_external_result_does_not_invent_candidate_or_success(self):
         helper = external_tests.Issue92ExternalSubmissionPreflightTests()
@@ -303,10 +379,19 @@ class Issue306ConversationViewTests(unittest.TestCase):
             try:
                 run_id, valid, _capture = helper.prepared(root, facade)
                 rejected = deepcopy(valid)
-                rejected["validation"] = {"status": "rejected", "issues": [{
-                    "code": "SOURCE-QUALITY", "severity": "error", "message": "Formal research rejection."
-                }]}
-                result = facade.collect_external(run_id, {"research_result": rejected}, view="conversation")
+                rejected["validation"] = {
+                    "status": "rejected",
+                    "issues": [
+                        {
+                            "code": "SOURCE-QUALITY",
+                            "severity": "error",
+                            "message": "Formal research rejection.",
+                        }
+                    ],
+                }
+                result = facade.collect_external(
+                    run_id, {"research_result": rejected}, view="conversation"
+                )
                 _assert_no_raw_target(self, result)
                 self.assertEqual(result["run"]["status"], "COMPLETED")
                 self.assertEqual(result["handoff_status"], "rejected")
@@ -322,7 +407,9 @@ class Issue306ConversationViewTests(unittest.TestCase):
                 run_id, valid, _capture = helper.prepared(root, facade)
                 broken = deepcopy(valid)
                 broken["outputs"] = []
-                result = facade.collect_external(run_id, {"research_result": broken}, view="conversation")
+                result = facade.collect_external(
+                    run_id, {"research_result": broken}, view="conversation"
+                )
                 _assert_no_raw_target(self, result)
                 self.assertEqual(result["run"]["status"], "RUNNING")
                 self.assertFalse(result["normalized_candidate_available"])
@@ -331,8 +418,11 @@ class Issue306ConversationViewTests(unittest.TestCase):
             finally:
                 facade.close()
 
-    def test_conversation_synthesis_listing_preserves_corruption_and_incomplete_collection_signals(self):
+    def test_conversation_synthesis_listing_preserves_corruption_and_incomplete_collection_signals(
+        self,
+    ):
         import json
+
         with tempfile.TemporaryDirectory() as temp:
             facade = synthesis_tests._make_facade(temp)
             try:
@@ -351,7 +441,9 @@ class Issue306ConversationViewTests(unittest.TestCase):
                     "INSERT INTO state_delta_proposals(proposal_id,payload_json) VALUES(?,?)",
                     ("SDP-UNATTRIBUTABLE", "not-json"),
                 )
-                listing = facade.list_synthesis_candidates(kind="recommendation", view="conversation")
+                listing = facade.list_synthesis_candidates(
+                    kind="recommendation", view="conversation"
+                )
                 _assert_no_raw_target(self, listing)
                 by_id = {item["candidate_id"]: item for item in listing["items"]}
                 self.assertEqual(listing["status"], "DEGRADED")
@@ -366,9 +458,9 @@ class Issue306ConversationViewTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             workspace = _init_workspace(Path(temp))
             with LocalApplicationFacade.open_workspace(workspace) as facade:
-                result = facade.submit_action({
-                    "action_type": "research_attention.status", "payload": {}
-                }, view="conversation")
+                result = facade.submit_action(
+                    {"action_type": "research_attention.status", "payload": {}}, view="conversation"
+                )
                 _assert_no_raw_target(self, result)
                 self.assertEqual(result["interpretation"]["status"], "UNSUPPORTED")
 
@@ -408,23 +500,33 @@ class Issue306ConversationViewTests(unittest.TestCase):
             workspace = _init_workspace(Path(temp))
             payload = _proposal_input(text="CLI approved literal")
             import json
+
             input_file = Path(temp) / "action.json"
             input_file.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
-            code, conversation = _run_cli([
-                "action", "submit", "--workspace", str(workspace), "--view", "conversation", "--json", str(input_file)
-            ])
+            code, conversation = _run_cli(
+                [
+                    "action",
+                    "submit",
+                    "--workspace",
+                    str(workspace),
+                    "--view",
+                    "conversation",
+                    "--json",
+                    str(input_file),
+                ]
+            )
             self.assertEqual(code, 0)
             _assert_no_raw_target(self, conversation)
-            self.assertEqual(conversation["candidate"]["content"][0]["content"]["text"], "CLI approved literal")
+            self.assertEqual(
+                conversation["candidate"]["content"][0]["content"]["text"], "CLI approved literal"
+            )
 
-            code, detail = _run_cli([
-                "resume", "--workspace", str(workspace), "--json"
-            ])
+            code, detail = _run_cli(["resume", "--workspace", str(workspace), "--json"])
             self.assertEqual(code, 0)
             self.assertIn("candidate_projection", detail["research_questions"]["candidates"][0])
-            code, conversation_resume = _run_cli([
-                "resume", "--workspace", str(workspace), "--view", "conversation", "--json"
-            ])
+            code, conversation_resume = _run_cli(
+                ["resume", "--workspace", str(workspace), "--view", "conversation", "--json"]
+            )
             self.assertEqual(code, 0)
             _assert_no_raw_target(self, conversation_resume)
 

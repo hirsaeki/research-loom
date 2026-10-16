@@ -23,20 +23,29 @@ def _run_cli(argv):
 def _submit_recovery(workspace, *, run_id: str, capture_id: str, kind: str, source_file: str):
     action_path = Path(workspace) / f"material-recovery-{kind}.json"
     action_path.write_text(
-        json.dumps({
-            "action_type": "desktop_research.material.recover",
-            "payload": {
-                "run_id": run_id,
-                "capture_id": capture_id,
-                "kind": kind,
-                "source_file": source_file,
-            },
-        }),
+        json.dumps(
+            {
+                "action_type": "desktop_research.material.recover",
+                "payload": {
+                    "run_id": run_id,
+                    "capture_id": capture_id,
+                    "kind": kind,
+                    "source_file": source_file,
+                },
+            }
+        ),
         encoding="utf-8",
     )
-    return _run_cli([
-        "action", "submit", "--workspace", workspace, "--json", action_path,
-    ])
+    return _run_cli(
+        [
+            "action",
+            "submit",
+            "--workspace",
+            workspace,
+            "--json",
+            action_path,
+        ]
+    )
 
 
 class HistoricalMaterialRecoveryTests(ResearchPackageAcceptanceSupport):
@@ -67,10 +76,17 @@ class HistoricalMaterialRecoveryTests(ResearchPackageAcceptanceSupport):
             facade.close()
             facade = None
 
-            code, shown_run = _run_cli([
-                "run", "show", "--workspace", self.workspace,
-                "--run-id", case["run_id"], "--json",
-            ])
+            code, shown_run = _run_cli(
+                [
+                    "run",
+                    "show",
+                    "--workspace",
+                    self.workspace,
+                    "--run-id",
+                    case["run_id"],
+                    "--json",
+                ]
+            )
             self.assertEqual(code, 0)
             diagnosis = shown_run["finding_recovery"]
             self.assertEqual(diagnosis["recovery_class"], "material_recovery_required")
@@ -108,36 +124,59 @@ class HistoricalMaterialRecoveryTests(ResearchPackageAcceptanceSupport):
             self.assertEqual(repeated_result["status"], "SUCCEEDED")
             self.assertEqual(repeated_result["data"]["status"], "ALREADY_VERIFIED")
 
-            code, shown = _run_cli([
-                "external", "materials", "show", "--workspace", self.workspace,
-                "--run-id", case["run_id"], "--capture-id", "CAP-1", "--json",
-            ])
+            code, shown = _run_cli(
+                [
+                    "external",
+                    "materials",
+                    "show",
+                    "--workspace",
+                    self.workspace,
+                    "--run-id",
+                    case["run_id"],
+                    "--capture-id",
+                    "CAP-1",
+                    "--json",
+                ]
+            )
             self.assertEqual(code, 0)
             self.assertEqual(shown["status"], "OK")
-            code, after_run = _run_cli([
-                "run", "show", "--workspace", self.workspace,
-                "--run-id", case["run_id"], "--json",
-            ])
+            code, after_run = _run_cli(
+                [
+                    "run",
+                    "show",
+                    "--workspace",
+                    self.workspace,
+                    "--run-id",
+                    case["run_id"],
+                    "--json",
+                ]
+            )
             self.assertEqual(code, 0)
             after = after_run["finding_recovery"]
             self.assertEqual(after["recovery_class"], "proposal_rematerializable")
             self.assertEqual(after["recovery_route"], "canonical_result_rematerialization")
-            self.assertTrue(any(
-                item.get("kind") == "historical_material_recovery"
-                and item.get("payload", {}).get("artifact_id") == original.artifact_id
-                for item in after_run["diagnostics"]
-            ))
+            self.assertTrue(
+                any(
+                    item.get("kind") == "historical_material_recovery"
+                    and item.get("payload", {}).get("artifact_id") == original.artifact_id
+                    for item in after_run["diagnostics"]
+                )
+            )
 
             with LocalApplicationFacade.open_workspace(self.workspace) as reopened:
                 original_after = next(
                     artifact
-                    for artifact in reopened._application.execution_store.artifacts_for(case["run_id"])
+                    for artifact in reopened._application.execution_store.artifacts_for(
+                        case["run_id"]
+                    )
                     if artifact.artifact_id == original.artifact_id
                 )
                 self.assertEqual(original_after, original)
                 state_after = reopened._application.state_repository.load_state_view(
                     reopened.project_id,
-                    reopened._application.state_repository.load_active_lineage_ref(reopened.project_id),
+                    reopened._application.state_repository.load_active_lineage_ref(
+                        reopened.project_id
+                    ),
                 ).current_snapshot
                 self.assertEqual(state_after, state_before)
         finally:
@@ -162,10 +201,17 @@ class HistoricalMaterialRecoveryTests(ResearchPackageAcceptanceSupport):
 
             facade.close()
             facade = None
-            code, shown_run = _run_cli([
-                "run", "show", "--workspace", self.workspace,
-                "--run-id", case["run_id"], "--json",
-            ])
+            code, shown_run = _run_cli(
+                [
+                    "run",
+                    "show",
+                    "--workspace",
+                    self.workspace,
+                    "--run-id",
+                    case["run_id"],
+                    "--json",
+                ]
+            )
             self.assertEqual(code, 0)
             failure = shown_run["finding_recovery"]["recovery_failure_details"]
             self.assertEqual(failure["artifact_kind"], "rendition")
@@ -193,10 +239,17 @@ class HistoricalMaterialRecoveryTests(ResearchPackageAcceptanceSupport):
             self.assertEqual(code, 0)
             self.assertEqual(recovery_result["status"], "SUCCEEDED")
             self.assertEqual(recovery_result["data"]["status"], "RESTORED")
-            code, recovered_run = _run_cli([
-                "run", "show", "--workspace", self.workspace,
-                "--run-id", case["run_id"], "--json",
-            ])
+            code, recovered_run = _run_cli(
+                [
+                    "run",
+                    "show",
+                    "--workspace",
+                    self.workspace,
+                    "--run-id",
+                    case["run_id"],
+                    "--json",
+                ]
+            )
             self.assertEqual(code, 0)
             self.assertEqual(
                 recovered_run["finding_recovery"]["recovery_class"],
@@ -213,9 +266,7 @@ class HistoricalMaterialRecoveryTests(ResearchPackageAcceptanceSupport):
             unavailable = self.root / "workspace-unavailable-after-material-recovery"
             self.workspace.rename(unavailable)
             self.assertEqual(verify_export_root(output)["status"], "VERIFIED")
-            detached = json.loads(
-                (output / "research-package.json").read_text(encoding="utf-8")
-            )
+            detached = json.loads((output / "research-package.json").read_text(encoding="utf-8"))
             material = detached["resolved_content"]["materials"][0]
             attachment = output / material["text_rendition"]["attachment_path"]
             self.assertEqual(attachment.read_text(encoding="utf-8"), case["source_text"])
@@ -239,10 +290,17 @@ class HistoricalMaterialRecoveryTests(ResearchPackageAcceptanceSupport):
             before = managed.read_bytes()
             facade.close()
             facade = None
-            code, shown_run = _run_cli([
-                "run", "show", "--workspace", self.workspace,
-                "--run-id", case["run_id"], "--json",
-            ])
+            code, shown_run = _run_cli(
+                [
+                    "run",
+                    "show",
+                    "--workspace",
+                    self.workspace,
+                    "--run-id",
+                    case["run_id"],
+                    "--json",
+                ]
+            )
             self.assertEqual(code, 0)
             failure = shown_run["finding_recovery"]["recovery_failure_details"]
             self.assertEqual(failure["artifact_kind"], "rendition")
@@ -260,7 +318,9 @@ class HistoricalMaterialRecoveryTests(ResearchPackageAcceptanceSupport):
             self.assertEqual(code, 0)
             self.assertEqual(recovery_result["status"], "SUCCEEDED")
             self.assertEqual(recovery_result["data"]["status"], "REPAIRED")
-            self.assertEqual(managed.read_bytes(), (self.workspace / "captures/text/source-a.txt").read_bytes())
+            self.assertEqual(
+                managed.read_bytes(), (self.workspace / "captures/text/source-a.txt").read_bytes()
+            )
             quarantine = store.root / recovery_result["data"]["quarantine_ref"]
             self.assertEqual(quarantine.read_bytes(), before)
         finally:
@@ -287,9 +347,7 @@ class HistoricalMaterialRecoveryTests(ResearchPackageAcceptanceSupport):
                 temporary.write_bytes(b"x" * size)
                 return temporary, digest, size
 
-            service = HistoricalMaterialRecoveryService(
-                store, facade.project_id, self.workspace
-            )
+            service = HistoricalMaterialRecoveryService(store, facade.project_id, self.workspace)
             with patch.object(store, "_stage_controlled_original", side_effect=tampered_stage):
                 with self.assertRaisesRegex(LocalApplicationError, "could not be restored"):
                     service.recover(
@@ -300,8 +358,9 @@ class HistoricalMaterialRecoveryTests(ResearchPackageAcceptanceSupport):
                     )
             self.assertFalse(managed.exists())
 
-            with patch.object(store, "_stage_controlled_original", side_effect=tampered_stage), patch.object(
-                store, "_verify_blob_streaming", return_value=None
+            with (
+                patch.object(store, "_stage_controlled_original", side_effect=tampered_stage),
+                patch.object(store, "_verify_blob_streaming", return_value=None),
             ):
                 ablated = service.recover(
                     case["run_id"],
@@ -310,6 +369,8 @@ class HistoricalMaterialRecoveryTests(ResearchPackageAcceptanceSupport):
                     source_file=self.workspace / "captures/text/source-a.txt",
                 )
             self.assertEqual(ablated["status"], "RESTORED")
-            self.assertNotEqual(managed.read_bytes(), (self.workspace / "captures/text/source-a.txt").read_bytes())
+            self.assertNotEqual(
+                managed.read_bytes(), (self.workspace / "captures/text/source-a.txt").read_bytes()
+            )
         finally:
             facade.close()

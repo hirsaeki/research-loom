@@ -9,7 +9,9 @@ from core.runtime import ObjectRef, StateDeltaProposal, TransitionAction, Transi
 from plugins.local_conversation_store.resume import state_delta_proposals_by_ids_for_project
 
 from .candidate_projection import build_candidate_projection
-from .new_material_continuation_public_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
+from .new_material_continuation_public_facade import (
+    LocalApplicationFacade as _BaseLocalApplicationFacade,
+)
 
 _ACTION_REGISTRATION_LOCK = RLock()
 _ACTION_TYPE = "research.recommendation.propose"
@@ -93,11 +95,12 @@ class ResearchRecommendationProposeHandler:
         self._store = store
         self._ids = id_provider
 
-    def execute(self, payload: Mapping[str, Any], *, state: Any, actor: Any, proposal: Mapping[str, Any]) -> HarnessServiceResult:
+    def execute(
+        self, payload: Mapping[str, Any], *, state: Any, actor: Any, proposal: Mapping[str, Any]
+    ) -> HarnessServiceResult:
         del actor
         effective = {
-            (str(item.get("kind")), str(item.get("id"))): item
-            for item in state.effective_objects()
+            (str(item.get("kind")), str(item.get("id"))): item for item in state.effective_objects()
         }
         for finding_id in payload["finding_ids"]:
             if not _current_authoritative_finding(effective, state.project_ref, str(finding_id)):
@@ -160,12 +163,14 @@ class ResearchRecommendationProposeHandler:
             "project_ref": candidate.project_ref,
             "lineage_ref": candidate.lineage_ref,
             "source_refs": list(candidate.source_refs),
-            "proposed_actions": [{
-                "kind": transition_action.kind.value,
-                "payload": deepcopy(dict(transition_action.payload)),
-                "decision_refs": list(transition_action.decision_refs),
-                "source_refs": list(transition_action.source_refs),
-            }],
+            "proposed_actions": [
+                {
+                    "kind": transition_action.kind.value,
+                    "payload": deepcopy(dict(transition_action.payload)),
+                    "decision_refs": list(transition_action.decision_refs),
+                    "source_refs": list(transition_action.source_refs),
+                }
+            ],
             "affected_refs": [{"kind": "recommendation", "id": recommendation_id}],
             "rationale": candidate.rationale,
             "required_human_decision_kinds": list(candidate.required_human_decision_kinds),
@@ -262,7 +267,10 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
         action_registry = coordinator._actions
         service_registry = coordinator._services
         with _ACTION_REGISTRATION_LOCK:
-            existing = {definition.action_type: definition for definition in coordinator.action_definitions()}
+            existing = {
+                definition.action_type: definition
+                for definition in coordinator.action_definitions()
+            }
             definition = existing.get(_ACTION_TYPE)
             if definition is None:
                 action_registry.register(

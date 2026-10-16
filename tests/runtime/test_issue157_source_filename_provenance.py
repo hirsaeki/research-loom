@@ -20,20 +20,29 @@ def _run_cli(argv):
 def _submit_recovery(workspace, *, run_id: str, capture_id: str, kind: str, source_file: str):
     action_path = Path(workspace) / f"issue157-recover-{kind}.json"
     action_path.write_text(
-        json.dumps({
-            "action_type": "desktop_research.material.recover",
-            "payload": {
-                "run_id": run_id,
-                "capture_id": capture_id,
-                "kind": kind,
-                "source_file": source_file,
-            },
-        }),
+        json.dumps(
+            {
+                "action_type": "desktop_research.material.recover",
+                "payload": {
+                    "run_id": run_id,
+                    "capture_id": capture_id,
+                    "kind": kind,
+                    "source_file": source_file,
+                },
+            }
+        ),
         encoding="utf-8",
     )
-    return _run_cli([
-        "action", "submit", "--workspace", workspace, "--json", action_path,
-    ])
+    return _run_cli(
+        [
+            "action",
+            "submit",
+            "--workspace",
+            workspace,
+            "--json",
+            action_path,
+        ]
+    )
 
 
 class Issue157SourceFilenameProvenanceTests(ResearchPackageAcceptanceSupport):
@@ -48,8 +57,12 @@ class Issue157SourceFilenameProvenanceTests(ResearchPackageAcceptanceSupport):
         facade, case = self._prepare_case()
         try:
             artifacts = facade._application.execution_store.artifacts_for(case["run_id"])
-            original = next(item for item in artifacts if item.role == "desktop_research.original_capture")
-            rendition = next(item for item in artifacts if item.role == "desktop_research.text_rendition")
+            original = next(
+                item for item in artifacts if item.role == "desktop_research.original_capture"
+            )
+            rendition = next(
+                item for item in artifacts if item.role == "desktop_research.text_rendition"
+            )
             self.assertEqual(original.provenance["original_source_filename"], "source-a.html")
             self.assertEqual(original.provenance["text_rendition_source_filename"], "source-a.txt")
             self.assertEqual(rendition.provenance["original_source_filename"], "source-a.html")
@@ -86,10 +99,17 @@ class Issue157SourceFilenameProvenanceTests(ResearchPackageAcceptanceSupport):
             facade.close()
             facade = None
 
-            code, shown = _run_cli([
-                "run", "show", "--workspace", self.workspace,
-                "--run-id", case["run_id"], "--json",
-            ])
+            code, shown = _run_cli(
+                [
+                    "run",
+                    "show",
+                    "--workspace",
+                    self.workspace,
+                    "--run-id",
+                    case["run_id"],
+                    "--json",
+                ]
+            )
             self.assertEqual(code, 0)
             failure = shown["finding_recovery"]["recovery_failure_details"]
             self.assertEqual(failure["source_filename"], "source-a.html")
@@ -128,7 +148,9 @@ class Issue157SourceFilenameProvenanceTests(ResearchPackageAcceptanceSupport):
             self._remove_producer_candidate(facade, case)
             store = facade._application.execution_store
             artifacts = store.artifacts_for(case["run_id"])
-            original = next(item for item in artifacts if item.role == "desktop_research.original_capture")
+            original = next(
+                item for item in artifacts if item.role == "desktop_research.original_capture"
+            )
             with store._lock:
                 for artifact in artifacts:
                     provenance = dict(artifact.provenance)
@@ -146,10 +168,17 @@ class Issue157SourceFilenameProvenanceTests(ResearchPackageAcceptanceSupport):
             facade.close()
             facade = None
 
-            code, shown = _run_cli([
-                "run", "show", "--workspace", self.workspace,
-                "--run-id", case["run_id"], "--json",
-            ])
+            code, shown = _run_cli(
+                [
+                    "run",
+                    "show",
+                    "--workspace",
+                    self.workspace,
+                    "--run-id",
+                    case["run_id"],
+                    "--json",
+                ]
+            )
             self.assertEqual(code, 0)
             failure = shown["finding_recovery"]["recovery_failure_details"]
             self.assertIsNone(failure["source_filename"])

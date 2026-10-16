@@ -20,8 +20,7 @@ class CapabilityContextExtensionValidator(Protocol):
         capability_id: str,
         capability_version: str,
         function_id: str,
-    ) -> bool:
-        ...
+    ) -> bool: ...
 
     def validate(
         self,
@@ -30,8 +29,7 @@ class CapabilityContextExtensionValidator(Protocol):
         context_pack: Mapping[str, Any],
         extension: Mapping[str, Any],
         state: StateView,
-    ) -> tuple[ExecutionIssue, ...]:
-        ...
+    ) -> tuple[ExecutionIssue, ...]: ...
 
 
 class CapabilityContextExtensionStore(Protocol):
@@ -44,8 +42,7 @@ class CapabilityContextExtensionStore(Protocol):
         function_id: str,
         context_pack_id: str,
         extension: Mapping[str, Any],
-    ) -> str:
-        ...
+    ) -> str: ...
 
     def load(
         self,
@@ -53,8 +50,7 @@ class CapabilityContextExtensionStore(Protocol):
         capability_version: str,
         function_id: str,
         context_pack_id: str,
-    ) -> Mapping[str, Any] | None:
-        ...
+    ) -> Mapping[str, Any] | None: ...
 
 
 class CapabilityContextExtensionRegistry:
@@ -82,9 +78,7 @@ class CapabilityContextExtensionRegistry:
             str(capability["capability_version"]),
             str(capability["function_id"]),
         )
-        matches = tuple(
-            item for item in self._validators if item.supports(*binding)
-        )
+        matches = tuple(item for item in self._validators if item.supports(*binding))
 
         if extension is None:
             if required:

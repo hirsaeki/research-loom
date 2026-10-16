@@ -16,7 +16,9 @@ from plugins.desktop_research.attempts import reconstruct_attempts
 
 from .facade import LocalApplicationError
 from .material_content_facade import _artifact_pair_for_capture
-from .material_reacquisition_public_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
+from .material_reacquisition_public_facade import (
+    LocalApplicationFacade as _BaseLocalApplicationFacade,
+)
 from . import new_material_continuation_admission as admission
 
 _CONTINUATION_LOCK = RLock()
@@ -86,9 +88,7 @@ def _render_reacquired_html_rendition(
     parser.close()
     rendered_text = (
         "\n".join(
-            " ".join(line.split())
-            for line in "".join(parser.parts).splitlines()
-            if line.strip()
+            " ".join(line.split()) for line in "".join(parser.parts).splitlines() if line.strip()
         )
         + "\n"
     )
@@ -154,6 +154,7 @@ def _target_lock(workspace_root, reacquisition_run_id: str):
 
                 fcntl.flock(fd, fcntl.LOCK_UN)
         os.close(fd)
+
 
 def _remap_outputs(
     handoff: Mapping[str, Any],
@@ -379,9 +380,7 @@ class NewMaterialContinuationService:
                 self._project_id,
                 reacquisition_run_id,
                 historical_payload,
-                current_bound_run_id=(
-                    str(binding["new_run_id"]) if binding is not None else None
-                ),
+                current_bound_run_id=(str(binding["new_run_id"]) if binding is not None else None),
             )
             if interrupted is not None:
                 if interrupted.status in {RunStatus.PREPARED, RunStatus.RUNNING}:
@@ -474,7 +473,11 @@ class NewMaterialContinuationService:
             if prior_run is None:
                 historical_payload.pop("parent_run_id", None)
             else:
-                if prior_run.status not in {RunStatus.COMPLETED, RunStatus.FAILED, RunStatus.ABORTED}:
+                if prior_run.status not in {
+                    RunStatus.COMPLETED,
+                    RunStatus.FAILED,
+                    RunStatus.ABORTED,
+                }:
                     raise LocalApplicationError(
                         "APPLICATION-NEW-MATERIAL-CONTINUATION-IDEMPOTENCY-001",
                         "prior continuation attempt is still active",
@@ -492,8 +495,7 @@ class NewMaterialContinuationService:
                     "action_type": "desktop_research.investigate",
                     "payload": historical_payload,
                     "rationale": (
-                        "Continue persisted NEW_MATERIAL_VERSION from "
-                        f"{reacquisition_run_id}."
+                        f"Continue persisted NEW_MATERIAL_VERSION from {reacquisition_run_id}."
                     ),
                     "conversation_id": admission._continuation_conversation_id(
                         reacquisition_run_id
@@ -555,7 +557,11 @@ class NewMaterialContinuationService:
                 )
                 execution = collected.get("execution_result") or {}
                 run_wire = execution.get("run") if isinstance(execution, Mapping) else None
-                proposal = execution.get("state_delta_proposal") if isinstance(execution, Mapping) else None
+                proposal = (
+                    execution.get("state_delta_proposal")
+                    if isinstance(execution, Mapping)
+                    else None
+                )
                 if (
                     not isinstance(run_wire, Mapping)
                     or run_wire.get("status") != "COMPLETED"
@@ -628,9 +634,7 @@ class NewMaterialContinuationService:
         store = self._application.execution_store
         capture_map: dict[str, str] = {}
         target_capture_id = str(result["historical_capture_id"])
-        new_material_kind = str(
-            result.get("new_material_kind") or result.get("kind") or ""
-        )
+        new_material_kind = str(result.get("new_material_kind") or result.get("kind") or "")
         target_count = 0
         service = DesktopResearchCaptureService(store)
 
@@ -660,7 +664,9 @@ class NewMaterialContinuationService:
                         text_content = new_artifact.content
                         acquired_at = str(result["reacquired_at"])
                     else:
-                        text_content = store.load_artifact_verified_once(old_text.artifact_id).content
+                        text_content = store.load_artifact_verified_once(
+                            old_text.artifact_id
+                        ).content
                         acquired_at = str(old_capture["acquired_at"])
             except Exception as exc:
                 if isinstance(exc, LocalApplicationError):
@@ -724,9 +730,7 @@ class NewMaterialContinuationService:
         capture_map: Mapping[str, str],
         reacquisition_run_id: str,
     ) -> dict[str, str]:
-        old_attempts = reconstruct_attempts(
-            self._application.operational_store, historical.run_id
-        )
+        old_attempts = reconstruct_attempts(self._application.operational_store, historical.run_id)
         recorder = DesktopResearchAttemptRecorder(
             new_run,
             self._application.execution_store,
@@ -763,9 +767,7 @@ class NewMaterialContinuationService:
                 failure_or_blocking_reason=attempt.get("failure_or_blocking_reason"),
                 target_locator=attempt.get("target_locator"),
                 resulting_capture_id=(
-                    capture_map[str(old_resulting)]
-                    if old_resulting in capture_map
-                    else None
+                    capture_map[str(old_resulting)] if old_resulting in capture_map else None
                 ),
                 provenance=provenance,
             )

@@ -220,14 +220,17 @@ class DesktopResearchRetentionReviewFixTests(unittest.TestCase):
                     except LocalApplicationError as exc:
                         return exc.code
 
-                with patch.object(
-                    app1.execution_store,
-                    "_stage_controlled_original",
-                    side_effect=delayed_stage,
-                ), patch.object(
-                    app2.execution_store,
-                    "_stage_controlled_original",
-                    side_effect=observed_second_stage,
+                with (
+                    patch.object(
+                        app1.execution_store,
+                        "_stage_controlled_original",
+                        side_effect=delayed_stage,
+                    ),
+                    patch.object(
+                        app2.execution_store,
+                        "_stage_controlled_original",
+                        side_effect=observed_second_stage,
+                    ),
                 ):
                     with ThreadPoolExecutor(max_workers=2) as pool:
                         first = pool.submit(

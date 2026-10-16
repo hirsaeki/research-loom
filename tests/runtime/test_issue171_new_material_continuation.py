@@ -150,17 +150,25 @@ class Issue171NewMaterialContinuationTests(ResearchPackageAcceptanceSupport):
                 {item.role for item in artifacts},
                 {"desktop_research.original_capture", "desktop_research.text_rendition"},
             )
-            text = next(item for item in artifacts if item.role == "desktop_research.text_rendition")
+            text = next(
+                item for item in artifacts if item.role == "desktop_research.text_rendition"
+            )
             self.assertEqual(text.provenance["reacquisition_run_id"], reacq_run_id)
             self.assertEqual(text.provenance["historical_run_id"], case["run_id"])
             self.assertEqual(text.provenance["historical_capture_id"], "CAP-1")
 
             old = facade.show_run(case["run_id"])
-            self.assertEqual(old["finding_recovery"]["recovery_class"], "material_recovery_required")
+            self.assertEqual(
+                old["finding_recovery"]["recovery_class"], "material_recovery_required"
+            )
             reacq_shown = facade.show_run(reacq_run_id)
             self.assertEqual(reacq_shown["new_material_continuation"]["status"], "completed")
-            self.assertEqual(reacq_shown["new_material_continuation"]["new_run_id"], data["new_run_id"])
-            self.assertFalse(reacq_shown["new_material_continuation"]["historical_recovery_satisfied"])
+            self.assertEqual(
+                reacq_shown["new_material_continuation"]["new_run_id"], data["new_run_id"]
+            )
+            self.assertFalse(
+                reacq_shown["new_material_continuation"]["historical_recovery_satisfied"]
+            )
             new_shown = facade.show_run(data["new_run_id"])
             self.assertEqual(new_shown["run"]["status"], "COMPLETED")
             self.assertIsNotNone(new_shown["run"]["handoff"]["ref"])
@@ -174,7 +182,9 @@ class Issue171NewMaterialContinuationTests(ResearchPackageAcceptanceSupport):
             self.assertEqual(lineage["reacquisition_run_id"], reacq_run_id)
             self.assertEqual(lineage["new_material_artifact_id"], reacquired["new_artifact_id"])
             self.assertEqual(lineage["exact_locator"], "https://example.test/source-a#section-1")
-            self.assertEqual(lineage["historical_acquired_at"], reacquired["historical_acquired_at"])
+            self.assertEqual(
+                lineage["historical_acquired_at"], reacquired["historical_acquired_at"]
+            )
             self.assertEqual(lineage["reacquired_at"], reacquired["reacquired_at"])
             self.assertNotIn("storage_locator", str(lineage))
 
@@ -194,15 +204,11 @@ class Issue171NewMaterialContinuationTests(ResearchPackageAcceptanceSupport):
         try:
             historical_before = facade._application.execution_store.load_run(case["run_id"])
             state_before = self._snapshot(facade)
-            original, rendition, changed, reacquired = self._make_original_new_version(
-                facade, case
-            )
+            original, rendition, changed, reacquired = self._make_original_new_version(facade, case)
             result = facade.submit_action(
                 {
                     "action_type": "desktop_research.material.continue_new_version",
-                    "payload": {
-                        "reacquisition_run_id": reacquired["reacquisition_run_id"]
-                    },
+                    "payload": {"reacquisition_run_id": reacquired["reacquisition_run_id"]},
                 }
             )
             self.assertEqual(result["status"], "SUCCEEDED")
@@ -271,9 +277,7 @@ class Issue171NewMaterialContinuationTests(ResearchPackageAcceptanceSupport):
             rejected = facade.submit_action(
                 {
                     "action_type": "desktop_research.material.continue_new_version",
-                    "payload": {
-                        "reacquisition_run_id": reacquired["reacquisition_run_id"]
-                    },
+                    "payload": {"reacquisition_run_id": reacquired["reacquisition_run_id"]},
                 }
             )
             self.assertEqual(rejected["status"], "FAILED")
@@ -289,9 +293,7 @@ class Issue171NewMaterialContinuationTests(ResearchPackageAcceptanceSupport):
                 admitted = facade.submit_action(
                     {
                         "action_type": "desktop_research.material.continue_new_version",
-                        "payload": {
-                            "reacquisition_run_id": reacquired["reacquisition_run_id"]
-                        },
+                        "payload": {"reacquisition_run_id": reacquired["reacquisition_run_id"]},
                     }
                 )["data"]
             self.assertEqual(admitted["status"], "COMPLETED")
@@ -337,7 +339,6 @@ class Issue171NewMaterialContinuationTests(ResearchPackageAcceptanceSupport):
             self.assertEqual(admitted["status"], "COMPLETED")
         finally:
             facade.close()
-
 
     def test_missing_persisted_new_material_fails_before_new_execution(self):
         facade, case = self._prepare_case()
@@ -387,9 +388,7 @@ class Issue171NewMaterialContinuationTests(ResearchPackageAcceptanceSupport):
             rejected = facade.submit_action(
                 {
                     "action_type": "desktop_research.material.continue_new_version",
-                    "payload": {
-                        "reacquisition_run_id": reacquired["reacquisition_run_id"]
-                    },
+                    "payload": {"reacquisition_run_id": reacquired["reacquisition_run_id"]},
                 }
             )
             self.assertEqual(rejected["status"], "FAILED")
@@ -411,9 +410,7 @@ class Issue171NewMaterialContinuationTests(ResearchPackageAcceptanceSupport):
             repeated = facade.submit_action(
                 {
                     "action_type": "desktop_research.material.continue_new_version",
-                    "payload": {
-                        "reacquisition_run_id": reacquired["reacquisition_run_id"]
-                    },
+                    "payload": {"reacquisition_run_id": reacquired["reacquisition_run_id"]},
                 }
             )
             self.assertEqual(repeated["status"], "SUCCEEDED")
@@ -439,9 +436,7 @@ class Issue171NewMaterialContinuationTests(ResearchPackageAcceptanceSupport):
             store = facade._application.execution_store
             from plugins.local_application import new_material_continuation_admission as admission
 
-            store.store_diagnostic(
-                run_id, admission._CONTINUATION_BINDING_DIAGNOSTIC, binding
-            )
+            store.store_diagnostic(run_id, admission._CONTINUATION_BINDING_DIAGNOSTIC, binding)
             store.store_diagnostic(
                 case["run_id"], admission._CONTINUATION_BINDING_DIAGNOSTIC, binding
             )

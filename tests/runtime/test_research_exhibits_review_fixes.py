@@ -93,17 +93,17 @@ class ResearchExhibitReviewFixTests(unittest.TestCase):
                 try:
                     base_columns = {
                         str(row[1])
-                        for row in connection.execute(
-                            "PRAGMA table_info(research_exhibits)"
-                        )
+                        for row in connection.execute("PRAGMA table_info(research_exhibits)")
                     }
                     self.assertNotIn("metadata_json", base_columns)
-                    self.assertIsNotNone(connection.execute(
-                        """
+                    self.assertIsNotNone(
+                        connection.execute(
+                            """
                         SELECT 1 FROM sqlite_master
                         WHERE type='table' AND name='research_exhibit_metadata'
                         """
-                    ).fetchone())
+                        ).fetchone()
+                    )
                     row = connection.execute(
                         """
                         SELECT metadata_json FROM research_exhibit_metadata
@@ -198,24 +198,28 @@ class ResearchExhibitReviewFixTests(unittest.TestCase):
                 )
                 connection = sqlite3.connect(database)
                 try:
-                    self.assertIsNone(connection.execute(
-                        """
+                    self.assertIsNone(
+                        connection.execute(
+                            """
                         SELECT 1 FROM sqlite_master
                         WHERE type='table' AND name='research_exhibit_metadata'
                         """
-                    ).fetchone())
+                        ).fetchone()
+                    )
                 finally:
                     connection.close()
 
                 second = facade.capture_exhibit(exhibit_payload(title="new exhibit"))
                 connection = sqlite3.connect(database)
                 try:
-                    self.assertIsNotNone(connection.execute(
-                        """
+                    self.assertIsNotNone(
+                        connection.execute(
+                            """
                         SELECT 1 FROM sqlite_master
                         WHERE type='table' AND name='research_exhibit_metadata'
                         """
-                    ).fetchone())
+                        ).fetchone()
+                    )
                     metadata_ids = {
                         str(row[0])
                         for row in connection.execute(

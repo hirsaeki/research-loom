@@ -40,7 +40,9 @@ class HumanDecisionHardStopContractTests(unittest.TestCase):
                 self.assertIn(phrase, skill)
 
     def test_bootstrap_enforces_same_hard_stop(self):
-        bootstrap = compact((SKILL_ROOT / "references" / "host-bootstrap.md").read_text(encoding="utf-8"))
+        bootstrap = compact(
+            (SKILL_ROOT / "references" / "host-bootstrap.md").read_text(encoding="utf-8")
+        )
         for phrase in (
             "decision request as a conversational hard stop",
             "end the user-visible turn and wait",
@@ -51,7 +53,11 @@ class HumanDecisionHardStopContractTests(unittest.TestCase):
                 self.assertIn(phrase, bootstrap)
 
     def test_uat_records_exact_2f73_failure(self):
-        runbook = compact((ROOT / "docs" / "architecture" / "misco-integrated-acceptance.md").read_text(encoding="utf-8"))
+        runbook = compact(
+            (ROOT / "docs" / "architecture" / "misco-integrated-acceptance.md").read_text(
+                encoding="utf-8"
+            )
+        )
         for phrase in (
             "ordinary Human Decision request is also a **hard stop**",
             "2f73d96d3bcaf686526d5935ee6e293d5a75744e",
@@ -65,7 +71,9 @@ class HumanDecisionHardStopContractTests(unittest.TestCase):
     def test_explicit_later_diagnostics_still_allowed(self):
         skill = compact((SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8"))
         self.assertIn("If the human later explicitly asks why the confirmation was required", skill)
-        self.assertIn("requests diagnostics/mechanics, explain the implementation accurately", skill)
+        self.assertIn(
+            "requests diagnostics/mechanics, explain the implementation accurately", skill
+        )
 
 
 if __name__ == "__main__":

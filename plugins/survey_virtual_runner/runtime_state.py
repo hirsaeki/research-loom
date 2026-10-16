@@ -27,32 +27,43 @@ def expected_issue_codes(faults: Sequence[str]) -> set[str]:
     return result
 
 
-def defects_from_issues(issues: Sequence[Mapping[str, Any]], *, run_id: str, instrument_id: str, expected_codes: set[str]) -> list[dict[str, Any]]:
+def defects_from_issues(
+    issues: Sequence[Mapping[str, Any]],
+    *,
+    run_id: str,
+    instrument_id: str,
+    expected_codes: set[str],
+) -> list[dict[str, Any]]:
     defects: list[dict[str, Any]] = []
     for index, item in enumerate(issues, start=1):
         code = str(item.get("code") or "SURVEY_RESPONSE_UNKNOWN")
         expected = code in expected_codes
         refs = [
-            str(value) for value in (item.get("response_id"), item.get("response_key"))
+            str(value)
+            for value in (item.get("response_id"), item.get("response_key"))
             if isinstance(value, str) and value
         ]
-        defects.append({
-            "defect_id": f"VRDEF-{index:04d}",
-            "taxonomy": "INSTRUMENT_DEFECT" if "BRANCH" in code or "CHOICE" in code else "EXECUTION_DEFECT",
-            "severity": "major" if str(item.get("severity")) == "error" else "minor",
-            "affected_ref": instrument_id,
-            "detecting_run_id": run_id,
-            "reproduction_refs": refs,
-            "observed_behavior": str(item.get("message") or code),
-            "expected_contract_behavior": "The exact pinned Survey response must satisfy canonical Survey response semantics.",
-            "proposed_correction": (
-                "No canonical change is required for an intentionally injected STRESS fault."
-                if expected
-                else "Review the pinned Instrument or runner implementation and revise only through the authoritative path if required."
-            ),
-            "disposition": "resolved" if expected else "open",
-            "resolution_refs": [f"stress:{code}"] if expected else [],
-        })
+        defects.append(
+            {
+                "defect_id": f"VRDEF-{index:04d}",
+                "taxonomy": "INSTRUMENT_DEFECT"
+                if "BRANCH" in code or "CHOICE" in code
+                else "EXECUTION_DEFECT",
+                "severity": "major" if str(item.get("severity")) == "error" else "minor",
+                "affected_ref": instrument_id,
+                "detecting_run_id": run_id,
+                "reproduction_refs": refs,
+                "observed_behavior": str(item.get("message") or code),
+                "expected_contract_behavior": "The exact pinned Survey response must satisfy canonical Survey response semantics.",
+                "proposed_correction": (
+                    "No canonical change is required for an intentionally injected STRESS fault."
+                    if expected
+                    else "Review the pinned Instrument or runner implementation and revise only through the authoritative path if required."
+                ),
+                "disposition": "resolved" if expected else "open",
+                "resolution_refs": [f"stress:{code}"] if expected else [],
+            }
+        )
     return defects
 
 
@@ -71,10 +82,20 @@ def candidate_change_requests(defects: Sequence[Mapping[str, Any]]) -> list[dict
 
 def _freeze_signature(pins: Mapping[str, Any]) -> dict[str, Any]:
     keys = (
-        "project_id", "design", "instrument", "rq_ids", "evidence_gap_refs",
-        "human_decision_bindings", "core_method", "protocol", "research_snapshot",
-        "project_config_digest", "effective_profile_set_digest",
-        "virtual_runner_descriptor", "runner_digest", "survey_binding_digest",
+        "project_id",
+        "design",
+        "instrument",
+        "rq_ids",
+        "evidence_gap_refs",
+        "human_decision_bindings",
+        "core_method",
+        "protocol",
+        "research_snapshot",
+        "project_config_digest",
+        "effective_profile_set_digest",
+        "virtual_runner_descriptor",
+        "runner_digest",
+        "survey_binding_digest",
     )
     return {key: deepcopy(pins.get(key)) for key in keys}
 
@@ -139,10 +160,10 @@ def prior_scenarios(
                 f"prior Virtual Run input pins do not match the current freeze: {run_id}",
             )
         result = extension.get("virtual_runner_result")
-        if (
-            not isinstance(result, Mapping)
-            or result.get("scenario_class") not in {"STANDARD", "STRESS"}
-        ):
+        if not isinstance(result, Mapping) or result.get("scenario_class") not in {
+            "STANDARD",
+            "STRESS",
+        }:
             raise CapabilityExecutionError(
                 "VR-FREEZE-STALE-001",
                 f"prior Virtual Run scenario is invalid: {run_id}",
@@ -151,7 +172,13 @@ def prior_scenarios(
     return scenarios
 
 
-def readiness_assessment(*, scenario_class: str, prior: set[str], defects: Sequence[Mapping[str, Any]], policy: Mapping[str, Any]) -> dict[str, Any]:
+def readiness_assessment(
+    *,
+    scenario_class: str,
+    prior: set[str],
+    defects: Sequence[Mapping[str, Any]],
+    policy: Mapping[str, Any],
+) -> dict[str, Any]:
     completed = set(prior)
     completed.add(str(scenario_class))
     reasons: list[str] = []
@@ -163,8 +190,7 @@ def readiness_assessment(*, scenario_class: str, prior: set[str], defects: Seque
     open_blocking = [
         item
         for item in defects
-        if item.get("disposition") == "open"
-        and item.get("severity") in blocking
+        if item.get("disposition") == "open" and item.get("severity") in blocking
     ]
     if open_blocking:
         reasons.append("open blocking Virtual Runner defects remain")

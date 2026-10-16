@@ -105,7 +105,7 @@ def _bounded_utf8_view(
                 raise LocalExecutionStoreIntegrityError(
                     "persisted external text rendition is not valid UTF-8"
                 ) from exc
-            prefix = prefix[:exc.start]
+            prefix = prefix[: exc.start]
     else:
         text = ""
     return {
@@ -272,7 +272,9 @@ def _windows_set_handle_delete_disposition_ex(handle: int) -> None:
     func.restype = wintypes.BOOL
     info = _FileDispositionInfoEx(0x00000001)  # FILE_DISPOSITION_FLAG_DELETE
     if not func(handle, 21, ctypes.byref(info), ctypes.sizeof(info)):
-        raise OSError(ctypes.get_last_error(), "SetFileInformationByHandle(FileDispositionInfoEx) failed")
+        raise OSError(
+            ctypes.get_last_error(), "SetFileInformationByHandle(FileDispositionInfoEx) failed"
+        )
 
 
 def _windows_set_delete_disposition(fd: int, delete: bool) -> None:
@@ -423,7 +425,12 @@ class ExternalMaterialContentService:
         *,
         max_text_bytes: int = _MATERIAL_SHOW_DEFAULT_BYTES,
     ) -> Mapping[str, Any]:
-        if not isinstance(run_id, str) or not run_id or not isinstance(capture_id, str) or not capture_id:
+        if (
+            not isinstance(run_id, str)
+            or not run_id
+            or not isinstance(capture_id, str)
+            or not capture_id
+        ):
             raise LocalApplicationError(
                 "APPLICATION-MATERIAL-INPUT-001",
                 "external material show requires non-empty run_id and capture_id",

@@ -30,7 +30,9 @@ class OrdinaryTurnDomainLanguageContractTests(unittest.TestCase):
                 self.assertIn(phrase, skill)
 
     def test_bootstrap_keeps_internal_route_out_of_progress_narration(self):
-        bootstrap = compact((SKILL_ROOT / "references" / "host-bootstrap.md").read_text(encoding="utf-8"))
+        bootstrap = compact(
+            (SKILL_ROOT / "references" / "host-bootstrap.md").read_text(encoding="utf-8")
+        )
         for phrase in (
             "Do not narrate this route to the human",
             "checking the specified sources",
@@ -44,7 +46,11 @@ class OrdinaryTurnDomainLanguageContractTests(unittest.TestCase):
                 self.assertIn(phrase, bootstrap)
 
     def test_uat_marks_general_skill_narration_as_blocking(self):
-        runbook = compact((ROOT / "docs" / "architecture" / "misco-integrated-acceptance.md").read_text(encoding="utf-8"))
+        runbook = compact(
+            (ROOT / "docs" / "architecture" / "misco-integrated-acceptance.md").read_text(
+                encoding="utf-8"
+            )
+        )
         for phrase in (
             "all ordinary user-visible progress and completion narration",
             "A host fails G4 if it volunteers which Skill",
@@ -57,7 +63,11 @@ class OrdinaryTurnDomainLanguageContractTests(unittest.TestCase):
 
     def test_explicit_diagnostics_remain_available(self):
         skill = compact((SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8"))
-        runbook = compact((ROOT / "docs" / "architecture" / "misco-integrated-acceptance.md").read_text(encoding="utf-8"))
+        runbook = compact(
+            (ROOT / "docs" / "architecture" / "misco-integrated-acceptance.md").read_text(
+                encoding="utf-8"
+            )
+        )
         self.assertIn("If the human explicitly asks how the system works", skill)
         self.assertIn("explicitly asks for diagnostics/mechanics", runbook)
 

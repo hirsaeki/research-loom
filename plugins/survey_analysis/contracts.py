@@ -90,10 +90,9 @@ def validate_aggregate_result(document: Mapping[str, Any]) -> None:
     if errors:
         raise ValueError(errors[0])
     population = document["population"]
-    if (
-        int(population["dataset_response_count"])
-        != int(population["accepted_response_count"]) + int(population["excluded_response_count"])
-    ):
+    if int(population["dataset_response_count"]) != int(
+        population["accepted_response_count"]
+    ) + int(population["excluded_response_count"]):
         raise ValueError("SurveyAggregateResult population counters are inconsistent")
     if document["content_digest"] != aggregate_result_content_digest(document):
         raise ValueError("SurveyAggregateResult content_digest does not match canonical content")

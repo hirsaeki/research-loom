@@ -8,18 +8,23 @@ from unittest.mock import patch
 
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade
 from plugins.local_project_input_store import LocalProjectInputStore
-from tests.runtime.test_research_question_review import _adopt_question, _workspace as make_workspace
+from tests.runtime.test_research_question_review import (
+    _adopt_question,
+    _workspace as make_workspace,
+)
 
 
 class ProjectInputHardeningTests(unittest.TestCase):
     def _register(self, facade, source: Path, *, role: str = "other"):
         snap = facade.resume_context()["research_state"]["snapshot"]
-        return facade.register_project_input({
-            "file": str(source),
-            "role": role,
-            "expected_snapshot_id": snap["snapshot_id"],
-            "expected_snapshot_digest": snap["content_digest"],
-        })["project_input"]
+        return facade.register_project_input(
+            {
+                "file": str(source),
+                "role": role,
+                "expected_snapshot_id": snap["snapshot_id"],
+                "expected_snapshot_digest": snap["content_digest"],
+            }
+        )["project_input"]
 
     def test_registration_rejects_head_change_during_file_read(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -64,11 +69,20 @@ class ProjectInputHardeningTests(unittest.TestCase):
                 self.assertEqual(shown["content"]["value"], content)
                 self.assertEqual(shown["content"]["content_digest"], registered["content_digest"])
                 digest_hex = registered["content_digest"].split(":", 1)[1]
-                blob = workspace / ".research-loom" / "project-inputs" / "blobs" / digest_hex[:2] / digest_hex
+                blob = (
+                    workspace
+                    / ".research-loom"
+                    / "project-inputs"
+                    / "blobs"
+                    / digest_hex[:2]
+                    / digest_hex
+                )
                 blob.write_bytes(b"corrupt")
                 with self.assertRaises(LocalApplicationError) as corrupted:
                     facade.show_project_input(registered["input_id"], format="text")
-                self.assertEqual(corrupted.exception.code, "APPLICATION-PROJECT-INPUT-INTEGRITY-001")
+                self.assertEqual(
+                    corrupted.exception.code, "APPLICATION-PROJECT-INPUT-INTEGRITY-001"
+                )
 
     def test_list_keyset_pagination_reaches_history_beyond_100(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -78,7 +92,8 @@ class ProjectInputHardeningTests(unittest.TestCase):
                 source = workspace / "common.txt"
                 source.write_text("common", encoding="utf-8")
                 common = {
-                    "file": str(source), "role": "other",
+                    "file": str(source),
+                    "role": "other",
                     "expected_snapshot_id": snap["snapshot_id"],
                     "expected_snapshot_digest": snap["content_digest"],
                 }
@@ -89,11 +104,13 @@ class ProjectInputHardeningTests(unittest.TestCase):
                     facade.register_project_input({**common, "file": str(item)})
                 _adopt_question(facade, "Advance snapshot")
                 current = facade.resume_context()["research_state"]["snapshot"]
-                second = facade.register_project_input({
-                    **common,
-                    "expected_snapshot_id": current["snapshot_id"],
-                    "expected_snapshot_digest": current["content_digest"],
-                })["project_input"]
+                second = facade.register_project_input(
+                    {
+                        **common,
+                        "expected_snapshot_id": current["snapshot_id"],
+                        "expected_snapshot_digest": current["content_digest"],
+                    }
+                )["project_input"]
 
                 ids, cursor = [], None
                 while True:
@@ -115,7 +132,8 @@ class ProjectInputHardeningTests(unittest.TestCase):
                 source.write_text("original", encoding="utf-8")
                 snap = facade.resume_context()["research_state"]["snapshot"]
                 payload = {
-                    "file": str(source), "role": "other",
+                    "file": str(source),
+                    "role": "other",
                     "expected_snapshot_id": snap["snapshot_id"],
                     "expected_snapshot_digest": snap["content_digest"],
                 }
@@ -125,12 +143,15 @@ class ProjectInputHardeningTests(unittest.TestCase):
                     _adopt_question(facade, "Ablation advance")
                     return content
 
-                with patch(
-                    "plugins.local_application.project_input_facade.read_controlled_file",
-                    side_effect=read_then_advance,
-                ), patch(
-                    "plugins.local_application.project_input_facade.guard_research_state_head",
-                    side_effect=lambda *_args, **_kwargs: nullcontext(),
+                with (
+                    patch(
+                        "plugins.local_application.project_input_facade.read_controlled_file",
+                        side_effect=read_then_advance,
+                    ),
+                    patch(
+                        "plugins.local_application.project_input_facade.guard_research_state_head",
+                        side_effect=lambda *_args, **_kwargs: nullcontext(),
+                    ),
                 ):
                     stale = facade.register_project_input(payload)["project_input"]
                 current = facade.resume_context()["research_state"]["snapshot"]
@@ -140,7 +161,14 @@ class ProjectInputHardeningTests(unittest.TestCase):
                 # then remove digest verification to demonstrate that corrupted content is returned.
                 registered = self._register(facade, source)
                 digest_hex = registered["content_digest"].split(":", 1)[1]
-                blob = workspace / ".research-loom" / "project-inputs" / "blobs" / digest_hex[:2] / digest_hex
+                blob = (
+                    workspace
+                    / ".research-loom"
+                    / "project-inputs"
+                    / "blobs"
+                    / digest_hex[:2]
+                    / digest_hex
+                )
                 blob.write_bytes(b"tampered")
                 with patch.object(
                     LocalProjectInputStore,

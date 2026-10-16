@@ -34,7 +34,14 @@ def _provider(answer_text: str, *, request_id: str = "resp_test") -> _HttpRespon
         "status": "completed",
         "model": "gpt-test",
         "usage": {"input_tokens": 10, "output_tokens": 5, "total_tokens": 15},
-        "output": [{"type": "message", "id": "msg_test", "status": "completed", "content": [{"type": "output_text", "text": answer_text}]}],
+        "output": [
+            {
+                "type": "message",
+                "id": "msg_test",
+                "status": "completed",
+                "content": [{"type": "output_text", "text": answer_text}],
+            }
+        ],
     }
     return _HttpResponse(200, json.dumps(body).encode("utf-8"), {"x-request-id": request_id})
 
@@ -60,8 +67,29 @@ class SurveyLlmBackendTests(unittest.TestCase):
         }
 
     def test_request_is_structured_minimal_and_secret_is_not_returned(self):
-        transport = _Transport([_provider(json.dumps({"answers": [{"response_key": "role", "state": "answered", "value": "manager"}, {"response_key": "usefulness", "state": "answered", "value": 4}, {"response_key": "count", "state": "unknown", "value": None}, {"response_key": "notes", "state": "answered", "value": "short synthetic note"}]}))])
-        backend = OpenAIResponsesVirtualRespondentBackend(transport=transport, credential_env="SURVEY_TEST_KEY")
+        transport = _Transport(
+            [
+                _provider(
+                    json.dumps(
+                        {
+                            "answers": [
+                                {"response_key": "role", "state": "answered", "value": "manager"},
+                                {"response_key": "usefulness", "state": "answered", "value": 4},
+                                {"response_key": "count", "state": "unknown", "value": None},
+                                {
+                                    "response_key": "notes",
+                                    "state": "answered",
+                                    "value": "short synthetic note",
+                                },
+                            ]
+                        }
+                    )
+                )
+            ]
+        )
+        backend = OpenAIResponsesVirtualRespondentBackend(
+            transport=transport, credential_env="SURVEY_TEST_KEY"
+        )
         with patch.dict(os.environ, {"SURVEY_TEST_KEY": "super-secret-test-key"}, clear=False):
             result = backend.generate_response(
                 instrument=self.instrument,
@@ -86,11 +114,25 @@ class SurveyLlmBackendTests(unittest.TestCase):
         self.assertIn("parsed_answer_payload_digest", result)
 
     def test_invalid_json_gets_one_serialization_only_repair(self):
-        transport = _Transport([
-            _provider("not-json", request_id="resp_bad"),
-            _provider(json.dumps({"answers": [{"response_key": "role", "state": "answered", "value": "manager"}, {"response_key": "usefulness", "state": "answered", "value": 5}]}), request_id="resp_fixed"),
-        ])
-        backend = OpenAIResponsesVirtualRespondentBackend(transport=transport, credential_env="SURVEY_TEST_KEY")
+        transport = _Transport(
+            [
+                _provider("not-json", request_id="resp_bad"),
+                _provider(
+                    json.dumps(
+                        {
+                            "answers": [
+                                {"response_key": "role", "state": "answered", "value": "manager"},
+                                {"response_key": "usefulness", "state": "answered", "value": 5},
+                            ]
+                        }
+                    ),
+                    request_id="resp_fixed",
+                ),
+            ]
+        )
+        backend = OpenAIResponsesVirtualRespondentBackend(
+            transport=transport, credential_env="SURVEY_TEST_KEY"
+        )
         with patch.dict(os.environ, {"SURVEY_TEST_KEY": "test-key"}, clear=False):
             result = backend.generate_response(
                 instrument=self.instrument,
@@ -103,10 +145,14 @@ class SurveyLlmBackendTests(unittest.TestCase):
         self.assertTrue(repaired["serialization_repair_only"])
         self.assertEqual(repaired["invalid_output"], "not-json")
         self.assertEqual(result["parsed_answer_payload"]["answers"][1]["value"], 5)
-        self.assertEqual([x["kind"] for x in result["attempts"]], ["generation", "serialization_repair"])
+        self.assertEqual(
+            [x["kind"] for x in result["attempts"]], ["generation", "serialization_repair"]
+        )
 
     def test_missing_credential_and_timeout_are_distinct_runtime_failures(self):
-        backend = OpenAIResponsesVirtualRespondentBackend(transport=_Transport([]), credential_env="SURVEY_TEST_KEY")
+        backend = OpenAIResponsesVirtualRespondentBackend(
+            transport=_Transport([]), credential_env="SURVEY_TEST_KEY"
+        )
         with patch.dict(os.environ, {}, clear=True):
             with self.assertRaises(VirtualRespondentBackendError) as missing:
                 backend.generate_response(
@@ -118,7 +164,9 @@ class SurveyLlmBackendTests(unittest.TestCase):
         self.assertEqual(missing.exception.code, "AUTH_CONFIGURATION_MISSING")
 
         transport = _Transport([socket.timeout("slow"), socket.timeout("still slow")])
-        backend = OpenAIResponsesVirtualRespondentBackend(transport=transport, credential_env="SURVEY_TEST_KEY")
+        backend = OpenAIResponsesVirtualRespondentBackend(
+            transport=transport, credential_env="SURVEY_TEST_KEY"
+        )
         with patch.dict(os.environ, {"SURVEY_TEST_KEY": "test-key"}, clear=False):
             with self.assertRaises(VirtualRespondentBackendError) as timeout:
                 backend.generate_response(
@@ -165,7 +213,10 @@ class SurveyLlmBackendTests(unittest.TestCase):
                 )
         self.assertEqual(provider.exception.code, "PROVIDER_ERROR")
 
-        backend = OpenAIResponsesVirtualRespondentBackend(transport=_Transport([_HttpResponse(200, b'not-http-json', {})]), credential_env="SURVEY_TEST_KEY")
+        backend = OpenAIResponsesVirtualRespondentBackend(
+            transport=_Transport([_HttpResponse(200, b"not-http-json", {})]),
+            credential_env="SURVEY_TEST_KEY",
+        )
         with patch.dict(os.environ, {"SURVEY_TEST_KEY": "test-key"}, clear=False):
             with self.assertRaises(VirtualRespondentBackendError) as malformed:
                 backend.generate_response(

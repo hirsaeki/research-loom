@@ -30,9 +30,7 @@ def canonical_digest(doc: dict, field: str) -> str:
     """Return the deterministic SHA-256 digest excluding the digest field."""
     value = copy.deepcopy(doc)
     value.pop(field, None)
-    raw = json.dumps(
-        value, ensure_ascii=False, sort_keys=True, separators=(",", ":")
-    ).encode()
+    raw = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
     return "sha256:" + hashlib.sha256(raw).hexdigest()
 
 
@@ -132,10 +130,7 @@ def fork_plan_error(
             return "RL-HUMAN-DECISION-001"
         if decision:
             used.add(decision)
-        if (
-            treatment["treatment"] == "INVALIDATE"
-            and treatment["source_ref"] in effective_refs
-        ):
+        if treatment["treatment"] == "INVALIDATE" and treatment["source_ref"] in effective_refs:
             return "RL-INVALIDATED-LEAK-001"
     if required != used:
         return "RL-HUMAN-DECISION-001"
@@ -175,8 +170,7 @@ def replay_error(
         return "RL-PARENT-001"
     if (
         source_lineage["execution_mode"] != target_lineage["execution_mode"]
-        or plan["baseline_snapshot"]["execution_mode"]
-        != source_lineage["execution_mode"]
+        or plan["baseline_snapshot"]["execution_mode"] != source_lineage["execution_mode"]
     ):
         return "RL-VIRTUAL-REAL-001"
     if set(execution["source_old_run_ids"]) & set(execution["target_new_run_ids"]):
@@ -212,9 +206,7 @@ def comparison_error(comparison: dict) -> str | None:
     return None
 
 
-def downstream_error(
-    binding: dict, active_lineage: dict, active_snapshot: dict
-) -> str | None:
+def downstream_error(binding: dict, active_lineage: dict, active_snapshot: dict) -> str | None:
     """Check Research Package lineage/snapshot freshness after selection."""
     if binding["status_against_active_lineage"] != "current":
         return None

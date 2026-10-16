@@ -22,14 +22,21 @@ STRUCTURAL_TEMPLATE = (
 RESPONSE_SCHEMA_PATH = ROOT / "core/packages/survey/survey-response.schema.json"
 
 
-def runner_digest(*, implementation_id: str = IMPLEMENTATION_ID, implementation_version: str = IMPLEMENTATION_VERSION, template_digest: str | None = None) -> str:
-    return canonical_digest({
-        "implementation_id": implementation_id,
-        "implementation_version": implementation_version,
-        "runner_version": RUNNER_VERSION,
-        "template_digest": template_digest or text_digest(STRUCTURAL_TEMPLATE),
-        "response_schema_digest": file_digest(RESPONSE_SCHEMA_PATH),
-    })
+def runner_digest(
+    *,
+    implementation_id: str = IMPLEMENTATION_ID,
+    implementation_version: str = IMPLEMENTATION_VERSION,
+    template_digest: str | None = None,
+) -> str:
+    return canonical_digest(
+        {
+            "implementation_id": implementation_id,
+            "implementation_version": implementation_version,
+            "runner_version": RUNNER_VERSION,
+            "template_digest": template_digest or text_digest(STRUCTURAL_TEMPLATE),
+            "response_schema_digest": file_digest(RESPONSE_SCHEMA_PATH),
+        }
+    )
 
 
 def survey_binding_digest() -> str:
@@ -71,7 +78,11 @@ def generation_provenance(request, extension: Mapping[str, Any]) -> dict[str, An
         "schema_version": "1.0.0",
         "schema_digest": file_digest(RESPONSE_SCHEMA_PATH),
         "runner_version": RUNNER_VERSION,
-        "runner_digest": runner_digest(implementation_id=implementation_id, implementation_version=implementation_version, template_digest=template_digest),
+        "runner_digest": runner_digest(
+            implementation_id=implementation_id,
+            implementation_version=implementation_version,
+            template_digest=template_digest,
+        ),
         "sampling_seed": extension["runner_configuration"].get("sampling_seed"),
         "generated_at": request.run.started_at or request.run.prepared_at,
         "generation_configuration_digest": configuration_digest,
@@ -80,15 +91,19 @@ def generation_provenance(request, extension: Mapping[str, Any]) -> dict[str, An
         "seed_proves_determinism": False,
     }
     if backend == "llm":
-        value.update({
-            "provider_identity": str(backend_config["backend_id"]),
-            "model_identity": str(backend_config["model_id"]),
-            "model_version_ref": str(backend_config["model_id"]),
-        })
+        value.update(
+            {
+                "provider_identity": str(backend_config["backend_id"]),
+                "model_identity": str(backend_config["model_id"]),
+                "model_version_ref": str(backend_config["model_id"]),
+            }
+        )
     return value
 
 
-def input_pins(request, extension: Mapping[str, Any], provenance: Mapping[str, Any]) -> dict[str, Any]:
+def input_pins(
+    request, extension: Mapping[str, Any], provenance: Mapping[str, Any]
+) -> dict[str, Any]:
     run_spec = extension["run_spec"]
     research_method = extension["research_method_context"]
     pins = {
@@ -107,8 +122,12 @@ def input_pins(request, extension: Mapping[str, Any], provenance: Mapping[str, A
             "input_digest": str(run_spec["input_digest"]),
         },
         "research_snapshot": deepcopy(dict(request.context_pack["pins"]["research_snapshot"])),
-        "project_config_digest": str(request.context_pack["pins"]["project_config"]["configuration_digest"]),
-        "effective_profile_set_digest": str(request.context_pack["pins"]["effective_profile_set"]["content_digest"]),
+        "project_config_digest": str(
+            request.context_pack["pins"]["project_config"]["configuration_digest"]
+        ),
+        "effective_profile_set_digest": str(
+            request.context_pack["pins"]["effective_profile_set"]["content_digest"]
+        ),
         "virtual_runner_descriptor": {
             "capability_id": str(request.descriptor["capability_id"]),
             "version": str(request.descriptor["capability_version"]),
@@ -129,7 +148,9 @@ def input_pins(request, extension: Mapping[str, Any], provenance: Mapping[str, A
     return pins
 
 
-def build_virtual_context(request, extension: Mapping[str, Any], provenance: Mapping[str, Any]) -> dict[str, Any]:
+def build_virtual_context(
+    request, extension: Mapping[str, Any], provenance: Mapping[str, Any]
+) -> dict[str, Any]:
     protocol = extension["protocol_ref"]
     instrument = extension["instrument_ref"]
     run_spec = extension["run_spec"]
@@ -144,7 +165,9 @@ def build_virtual_context(request, extension: Mapping[str, Any], provenance: Map
             "method_family": "survey",
             "method_capability_id": "research-method.survey",
             "function_id": "execute",
-            "research_method_context_extension_digest": str(extension["research_method_context"]["extension_digest"]),
+            "research_method_context_extension_digest": str(
+                extension["research_method_context"]["extension_digest"]
+            ),
         },
         "adopted_core_method": {
             "method_id": str(extension["core_method_ref"]["method_id"]),
@@ -157,12 +180,14 @@ def build_virtual_context(request, extension: Mapping[str, Any], provenance: Map
             "content_digest": str(protocol["content_digest"]),
             "approval_status": "approved",
         },
-        "approved_instruments": [{
-            "id": str(instrument["id"]),
-            "version": str(instrument["version"]),
-            "content_digest": str(instrument["content_digest"]),
-            "approval_status": "approved",
-        }],
+        "approved_instruments": [
+            {
+                "id": str(instrument["id"]),
+                "version": str(instrument["version"]),
+                "content_digest": str(instrument["content_digest"]),
+                "approval_status": "approved",
+            }
+        ],
         "run_spec": {
             "id": str(run_spec["run_spec_id"]),
             "version": str(run_spec["version"]),
@@ -170,8 +195,12 @@ def build_virtual_context(request, extension: Mapping[str, Any], provenance: Map
             "input_digest": str(run_spec["input_digest"]),
         },
         "pins": {
-            "project_config_digest": str(request.context_pack["pins"]["project_config"]["configuration_digest"]),
-            "effective_profile_set_digest": str(request.context_pack["pins"]["effective_profile_set"]["content_digest"]),
+            "project_config_digest": str(
+                request.context_pack["pins"]["project_config"]["configuration_digest"]
+            ),
+            "effective_profile_set_digest": str(
+                request.context_pack["pins"]["effective_profile_set"]["content_digest"]
+            ),
             "research_snapshot": deepcopy(dict(request.context_pack["pins"]["research_snapshot"])),
         },
         "runtime_authorization": {
@@ -181,7 +210,9 @@ def build_virtual_context(request, extension: Mapping[str, Any], provenance: Map
         "synthetic_population": deepcopy(dict(extension["synthetic_population"])),
         "generation_provenance": deepcopy(dict(provenance)),
         "runner_configuration_pin": {
-            "runner_id": "survey-llm-respondent" if extension.get("generator_backend") == "llm" else "survey-structural-runner",
+            "runner_id": "survey-llm-respondent"
+            if extension.get("generator_backend") == "llm"
+            else "survey-structural-runner",
             "version": RUNNER_VERSION,
             "content_digest": canonical_digest(extension["runner_configuration"]),
         },

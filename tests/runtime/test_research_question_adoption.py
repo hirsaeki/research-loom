@@ -20,7 +20,9 @@ from plugins.local_application.cli import main as cli_main
 ROOT = Path(__file__).resolve().parents[2]
 PROJECT_FIXTURE = ROOT / "projects/fixtures/valid/generic-project-config.json"
 PROFILE_FIXTURE = ROOT / "profiles/fixtures/valid/effective-profile-set.json"
-RESEARCH_SCHEMA = json.loads((ROOT / "core/models/research-object.schema.json").read_text(encoding="utf-8"))
+RESEARCH_SCHEMA = json.loads(
+    (ROOT / "core/models/research-object.schema.json").read_text(encoding="utf-8")
+)
 
 
 def _configuration_digest(config: dict) -> str:
@@ -103,7 +105,9 @@ class ResearchQuestionProposalTests(unittest.TestCase):
             workspace = _init_workspace(Path(temp))
             with LocalApplicationFacade.open_workspace(workspace) as facade:
                 before = facade.status()["snapshot"]
-                definitions = {item["action_type"]: item for item in facade.list_actions()["actions"]}
+                definitions = {
+                    item["action_type"]: item for item in facade.list_actions()["actions"]
+                }
                 definition = definitions["research_question.propose"]
                 self.assertEqual(definition["effect"], "read_only")
                 self.assertFalse(definition["confirmation_required"])
@@ -139,17 +143,24 @@ class ResearchQuestionProposalTests(unittest.TestCase):
                     state_delta["proposal_id"]
                 )
                 self.assertEqual(stored, state_delta)
-                kinds = {item["kind"] for item in facade._application.state_repository.load_state_view(
-                    facade.project_id,
-                    facade._application.state_repository.load_active_lineage_ref(facade.project_id),
-                ).effective_objects()}
+                kinds = {
+                    item["kind"]
+                    for item in facade._application.state_repository.load_state_view(
+                        facade.project_id,
+                        facade._application.state_repository.load_active_lineage_ref(
+                            facade.project_id
+                        ),
+                    ).effective_objects()
+                }
                 self.assertNotIn("research_question", kinds)
                 self.assertNotIn("source", kinds)
                 self.assertNotIn("evidence", kinds)
 
                 null_parent = facade.submit_action(_proposal_input(parent_question_id=None))
                 self.assertEqual(null_parent["status"], "SUCCEEDED")
-                self.assertNotIn("parent_question_id", null_parent["data"]["research_question_candidate"])
+                self.assertNotIn(
+                    "parent_question_id", null_parent["data"]["research_question_candidate"]
+                )
 
                 forbidden_fields = {
                     "id": "RQ-CALLER",
@@ -185,7 +196,9 @@ class ResearchQuestionProposalTests(unittest.TestCase):
                     with self.subTest(payload=payload):
                         failed = facade.submit_action(_proposal_input(**payload))
                         self.assertEqual(failed["status"], "FAILED")
-                        self.assertFalse(failed["action_receipt"]["research_state_mutation_performed"])
+                        self.assertFalse(
+                            failed["action_receipt"]["research_state_mutation_performed"]
+                        )
                         self.assertEqual(before, facade.status()["snapshot"])
 
     def test_valid_authoritative_parent_is_accepted_after_adoption(self):
@@ -194,26 +207,38 @@ class ResearchQuestionProposalTests(unittest.TestCase):
             with LocalApplicationFacade.open_workspace(workspace) as facade:
                 proposed = facade.submit_action(_proposal_input())
                 parent_id = proposed["data"]["research_question_candidate"]["id"]
-                apply = facade.submit_action({
-                    "action_type": "state.apply_candidate",
-                    "payload": {"state_delta_proposal_id": proposed["data"]["state_delta_proposal_id"]},
-                    "actor_id": "HUMAN-RQ",
-                })
-                decision = facade.submit_confirmation({
-                    "confirmation_request_id": apply["confirmation_request"]["confirmation_request_id"],
-                    "actor_id": "HUMAN-RQ",
-                })["decision_request"]
-                resolved = facade.resolve_human_decision({
-                    "request_id": decision["request_id"],
-                    "request_digest": decision["request_digest"],
-                    "disposition": "approve_exact",
-                    "actor_id": "HUMAN-RQ",
-                })
+                apply = facade.submit_action(
+                    {
+                        "action_type": "state.apply_candidate",
+                        "payload": {
+                            "state_delta_proposal_id": proposed["data"]["state_delta_proposal_id"]
+                        },
+                        "actor_id": "HUMAN-RQ",
+                    }
+                )
+                decision = facade.submit_confirmation(
+                    {
+                        "confirmation_request_id": apply["confirmation_request"][
+                            "confirmation_request_id"
+                        ],
+                        "actor_id": "HUMAN-RQ",
+                    }
+                )["decision_request"]
+                resolved = facade.resolve_human_decision(
+                    {
+                        "request_id": decision["request_id"],
+                        "request_digest": decision["request_digest"],
+                        "disposition": "approve_exact",
+                        "actor_id": "HUMAN-RQ",
+                    }
+                )
                 self.assertEqual(resolved["status"], "RESOLVED")
-                child = facade.submit_action(_proposal_input(
-                    text="親RQを実装条件へ分解すると何が必要か",
-                    parent_question_id=parent_id,
-                ))
+                child = facade.submit_action(
+                    _proposal_input(
+                        text="親RQを実装条件へ分解すると何が必要か",
+                        parent_question_id=parent_id,
+                    )
+                )
                 self.assertEqual(child["status"], "SUCCEEDED")
                 self.assertEqual(
                     child["data"]["research_question_candidate"]["parent_question_id"], parent_id
@@ -226,73 +251,139 @@ class ResearchQuestionAdoptionCliTests(unittest.TestCase):
             root = Path(temp)
             config, profiles = _write_inputs(root)
             workspace = root / "workspace"
-            code, initialized = _run_cli([
-                "init", "--workspace", str(workspace), "--project-config", str(config),
-                "--effective-profile-set", str(profiles), "--json",
-            ])
+            code, initialized = _run_cli(
+                [
+                    "init",
+                    "--workspace",
+                    str(workspace),
+                    "--project-config",
+                    str(config),
+                    "--effective-profile-set",
+                    str(profiles),
+                    "--json",
+                ]
+            )
             self.assertEqual((code, initialized["status"]), (0, "INITIALIZED"))
             initial_snapshot = initialized["snapshot_id"]
 
             actions_file = _write_json(root / "rq-proposal.json", _proposal_input())
-            code, proposed = _run_cli([
-                "action", "submit", "--workspace", str(workspace), "--json", str(actions_file),
-            ])
+            code, proposed = _run_cli(
+                [
+                    "action",
+                    "submit",
+                    "--workspace",
+                    str(workspace),
+                    "--json",
+                    str(actions_file),
+                ]
+            )
             self.assertEqual((code, proposed["status"]), (0, "SUCCEEDED"))
             rq_candidate = proposed["data"]["research_question_candidate"]
             candidate_id = proposed["data"]["state_delta_proposal_id"]
             self.assertFalse(proposed["action_receipt"]["research_state_mutation_performed"])
 
-            status_query = _write_json(root / "research-status.json", {
-                "action_type": "research.status",
-                "payload": {"kinds": ["research_question"]},
-            })
-            code, status_before = _run_cli([
-                "action", "submit", "--workspace", str(workspace), "--json", str(status_query),
-            ])
+            status_query = _write_json(
+                root / "research-status.json",
+                {
+                    "action_type": "research.status",
+                    "payload": {"kinds": ["research_question"]},
+                },
+            )
+            code, status_before = _run_cli(
+                [
+                    "action",
+                    "submit",
+                    "--workspace",
+                    str(workspace),
+                    "--json",
+                    str(status_query),
+                ]
+            )
             self.assertEqual(code, 0)
             self.assertEqual(status_before["data"]["objects"], [])
 
-            apply_file = _write_json(root / "apply.json", {
-                "action_type": "state.apply_candidate",
-                "payload": {"state_delta_proposal_id": candidate_id},
-                "actor_id": "HUMAN-RQ",
-            })
-            code, apply = _run_cli([
-                "action", "submit", "--workspace", str(workspace), "--json", str(apply_file),
-            ])
+            apply_file = _write_json(
+                root / "apply.json",
+                {
+                    "action_type": "state.apply_candidate",
+                    "payload": {"state_delta_proposal_id": candidate_id},
+                    "actor_id": "HUMAN-RQ",
+                },
+            )
+            code, apply = _run_cli(
+                [
+                    "action",
+                    "submit",
+                    "--workspace",
+                    str(workspace),
+                    "--json",
+                    str(apply_file),
+                ]
+            )
             self.assertEqual((code, apply["status"]), (0, "CONFIRMATION_REQUIRED"))
             self.assertNotIn("action_receipt", apply)
 
-            confirmation_file = _write_json(root / "confirmation.json", {
-                "confirmation_request_id": apply["confirmation_request"]["confirmation_request_id"],
-                "actor_id": "HUMAN-RQ",
-            })
-            code, confirmed = _run_cli([
-                "confirmation", "submit", "--workspace", str(workspace), "--json", str(confirmation_file),
-            ])
+            confirmation_file = _write_json(
+                root / "confirmation.json",
+                {
+                    "confirmation_request_id": apply["confirmation_request"][
+                        "confirmation_request_id"
+                    ],
+                    "actor_id": "HUMAN-RQ",
+                },
+            )
+            code, confirmed = _run_cli(
+                [
+                    "confirmation",
+                    "submit",
+                    "--workspace",
+                    str(workspace),
+                    "--json",
+                    str(confirmation_file),
+                ]
+            )
             self.assertEqual((code, confirmed["status"]), (0, "HUMAN_DECISION_REQUIRED"))
             request = confirmed["decision_request"]
             unit = request["decision_units"][0]
             self.assertEqual(unit["required_decision_kind"], "research_adoption")
             self.assertEqual(unit["required_choice"], "approve")
-            self.assertEqual(unit["subject"], {"kind": "research_question", "id": rq_candidate["id"]})
+            self.assertEqual(
+                unit["subject"], {"kind": "research_question", "id": rq_candidate["id"]}
+            )
             self.assertEqual(unit["candidate_value"], rq_candidate)
 
-            decision_file = _write_json(root / "decision.json", {
-                "request_id": request["request_id"],
-                "request_digest": request["request_digest"],
-                "disposition": "approve_exact",
-                "actor_id": "HUMAN-RQ",
-            })
-            code, resolved = _run_cli([
-                "decision", "resolve", "--workspace", str(workspace), "--json", str(decision_file),
-            ])
+            decision_file = _write_json(
+                root / "decision.json",
+                {
+                    "request_id": request["request_id"],
+                    "request_digest": request["request_digest"],
+                    "disposition": "approve_exact",
+                    "actor_id": "HUMAN-RQ",
+                },
+            )
+            code, resolved = _run_cli(
+                [
+                    "decision",
+                    "resolve",
+                    "--workspace",
+                    str(workspace),
+                    "--json",
+                    str(decision_file),
+                ]
+            )
             self.assertEqual((code, resolved["status"]), (0, "RESOLVED"))
             self.assertIsNotNone(resolved["commit_receipt"])
 
-            code, research_status = _run_cli([
-                "action", "submit", "--workspace", str(workspace), "--json", str(status_query),
-            ])
+            code, research_status = _run_cli(
+                [
+                    "action",
+                    "submit",
+                    "--workspace",
+                    str(workspace),
+                    "--json",
+                    str(status_query),
+                ]
+            )
             self.assertEqual(code, 0)
             self.assertEqual(len(research_status["data"]["objects"]), 1)
             authoritative = research_status["data"]["objects"][0]
@@ -323,28 +414,47 @@ class ResearchQuestionAdoptionCliTests(unittest.TestCase):
                 with LocalApplicationFacade.open_workspace(workspace) as facade:
                     before = facade.status()["snapshot"]
                     proposed = facade.submit_action(_proposal_input())
-                    apply = facade.submit_action({
-                        "action_type": "state.apply_candidate",
-                        "payload": {"state_delta_proposal_id": proposed["data"]["state_delta_proposal_id"]},
-                        "actor_id": "HUMAN-RQ",
-                    })
-                    request = facade.submit_confirmation({
-                        "confirmation_request_id": apply["confirmation_request"]["confirmation_request_id"],
-                        "actor_id": "HUMAN-RQ",
-                    })["decision_request"]
-                    resolved = facade.resolve_human_decision({
-                        "request_id": request["request_id"],
-                        "request_digest": request["request_digest"],
-                        "disposition": disposition,
-                        "actor_id": "HUMAN-RQ",
-                    })
+                    apply = facade.submit_action(
+                        {
+                            "action_type": "state.apply_candidate",
+                            "payload": {
+                                "state_delta_proposal_id": proposed["data"][
+                                    "state_delta_proposal_id"
+                                ]
+                            },
+                            "actor_id": "HUMAN-RQ",
+                        }
+                    )
+                    request = facade.submit_confirmation(
+                        {
+                            "confirmation_request_id": apply["confirmation_request"][
+                                "confirmation_request_id"
+                            ],
+                            "actor_id": "HUMAN-RQ",
+                        }
+                    )["decision_request"]
+                    resolved = facade.resolve_human_decision(
+                        {
+                            "request_id": request["request_id"],
+                            "request_digest": request["request_digest"],
+                            "disposition": disposition,
+                            "actor_id": "HUMAN-RQ",
+                        }
+                    )
                     self.assertEqual(resolved["status"], expected)
                     self.assertEqual(facade.status()["snapshot"], before)
                     state = facade._application.state_repository.load_state_view(
                         facade.project_id,
-                        facade._application.state_repository.load_active_lineage_ref(facade.project_id),
+                        facade._application.state_repository.load_active_lineage_ref(
+                            facade.project_id
+                        ),
                     )
-                    self.assertFalse(any(item["kind"] == "research_question" for item in state.effective_objects()))
+                    self.assertFalse(
+                        any(
+                            item["kind"] == "research_question"
+                            for item in state.effective_objects()
+                        )
+                    )
                     if disposition == "request_revision":
                         revised = facade.submit_action(_proposal_input(text="修正版の研究問い"))
                         self.assertEqual(revised["status"], "SUCCEEDED")
@@ -359,43 +469,67 @@ class ResearchQuestionAdoptionCliTests(unittest.TestCase):
                     facade._application.state_repository.load_active_lineage_ref(facade.project_id),
                 )
                 source = {
-                    "schema_version": "0.1.0", "id": "SRC-HEAD-ADVANCE", "kind": "source",
-                    "revision": 0, "project_id": facade.project_id, "source_type": "report",
+                    "schema_version": "0.1.0",
+                    "id": "SRC-HEAD-ADVANCE",
+                    "kind": "source",
+                    "revision": 0,
+                    "project_id": facade.project_id,
+                    "source_type": "report",
                     "canonical_locator": "fixture://head-advance",
                 }
-                head_advance = _state_delta(state, "SDP-HEAD-ADVANCE", {
-                    "kind": "CREATE_OBJECT", "payload": {"object": source},
-                    "decision_refs": [], "source_refs": [],
-                })
+                head_advance = _state_delta(
+                    state,
+                    "SDP-HEAD-ADVANCE",
+                    {
+                        "kind": "CREATE_OBJECT",
+                        "payload": {"object": source},
+                        "decision_refs": [],
+                        "source_refs": [],
+                    },
+                )
                 facade._application.conversation_store.store_state_delta_proposal(
                     head_advance["proposal_id"], head_advance
                 )
-                apply = facade.submit_action({
-                    "action_type": "state.apply_candidate",
-                    "payload": {"state_delta_proposal_id": head_advance["proposal_id"]},
-                    "actor_id": "HUMAN-RQ",
-                })
-                advanced = facade.submit_confirmation({
-                    "confirmation_request_id": apply["confirmation_request"]["confirmation_request_id"],
-                    "actor_id": "HUMAN-RQ",
-                })
+                apply = facade.submit_action(
+                    {
+                        "action_type": "state.apply_candidate",
+                        "payload": {"state_delta_proposal_id": head_advance["proposal_id"]},
+                        "actor_id": "HUMAN-RQ",
+                    }
+                )
+                advanced = facade.submit_confirmation(
+                    {
+                        "confirmation_request_id": apply["confirmation_request"][
+                            "confirmation_request_id"
+                        ],
+                        "actor_id": "HUMAN-RQ",
+                    }
+                )
                 self.assertEqual(advanced["status"], "SUCCEEDED")
 
-                stale_apply = facade.submit_action({
-                    "action_type": "state.apply_candidate",
-                    "payload": {"state_delta_proposal_id": stale_id},
-                    "actor_id": "HUMAN-RQ",
-                })
-                stale_result = facade.submit_confirmation({
-                    "confirmation_request_id": stale_apply["confirmation_request"]["confirmation_request_id"],
-                    "actor_id": "HUMAN-RQ",
-                })
+                stale_apply = facade.submit_action(
+                    {
+                        "action_type": "state.apply_candidate",
+                        "payload": {"state_delta_proposal_id": stale_id},
+                        "actor_id": "HUMAN-RQ",
+                    }
+                )
+                stale_result = facade.submit_confirmation(
+                    {
+                        "confirmation_request_id": stale_apply["confirmation_request"][
+                            "confirmation_request_id"
+                        ],
+                        "actor_id": "HUMAN-RQ",
+                    }
+                )
                 self.assertEqual(stale_result["status"], "FAILED")
                 state = facade._application.state_repository.load_state_view(
                     facade.project_id,
                     facade._application.state_repository.load_active_lineage_ref(facade.project_id),
                 )
-                self.assertFalse(any(item["kind"] == "research_question" for item in state.effective_objects()))
+                self.assertFalse(
+                    any(item["kind"] == "research_question" for item in state.effective_objects())
+                )
                 stored = facade._application.conversation_store.load_state_delta_proposal(stale_id)
                 self.assertNotEqual(stored["current_snapshot_ref"], state.current_snapshot["id"])
 

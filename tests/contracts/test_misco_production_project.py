@@ -29,10 +29,15 @@ class MiscoProductionProjectContractTests(unittest.TestCase):
         actual = resolve_effective_profile_set(config, [WRITER, PUBLICATION])
         self.assertEqual(actual, expected)
         self.assertEqual(
-            [(x["profile_type"], x["profile_id"], x["profile_version"]) for x in actual["effective_profiles"]],
+            [
+                (x["profile_type"], x["profile_id"], x["profile_version"])
+                for x in actual["effective_profiles"]
+            ],
             [("narrative", "misco.writer", "1.1.0"), ("publication", "misco.publication", "1.3.0")],
         )
-        self.assertFalse(any(str(x["profile_id"]).startswith("fixture.") for x in actual["effective_profiles"]))
+        self.assertFalse(
+            any(str(x["profile_id"]).startswith("fixture.") for x in actual["effective_profiles"])
+        )
 
     def test_continuity_profile_is_migration_only_and_does_not_import_research_policy(self):
         profile = json.loads(CONTINUITY.read_text(encoding="utf-8"))
@@ -41,7 +46,9 @@ class MiscoProductionProjectContractTests(unittest.TestCase):
             [(x["path"], x["value"]) for x in profile["constraints"]],
             [("evidence.capture.locator_precision", "exact")],
         )
-        self.assertFalse(any(str(x["path"]).startswith("research_quality.") for x in profile["constraints"]))
+        self.assertFalse(
+            any(str(x["path"]).startswith("research_quality.") for x in profile["constraints"])
+        )
         self.assertEqual(profile.get("extends", []), [])
         self.assertEqual(profile.get("requires", []), [])
         self.assertEqual(profile.get("resources", []), [])
@@ -60,7 +67,13 @@ class MiscoProductionProjectContractTests(unittest.TestCase):
         self.assertEqual([x["profile_id"] for x in targets], ["misco.writer", "misco.publication"])
         self.assertEqual(
             request["request_additions"],
-            [{"profile_id": "misco.workspace-continuity.exact-locator", "profile_type": "research", "version": "1.0.0"}],
+            [
+                {
+                    "profile_id": "misco.workspace-continuity.exact-locator",
+                    "profile_type": "research",
+                    "version": "1.0.0",
+                }
+            ],
         )
 
     def test_fresh_config_contains_no_legacy_research_state_or_virtual_feedback(self):
@@ -69,16 +82,24 @@ class MiscoProductionProjectContractTests(unittest.TestCase):
         self.assertEqual(config["project"]["title"], "AIの進化とそれがもたらすMISCO企業への影響")
         self.assertEqual(config["research_questions"]["references"], [])
         self.assertEqual(len(config["research_questions"]["seeds"]), 1)
-        self.assertEqual(config["research_questions"]["seeds"][0]["seed_id"], "RQ-SEED-MISCO-FRESH-START")
-        self.assertIn("not copied from legacy/probe", config["research_questions"]["seeds"][0]["rationale"])
+        self.assertEqual(
+            config["research_questions"]["seeds"][0]["seed_id"], "RQ-SEED-MISCO-FRESH-START"
+        )
+        self.assertIn(
+            "not copied from legacy/probe", config["research_questions"]["seeds"][0]["rationale"]
+        )
         self.assertEqual(config["research_attention"], [])
         refs = {x["reference_id"]: x for x in config["resource_references"]}
         self.assertEqual(set(refs), {"REF-MISCO-ATTENTION-MAP"})
-        self.assertNotIn("project_feedback/virtual_run_feedback", PROJECT_CONFIG.read_text(encoding="utf-8"))
+        self.assertNotIn(
+            "project_feedback/virtual_run_feedback", PROJECT_CONFIG.read_text(encoding="utf-8")
+        )
         self.assertEqual(config["profile_requests"]["research"], [])
         self.assertEqual(config["profile_requests"]["organization"], [])
         self.assertEqual(config["profile_requests"]["narrative"], [])
-        self.assertEqual(config["profile_requests"]["publication"][0]["profile_id"], "misco.publication")
+        self.assertEqual(
+            config["profile_requests"]["publication"][0]["profile_id"], "misco.publication"
+        )
         for legacy_rq_id in [
             "RQ-2dcc76ea645e41de88ec20a6f0dab2e5",
             "RQ-9d960b47be384c36a430662a21d560eb",
@@ -90,7 +111,9 @@ class MiscoProductionProjectContractTests(unittest.TestCase):
         for ref in config["resource_references"]:
             source = ROOT / ref["locator"]
             self.assertTrue(source.is_file())
-            self.assertEqual(ref["digest"], "sha256:" + hashlib.sha256(source.read_bytes()).hexdigest())
+            self.assertEqual(
+                ref["digest"], "sha256:" + hashlib.sha256(source.read_bytes()).hexdigest()
+            )
 
 
 if __name__ == "__main__":

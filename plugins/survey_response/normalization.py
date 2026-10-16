@@ -40,7 +40,9 @@ def _issue(
     return value
 
 
-def _normalization_event(code: str, detail: str, *, response_key: str | None = None) -> dict[str, Any]:
+def _normalization_event(
+    code: str, detail: str, *, response_key: str | None = None
+) -> dict[str, Any]:
     value: dict[str, Any] = {"code": code, "detail": detail}
     if response_key:
         value["response_key"] = response_key
@@ -116,7 +118,11 @@ def _normalize_raw_answer(
                     response_key=key,
                 )
             )
-            return {"question_id": str(question["question_id"]), "response_key": key, "state": "missing"}
+            return {
+                "question_id": str(question["question_id"]),
+                "response_key": key,
+                "state": "missing",
+            }
         answer = {"question_id": str(question["question_id"]), "response_key": key, "state": state}
         if state == "answered":
             answer["value"] = _choice_value(
@@ -135,7 +141,11 @@ def _normalize_raw_answer(
                 response_key=key,
             )
         )
-        return {"question_id": str(question["question_id"]), "response_key": key, "state": "missing"}
+        return {
+            "question_id": str(question["question_id"]),
+            "response_key": key,
+            "state": "missing",
+        }
     return {
         "question_id": str(question["question_id"]),
         "response_key": key,
@@ -169,7 +179,9 @@ def _compatibility_record(response: Mapping[str, Any]) -> dict[str, Any]:
         "verified_evidence_claimed": False,
         "dropout": response["dropout"],
         "answers": answers,
-        **({"response_timestamp": response["completed_at"]} if response.get("completed_at") else {}),
+        **(
+            {"response_timestamp": response["completed_at"]} if response.get("completed_at") else {}
+        ),
     }
 
 
@@ -205,7 +217,9 @@ def normalize_response(
     events: list[dict[str, Any]] = []
 
     if response_origin == "synthetic":
-        if epistemic_status != "SYNTHETIC_TEST_ONLY" or not identity_namespace.startswith("synthetic:"):
+        if epistemic_status != "SYNTHETIC_TEST_ONLY" or not identity_namespace.startswith(
+            "synthetic:"
+        ):
             issues.append(
                 _issue(
                     "SURVEY_RESPONSE_ORIGIN_MISMATCH",
@@ -223,7 +237,13 @@ def normalize_response(
                 )
             )
     else:
-        issues.append(_issue("SURVEY_RESPONSE_ORIGIN_MISMATCH", "response_origin must be synthetic or real", response_id=response_id))
+        issues.append(
+            _issue(
+                "SURVEY_RESPONSE_ORIGIN_MISMATCH",
+                "response_origin must be synthetic or real",
+                response_id=response_id,
+            )
+        )
 
     aliases = _alias_map(questionnaire)
     provided: dict[str, dict[str, Any]] = {}
@@ -344,7 +364,9 @@ def normalize_response(
     )
     combined = list(issues) + list(validation["issues"])
     response["validation"] = {
-        "status": "rejected" if any(item.get("severity") == "error" for item in combined) else "accepted",
+        "status": "rejected"
+        if any(item.get("severity") == "error" for item in combined)
+        else "accepted",
         "issues": combined,
         "preservation_events": deepcopy(list(validation["preservation_events"])),
     }
@@ -393,7 +415,11 @@ def virtual_record_to_raw(record: Any) -> Any:
         return deepcopy(record)
     answers: dict[str, Any] = {}
     for answer in record.get("answers", ()):
-        if not isinstance(answer, Mapping) or not answer.get("response_key") or not answer.get("state"):
+        if (
+            not isinstance(answer, Mapping)
+            or not answer.get("response_key")
+            or not answer.get("state")
+        ):
             return deepcopy(record)
         state = str(answer["state"])
         if state == "answered":

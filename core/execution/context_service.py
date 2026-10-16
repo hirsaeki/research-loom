@@ -43,8 +43,9 @@ class CapabilityExecutionService(_BaseCapabilityExecutionService):
     EXTERNAL Run can enter PREPARED/RUNNING.
     """
 
-    def __init__(self, *args, context_extension_registry=None,
-                 context_extension_store=None, **kwargs) -> None:
+    def __init__(
+        self, *args, context_extension_registry=None, context_extension_store=None, **kwargs
+    ) -> None:
         super().__init__(*args, **kwargs)
         self._context_extension_registry = (
             context_extension_registry or CapabilityContextExtensionRegistry()
@@ -85,7 +86,8 @@ class CapabilityExecutionService(_BaseCapabilityExecutionService):
                     deepcopy(dict(context_pack)),
                     access,
                     context_extension=deepcopy(dict(context_extension))
-                    if context_extension is not None else None,
+                    if context_extension is not None
+                    else None,
                 )
             )
         except CapabilityExecutionError as exc:

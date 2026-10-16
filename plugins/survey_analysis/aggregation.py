@@ -81,10 +81,12 @@ def _regular_options(question: Mapping[str, Any]) -> list[dict[str, Any]]:
         if encoded in seen:
             raise ValueError("Survey Instrument stable choice values must be unique")
         seen.add(encoded)
-        result.append({
-            "value": deepcopy(value),
-            "label": str(option.get("label", value)),
-        })
+        result.append(
+            {
+                "value": deepcopy(value),
+                "label": str(option.get("label", value)),
+            }
+        )
     return result
 
 
@@ -98,7 +100,9 @@ def _denominator(value: Any) -> str:
     if value is None:
         return "valid_responses"
     if value not in _DENOMINATORS:
-        raise ValueError("denominator_rule must be all_responses, asked_responses, or valid_responses")
+        raise ValueError(
+            "denominator_rule must be all_responses, asked_responses, or valid_responses"
+        )
     return str(value)
 
 
@@ -107,36 +111,44 @@ def default_analysis_items(questionnaire: Mapping[str, Any]) -> list[dict[str, A
     next_index = 1
     for question in questionnaire.get("questions") or []:
         qid = str(question["question_id"])
-        items.append({
-            "item_id": f"AN-{next_index:03d}",
-            "analysis_type": "missingness",
-            "question_id": qid,
-        })
+        items.append(
+            {
+                "item_id": f"AN-{next_index:03d}",
+                "analysis_type": "missingness",
+                "question_id": qid,
+            }
+        )
         next_index += 1
         question_type = str(question["question_type"])
         if question_type in {"single_choice", "multiple_choice"}:
-            items.append({
-                "item_id": f"AN-{next_index:03d}",
-                "analysis_type": "frequency",
-                "question_id": qid,
-                "denominator_rule": "valid_responses",
-            })
+            items.append(
+                {
+                    "item_id": f"AN-{next_index:03d}",
+                    "analysis_type": "frequency",
+                    "question_id": qid,
+                    "denominator_rule": "valid_responses",
+                }
+            )
             next_index += 1
         elif question_type == "scale":
-            items.append({
-                "item_id": f"AN-{next_index:03d}",
-                "analysis_type": "scale_summary",
-                "question_id": qid,
-                "denominator_rule": "valid_responses",
-            })
+            items.append(
+                {
+                    "item_id": f"AN-{next_index:03d}",
+                    "analysis_type": "scale_summary",
+                    "question_id": qid,
+                    "denominator_rule": "valid_responses",
+                }
+            )
             next_index += 1
         elif question_type == "free_text":
-            items.append({
-                "item_id": f"AN-{next_index:03d}",
-                "analysis_type": "free_text_listing",
-                "question_id": qid,
-                "max_rows": 25,
-            })
+            items.append(
+                {
+                    "item_id": f"AN-{next_index:03d}",
+                    "analysis_type": "free_text_listing",
+                    "question_id": qid,
+                    "max_rows": 25,
+                }
+            )
             next_index += 1
     return items
 
@@ -175,33 +187,39 @@ def normalize_analysis_items(
                     raise ValueError("frequency requires a categorical Survey question")
                 if not _regular_options(question):
                     raise ValueError("frequency requires at least one ordinary stable choice value")
-                result.append({
-                    "item_id": item_id,
-                    "analysis_type": analysis_type,
-                    "question_id": qid,
-                    "denominator_rule": _denominator(raw.get("denominator_rule")),
-                })
+                result.append(
+                    {
+                        "item_id": item_id,
+                        "analysis_type": analysis_type,
+                        "question_id": qid,
+                        "denominator_rule": _denominator(raw.get("denominator_rule")),
+                    }
+                )
             elif analysis_type == "missingness":
                 allowed = {"analysis_type", "item_id", "question_id"}
                 if set(raw) - allowed:
                     raise ValueError("missingness analysis item contains unknown fields")
-                result.append({
-                    "item_id": item_id,
-                    "analysis_type": analysis_type,
-                    "question_id": qid,
-                })
+                result.append(
+                    {
+                        "item_id": item_id,
+                        "analysis_type": analysis_type,
+                        "question_id": qid,
+                    }
+                )
             elif analysis_type == "scale_summary":
                 allowed = {"analysis_type", "item_id", "question_id", "denominator_rule"}
                 if set(raw) - allowed:
                     raise ValueError("scale_summary analysis item contains unknown fields")
                 if question["question_type"] != "scale":
                     raise ValueError("scale_summary requires an Instrument scale question")
-                result.append({
-                    "item_id": item_id,
-                    "analysis_type": analysis_type,
-                    "question_id": qid,
-                    "denominator_rule": _denominator(raw.get("denominator_rule")),
-                })
+                result.append(
+                    {
+                        "item_id": item_id,
+                        "analysis_type": analysis_type,
+                        "question_id": qid,
+                        "denominator_rule": _denominator(raw.get("denominator_rule")),
+                    }
+                )
             else:
                 allowed = {"analysis_type", "item_id", "question_id", "max_rows"}
                 if set(raw) - allowed:
@@ -209,14 +227,22 @@ def normalize_analysis_items(
                 if question["question_type"] != "free_text":
                     raise ValueError("free_text_listing requires an Instrument free_text question")
                 max_rows = raw.get("max_rows", 25)
-                if not isinstance(max_rows, int) or isinstance(max_rows, bool) or not 1 <= max_rows <= 100:
-                    raise ValueError("free_text_listing max_rows must be an integer from 1 through 100")
-                result.append({
-                    "item_id": item_id,
-                    "analysis_type": analysis_type,
-                    "question_id": qid,
-                    "max_rows": max_rows,
-                })
+                if (
+                    not isinstance(max_rows, int)
+                    or isinstance(max_rows, bool)
+                    or not 1 <= max_rows <= 100
+                ):
+                    raise ValueError(
+                        "free_text_listing max_rows must be an integer from 1 through 100"
+                    )
+                result.append(
+                    {
+                        "item_id": item_id,
+                        "analysis_type": analysis_type,
+                        "question_id": qid,
+                        "max_rows": max_rows,
+                    }
+                )
             continue
 
         if analysis_type == "cross_tab":
@@ -231,23 +257,32 @@ def normalize_analysis_items(
             column = questions.get(column_id)
             if row is None or column is None:
                 raise ValueError("cross_tab references an unknown Survey question ID")
-            if row["question_type"] != "single_choice" or column["question_type"] != "single_choice":
-                raise ValueError("initial cross_tab support is limited to single_choice x single_choice")
+            if (
+                row["question_type"] != "single_choice"
+                or column["question_type"] != "single_choice"
+            ):
+                raise ValueError(
+                    "initial cross_tab support is limited to single_choice x single_choice"
+                )
             if not _regular_options(row) or not _regular_options(column):
                 raise ValueError("cross_tab requires ordinary stable choice values")
-            result.append({
-                "item_id": item_id,
-                "analysis_type": analysis_type,
-                "row_question_id": row_id,
-                "column_question_id": column_id,
-            })
+            result.append(
+                {
+                    "item_id": item_id,
+                    "analysis_type": analysis_type,
+                    "row_question_id": row_id,
+                    "column_question_id": column_id,
+                }
+            )
             continue
 
         raise ValueError(f"unsupported Survey analysis type: {analysis_type or '<missing>'}")
     return result
 
 
-def _answer_map(questionnaire: Mapping[str, Any], response: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
+def _answer_map(
+    questionnaire: Mapping[str, Any], response: Mapping[str, Any]
+) -> dict[str, Mapping[str, Any]]:
     questions = _question_map(questionnaire)
     answers = response.get("answers")
     if not isinstance(answers, list):
@@ -265,11 +300,15 @@ def _answer_map(questionnaire: Mapping[str, Any], response: Mapping[str, Any]) -
             raise ValueError("canonical Survey response contains an unsupported answer state")
         result[qid] = answer
     if set(result) != set(questions):
-        raise ValueError("canonical Survey response must preserve one answer state for every Instrument question")
+        raise ValueError(
+            "canonical Survey response must preserve one answer state for every Instrument question"
+        )
     return result
 
 
-def _missingness(answer_maps: Sequence[Mapping[str, Mapping[str, Any]]], question_id: str) -> dict[str, int]:
+def _missingness(
+    answer_maps: Sequence[Mapping[str, Mapping[str, Any]]], question_id: str
+) -> dict[str, int]:
     counts = {state: 0 for state in _STATES}
     for answers in answer_maps:
         counts[str(answers[question_id]["state"])] += 1
@@ -324,7 +363,9 @@ def _frequency(
             raise ValueError("accepted multiple_choice answer cannot repeat a stable choice")
         for encoded_value in encoded_values:
             if encoded_value not in counts:
-                raise ValueError("accepted categorical answer is not an ordinary stable Instrument choice")
+                raise ValueError(
+                    "accepted categorical answer is not an ordinary stable Instrument choice"
+                )
             counts[encoded_value] += 1
             selection_total += 1
 
@@ -411,8 +452,12 @@ def _scale_summary(
     keys = sorted(
         counts,
         key=lambda key: (
-            0 if isinstance(originals[key], (int, float)) and not isinstance(originals[key], bool) else 1,
-            originals[key] if isinstance(originals[key], (int, float)) and not isinstance(originals[key], bool) else key,
+            0
+            if isinstance(originals[key], (int, float)) and not isinstance(originals[key], bool)
+            else 1,
+            originals[key]
+            if isinstance(originals[key], (int, float)) and not isinstance(originals[key], bool)
+            else key,
         ),
     )
     return {
@@ -463,14 +508,16 @@ def _free_text_listing(
             continue
         non_empty_count += 1
         if len(rows) < max_rows:
-            rows.append({
-                "question_id": qid,
-                "response_id": str(response["response_id"]),
-                "participant_id": str(response["participant_id"]),
-                "identity_namespace": str(response["identity_namespace"]),
-                "text": text,
-                "response_origin": str(response["response_origin"]),
-            })
+            rows.append(
+                {
+                    "question_id": qid,
+                    "response_id": str(response["response_id"]),
+                    "participant_id": str(response["participant_id"]),
+                    "identity_namespace": str(response["identity_namespace"]),
+                    "text": text,
+                    "response_origin": str(response["response_origin"]),
+                }
+            )
     return {
         "item_id": str(item["item_id"]),
         "analysis_type": "free_text_listing",
@@ -511,7 +558,9 @@ def _cross_tab(
         row_key = _encoded(row_answer.get("value"))
         column_key = _encoded(column_answer.get("value"))
         if (row_key, column_key) not in counts:
-            raise ValueError("accepted cross_tab answer is not an ordinary stable Instrument choice")
+            raise ValueError(
+                "accepted cross_tab answer is not an ordinary stable Instrument choice"
+            )
         counts[(row_key, column_key)] += 1
 
     row_denominators = {
@@ -531,7 +580,10 @@ def _cross_tab(
         "pair_denominator_rule": "valid_pairs",
         "pair_denominator_count": paired,
         "column_denominators": [
-            {"value": deepcopy(option["value"]), "count": column_denominators[_encoded(option["value"])]}
+            {
+                "value": deepcopy(option["value"]),
+                "count": column_denominators[_encoded(option["value"])],
+            }
             for option in column_options
         ],
         "rows": [
@@ -541,13 +593,19 @@ def _cross_tab(
                 "cells": [
                     {
                         "column_value": deepcopy(column_option["value"]),
-                        "count": counts[(_encoded(row_option["value"]), _encoded(column_option["value"]))],
+                        "count": counts[
+                            (_encoded(row_option["value"]), _encoded(column_option["value"]))
+                        ],
                         "row_percentage": _percentage(
-                            counts[(_encoded(row_option["value"]), _encoded(column_option["value"]))],
+                            counts[
+                                (_encoded(row_option["value"]), _encoded(column_option["value"]))
+                            ],
                             row_denominators[_encoded(row_option["value"])],
                         ),
                         "column_percentage": _percentage(
-                            counts[(_encoded(row_option["value"]), _encoded(column_option["value"]))],
+                            counts[
+                                (_encoded(row_option["value"]), _encoded(column_option["value"]))
+                            ],
                             column_denominators[_encoded(column_option["value"])],
                         ),
                     }
@@ -622,12 +680,14 @@ def aggregate_dataset(
     rejected_canonical = len(dataset["rejected_response_refs"])
     warnings: list[dict[str, str]] = []
     if dataset["response_origin"] == "synthetic":
-        warnings.append({
-            "code": "SURVEY_AGGREGATE_SYNTHETIC_NOT_POPULATION_ESTIMATE",
-            "message": (
-                "Synthetic Survey aggregation is configuration-dependent test output and is not a population estimate."
-            ),
-        })
+        warnings.append(
+            {
+                "code": "SURVEY_AGGREGATE_SYNTHETIC_NOT_POPULATION_ESTIMATE",
+                "message": (
+                    "Synthetic Survey aggregation is configuration-dependent test output and is not a population estimate."
+                ),
+            }
+        )
 
     instrument_ref = deepcopy(dict(dataset["instrument_ref"]))
     document: dict[str, Any] = {

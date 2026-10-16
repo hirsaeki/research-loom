@@ -26,20 +26,28 @@ class ResearchQualityApplicationMappingTests(unittest.TestCase):
             "machine_check_on_explicit_assessment_and_core_state",
             "aggregate_of_configured_quality_checks",
         }
-        self.assertTrue(all(row["evaluation_mode"] in allowed_modes for row in mapping["constraints"]))
+        self.assertTrue(
+            all(row["evaluation_mode"] in allowed_modes for row in mapping["constraints"])
+        )
 
     def test_mapping_keeps_semantic_truth_and_authority_outside_machine_pass(self):
         mapping = yaml.safe_load(MAPPING.read_text(encoding="utf-8"))
         self.assertFalse(mapping["semantic_assessment_boundary"]["classification_truth_verified"])
-        self.assertEqual(mapping["semantic_assessment_boundary"]["missing_assessment_status"], "unevaluated")
+        self.assertEqual(
+            mapping["semantic_assessment_boundary"]["missing_assessment_status"], "unevaluated"
+        )
         self.assertEqual(
             mapping["consumer"],
             "plugins.local_application.research_quality_evaluation.evaluate",
         )
         self.assertEqual(mapping["result_record"]["kind"], "research_exhibit")
         self.assertEqual(mapping["result_record"]["authority_effect"], "none")
-        self.assertEqual(mapping["organization_constraints"]["evaluation_mode"], "host_or_human_assessment")
-        self.assertEqual(mapping["organization_constraints"]["missing_assessment_status"], "unevaluated")
+        self.assertEqual(
+            mapping["organization_constraints"]["evaluation_mode"], "host_or_human_assessment"
+        )
+        self.assertEqual(
+            mapping["organization_constraints"]["missing_assessment_status"], "unevaluated"
+        )
         self.assertEqual(mapping["organization_constraints"]["authority_effect"], "none")
 
 

@@ -33,8 +33,16 @@ class QuestionLineageHistoryIdentityTests(unittest.TestCase):
                 "baseline_snapshot_digest": base.current_snapshot["content_digest"],
                 "treatments": [
                     {"object_kind": "project", "source_ref": "PRJ-1", "treatment": "PRESERVE"},
-                    {"object_kind": "research_question", "source_ref": "RQ-1", "treatment": "INVALIDATE"},
-                    {"object_kind": "research_question", "source_ref": "RQ-2", "treatment": "PRESERVE"},
+                    {
+                        "object_kind": "research_question",
+                        "source_ref": "RQ-1",
+                        "treatment": "INVALIDATE",
+                    },
+                    {
+                        "object_kind": "research_question",
+                        "source_ref": "RQ-2",
+                        "treatment": "PRESERVE",
+                    },
                 ],
             },
             decision_refs=("DEC-FORK",),

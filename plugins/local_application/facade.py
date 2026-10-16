@@ -194,6 +194,7 @@ class LocalApplicationFacade:
         output: str | Path,
     ) -> Mapping[str, Any]:
         from plugins.local_application.profile_advancement import prepare_profile_generation
+
         return prepare_profile_generation(workspace, request, output)
 
     @classmethod
@@ -203,11 +204,13 @@ class LocalApplicationFacade:
         request: Mapping[str, Any],
     ) -> Mapping[str, Any]:
         from plugins.local_application.profile_advancement import advance_profile_generation
+
         return advance_profile_generation(workspace, request)
 
     @classmethod
     def profile_generation_history(cls, workspace: str | Path) -> Mapping[str, Any]:
         from plugins.local_application.profile_advancement import profile_history
+
         return profile_history(workspace)
 
     @property
@@ -216,24 +219,37 @@ class LocalApplicationFacade:
 
     def _publication_release_service(self):
         from plugins.local_application.publication_release_service import PublicationReleaseService
+
         return PublicationReleaseService(self)
 
     def build_publication_preview(
-        self, composition_id: str, revision_id: str | None = None,
+        self,
+        composition_id: str,
+        revision_id: str | None = None,
         publication_inputs: Mapping[str, Any] | None = None,
     ) -> Mapping[str, Any]:
-        return self._publication_release_service().build_preview(composition_id, revision_id, publication_inputs)
+        return self._publication_release_service().build_preview(
+            composition_id, revision_id, publication_inputs
+        )
 
     def show_publication_preview(self, build_id: str) -> Mapping[str, Any]:
         return self._publication_release_service().show_preview(build_id)
 
-    def finalize_publication_pdf(self, build_id: str, input_: Mapping[str, Any]) -> Mapping[str, Any]:
+    def finalize_publication_pdf(
+        self, build_id: str, input_: Mapping[str, Any]
+    ) -> Mapping[str, Any]:
         return self._publication_release_service().finalize_pdf(build_id, input_)
 
     def request_publication_release(
-        self, build_id: str, actor_id: str, *, renewal_of: str | None = None,
+        self,
+        build_id: str,
+        actor_id: str,
+        *,
+        renewal_of: str | None = None,
     ) -> Mapping[str, Any]:
-        return self._publication_release_service().request_release(build_id, actor_id, renewal_of=renewal_of)
+        return self._publication_release_service().request_release(
+            build_id, actor_id, renewal_of=renewal_of
+        )
 
     def release_publication(self, build_id: str, decision: Mapping[str, Any]) -> Mapping[str, Any]:
         return self._publication_release_service().release(build_id, decision)
@@ -258,22 +274,26 @@ class LocalApplicationFacade:
         definitions = self._application.coordinator.action_definitions()
         actions = []
         for definition in definitions:
-            actions.append({
-                "action_type": definition.action_type,
-                "payload_contract": definition.payload_contract,
-                "effect": definition.effect,
-                "confirmation_required": bool(definition.confirmation_required),
-                "route_category": (
-                    "research_capability"
-                    if definition.route_kind == "capability_invocation"
-                    else "harness_service"
-                ),
-            })
+            actions.append(
+                {
+                    "action_type": definition.action_type,
+                    "payload_contract": definition.payload_contract,
+                    "effect": definition.effect,
+                    "confirmation_required": bool(definition.confirmation_required),
+                    "route_category": (
+                        "research_capability"
+                        if definition.route_kind == "capability_invocation"
+                        else "harness_service"
+                    ),
+                }
+            )
         return {"status": "OK", "project_id": self._project_id, "actions": actions}
 
     def submit_action(self, draft_input: Mapping[str, Any]) -> Mapping[str, Any]:
         if not isinstance(draft_input, Mapping):
-            raise LocalApplicationError("APPLICATION-INGRESS-001", "typed action input must be an object")
+            raise LocalApplicationError(
+                "APPLICATION-INGRESS-001", "typed action input must be an object"
+            )
         unknown = set(draft_input) - _INGRESS_FIELDS
         if unknown:
             raise LocalApplicationError(
@@ -291,8 +311,7 @@ class LocalApplicationFacade:
         if forbidden:
             raise LocalApplicationError(
                 "APPLICATION-AUTHORITY-001",
-                "caller may not supply Harness authority metadata: "
-                + ", ".join(sorted(forbidden)),
+                "caller may not supply Harness authority metadata: " + ", ".join(sorted(forbidden)),
             )
         rationale = draft_input.get("rationale")
         if rationale is not None and not isinstance(rationale, str):
@@ -300,9 +319,15 @@ class LocalApplicationFacade:
         actor_id = draft_input.get("actor_id", "local-human")
         conversation_id = draft_input.get("conversation_id")
         if not isinstance(actor_id, str) or not actor_id:
-            raise LocalApplicationError("APPLICATION-INGRESS-001", "actor_id must be a non-empty string")
-        if conversation_id is not None and (not isinstance(conversation_id, str) or not conversation_id):
-            raise LocalApplicationError("APPLICATION-INGRESS-001", "conversation_id must be a non-empty string")
+            raise LocalApplicationError(
+                "APPLICATION-INGRESS-001", "actor_id must be a non-empty string"
+            )
+        if conversation_id is not None and (
+            not isinstance(conversation_id, str) or not conversation_id
+        ):
+            raise LocalApplicationError(
+                "APPLICATION-INGRESS-001", "conversation_id must be a non-empty string"
+            )
 
         draft = ActionDraft(action_type, deepcopy(dict(payload)), rationale)
         try:
@@ -327,9 +352,13 @@ class LocalApplicationFacade:
         request_id = confirmation.get("confirmation_request_id")
         actor_id = confirmation.get("actor_id", "local-human")
         if not isinstance(request_id, str) or not request_id:
-            raise LocalApplicationError("APPLICATION-CONFIRMATION-001", "confirmation_request_id is required")
+            raise LocalApplicationError(
+                "APPLICATION-CONFIRMATION-001", "confirmation_request_id is required"
+            )
         if not isinstance(actor_id, str) or not actor_id:
-            raise LocalApplicationError("APPLICATION-CONFIRMATION-001", "actor_id must be a non-empty string")
+            raise LocalApplicationError(
+                "APPLICATION-CONFIRMATION-001", "actor_id must be a non-empty string"
+            )
         request = self._application.conversation_store.load_confirmation_request(request_id)
         if request is None:
             raise ConversationRuntimeError(
@@ -365,7 +394,9 @@ class LocalApplicationFacade:
             if not isinstance(request_id, str) or not request_id:
                 raise LocalApplicationError("APPLICATION-DECISION-001", "request_id is required")
             if not isinstance(supplied_digest, str) or not supplied_digest:
-                raise LocalApplicationError("APPLICATION-DECISION-001", "request_digest is required")
+                raise LocalApplicationError(
+                    "APPLICATION-DECISION-001", "request_digest is required"
+                )
             if disposition not in _DECISION_DISPOSITIONS:
                 raise LocalApplicationError(
                     "APPLICATION-DECISION-001", "unsupported Human Decision disposition"
@@ -385,11 +416,13 @@ class LocalApplicationFacade:
                 )
             if str(request.get("project_ref")) != self._project_id:
                 raise LocalApplicationError(
-                    "APPLICATION-DECISION-BINDING-001", "Human Decision Request belongs to another project"
+                    "APPLICATION-DECISION-BINDING-001",
+                    "Human Decision Request belongs to another project",
                 )
             if str(request.get("human_actor_id")) != actor_id:
                 raise LocalApplicationError(
-                    "APPLICATION-DECISION-BINDING-001", "Human Decision actor does not match request"
+                    "APPLICATION-DECISION-BINDING-001",
+                    "Human Decision actor does not match request",
                 )
             try:
                 claimed = self._application.decision_store.get_claimed_response(request_id)
@@ -439,7 +472,9 @@ class LocalApplicationFacade:
             "status": str(result.status),
             "request": _jsonable(result.request),
             "response": _jsonable(result.response),
-            "commit_receipt": _jsonable(result.commit_receipt) if result.commit_receipt is not None else None,
+            "commit_receipt": _jsonable(result.commit_receipt)
+            if result.commit_receipt is not None
+            else None,
             "transition_rejection": (
                 _jsonable(result.transition_rejection)
                 if result.transition_rejection is not None
@@ -452,7 +487,8 @@ class LocalApplicationFacade:
             raise LocalApplicationError("APPLICATION-EXTERNAL-001", "run_id is required")
         if not isinstance(submission, Mapping) or set(submission) - {"handoff", "extension"}:
             raise LocalApplicationError(
-                "APPLICATION-EXTERNAL-001", "external collection accepts handoff and optional extension"
+                "APPLICATION-EXTERNAL-001",
+                "external collection accepts handoff and optional extension",
             )
         handoff = submission.get("handoff")
         extension = submission.get("extension")
@@ -474,9 +510,11 @@ class LocalApplicationFacade:
         pending_decisions = self._application.human_decisions.pending(self._project_id)
 
         probe_limit = _STATUS_ITEM_LIMIT + 1
-        confirmation_probe = self._application.conversation_store.list_pending_confirmation_requests(
-            self._project_id,
-            limit=probe_limit,
+        confirmation_probe = (
+            self._application.conversation_store.list_pending_confirmation_requests(
+                self._project_id,
+                limit=probe_limit,
+            )
         )
         pending_confirmations = confirmation_probe[:_STATUS_ITEM_LIMIT]
         confirmations_truncated = len(confirmation_probe) > _STATUS_ITEM_LIMIT
@@ -505,11 +543,16 @@ class LocalApplicationFacade:
         if self._workspace_root is not None:
             from plugins.local_durable_store import inspect_optional_children
             from .workspace import _read_json, BINDING_NAME, INTERNAL_DIR
-            binding = _read_json(self._workspace_root / INTERNAL_DIR / BINDING_NAME, code="WORKSPACE-BINDING-001")
+
+            binding = _read_json(
+                self._workspace_root / INTERNAL_DIR / BINDING_NAME, code="WORKSPACE-BINDING-001"
+            )
             optional = inspect_optional_children(self._workspace_root, binding)
         snapshot = state.current_snapshot
         return {
-            "status": "DEGRADED" if any(row["status"] == "UNAVAILABLE" for row in optional) else "OK",
+            "status": "DEGRADED"
+            if any(row["status"] == "UNAVAILABLE" for row in optional)
+            else "OK",
             "optional_children": optional,
             "project_id": self._project_id,
             "active_lineage": state.active_lineage_ref,
@@ -540,6 +583,7 @@ class LocalApplicationFacade:
     def doctor(self) -> Mapping[str, Any]:
         if self._workspace_root is None:
             raise LocalApplicationError(
-                "APPLICATION-WORKSPACE-001", "doctor requires a facade opened from a local workspace"
+                "APPLICATION-WORKSPACE-001",
+                "doctor requires a facade opened from a local workspace",
             )
         return self.doctor_workspace(self._workspace_root)

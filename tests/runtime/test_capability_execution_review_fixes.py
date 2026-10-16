@@ -40,10 +40,7 @@ class DisappearingStateProvider:
     def load_state_view(self, project_ref: str, lineage_ref: str):
         self.calls += 1
         if self.calls == 1:
-            if (
-                project_ref != self.state.project_ref
-                or lineage_ref != self.state.lineage_ref
-            ):
+            if project_ref != self.state.project_ref or lineage_ref != self.state.lineage_ref:
                 raise KeyError((project_ref, lineage_ref))
             return self.state
         raise KeyError((project_ref, lineage_ref))
@@ -73,18 +70,12 @@ class CapabilityExecutionReviewFixTests(unittest.TestCase):
         traces = InMemoryExecutionTraceStore()
         states = state_provider or MutableStateProvider(state_for_context())
         authorization = AllowListedAuthorizationProvider(
-            (
-                invocation["runtime_authorization_evidence"][
-                    "authorization_digest"
-                ],
-            )
+            (invocation["runtime_authorization_evidence"]["authorization_digest"],)
         )
         resources = InMemoryResourceProvider(
             {
                 ref: b"fixture"
-                for ref in invocation["runtime_authorization_evidence"][
-                    "resource_reference_ids"
-                ]
+                for ref in invocation["runtime_authorization_evidence"]["resource_reference_ids"]
             }
         )
         service = CapabilityExecutionService(
@@ -93,9 +84,7 @@ class CapabilityExecutionReviewFixTests(unittest.TestCase):
             states,
             authorization,
             resources,
-            CapabilityNormalizationBoundary(
-                tuple(normalizers or (GenericNormalizer(),))
-            ),
+            CapabilityNormalizationBoundary(tuple(normalizers or (GenericNormalizer(),))),
             StaticClock(),
         )
         return service, traces, states

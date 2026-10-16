@@ -51,7 +51,9 @@ class ProfileContractTests(unittest.TestCase):
 
     def test_contract_yaml_parses_and_registry_covers_all_core_invariants(self):
         self.assertEqual(self.semantics["status"], "CANONICAL")
-        core = yaml.safe_load((ROOT / "core/validators/non-overridable-invariants.yaml").read_text(encoding="utf-8"))
+        core = yaml.safe_load(
+            (ROOT / "core/validators/non-overridable-invariants.yaml").read_text(encoding="utf-8")
+        )
         self.assertEqual({x["id"] for x in core["invariants"]}, set(self.registry["invariants"]))
 
     def test_valid_profile_fixtures_validate(self):
@@ -74,7 +76,8 @@ class ProfileContractTests(unittest.TestCase):
     def test_required_fields_constraint_rejects_non_string_members(self):
         eps = load_json(ROOT / "profiles/fixtures/valid/effective-profile-set.json")
         required = next(
-            item for item in eps["effective_constraints"]
+            item
+            for item in eps["effective_constraints"]
             if item["path"] == "evidence.capture.required_fields"
         )
         required["value"] = [["capture_digest"]]
@@ -86,9 +89,26 @@ class ProfileContractTests(unittest.TestCase):
             "core-invariant-weakening.profile.json",
             "merge-strategy-value-type.profile.json",
         ]:
-            self.assertTrue(list(self.profile_validator.iter_errors(load_json(ROOT / "profiles/fixtures/invalid" / name))), name)
-        for name in ["effective-profile-set-status-provenance.json", "effective-profile-set-invalid-resolution.json"]:
-            self.assertTrue(list(self.effective_validator.iter_errors(load_json(ROOT / "profiles/fixtures/invalid" / name))), name)
+            self.assertTrue(
+                list(
+                    self.profile_validator.iter_errors(
+                        load_json(ROOT / "profiles/fixtures/invalid" / name)
+                    )
+                ),
+                name,
+            )
+        for name in [
+            "effective-profile-set-status-provenance.json",
+            "effective-profile-set-invalid-resolution.json",
+        ]:
+            self.assertTrue(
+                list(
+                    self.effective_validator.iter_errors(
+                        load_json(ROOT / "profiles/fixtures/invalid" / name)
+                    )
+                ),
+                name,
+            )
 
     def test_semantic_invalid_fixtures_are_schema_valid_then_fail_expected_code(self):
         cases = load_json(ROOT / "profiles/fixtures/contract-cases.json")["semantic_invalid"]
@@ -115,31 +135,52 @@ class ProfileContractTests(unittest.TestCase):
 
     def test_registered_strengthening_fixture_is_machine_distinguishable(self):
         valid = load_json(ROOT / "profiles/fixtures/valid/research-strict.profile.json")
-        invalid = load_json(ROOT / "profiles/fixtures/invalid/unverifiable-core-strengthening.profile.json")
+        invalid = load_json(
+            ROOT / "profiles/fixtures/invalid/unverifiable-core-strengthening.profile.json"
+        )
         self.assertIsNone(strengthening_error(valid, self.registry))
-        self.assertEqual("PROFILE-CORE-STRENGTHENING-001", strengthening_error(invalid, self.registry))
+        self.assertEqual(
+            "PROFILE-CORE-STRENGTHENING-001", strengthening_error(invalid, self.registry)
+        )
 
     def test_version_resolution_intersects_transitive_ranges_and_selects_deterministically(self):
         case_dir = ROOT / "profiles/fixtures/semantic/version-resolution"
         case = load_json(case_dir / "case.json")
-        base_candidates = [load_candidate(case_dir / "candidates" / name) for name in case["candidate_files"]]
-        expected = [(x["profile_type"], x["profile_id"], x["profile_version"]) for x in case["expected_selected"]]
+        base_candidates = [
+            load_candidate(case_dir / "candidates" / name) for name in case["candidate_files"]
+        ]
+        expected = [
+            (x["profile_type"], x["profile_id"], x["profile_version"])
+            for x in case["expected_selected"]
+        ]
         expected_output = None
         for seed in range(20):
             candidates = base_candidates[:]
             random.Random(seed).shuffle(candidates)
-            output, error = resolve_candidates(candidates, case["requested_profiles"], case["core_contracts"])
+            output, error = resolve_candidates(
+                candidates, case["requested_profiles"], case["core_contracts"]
+            )
             self.assertIsNone(error)
-            self.assertEqual(expected, [(x["profile_type"], x["profile_id"], x["profile_version"]) for x in output])
+            self.assertEqual(
+                expected,
+                [(x["profile_type"], x["profile_id"], x["profile_version"]) for x in output],
+            )
             normalized = canonical_json_bytes(output)
             expected_output = normalized if expected_output is None else expected_output
             self.assertEqual(expected_output, normalized)
         target = next(x for x in output if x["profile_id"] == "fixture.version-target")
         dependencies = [x for x in target["selection_provenance"] if x["relation"] == "requires"]
-        self.assertEqual({">=1.5.0 <3.0.0", ">=2.0.0 <2.5.0"}, {x["required_version"] for x in dependencies})
-        self.assertEqual({"fixture.version-org", "fixture.version-root"}, {x["introduced_by"]["profile_id"] for x in dependencies})
+        self.assertEqual(
+            {">=1.5.0 <3.0.0", ">=2.0.0 <2.5.0"}, {x["required_version"] for x in dependencies}
+        )
+        self.assertEqual(
+            {"fixture.version-org", "fixture.version-root"},
+            {x["introduced_by"]["profile_id"] for x in dependencies},
+        )
         root = next(x for x in output if x["profile_id"] == "fixture.version-root")
-        self.assertEqual([{"relation": "requested", "required_version": "1.0.0"}], root["selection_provenance"])
+        self.assertEqual(
+            [{"relation": "requested", "required_version": "1.0.0"}], root["selection_provenance"]
+        )
 
     def test_dependency_provenance_in_effective_fixture_is_bidirectionally_lossless(self):
         eps = load_json(ROOT / "profiles/fixtures/valid/effective-profile-set.json")
@@ -169,7 +210,9 @@ class ProfileContractTests(unittest.TestCase):
         self.assertEqual(sorted(c["path"] for c in composed), [c["path"] for c in composed])
         union = next(c for c in composed if c["path"] == "evidence.capture.required_fields")
         self.assertEqual(["capture_digest", "locator", "source_id"], union["value"])
-        self.assertEqual(sorted(union["provenance"], key=canonical_constraint_source_key), union["provenance"])
+        self.assertEqual(
+            sorted(union["provenance"], key=canonical_constraint_source_key), union["provenance"]
+        )
 
     def test_set_like_serialization_uses_rfc8785_for_numbers_objects_and_unicode(self):
         fixture = load_json(ROOT / "profiles/fixtures/semantic/canonical-serialization.json")

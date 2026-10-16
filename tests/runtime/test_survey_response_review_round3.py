@@ -48,9 +48,7 @@ class SurveyResponseReviewRound3Tests(SurveyVirtualRunnerTestBase):
                     connection.close()
 
                 with self.assertRaises(LocalApplicationError) as caught:
-                    facade.show_survey_response_dataset(
-                        captured["dataset_id"], limit=1, offset=0
-                    )
+                    facade.show_survey_response_dataset(captured["dataset_id"], limit=1, offset=0)
                 self.assertEqual(
                     caught.exception.code,
                     "SURVEY-RESPONSE-STORE-INTEGRITY-001",

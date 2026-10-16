@@ -41,7 +41,9 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                     ]
                     if len(matches) == 1:
                         detail = matches[0]
-                        key = "original_capture" if artifact_kind == "original" else "text_rendition"
+                        key = (
+                            "original_capture" if artifact_kind == "original" else "text_rendition"
+                        )
                         binding = detail.get(key)
                         if isinstance(binding, Mapping):
                             enriched_details["exact_locator"] = detail.get("exact_locator")
@@ -64,12 +66,14 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                                 break
                         enriched_details["source_filename"] = source_filename
         verification_status = enriched_details.get("verification_status")
-        enriched_details["available_actions"] = material_recovery_action_guidance(verification_status)
+        enriched_details["available_actions"] = material_recovery_action_guidance(
+            verification_status
+        )
         if not enriched_details["available_actions"]:
             enriched_details["operator_guidance"] = (
                 "restore filesystem permissions/access, then retry"
-                if verification_status == "content_unreadable" else
-                "restore exact metadata and safe bindings from backup; payload repair cannot reconstruct them"
+                if verification_status == "content_unreadable"
+                else "restore exact metadata and safe bindings from backup; payload repair cannot reconstruct them"
             )
         enriched_recovery["recovery_failure_details"] = enriched_details
         result["finding_recovery"] = enriched_recovery

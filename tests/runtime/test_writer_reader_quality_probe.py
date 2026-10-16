@@ -29,7 +29,10 @@ class WriterReaderQualityProbeTests(unittest.TestCase):
             source.write_bytes(b"{}")
             args = argparse.Namespace(run_root=directory, response=str(source))
             stream = BytesIO(b" " * (probe.MAX_RESPONSE_BYTES + 1))
-            with patch.object(Path, "open", return_value=stream), patch.object(probe.json, "loads") as parsed:
+            with (
+                patch.object(Path, "open", return_value=stream),
+                patch.object(probe.json, "loads") as parsed,
+            ):
                 with self.assertRaisesRegex(SystemExit, "exceeds the supported size"):
                     probe._import_response(args)
                 parsed.assert_not_called()
@@ -40,7 +43,9 @@ class WriterReaderQualityProbeTests(unittest.TestCase):
             raw = b"{}" + b" " * (probe.MAX_RESPONSE_BYTES - 2)
             source.write_bytes(raw)
             args = argparse.Namespace(run_root=directory, response=str(source))
-            with patch.object(probe.json, "loads", side_effect=RuntimeError("parser reached")) as parsed:
+            with patch.object(
+                probe.json, "loads", side_effect=RuntimeError("parser reached")
+            ) as parsed:
                 with self.assertRaisesRegex(RuntimeError, "parser reached"):
                     probe._import_response(args)
                 parsed.assert_called_once_with(raw.decode("utf-8"))

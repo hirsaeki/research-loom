@@ -4,7 +4,10 @@ import tempfile
 import unittest
 
 from plugins.local_application import LocalApplicationFacade
-from tests.runtime.survey_virtual_runner_test_support import SurveyVirtualRunnerTestBase, make_virtual_app
+from tests.runtime.survey_virtual_runner_test_support import (
+    SurveyVirtualRunnerTestBase,
+    make_virtual_app,
+)
 from tests.runtime.test_survey_response_dataset import intake, raw_response
 
 
@@ -15,34 +18,49 @@ class SurveyAnalysisOriginNeutralTests(SurveyVirtualRunnerTestBase):
             facade = LocalApplicationFacade(app, "PRJ-1")
             questionnaire = self._capture(facade)
 
-            synthetic = facade.capture_survey_response_dataset(intake(
-                questionnaire,
-                responses=[raw_response("SYN-1", "SYN-P-1", answers={"role": "contributor"})],
-            ))
-            real = facade.capture_survey_response_dataset(intake(
-                questionnaire,
-                origin="real",
-                responses=[raw_response(
-                    "REAL-1", "REAL-P-1", namespace="real:test", answers={"role": "contributor"}
-                )],
-            ))
+            synthetic = facade.capture_survey_response_dataset(
+                intake(
+                    questionnaire,
+                    responses=[raw_response("SYN-1", "SYN-P-1", answers={"role": "contributor"})],
+                )
+            )
+            real = facade.capture_survey_response_dataset(
+                intake(
+                    questionnaire,
+                    origin="real",
+                    responses=[
+                        raw_response(
+                            "REAL-1",
+                            "REAL-P-1",
+                            namespace="real:test",
+                            answers={"role": "contributor"},
+                        )
+                    ],
+                )
+            )
 
             def aggregate(dataset):
-                spec = facade.capture_survey_analysis_spec({
-                    "dataset_id": dataset["dataset_id"],
-                    "dataset_digest": dataset["content_digest"],
-                    "analysis_items": [{
-                        "analysis_type": "frequency",
-                        "question_id": "Q1",
-                        "denominator_rule": "valid_responses",
-                    }],
-                })
-                result = facade.run_survey_aggregation({
-                    "analysis_spec_id": spec["analysis_spec_id"],
-                    "analysis_spec_digest": spec["content_digest"],
-                    "dataset_id": dataset["dataset_id"],
-                    "dataset_digest": dataset["content_digest"],
-                })
+                spec = facade.capture_survey_analysis_spec(
+                    {
+                        "dataset_id": dataset["dataset_id"],
+                        "dataset_digest": dataset["content_digest"],
+                        "analysis_items": [
+                            {
+                                "analysis_type": "frequency",
+                                "question_id": "Q1",
+                                "denominator_rule": "valid_responses",
+                            }
+                        ],
+                    }
+                )
+                result = facade.run_survey_aggregation(
+                    {
+                        "analysis_spec_id": spec["analysis_spec_id"],
+                        "analysis_spec_digest": spec["content_digest"],
+                        "dataset_id": dataset["dataset_id"],
+                        "dataset_digest": dataset["content_digest"],
+                    }
+                )
                 return facade.show_survey_aggregate_result(result["aggregate_result_id"])
 
             synthetic_result = aggregate(synthetic)

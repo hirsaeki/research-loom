@@ -202,14 +202,17 @@ class StateView:
 
     def exact_object(self, kind: str, object_id: str, revision: int) -> Mapping[str, Any] | None:
         for obj in self.objects:
-            if obj.get("kind") == kind and obj.get("id") == object_id and int(obj.get("revision", -1)) == revision:
+            if (
+                obj.get("kind") == kind
+                and obj.get("id") == object_id
+                and int(obj.get("revision", -1)) == revision
+            ):
                 return obj
         return None
 
     def latest_object(self, kind: str, object_id: str) -> Mapping[str, Any] | None:
         matches = [
-            obj for obj in self.objects
-            if obj.get("kind") == kind and obj.get("id") == object_id
+            obj for obj in self.objects if obj.get("kind") == kind and obj.get("id") == object_id
         ]
         if not matches:
             return None
@@ -364,7 +367,9 @@ def canonical_digest(value: Any) -> str:
     return DIGEST_PREFIX + hashlib.sha256(payload).hexdigest()
 
 
-def with_content_digest(payload: Mapping[str, Any], field_name: str = "content_digest") -> dict[str, Any]:
+def with_content_digest(
+    payload: Mapping[str, Any], field_name: str = "content_digest"
+) -> dict[str, Any]:
     data = dict(payload)
     data.pop(field_name, None)
     data[field_name] = canonical_digest(data)

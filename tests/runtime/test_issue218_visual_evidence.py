@@ -74,8 +74,12 @@ class Issue218VisualEvidenceTests(ResearchPackageAcceptanceSupport):
 
         self.assertEqual(verify_export_root(out)["status"], "VERIFIED")
         package = json.loads((out / "research-package.json").read_text(encoding="utf-8"))
-        visual = package["resolved_content"]["working_material"]["research_exhibits"][0]["visual_target"]
-        self.assertEqual((out / visual["source_attachment_path"]).read_bytes(), case["visual_original"])
+        visual = package["resolved_content"]["working_material"]["research_exhibits"][0][
+            "visual_target"
+        ]
+        self.assertEqual(
+            (out / visual["source_attachment_path"]).read_bytes(), case["visual_original"]
+        )
         self.assertIn("Source visual:", (out / "research-package.md").read_text(encoding="utf-8"))
 
     def test_derived_crop_keeps_source_derivation_and_is_detached(self):
@@ -119,7 +123,9 @@ class Issue218VisualEvidenceTests(ResearchPackageAcceptanceSupport):
             built = facade.build_research_package(case["build_input"])
             package_id = built["package"]["package_id"]
             shown = facade.show_research_package(package_id)["package"]
-            visual = shown["resolved_content"]["working_material"]["research_exhibits"][0]["visual_target"]
+            visual = shown["resolved_content"]["working_material"]["research_exhibits"][0][
+                "visual_target"
+            ]
             self.assertEqual(
                 visual["derived_artifact"]["derived_from_artifact_ref"],
                 source_ref,
@@ -130,7 +136,9 @@ class Issue218VisualEvidenceTests(ResearchPackageAcceptanceSupport):
             facade.close()
 
         package = json.loads((out / "research-package.json").read_text(encoding="utf-8"))
-        visual = package["resolved_content"]["working_material"]["research_exhibits"][0]["visual_target"]
+        visual = package["resolved_content"]["working_material"]["research_exhibits"][0][
+            "visual_target"
+        ]
         derived_path = visual["derived_artifact"]["attachment_path"]
         self.assertEqual(
             (out / derived_path).read_bytes(),
@@ -196,8 +204,11 @@ class Issue218VisualEvidenceTests(ResearchPackageAcceptanceSupport):
                     "kind": "region",
                     "page": 1,
                     "region": {
-                        "x": float("nan"), "y": 0.1,
-                        "width": 0.5, "height": 0.5, "unit": "normalized",
+                        "x": float("nan"),
+                        "y": 0.1,
+                        "width": 0.5,
+                        "height": 0.5,
+                        "unit": "normalized",
                     },
                 },
             }
@@ -268,7 +279,9 @@ class Issue218VisualEvidenceTests(ResearchPackageAcceptanceSupport):
 
         package_path = out / "research-package.json"
         package = json.loads(package_path.read_text(encoding="utf-8"))
-        visual = package["resolved_content"]["working_material"]["research_exhibits"][0]["visual_target"]
+        visual = package["resolved_content"]["working_material"]["research_exhibits"][0][
+            "visual_target"
+        ]
         visual["source_digest"] = "sha256:" + "0" * 64
         package["package_digest"] = digest_json(without_digest(package))
         package_path.write_text(
@@ -289,7 +302,9 @@ class Issue218VisualEvidenceTests(ResearchPackageAcceptanceSupport):
 
         package_path = out / "research-package.json"
         package = json.loads(package_path.read_text(encoding="utf-8"))
-        visual = package["resolved_content"]["working_material"]["research_exhibits"][0]["visual_target"]
+        visual = package["resolved_content"]["working_material"]["research_exhibits"][0][
+            "visual_target"
+        ]
         visual["locator"]["page"] = 0
         package["package_digest"] = digest_json(without_digest(package))
         package_path.write_text(
@@ -330,8 +345,7 @@ class Issue218VisualEvidenceTests(ResearchPackageAcceptanceSupport):
             facade.close()
 
         visual_attachments = [
-            item for item in package["attachments"]
-            if item["source"].startswith("visual_source:")
+            item for item in package["attachments"] if item["source"].startswith("visual_source:")
         ]
         self.assertEqual(len(visual_attachments), 1)
         paths = {
@@ -378,7 +392,10 @@ class Issue218VisualEvidenceTests(ResearchPackageAcceptanceSupport):
             exhibit = package["resolved_content"]["working_material"]["research_exhibits"][0]
             self.assertNotIn("visual_target", exhibit)
             self.assertFalse(
-                any(item["path"].startswith("attachments/visual/") for item in package["attachments"])
+                any(
+                    item["path"].startswith("attachments/visual/")
+                    for item in package["attachments"]
+                )
             )
         finally:
             facade.close()
@@ -386,4 +403,5 @@ class Issue218VisualEvidenceTests(ResearchPackageAcceptanceSupport):
 
 if __name__ == "__main__":
     import unittest
+
     unittest.main()

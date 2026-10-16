@@ -71,9 +71,7 @@ class StagedMaterialImportAcceptanceTests(unittest.TestCase):
                 # itself be destination durability.
                 disposable = destination.stage_external_material_source(source_root)
                 disposable_root = destination_root / disposable["staged_source"]["root"]
-                with open_read_only_execution_store(
-                    disposable_root / "execution"
-                ) as staged:
+                with open_read_only_execution_store(disposable_root / "execution") as staged:
                     artifact = next(
                         item
                         for item in staged.artifacts_for(source_run)
@@ -109,17 +107,11 @@ class StagedMaterialImportAcceptanceTests(unittest.TestCase):
                 self.assertFalse(imported["source_authority_imported"])
                 self.assertNotIn(
                     str(staged_root),
-                    repr(
-                        destination_app.execution_store.artifacts_for(
-                            destination_run
-                        )
-                    ),
+                    repr(destination_app.execution_store.artifacts_for(destination_run)),
                 )
 
                 shutil.rmtree(staged_root)
-                shown = destination.show_external_material(
-                    destination_run, "CAP-1"
-                )
+                shown = destination.show_external_material(destination_run, "CAP-1")
                 self.assertEqual(shown["status"], "OK")
                 self.assertIn(
                     "exact supporting excerpt",
@@ -182,9 +174,7 @@ class StagedMaterialImportAcceptanceTests(unittest.TestCase):
                 ).current_snapshot
                 self.assertEqual(result["status"], "CAPABILITY_RESULT_COLLECTED")
                 self.assertTrue(
-                    result["execution_result"]["state_delta_proposal"][
-                        "candidate_only"
-                    ]
+                    result["execution_result"]["state_delta_proposal"]["candidate_only"]
                 )
                 self.assertEqual(
                     (before["id"], before["content_digest"]),
@@ -212,17 +202,13 @@ class StagedMaterialImportAcceptanceTests(unittest.TestCase):
                 destination_run = helper.prepare(destination)["run_id"]
                 staged = destination.stage_external_material_source(source_root)
                 staged_root = destination_root / staged["staged_source"]["root"]
-                with open_read_only_execution_store(
-                    staged_root / "execution"
-                ) as source_store:
+                with open_read_only_execution_store(staged_root / "execution") as source_store:
                     original = next(
                         item
                         for item in source_store.artifacts_for(source_run)
                         if item.role == "desktop_research.original_capture"
                     )
-                    backing = source_store.verified_artifact_path(
-                        original.artifact_id
-                    )
+                    backing = source_store.verified_artifact_path(original.artifact_id)
                 backing.write_bytes(b"corrupt")
                 with self.assertRaises(LocalApplicationError) as caught:
                     destination.import_staged_external_material(
@@ -236,9 +222,7 @@ class StagedMaterialImportAcceptanceTests(unittest.TestCase):
                     "APPLICATION-MATERIAL-IMPORT-VERIFY-001",
                 )
                 self.assertEqual(
-                    destination_app.execution_store.artifacts_for(
-                        destination_run
-                    ),
+                    destination_app.execution_store.artifacts_for(destination_run),
                     (),
                 )
             finally:

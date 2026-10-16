@@ -46,9 +46,7 @@ class SQLiteResearchStateRepository(
         if journal_mode not in _ALLOWED_JOURNAL_MODES:
             raise ValueError(f"unsupported journal_mode {journal_mode!r}")
         if synchronous not in _ALLOWED_SYNCHRONOUS:
-            raise ValueError(
-                f"unsupported synchronous setting {synchronous!r}"
-            )
+            raise ValueError(f"unsupported synchronous setting {synchronous!r}")
 
         try:
             self._connection = sqlite3.connect(
@@ -58,33 +56,18 @@ class SQLiteResearchStateRepository(
             )
             self._connection.row_factory = sqlite3.Row
             self._connection.execute("PRAGMA foreign_keys = ON")
-            self._connection.execute(
-                f"PRAGMA busy_timeout = {int(busy_timeout_ms)}"
-            )
+            self._connection.execute(f"PRAGMA busy_timeout = {int(busy_timeout_ms)}")
             actual_journal = str(
-                self._connection.execute(
-                    f"PRAGMA journal_mode = {journal_mode}"
-                ).fetchone()[0]
+                self._connection.execute(f"PRAGMA journal_mode = {journal_mode}").fetchone()[0]
             ).upper()
-            self._connection.execute(
-                f"PRAGMA synchronous = {synchronous}"
-            )
-            if (
-                self.database != ":memory:"
-                and actual_journal != journal_mode
-            ):
+            self._connection.execute(f"PRAGMA synchronous = {synchronous}")
+            if self.database != ":memory:" and actual_journal != journal_mode:
                 raise RepositoryError(
                     "SQLite refused requested journal_mode "
                     f"{journal_mode!r}; got {actual_journal!r}"
                 )
-            if int(
-                self._connection.execute(
-                    "PRAGMA foreign_keys"
-                ).fetchone()[0]
-            ) != 1:
-                raise RepositoryError(
-                    "SQLite foreign_keys pragma is not enabled"
-                )
+            if int(self._connection.execute("PRAGMA foreign_keys").fetchone()[0]) != 1:
+                raise RepositoryError("SQLite foreign_keys pragma is not enabled")
             self._migrate()
         except RepositoryError:
             connection = getattr(self, "_connection", None)
@@ -95,9 +78,7 @@ class SQLiteResearchStateRepository(
             connection = getattr(self, "_connection", None)
             if connection is not None:
                 connection.close()
-            raise RepositoryError(
-                "failed to initialize SQLite Research State repository"
-            ) from exc
+            raise RepositoryError("failed to initialize SQLite Research State repository") from exc
         except Exception:
             connection = getattr(self, "_connection", None)
             if connection is not None:
@@ -123,9 +104,7 @@ class SQLiteResearchStateRepository(
                 """
             ).fetchone()
         except sqlite3.Error as exc:
-            raise RepositoryError(
-                "SQLite schema metadata is unavailable"
-            ) from exc
+            raise RepositoryError("SQLite schema metadata is unavailable") from exc
         return int(row["version"]) if row is not None else 0
 
     def _migrate(self) -> None:
@@ -154,8 +133,7 @@ class SQLiteResearchStateRepository(
             }
             if applied and max(applied) > latest:
                 raise RepositoryError(
-                    f"SQLite schema version {max(applied)} is newer "
-                    f"than supported version {latest}"
+                    f"SQLite schema version {max(applied)} is newer than supported version {latest}"
                 )
             applied_versions = sorted(applied)
             expected_prefix = known_versions[: len(applied_versions)]
@@ -166,10 +144,7 @@ class SQLiteResearchStateRepository(
                 )
             for version, name, _sql in migrations:
                 existing_name = applied.get(version)
-                if (
-                    existing_name is not None
-                    and existing_name != name
-                ):
+                if existing_name is not None and existing_name != name:
                     raise RepositoryError(
                         f"SQLite migration {version:04d} name mismatch: "
                         f"{existing_name!r} != {name!r}"
@@ -192,9 +167,7 @@ class SQLiteResearchStateRepository(
             raise
         except (OSError, UnicodeError, sqlite3.Error) as exc:
             rollback_quietly(self._connection)
-            raise RepositoryError(
-                "SQLite schema migration failed atomically"
-            ) from exc
+            raise RepositoryError("SQLite schema migration failed atomically") from exc
 
     @contextmanager
     def _write_transaction(self) -> Iterator[None]:

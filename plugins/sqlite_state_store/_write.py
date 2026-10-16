@@ -66,7 +66,8 @@ class WriteMixin:
                 for row in (project, lineage):
                     if (
                         str(row["project_config_digest"]) != expected_project_config_digest
-                        or str(row["effective_profile_set_digest"]) != expected_effective_profile_set_digest
+                        or str(row["effective_profile_set_digest"])
+                        != expected_effective_profile_set_digest
                     ):
                         raise StaleHeadError(
                             "current Project/Profile binding changed before atomic rebind"
@@ -112,7 +113,9 @@ class WriteMixin:
         except (AtomicCommitError, StaleHeadError):
             raise
         except sqlite3.Error as exc:
-            raise AtomicCommitError("current Project/Profile binding rebind failed atomically") from exc
+            raise AtomicCommitError(
+                "current Project/Profile binding rebind failed atomically"
+            ) from exc
 
     def commit(
         self: "SQLiteResearchStateRepository",
@@ -121,9 +124,7 @@ class WriteMixin:
         expected_head_snapshot_digest: str,
     ) -> CommitReceipt:
         if bundle.receipt is None:
-            raise AtomicCommitError(
-                "CommitBundle must contain its immutable receipt"
-            )
+            raise AtomicCommitError("CommitBundle must contain its immutable receipt")
         try:
             with self._write_transaction():
                 prior = self._connection.execute(
@@ -152,25 +153,15 @@ class WriteMixin:
                         f"source lineage {bundle.lineage_ref!r} does not resolve"
                     )
                 if str(source["project_ref"]) != bundle.project_ref:
-                    raise AtomicCommitError(
-                        "source lineage belongs to a different project"
-                    )
+                    raise AtomicCommitError("source lineage belongs to a different project")
+                if str(source["head_snapshot_digest"]) != expected_head_snapshot_digest:
+                    raise StaleHeadError("Research Lineage HEAD changed before atomic commit")
                 if (
-                    str(source["head_snapshot_digest"])
-                    != expected_head_snapshot_digest
+                    str(source["head_snapshot_ref"]) != bundle.previous_snapshot_ref
+                    or str(source["head_snapshot_digest"]) != bundle.previous_snapshot_digest
                 ):
                     raise StaleHeadError(
-                        "Research Lineage HEAD changed before atomic commit"
-                    )
-                if (
-                    str(source["head_snapshot_ref"])
-                    != bundle.previous_snapshot_ref
-                    or str(source["head_snapshot_digest"])
-                    != bundle.previous_snapshot_digest
-                ):
-                    raise StaleHeadError(
-                        "CommitBundle previous Snapshot no longer matches "
-                        "Research Lineage HEAD"
+                        "CommitBundle previous Snapshot no longer matches Research Lineage HEAD"
                     )
 
                 for obj in bundle.object_revisions:
@@ -188,8 +179,7 @@ class WriteMixin:
                         ) from exc
                     if stored_decision is None:
                         raise AtomicCommitError(
-                            f"Decision {decision['id']!r} is missing its "
-                            "canonical object revision"
+                            f"Decision {decision['id']!r} is missing its canonical object revision"
                         )
                     self._insert_decision_index(
                         decision,
@@ -198,13 +188,15 @@ class WriteMixin:
 
                 if bundle.new_snapshot is not None:
                     snapshot_id = str(bundle.new_snapshot["id"])
-                    if self._connection.execute(
-                        "SELECT 1 FROM snapshots WHERE snapshot_ref = ?",
-                        (snapshot_id,),
-                    ).fetchone() is not None:
+                    if (
+                        self._connection.execute(
+                            "SELECT 1 FROM snapshots WHERE snapshot_ref = ?",
+                            (snapshot_id,),
+                        ).fetchone()
+                        is not None
+                    ):
                         raise AtomicCommitError(
-                            f"immutable Snapshot identity already exists: "
-                            f"{snapshot_id}"
+                            f"immutable Snapshot identity already exists: {snapshot_id}"
                         )
                     self._insert_immutable_object(
                         bundle.new_snapshot,
@@ -222,14 +214,11 @@ class WriteMixin:
                         updated_commit_id=bundle.commit_id,
                     )
                 for lineage in bundle.new_lineages:
-                    if (
-                        bundle.new_snapshot is None
-                        or lineage.head_snapshot_ref
-                        != str(bundle.new_snapshot["id"])
+                    if bundle.new_snapshot is None or lineage.head_snapshot_ref != str(
+                        bundle.new_snapshot["id"]
                     ):
                         raise AtomicCommitError(
-                            "new lineage HEAD snapshot must be in the same "
-                            "atomic bundle"
+                            "new lineage HEAD snapshot must be in the same atomic bundle"
                         )
                     self._insert_new_lineage(
                         bundle.project_ref,
@@ -250,9 +239,7 @@ class WriteMixin:
                         ),
                     ).fetchone()
                     if target is None:
-                        raise AtomicCommitError(
-                            "active lineage target does not resolve"
-                        )
+                        raise AtomicCommitError("active lineage target does not resolve")
                     updated = self._connection.execute(
                         """
                         UPDATE project_active_lineage
@@ -267,8 +254,7 @@ class WriteMixin:
                     )
                     if updated.rowcount != 1:
                         raise AtomicCommitError(
-                            "project active lineage pointer is missing: "
-                            f"{bundle.project_ref}"
+                            f"project active lineage pointer is missing: {bundle.project_ref}"
                         )
 
                 for decision_ref in bundle.used_decision_refs:
@@ -288,8 +274,7 @@ class WriteMixin:
                         )
                     except sqlite3.IntegrityError as exc:
                         raise AtomicCommitError(
-                            "Decision reference cannot be consumed twice: "
-                            f"{decision_ref}"
+                            f"Decision reference cannot be consumed twice: {decision_ref}"
                         ) from exc
 
                 for adoption_ref in bundle.adoption_refs:
@@ -310,13 +295,14 @@ class WriteMixin:
 
                 for audit in bundle.audit_events:
                     audit_id = str(audit["id"])
-                    if self._connection.execute(
-                        "SELECT 1 FROM audit_events WHERE audit_ref = ?",
-                        (audit_id,),
-                    ).fetchone() is not None:
-                        raise AtomicCommitError(
-                            f"AuditEvent identity already exists: {audit_id}"
-                        )
+                    if (
+                        self._connection.execute(
+                            "SELECT 1 FROM audit_events WHERE audit_ref = ?",
+                            (audit_id,),
+                        ).fetchone()
+                        is not None
+                    ):
+                        raise AtomicCommitError(f"AuditEvent identity already exists: {audit_id}")
                     self._insert_immutable_object(
                         audit,
                         created_commit_id=bundle.commit_id,
@@ -374,13 +360,9 @@ class WriteMixin:
         ):
             raise
         except sqlite3.IntegrityError as exc:
-            raise AtomicCommitError(
-                "SQLite integrity constraint rejected atomic commit"
-            ) from exc
+            raise AtomicCommitError("SQLite integrity constraint rejected atomic commit") from exc
         except sqlite3.Error as exc:
-            raise AtomicCommitError(
-                "SQLite persistence operation failed"
-            ) from exc
+            raise AtomicCommitError("SQLite persistence operation failed") from exc
 
     def _insert_immutable_object(
         self: "SQLiteResearchStateRepository",
@@ -394,14 +376,10 @@ class WriteMixin:
             if kind == "project":
                 project_ref = object_id
             else:
-                raise AtomicCommitError(
-                    f"{kind}:{object_id} has no project_id"
-                )
+                raise AtomicCommitError(f"{kind}:{object_id} has no project_id")
         payload_json = encode_json(obj)
         payload_digest = canonical_digest(obj)
-        content_digest = str(
-            obj.get("content_digest") or payload_digest
-        )
+        content_digest = str(obj.get("content_digest") or payload_digest)
         existing = self._connection.execute(
             """
             SELECT payload_digest FROM object_revisions
@@ -413,8 +391,7 @@ class WriteMixin:
             if str(existing["payload_digest"]) == payload_digest:
                 return
             raise AtomicCommitError(
-                f"immutable object revision collision at "
-                f"{(kind, object_id, revision)}"
+                f"immutable object revision collision at {(kind, object_id, revision)}"
             )
         self._connection.execute(
             """
@@ -462,17 +439,11 @@ class WriteMixin:
             ),
         )
         members = snapshot.get("members", ())
-        if isinstance(members, (str, bytes)) or not isinstance(
-            members, (list, tuple)
-        ):
-            raise AtomicCommitError(
-                "Snapshot members must be an ordered sequence"
-            )
+        if isinstance(members, (str, bytes)) or not isinstance(members, (list, tuple)):
+            raise AtomicCommitError("Snapshot members must be an ordered sequence")
         for ordinal, member in enumerate(members):
             if not isinstance(member, Mapping):
-                raise AtomicCommitError(
-                    "Snapshot member must be an object"
-                )
+                raise AtomicCommitError("Snapshot member must be an object")
             kind = str(member["kind"])
             object_id = str(member["id"])
             revision = int(member["revision"])
@@ -486,13 +457,11 @@ class WriteMixin:
             ).fetchone()
             if target is None:
                 raise AtomicCommitError(
-                    "Snapshot member does not resolve: "
-                    f"{kind}:{object_id}@{revision}"
+                    f"Snapshot member does not resolve: {kind}:{object_id}@{revision}"
                 )
             if str(target["payload_digest"]) != digest:
                 raise AtomicCommitError(
-                    "Snapshot member digest mismatch: "
-                    f"{kind}:{object_id}@{revision}"
+                    f"Snapshot member digest mismatch: {kind}:{object_id}@{revision}"
                 )
             self._connection.execute(
                 """
@@ -528,14 +497,9 @@ class WriteMixin:
             (decision_ref,),
         ).fetchone()
         if existing is not None:
-            if (
-                int(existing["revision"]) == revision
-                and str(existing["payload_digest"]) == digest
-            ):
+            if int(existing["revision"]) == revision and str(existing["payload_digest"]) == digest:
                 return
-            raise AtomicCommitError(
-                f"immutable Decision collision at {decision_ref}"
-            )
+            raise AtomicCommitError(f"immutable Decision collision at {decision_ref}")
         self._connection.execute(
             """
             INSERT INTO decisions(
@@ -560,13 +524,14 @@ class WriteMixin:
         created_commit_id: str | None,
         updated_commit_id: str | None,
     ) -> None:
-        if self._connection.execute(
-            "SELECT 1 FROM lineages WHERE lineage_id = ?",
-            (lineage.lineage_id,),
-        ).fetchone() is not None:
-            raise AtomicCommitError(
-                f"lineage identity already exists: {lineage.lineage_id}"
-            )
+        if (
+            self._connection.execute(
+                "SELECT 1 FROM lineages WHERE lineage_id = ?",
+                (lineage.lineage_id,),
+            ).fetchone()
+            is not None
+        ):
+            raise AtomicCommitError(f"lineage identity already exists: {lineage.lineage_id}")
         self._assert_lineage_head(lineage)
         self._connection.execute(
             """
@@ -608,16 +573,17 @@ class WriteMixin:
         *,
         updated_commit_id: str,
     ) -> None:
-        if self._connection.execute(
-            """
+        if (
+            self._connection.execute(
+                """
             SELECT 1 FROM lineages
             WHERE lineage_id = ? AND project_ref = ?
             """,
-            (lineage.lineage_id, project_ref),
-        ).fetchone() is None:
-            raise AtomicCommitError(
-                f"cannot update unknown lineage {lineage.lineage_id}"
-            )
+                (lineage.lineage_id, project_ref),
+            ).fetchone()
+            is None
+        ):
+            raise AtomicCommitError(f"cannot update unknown lineage {lineage.lineage_id}")
         self._assert_lineage_head(lineage)
         self._connection.execute(
             """
@@ -662,14 +628,10 @@ class WriteMixin:
         ).fetchone()
         if row is None:
             raise AtomicCommitError(
-                f"lineage HEAD snapshot does not resolve: "
-                f"{lineage.head_snapshot_ref}"
+                f"lineage HEAD snapshot does not resolve: {lineage.head_snapshot_ref}"
             )
         if (
             int(row["revision"]) != lineage.head_snapshot_revision
-            or str(row["content_digest"])
-            != lineage.head_snapshot_digest
+            or str(row["content_digest"]) != lineage.head_snapshot_digest
         ):
-            raise AtomicCommitError(
-                "lineage HEAD metadata does not match Snapshot"
-            )
+            raise AtomicCommitError("lineage HEAD metadata does not match Snapshot")

@@ -37,7 +37,9 @@ class ResearchQualityPolicyContractTests(unittest.TestCase):
         cls.profile_validator = Draft202012Validator(cls.profile_schema)
         cls.core_validator = Draft202012Validator(cls.core_schema)
         cls.quality_validator = Draft202012Validator(cls.quality_schema)
-        cls.generic = json.loads((FIXTURES / "valid/generic-research-quality.profile.json").read_text(encoding="utf-8"))
+        cls.generic = json.loads(
+            (FIXTURES / "valid/generic-research-quality.profile.json").read_text(encoding="utf-8")
+        )
 
     def test_quality_catalog_schema_is_valid_and_catalog_conforms(self):
         """Require the catalog to conform and semantic entries to remain set-valued."""
@@ -59,7 +61,9 @@ class ResearchQualityPolicyContractTests(unittest.TestCase):
                 self.assertIn(entry["merge_strategy"], {"union", "intersection"})
 
         invalid_catalog = json.loads(json.dumps(self.catalog))
-        semantic_entry = next(entry for entry in invalid_catalog["constraint_paths"] if entry["class"] == "semantic")
+        semantic_entry = next(
+            entry for entry in invalid_catalog["constraint_paths"] if entry["class"] == "semantic"
+        )
         semantic_entry["value_shape"] = "integer"
         semantic_entry["merge_strategy"] = "max"
         semantic_entry.pop("vocabulary", None)
@@ -68,7 +72,11 @@ class ResearchQualityPolicyContractTests(unittest.TestCase):
     def test_quality_catalog_cross_references_fail_closed(self):
         """Reject missing constraint vocabularies and quality-gate definition drift."""
         missing_vocabulary = json.loads(json.dumps(self.catalog))
-        enum_entry = next(entry for entry in missing_vocabulary["constraint_paths"] if entry["value_shape"] == "enum_set")
+        enum_entry = next(
+            entry
+            for entry in missing_vocabulary["constraint_paths"]
+            if entry["value_shape"] == "enum_set"
+        )
         enum_entry["vocabulary"] = "missing_vocabulary"
         errors = catalog_cross_reference_errors(missing_vocabulary)
         self.assertEqual(1, len(errors))
@@ -84,7 +92,9 @@ class ResearchQualityPolicyContractTests(unittest.TestCase):
         self.assertIn("quality_gate vocabulary/definition mismatch", errors[0])
 
         extra_gate_definition = json.loads(json.dumps(self.catalog))
-        extra_gate_definition["quality_gates"]["fixture_extra_gate"] = {"meaning": "Synthetic invalid gate definition."}
+        extra_gate_definition["quality_gates"]["fixture_extra_gate"] = {
+            "meaning": "Synthetic invalid gate definition."
+        }
         errors = catalog_cross_reference_errors(extra_gate_definition)
         self.assertEqual(1, len(errors))
         self.assertIn("quality_gate vocabulary/definition mismatch", errors[0])
@@ -100,10 +110,46 @@ class ResearchQualityPolicyContractTests(unittest.TestCase):
         """Reject invalid Research quality ownership, paths, merge rules, and values."""
         cases = [
             ("PROFILE-RESEARCH-QUALITY-OWNER-001", {"profile_type": "organization"}),
-            ("PROFILE-RESEARCH-QUALITY-PATH-001", {"constraint": {"path": "research_quality.evidence.magic_score", "merge_strategy": "max", "value": 5}}),
-            ("PROFILE-RESEARCH-QUALITY-MERGE-001", {"constraint": {"path": "research_quality.counter_review.required_lenses", "merge_strategy": "intersection", "value": ["contradictory_evidence"]}}),
-            ("PROFILE-RESEARCH-QUALITY-VALUE-001", {"constraint": {"path": "research_quality.evidence.claim_support.allowed_directness", "merge_strategy": "intersection", "value": ["very_direct"]}}),
-            ("PROFILE-RESEARCH-QUALITY-VALUE-001", {"constraint": {"path": "research_quality.thresholds.material_finding.min_supporting_evidence_count", "merge_strategy": "max", "value": -1}}),
+            (
+                "PROFILE-RESEARCH-QUALITY-PATH-001",
+                {
+                    "constraint": {
+                        "path": "research_quality.evidence.magic_score",
+                        "merge_strategy": "max",
+                        "value": 5,
+                    }
+                },
+            ),
+            (
+                "PROFILE-RESEARCH-QUALITY-MERGE-001",
+                {
+                    "constraint": {
+                        "path": "research_quality.counter_review.required_lenses",
+                        "merge_strategy": "intersection",
+                        "value": ["contradictory_evidence"],
+                    }
+                },
+            ),
+            (
+                "PROFILE-RESEARCH-QUALITY-VALUE-001",
+                {
+                    "constraint": {
+                        "path": "research_quality.evidence.claim_support.allowed_directness",
+                        "merge_strategy": "intersection",
+                        "value": ["very_direct"],
+                    }
+                },
+            ),
+            (
+                "PROFILE-RESEARCH-QUALITY-VALUE-001",
+                {
+                    "constraint": {
+                        "path": "research_quality.thresholds.material_finding.min_supporting_evidence_count",
+                        "merge_strategy": "max",
+                        "value": -1,
+                    }
+                },
+            ),
         ]
         for index, (code, mutation) in enumerate(cases):
             manifest = json.loads(json.dumps(self.generic))
@@ -114,20 +160,35 @@ class ResearchQualityPolicyContractTests(unittest.TestCase):
             else:
                 manifest["constraints"] = [{"id": f"bad-{index}", **mutation["constraint"]}]
             self.assertFalse(list(self.profile_validator.iter_errors(manifest)), str(index))
-            self.assertEqual(code, research_quality_constraint_error(manifest, self.catalog), str(index))
+            self.assertEqual(
+                code, research_quality_constraint_error(manifest, self.catalog), str(index)
+            )
 
     def test_quality_composition_is_monotone_and_reuses_profile_merge_semantics(self):
         """Prove stricter quality constraints compose monotonically via PR 4 rules."""
         generic = load_candidate(FIXTURES / "valid/generic-research-quality.profile.json")
         strict = load_candidate(FIXTURES / "valid/strict-research-quality.profile.json")
-        composed = {item["path"]: item["value"] for item in canonical_compose_constraints([strict, generic])}
-        self.assertEqual(["descriptive_context"], composed["research_quality.source.low_confidence.allowed_support_scopes"])
+        composed = {
+            item["path"]: item["value"] for item in canonical_compose_constraints([strict, generic])
+        }
+        self.assertEqual(
+            ["descriptive_context"],
+            composed["research_quality.source.low_confidence.allowed_support_scopes"],
+        )
         self.assertEqual(
             ["alternative_explanation", "contradictory_evidence", "methodological_weakness"],
             composed["research_quality.counter_review.required_lenses"],
         )
-        self.assertEqual(3, composed["research_quality.thresholds.material_finding.min_supporting_evidence_count"])
-        self.assertEqual(3, composed["research_quality.thresholds.material_finding.min_independent_evidence_groups"])
+        self.assertEqual(
+            3,
+            composed["research_quality.thresholds.material_finding.min_supporting_evidence_count"],
+        )
+        self.assertEqual(
+            3,
+            composed[
+                "research_quality.thresholds.material_finding.min_independent_evidence_groups"
+            ],
+        )
         self.assertIn("research_freeze", composed["research_quality.gates.required"])
 
     def test_semantic_quality_fixtures_use_schema_valid_core_objects_and_expected_outcomes(self):
@@ -139,15 +200,31 @@ class ResearchQualityPolicyContractTests(unittest.TestCase):
             for object_id, obj in state["objects"].items():
                 errors = list(self.core_validator.iter_errors(obj))
                 self.assertFalse(errors, f"{case['id']}:{object_id}:{errors}")
-            self.assertEqual(case["expected_error"], research_quality_state_error(state, self.generic), case["id"])
+            self.assertEqual(
+                case["expected_error"],
+                research_quality_state_error(state, self.generic),
+                case["id"],
+            )
 
     def test_policy_keeps_numeric_thresholds_distinct_from_semantic_sufficiency(self):
         """Keep numeric evidence floors distinct from semantic sufficiency checks."""
         paths = catalog_index(self.catalog)
-        count_path = paths["research_quality.thresholds.material_finding.min_supporting_evidence_count"]
+        count_path = paths[
+            "research_quality.thresholds.material_finding.min_supporting_evidence_count"
+        ]
         sufficiency_path = paths["research_quality.evidence_sufficiency.required_checks"]
-        self.assertEqual(("threshold", "integer", "max"), (count_path["class"], count_path["value_shape"], count_path["merge_strategy"]))
-        self.assertEqual(("semantic", "enum_set", "union"), (sufficiency_path["class"], sufficiency_path["value_shape"], sufficiency_path["merge_strategy"]))
+        self.assertEqual(
+            ("threshold", "integer", "max"),
+            (count_path["class"], count_path["value_shape"], count_path["merge_strategy"]),
+        )
+        self.assertEqual(
+            ("semantic", "enum_set", "union"),
+            (
+                sufficiency_path["class"],
+                sufficiency_path["value_shape"],
+                sufficiency_path["merge_strategy"],
+            ),
+        )
         self.assertTrue(self.catalog["principles"]["no_fixed_source_count_stopping"])
 
 

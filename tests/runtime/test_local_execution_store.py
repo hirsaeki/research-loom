@@ -56,9 +56,7 @@ def load(name: str) -> dict:
 def refresh(document: dict, field: str) -> dict:
     body = deepcopy(document)
     body.pop(field, None)
-    document[field] = "sha256:" + hashlib.sha256(
-        rfc8785.dumps(body)
-    ).hexdigest()
+    document[field] = "sha256:" + hashlib.sha256(rfc8785.dumps(body)).hexdigest()
     return document
 
 
@@ -161,24 +159,14 @@ def bound_documents(store: LocalExecutionStore):
     refresh(context, "context_pack_digest")
 
     invocation = deepcopy(INVOCATION)
-    invocation["context_pack"]["context_pack_digest"] = context[
-        "context_pack_digest"
-    ]
-    invocation["pins"]["research_snapshot"] = deepcopy(
-        context["pins"]["research_snapshot"]
-    )
+    invocation["context_pack"]["context_pack_digest"] = context["context_pack_digest"]
+    invocation["pins"]["research_snapshot"] = deepcopy(context["pins"]["research_snapshot"])
     refresh(invocation, "invocation_digest")
 
     handoff = deepcopy(HANDOFF)
-    handoff["input_pins"]["invocation_digest"] = invocation[
-        "invocation_digest"
-    ]
-    handoff["input_pins"]["context_pack_digest"] = context[
-        "context_pack_digest"
-    ]
-    handoff["input_pins"]["research_snapshot"] = deepcopy(
-        context["pins"]["research_snapshot"]
-    )
+    handoff["input_pins"]["invocation_digest"] = invocation["invocation_digest"]
+    handoff["input_pins"]["context_pack_digest"] = context["context_pack_digest"]
+    handoff["input_pins"]["research_snapshot"] = deepcopy(context["pins"]["research_snapshot"])
     handoff["provenance"]["input_content_digests"] = [
         DESCRIPTOR["descriptor_digest"],
         context["context_pack_digest"],
@@ -279,11 +267,7 @@ def make_service(
     registry = CapabilityRegistry()
     registry.register(adapter, DESCRIPTOR)
     auth = AllowListedAuthorizationProvider(
-        (
-            invocation["runtime_authorization_evidence"][
-                "authorization_digest"
-            ],
-        )
+        (invocation["runtime_authorization_evidence"]["authorization_digest"],)
     )
     return CapabilityExecutionService(
         registry,
@@ -336,9 +320,7 @@ class TraceStoreConformanceMixin:
             )
         self.assertEqual(store.load_run(run.run_id), run)
         self.assertTrue(store.transition_run(RunStatus.PREPARED, running, event))
-        self.assertFalse(
-            store.transition_run(RunStatus.PREPARED, running, event)
-        )
+        self.assertFalse(store.transition_run(RunStatus.PREPARED, running, event))
 
         invocation = {
             "invocation_id": "INV-IMM",
@@ -347,9 +329,7 @@ class TraceStoreConformanceMixin:
         store.store_invocation(invocation)
         store.store_invocation(deepcopy(invocation))
         with self.assertRaises(ValueError):
-            store.store_invocation(
-                {"invocation_id": "INV-IMM", "value": 2}
-            )
+            store.store_invocation({"invocation_id": "INV-IMM", "value": 2})
 
 
 class InMemoryTraceStoreConformanceTests(
@@ -366,9 +346,7 @@ class LocalTraceStoreConformanceTests(
 ):
     def setUp(self):
         self.tempdir = tempfile.TemporaryDirectory()
-        self.store = LocalExecutionStore(
-            Path(self.tempdir.name) / "execution-store"
-        )
+        self.store = LocalExecutionStore(Path(self.tempdir.name) / "execution-store")
 
     def tearDown(self):
         self.store.close()
@@ -449,9 +427,7 @@ class LocalExecutionStoreTests(unittest.TestCase):
 
     def test_unknown_newer_schema_fails_closed(self):
         self.store.close()
-        with sqlite3.connect(
-            self.root / "execution-store" / "execution.db"
-        ) as connection:
+        with sqlite3.connect(self.root / "execution-store" / "execution.db") as connection:
             connection.execute(
                 """
                 INSERT INTO schema_migrations(version, name)
@@ -693,18 +669,14 @@ class LocalExecutionStoreTests(unittest.TestCase):
             artifact_id="ART-MISSING",
         )
         missing_hex = missing.digest.removeprefix("sha256:")
-        (
-            self.store.blob_root / missing_hex[:2] / missing_hex
-        ).unlink()
+        (self.store.blob_root / missing_hex[:2] / missing_hex).unlink()
         self.assertIn(
             "ARTIFACT_BLOB_MISSING",
             {item.code for item in self.store.diagnose_integrity()},
         )
 
     def test_run_scoped_doctor_ignores_unrelated_document_corruption(self):
-        with sqlite3.connect(
-            self.root / "execution-store" / "execution.db"
-        ) as connection:
+        with sqlite3.connect(self.root / "execution-store" / "execution.db") as connection:
             connection.execute(
                 """
                 INSERT INTO execution_documents(
@@ -720,15 +692,9 @@ class LocalExecutionStoreTests(unittest.TestCase):
     def test_doctor_detects_dangling_document_and_diagnostic_run_refs(self):
         payload = {"kind": "fixture"}
         payload_json = rfc8785.dumps(payload).decode("utf-8")
-        payload_sha = "sha256:" + hashlib.sha256(
-            rfc8785.dumps(payload)
-        ).hexdigest()
-        with sqlite3.connect(
-            self.root / "execution-store" / "execution.db"
-        ) as connection:
-            connection.execute(
-                "PRAGMA foreign_keys = OFF"
-            )
+        payload_sha = "sha256:" + hashlib.sha256(rfc8785.dumps(payload)).hexdigest()
+        with sqlite3.connect(self.root / "execution-store" / "execution.db") as connection:
+            connection.execute("PRAGMA foreign_keys = OFF")
             connection.execute(
                 """
                 INSERT INTO execution_documents(
@@ -748,16 +714,9 @@ class LocalExecutionStoreTests(unittest.TestCase):
         self.assertIn("DANGLING_DIAGNOSTIC_RUN_REF", codes)
 
     def test_lifecycle_projection_corruption_is_diagnostic_only(self):
-        with sqlite3.connect(
-            self.root / "execution-store" / "execution.db"
-        ) as connection:
-            connection.execute(
-                "UPDATE runs SET status='COMPLETED' WHERE run_id='RUN-A'"
-            )
-        codes = {
-            item.code
-            for item in self.store.diagnose_integrity("RUN-A")
-        }
+        with sqlite3.connect(self.root / "execution-store" / "execution.db") as connection:
+            connection.execute("UPDATE runs SET status='COMPLETED' WHERE run_id='RUN-A'")
+        codes = {item.code for item in self.store.diagnose_integrity("RUN-A")}
         self.assertIn("RUN_EVENT_PROJECTION_MISMATCH", codes)
         self.assertEqual(
             self.store.diagnose_integrity("NO-SUCH-RUN")[0].code,
@@ -816,9 +775,7 @@ class LocalExecutionIntegrationTests(unittest.TestCase):
             {item.role for item in artifacts},
             {"generated_code", "log", "measurement"},
         )
-        self.assertTrue(
-            all(item.execution_mode == "virtual" for item in artifacts)
-        )
+        self.assertTrue(all(item.execution_mode == "virtual" for item in artifacts))
         after = self.state_repo.load_state_view("PRJ-1", "LIN-1")
         self.assertEqual(before, after)
         self.assertEqual(

@@ -15,37 +15,79 @@ import issue80_writer_composition_suite as compositions
 
 class ReusedSourceTests(ResearchPackageAcceptanceSupport):
     def adopt(self, facade, proposal):
-        pending = facade.submit_action({"action_type": "state.apply_candidate", "payload": {
-            "state_delta_proposal_id": proposal["proposal_id"]}, "actor_id": "fixture"})
-        confirmed = facade.submit_confirmation({
-            "confirmation_request_id": pending["confirmation_request"]["confirmation_request_id"],
-            "actor_id": "fixture"})
+        pending = facade.submit_action(
+            {
+                "action_type": "state.apply_candidate",
+                "payload": {"state_delta_proposal_id": proposal["proposal_id"]},
+                "actor_id": "fixture",
+            }
+        )
+        confirmed = facade.submit_confirmation(
+            {
+                "confirmation_request_id": pending["confirmation_request"][
+                    "confirmation_request_id"
+                ],
+                "actor_id": "fixture",
+            }
+        )
         if confirmed["status"] == "HUMAN_DECISION_REQUIRED":
             request = confirmed["decision_request"]
-            facade.resolve_human_decision({"request_id": request["request_id"],
-                "request_digest": request["request_digest"], "disposition": "approve_exact",
-                "actor_id": "fixture"})
+            facade.resolve_human_decision(
+                {
+                    "request_id": request["request_id"],
+                    "request_digest": request["request_digest"],
+                    "disposition": "approve_exact",
+                    "actor_id": "fixture",
+                }
+            )
 
     def test_two_questions_reusing_identical_material_keep_distinct_capture_sources(self):
         facade, case = self._prepare_case()
         self.addCleanup(facade.close)
         self.adopt(facade, case["proposal"])
         second_rq = intake.adopt_rq(facade)
-        run_id = facade.submit_action({"action_type": "desktop_research.investigate",
-            "payload": {"question_id": second_rq, "purpose": "Fixture second comparison."}})["run_id"]
-        facade.start_external_retrieval_attempt(run_id, {"attempt_id": "ATT-1",
-            "strategy": "support search", "coverage_dimension_ids": ["COV-SUPPORT"],
-            "target_locator": "https://example.test/source-a"})
-        capture = facade.capture_external_source(run_id, {"capture_id": "CAP-1",
-            "source_category": "other", "exact_locator": "https://example.test/source-a#section-1",
-            "acquired_at": "2026-09-07T00:00:00Z", "original_file": "captures/raw/source-a.html",
-            "original_media_type": "text/html", "text_rendition_file": "captures/text/source-a.txt"})["capture"]
-        facade.complete_external_retrieval_attempt(run_id, {"attempt_id": "ATT-1",
-            "outcome": "source_captured", "resulting_capture_id": "CAP-1"})
-        facade.start_external_retrieval_attempt(run_id, {"attempt_id": "ATT-2",
-            "strategy": "counter search", "coverage_dimension_ids": ["COV-COUNTER"]})
-        facade.complete_external_retrieval_attempt(run_id, {"attempt_id": "ATT-2",
-            "outcome": "no_relevant_source"})
+        run_id = facade.submit_action(
+            {
+                "action_type": "desktop_research.investigate",
+                "payload": {"question_id": second_rq, "purpose": "Fixture second comparison."},
+            }
+        )["run_id"]
+        facade.start_external_retrieval_attempt(
+            run_id,
+            {
+                "attempt_id": "ATT-1",
+                "strategy": "support search",
+                "coverage_dimension_ids": ["COV-SUPPORT"],
+                "target_locator": "https://example.test/source-a",
+            },
+        )
+        capture = facade.capture_external_source(
+            run_id,
+            {
+                "capture_id": "CAP-1",
+                "source_category": "other",
+                "exact_locator": "https://example.test/source-a#section-1",
+                "acquired_at": "2026-09-07T00:00:00Z",
+                "original_file": "captures/raw/source-a.html",
+                "original_media_type": "text/html",
+                "text_rendition_file": "captures/text/source-a.txt",
+            },
+        )["capture"]
+        facade.complete_external_retrieval_attempt(
+            run_id,
+            {"attempt_id": "ATT-1", "outcome": "source_captured", "resulting_capture_id": "CAP-1"},
+        )
+        facade.start_external_retrieval_attempt(
+            run_id,
+            {
+                "attempt_id": "ATT-2",
+                "strategy": "counter search",
+                "coverage_dimension_ids": ["COV-COUNTER"],
+            },
+        )
+        facade.complete_external_retrieval_attempt(
+            run_id, {"attempt_id": "ATT-2", "outcome": "no_relevant_source"}
+        )
         handoff, extension = intake.golden_submission(facade._application, run_id, capture)
         # Gap identifiers are local to these otherwise identical fixture submissions.
         handoff = json.loads(json.dumps(handoff).replace("GAP-1", "GAP-2"))
@@ -61,35 +103,62 @@ class ReusedSourceTests(ResearchPackageAcceptanceSupport):
         before = deepcopy(state.current_snapshot)
         object_ids = [case["rq_id"], second_rq]
         for candidate in (case["proposal"], proposal):
-            object_ids.extend(action["payload"]["object"]["id"] for action in candidate["proposed_actions"])
-        value = {"snapshot_id": state.current_snapshot["id"], "rq_id": case["rq_id"],
-            "object_ids": list(dict.fromkeys(object_ids)), "run_ids": [case["run_id"], run_id],
-            "materials": [{"run_id": rid, "capture_id": "CAP-1"} for rid in (case["run_id"], run_id)]}
+            object_ids.extend(
+                action["payload"]["object"]["id"] for action in candidate["proposed_actions"]
+            )
+        value = {
+            "snapshot_id": state.current_snapshot["id"],
+            "rq_id": case["rq_id"],
+            "object_ids": list(dict.fromkeys(object_ids)),
+            "run_ids": [case["run_id"], run_id],
+            "materials": [
+                {"run_id": rid, "capture_id": "CAP-1"} for rid in (case["run_id"], run_id)
+            ],
+        }
         built = facade.build_research_package(value)
         package = facade.show_research_package(built["package"]["package_id"])["package"]
-        self.assertEqual(set(package["content"]["research_question_refs"]), {case["rq_id"], second_rq})
+        self.assertEqual(
+            set(package["content"]["research_question_refs"]), {case["rq_id"], second_rq}
+        )
         for material in package["resolved_content"]["materials"]:
-            self.assertEqual(material["source_id"], source_id_for_capture(material["run_id"], "CAP-1"))
+            self.assertEqual(
+                material["source_id"], source_id_for_capture(material["run_id"], "CAP-1")
+            )
         self.assertEqual(facade._current_state_view().current_snapshot, before)
         output = self.root / "combined-detached"
         facade.export_research_package(package["package_id"], output)
         self.assertEqual(verify_export_root(output)["status"], "VERIFIED")
         tampered = deepcopy(package)
-        tampered["resolved_content"]["materials"][0]["source_id"] = package["resolved_content"]["materials"][1]["source_id"]
+        tampered["resolved_content"]["materials"][0]["source_id"] = package["resolved_content"][
+            "materials"
+        ][1]["source_id"]
         with self.assertRaisesRegex(LocalApplicationError, "material.capture_source_id"):
             validate_resolved_references(tampered)
         # Follow the public late-visual path, which must retain both selected RQs.
-        with_visual = facade.build_research_package({**value, "exhibit_ids": [case["exhibit_id"]]})["package"]
+        with_visual = facade.build_research_package({**value, "exhibit_ids": [case["exhibit_id"]]})[
+            "package"
+        ]
         composition_input = compositions.Issue80WriterCompositionTests._proposal(self, case)
         composition_input["sections"][1]["narrative_stage_refs"] = ["framing"]
         composition_input["sections"][1]["semantic_purpose_refs"] = ["frame_problem"]
-        composition = facade.capture_writer_composition(with_visual["package_id"], composition_input)["composition"]
-        need = facade.capture_visual_need({"origin": {"stage": "narrative",
-            "composition_id": composition["composition_id"], "composition_version": 1},
-            "purpose": "Use existing prose instead", "semantic_changes": [],
-            "affected_section_ids": ["SEC-FRAME"]})["exhibit"]["exhibit_id"]
-        resumed = facade.resume_visual_need({"need_id": need, "exhibit_ids": [],
-            "section_exhibit_refs": {"SEC-FRAME": []}})
+        composition = facade.capture_writer_composition(
+            with_visual["package_id"], composition_input
+        )["composition"]
+        need = facade.capture_visual_need(
+            {
+                "origin": {
+                    "stage": "narrative",
+                    "composition_id": composition["composition_id"],
+                    "composition_version": 1,
+                },
+                "purpose": "Use existing prose instead",
+                "semantic_changes": [],
+                "affected_section_ids": ["SEC-FRAME"],
+            }
+        )["exhibit"]["exhibit_id"]
+        resumed = facade.resume_visual_need(
+            {"need_id": need, "exhibit_ids": [], "section_exhibit_refs": {"SEC-FRAME": []}}
+        )
         self.assertEqual(set(resumed["package"]["rq_ids"]), {case["rq_id"], second_rq})
         self.assertEqual(facade._current_state_view().current_snapshot, before)
         self.assertEqual(facade.show_research_package(package["package_id"])["package"], package)
@@ -97,24 +166,45 @@ class ReusedSourceTests(ResearchPackageAcceptanceSupport):
         objects = {obj["id"]: obj for obj in state.effective_objects()}
         original_id = source_id_for_capture(case["run_id"], "CAP-1")
         original = objects[original_id]
-        single = {"snapshot_id": state.current_snapshot["id"], "rq_id": case["rq_id"],
-            "run_ids": [case["run_id"]], "materials": [value["materials"][0]]}
-        with self.assertRaisesRegex(LocalApplicationError, "does not resolve to its capture Source"):
+        single = {
+            "snapshot_id": state.current_snapshot["id"],
+            "rq_id": case["rq_id"],
+            "run_ids": [case["run_id"]],
+            "materials": [value["materials"][0]],
+        }
+        with self.assertRaisesRegex(
+            LocalApplicationError, "does not resolve to its capture Source"
+        ):
             service.build({**single, "object_ids": [source_id_for_capture(run_id, "CAP-1")]})
         mismatched = {**deepcopy(original), "content_digest": "sha256:" + "0" * 64}
-        with patch.object(service, "_objects", return_value={case["rq_id"]: objects[case["rq_id"]], original_id: mismatched}):
+        with patch.object(
+            service,
+            "_objects",
+            return_value={case["rq_id"]: objects[case["rq_id"]], original_id: mismatched},
+        ):
             with self.assertRaisesRegex(LocalApplicationError, "does not match verified material"):
                 service.build({**single, "object_ids": [original_id]})
-        unrelated = [{**deepcopy(original), "id": "SRC-UNRELATED-A"},
-                     {**deepcopy(original), "id": "SRC-UNRELATED-B"}]
-        with patch.object(service, "_objects", return_value={case["rq_id"]: objects[case["rq_id"]],
-                **{obj["id"]: obj for obj in unrelated}}):
+        unrelated = [
+            {**deepcopy(original), "id": "SRC-UNRELATED-A"},
+            {**deepcopy(original), "id": "SRC-UNRELATED-B"},
+        ]
+        with patch.object(
+            service,
+            "_objects",
+            return_value={
+                case["rq_id"]: objects[case["rq_id"]],
+                **{obj["id"]: obj for obj in unrelated},
+            },
+        ):
             with self.assertRaisesRegex(LocalApplicationError, "ambiguously resolves"):
                 service.build({**single, "object_ids": [obj["id"] for obj in unrelated]})
         # A legacy manually supplied Source has no normalized capture identity.
         # Preserve its existing unambiguous verified-content binding.
-        with patch.object(service, "_objects", return_value={case["rq_id"]: objects[case["rq_id"]],
-                unrelated[0]["id"]: unrelated[0]}):
+        with patch.object(
+            service,
+            "_objects",
+            return_value={case["rq_id"]: objects[case["rq_id"]], unrelated[0]["id"]: unrelated[0]},
+        ):
             legacy = service.build({**single, "object_ids": [unrelated[0]["id"]]})
             self.assertEqual(legacy["status"], "BUILT")
 

@@ -37,9 +37,7 @@ class FindingCandidateRecoveryReviewFixTests(ResearchPackageAcceptanceSupport):
         try:
             self._legacyize(facade, case["proposal"])
             run = facade._application.execution_store.load_run(case["run_id"])
-            context = facade._application.execution_store.load_context_pack(
-                run.context_pack_id
-            )
+            context = facade._application.execution_store.load_context_pack(run.context_pack_id)
             malformed = deepcopy(context)
             malformed["pins"] = None
             with patch.object(
@@ -48,12 +46,8 @@ class FindingCandidateRecoveryReviewFixTests(ResearchPackageAcceptanceSupport):
                 return_value=malformed,
             ):
                 with self.assertRaises(LocalApplicationError) as caught:
-                    facade.recover_legacy_desktop_research_finding_candidate(
-                        case["run_id"]
-                    )
-            self.assertEqual(
-                caught.exception.code, "APPLICATION-FINDING-RECOVERY-INTEGRITY-001"
-            )
+                    facade.recover_legacy_desktop_research_finding_candidate(case["run_id"])
+            self.assertEqual(caught.exception.code, "APPLICATION-FINDING-RECOVERY-INTEGRITY-001")
         finally:
             facade.close()
 
@@ -85,9 +79,7 @@ class FindingCandidateRecoveryReviewFixTests(ResearchPackageAcceptanceSupport):
         facade, case = self._prepare_case()
         try:
             self._legacyize(facade, case["proposal"])
-            recovered = facade.recover_legacy_desktop_research_finding_candidate(
-                case["run_id"]
-            )
+            recovered = facade.recover_legacy_desktop_research_finding_candidate(case["run_id"])
             store = facade._application.conversation_store
             store._db.execute(
                 "UPDATE state_delta_proposals SET payload_json=? WHERE proposal_id=?",
@@ -103,9 +95,7 @@ class FindingCandidateRecoveryReviewFixTests(ResearchPackageAcceptanceSupport):
             )
             with self.assertRaises(LocalApplicationError) as caught:
                 facade.recover_legacy_desktop_research_finding_candidate(case["run_id"])
-            self.assertEqual(
-                caught.exception.code, "APPLICATION-FINDING-RECOVERY-INTEGRITY-001"
-            )
+            self.assertEqual(caught.exception.code, "APPLICATION-FINDING-RECOVERY-INTEGRITY-001")
         finally:
             facade.close()
 
@@ -133,9 +123,7 @@ class FindingCandidateRecoveryReviewFixTests(ResearchPackageAcceptanceSupport):
             finally:
                 store._db.set_trace_callback(None)
             self.assertEqual(len(matches), 3)
-            self.assertTrue(
-                all(item["provenance"]["run_id"] == "RUN-TARGET" for item in matches)
-            )
+            self.assertTrue(all(item["provenance"]["run_id"] == "RUN-TARGET" for item in matches))
             self.assertFalse(
                 any(
                     statement.lstrip().upper().startswith("CREATE INDEX")

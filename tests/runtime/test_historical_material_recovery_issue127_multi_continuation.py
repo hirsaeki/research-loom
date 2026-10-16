@@ -147,9 +147,7 @@ class Issue127MultiMaterialContinuationTests(ResearchPackageAcceptanceSupport):
             elif dimension["dimension_id"] == "COV-COUNTER":
                 dimension["trace_entry_ids"] = ["ATT-4"]
         extension = with_context_extension_digest(extension)
-        collected = facade.collect_external(
-            run_id, {"handoff": handoff, "extension": extension}
-        )
+        collected = facade.collect_external(run_id, {"handoff": handoff, "extension": extension})
         self.assertEqual(collected["execution_result"]["run"]["status"], "COMPLETED")
         return facade, {
             "run_id": run_id,
@@ -227,7 +225,9 @@ class Issue127MultiMaterialContinuationTests(ResearchPackageAcceptanceSupport):
                 }
             )
             self.assertEqual(single["status"], "FAILED")
-            self.assertIn("required paired capture material is unavailable", single["issues"][0]["message"])
+            self.assertIn(
+                "required paired capture material is unavailable", single["issues"][0]["message"]
+            )
 
             # A too-small explicit group also fails, but must not permanently
             # poison the same material Runs: the operator can add the missing
@@ -242,7 +242,10 @@ class Issue127MultiMaterialContinuationTests(ResearchPackageAcceptanceSupport):
                 }
             )
             self.assertEqual(partial["status"], "FAILED")
-            self.assertIn("required paired capture material is unavailable: CAP-3", partial["issues"][0]["message"])
+            self.assertIn(
+                "required paired capture material is unavailable: CAP-3",
+                partial["issues"][0]["message"],
+            )
 
             grouped = facade.submit_action(
                 {
@@ -264,8 +267,14 @@ class Issue127MultiMaterialContinuationTests(ResearchPackageAcceptanceSupport):
             self.assertEqual(store.load_run(case["run_id"]), historical_before)
             self.assertEqual(self._snapshot(facade), state_before)
             for original, rendition in old_pairs.values():
-                self.assertEqual(store.diagnose_artifact_content(original.artifact_id)["status"], "content_missing")
-                self.assertEqual(store.diagnose_artifact_content(rendition.artifact_id)["status"], "content_missing")
+                self.assertEqual(
+                    store.diagnose_artifact_content(original.artifact_id)["status"],
+                    "content_missing",
+                )
+                self.assertEqual(
+                    store.diagnose_artifact_content(rendition.artifact_id)["status"],
+                    "content_missing",
+                )
 
             new_run = store.load_run(data["new_run_id"])
             self.assertEqual(new_run.status.value, "COMPLETED")
@@ -281,8 +290,12 @@ class Issue127MultiMaterialContinuationTests(ResearchPackageAcceptanceSupport):
                 expected = reacquired[capture_id]
                 self.assertEqual(item.digest, expected["actual_digest"])
                 self.assertEqual(item.size, expected["actual_size"])
-                self.assertEqual(item.provenance["reacquisition_run_id"], expected["reacquisition_run_id"])
-                self.assertEqual(item.provenance["relation"], "new_material_version_group_continuation")
+                self.assertEqual(
+                    item.provenance["reacquisition_run_id"], expected["reacquisition_run_id"]
+                )
+                self.assertEqual(
+                    item.provenance["relation"], "new_material_version_group_continuation"
+                )
 
             shown = facade.show_run(data["new_run_id"])["new_material_continuation"]
             self.assertEqual(shown["status"], "completed")

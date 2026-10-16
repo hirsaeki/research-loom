@@ -52,9 +52,7 @@ class WorkConversationContracts(unittest.TestCase):
         errors = list(self.validator.iter_errors(document))
         self.assertFalse(
             errors,
-            "\n".join(
-                f"{list(error.path)}: {error.message}" for error in errors
-            ),
+            "\n".join(f"{list(error.path)}: {error.message}" for error in errors),
         )
 
     def assert_invalid_document(self, document):
@@ -72,8 +70,7 @@ class WorkConversationContracts(unittest.TestCase):
         return next(
             document
             for document in self.flow["documents"]
-            if document["message_type"] == message_type
-            and document[id_field] == identifier
+            if document["message_type"] == message_type and document[id_field] == identifier
         )
 
     def test_schemas_semantics_and_generic_flow_are_valid(self):
@@ -126,9 +123,7 @@ class WorkConversationContracts(unittest.TestCase):
         self.assert_invalid_document(bad)
 
     def test_closed_input_classification_and_explicit_targets(self):
-        enum = self.contract["$defs"]["conversation_input"]["properties"][
-            "classification"
-        ]["enum"]
+        enum = self.contract["$defs"]["conversation_input"]["properties"]["classification"]["enum"]
         self.assertEqual(
             enum,
             ["QUERY", "PROPOSAL", "COMMITTABLE_ACTION", "CONFIRMATION", "CANCEL"],
@@ -147,9 +142,9 @@ class WorkConversationContracts(unittest.TestCase):
         self.assert_invalid_document(query)
 
     def test_action_vocabulary_is_open_but_typed_and_legacy_enum_is_not_canonicalized(self):
-        action_schema = self.contract["$defs"]["action_proposal"]["properties"][
-            "action"
-        ]["properties"]
+        action_schema = self.contract["$defs"]["action_proposal"]["properties"]["action"][
+            "properties"
+        ]
         self.assertNotIn("enum", action_schema["action_type"])
         self.assertIn("payload_contract", action_schema)
         self.assertIn("payload_digest", action_schema)
@@ -258,9 +253,7 @@ class WorkConversationContracts(unittest.TestCase):
         flow["documents"].extend([cancel, receipt])
         self.assert_valid_document(cancel)
         self.assert_valid_document(receipt)
-        self.assertIsNone(
-            conversation_semantic_error(flow, self.invocation, self.handoff)
-        )
+        self.assertIsNone(conversation_semantic_error(flow, self.invocation, self.handoff))
 
     def test_state_changing_capability_action_uses_bound_single_use_confirmation(self):
         proposal = self.by_id("action_proposal", "P-CAP")
@@ -277,9 +270,7 @@ class WorkConversationContracts(unittest.TestCase):
             request["research_context_binding"],
             confirmation["research_context_binding"],
         )
-        self.assertFalse(
-            proposal["human_decision_boundary"]["confirmation_is_human_decision"]
-        )
+        self.assertFalse(proposal["human_decision_boundary"]["confirmation_is_human_decision"])
         self.assertEqual(
             receipt["confirmation_receipt_binding"]["confirmation_receipt_id"],
             "CF-CAP",
@@ -309,9 +300,7 @@ class WorkConversationContracts(unittest.TestCase):
         )
         self.assertFalse(receipt["research_state_mutation_performed"])
         bad = deepcopy(proposal)
-        bad["route"]["runtime_authorization_evidence"] = {
-            "authorization_id": "FAKE"
-        }
+        bad["route"]["runtime_authorization_evidence"] = {"authorization_id": "FAKE"}
         refresh_document_digest(bad)
         self.assert_invalid_document(bad)
 
@@ -340,8 +329,7 @@ class WorkConversationContracts(unittest.TestCase):
             method_proposal["human_decision_boundary"]["confirmation_is_human_decision"]
         )
         handoff_method_ids = {
-            item["proposal_id"]
-            for item in self.handoff["outputs"]["candidate_next_methods"]
+            item["proposal_id"] for item in self.handoff["outputs"]["candidate_next_methods"]
         }
         self.assertIn(
             next_method["candidate"]["candidate_proposal_id"],

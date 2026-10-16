@@ -7,7 +7,11 @@ import tempfile
 from unittest.mock import patch
 
 from plugins.local_survey_response_store import LocalSurveyResponseStore
-from plugins.local_application import LocalApplicationError, LocalApplicationFacade, LocalResearchApplication
+from plugins.local_application import (
+    LocalApplicationError,
+    LocalApplicationFacade,
+    LocalResearchApplication,
+)
 from tests.runtime import test_issue251_real_survey_batches as batches
 from tests.runtime.survey_virtual_runner_test_support import SurveyVirtualRunnerTestBase
 from tests.runtime.test_survey_production import NullResolver, profile_provider, state_signature
@@ -40,8 +44,14 @@ class Issue251MalformedResponseConflictTests(SurveyVirtualRunnerTestBase):
                     # A new answer before the conflict must not be partially saved.
                     document["responses"].insert(0, document["responses"].pop())
                     source.write_text(json.dumps(document), encoding="utf-8")
-                    rejected_dataset_id = batches.Issue251RealSurveyBatchTests._batch_id(root, payload)
-                    with patch.object(facade, "capture_survey_analysis_spec", wraps=facade.capture_survey_analysis_spec) as analysis:
+                    rejected_dataset_id = batches.Issue251RealSurveyBatchTests._batch_id(
+                        root, payload
+                    )
+                    with patch.object(
+                        facade,
+                        "capture_survey_analysis_spec",
+                        wraps=facade.capture_survey_analysis_spec,
+                    ) as analysis:
                         with self.assertRaises(LocalApplicationError) as error:
                             facade.capture_real_survey_intake(payload)
                     self.assertEqual(error.exception.code, "SURVEY_RESPONSE_DUPLICATE_RECORD")
@@ -50,12 +60,16 @@ class Issue251MalformedResponseConflictTests(SurveyVirtualRunnerTestBase):
                     self.assertIsNone(store.load_dataset("PRJ-1", rejected_dataset_id))
                     self.assertIsNone(store.load_response("PRJ-1", "REAL-C"))
                     self.assertEqual(facade.show_survey_response("REAL-A"), original)
-                    self.assertEqual(facade.show_real_survey_intake(first["dataset_id"]), first_result)
+                    self.assertEqual(
+                        facade.show_real_survey_intake(first["dataset_id"]), first_result
+                    )
                     self.assertEqual(state_signature(app), before)
                 finally:
                     app.close()
 
-                reopened = LocalResearchApplication(root, resolver=NullResolver(), effective_profile_set_provider=profile_provider)
+                reopened = LocalResearchApplication(
+                    root, resolver=NullResolver(), effective_profile_set_provider=profile_provider
+                )
                 try:
                     facade = LocalApplicationFacade(reopened, "PRJ-1", workspace_root=root)
                     with self.assertRaises(LocalApplicationError) as retry_error:
@@ -81,7 +95,9 @@ class Issue251MalformedResponseConflictTests(SurveyVirtualRunnerTestBase):
                 malformed = deepcopy(document["responses"][0])
                 malformed.update(response_id="NEW-MALFORMED", answers=[])
                 foreign_namespace = deepcopy(malformed)
-                foreign_namespace.update(response_id="REAL-A", identity_namespace="real:other-provider")
+                foreign_namespace.update(
+                    response_id="REAL-A", identity_namespace="real:other-provider"
+                )
                 incomplete = [
                     {"response_id": "REAL-A", "answers": []},
                     {"identity_namespace": "real:issue221", "response_id": 42, "answers": []},
@@ -94,7 +110,11 @@ class Issue251MalformedResponseConflictTests(SurveyVirtualRunnerTestBase):
                 self.assertEqual(captured["accepted_count"], 2)
                 self.assertEqual(captured["rejected_count"], 1 + len(new_inputs))
                 shown = facade.show_real_survey_intake(captured["dataset_id"], limit=100)
-                rejected = [row["raw_input"] for row in shown["responses"] if row["kind"] == "rejected_raw_input"]
+                rejected = [
+                    row["raw_input"]
+                    for row in shown["responses"]
+                    if row["kind"] == "rejected_raw_input"
+                ]
                 for raw in new_inputs:
                     self.assertIn(raw, rejected)
                 self.assertEqual(facade.show_survey_response("REAL-A"), original)
@@ -120,11 +140,18 @@ class Issue251MalformedResponseConflictTests(SurveyVirtualRunnerTestBase):
                 captured = facade.capture_real_survey_intake(payload)
                 self.assertEqual(captured["accepted_count"], 2)
                 self.assertEqual(captured["rejected_count"], 2)
-                self.assertIn("SURVEY_RESPONSE_DUPLICATE_RECORD", captured["validation_summary"]["issue_code_counts"])
+                self.assertIn(
+                    "SURVEY_RESPONSE_DUPLICATE_RECORD",
+                    captured["validation_summary"]["issue_code_counts"],
+                )
                 shown = facade.show_real_survey_intake(captured["dataset_id"], limit=100)
-                self.assertEqual(shown["aggregate_result"]["population"]["accepted_response_count"], 2)
+                self.assertEqual(
+                    shown["aggregate_result"]["population"]["accepted_response_count"], 2
+                )
                 self.assertEqual(facade.show_survey_response("REAL-A"), original)
-                self.assertEqual(facade.capture_real_survey_intake(payload)["status"], "ALREADY_CAPTURED")
+                self.assertEqual(
+                    facade.capture_real_survey_intake(payload)["status"], "ALREADY_CAPTURED"
+                )
             finally:
                 app.close()
 
@@ -143,7 +170,9 @@ class Issue251MalformedResponseConflictTests(SurveyVirtualRunnerTestBase):
                 with self.assertRaises(LocalApplicationError) as error:
                     facade.capture_real_survey_intake(payload)
                 self.assertEqual(error.exception.code, "SURVEY_RESPONSE_DUPLICATE_RECORD")
-                self.assertEqual(facade.show_real_survey_intake(first["dataset_id"])["accepted_count"], 2)
+                self.assertEqual(
+                    facade.show_real_survey_intake(first["dataset_id"])["accepted_count"], 2
+                )
             finally:
                 app.close()
 
@@ -173,8 +202,12 @@ class Issue251MalformedResponseConflictTests(SurveyVirtualRunnerTestBase):
                 self.assertEqual(len(interleaved), 1)
                 self.assertEqual(interleaved[0]["accepted_count"], 2)
                 rejected_id = batches.Issue251RealSurveyBatchTests._batch_id(root, malformed)
-                self.assertIsNone(facade._survey_response_store().load_dataset("PRJ-1", rejected_id))
-                self.assertEqual(facade.capture_real_survey_intake(payload)["status"], "ALREADY_CAPTURED")
+                self.assertIsNone(
+                    facade._survey_response_store().load_dataset("PRJ-1", rejected_id)
+                )
+                self.assertEqual(
+                    facade.capture_real_survey_intake(payload)["status"], "ALREADY_CAPTURED"
+                )
             finally:
                 app.close()
 
@@ -196,7 +229,9 @@ class Issue251MalformedResponseConflictTests(SurveyVirtualRunnerTestBase):
                 replay = facade.capture_real_survey_intake(malformed)
                 self.assertEqual(replay["status"], "ALREADY_CAPTURED")
                 self.assertEqual(replay["aggregate_result_id"], earlier["aggregate_result_id"])
-                self.assertEqual(facade.show_real_survey_intake(earlier["dataset_id"]), earlier_result)
+                self.assertEqual(
+                    facade.show_real_survey_intake(earlier["dataset_id"]), earlier_result
+                )
                 self.assertEqual(facade.show_survey_response("REAL-A"), original)
             finally:
                 app.close()
@@ -210,7 +245,11 @@ class Issue251MalformedResponseConflictTests(SurveyVirtualRunnerTestBase):
                 source = root / payload["file"]
                 document = json.loads(source.read_text(encoding="utf-8"))
                 new_inputs = [
-                    {"identity_namespace": "real:issue221", "response_id": f"NEW-{i}", "answers": []}
+                    {
+                        "identity_namespace": "real:issue221",
+                        "response_id": f"NEW-{i}",
+                        "answers": [],
+                    }
                     for i in range(801)
                 ]
                 document["responses"].extend(new_inputs + [new_inputs[-1]])
@@ -225,14 +264,22 @@ class Issue251MalformedResponseConflictTests(SurveyVirtualRunnerTestBase):
 
                 with patch.object(LocalSurveyResponseStore, "_write", traced_write):
                     captured = facade.capture_real_survey_intake(payload)
-                queries = [q for q in statements if q.startswith("SELECT response_id FROM survey_responses")]
+                queries = [
+                    q
+                    for q in statements
+                    if q.startswith("SELECT response_id FROM survey_responses")
+                ]
                 self.assertEqual(len(queries), 3)
-                self.assertFalse(any(q.startswith("SELECT 1 FROM survey_responses") for q in statements))
+                self.assertFalse(
+                    any(q.startswith("SELECT 1 FROM survey_responses") for q in statements)
+                )
                 begin = statements.index("BEGIN IMMEDIATE")
                 commit = statements.index("COMMIT")
                 self.assertTrue(all(begin < statements.index(q) < commit for q in queries))
                 self.assertEqual(captured["accepted_count"], first["accepted_count"])
                 self.assertEqual(captured["rejected_count"], first["rejected_count"] + 802)
-                self.assertEqual(facade.capture_real_survey_intake(payload)["status"], "ALREADY_CAPTURED")
+                self.assertEqual(
+                    facade.capture_real_survey_intake(payload)["status"], "ALREADY_CAPTURED"
+                )
             finally:
                 app.close()

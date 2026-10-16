@@ -80,8 +80,6 @@ class Issue91ReviewFixTests(unittest.TestCase):
             finally:
                 opened.close()
 
-
-
     def test_windows_open_osfhandle_failure_closes_full_width_handle_and_preserves_error(self):
         import ctypes
         import sys
@@ -187,7 +185,6 @@ class Issue91ReviewFixTests(unittest.TestCase):
         disposition.assert_not_called()
         close_fd.assert_called_once_with(101)
         path_unlink.assert_not_called()
-
 
     def test_windows_post_validation_failure_never_path_unlinks_replacement(self):
         with tempfile.TemporaryDirectory() as temp:

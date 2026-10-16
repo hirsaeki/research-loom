@@ -74,9 +74,7 @@ def test_historical_batch_projection_reports_current_values_without_false_reprop
         with LocalApplicationFacade.open_workspace(workspace) as facade:
             proposed = facade.submit_action(_batch_input(*_five_questions()))
             candidate_id = proposed["data"]["state_delta_proposal_id"]
-            generated_ids = [
-                item["id"] for item in proposed["data"]["research_questions"]
-            ]
+            generated_ids = [item["id"] for item in proposed["data"]["research_questions"]]
             _, confirmed = _apply_to_decision(facade, candidate_id)
             resolved = _resolve(facade, confirmed["decision_request"], "approve_exact")
             assert resolved["status"] == "RESOLVED"

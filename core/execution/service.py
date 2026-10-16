@@ -51,9 +51,7 @@ _ALLOWED_TRANSITIONS = {
     RunStatus.SUPERSEDED: set(),
 }
 _TERMINAL_STATUSES = frozenset(
-    status
-    for status, allowed_next in _ALLOWED_TRANSITIONS.items()
-    if not allowed_next
+    status for status, allowed_next in _ALLOWED_TRANSITIONS.items() if not allowed_next
 )
 
 
@@ -418,9 +416,7 @@ class CapabilityExecutionService:
                 ExecutionFailureCode.AUTHORIZATION_DENIED,
                 message,
             )
-        required = {
-            item["reference_id"] for item in context_pack["resources"]
-        }
+        required = {item["reference_id"] for item in context_pack["resources"]}
         if not required.issubset(set(decision.resource_reference_ids)):
             raise CapabilityExecutionError(
                 ExecutionFailureCode.AUTHORIZATION_DENIED,
@@ -452,10 +448,7 @@ class CapabilityExecutionService:
                     deepcopy(dict(extension)),
                 )
             for artifact in artifacts:
-                if (
-                    artifact.run_id != run.run_id
-                    or artifact.execution_mode != run.execution_mode
-                ):
+                if artifact.run_id != run.run_id or artifact.execution_mode != run.execution_mode:
                     return self._fail(
                         run,
                         ExecutionIssue(
@@ -478,8 +471,7 @@ class CapabilityExecutionService:
             provenance = handoff["provenance"]
             if (
                 provenance["implementation_id"] != run.implementation_id
-                or provenance["implementation_version"]
-                != run.implementation_version
+                or provenance["implementation_version"] != run.implementation_version
             ):
                 raise CapabilityExecutionError(
                     "CAP-HANDOFF-PROVENANCE-001",

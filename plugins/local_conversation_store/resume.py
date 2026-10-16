@@ -78,10 +78,7 @@ def research_question_candidates_for_project(
         raise ConversationRuntimeError(
             "RESUME-CANDIDATE-001", "StateDeltaProposal listing is unreadable"
         ) from exc
-    return tuple(
-        _validated_state_delta(row, project_ref=str(project_ref))
-        for row in rows
-    )
+    return tuple(_validated_state_delta(row, project_ref=str(project_ref)) for row in rows)
 
 
 def research_question_review_candidates_for_project(
@@ -120,10 +117,7 @@ def research_question_review_candidates_for_project(
         raise ConversationRuntimeError(
             "RESUME-CANDIDATE-001", "StateDeltaProposal listing is unreadable"
         ) from exc
-    return tuple(
-        _validated_state_delta(row, project_ref=str(project_ref))
-        for row in rows
-    )
+    return tuple(_validated_state_delta(row, project_ref=str(project_ref)) for row in rows)
 
 
 def state_delta_proposals_by_ids_for_project(

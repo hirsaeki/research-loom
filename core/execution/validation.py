@@ -102,10 +102,7 @@ class CanonicalCapabilityExecutionValidator:
                 "CAP-DESCRIPTOR-DIGEST-001",
                 "descriptor digest is invalid",
             )
-        functions = [
-            str(item["function_id"])
-            for item in descriptor["declared_functions"]
-        ]
+        functions = [str(item["function_id"]) for item in descriptor["declared_functions"]]
         if len(functions) != len(set(functions)):
             raise CapabilityExecutionError(
                 "CAP-DESCRIPTOR-IDENTITY-001",
@@ -167,18 +164,12 @@ class CanonicalCapabilityExecutionValidator:
                 ExecutionFailureCode.STALE_STATE,
                 "Context Pack Research Snapshot pin is stale",
             )
-        if (
-            pins["project_config"]["configuration_digest"]
-            != state.project_config_digest
-        ):
+        if pins["project_config"]["configuration_digest"] != state.project_config_digest:
             raise CapabilityExecutionError(
                 ExecutionFailureCode.STALE_STATE,
                 "Context Pack Project Config pin is stale",
             )
-        if (
-            pins["effective_profile_set"]["content_digest"]
-            != state.effective_profile_set_digest
-        ):
+        if pins["effective_profile_set"]["content_digest"] != state.effective_profile_set_digest:
             raise CapabilityExecutionError(
                 ExecutionFailureCode.STALE_STATE,
                 "Context Pack Effective Profile Set pin is stale",
@@ -202,9 +193,7 @@ class CanonicalCapabilityExecutionValidator:
         bounds = context["bounds"]
         actual = {
             "max_questions": len(context["question_ids"]),
-            "max_research_object_references": len(
-                context["research_object_references"]
-            ),
+            "max_research_object_references": len(context["research_object_references"]),
             "max_resources": len(context["resources"]),
             "max_attention_items": len(context["research_attention"]),
             "max_project_guards": sum(
@@ -215,9 +204,7 @@ class CanonicalCapabilityExecutionValidator:
                     "must_not_claim",
                 )
             ),
-            "max_effective_constraints": len(
-                context["effective_constraints"]
-            ),
+            "max_effective_constraints": len(context["effective_constraints"]),
         }
         if any(actual[key] > bounds[key] for key in actual):
             raise CapabilityExecutionError(
@@ -255,10 +242,8 @@ class CanonicalCapabilityExecutionValidator:
         capability = invocation["capability"]
         if (
             capability["capability_id"] != descriptor["capability_id"]
-            or capability["capability_version"]
-            != descriptor["capability_version"]
-            or capability["descriptor_digest"]
-            != descriptor["descriptor_digest"]
+            or capability["capability_version"] != descriptor["capability_version"]
+            or capability["descriptor_digest"] != descriptor["descriptor_digest"]
         ):
             raise CapabilityExecutionError(
                 "CAP-DESCRIPTOR-BINDING-001",
@@ -274,8 +259,7 @@ class CanonicalCapabilityExecutionValidator:
         )
         if (
             function is None
-            or invocation["execution_mode"]
-            not in function["supported_execution_modes"]
+            or invocation["execution_mode"] not in function["supported_execution_modes"]
         ):
             raise CapabilityExecutionError(
                 "CAP-DESCRIPTOR-BINDING-001",
@@ -298,19 +282,14 @@ class CanonicalCapabilityExecutionValidator:
         if (
             authorization["capability_id"] != capability["capability_id"]
             or authorization["function_id"] != capability["function_id"]
-            or invocation["execution_mode"]
-            not in authorization["execution_modes"]
+            or invocation["execution_mode"] not in authorization["execution_modes"]
         ):
             raise CapabilityExecutionError(
                 "CAP-AUTH-001",
                 "authorization evidence does not cover capability/function/mode",
             )
-        resources = {
-            item["reference_id"] for item in context["resources"]
-        }
-        if not resources.issubset(
-            set(authorization["resource_reference_ids"])
-        ):
+        resources = {item["reference_id"] for item in context["resources"]}
+        if not resources.issubset(set(authorization["resource_reference_ids"])):
             raise CapabilityExecutionError(
                 "CAP-AUTH-001",
                 "authorization evidence does not cover all Context Pack resources",
@@ -347,8 +326,7 @@ class CanonicalCapabilityExecutionValidator:
                 "Handoff run/invocation/project binding is invalid",
             )
         if (
-            _canonical(handoff["capability"])
-            != _canonical(invocation["capability"])
+            _canonical(handoff["capability"]) != _canonical(invocation["capability"])
             or handoff["execution_mode"] != invocation["execution_mode"]
         ):
             raise CapabilityExecutionError(
@@ -358,12 +336,10 @@ class CanonicalCapabilityExecutionValidator:
         expected_pins = {
             "invocation_digest": invocation["invocation_digest"],
             "context_pack_digest": context["context_pack_digest"],
-            "project_config_digest": context["pins"]["project_config"][
-                "configuration_digest"
+            "project_config_digest": context["pins"]["project_config"]["configuration_digest"],
+            "effective_profile_set_digest": context["pins"]["effective_profile_set"][
+                "content_digest"
             ],
-            "effective_profile_set_digest": context["pins"][
-                "effective_profile_set"
-            ]["content_digest"],
             "research_snapshot": context["pins"]["research_snapshot"],
         }
         if _canonical(handoff["input_pins"]) != _canonical(expected_pins):
@@ -390,10 +366,7 @@ class CanonicalCapabilityExecutionValidator:
         preserved = handoff["preserved_context"]
         if (
             set(preserved["research_attention_ids"])
-            != {
-                item["attention_id"]
-                for item in context["research_attention"]
-            }
+            != {item["attention_id"] for item in context["research_attention"]}
             or set(preserved["project_guard_ids"]) != _guard_ids(context)
             or set(preserved["effective_constraint_paths"])
             != {item["path"] for item in context["effective_constraints"]}
@@ -423,29 +396,19 @@ class CanonicalCapabilityExecutionValidator:
             "candidate_next_methods": "proposal_id",
         }
         ids = [
-            item[field]
-            for collection, field in id_fields.items()
-            for item in outputs[collection]
+            item[field] for collection, field in id_fields.items() for item in outputs[collection]
         ]
         if len(ids) != len(set(ids)):
             raise CapabilityExecutionError(
                 "CAP-HANDOFF-IDENTITY-001",
                 "Handoff output identities are not globally unique",
             )
-        evidence_ids = {
-            item["evidence_candidate_id"]
-            for item in outputs["evidence_candidates"]
-        }
-        counter_ids = {
-            item["counterevidence_id"]
-            for item in outputs["counterevidence"]
-        }
+        evidence_ids = {item["evidence_candidate_id"] for item in outputs["evidence_candidates"]}
+        counter_ids = {item["counterevidence_id"] for item in outputs["counterevidence"]}
         question_ids = set(context["question_ids"])
         all_ids = set(ids)
         if any(
-            not set(item.get("evidence_candidate_ids", ())).issubset(
-                evidence_ids
-            )
+            not set(item.get("evidence_candidate_ids", ())).issubset(evidence_ids)
             for item in outputs["observations"]
         ):
             raise CapabilityExecutionError(
@@ -455,12 +418,8 @@ class CanonicalCapabilityExecutionValidator:
         for finding in outputs["candidate_findings"]:
             if (
                 not set(finding["question_ids"]).issubset(question_ids)
-                or not set(
-                    finding["supporting_evidence_candidate_ids"]
-                ).issubset(evidence_ids)
-                or not set(
-                    finding["counterevidence_candidate_ids"]
-                ).issubset(counter_ids)
+                or not set(finding["supporting_evidence_candidate_ids"]).issubset(evidence_ids)
+                or not set(finding["counterevidence_candidate_ids"]).issubset(counter_ids)
             ):
                 raise CapabilityExecutionError(
                     "CAP-HANDOFF-REF-001",
@@ -475,8 +434,7 @@ class CanonicalCapabilityExecutionValidator:
                 "evidence gap references an unknown question",
             )
         if any(
-            not set(item["related_output_ids"]).issubset(all_ids)
-            for item in outputs["conflicts"]
+            not set(item["related_output_ids"]).issubset(all_ids) for item in outputs["conflicts"]
         ):
             raise CapabilityExecutionError(
                 "CAP-HANDOFF-REF-001",
@@ -489,32 +447,22 @@ class CanonicalCapabilityExecutionValidator:
                 + outputs["candidate_findings"]
                 + outputs["counterevidence"]
             )
-            if any(
-                item["epistemic_mode"] != "synthetic"
-                for item in epistemic
-            ):
+            if any(item["epistemic_mode"] != "synthetic" for item in epistemic):
                 raise CapabilityExecutionError(
                     "CAP-MODE-001",
                     "virtual/synthetic_test output may not be labeled empirical",
                 )
         validation = handoff["validation"]
-        if (
-            validation["status"] == "valid" and validation["issues"]
-        ) or (
-            validation["status"] in {"partial", "rejected"}
-            and not validation["issues"]
+        if (validation["status"] == "valid" and validation["issues"]) or (
+            validation["status"] in {"partial", "rejected"} and not validation["issues"]
         ):
             raise CapabilityExecutionError(
                 "CAP-HANDOFF-VALIDATION-001",
                 "Handoff validation status/issues are inconsistent",
             )
 
-        resources = {
-            item["reference_id"]: item for item in context["resources"]
-        }
-        captures = {
-            item["capture_id"]: item for item in outputs["source_captures"]
-        }
+        resources = {item["reference_id"]: item for item in context["resources"]}
+        captures = {item["capture_id"]: item for item in outputs["source_captures"]}
         for capture in captures.values():
             origin = capture["origin"]
             if origin["origin_type"] == "project_source_reference":
@@ -528,9 +476,7 @@ class CanonicalCapabilityExecutionValidator:
                         "CAP-HANDOFF-REF-001",
                         "source capture references an ineligible resource",
                     )
-        for item in (
-            outputs["evidence_candidates"] + outputs["counterevidence"]
-        ):
+        for item in outputs["evidence_candidates"] + outputs["counterevidence"]:
             basis = item["source_basis"]
             resource = None
             if basis["basis_type"] == "resource_reference":

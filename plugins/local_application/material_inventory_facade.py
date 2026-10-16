@@ -112,16 +112,14 @@ def _unchecked_content_health_projection(artifact) -> Mapping[str, Any]:
 
 
 def _source_filename_hint(provenance: Mapping[str, Any], *, kind: str) -> str | None:
-    key = (
-        "original_source_filename"
-        if kind == "original"
-        else "text_rendition_source_filename"
-    )
+    key = "original_source_filename" if kind == "original" else "text_rendition_source_filename"
     value = provenance.get(key)
     return value if isinstance(value, str) and value else None
 
 
-def _healthy_artifact_projection(artifact, health: Mapping[str, Any], *, kind: str) -> Mapping[str, Any]:
+def _healthy_artifact_projection(
+    artifact, health: Mapping[str, Any], *, kind: str
+) -> Mapping[str, Any]:
     projected = {
         **_artifact_projection(artifact),
         "content_health": deepcopy(dict(health)),
@@ -185,15 +183,17 @@ def _capture_projection(
             if original_health is not None
             else _artifact_projection(original)
         ),
-        "renditions": [{
-            **(
-                _healthy_artifact_projection(rendition, rendition_health, kind="rendition")
-                if rendition_health is not None
-                else _artifact_projection(rendition)
-            ),
-            "kind": "utf8_text",
-            "encoding": "UTF-8",
-        }],
+        "renditions": [
+            {
+                **(
+                    _healthy_artifact_projection(rendition, rendition_health, kind="rendition")
+                    if rendition_health is not None
+                    else _artifact_projection(rendition)
+                ),
+                "kind": "utf8_text",
+                "encoding": "UTF-8",
+            }
+        ],
         "provenance": _public_provenance(deepcopy(dict(original_provenance))),
     }
 
@@ -335,7 +335,9 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                 grouped.setdefault(material_id, []).append(capture)
 
             materials = [_material_projection(captures) for captures in grouped.values()]
-            materials.sort(key=lambda item: (str(item["first_captured_at"]), str(item["material_id"])))
+            materials.sort(
+                key=lambda item: (str(item["first_captured_at"]), str(item["material_id"]))
+            )
         except LocalApplicationError:
             raise
         except Exception as exc:

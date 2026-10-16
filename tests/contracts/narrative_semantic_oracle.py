@@ -32,7 +32,13 @@ def _unique_strings(value: Any, allowed: set[str]) -> bool:
 
 
 def _valid_stage(item: Any, vocabularies: dict[str, list[str]]) -> bool:
-    if not isinstance(item, dict) or set(item) != {"id", "semantic_role", "consumes", "requires", "produces"}:
+    if not isinstance(item, dict) or set(item) != {
+        "id",
+        "semantic_role",
+        "consumes",
+        "requires",
+        "produces",
+    }:
         return False
     if not isinstance(item["id"], str) or not item["id"]:
         return False
@@ -143,7 +149,9 @@ def _normalized_purpose(purpose: dict[str, Any]) -> tuple[Any, ...]:
     return purpose["purpose_role"], tuple(sorted(purpose["stage_ids"]))
 
 
-def narrative_composition_error(profiles: list[dict[str, Any]], catalog: dict[str, Any]) -> str | None:
+def narrative_composition_error(
+    profiles: list[dict[str, Any]], catalog: dict[str, Any]
+) -> str | None:
     for profile in profiles:
         error = narrative_constraint_error(profile, catalog)
         if error:

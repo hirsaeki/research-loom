@@ -26,13 +26,15 @@ class ActionRegistry:
             raise ConversationRuntimeError("CONV-ROUTE-001", "invalid action route")
         if definition.route_kind == "harness_service" and not definition.service_id:
             raise ConversationRuntimeError("CONV-ROUTE-001", "missing Harness service id")
-        if definition.route_kind == "capability_invocation" and not all((
-            definition.capability_id,
-            definition.capability_version,
-            definition.function_id,
-            definition.materializer_id,
-            definition.execution_mode,
-        )):
+        if definition.route_kind == "capability_invocation" and not all(
+            (
+                definition.capability_id,
+                definition.capability_version,
+                definition.function_id,
+                definition.materializer_id,
+                definition.execution_mode,
+            )
+        ):
             raise ConversationRuntimeError(
                 "CONV-ROUTE-001", "incomplete capability action definition"
             )

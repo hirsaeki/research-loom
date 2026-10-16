@@ -144,7 +144,9 @@ def verify_bundle(repo: Path, bundle: Path, *, check_host: bool = True) -> dict[
     if not isinstance(wheels, list) or not wheels:
         raise WheelhouseError("wheel list is missing or empty")
     recorded = {verify_record(bundle, item, f"wheel[{index}]") for index, item in enumerate(wheels)}
-    if len(recorded) != len(wheels) or any(not p.startswith("wheels/") or not p.endswith(".whl") for p in recorded):
+    if len(recorded) != len(wheels) or any(
+        not p.startswith("wheels/") or not p.endswith(".whl") for p in recorded
+    ):
         raise WheelhouseError("wheel records are invalid or duplicated")
     actual = {
         path.relative_to(bundle).as_posix()
@@ -172,8 +174,16 @@ def install_runtime(repo: Path, bundle: Path, target: Path) -> None:
         python = staging / "bin" / "python"
         subprocess.run(
             [
-                str(python), "-m", "pip", "install", "--no-index", "--require-hashes",
-                "--find-links", str(bundle / "wheels"), "-r", str(bundle / "requirements.txt"),
+                str(python),
+                "-m",
+                "pip",
+                "install",
+                "--no-index",
+                "--require-hashes",
+                "--find-links",
+                str(bundle / "wheels"),
+                "-r",
+                str(bundle / "requirements.txt"),
             ],
             check=True,
             env=env,

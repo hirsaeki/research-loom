@@ -39,9 +39,7 @@ class Issue127HtmlContinuationReviewTests(ResearchPackageAcceptanceSupport):
             return facade.submit_action(
                 {
                     "action_type": "desktop_research.material.continue_new_version",
-                    "payload": {
-                        "reacquisition_run_id": reacquired["reacquisition_run_id"]
-                    },
+                    "payload": {"reacquisition_run_id": reacquired["reacquisition_run_id"]},
                 }
             )
 

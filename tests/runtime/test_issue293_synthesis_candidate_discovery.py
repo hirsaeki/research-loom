@@ -51,7 +51,9 @@ def _reopen_facade(root: str) -> LocalApplicationFacade:
     return LocalApplicationFacade(app, "PRJ-1", owns_application=True)
 
 
-def _recommendation_input(statement: str = "Adopt the bounded operating control supported by the Finding.") -> dict:
+def _recommendation_input(
+    statement: str = "Adopt the bounded operating control supported by the Finding.",
+) -> dict:
     return {
         "action_type": "research.recommendation.propose",
         "payload": {
@@ -101,8 +103,13 @@ def test_saved_recommendation_and_argument_are_discoverable_after_reopen():
 
             rec_show = reopened.show_synthesis_candidate(recommendation_id)
             assert rec_show["kind"] == "recommendation"
-            assert rec_show["content"]["statement"] == _recommendation_input()["payload"]["statement"]
-            assert rec_show["content"]["conditions"] == _recommendation_input()["payload"]["conditions"]
+            assert (
+                rec_show["content"]["statement"] == _recommendation_input()["payload"]["statement"]
+            )
+            assert (
+                rec_show["content"]["conditions"]
+                == _recommendation_input()["payload"]["conditions"]
+            )
             assert rec_show["content"]["scope"] == _recommendation_input()["payload"]["scope"]
             assert rec_show["content"]["finding_ids"] == ["FND-1"]
 
@@ -139,10 +146,10 @@ def test_list_is_bounded_cursor_stable_and_filter_bound():
             second_ids = [item["candidate_id"] for item in second["items"]]
             assert len(second_ids) == 5
             assert newer_id not in second_ids
-            assert set(second_ids).isdisjoint(
-                {item["candidate_id"] for item in first["items"]}
+            assert set(second_ids).isdisjoint({item["candidate_id"] for item in first["items"]})
+            assert set(second_ids) | {item["candidate_id"] for item in first["items"]} == set(
+                created
             )
-            assert set(second_ids) | {item["candidate_id"] for item in first["items"]} == set(created)
             assert second["truncated"] is False
             assert second["next_cursor"] is None
 
@@ -164,9 +171,9 @@ def test_more_than_one_hundred_candidates_are_reachable_by_cursor_without_preloa
         facade = _make_facade(temp)
         try:
             created = [
-                facade.submit_action(_recommendation_input(statement=f"Long history {index:03d}"))["data"][
-                    "state_delta_proposal_id"
-                ]
+                facade.submit_action(_recommendation_input(statement=f"Long history {index:03d}"))[
+                    "data"
+                ]["state_delta_proposal_id"]
                 for index in range(105)
             ]
             first = facade.list_synthesis_candidates(kind="recommendation", limit=100)
@@ -177,18 +184,23 @@ def test_more_than_one_hundred_candidates_are_reachable_by_cursor_without_preloa
             )
             assert len(second["items"]) == 5
             assert second["truncated"] is False
-            assert {item["candidate_id"] for item in first["items"] + second["items"]} == set(created)
+            assert {item["candidate_id"] for item in first["items"] + second["items"]} == set(
+                created
+            )
         finally:
             facade.close()
-
 
 
 def test_corrupt_items_are_isolated_and_unattributable_json_marks_collection_incomplete():
     with tempfile.TemporaryDirectory() as temp:
         facade = _make_facade(temp)
         try:
-            healthy = facade.submit_action(_recommendation_input(statement="Healthy recommendation"))
-            corrupt = facade.submit_action(_recommendation_input(statement="Corrupt recommendation"))
+            healthy = facade.submit_action(
+                _recommendation_input(statement="Healthy recommendation")
+            )
+            corrupt = facade.submit_action(
+                _recommendation_input(statement="Corrupt recommendation")
+            )
             healthy_id = healthy["data"]["state_delta_proposal_id"]
             corrupt_id = corrupt["data"]["state_delta_proposal_id"]
             store = facade._application.conversation_store
@@ -208,10 +220,12 @@ def test_corrupt_items_are_isolated_and_unattributable_json_marks_collection_inc
             assert listing["status"] == "DEGRADED"
             assert by_id[healthy_id]["availability"] == "AVAILABLE"
             assert by_id[corrupt_id]["availability"] == "UNAVAILABLE"
-            assert listing["issues"] == [{
-                "code": "SYNTHESIS-CANDIDATE-COLLECTION-001",
-                "message": "candidate collection may be incomplete because an unattributable stored proposal is malformed",
-            }]
+            assert listing["issues"] == [
+                {
+                    "code": "SYNTHESIS-CANDIDATE-COLLECTION-001",
+                    "message": "candidate collection may be incomplete because an unattributable stored proposal is malformed",
+                }
+            ]
 
             shown = facade.show_synthesis_candidate(healthy_id)
             assert shown["status"] == "OK"
@@ -240,13 +254,13 @@ def test_corrupt_items_are_isolated_and_unattributable_json_marks_collection_inc
             facade.close()
 
 
-
-
 def test_projection_validation_failure_isolated_as_unavailable_item():
     with tempfile.TemporaryDirectory() as temp:
         facade = _make_facade(temp)
         try:
-            result = facade.submit_action(_recommendation_input(statement="Broken projection binding"))
+            result = facade.submit_action(
+                _recommendation_input(statement="Broken projection binding")
+            )
             candidate_id = result["data"]["state_delta_proposal_id"]
             store = facade._application.conversation_store
             wire = store.load_state_delta_proposal(candidate_id)
@@ -265,7 +279,9 @@ def test_projection_validation_failure_isolated_as_unavailable_item():
             assert item["issues"][0]["code"] == "APPLICATION-CANDIDATE-PROJECTION-001"
 
             resumed = facade.resume_context()["saved_synthesis_candidates"]
-            resumed_item = next(row for row in resumed["items"] if row["candidate_id"] == candidate_id)
+            resumed_item = next(
+                row for row in resumed["items"] if row["candidate_id"] == candidate_id
+            )
             assert resumed_item["availability"] == "UNAVAILABLE"
         finally:
             facade.close()
@@ -290,8 +306,7 @@ def test_synthesis_list_queries_use_operational_indexes():
                 "WHERE json_valid(payload_json)=0 LIMIT 1"
             ).fetchall()
             assert any(
-                "state_delta_proposals_json_valid" in str(row["detail"])
-                for row in malformed_plan
+                "state_delta_proposals_json_valid" in str(row["detail"]) for row in malformed_plan
             )
 
             list_plan = store._db.execute(
@@ -309,13 +324,9 @@ def test_synthesis_list_queries_use_operational_indexes():
                 ("PRJ-1", "research.recommendation.propose@0.1.0", 21),
             ).fetchall()
             assert any(
-                "state_delta_proposals_synthesis_lookup" in str(row["detail"])
-                for row in list_plan
+                "state_delta_proposals_synthesis_lookup" in str(row["detail"]) for row in list_plan
             )
-            assert not any(
-                str(row["detail"]).startswith("SCAN s")
-                for row in list_plan
-            )
+            assert not any(str(row["detail"]).startswith("SCAN s") for row in list_plan)
         finally:
             facade.close()
 
@@ -336,10 +347,14 @@ def test_cross_project_candidate_and_cursor_do_not_leak_content_and_reads_do_not
             store.store_state_delta_proposal("SDP-FOREIGN", foreign)
 
             state_before = deepcopy(facade._current_state_view().current_snapshot)
-            count_before = store._db.execute("SELECT COUNT(*) FROM state_delta_proposals").fetchone()[0]
+            count_before = store._db.execute(
+                "SELECT COUNT(*) FROM state_delta_proposals"
+            ).fetchone()[0]
             local_show = facade.show_synthesis_candidate(local_id)
             facade.list_synthesis_candidates()
-            count_after = store._db.execute("SELECT COUNT(*) FROM state_delta_proposals").fetchone()[0]
+            count_after = store._db.execute(
+                "SELECT COUNT(*) FROM state_delta_proposals"
+            ).fetchone()[0]
             state_after = facade._current_state_view().current_snapshot
             assert local_show["candidate_id"] == local_id
             assert count_after == count_before
@@ -366,7 +381,14 @@ class _CliFacade:
 
     def list_synthesis_candidates(self, *, kind=None, limit=20, cursor=None):
         self.calls.append(("list", kind, limit, cursor))
-        return {"status": "OK", "project_id": "PRJ-1", "items": [], "truncated": False, "next_cursor": None, "issues": []}
+        return {
+            "status": "OK",
+            "project_id": "PRJ-1",
+            "items": [],
+            "truncated": False,
+            "next_cursor": None,
+            "issues": [],
+        }
 
     def show_synthesis_candidate(self, candidate_id):
         self.calls.append(("show", candidate_id))
@@ -376,27 +398,51 @@ class _CliFacade:
 def test_cli_list_and_show_route_to_public_facade():
     fake = _CliFacade()
     output = io.StringIO()
-    with patch(
-        "plugins.local_application.cli.LocalApplicationFacade.open_workspace",
-        return_value=fake,
-    ), redirect_stdout(output):
-        code = cli_main([
-            "synthesis-candidate", "list", "--workspace", "unused", "--kind", "argument",
-            "--limit", "7", "--cursor", "SDP-CURSOR", "--json",
-        ])
+    with (
+        patch(
+            "plugins.local_application.cli.LocalApplicationFacade.open_workspace",
+            return_value=fake,
+        ),
+        redirect_stdout(output),
+    ):
+        code = cli_main(
+            [
+                "synthesis-candidate",
+                "list",
+                "--workspace",
+                "unused",
+                "--kind",
+                "argument",
+                "--limit",
+                "7",
+                "--cursor",
+                "SDP-CURSOR",
+                "--json",
+            ]
+        )
     assert code == 0
     assert fake.calls == [("list", "argument", 7, "SDP-CURSOR")]
 
     fake.calls.clear()
     output = io.StringIO()
-    with patch(
-        "plugins.local_application.cli.LocalApplicationFacade.open_workspace",
-        return_value=fake,
-    ), redirect_stdout(output):
-        code = cli_main([
-            "synthesis-candidate", "show", "--workspace", "unused",
-            "--candidate-id", "SDP-ONE", "--json",
-        ])
+    with (
+        patch(
+            "plugins.local_application.cli.LocalApplicationFacade.open_workspace",
+            return_value=fake,
+        ),
+        redirect_stdout(output),
+    ):
+        code = cli_main(
+            [
+                "synthesis-candidate",
+                "show",
+                "--workspace",
+                "unused",
+                "--candidate-id",
+                "SDP-ONE",
+                "--json",
+            ]
+        )
     assert code == 0
     assert fake.calls == [("show", "SDP-ONE")]
 

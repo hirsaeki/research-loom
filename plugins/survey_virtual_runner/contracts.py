@@ -19,9 +19,9 @@ VR_SCHEMA = json.loads(
     )
 )
 RM_SCHEMA = json.loads(
-    (ROOT / "core/packages/research-method/research-method-context-extension.schema.json").read_text(
-        encoding="utf-8"
-    )
+    (
+        ROOT / "core/packages/research-method/research-method-context-extension.schema.json"
+    ).read_text(encoding="utf-8")
 )
 SURVEY_SCHEMA = json.loads(
     (ROOT / "core/packages/survey/survey-contract.schema.json").read_text(encoding="utf-8")
@@ -100,15 +100,30 @@ class SurveyVirtualRunnerContextValidator:
         issues: list[ExecutionIssue] = []
         if not isinstance(extension, Mapping):
             return (issue("VR-CONTEXT-BINDING-001", "Survey Virtual Runner binding is missing"),)
-        if extension.get("schema_version") != "0.1.0" or extension.get("binding_type") != "survey_virtual_runner":
+        if (
+            extension.get("schema_version") != "0.1.0"
+            or extension.get("binding_type") != "survey_virtual_runner"
+        ):
             return (issue("VR-CONTEXT-BINDING-001", "unsupported Survey Virtual Runner binding"),)
         if extension.get("extension_digest") != document_digest(extension, "extension_digest"):
-            issues.append(issue("VR-CONTEXT-DIGEST-001", "Survey Virtual Runner binding digest is invalid"))
+            issues.append(
+                issue("VR-CONTEXT-DIGEST-001", "Survey Virtual Runner binding digest is invalid")
+            )
 
-        if descriptor.get("capability_id") != "virtual-runner" or invocation["execution_mode"] != "virtual":
-            issues.append(issue("VR-CONTEXT-BINDING-001", "Virtual Runner execution binding is not virtual-runner/virtual"))
+        if (
+            descriptor.get("capability_id") != "virtual-runner"
+            or invocation["execution_mode"] != "virtual"
+        ):
+            issues.append(
+                issue(
+                    "VR-CONTEXT-BINDING-001",
+                    "Virtual Runner execution binding is not virtual-runner/virtual",
+                )
+            )
         if extension.get("scenario_class") not in {"STANDARD", "STRESS"}:
-            issues.append(issue("VR-CONTEXT-BINDING-001", "scenario_class must be STANDARD or STRESS"))
+            issues.append(
+                issue("VR-CONTEXT-BINDING-001", "scenario_class must be STANDARD or STRESS")
+            )
 
         expected_binding = {
             "context_pack_id": context_pack["context_pack_id"],
@@ -116,17 +131,29 @@ class SurveyVirtualRunnerContextValidator:
             "project_id": context_pack["project_id"],
         }
         if extension.get("context_pack_binding") != expected_binding:
-            issues.append(issue("VR-CONTEXT-BINDING-001", "Survey Virtual Runner binding does not pin the exact Context Pack"))
+            issues.append(
+                issue(
+                    "VR-CONTEXT-BINDING-001",
+                    "Survey Virtual Runner binding does not pin the exact Context Pack",
+                )
+            )
 
         research_method = extension.get("research_method_context")
         if not isinstance(research_method, Mapping):
-            issues.append(issue("VR-METHOD-BINDING-001", "Research Method execute context is missing"))
+            issues.append(
+                issue("VR-METHOD-BINDING-001", "Research Method execute context is missing")
+            )
         else:
             error = validate_research_method_context(research_method)
             if error:
                 issues.append(issue("VR-METHOD-BINDING-001", error))
             elif research_method.get("context_binding") != expected_binding:
-                issues.append(issue("VR-METHOD-BINDING-001", "Research Method context does not bind the exact PR9 Context Pack"))
+                issues.append(
+                    issue(
+                        "VR-METHOD-BINDING-001",
+                        "Research Method context does not bind the exact PR9 Context Pack",
+                    )
+                )
 
         survey = extension.get("survey_context")
         if not isinstance(survey, Mapping):
@@ -139,7 +166,11 @@ class SurveyVirtualRunnerContextValidator:
         instrument = extension.get("instrument")
         design = extension.get("design")
         if not isinstance(instrument, Mapping) or not isinstance(design, Mapping):
-            issues.append(issue("VR-CONTEXT-BINDING-001", "exact Survey Design/Instrument payloads are missing"))
+            issues.append(
+                issue(
+                    "VR-CONTEXT-BINDING-001", "exact Survey Design/Instrument payloads are missing"
+                )
+            )
         else:
             try:
                 schema_error = first_schema_error(_SURVEY_VALIDATOR, instrument)
@@ -153,7 +184,9 @@ class SurveyVirtualRunnerContextValidator:
                     state,
                 )
             except Exception as exc:
-                issues.append(issue("VR-CONTEXT-BINDING-001", f"pinned Survey Instrument is invalid: {exc}"))
+                issues.append(
+                    issue("VR-CONTEXT-BINDING-001", f"pinned Survey Instrument is invalid: {exc}")
+                )
 
         method_ref = extension.get("core_method_ref")
         effective = {
@@ -163,17 +196,30 @@ class SurveyVirtualRunnerContextValidator:
         if not isinstance(method_ref, Mapping):
             issues.append(issue("VR-METHOD-BINDING-001", "approved Core Method pin is missing"))
         else:
-            method = effective.get(("method", str(method_ref.get("method_id")), int(method_ref.get("revision", -1))))
+            method = effective.get(
+                ("method", str(method_ref.get("method_id")), int(method_ref.get("revision", -1)))
+            )
             if method is None or method.get("adoption_state") != "approved":
-                issues.append(issue("VR-METHOD-BINDING-001", "approved Core Method pin does not resolve in Research State"))
-            elif not set(context_pack["question_ids"]).issubset(set(map(str, method.get("question_ids", ())))):
-                issues.append(issue("VR-METHOD-BINDING-001", "approved Core Method does not cover all pinned Survey RQs"))
+                issues.append(
+                    issue(
+                        "VR-METHOD-BINDING-001",
+                        "approved Core Method pin does not resolve in Research State",
+                    )
+                )
+            elif not set(context_pack["question_ids"]).issubset(
+                set(map(str, method.get("question_ids", ())))
+            ):
+                issues.append(
+                    issue(
+                        "VR-METHOD-BINDING-001",
+                        "approved Core Method does not cover all pinned Survey RQs",
+                    )
+                )
 
         snapshot = context_pack["pins"]["research_snapshot"]
-        if (
-            str(snapshot["snapshot_id"]) != str(state.current_snapshot["id"])
-            or str(snapshot["content_digest"]) != str(state.current_snapshot["content_digest"])
-        ):
+        if str(snapshot["snapshot_id"]) != str(state.current_snapshot["id"]) or str(
+            snapshot["content_digest"]
+        ) != str(state.current_snapshot["content_digest"]):
             issues.append(issue("VR-CONTEXT-BINDING-001", "Research Snapshot pin is stale"))
 
         return tuple(issues)

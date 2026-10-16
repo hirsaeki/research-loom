@@ -16,10 +16,12 @@ class SurveyVirtualRunnerProductionTestsA2(SurveyVirtualRunnerTestBase):
                     instrument_digest="sha256:" + "0" * 64,
                 )
                 with self.assertRaises(LocalApplicationError) as error:
-                    facade.submit_action({
-                        "action_type": "virtual_runner.survey.execute",
-                        "payload": stale,
-                    })
+                    facade.submit_action(
+                        {
+                            "action_type": "virtual_runner.survey.execute",
+                            "payload": stale,
+                        }
+                    )
                 self.assertEqual(error.exception.code, "APPLICATION-VIRTUAL-PIN-001")
 
                 promotion = execution_payload(
@@ -29,10 +31,12 @@ class SurveyVirtualRunnerProductionTestsA2(SurveyVirtualRunnerTestBase):
                 )
                 promotion["epistemic_mode"] = "empirical"
                 with self.assertRaises(LocalApplicationError) as forbidden:
-                    facade.submit_action({
-                        "action_type": "virtual_runner.survey.execute",
-                        "payload": promotion,
-                    })
+                    facade.submit_action(
+                        {
+                            "action_type": "virtual_runner.survey.execute",
+                            "payload": promotion,
+                        }
+                    )
                 self.assertEqual(
                     forbidden.exception.code,
                     "APPLICATION-VIRTUAL-PAYLOAD-001",
@@ -47,10 +51,12 @@ class SurveyVirtualRunnerProductionTestsA2(SurveyVirtualRunnerTestBase):
                     "scenario_dimensions": 1,
                 }
                 with self.assertRaises(LocalApplicationError) as malformed:
-                    facade.submit_action({
-                        "action_type": "virtual_runner.survey.execute",
-                        "payload": malformed_synth,
-                    })
+                    facade.submit_action(
+                        {
+                            "action_type": "virtual_runner.survey.execute",
+                            "payload": malformed_synth,
+                        }
+                    )
                 self.assertEqual(
                     malformed.exception.code,
                     "APPLICATION-VIRTUAL-PAYLOAD-001",
@@ -65,10 +71,12 @@ class SurveyVirtualRunnerProductionTestsA2(SurveyVirtualRunnerTestBase):
                     f"RUN-PRIOR-{index:02d}" for index in range(17)
                 ]
                 with self.assertRaises(LocalApplicationError) as bounded:
-                    facade.submit_action({
-                        "action_type": "virtual_runner.survey.execute",
-                        "payload": too_many_prior,
-                    })
+                    facade.submit_action(
+                        {
+                            "action_type": "virtual_runner.survey.execute",
+                            "payload": too_many_prior,
+                        }
+                    )
                 self.assertEqual(
                     bounded.exception.code,
                     "APPLICATION-VIRTUAL-PAYLOAD-001",
@@ -106,13 +114,15 @@ class SurveyVirtualRunnerProductionTestsA2(SurveyVirtualRunnerTestBase):
     def test_structural_generator_handles_branch_chains_and_null_numeric_minimum(self):
         chained = extended_questionnaire()
         chained["questions"][1]["branching"][0]["value"] = "contributor"
-        chained["questions"][2]["branching"] = [{
-            "condition_question_id": "Q2",
-            "operator": "equals",
-            "value": 1,
-            "action": "show",
-            "target_question_id": "Q3",
-        }]
+        chained["questions"][2]["branching"] = [
+            {
+                "condition_question_id": "Q2",
+                "operator": "equals",
+                "value": 1,
+                "action": "show",
+                "target_question_id": "Q3",
+            }
+        ]
         records, injected = generate_records(
             chained,
             scenario_class="STANDARD",
@@ -127,12 +137,14 @@ class SurveyVirtualRunnerProductionTestsA2(SurveyVirtualRunnerTestBase):
 
         restoring = extended_questionnaire()
         restoring["questions"][1]["branching"][0]["value"] = "contributor"
-        restoring["questions"][2]["branching"] = [{
-            "condition_question_id": "Q2",
-            "operator": "missing",
-            "action": "show",
-            "target_question_id": "Q3",
-        }]
+        restoring["questions"][2]["branching"] = [
+            {
+                "condition_question_id": "Q2",
+                "operator": "missing",
+                "action": "show",
+                "target_question_id": "Q3",
+            }
+        ]
         records, _ = generate_records(
             restoring,
             scenario_class="STANDARD",
@@ -153,11 +165,7 @@ class SurveyVirtualRunnerProductionTestsA2(SurveyVirtualRunnerTestBase):
             identity_namespace="synthetic:survey:numeric",
             stress_faults=(),
         )
-        count = next(
-            item
-            for item in records[0]["answers"]
-            if item["response_key"] == "count"
-        )
+        count = next(item for item in records[0]["answers"] if item["response_key"] == "count")
         self.assertEqual(count["value"], 0)
         validation = SurveyResponseValidator().validate(
             numeric,

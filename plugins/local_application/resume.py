@@ -5,7 +5,10 @@ from typing import Any, Mapping
 
 from core.conversation import ConversationRuntimeError
 from core.conversation.validation import WorkConversationValidator
-from plugins.local_attention_resume import attention_maps_for_project, validate_active_attention_binding
+from plugins.local_attention_resume import (
+    attention_maps_for_project,
+    validate_active_attention_binding,
+)
 from plugins.local_conversation_store.resume import research_question_candidates_for_project
 from plugins.local_decision_store.resume import decision_requests_for_project
 from plugins.local_execution_store.status import pending_runs_for_project, recent_runs_for_project
@@ -63,7 +66,10 @@ def _status_projection(
             "content_digest": str(snapshot["content_digest"]),
         },
         "bindings": {
-            "project_config": {"ref": state.project_config_ref, "digest": state.project_config_digest},
+            "project_config": {
+                "ref": state.project_config_ref,
+                "digest": state.project_config_digest,
+            },
             "effective_profile_set": {
                 "ref": state.effective_profile_set_ref,
                 "digest": state.effective_profile_set_digest,
@@ -103,9 +109,7 @@ def _validated_limits(limits: Mapping[str, int] | None) -> dict[str, int]:
         value = int(raw_value)
         maximum = DEFAULT_RESUME_LIMITS[str(key)]
         if value <= 0 or value > maximum:
-            raise ValueError(
-                f"resume context limit must be between 1 and {maximum}: {key}"
-            )
+            raise ValueError(f"resume context limit must be between 1 and {maximum}: {key}")
         effective[str(key)] = value
     return effective
 
@@ -132,7 +136,9 @@ def _validated_action_proposal(store, proposal_id: str, *, project_id: str) -> M
     return proposal
 
 
-def _validated_confirmation_request(document: Mapping[str, Any], *, project_id: str) -> Mapping[str, Any]:
+def _validated_confirmation_request(
+    document: Mapping[str, Any], *, project_id: str
+) -> Mapping[str, Any]:
     _CONVERSATION_VALIDATOR.validate(document)
     if str(document.get("project_id")) != project_id:
         raise ConversationRuntimeError(
@@ -167,7 +173,9 @@ def _rq_candidate(
     actions = candidate.get("proposed_actions")
     affected = candidate.get("affected_refs")
     if not isinstance(actions, list) or not isinstance(affected, list):
-        raise ConversationRuntimeError("RESUME-CANDIDATE-001", "RQ candidate structure is malformed")
+        raise ConversationRuntimeError(
+            "RESUME-CANDIDATE-001", "RQ candidate structure is malformed"
+        )
 
     questions: list[Mapping[str, Any]] = []
     for action in actions:
@@ -200,9 +208,12 @@ def _rq_candidate(
         )
 
     question_ids = [str(question.get("id") or "") for question in questions]
-    if any(not question_id for question_id in question_ids) or len(question_ids) != len(set(question_ids)):
+    if any(not question_id for question_id in question_ids) or len(question_ids) != len(
+        set(question_ids)
+    ):
         raise ConversationRuntimeError(
-            "RESUME-CANDIDATE-001", "RQ candidate Research Question identities are missing or duplicated"
+            "RESUME-CANDIDATE-001",
+            "RQ candidate Research Question identities are missing or duplicated",
         )
     affected_ids = [
         str(ref.get("id") or "")
@@ -215,7 +226,8 @@ def _rq_candidate(
         valid_affected = question_ids[0] in affected_ids
     if not valid_affected:
         raise ConversationRuntimeError(
-            "RESUME-CANDIDATE-001", "RQ candidate affected_refs do not bind the proposed Research Question(s)"
+            "RESUME-CANDIDATE-001",
+            "RQ candidate affected_refs do not bind the proposed Research Question(s)",
         )
     return tuple(questions), provenance, is_batch
 
@@ -261,10 +273,14 @@ def _question_projection(
 def _project_projection(project_config: Mapping[str, Any], project_id: str) -> dict[str, Any]:
     project = project_config.get("project")
     if not isinstance(project, Mapping):
-        raise ConversationRuntimeError("RESUME-PROJECT-001", "Project Config project section is malformed")
+        raise ConversationRuntimeError(
+            "RESUME-PROJECT-001", "Project Config project section is malformed"
+        )
     scope = project_config.get("scope", {})
     if not isinstance(scope, Mapping):
-        raise ConversationRuntimeError("RESUME-PROJECT-001", "Project Config scope section is malformed")
+        raise ConversationRuntimeError(
+            "RESUME-PROJECT-001", "Project Config scope section is malformed"
+        )
     in_scope = scope.get("in_scope")
     out_of_scope = scope.get("out_of_scope")
     if not isinstance(in_scope, list) or not isinstance(out_of_scope, list):
@@ -279,10 +295,13 @@ def _project_projection(project_config: Mapping[str, Any], project_id: str) -> d
         or configured_project_id != project_id
     ):
         raise ConversationRuntimeError(
-            "RESUME-PROJECT-001", "Project Config project identity does not bind the requested project"
+            "RESUME-PROJECT-001",
+            "Project Config project identity does not bind the requested project",
         )
     if not isinstance(title, str) or not title.strip():
-        raise ConversationRuntimeError("RESUME-PROJECT-001", "Project Config project title is missing")
+        raise ConversationRuntimeError(
+            "RESUME-PROJECT-001", "Project Config project title is missing"
+        )
     return {
         "project_id": configured_project_id,
         "title": title,
@@ -335,11 +354,14 @@ def build_resume_context(
     if (
         str(status_projection.get("project_id")) != project_id
         or str(status_projection.get("active_lineage")) != state.active_lineage_ref
-        or status_projection.get("snapshot", {}).get("snapshot_id") != str(state.current_snapshot["id"])
-        or status_projection.get("snapshot", {}).get("content_digest") != str(state.current_snapshot["content_digest"])
+        or status_projection.get("snapshot", {}).get("snapshot_id")
+        != str(state.current_snapshot["id"])
+        or status_projection.get("snapshot", {}).get("content_digest")
+        != str(state.current_snapshot["content_digest"])
     ):
         raise ConversationRuntimeError(
-            "RESUME-STATE-001", "status projection does not bind the current authoritative Research State"
+            "RESUME-STATE-001",
+            "status projection does not bind the current authoritative Research State",
         )
 
     project_config = state.project_config
@@ -406,27 +428,35 @@ def build_resume_context(
                 "RESUME-BINDING-001", "Human Decision Request source candidate binding is malformed"
             )
         candidate_id = str(source_candidate.get("proposal_id") or "")
-        decisions_by_candidate.setdefault(candidate_id, []).append({
-            "request_id": str(request["request_id"]),
-            "source_candidate_id": candidate_id,
-            "status": str(request.get("operational_status", request.get("status", ""))),
-        })
+        decisions_by_candidate.setdefault(candidate_id, []).append(
+            {
+                "request_id": str(request["request_id"]),
+                "source_candidate_id": candidate_id,
+                "status": str(request.get("operational_status", request.get("status", ""))),
+            }
+        )
 
     confirmations_by_candidate: dict[str, list[str]] = {}
     for raw_request in status_projection.get("pending_confirmations", ()):
         if not isinstance(raw_request, Mapping):
-            raise ConversationRuntimeError("RESUME-BINDING-001", "pending Confirmation projection is malformed")
+            raise ConversationRuntimeError(
+                "RESUME-BINDING-001", "pending Confirmation projection is malformed"
+            )
         request = _validated_confirmation_request(raw_request, project_id=project_id)
         binding = request.get("proposal_binding")
         if not isinstance(binding, Mapping):
-            raise ConversationRuntimeError("RESUME-BINDING-001", "Confirmation proposal binding is malformed")
+            raise ConversationRuntimeError(
+                "RESUME-BINDING-001", "Confirmation proposal binding is malformed"
+            )
         proposal = _validated_action_proposal(
             application.conversation_store,
             str(binding.get("proposal_id") or ""),
             project_id=project_id,
         )
         if proposal.get("proposal_digest") != binding.get("proposal_digest"):
-            raise ConversationRuntimeError("RESUME-BINDING-001", "Confirmation Action Proposal digest binding is invalid")
+            raise ConversationRuntimeError(
+                "RESUME-BINDING-001", "Confirmation Action Proposal digest binding is invalid"
+            )
         action = proposal.get("action")
         payload = action.get("payload") if isinstance(action, Mapping) else None
         if (
@@ -435,9 +465,9 @@ def build_resume_context(
             and isinstance(payload, Mapping)
             and isinstance(payload.get("state_delta_proposal_id"), str)
         ):
-            confirmations_by_candidate.setdefault(str(payload["state_delta_proposal_id"]), []).append(
-                str(request["confirmation_request_id"])
-            )
+            confirmations_by_candidate.setdefault(
+                str(payload["state_delta_proposal_id"]), []
+            ).append(str(request["confirmation_request_id"]))
 
     candidate_output = []
     for candidate, questions, provenance, is_batch in rq_candidates:
@@ -453,7 +483,9 @@ def build_resume_context(
             project_id=project_id,
         )
         if source_proposal.get("proposal_digest") != source_binding.get("proposal_digest"):
-            raise ConversationRuntimeError("RESUME-BINDING-001", "RQ candidate source Action Proposal digest mismatch")
+            raise ConversationRuntimeError(
+                "RESUME-BINDING-001", "RQ candidate source Action Proposal digest mismatch"
+            )
         expected_action_type = (
             "research_question.propose_many" if is_batch else "research_question.propose"
         )
@@ -464,9 +496,12 @@ def build_resume_context(
         for request in decision_requests:
             source_candidate = request.get("source_state_delta_proposal", {})
             if str(source_candidate.get("proposal_id") or "") == candidate_id:
-                if str(source_candidate.get("proposal_digest") or "") != str(candidate["proposal_digest"]):
+                if str(source_candidate.get("proposal_digest") or "") != str(
+                    candidate["proposal_digest"]
+                ):
                     raise ConversationRuntimeError(
-                        "RESUME-BINDING-001", "Human Decision Request candidate digest binding is invalid"
+                        "RESUME-BINDING-001",
+                        "Human Decision Request candidate digest binding is invalid",
                     )
         snapshot_ref = str(candidate["current_snapshot_ref"])
         snapshot_digest = str(candidate["current_snapshot_digest"])
@@ -489,24 +524,30 @@ def build_resume_context(
                 "proposal_id": str(source_proposal["proposal_id"]),
                 "created_at": str(source_proposal["created_at"]),
             },
-            "pending_confirmation_request_ids": sorted(confirmations_by_candidate.get(candidate_id, ())),
+            "pending_confirmation_request_ids": sorted(
+                confirmations_by_candidate.get(candidate_id, ())
+            ),
             "human_decision_requests": deepcopy(decisions_by_candidate.get(candidate_id, ())),
         }
         if is_batch:
-            row.update({
-                "batch_size": len(projected_questions),
-                "questions": projected_questions,
-                "authoritative_same_ids": [
-                    question["id"]
-                    for question in projected_questions
-                    if question["id"] in authoritative_ids
-                ],
-            })
+            row.update(
+                {
+                    "batch_size": len(projected_questions),
+                    "questions": projected_questions,
+                    "authoritative_same_ids": [
+                        question["id"]
+                        for question in projected_questions
+                        if question["id"] in authoritative_ids
+                    ],
+                }
+            )
         else:
-            row.update({
-                "question": projected_questions[0],
-                "authoritative_same_id": projected_questions[0]["id"] in authoritative_ids,
-            })
+            row.update(
+                {
+                    "question": projected_questions[0],
+                    "authoritative_same_id": projected_questions[0]["id"] in authoritative_ids,
+                }
+            )
         candidate_output.append(row)
 
     attention_limit = _limit(effective_limits, "attention_maps")
@@ -542,18 +583,20 @@ def build_resume_context(
         document = stored["map"]
         stored_activation_truncated = bool(stored.get("activation_ids_truncated", False))
         activation_events_truncated = activation_events_truncated or stored_activation_truncated
-        stored_maps.append({
-            "map_id": str(document["map_id"]),
-            "map_digest": str(document["map_digest"]),
-            "created_at": str(document["created_at"]),
-            "activation": {
-                "is_active": str(document["map_id"]) == active_map_id,
-                "activation_ids": deepcopy(list(stored["activation_ids"])),
-                "activation_ids_truncated": stored_activation_truncated,
-            },
-            "base": deepcopy(document["base"]),
-            "items": deepcopy(list(document["items"])),
-        })
+        stored_maps.append(
+            {
+                "map_id": str(document["map_id"]),
+                "map_digest": str(document["map_digest"]),
+                "created_at": str(document["created_at"]),
+                "activation": {
+                    "is_active": str(document["map_id"]) == active_map_id,
+                    "activation_ids": deepcopy(list(stored["activation_ids"])),
+                    "activation_ids_truncated": stored_activation_truncated,
+                },
+                "base": deepcopy(document["base"]),
+                "items": deepcopy(list(document["items"])),
+            }
+        )
 
     active_projection = None
     if active is not None:
@@ -576,18 +619,22 @@ def build_resume_context(
     recent_truncated = len(recent_probe) > recent_limit
 
     truncated = deepcopy(dict(status_projection.get("truncated", {})))
-    truncated.update({
-        "authoritative_research_questions": len(authoritative_all) > authoritative_limit,
-        "research_question_candidates": candidates_truncated,
-        "attention_maps": maps_truncated,
-        "attention_activation_events": activation_events_truncated,
-        "human_decision_requests": decisions_truncated,
-        "pending_human_decisions": pending_decisions_truncated,
-        "recent_runs": recent_truncated,
-    })
+    truncated.update(
+        {
+            "authoritative_research_questions": len(authoritative_all) > authoritative_limit,
+            "research_question_candidates": candidates_truncated,
+            "attention_maps": maps_truncated,
+            "attention_activation_events": activation_events_truncated,
+            "human_decision_requests": decisions_truncated,
+            "pending_human_decisions": pending_decisions_truncated,
+            "recent_runs": recent_truncated,
+        }
+    )
 
     return {
-        "status": "DEGRADED" if attention_issue or status_projection.get("status") == "DEGRADED" else "OK",
+        "status": "DEGRADED"
+        if attention_issue or status_projection.get("status") == "DEGRADED"
+        else "OK",
         "optional_children": deepcopy(status_projection.get("optional_children", [])),
         "project": project_projection,
         "research_state": {
@@ -609,7 +656,9 @@ def build_resume_context(
             "stored_maps": stored_maps,
         },
         "workflow": {
-            "pending_confirmations": deepcopy(list(status_projection.get("pending_confirmations", ()))),
+            "pending_confirmations": deepcopy(
+                list(status_projection.get("pending_confirmations", ()))
+            ),
             "pending_human_decisions": deepcopy(list(pending_decisions)),
             "pending_runs": deepcopy(list(status_projection.get("pending_runs", ()))),
             "recent_runs": [_run_projection(run) for run in recent_probe[:recent_limit]],

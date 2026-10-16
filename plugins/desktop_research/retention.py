@@ -137,10 +137,7 @@ class DesktopResearchResultValidator(_BaseValidator):
             for item in projected.get("source_capture_details", ())
             if isinstance(item, Mapping) and item.get("capture_id")
         }
-        metadata = {
-            item.artifact_id: item
-            for item in self._artifacts.artifacts_for(run_id)
-        }
+        metadata = {item.artifact_id: item for item in self._artifacts.artifacts_for(run_id)}
         for citation in projected.get("citation_details", ()):
             capture_id = str(citation.get("capture_id") or "")
             detail = details.get(capture_id)

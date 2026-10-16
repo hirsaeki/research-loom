@@ -25,7 +25,9 @@ class RuntimeWheelhouseContractTests(unittest.TestCase):
         )
         (self.bundle / "wheels" / "demo-1.0-py3-none-any.whl").write_bytes(b"wheel")
         subprocess.run(["git", "init", "-q", str(self.repo)], check=True)
-        subprocess.run(["git", "-C", str(self.repo), "config", "user.email", "test@example.com"], check=True)
+        subprocess.run(
+            ["git", "-C", str(self.repo), "config", "user.email", "test@example.com"], check=True
+        )
         subprocess.run(["git", "-C", str(self.repo), "config", "user.name", "test"], check=True)
         subprocess.run(["git", "-C", str(self.repo), "add", "."], check=True)
         subprocess.run(["git", "-C", str(self.repo), "commit", "-qm", "base"], check=True)

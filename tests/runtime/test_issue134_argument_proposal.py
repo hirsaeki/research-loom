@@ -5,7 +5,11 @@ import unittest
 from unittest.mock import patch
 
 from core.conversation import ConversationRuntimeError
-from plugins.local_application import LocalApplicationError, LocalApplicationFacade, LocalResearchApplication
+from plugins.local_application import (
+    LocalApplicationError,
+    LocalApplicationFacade,
+    LocalResearchApplication,
+)
 from runtime_fixtures import evidence, finding, project, rq, seed_state, source
 from test_survey_production import NullResolver
 
@@ -20,9 +24,7 @@ def profile_provider(_project_ref, expected_digest):
 
 
 class Issue134ArgumentProposalTests(unittest.TestCase):
-    def make_facade(
-        self, root: str, *, finding_state: str = "approved"
-    ) -> LocalApplicationFacade:
+    def make_facade(self, root: str, *, finding_state: str = "approved") -> LocalApplicationFacade:
         seed = seed_state(
             objects=[
                 project(),
@@ -53,7 +55,11 @@ class Issue134ArgumentProposalTests(unittest.TestCase):
             "implications": ["Carry the bounded conclusion into composition."],
         }
         payload.update(overrides)
-        return {"action_type": "research.argument.propose", "payload": payload, "actor_id": "HUMAN-ARG"}
+        return {
+            "action_type": "research.argument.propose",
+            "payload": payload,
+            "actor_id": "HUMAN-ARG",
+        }
 
     def test_arg1_candidate_is_bound_to_current_snapshot_without_mutation(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -66,7 +72,9 @@ class Issue134ArgumentProposalTests(unittest.TestCase):
                 candidate = result["data"]["state_delta_proposal"]
                 self.assertTrue(candidate["candidate_only"])
                 self.assertEqual(candidate["current_snapshot_ref"], before.current_snapshot["id"])
-                self.assertEqual(candidate["current_snapshot_digest"], before.current_snapshot["content_digest"])
+                self.assertEqual(
+                    candidate["current_snapshot_digest"], before.current_snapshot["content_digest"]
+                )
                 self.assertEqual(before.current_snapshot, after.current_snapshot)
                 self.assertEqual(result["data"]["argument_candidate"]["kind"], "argument")
             finally:
@@ -79,19 +87,27 @@ class Issue134ArgumentProposalTests(unittest.TestCase):
             result = facade.submit_action(self.proposal_input())
             proposal_id = result["data"]["state_delta_proposal_id"]
             argument_id = result["data"]["argument_candidate"]["id"]
-            pending = facade.submit_action({
-                "action_type": "state.apply_candidate",
-                "payload": {"state_delta_proposal_id": proposal_id},
-                "actor_id": "HUMAN-ARG",
-            })
+            pending = facade.submit_action(
+                {
+                    "action_type": "state.apply_candidate",
+                    "payload": {"state_delta_proposal_id": proposal_id},
+                    "actor_id": "HUMAN-ARG",
+                }
+            )
             self.assertEqual(pending["status"], "CONFIRMATION_REQUIRED")
-            committed = facade.submit_confirmation({
-                "confirmation_request_id": pending["confirmation_request"]["confirmation_request_id"],
-                "actor_id": "HUMAN-ARG",
-            })
+            committed = facade.submit_confirmation(
+                {
+                    "confirmation_request_id": pending["confirmation_request"][
+                        "confirmation_request_id"
+                    ],
+                    "actor_id": "HUMAN-ARG",
+                }
+            )
             self.assertEqual(committed["status"], "SUCCEEDED")
             state = app.state_repository.load_state_view("PRJ-1", "LIN-1")
-            argument = next(obj for obj in state.effective_objects() if obj.get("id") == argument_id)
+            argument = next(
+                obj for obj in state.effective_objects() if obj.get("id") == argument_id
+            )
             self.assertEqual(argument["kind"], "argument")
             self.assertEqual(argument["finding_ids"], ["FND-1"])
             facade.close()
@@ -100,12 +116,16 @@ class Issue134ArgumentProposalTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             facade = self.make_facade(temp)
             try:
-                before = facade._application.state_repository.load_state_view("PRJ-1", "LIN-1").current_snapshot
+                before = facade._application.state_repository.load_state_view(
+                    "PRJ-1", "LIN-1"
+                ).current_snapshot
                 bad = self.proposal_input(finding_ids=["CF-RUN-ONLY"], evidence_ids=[])
                 with self.assertRaises(ConversationRuntimeError) as raised:
                     facade.submit_action(bad)
                 self.assertEqual(raised.exception.code, "ARGUMENT-SUPPORT-001")
-                after = facade._application.state_repository.load_state_view("PRJ-1", "LIN-1").current_snapshot
+                after = facade._application.state_repository.load_state_view(
+                    "PRJ-1", "LIN-1"
+                ).current_snapshot
                 self.assertEqual(before, after)
             finally:
                 facade.close()
@@ -152,7 +172,9 @@ class Issue134ArgumentProposalTests(unittest.TestCase):
                 ):
                     result = facade.submit_action(invalid)
                 self.assertEqual(result["status"], "SUCCEEDED")
-                self.assertEqual(result["data"]["argument_candidate"]["finding_ids"], ["CF-RUN-ONLY"])
+                self.assertEqual(
+                    result["data"]["argument_candidate"]["finding_ids"], ["CF-RUN-ONLY"]
+                )
             finally:
                 facade.close()
 
@@ -162,43 +184,57 @@ class Issue134ArgumentProposalTests(unittest.TestCase):
             try:
                 result = facade.submit_action(self.proposal_input())
                 stale_id = result["data"]["state_delta_proposal_id"]
-                advancing = facade.submit_action(self.proposal_input(
-                    conclusion="A second valid Argument advances the current Snapshot."
-                ))
-                pending = facade.submit_action({
-                    "action_type": "state.apply_candidate",
-                    "payload": {
-                        "state_delta_proposal_id": advancing["data"]["state_delta_proposal_id"]
-                    },
-                    "actor_id": "HUMAN-ARG",
-                })
-                committed = facade.submit_confirmation({
-                    "confirmation_request_id": pending["confirmation_request"]["confirmation_request_id"],
-                    "actor_id": "HUMAN-ARG",
-                })
+                advancing = facade.submit_action(
+                    self.proposal_input(
+                        conclusion="A second valid Argument advances the current Snapshot."
+                    )
+                )
+                pending = facade.submit_action(
+                    {
+                        "action_type": "state.apply_candidate",
+                        "payload": {
+                            "state_delta_proposal_id": advancing["data"]["state_delta_proposal_id"]
+                        },
+                        "actor_id": "HUMAN-ARG",
+                    }
+                )
+                committed = facade.submit_confirmation(
+                    {
+                        "confirmation_request_id": pending["confirmation_request"][
+                            "confirmation_request_id"
+                        ],
+                        "actor_id": "HUMAN-ARG",
+                    }
+                )
                 self.assertEqual(committed["status"], "SUCCEEDED")
                 head = facade._application.state_repository.load_state_view(
                     "PRJ-1", "LIN-1"
                 ).current_snapshot
-                stale_pending = facade.submit_action({
-                    "action_type": "state.apply_candidate",
-                    "payload": {"state_delta_proposal_id": stale_id},
-                    "actor_id": "HUMAN-ARG",
-                })
+                stale_pending = facade.submit_action(
+                    {
+                        "action_type": "state.apply_candidate",
+                        "payload": {"state_delta_proposal_id": stale_id},
+                        "actor_id": "HUMAN-ARG",
+                    }
+                )
                 self.assertEqual(stale_pending["status"], "CONFIRMATION_REQUIRED")
-                failed = facade.submit_confirmation({
-                    "confirmation_request_id": stale_pending["confirmation_request"][
-                        "confirmation_request_id"
-                    ],
-                    "actor_id": "HUMAN-ARG",
-                })
+                failed = facade.submit_confirmation(
+                    {
+                        "confirmation_request_id": stale_pending["confirmation_request"][
+                            "confirmation_request_id"
+                        ],
+                        "actor_id": "HUMAN-ARG",
+                    }
+                )
                 self.assertEqual(failed["status"], "FAILED")
                 self.assertEqual(
                     failed["issues"],
-                    [{
-                        "code": "CONV-AUDIT-001",
-                        "message": "StateDeltaProposal is stale or bound to another state",
-                    }],
+                    [
+                        {
+                            "code": "CONV-AUDIT-001",
+                            "message": "StateDeltaProposal is stale or bound to another state",
+                        }
+                    ],
                 )
                 after = facade._application.state_repository.load_state_view(
                     "PRJ-1", "LIN-1"

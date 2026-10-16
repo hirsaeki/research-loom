@@ -57,7 +57,9 @@ class StateTransitionService:
 
         schema_issues = _ordered_issues(self._schema_validator.validate_request(request))
         if schema_issues:
-            return StateTransitionRejected(transition_id=request.transition_id, issues=schema_issues)
+            return StateTransitionRejected(
+                transition_id=request.transition_id, issues=schema_issues
+            )
 
         prior = self._repository.find_commit_by_idempotency_key(request.idempotency_key)
         if prior is not None:
@@ -130,12 +132,14 @@ class StateTransitionService:
             return _rejected_with_head(
                 request,
                 fresh,
-                [ValidationIssue(
-                    "RT-HEAD-002",
-                    ValidationStage.PERSISTENCE,
-                    str(exc) or "Research Lineage HEAD changed before atomic commit.",
-                    retryable=True,
-                )],
+                [
+                    ValidationIssue(
+                        "RT-HEAD-002",
+                        ValidationStage.PERSISTENCE,
+                        str(exc) or "Research Lineage HEAD changed before atomic commit.",
+                        retryable=True,
+                    )
+                ],
             )
         except IdempotencyConflictError as exc:
             return _rejected_with_head(
@@ -152,10 +156,12 @@ class StateTransitionService:
 
 
 def _ordered_issues(issues: Iterable[ValidationIssue]) -> tuple[ValidationIssue, ...]:
-    return tuple(sorted(
-        issues,
-        key=lambda item: (item.stage.value, item.error_code, item.message, item.affected_refs),
-    ))
+    return tuple(
+        sorted(
+            issues,
+            key=lambda item: (item.stage.value, item.error_code, item.message, item.affected_refs),
+        )
+    )
 
 
 def _reject(request: StateTransitionRequest, issue: ValidationIssue) -> StateTransitionRejected:

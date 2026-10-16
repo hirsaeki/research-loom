@@ -21,20 +21,42 @@ SURVEY_RESPONSE_STORE_SCHEMA_VERSION = "0.1.0"
 _REQUIRED_COLUMNS = {
     "survey_response_store_meta": {"schema_version"},
     "survey_responses": {
-        "project_id", "response_id", "identity_namespace", "instrument_id",
-        "instrument_version", "content_digest", "response_origin",
-        "validation_status", "ingested_at", "document_json", "raw_input_json",
+        "project_id",
+        "response_id",
+        "identity_namespace",
+        "instrument_id",
+        "instrument_version",
+        "content_digest",
+        "response_origin",
+        "validation_status",
+        "ingested_at",
+        "document_json",
+        "raw_input_json",
     },
     "survey_response_datasets": {
-        "project_id", "dataset_id", "instrument_id", "instrument_version",
-        "content_digest", "response_origin", "created_at", "summary_digest",
-        "summary_json", "document_json",
+        "project_id",
+        "dataset_id",
+        "instrument_id",
+        "instrument_version",
+        "content_digest",
+        "response_origin",
+        "created_at",
+        "summary_digest",
+        "summary_json",
+        "document_json",
     },
     "survey_response_dataset_entries": {
-        "project_id", "dataset_id", "entry_index", "kind", "payload_json",
+        "project_id",
+        "dataset_id",
+        "entry_index",
+        "kind",
+        "payload_json",
     },
     "survey_response_dataset_entry_counts": {
-        "project_id", "dataset_id", "entry_count", "accepted_count",
+        "project_id",
+        "dataset_id",
+        "entry_count",
+        "accepted_count",
     },
 }
 
@@ -158,10 +180,7 @@ class LocalSurveyResponseStore:
             rows = connection.execute(
                 "SELECT schema_version FROM survey_response_store_meta"
             ).fetchall()
-            if (
-                len(rows) != 1
-                or str(rows[0][0]) != SURVEY_RESPONSE_STORE_SCHEMA_VERSION
-            ):
+            if len(rows) != 1 or str(rows[0][0]) != SURVEY_RESPONSE_STORE_SCHEMA_VERSION:
                 raise LocalSurveyResponseStoreError(
                     "SURVEY-RESPONSE-STORE-SCHEMA-001",
                     "Survey response registry schema version is incompatible",
@@ -169,9 +188,7 @@ class LocalSurveyResponseStore:
             for table_name, required in _REQUIRED_COLUMNS.items():
                 columns = {
                     str(row["name"])
-                    for row in connection.execute(
-                        f"PRAGMA table_info({table_name})"
-                    ).fetchall()
+                    for row in connection.execute(f"PRAGMA table_info({table_name})").fetchall()
                 }
                 if not required <= columns:
                     raise LocalSurveyResponseStoreError(
@@ -210,7 +227,9 @@ class LocalSurveyResponseStore:
     def _initialize(self) -> None:
         # Publish a complete SQLite schema. Readers must see either no registry
         # yet or a committed schema, never the half-created first batch store.
-        descriptor, name = tempfile.mkstemp(prefix=f".{self.path.name}.", suffix=".tmp", dir=self.path.parent)
+        descriptor, name = tempfile.mkstemp(
+            prefix=f".{self.path.name}.", suffix=".tmp", dir=self.path.parent
+        )
         os.close(descriptor)
         staging = Path(name)
         try:
@@ -246,7 +265,9 @@ class LocalSurveyResponseStore:
                 self._initialize()
             # rw does not recreate a removed registered store, nor repair schema
             # metadata by running CREATE TABLE against an existing damaged DB.
-            connection = sqlite3.connect(self.path.resolve().as_uri() + "?mode=rw", uri=True, timeout=5.0)
+            connection = sqlite3.connect(
+                self.path.resolve().as_uri() + "?mode=rw", uri=True, timeout=5.0
+            )
             connection.row_factory = sqlite3.Row
             connection.execute("PRAGMA busy_timeout=5000")
             self._schema_version(connection)
@@ -285,10 +306,12 @@ class LocalSurveyResponseStore:
     def _dataset_entries(document: Mapping[str, Any]) -> list[dict[str, Any]]:
         entries: list[dict[str, Any]] = []
         for ref in document["accepted_response_refs"]:
-            entries.append({
-                "kind": "accepted_response",
-                "response_ref": deepcopy(ref),
-            })
+            entries.append(
+                {
+                    "kind": "accepted_response",
+                    "response_ref": deepcopy(ref),
+                }
+            )
 
         rejected_by_ref = {
             (
@@ -305,21 +328,25 @@ class LocalSurveyResponseStore:
                 raise ValueError(
                     "SurveyResponseDataset rejected response lacks rejected-input provenance"
                 )
-            entries.append({
-                "kind": "rejected_response",
-                "response_ref": deepcopy(ref),
-                "issues": deepcopy(rejected["issues"]),
-            })
+            entries.append(
+                {
+                    "kind": "rejected_response",
+                    "response_ref": deepcopy(ref),
+                    "issues": deepcopy(rejected["issues"]),
+                }
+            )
 
         for rejected in document["rejected_inputs"]:
             if rejected.get("canonical_response_ref"):
                 continue
-            entries.append({
-                "kind": "rejected_raw_input",
-                "raw_input_digest": str(rejected["raw_input_digest"]),
-                "raw_input": deepcopy(rejected["raw_input"]),
-                "issues": deepcopy(rejected["issues"]),
-            })
+            entries.append(
+                {
+                    "kind": "rejected_raw_input",
+                    "raw_input_digest": str(rejected["raw_input_digest"]),
+                    "raw_input": deepcopy(rejected["raw_input"]),
+                    "issues": deepcopy(rejected["issues"]),
+                }
+            )
 
         entries.sort(
             key=lambda item: (
@@ -424,14 +451,18 @@ class LocalSurveyResponseStore:
                 response_id = str(response["response_id"])
                 response_key = (str(response["identity_namespace"]), response_id)
                 if response_key in response_by_id:
-                    raise ValueError("SurveyResponseDataset persistence input contains duplicate response identity")
+                    raise ValueError(
+                        "SurveyResponseDataset persistence input contains duplicate response identity"
+                    )
                 response_by_id[response_key] = response
                 if (
                     response["instrument_ref"] != dataset["instrument_ref"]
                     or response["response_origin"] != dataset["response_origin"]
                     or response["epistemic_status"] != dataset["epistemic_status"]
                 ):
-                    raise ValueError("SurveyResponseDataset contains mixed Instrument/origin/epistemic response content")
+                    raise ValueError(
+                        "SurveyResponseDataset contains mixed Instrument/origin/epistemic response content"
+                    )
             for field, expected_status in (
                 ("accepted_response_refs", "accepted"),
                 ("rejected_response_refs", "rejected"),
@@ -489,8 +520,10 @@ class LocalSurveyResponseStore:
                     namespace = raw.get("identity_namespace")
                     response_id = raw.get("response_id")
                     if (
-                        not isinstance(namespace, str) or not namespace
-                        or not isinstance(response_id, str) or not response_id
+                        not isinstance(namespace, str)
+                        or not namespace
+                        or not isinstance(response_id, str)
+                        or not response_id
                         or (namespace, response_id) in response_by_id
                     ):
                         # Unidentifiable/new inputs remain visible rejections.
@@ -502,7 +535,7 @@ class LocalSurveyResponseStore:
                 # Match the existing prefetch's conservative SQLite parameter
                 # budget, while retaining this check inside BEGIN IMMEDIATE.
                 for start in range(0, len(keys), 400):
-                    chunk = keys[start:start + 400]
+                    chunk = keys[start : start + 400]
                     pairs = ",".join("(?,?)" for _ in chunk)
                     parameters = [str(dataset["project_id"])]
                     parameters.extend(value for key in chunk for value in key)
@@ -654,7 +687,11 @@ class LocalSurveyResponseStore:
         project_id: str,
         response_keys: Sequence[tuple[str, str]],
     ) -> dict[tuple[str, str], dict[str, Any]]:
-        keys = list(dict.fromkeys((str(namespace), str(response_id)) for namespace, response_id in response_keys))
+        keys = list(
+            dict.fromkeys(
+                (str(namespace), str(response_id)) for namespace, response_id in response_keys
+            )
+        )
         if not keys:
             return {}
         connection = self._read()
@@ -665,7 +702,7 @@ class LocalSurveyResponseStore:
             # Keep well below SQLite's common 999-parameter limit while reusing one connection.
             chunk_size = 400
             for start in range(0, len(keys), chunk_size):
-                chunk = keys[start:start + chunk_size]
+                chunk = keys[start : start + chunk_size]
                 pairs = ",".join("(?,?)" for _ in chunk)
                 parameters: list[str] = [project_id]
                 for identity_namespace, response_id in chunk:
@@ -807,9 +844,8 @@ class LocalSurveyResponseStore:
                         "SURVEY-RESPONSE-STORE-INTEGRITY-001",
                         "stored SurveyResponseDataset entry is invalid",
                     ) from exc
-                if (
-                    not isinstance(entry, Mapping)
-                    or str(entry.get("kind")) != str(entry_row["kind"])
+                if not isinstance(entry, Mapping) or str(entry.get("kind")) != str(
+                    entry_row["kind"]
                 ):
                     raise LocalSurveyResponseStoreError(
                         "SURVEY-RESPONSE-STORE-INTEGRITY-001",

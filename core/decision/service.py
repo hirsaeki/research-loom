@@ -140,7 +140,9 @@ class HumanDecisionService:
             requirements=requirements,
             source_action_proposal=source_action_proposal,
         )
-        return DecisionGateResult("DECISION_REQUIRED", decision_request=self._store.put_request(request))
+        return DecisionGateResult(
+            "DECISION_REQUIRED", decision_request=self._store.put_request(request)
+        )
 
     def resolve(self, response: Mapping[str, Any]) -> DecisionResolutionResult:
         response = deepcopy(dict(response))
@@ -148,39 +150,63 @@ class HumanDecisionService:
         request_id = str(response["request_id"])
         request = self._store.get_request(request_id)
         if request is None:
-            raise HumanDecisionError("DECISION-REQUEST-UNKNOWN", "Human Decision Request does not resolve")
+            raise HumanDecisionError(
+                "DECISION-REQUEST-UNKNOWN", "Human Decision Request does not resolve"
+            )
         if request.get("request_digest") != response.get("request_digest"):
             self._store.record_rejected_response(request_id, response, "request digest mismatch")
-            raise HumanDecisionError("DECISION-BINDING-001", "Human response request digest mismatch")
+            raise HumanDecisionError(
+                "DECISION-BINDING-001", "Human response request digest mismatch"
+            )
         if request_digest(request) != request.get("request_digest"):
-            raise HumanDecisionError("DECISION-BINDING-001", "stored Human Decision Request digest is invalid")
+            raise HumanDecisionError(
+                "DECISION-BINDING-001", "stored Human Decision Request digest is invalid"
+            )
 
         resolution = self._resolution(request_id)
-        status = str(resolution["status"]) if resolution is not None else str(self._store.get_status(request_id))
+        status = (
+            str(resolution["status"])
+            if resolution is not None
+            else str(self._store.get_status(request_id))
+        )
         if status in _TERMINAL:
-            if resolution is None or resolution.get("response_digest") != response.get("response_digest"):
+            if resolution is None or resolution.get("response_digest") != response.get(
+                "response_digest"
+            ):
                 raise HumanDecisionError(
                     "DECISION-TERMINAL-001",
                     f"Human Decision Request is already {status} with another response",
                 )
             receipt = (
-                self._verify_committed_resolution(request, response, resolution.get("commit_receipt"))
+                self._verify_committed_resolution(
+                    request, response, resolution.get("commit_receipt")
+                )
                 if status == "RESOLVED"
                 else _receipt_from_wire(resolution.get("commit_receipt"))
             )
             return DecisionResolutionResult(status, request, response, commit_receipt=receipt)
 
         actor = response["actor"]
-        if actor.get("actor_type") != "human" or actor.get("actor_id") != request.get("human_actor_id"):
+        if actor.get("actor_type") != "human" or actor.get("actor_id") != request.get(
+            "human_actor_id"
+        ):
             self._store.record_rejected_response(request_id, response, "human actor mismatch")
-            raise HumanDecisionError("DECISION-ACTOR-001", "only the bound human actor may resolve this request")
+            raise HumanDecisionError(
+                "DECISION-ACTOR-001", "only the bound human actor may resolve this request"
+            )
 
         if status == "RESOLVING":
-            if resolution is None or resolution.get("response_digest") != response.get("response_digest"):
-                raise HumanDecisionError("DECISION-RACE-001", "another response already owns this request")
+            if resolution is None or resolution.get("response_digest") != response.get(
+                "response_digest"
+            ):
+                raise HumanDecisionError(
+                    "DECISION-RACE-001", "another response already owns this request"
+                )
             return self._resolve_claimed(request, response)
         if status != "PENDING":
-            raise HumanDecisionError("DECISION-STATE-001", f"Human Decision Request is not pending: {status}")
+            raise HumanDecisionError(
+                "DECISION-STATE-001", f"Human Decision Request is not pending: {status}"
+            )
 
         current_state = self._load_bound_state(request)
         stale_reason = self._stale_reason(request, current_state)
@@ -228,7 +254,9 @@ class HumanDecisionService:
             "restore a consistent quiesced Parent backup set, not individual stores"
         )
         try:
-            if response.get("disposition") != "approve_exact" or not isinstance(stored_receipt, Mapping):
+            if response.get("disposition") != "approve_exact" or not isinstance(
+                stored_receipt, Mapping
+            ):
                 raise HumanDecisionError("DECISION-STATE-MISMATCH-001", message)
             decisions, transition = self._approval_transition(request, response)
             receipt = _receipt_from_wire(stored_receipt)
@@ -253,7 +281,9 @@ class HumanDecisionService:
             for action in decisions:
                 expected = action.object_payload()
                 actual = self._states.load_object_revision(
-                    "decision", str(expected["id"]), int(expected["revision"]),
+                    "decision",
+                    str(expected["id"]),
+                    int(expected["revision"]),
                 )
                 if actual != expected:
                     raise HumanDecisionError("DECISION-STATE-MISMATCH-001", message)
@@ -271,7 +301,9 @@ class HumanDecisionService:
             self._store.finalize(request_id, str(response["response_digest"]), "REVISION_REQUESTED")
             return DecisionResolutionResult("REVISION_REQUESTED", request, response)
         if disposition != "approve_exact":
-            raise HumanDecisionError("DECISION-DISPOSITION-001", "unsupported Human Decision disposition")
+            raise HumanDecisionError(
+                "DECISION-DISPOSITION-001", "unsupported Human Decision disposition"
+            )
 
         _decision_actions, transition = self._approval_transition(request, response)
         result = self._transitions.apply(transition)
@@ -287,7 +319,9 @@ class HumanDecisionService:
             )
             return DecisionResolutionResult("RESOLVED", request, response, commit_receipt=result)
         if not isinstance(result, StateTransitionRejected):
-            raise HumanDecisionError("DECISION-COMMIT-001", "unexpected StateTransitionService result")
+            raise HumanDecisionError(
+                "DECISION-COMMIT-001", "unexpected StateTransitionService result"
+            )
         if any(issue.error_code in _STALE_TRANSITION_CODES for issue in result.issues):
             self._store.finalize(
                 request_id,
@@ -299,7 +333,9 @@ class HumanDecisionService:
         # Keep RESOLVING for an identical retry. A deterministic failure remains
         # auditable and a transient persistence failure can be retried without a
         # second Decision identity or Snapshot.
-        return DecisionResolutionResult("COMMIT_REJECTED", request, response, transition_rejection=result)
+        return DecisionResolutionResult(
+            "COMMIT_REJECTED", request, response, transition_rejection=result
+        )
 
     def _claim_or_raise(self, request, response) -> None:
         claimed = self._store.claim_response(
@@ -308,7 +344,9 @@ class HumanDecisionService:
             response,
         )
         if claimed not in {"claimed", "retry"}:
-            raise HumanDecisionError("DECISION-RACE-001", "a different response already owns this request")
+            raise HumanDecisionError(
+                "DECISION-RACE-001", "a different response already owns this request"
+            )
 
     def _validate_candidate(self, candidate, state) -> None:
         required = (
@@ -328,16 +366,22 @@ class HumanDecisionService:
         basis = deepcopy(dict(candidate))
         supplied = str(basis.pop("proposal_digest", ""))
         if canonical_digest(basis) != supplied:
-            raise HumanDecisionError("DECISION-CANDIDATE-001", "StateDeltaProposal digest is invalid")
+            raise HumanDecisionError(
+                "DECISION-CANDIDATE-001", "StateDeltaProposal digest is invalid"
+            )
         if candidate.get("candidate_only") is not True:
-            raise HumanDecisionError("DECISION-CANDIDATE-001", "only candidate-only StateDeltaProposal is accepted")
+            raise HumanDecisionError(
+                "DECISION-CANDIDATE-001", "only candidate-only StateDeltaProposal is accepted"
+            )
         if (
             candidate.get("project_ref") != state.project_ref
             or candidate.get("lineage_ref") != state.lineage_ref
             or candidate.get("current_snapshot_ref") != state.current_snapshot["id"]
             or candidate.get("current_snapshot_digest") != state.current_snapshot["content_digest"]
         ):
-            raise HumanDecisionError("DECISION-STALE-001", "StateDeltaProposal is stale or bound to another state")
+            raise HumanDecisionError(
+                "DECISION-STALE-001", "StateDeltaProposal is stale or bound to another state"
+            )
 
     def _candidate_actions(self, candidate, state) -> tuple[TransitionAction, ...]:
         actions: list[TransitionAction] = []
@@ -399,7 +443,9 @@ class HumanDecisionService:
                         )
             actions.append(action)
         if not actions:
-            raise HumanDecisionError("DECISION-CANDIDATE-001", "StateDeltaProposal has no proposed actions")
+            raise HumanDecisionError(
+                "DECISION-CANDIDATE-001", "StateDeltaProposal has no proposed actions"
+            )
         return tuple(actions)
 
     def _build_request(
@@ -430,7 +476,11 @@ class HumanDecisionService:
                 "proposal_id": str(source_action_proposal["proposal_id"]),
                 "proposal_digest": str(source_action_proposal["proposal_digest"]),
             }
-        action_token = source_action_binding["proposal_digest"] if source_action_binding else "no-action-proposal"
+        action_token = (
+            source_action_binding["proposal_digest"]
+            if source_action_binding
+            else "no-action-proposal"
+        )
         request_id = _stable_id(
             "HDREQ-",
             str(candidate["proposal_id"]),
@@ -457,47 +507,60 @@ class HumanDecisionService:
             action = actions[index]
             obj = action.object_payload()
             prior = state.latest_object(requirement.subject_kind, requirement.subject_id)
-            units.append({
-                "unit_id": _stable_id("HDU-", request_id, str(ordinal), *_requirement_key(requirement)),
-                "transition_action_index": index,
-                "transition_action_digest": _action_digest(action),
-                "required_decision_kind": requirement.decision_kind,
-                "required_choice": requirement.choice,
-                "subject": {"kind": requirement.subject_kind, "id": requirement.subject_id},
-                "proposed_semantic_effect": action.kind.value,
-                "current_value": deepcopy(prior) if prior is not None else None,
-                "candidate_value": deepcopy(dict(obj)) if obj is not None else deepcopy(dict(action.payload)),
-                "relevant_source_refs": list(dict.fromkeys((*candidate.get("source_refs", ()), *action.source_refs))),
-                "research_context": deepcopy(context),
-            })
-        return with_request_digest({
-            "schema_version": "0.1.0",
-            "request_id": request_id,
-            "project_ref": state.project_ref,
-            "lineage_ref": state.lineage_ref,
-            "human_actor_id": str(actor["actor_id"]),
-            "source_state_delta_proposal": {
-                "proposal_id": str(candidate["proposal_id"]),
-                "proposal_digest": str(candidate["proposal_digest"]),
-            },
-            "source_action_proposal": source_action_binding,
-            "snapshot_binding": {
-                "snapshot_ref": str(state.current_snapshot["id"]),
-                "snapshot_digest": str(state.current_snapshot["content_digest"]),
-            },
-            "project_config": {"ref": state.project_config_ref, "digest": state.project_config_digest},
-            "effective_profile_set": {
-                "ref": state.effective_profile_set_ref,
-                "digest": state.effective_profile_set_digest,
-            },
-            "decision_units": units,
-            "requirement_set_digest": requirement_set_digest,
-            "target_actions": [_action_wire(action) for action in actions],
-            "source_refs": list(candidate.get("source_refs", ())),
-            "provenance": provenance,
-            "issued_at": self._clock.now(),
-            "status": "PENDING",
-        })
+            units.append(
+                {
+                    "unit_id": _stable_id(
+                        "HDU-", request_id, str(ordinal), *_requirement_key(requirement)
+                    ),
+                    "transition_action_index": index,
+                    "transition_action_digest": _action_digest(action),
+                    "required_decision_kind": requirement.decision_kind,
+                    "required_choice": requirement.choice,
+                    "subject": {"kind": requirement.subject_kind, "id": requirement.subject_id},
+                    "proposed_semantic_effect": action.kind.value,
+                    "current_value": deepcopy(prior) if prior is not None else None,
+                    "candidate_value": deepcopy(dict(obj))
+                    if obj is not None
+                    else deepcopy(dict(action.payload)),
+                    "relevant_source_refs": list(
+                        dict.fromkeys((*candidate.get("source_refs", ()), *action.source_refs))
+                    ),
+                    "research_context": deepcopy(context),
+                }
+            )
+        return with_request_digest(
+            {
+                "schema_version": "0.1.0",
+                "request_id": request_id,
+                "project_ref": state.project_ref,
+                "lineage_ref": state.lineage_ref,
+                "human_actor_id": str(actor["actor_id"]),
+                "source_state_delta_proposal": {
+                    "proposal_id": str(candidate["proposal_id"]),
+                    "proposal_digest": str(candidate["proposal_digest"]),
+                },
+                "source_action_proposal": source_action_binding,
+                "snapshot_binding": {
+                    "snapshot_ref": str(state.current_snapshot["id"]),
+                    "snapshot_digest": str(state.current_snapshot["content_digest"]),
+                },
+                "project_config": {
+                    "ref": state.project_config_ref,
+                    "digest": state.project_config_digest,
+                },
+                "effective_profile_set": {
+                    "ref": state.effective_profile_set_ref,
+                    "digest": state.effective_profile_set_digest,
+                },
+                "decision_units": units,
+                "requirement_set_digest": requirement_set_digest,
+                "target_actions": [_action_wire(action) for action in actions],
+                "source_refs": list(candidate.get("source_refs", ())),
+                "provenance": provenance,
+                "issued_at": self._clock.now(),
+                "status": "PENDING",
+            }
+        )
 
     def _validate_response_envelope(self, response) -> None:
         required = {
@@ -509,25 +572,42 @@ class HumanDecisionService:
             "response_digest",
         }
         if not required.issubset(response):
-            raise HumanDecisionError("DECISION-RESPONSE-001", "structured Human Decision response is incomplete")
+            raise HumanDecisionError(
+                "DECISION-RESPONSE-001", "structured Human Decision response is incomplete"
+            )
         if response.get("disposition") not in {"approve_exact", "decline", "request_revision"}:
-            raise HumanDecisionError("DECISION-DISPOSITION-001", "unsupported Human Decision disposition")
+            raise HumanDecisionError(
+                "DECISION-DISPOSITION-001", "unsupported Human Decision disposition"
+            )
         actor = response.get("actor")
-        if not isinstance(actor, Mapping) or not actor.get("actor_id") or not actor.get("actor_type"):
-            raise HumanDecisionError("DECISION-RESPONSE-001", "Human Decision response actor is invalid")
+        if (
+            not isinstance(actor, Mapping)
+            or not actor.get("actor_id")
+            or not actor.get("actor_type")
+        ):
+            raise HumanDecisionError(
+                "DECISION-RESPONSE-001", "Human Decision response actor is invalid"
+            )
         if response_digest(response) != response.get("response_digest"):
-            raise HumanDecisionError("DECISION-RESPONSE-001", "Human Decision response digest is invalid")
+            raise HumanDecisionError(
+                "DECISION-RESPONSE-001", "Human Decision response digest is invalid"
+            )
 
     def _load_bound_state(self, request):
         try:
-            return self._states.load_state_view(str(request["project_ref"]), str(request["lineage_ref"]))
+            return self._states.load_state_view(
+                str(request["project_ref"]), str(request["lineage_ref"])
+            )
         except Exception as exc:
-            raise HumanDecisionError("DECISION-BINDING-001", "bound Research State no longer resolves") from exc
+            raise HumanDecisionError(
+                "DECISION-BINDING-001", "bound Research State no longer resolves"
+            ) from exc
 
     def _stale_reason(self, request, state) -> str | None:
         if (
             request["snapshot_binding"]["snapshot_ref"] != state.current_snapshot["id"]
-            or request["snapshot_binding"]["snapshot_digest"] != state.current_snapshot["content_digest"]
+            or request["snapshot_binding"]["snapshot_digest"]
+            != state.current_snapshot["content_digest"]
         ):
             return "Research Lineage HEAD advanced after Decision Request issuance"
         if (
@@ -546,14 +626,16 @@ class HumanDecisionService:
         rebuilt = []
         for index, action in enumerate(self._request_actions(request)):
             for requirement in required_decisions_for_action(state, action):
-                rebuilt.append({
-                    "action_index": index,
-                    "action_digest": _action_digest(action),
-                    "decision_kind": requirement.decision_kind,
-                    "choice": requirement.choice,
-                    "subject_kind": requirement.subject_kind,
-                    "subject_id": requirement.subject_id,
-                })
+                rebuilt.append(
+                    {
+                        "action_index": index,
+                        "action_digest": _action_digest(action),
+                        "decision_kind": requirement.decision_kind,
+                        "choice": requirement.choice,
+                        "subject_kind": requirement.subject_kind,
+                        "subject_id": requirement.subject_id,
+                    }
+                )
         if canonical_digest(rebuilt) != request["requirement_set_digest"]:
             return "DecisionRequirement set changed after Decision Request issuance"
         return None
@@ -563,7 +645,10 @@ class HumanDecisionService:
             return None
         candidate_binding = request["source_state_delta_proposal"]
         candidate = self._sources.load_state_delta_proposal(str(candidate_binding["proposal_id"]))
-        if candidate is None or candidate.get("proposal_digest") != candidate_binding["proposal_digest"]:
+        if (
+            candidate is None
+            or candidate.get("proposal_digest") != candidate_binding["proposal_digest"]
+        ):
             return "source StateDeltaProposal binding changed or disappeared"
         basis = deepcopy(dict(candidate))
         supplied = str(basis.pop("proposal_digest", ""))
@@ -572,7 +657,10 @@ class HumanDecisionService:
         action_binding = request.get("source_action_proposal")
         if action_binding is not None:
             proposal = self._sources.load_proposal(str(action_binding["proposal_id"]))
-            if proposal is None or proposal.get("proposal_digest") != action_binding["proposal_digest"]:
+            if (
+                proposal is None
+                or proposal.get("proposal_digest") != action_binding["proposal_digest"]
+            ):
                 return "source Action Proposal binding changed or disappeared"
         return None
 
@@ -588,8 +676,14 @@ class HumanDecisionService:
         )
         for unit in request["decision_units"]:
             index = int(unit["transition_action_index"])
-            if index < 0 or index >= len(actions) or _action_digest(actions[index]) != unit["transition_action_digest"]:
-                raise HumanDecisionError("DECISION-BINDING-001", "target action digest does not match Decision Request")
+            if (
+                index < 0
+                or index >= len(actions)
+                or _action_digest(actions[index]) != unit["transition_action_digest"]
+            ):
+                raise HumanDecisionError(
+                    "DECISION-BINDING-001", "target action digest does not match Decision Request"
+                )
         return actions
 
     def _materialize_decisions_and_bind(self, request, target_actions, *, actor_id, decided_at):
@@ -620,7 +714,9 @@ class HumanDecisionService:
                 "decided_by": actor_id,
                 "decided_at": decided_at,
             }
-            decision_actions.append(TransitionAction(TransitionKind.RECORD_DECISION, {"object": decision}))
+            decision_actions.append(
+                TransitionAction(TransitionKind.RECORD_DECISION, {"object": decision})
+            )
 
         bound_actions = []
         for index, action in enumerate(target_actions):
@@ -641,11 +737,17 @@ class HumanDecisionService:
                         if isinstance(derived, Mapping):
                             subject = (str(derived.get("kind", "")), str(derived.get("id", "")))
                             matching = [
-                                decision_ids[(str(unit["required_decision_kind"]), str(unit["required_choice"]))]
+                                decision_ids[
+                                    (
+                                        str(unit["required_decision_kind"]),
+                                        str(unit["required_choice"]),
+                                    )
+                                ]
                                 for unit in request["decision_units"]
                                 if int(unit["transition_action_index"]) == index
                                 and unit["required_decision_kind"] == "lineage_reconfirmation"
-                                and (str(unit["subject"]["kind"]), str(unit["subject"]["id"])) == subject
+                                and (str(unit["subject"]["kind"]), str(unit["subject"]["id"]))
+                                == subject
                             ]
                             if len(matching) != 1:
                                 raise HumanDecisionError(
@@ -654,8 +756,12 @@ class HumanDecisionService:
                                 )
                             item["human_decision_ref"] = matching[0]
                             derived_copy = deepcopy(dict(derived))
-                            existing = tuple(str(value) for value in derived_copy.get("decision_ids", ()) or ())
-                            derived_copy["decision_ids"] = list(dict.fromkeys((*existing, matching[0])))
+                            existing = tuple(
+                                str(value) for value in derived_copy.get("decision_ids", ()) or ()
+                            )
+                            derived_copy["decision_ids"] = list(
+                                dict.fromkeys((*existing, matching[0]))
+                            )
                             item["derived_object"] = derived_copy
                     treatments.append(item)
                 payload["treatments"] = treatments
@@ -769,12 +875,14 @@ def make_response(
     responded_at: str,
 ) -> Mapping[str, Any]:
     """Build an explicit structured Human response; never parse prose."""
-    return with_response_digest({
-        "schema_version": "0.1.0",
-        "response_id": _stable_id("HDRESP-", str(request["request_id"]), disposition, actor_id),
-        "request_id": str(request["request_id"]),
-        "request_digest": str(request["request_digest"]),
-        "disposition": disposition,
-        "actor": {"actor_id": actor_id, "actor_type": "human"},
-        "responded_at": responded_at,
-    })
+    return with_response_digest(
+        {
+            "schema_version": "0.1.0",
+            "response_id": _stable_id("HDRESP-", str(request["request_id"]), disposition, actor_id),
+            "request_id": str(request["request_id"]),
+            "request_digest": str(request["request_digest"]),
+            "disposition": disposition,
+            "actor": {"actor_id": actor_id, "actor_type": "human"},
+            "responded_at": responded_at,
+        }
+    )

@@ -43,15 +43,17 @@ class ResearchConversationSkillContractTests(unittest.TestCase):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, skill)
         self.assertIn("## Public read selection", skill)
-        self.assertIn('--view conversation', skill)
-        self.assertIn('decision show --request-id', skill)
-        self.assertIn('candidate show --candidate-id', skill)
+        self.assertIn("--view conversation", skill)
+        self.assertIn("decision show --request-id", skill)
+        self.assertIn("candidate show --candidate-id", skill)
         self.assertIn("## Candidate interpretation gate", skill)
         self.assertIn("PROPOSAL_SAVED_NOT_ADOPTED", skill)
         self.assertIn("determine the semantic candidate state first", skill)
         self.assertIn("treat candidate-local `adoption_state` as proposed payload", skill)
         self.assertIn("do not use candidate-local `approved` to choose words", skill)
-        self.assertIn("Do not derive a separate \"candidate approved\" or \"human approved\" stage", skill)
+        self.assertIn(
+            'Do not derive a separate "candidate approved" or "human approved" stage', skill
+        )
         self.assertIn("If the human explicitly asks for internal IDs", skill)
         self.assertIn("translate them into research meaning first", skill)
         self.assertIn("Do not quote field names or opaque IDs", skill)
@@ -99,7 +101,10 @@ class ResearchConversationSkillContractTests(unittest.TestCase):
                 self.assertIn(f"## S{number} —", scenarios)
         self.assertEqual(scenarios.count("**Must convey:**"), 8)
         self.assertEqual(scenarios.count("**Must not:**"), 8)
-        self.assertIn("Exact wording is not required", (SKILL_ROOT / "acceptance" / "rubric.md").read_text(encoding="utf-8"))
+        self.assertIn(
+            "Exact wording is not required",
+            (SKILL_ROOT / "acceptance" / "rubric.md").read_text(encoding="utf-8"),
+        )
 
     def test_rubric_scores_semantics_not_loom_word_blacklist(self):
         rubric = (SKILL_ROOT / "acceptance" / "rubric.md").read_text(encoding="utf-8")
