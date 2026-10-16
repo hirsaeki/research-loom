@@ -170,6 +170,15 @@ repo-local hook is not discovered, trusted, or fired by the installed Codex
 build, record that as a host-integration blocker and do not award G4 PASS merely
 because repository unit tests passed.
 
+The guard applies to research-conversation sessions: it stands down only when
+the session transcript is readable and shows that
+`skills/research-conversation/SKILL.md` was never loaded (repository
+development sessions), and stays active when no transcript is available.
+`RESEARCH_LOOM_STOP_GUARD=on|off` overrides the detection. Each probe-log
+record carries `guard_active`; a UAT session whose records show
+`guard_active: false` did not register as a research-conversation session and
+must be treated as missing hook evidence.
+
 The guard is intentionally bounded: an explicit user request for
 diagnostics/mechanics may allow implementation terms, and `stop_hook_active`
 prevents an infinite rewrite loop. The Skill/host language contract remains
