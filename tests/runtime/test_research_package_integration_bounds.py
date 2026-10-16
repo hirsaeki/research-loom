@@ -12,6 +12,8 @@ from plugins.local_application.research_package_format import (
 )
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
+CI_WINDOWS = True
+
 
 class ResearchPackageIntegrationBoundsTests(unittest.TestCase):
     def test_full_manuscript_object_selection(self):

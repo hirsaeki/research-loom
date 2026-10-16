@@ -10,6 +10,8 @@ from tests.runtime import test_issue251_real_survey_batches as batches
 from tests.runtime.survey_virtual_runner_test_support import SurveyVirtualRunnerTestBase
 from tests.runtime.test_survey_production import state_signature
 
+CI_WINDOWS = True
+
 
 class Issue251MalformedResponseIdentityTests(SurveyVirtualRunnerTestBase):
     _fixture = batches.Issue251RealSurveyBatchTests._fixture

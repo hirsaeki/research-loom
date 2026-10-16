@@ -18,6 +18,8 @@ from plugins.local_application.cli import main
 from plugins.local_durable_store import OPTIONAL_DURABLE_CHILDREN, register_optional_path
 from tests.runtime.test_research_question_review import _workspace
 
+CI_WINDOWS = True
+
 
 class OptionalDurableHealthTests(unittest.TestCase):
     def setUp(self):

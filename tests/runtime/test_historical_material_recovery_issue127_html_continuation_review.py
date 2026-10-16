@@ -12,6 +12,8 @@ from tests.runtime.test_issue171_new_material_continuation import (
     Issue171NewMaterialContinuationTests as _Issue171Support,
 )
 
+CI_WINDOWS = True
+
 
 class Issue127HtmlContinuationReviewTests(ResearchPackageAcceptanceSupport):
     _remove_producer_candidate = staticmethod(_Issue171Support._remove_producer_candidate)

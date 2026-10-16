@@ -11,6 +11,8 @@ from unittest.mock import patch
 from plugins.local_application import material_reacquisition_facade as base
 from plugins.local_application import material_reacquisition_pypdf_provider as provider
 
+CI_WINDOWS = True
+
 
 class HistoricalMaterialReacquisitionPypdfProviderTests(unittest.TestCase):
     def test_uv_pypdf_provider_is_version_pinned_bounded_and_crlf_replaying(self):

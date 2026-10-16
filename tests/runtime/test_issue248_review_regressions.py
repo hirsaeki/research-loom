@@ -14,6 +14,8 @@ from plugins.local_durable_store import register_optional_path, require_optional
 from plugins.local_project_input_store import LocalProjectInputStore, LocalProjectInputStoreError
 from tests.runtime.test_research_question_review import _workspace
 
+CI_WINDOWS = True
+
 
 class OptionalDurableReviewTests(unittest.TestCase):
     def setUp(self):

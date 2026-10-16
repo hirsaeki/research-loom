@@ -15,6 +15,8 @@ from plugins.local_execution_store import (
     open_read_only_execution_store,
 )
 
+CI_WINDOWS = True
+
 _ORIGINAL = "desktop_research.original_capture"
 _RENDITION = "desktop_research.text_rendition"
 

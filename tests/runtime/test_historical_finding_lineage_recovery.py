@@ -10,6 +10,8 @@ from core.runtime import canonical_digest
 from plugins.local_application import LocalApplicationError
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
+CI_WINDOWS = True
+
 
 class HistoricalFindingLineageRecoveryTests(ResearchPackageAcceptanceSupport):
     def _legacyize(self, facade, proposal):

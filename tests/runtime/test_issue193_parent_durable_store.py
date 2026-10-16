@@ -13,6 +13,8 @@ import rfc8785
 from plugins.local_application import LocalWorkspace
 from plugins.local_project_input_store import LocalProjectInputStore
 
+CI_WINDOWS = True
+
 ROOT = Path(__file__).resolve().parents[2]
 PROJECT_FIXTURE = ROOT / "projects/fixtures/valid/generic-project-config.json"
 PROFILE_FIXTURE = ROOT / "profiles/fixtures/valid/effective-profile-set.json"

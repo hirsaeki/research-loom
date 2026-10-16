@@ -15,6 +15,8 @@ from tests.runtime.test_delphi_two_round_production import (
 )
 from tests.runtime.test_issue252_delphi_lifecycle import proposal, round_input
 
+CI_WINDOWS = True
+
 
 class DelphiReviewRegressions(unittest.TestCase):
     def test_late_revision_cannot_add_or_remove_expected_participants(self):

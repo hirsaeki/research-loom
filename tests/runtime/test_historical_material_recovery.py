@@ -12,6 +12,8 @@ from plugins.local_application.material_recovery_facade import HistoricalMateria
 from plugins.local_application.research_package_service import verify_export_root
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
+CI_WINDOWS = True
+
 
 def _run_cli(argv):
     stream = io.StringIO()

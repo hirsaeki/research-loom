@@ -10,6 +10,8 @@ import tests.runtime.test_issue219_writer_round_trip as round_trip
 from plugins.local_application.workspace import LocalWorkspaceError, _safe_locator
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
+CI_WINDOWS = True
+
 
 class WriterRecoveryReviewTests(ResearchPackageAcceptanceSupport):
     def test_legacy_writer_recovery_ignores_non_file_json_entries(self):

@@ -4,6 +4,8 @@ import os
 import unittest
 from pathlib import Path
 
+CI_WINDOWS = False  # text checks; os.name only skips the POSIX exec-bit assertion
+
 ROOT = Path(__file__).resolve().parents[2]
 POSIX_LAUNCHER = ROOT / "research-loom"
 WINDOWS_LAUNCHER = ROOT / "research-loom.cmd"

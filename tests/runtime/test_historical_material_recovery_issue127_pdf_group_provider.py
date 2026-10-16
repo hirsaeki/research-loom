@@ -10,6 +10,8 @@ from plugins.local_application import new_material_group_continuation_service as
 from plugins.local_application.facade import LocalApplicationError
 from plugins.local_application.material_reacquisition_facade import RetrievedMaterial
 
+CI_WINDOWS = True
+
 
 class Issue127PdfGroupProviderTests(unittest.TestCase):
     def test_pdf_group_provider_ablation_and_provenance(self):

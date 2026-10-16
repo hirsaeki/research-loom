@@ -20,6 +20,8 @@ from plugins.local_application import workspace_lock as locking
 from plugins.local_application.workspace import LocalWorkspaceError
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
+CI_WINDOWS = True
+
 
 class Issue255WorkspaceLockTests(ResearchPackageAcceptanceSupport):
     _write_structured_workspace_inputs = (

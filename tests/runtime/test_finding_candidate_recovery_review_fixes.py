@@ -13,6 +13,8 @@ from plugins.local_conversation_store import (
 )
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
+CI_WINDOWS = True
+
 
 class FindingCandidateRecoveryReviewFixTests(ResearchPackageAcceptanceSupport):
     def _legacyize(self, facade, proposal):

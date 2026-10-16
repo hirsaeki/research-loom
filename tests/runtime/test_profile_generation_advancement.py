@@ -30,6 +30,8 @@ from tests.runtime.research_package_acceptance_support import ResearchPackageAcc
 from tests.runtime.runtime_fixtures import make_request
 from tests.runtime.test_profile_constraint_enforcement import _evidence, _source
 
+CI_WINDOWS = True
+
 ROOT = Path(__file__).resolve().parents[2]
 OLD_EPS = ROOT / "profiles/fixtures/valid/effective-profile-set.json"
 OLD_NARRATIVE = ROOT / "profiles/fixtures/valid/narrative.profile.json"

@@ -19,6 +19,8 @@ from tests.runtime.research_package_acceptance_support import ResearchPackageAcc
 from tests.runtime.test_historical_material_recovery import _run_cli, _submit_recovery
 from tests.runtime.test_historical_material_recovery_reacquire import _submit_reacquire
 
+CI_WINDOWS = True
+
 
 class ExactPayloadRepairTests(ResearchPackageAcceptanceSupport):
     def _ready(self, *, kind="rendition"):

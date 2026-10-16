@@ -13,6 +13,8 @@ from plugins.local_application import (
 from tests.runtime.runtime_fixtures import evidence, finding, project, rq, seed_state, source
 from tests.runtime.test_survey_production import NullResolver
 
+CI_WINDOWS = True
+
 
 def profile_provider(_project_ref, expected_digest):
     return {

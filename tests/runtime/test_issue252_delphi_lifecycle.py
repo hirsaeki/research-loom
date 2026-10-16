@@ -34,6 +34,8 @@ from tests.runtime.test_survey_production import (
     state_signature as state_signature,
 )
 
+CI_WINDOWS = True
+
 
 def proposal(inst, *, panel="PANEL-1", derived=None):
     value = {

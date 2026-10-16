@@ -11,6 +11,8 @@ from plugins.local_application.research_package_format import (
 )
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
+CI_WINDOWS = True
+
 
 class ResearchPackageBodyMetadataReviewTests(ResearchPackageAcceptanceSupport):
     def _verify_mutation_rejected(self, label, mutate):

@@ -17,6 +17,8 @@ from plugins.local_survey_store import canonical_document_digest
 from tests.runtime.runtime_fixtures import decision, project, rq, seed_state
 from tests.runtime.test_survey_production import NullResolver, profile_provider
 
+CI_WINDOWS = True
+
 ROOT = Path(__file__).resolve().parents[2]
 
 

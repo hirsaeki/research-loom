@@ -26,6 +26,8 @@ from plugins.local_application.workspace import (
 )
 from plugins.local_application.workspace_initialization import finish_initialization, initial_intent
 
+CI_WINDOWS = True
+
 ROOT = Path(__file__).resolve().parents[2]
 CRASH = r"""
 import os,sys

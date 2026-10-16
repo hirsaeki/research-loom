@@ -10,6 +10,8 @@ import tests.runtime.test_issue92_external_submission_preflight as submission
 from plugins.local_application import LocalApplicationError
 from plugins.local_execution_store import open_read_only_execution_store
 
+CI_WINDOWS = True
+
 
 def _capture_source(root: Path, facade, run_id: str):
     facade.start_external_retrieval_attempt(

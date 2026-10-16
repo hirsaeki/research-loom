@@ -11,6 +11,8 @@ import tests.runtime.test_external_desktop_research_intake as intake
 from plugins.local_application import LocalApplicationError
 from plugins.local_application.research_package_service import verify_export_root
 
+CI_WINDOWS = True
+
 
 class ResearchPackageAcceptanceTests(baseline.ResearchPackageAcceptanceTests):
     def test_rp1_public_cli_round_trip_is_detached_from_workspace(self):

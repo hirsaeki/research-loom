@@ -91,26 +91,22 @@ jobs:
         run: uv sync --frozen
       - name: Run Research State runtime tests shard ${{ matrix.shard }}
         shell: bash
-        env:
-          SHARD_INDEX: ${{ matrix.shard }}
-          SHARD_TOTAL: 4
         run: |
-          mapfile -t runtime_tests < <(find tests/runtime -type f -name 'test_*.py' | sort)
-          selected=()
-          for i in "${!runtime_tests[@]}"; do
-            if (( i % SHARD_TOTAL == SHARD_INDEX )); then
-              selected+=("${runtime_tests[$i]}")
-            fi
-          done
-          test "${#selected[@]}" -gt 0
-          printf 'Shard %s/%s: %s files\n' "$SHARD_INDEX" "$SHARD_TOTAL" "${#selected[@]}"
-          printf '  %s\n' "${selected[@]}"
-          uv run --frozen python -m unittest -v "${selected[@]}"
+          mapfile -t modules < <(uv run --frozen python scripts/ci_test_shards.py select \
+            --platform linux --shards 4 --index ${{ matrix.shard }} | tr -d '\r')
+          test "${#modules[@]}" -gt 0
+          printf 'Shard ${{ matrix.shard }}/4: %s modules\n' "${#modules[@]}"
+          printf '  %s\n' "${modules[@]}"
+          uv run --frozen python -m unittest -v "${modules[@]}"
 
-  windows-material-recovery:
-    name: windows-material-recovery
+  runtime-windows:
+    name: runtime-windows-${{ matrix.shard }}
     runs-on: windows-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
     steps:
       - uses: actions/checkout@v5
         with:
@@ -124,101 +120,19 @@ jobs:
         run: uv sync --frozen
       - name: Smoke production Windows launcher
         run: .\research-loom.cmd --help
-      - name: Run Issue 91 C acceptance tests
-        run: uv run --frozen python -m unittest -v tests.runtime.test_issue91_external_material_content
-      - name: Run Issue 91 mocked review regressions
-        run: uv run --frozen python -m unittest -v tests.runtime.test_issue91_review_fixes.Issue91ReviewFixTests
-      - name: Run Issue 91 real Windows file I/O regressions
-        run: uv run --frozen python -m unittest -v tests.runtime.test_issue91_review_fixes.Issue91WindowsRealIoTests
-      - name: Run Issue 127 historical material recovery acceptance
-        run: uv run --frozen python -m unittest discover -t . -s tests/runtime -p 'test_historical_material_recovery*.py' -v
-      - name: Run Issue 158 external material health acceptance
-        run: uv run --frozen python -m unittest discover -t . -s tests/runtime -p 'test_external_material_health.py' -v
-      - name: Run Issue 160 portable execution/material store acceptance
-        run: uv run --frozen python -m unittest discover -t . -s tests/runtime -p 'test_issue160_execution_store_portability.py' -v
-      - name: Run Issue 165 staged material import acceptance
-        run: uv run --frozen python -m unittest discover -t . -s tests/runtime -p 'test_issue165_staged_material_import.py' -v
-      - name: Run Issue 171 new material continuation acceptance
-        run: uv run --frozen python -m unittest discover -t . -s tests/runtime -p 'test_issue171_new_material_continuation.py' -v
+      # Modules opt in with CI_WINDOWS = True; see scripts/ci_test_shards.py.
+      - name: Run Windows-sensitive tests shard ${{ matrix.shard }}
+        shell: bash
+        run: |
+          mapfile -t modules < <(uv run --frozen python scripts/ci_test_shards.py select \
+            --platform windows --shards 4 --index ${{ matrix.shard }} | tr -d '\r')
+          test "${#modules[@]}" -gt 0
+          printf 'Shard ${{ matrix.shard }}/4: %s modules\n' "${#modules[@]}"
+          printf '  %s\n' "${modules[@]}"
+          uv run --frozen python -m unittest -v "${modules[@]}"
 
-  windows-package-lineage:
-    name: windows-package-lineage
-    runs-on: windows-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@v6
-        with:
-          python-version: '3.12'
-      - name: Install uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
-      - name: Sync locked Python environment
-        run: uv sync --frozen
-      - name: Run Issue 77 Research Package Windows acceptance
-        run: uv run --frozen python -m unittest discover -t . -s tests/runtime -p 'test_research_package_*.py' -v
-      - name: Run Issue 133 Research Package ACL acceptance
-        run: uv run --frozen python -m unittest discover -t . -s tests/runtime -p 'test_issue133_windows_acl.py' -v
-      - name: Run Issue 134 Argument proposal and Writer recovery acceptance
-        run: uv run --frozen python -m unittest discover -t . -s tests/runtime -p 'test_issue134_*.py' -v
-      - name: Run Issue 145 historical Finding lineage recovery acceptance
-        run: uv run --frozen python -m unittest discover -t . -s tests/runtime -p 'test_*finding*recovery*.py' -v
-      - name: Run Issue 148 historical G1 result recovery acceptance
-        run: uv run --frozen python -m unittest discover -t . -s tests/runtime -p 'test_historical_result_recovery.py' -v
-
-  windows-writer-publication-a:
-    name: windows-writer-publication-a
-    runs-on: windows-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@v6
-        with:
-          python-version: '3.12'
-      - name: Install uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
-      - name: Sync locked Python environment
-        run: uv sync --frozen
-      - name: Run Issue 80 Writer Composition Windows acceptance
-        run: uv run --frozen python -m unittest discover -t . -s tests/runtime -p 'test_issue80_writer_composition.py' -v
-      - name: Run Issue 245 Publication recovery acceptance
-        run: uv run --frozen python -m unittest discover -t . -s tests/runtime -p 'test_issue245*.py' -v
-      - name: Run Issue 249 Writer continuity recovery acceptance
-        run: uv run --frozen python -m unittest discover -t . -s tests/runtime -p 'test_issue249*.py' -v
-      - name: Run Issue 193 Parent Durable Store acceptance
-        run: uv run --frozen python -m unittest discover -t . -s tests/runtime -p 'test_issue193_parent_durable_store.py' -v
-
-  windows-writer-publication-b:
-    name: windows-writer-publication-b
-    runs-on: windows-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@v6
-        with:
-          python-version: '3.12'
-      - name: Install uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
-      - name: Sync locked Python environment
-        run: uv sync --frozen
-      - name: Run Issue 250 exact payload repair acceptance
-        run: uv run --frozen python -m unittest discover -t . -s tests/runtime -p 'test_issue250*.py' -v
-      - name: Run Issue 251 REAL Survey batch acceptance
-        run: uv run --frozen python -m unittest discover -t . -s tests/runtime -p 'test_issue251*.py' -v
-      - name: Run Issue 256 native Publication Exhibit acceptance
-        run: uv run --frozen python -m unittest discover -t . -s tests/runtime -p 'test_issue256*.py' -v
-      - name: Run Issue 254 bounded item inventory acceptance
-        run: uv run --frozen python -m unittest discover -t . -s tests/runtime -p 'test_issue254*.py' -v
-      - name: Run Issue 248 optional child recovery acceptance
-        run: uv run --frozen python -m unittest discover -t . -s tests/runtime -p 'test_issue248*.py' -v
-
-  issue128-windows:
-    name: issue128-windows
+  windows-misco-migration:
+    name: windows-misco-migration
     runs-on: windows-latest
     timeout-minutes: 10
     steps:
@@ -263,29 +177,3 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           .\projects\misco-ai-2026\New-MiscoMigrationProbe.ps1 -ExpectedHead $head -Workspace $workspace
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Run Issue 128 Profile generation advancement acceptance
-        run: uv run --frozen python -m unittest discover -t . -s tests/runtime -p 'test_profile_generation_advancement*.py' -v
-      - name: Run Issue 257 interrupted initialization acceptance
-        run: uv run --frozen python -m unittest discover -t . -s tests/runtime -p 'test_issue257*.py' -v
-      - name: Run Issue 255 shared Workspace and exclusive Profile lock acceptance
-        run: uv run --frozen python -m unittest discover -t . -s tests/runtime -p 'test_issue255*.py' -v
-
-  delphi-windows:
-    name: delphi-windows
-    runs-on: windows-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@v6
-        with:
-          python-version: '3.12'
-      - name: Install uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
-      - name: Sync locked Python environment
-        run: uv sync --frozen
-      - name: Run existing Delphi two-round acceptance
-        run: uv run --frozen python -m unittest discover -t . -s tests/runtime -p 'test_delphi_two_round_production.py' -v
-      - name: Run exact Delphi lifecycle and mode-scale acceptance
-        run: uv run --frozen python -m unittest discover -t . -s tests/runtime -p 'test_issue25[23]*.py' -v

@@ -17,6 +17,8 @@ from plugins.local_application.research_package_format import (
 )
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
+CI_WINDOWS = True
+
 
 class ResearchPackageCompletionReviewTests(ResearchPackageAcceptanceSupport):
     def test_selected_finding_requires_complete_support_chain(self):
