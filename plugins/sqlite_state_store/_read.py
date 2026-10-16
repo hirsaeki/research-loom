@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Mapping, Sequence, TYPE_CHECKING
+from collections.abc import Mapping, Sequence
+from typing import TYPE_CHECKING, Any
 
 from core.runtime.ports import RepositoryError
 from core.runtime.transition_models import CommitReceipt, StateView
@@ -21,7 +22,7 @@ if TYPE_CHECKING:
 class ReadMixin:
     @repository_read
     def load_active_lineage_ref(
-        self: "SQLiteResearchStateRepository",
+        self: SQLiteResearchStateRepository,
         project_ref: str,
     ) -> str:
         row = self._connection.execute(
@@ -38,7 +39,7 @@ class ReadMixin:
 
     @repository_read
     def load_current_snapshot_binding(
-        self: "SQLiteResearchStateRepository",
+        self: SQLiteResearchStateRepository,
         project_ref: str,
     ) -> tuple[str, str, str]:
         row = self._connection.execute(
@@ -82,7 +83,7 @@ class ReadMixin:
 
     @repository_read
     def load_state_view(
-        self: "SQLiteResearchStateRepository",
+        self: SQLiteResearchStateRepository,
         project_ref: str,
         lineage_ref: str,
     ) -> StateView:
@@ -229,7 +230,7 @@ class ReadMixin:
 
     @repository_read
     def load_snapshot(
-        self: "SQLiteResearchStateRepository",
+        self: SQLiteResearchStateRepository,
         snapshot_ref: str,
     ) -> Mapping[str, Any] | None:
         row = self._connection.execute(
@@ -251,7 +252,7 @@ class ReadMixin:
         return payload
 
     def _load_object_revision_unchecked(
-        self: "SQLiteResearchStateRepository",
+        self: SQLiteResearchStateRepository,
         kind: str,
         object_id: str,
         revision: int,
@@ -268,7 +269,7 @@ class ReadMixin:
 
     @repository_read
     def load_object_revision(
-        self: "SQLiteResearchStateRepository",
+        self: SQLiteResearchStateRepository,
         kind: str,
         object_id: str,
         revision: int,
@@ -277,7 +278,7 @@ class ReadMixin:
 
     @repository_read
     def resolve_refs(
-        self: "SQLiteResearchStateRepository",
+        self: SQLiteResearchStateRepository,
         refs: Sequence[tuple[str, str]],
     ) -> Mapping[tuple[str, str], bool]:
         requested = tuple((str(ref[0]), str(ref[1])) for ref in refs)
@@ -334,7 +335,7 @@ class ReadMixin:
 
     @repository_read
     def find_commit_by_idempotency_key(
-        self: "SQLiteResearchStateRepository",
+        self: SQLiteResearchStateRepository,
         idempotency_key: str,
     ) -> tuple[str, CommitReceipt] | None:
         row = self._connection.execute(

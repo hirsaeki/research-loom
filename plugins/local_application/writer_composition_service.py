@@ -1,24 +1,24 @@
 from __future__ import annotations
 
-from plugins.local_durable_store import require_optional_available, register_optional_path
-
-from contextlib import contextmanager
-from copy import deepcopy
-from datetime import datetime, timezone
 import hashlib
 import json
 import os
-from pathlib import Path
 import shutil
 import tempfile
 import uuid
-from typing import Any, Mapping
+from collections.abc import Mapping
+from contextlib import contextmanager
+from copy import deepcopy
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
 
 import rfc8785
-
 from jsonschema import Draft202012Validator, FormatChecker
 
 from core.runtime import canonical_digest
+from plugins.local_durable_store import register_optional_path, require_optional_available
+
 from .facade import LocalApplicationError
 from .item_listing import read_mapping
 from .research_package_format import _package_required_refs, safe_component
@@ -58,7 +58,7 @@ def _validate_schema(value: Mapping[str, Any]) -> None:
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
 def _require_string(value: Any, field: str) -> str:

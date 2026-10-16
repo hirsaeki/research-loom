@@ -1,13 +1,15 @@
-from copy import deepcopy
 import base64
 import hashlib
 import inspect
-import json
-from pathlib import Path
 import tempfile
 import unittest
+from copy import deepcopy
+from pathlib import Path
 
 import rfc8785
+import test_issue405_research_charts as charts
+from runtime_fixtures import project, rq, seed_state, source
+from test_research_exhibits import NullResolver, profile_provider
 
 from core.conversation import ConversationRuntimeError
 from core.runtime import canonical_digest
@@ -17,9 +19,6 @@ from plugins.local_application import (
     LocalResearchApplication,
 )
 from plugins.local_application.publication_exhibits import prepare_exhibits
-from runtime_fixtures import project, rq, source, seed_state
-from test_research_exhibits import NullResolver, profile_provider
-import test_issue405_research_charts as charts
 
 
 class SourceBibliographyIngressTests(unittest.TestCase):

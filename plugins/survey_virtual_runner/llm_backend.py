@@ -1,16 +1,16 @@
 from __future__ import annotations
 
-from copy import deepcopy
-from dataclasses import dataclass
 import json
 import os
-import socket
-from typing import Any, Mapping, Protocol
+from collections.abc import Mapping
+from copy import deepcopy
+from dataclasses import dataclass
+from typing import Any, Protocol
 from urllib import error, request
 
 from core.conversation.validation import canonical_digest
-from .response_validation import stable_response_key
 
+from .response_validation import stable_response_key
 
 PROMPT_TEMPLATE_ID = "survey-virtual-respondent"
 PROMPT_TEMPLATE_VERSION = "1.0.0"
@@ -306,7 +306,7 @@ class OpenAIResponsesVirtualRespondentBackend:
                         body=encoded,
                         timeout=timeout,
                     )
-                except (TimeoutError, socket.timeout) as exc:
+                except TimeoutError as exc:
                     attempts.append(
                         {
                             "attempt": attempt_no,
@@ -397,7 +397,7 @@ class OpenAIResponsesVirtualRespondentBackend:
                         "STRUCTURED_OUTPUT_INVALID",
                         "structured model output was invalid JSON after bounded repair",
                         attempts=attempts,
-                    )
+                    ) from None
                 repair_text = output_text
                 continue
             if not isinstance(parsed, Mapping) or not isinstance(parsed.get("answers"), list):

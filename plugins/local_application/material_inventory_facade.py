@@ -2,16 +2,16 @@ from __future__ import annotations
 
 import base64
 import binascii
-from copy import deepcopy
 import json
-from typing import Any, Mapping
+from collections.abc import Mapping
+from copy import deepcopy
+from typing import Any
 
 from plugins.local_execution_store import external_capture_artifact_metadata_for_project
 
 from .exhibit_guard_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
 from .facade import LocalApplicationError
 from .run_inspection_facade import _public_provenance
-
 
 _ORIGINAL_ROLE = "desktop_research.original_capture"
 _TEXT_ROLE = "desktop_research.text_rendition"

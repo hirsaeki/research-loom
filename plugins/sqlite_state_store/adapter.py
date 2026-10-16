@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+import sqlite3
+from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-import sqlite3
-from typing import Iterator
 
 from core.runtime.ports import RepositoryError
 
@@ -88,7 +88,7 @@ class SQLiteResearchStateRepository(
     def close(self) -> None:
         self._connection.close()
 
-    def __enter__(self) -> "SQLiteResearchStateRepository":
+    def __enter__(self) -> SQLiteResearchStateRepository:
         return self
 
     def __exit__(self, *_exc: object) -> None:

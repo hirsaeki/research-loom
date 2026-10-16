@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-from copy import deepcopy
-from dataclasses import replace
 import tempfile
 import unittest
+from copy import deepcopy
+from dataclasses import replace
+
+from runtime_fixtures import SCHEMA_VALIDATOR, finding, make_request, project, rq, seed_state
 
 from core.decision import HumanDecisionError, HumanDecisionService, with_response_digest
 from core.execution.testing import StaticClock
@@ -17,8 +19,6 @@ from core.runtime import (
 )
 from core.runtime.testing import InMemoryResearchStateRepository
 from plugins.local_decision_store import LocalHumanDecisionStore
-from runtime_fixtures import SCHEMA_VALIDATOR, finding, make_request, project, rq, seed_state
-
 
 CLOCK = StaticClock("2026-08-27T06:00:00Z")
 ACTOR = {"actor_id": "HUMAN-1", "actor_type": "human"}

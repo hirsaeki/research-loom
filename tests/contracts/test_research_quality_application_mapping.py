@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from pathlib import Path
 import unittest
+from pathlib import Path
 
 import yaml
-
 
 ROOT = Path(__file__).resolve().parents[2]
 POLICY = ROOT / "profiles/contracts/research-quality-policy.yaml"

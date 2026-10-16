@@ -1,15 +1,12 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import json
+from copy import deepcopy
 from pathlib import Path
 from unittest import mock
 
-from core.conversation import ConversationRuntimeError
-from plugins.local_application import LocalApplicationFacade
-from plugins.local_application.application import EffectiveResearchAttentionProvider
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
 import test_external_desktop_research_intake as intake
+from research_package_acceptance_support import ResearchPackageAcceptanceSupport
 from test_profile_generation_advancement import (
     GENERIC_NARRATIVE,
     OLD_EPS,
@@ -19,6 +16,10 @@ from test_profile_generation_advancement import (
     RESEARCH_STRICT_NEXT,
     _run_cli,
 )
+
+from core.conversation import ConversationRuntimeError
+from plugins.local_application import LocalApplicationFacade
+from plugins.local_application.application import EffectiveResearchAttentionProvider
 
 
 class ProfileAdvancementAttentionTests(ResearchPackageAcceptanceSupport):

@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from collections import Counter
-from contextlib import contextmanager
 import hashlib
+from collections import Counter
+from collections.abc import Iterator, Mapping
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Iterator, Mapping
+from typing import Any
 
 from core.execution.models import CapabilityRunRecord, ExecutionArtifactMetadata, RunStatus
 from core.execution.operational_trace import OperationalTraceEvent
@@ -12,6 +13,8 @@ from core.execution.operational_trace import OperationalTraceEvent
 from .operational_trace import LocalOperationalTraceStore as _BaseOperationalTraceStore
 from .store import (
     LocalExecutionStore as _BaseExecutionStore,
+)
+from .store import (
     LocalExecutionStoreError,
     LocalExecutionStoreIntegrityError,
     _canonical_json,

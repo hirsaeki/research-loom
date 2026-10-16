@@ -1,14 +1,15 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import json
+from copy import deepcopy
 from unittest.mock import patch
 
-from plugins.local_execution_store import result_extensions_for_run
-from plugins.local_application.finding_recovery_lineage import RecoveryFailure
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
 import test_external_desktop_research_attempt_lifecycle as attempt_lifecycle
 import test_issue134_writer_composition as issue134_writer
+from research_package_acceptance_support import ResearchPackageAcceptanceSupport
+
+from plugins.local_application.finding_recovery_lineage import RecoveryFailure
+from plugins.local_execution_store import result_extensions_for_run
 
 
 class HistoricalResultRecoveryTests(ResearchPackageAcceptanceSupport):

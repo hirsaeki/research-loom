@@ -1,16 +1,18 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from copy import deepcopy
 from threading import RLock
-from typing import Any, Mapping
+from typing import Any
 
 from core.conversation import ActionDefinition, ConversationRuntimeError
+
+from .delphi_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
+from .question_review_resume import append_question_review_candidates
 from .research_question_review import (
     ResearchQuestionReviewHandler,
     research_question_review_payload,
 )
-from .question_review_resume import append_question_review_candidates
-from .delphi_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
 
 _ACTION_REGISTRATION_LOCK = RLock()
 _ACTION_TYPE = "research_question.review"

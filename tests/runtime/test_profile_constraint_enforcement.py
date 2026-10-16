@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import tempfile
 import unittest
+from pathlib import Path
 
-from core.runtime import CommitReceipt, StateTransitionRejected, TransitionAction, TransitionKind
-from plugins.local_application.workspace import LocalWorkspace, LocalWorkspaceError
 from runtime_fixtures import make_request
 from test_research_question_adoption import _bootstrap_config
 
+from core.runtime import CommitReceipt, StateTransitionRejected, TransitionAction, TransitionKind
+from plugins.local_application.workspace import LocalWorkspace, LocalWorkspaceError
 
 ROOT = Path(__file__).resolve().parents[2]
 PROFILE_FIXTURE = ROOT / "profiles/fixtures/valid/effective-profile-set.json"

@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from unittest.mock import patch
 
-from plugins.local_application import LocalApplicationError, LocalApplicationFacade
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-import test_misco_writer_profile_application as writer_profile
 import test_external_desktop_research_intake as intake
+import test_misco_writer_profile_application as writer_profile
+from research_package_acceptance_support import ResearchPackageAcceptanceSupport
+
+from plugins.local_application import LocalApplicationError, LocalApplicationFacade
 
 ROOT = Path(__file__).resolve().parents[2]
 PROJECT_CONFIG = ROOT / "projects/misco-ai-2026/project-config.json"

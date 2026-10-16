@@ -1,18 +1,19 @@
 from __future__ import annotations
 
-from contextlib import closing
-
 import hashlib
-from pathlib import Path
 import sqlite3
 import tempfile
 import unittest
+from contextlib import closing
+from pathlib import Path
 from unittest.mock import patch
 
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade
 from tests.runtime.test_research_question_review import (
-    _workspace as make_workspace,
     _adopt_question,
+)
+from tests.runtime.test_research_question_review import (
+    _workspace as make_workspace,
 )
 
 

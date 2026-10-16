@@ -1,15 +1,15 @@
-from copy import deepcopy
 import base64
 import tempfile
 import unittest
 from unittest.mock import patch
 
-from plugins.local_application import LocalApplicationFacade, LocalApplicationError
+from research_package_acceptance_support import ResearchPackageAcceptanceSupport
+from test_issue256_native_publication import fixture_png
+from test_research_exhibits import make_app, state_signature
+
+from plugins.local_application import LocalApplicationError, LocalApplicationFacade
 from plugins.local_application.generated_explanation import matching_review, validate_explanation
 from plugins.research_visual_semantics import digest, validate_visual_package_bindings
-from test_research_exhibits import make_app, state_signature
-from test_issue256_native_publication import fixture_png
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 
 class GeneratedExplanationTests(unittest.TestCase):

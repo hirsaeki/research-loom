@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Any, Mapping
+from collections.abc import Mapping
+from datetime import UTC, datetime
+from typing import Any
 
 from core.execution.models import CapabilityRunRecord, ExecutionArtifactMetadata
 from core.execution.ports import ExecutionArtifactStore
@@ -16,7 +17,7 @@ def _is_utc(value: str) -> bool:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
         return False
-    return parsed.tzinfo is not None and parsed.utcoffset() == timezone.utc.utcoffset(parsed)
+    return parsed.tzinfo is not None and parsed.utcoffset() == UTC.utcoffset(parsed)
 
 
 def _looks_like_real_web_locator(locator: str) -> bool:

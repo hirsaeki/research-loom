@@ -1,25 +1,25 @@
 from __future__ import annotations
 
-from contextlib import nullcontext
 import errno
 import io
 import json
-import os
-from pathlib import Path
 import queue
 import shutil
 import subprocess
 import sys
 import threading
 import time
+from contextlib import nullcontext
+from pathlib import Path
 from unittest.mock import patch
 
+import test_profile_generation_advancement as profile
+from research_package_acceptance_support import ResearchPackageAcceptanceSupport
+
 from plugins.local_application import LocalApplicationFacade, LocalWorkspace
-from plugins.local_application.workspace import LocalWorkspaceError
 from plugins.local_application import profile_advancement as advancement
 from plugins.local_application import workspace_lock as locking
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-import test_profile_generation_advancement as profile
+from plugins.local_application.workspace import LocalWorkspaceError
 
 
 class Issue255WorkspaceLockTests(ResearchPackageAcceptanceSupport):

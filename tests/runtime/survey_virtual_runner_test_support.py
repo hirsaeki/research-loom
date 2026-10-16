@@ -1,17 +1,10 @@
 from __future__ import annotations
 
-from copy import deepcopy
-from pathlib import Path
 import tempfile
 import unittest
+from copy import deepcopy
+from pathlib import Path
 
-from plugins.local_application import (
-    LocalApplicationError,
-    LocalApplicationFacade,
-    LocalResearchApplication,
-)
-from plugins.local_survey_store import canonical_document_digest
-from plugins.survey_virtual_runner.response_validation import SurveyResponseValidator
 from runtime_fixtures import decision, project, rq, seed_state
 from test_survey_production import (
     NullResolver,
@@ -21,6 +14,14 @@ from test_survey_production import (
     profile_provider,
     state_signature,
 )
+
+from plugins.local_application import (
+    LocalApplicationError,
+    LocalApplicationFacade,
+    LocalResearchApplication,
+)
+from plugins.local_survey_store import canonical_document_digest
+from plugins.survey_virtual_runner.response_validation import SurveyResponseValidator
 
 METHOD_ID = "METHOD-SURVEY-1"
 PROTOCOL_ID = "PROTOCOL-SURVEY-1"

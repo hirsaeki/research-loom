@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from typing import Any, Mapping, TYPE_CHECKING
 import sqlite3
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any
 
 from core.runtime.ports import (
     AtomicCommitError,
@@ -25,7 +26,7 @@ if TYPE_CHECKING:
 
 class WriteMixin:
     def rebind_current_configuration(
-        self: "SQLiteResearchStateRepository",
+        self: SQLiteResearchStateRepository,
         project_ref: str,
         *,
         expected_project_config_digest: str,
@@ -118,7 +119,7 @@ class WriteMixin:
             ) from exc
 
     def commit(
-        self: "SQLiteResearchStateRepository",
+        self: SQLiteResearchStateRepository,
         bundle: CommitBundle,
         *,
         expected_head_snapshot_digest: str,
@@ -365,7 +366,7 @@ class WriteMixin:
             raise AtomicCommitError("SQLite persistence operation failed") from exc
 
     def _insert_immutable_object(
-        self: "SQLiteResearchStateRepository",
+        self: SQLiteResearchStateRepository,
         obj: Mapping[str, Any],
         *,
         created_commit_id: str | None,
@@ -413,7 +414,7 @@ class WriteMixin:
         )
 
     def _insert_snapshot_index(
-        self: "SQLiteResearchStateRepository",
+        self: SQLiteResearchStateRepository,
         snapshot: Mapping[str, Any],
         *,
         created_commit_id: str | None,
@@ -481,7 +482,7 @@ class WriteMixin:
             )
 
     def _insert_decision_index(
-        self: "SQLiteResearchStateRepository",
+        self: SQLiteResearchStateRepository,
         decision: Mapping[str, Any],
         *,
         created_commit_id: str | None,
@@ -517,7 +518,7 @@ class WriteMixin:
         )
 
     def _insert_new_lineage(
-        self: "SQLiteResearchStateRepository",
+        self: SQLiteResearchStateRepository,
         project_ref: str,
         lineage: LineageView,
         *,
@@ -567,7 +568,7 @@ class WriteMixin:
         )
 
     def _update_lineage(
-        self: "SQLiteResearchStateRepository",
+        self: SQLiteResearchStateRepository,
         project_ref: str,
         lineage: LineageView,
         *,
@@ -616,7 +617,7 @@ class WriteMixin:
         )
 
     def _assert_lineage_head(
-        self: "SQLiteResearchStateRepository",
+        self: SQLiteResearchStateRepository,
         lineage: LineageView,
     ) -> None:
         row = self._connection.execute(

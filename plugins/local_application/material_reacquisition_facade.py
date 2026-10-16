@@ -1,24 +1,25 @@
 from __future__ import annotations
 
-from contextlib import contextmanager
-from dataclasses import dataclass
-from datetime import datetime, timezone
 import errno
 import hashlib
 import http.client
 import ipaddress
 import os
-from pathlib import Path
 import shutil
 import socket
 import ssl
 import subprocess
-from threading import RLock, Thread
 import tempfile
 import time
-from typing import Any, Callable, Mapping
-from urllib.parse import urljoin, urlparse
 import uuid
+from collections.abc import Callable, Mapping
+from contextlib import contextmanager
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from pathlib import Path
+from threading import RLock, Thread
+from typing import Any
+from urllib.parse import urljoin, urlparse
 
 from core.conversation import ActionDefinition, ConversationRuntimeError, HarnessServiceResult
 from core.execution import CapabilityRunRecord, ExecutionIssue, RunLifecycleEvent, RunStatus
@@ -28,13 +29,11 @@ from plugins.local_execution_store import (
     child_runs_for_parent,
     diagnostics_for,
 )
-
 from plugins.local_payload_repair import REPAIRABLE
 
 from .facade import LocalApplicationError
 from .material_content_facade import _artifact_pair_for_capture
 from .material_recovery_facade import _canonical_artifact_binding_for_capture
-
 
 _ACTION_TYPE = "desktop_research.material.reacquire"
 _PAYLOAD_CONTRACT = "desktop-research-material-reacquisition@0.2.0"
@@ -108,7 +107,7 @@ def material_reacquisition_payload(payload: Mapping[str, Any]) -> dict[str, str]
 
 
 def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
 def _sha256(content: bytes) -> str:
@@ -535,9 +534,7 @@ class HistoricalMaterialReacquisitionService:
             )
         lock_root = self._workspace_root / ".research-loom" / "material-reacquisition-locks"
         lock_root.mkdir(parents=True, exist_ok=True)
-        token = hashlib.sha256(
-            f"{historical_run_id}\0{capture_id}\0{kind}".encode("utf-8")
-        ).hexdigest()
+        token = hashlib.sha256(f"{historical_run_id}\0{capture_id}\0{kind}".encode()).hexdigest()
         lock_path = lock_root / f"{token}.lock"
         fd = os.open(
             lock_path,

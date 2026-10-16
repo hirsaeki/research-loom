@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from copy import deepcopy
-from datetime import datetime, timezone
 import hashlib
+from copy import deepcopy
+from datetime import UTC, datetime
 from typing import Any
 
 import rfc8785
-
 
 REQUIRED_FORBIDDEN_ROLES = {
     "writer_material",
@@ -78,7 +77,7 @@ def _is_utc(value: str) -> bool:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
         return False
-    return parsed.tzinfo is not None and parsed.utcoffset() == timezone.utc.utcoffset(parsed)
+    return parsed.tzinfo is not None and parsed.utcoffset() == UTC.utcoffset(parsed)
 
 
 def context_semantic_error(

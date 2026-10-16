@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import replace
 import unittest
+from dataclasses import replace
+
+from runtime_fixtures import *
 
 from core.runtime import (
     ReductionError,
@@ -11,7 +13,6 @@ from core.runtime import (
     reduce_state,
 )
 from core.runtime.transition_models import CommitReceipt
-from runtime_fixtures import *
 
 
 class StateTransitionRuntimeTests(unittest.TestCase):
@@ -701,9 +702,7 @@ class StateTransitionRuntimeTests(unittest.TestCase):
         promoted = evidence(
             revision=1, evidence_kind="counterevidence", verification="unverified", mode="empirical"
         )
-        dec = decision(
-            "DEC-RECLASS", "evidence_reclassification", "reclassify", "evidence", "EVD-1"
-        )
+        decision("DEC-RECLASS", "evidence_reclassification", "reclassify", "evidence", "EVD-1")
         promoted["decision_ids"] = ["DEC-RECLASS"]
         _, svc = service(base)
         rejected = svc.apply(

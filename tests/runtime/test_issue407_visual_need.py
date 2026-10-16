@@ -1,8 +1,10 @@
 from copy import deepcopy
-from plugins.local_application import LocalApplicationFacade, LocalApplicationError
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
+
 import test_issue256_native_publication as native
+from research_package_acceptance_support import ResearchPackageAcceptanceSupport
 from test_research_exhibits import exhibit_payload, state_signature
+
+from plugins.local_application import LocalApplicationError, LocalApplicationFacade
 
 
 class VisualNeedTests(ResearchPackageAcceptanceSupport):
@@ -167,6 +169,7 @@ class VisualNeedTests(ResearchPackageAcceptanceSupport):
     def test_pending_explanation_cannot_resume_until_exact_review_is_selected(self):
         import base64
         from unittest.mock import patch
+
         from test_issue256_native_publication import fixture_png
 
         facade, case = self._prepared(matrix=True)

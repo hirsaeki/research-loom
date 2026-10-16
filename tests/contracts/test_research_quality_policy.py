@@ -6,7 +6,6 @@ from pathlib import Path
 
 import yaml
 from jsonschema import Draft202012Validator
-
 from research_quality_oracle import (
     apply_mutations,
     catalog_cross_reference_errors,

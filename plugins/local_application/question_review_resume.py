@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from copy import deepcopy
-from typing import Any, Mapping
+from typing import Any
 
 from core.conversation import ConversationRuntimeError
 from core.conversation.validation import WorkConversationValidator
@@ -9,7 +10,6 @@ from plugins.local_conversation_store.resume import (
     research_question_review_candidates_for_project,
 )
 from plugins.local_decision_store.resume import decision_requests_for_project
-
 
 _REVIEW_PRODUCER = "research_question.review@0.1.0"
 _REVIEW_OPERATIONS = {"REFINE", "SPLIT", "MERGE", "CLOSE"}

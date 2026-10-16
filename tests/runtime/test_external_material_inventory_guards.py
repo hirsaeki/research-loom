@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from contextlib import redirect_stdout
 import io
 import json
 import sqlite3
-from types import SimpleNamespace
-from threading import RLock
 import unittest
+from contextlib import redirect_stdout
+from threading import RLock
+from types import SimpleNamespace
 
 from plugins.local_application.cli import _emit_external_materials_human
 from plugins.local_application.facade import LocalApplicationError
@@ -18,7 +18,6 @@ from plugins.local_application.material_inventory_facade import (
 from plugins.local_execution_store.material_inventory import (
     external_capture_artifact_metadata_for_project,
 )
-
 
 _ORIGINAL_ROLE = "desktop_research.original_capture"
 _TEXT_ROLE = "desktop_research.text_rendition"

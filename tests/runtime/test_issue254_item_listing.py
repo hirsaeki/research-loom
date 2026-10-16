@@ -1,11 +1,14 @@
 from __future__ import annotations
 
-from contextlib import redirect_stdout
 import io
 import json
-from pathlib import Path
 import shutil
+from contextlib import redirect_stdout
+from pathlib import Path
 from unittest.mock import patch
+
+import issue80_writer_composition_suite as issue80
+from research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade
 from plugins.local_application.cli import main
@@ -16,8 +19,6 @@ from plugins.local_application.research_package_format import (
     without_digest,
 )
 from plugins.local_application.writer_composition_service import _digest_document
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-import issue80_writer_composition_suite as issue80
 
 
 class Issue254ItemListingTests(ResearchPackageAcceptanceSupport):

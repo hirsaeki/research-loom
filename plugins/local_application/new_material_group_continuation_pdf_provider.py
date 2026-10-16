@@ -4,8 +4,8 @@ from contextvars import ContextVar
 from copy import deepcopy
 from threading import RLock
 
-from .facade import LocalApplicationError
 from . import new_material_group_continuation_service as _group
+from .facade import LocalApplicationError
 from .material_reacquisition_facade import MaterialReacquisitionRetrievalError
 from .material_reacquisition_pypdf_provider import (
     _regenerate_text_rendition as _regenerate_pinned_text_rendition,

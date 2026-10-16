@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import base64
-from copy import deepcopy
 import mimetypes
+from collections.abc import Mapping
+from copy import deepcopy
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from core.runtime.ports import StaleHeadError
 from plugins.local_execution_store import (
@@ -18,8 +19,8 @@ from plugins.local_project_input_store import (
 )
 from plugins.sqlite_state_store.exhibit_guard import guard_research_state_head
 
-from .facade import LocalApplicationError
 from .external_attempt_lifecycle_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
+from .facade import LocalApplicationError
 
 _ROLES = {
     "theme",

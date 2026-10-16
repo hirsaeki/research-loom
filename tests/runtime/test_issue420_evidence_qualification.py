@@ -1,18 +1,19 @@
-from copy import deepcopy
 import inspect
 import json
-from pathlib import Path
 import tempfile
 import unittest
+from copy import deepcopy
+from pathlib import Path
 
+from runtime_fixtures import evidence, project, rq, seed_state, source
+from test_research_exhibits import NullResolver, profile_provider
+
+from core.conversation import ConversationRuntimeError
 from core.runtime import canonical_digest
 from plugins.local_application import LocalApplicationFacade, LocalResearchApplication
-from plugins.local_application.research_chart import quantitative_input
-from plugins.local_application.facade import LocalApplicationError
 from plugins.local_application.conversation_view import candidate_summary
-from core.conversation import ConversationRuntimeError
-from runtime_fixtures import project, rq, source, evidence, seed_state
-from test_research_exhibits import NullResolver, profile_provider
+from plugins.local_application.facade import LocalApplicationError
+from plugins.local_application.research_chart import quantitative_input
 
 
 class EvidenceQualificationTests(unittest.TestCase):

@@ -7,15 +7,17 @@ uncommitted directory and use the normal initializer at a new empty location.
 from __future__ import annotations
 
 import hashlib
-from itertools import islice
 import json
 import os
-from pathlib import Path
 import sqlite3
 import stat
-from typing import Any, Mapping
+from collections.abc import Mapping
+from itertools import islice
+from pathlib import Path
+from typing import Any
 
 from core.runtime import canonical_digest
+
 from .workspace import (
     BINDING_NAME,
     EFFECTIVE_PROFILE_SET_NAME,

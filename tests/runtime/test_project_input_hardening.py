@@ -1,15 +1,17 @@
 from __future__ import annotations
 
-from contextlib import nullcontext
-from pathlib import Path
 import tempfile
 import unittest
+from contextlib import nullcontext
+from pathlib import Path
 from unittest.mock import patch
 
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade
 from plugins.local_project_input_store import LocalProjectInputStore
 from tests.runtime.test_research_question_review import (
     _adopt_question,
+)
+from tests.runtime.test_research_question_review import (
     _workspace as make_workspace,
 )
 

@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from contextlib import redirect_stdout
 import io
 import json
+from contextlib import redirect_stdout
 from pathlib import Path
 
-from plugins.local_application import LocalApplicationFacade
-from plugins.local_application.cli import main as cli_main
 from research_package_acceptance_support import ResearchPackageAcceptanceSupport
+
+from plugins.local_application.cli import main as cli_main
 
 
 def _run_cli(argv):

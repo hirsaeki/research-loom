@@ -1,18 +1,19 @@
 from __future__ import annotations
 
-from copy import deepcopy
-from dataclasses import replace
 import json
 import unittest
+from copy import deepcopy
+from dataclasses import replace
 from unittest.mock import patch
+
+import survey_virtual_runner_test_support as vr
+import test_external_desktop_research_intake as intake
+import test_research_exhibits as exhibits
+from research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 from core.execution import CapabilityRunRecord, RunStatus
 from plugins.local_application import LocalApplicationError
 from plugins.local_application.research_package_service import verify_export_root
-import test_external_desktop_research_intake as intake
-import test_research_exhibits as exhibits
-import survey_virtual_runner_test_support as vr
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 
 class ResearchPackageAcceptanceTests(ResearchPackageAcceptanceSupport):

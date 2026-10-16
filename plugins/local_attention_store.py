@@ -1,17 +1,16 @@
 from __future__ import annotations
 
-from plugins.local_durable_store import require_optional_available, register_optional_path
-
-from copy import deepcopy
 import json
-from pathlib import Path
 import sqlite3
-from typing import Any, Mapping
+from collections.abc import Mapping
+from copy import deepcopy
+from pathlib import Path
+from typing import Any
 
 from jsonschema import Draft202012Validator, FormatChecker
 
 from core.conversation import canonical_digest
-
+from plugins.local_durable_store import register_optional_path, require_optional_available
 
 ROOT = Path(__file__).resolve().parents[1]
 ATTENTION_MAP_SCHEMA_PATH = ROOT / "projects/contracts/research-attention-map.schema.json"

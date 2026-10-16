@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from typing import Mapping
+from collections.abc import Mapping
 
 from plugins.local_attention_store import (
     LocalAttentionStoreError,

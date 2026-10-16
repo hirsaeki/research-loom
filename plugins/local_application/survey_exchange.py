@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import json
-from typing import Any, Mapping
+from collections.abc import Mapping
+from copy import deepcopy
+from typing import Any
 
 
 def missing_semantics(question: Mapping[str, Any]) -> dict[str, Any]:

@@ -3,11 +3,6 @@ from __future__ import annotations
 import tempfile
 import unittest
 
-from plugins.local_application import (
-    LocalApplicationError,
-    LocalApplicationFacade,
-    LocalResearchApplication,
-)
 from runtime_fixtures import project, rq, seed_state
 from test_survey_production import (
     NullResolver,
@@ -15,6 +10,12 @@ from test_survey_production import (
     instrument_payload,
     make_app,
     profile_provider,
+)
+
+from plugins.local_application import (
+    LocalApplicationError,
+    LocalApplicationFacade,
+    LocalResearchApplication,
 )
 
 

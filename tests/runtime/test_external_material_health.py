@@ -1,14 +1,15 @@
 from __future__ import annotations
 
-from pathlib import Path
 import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
+
+from research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 from plugins.desktop_research import DesktopResearchCaptureService
 from plugins.local_application import LocalApplicationFacade, LocalWorkspace
 from plugins.local_application.material_recovery_facade import HistoricalMaterialRecoveryService
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
 from tests.runtime.test_external_material_inventory import _capture, _create_running, _write_inputs
 
 
@@ -64,10 +65,6 @@ class ExternalMaterialHealthTests(unittest.TestCase):
                     if artifact.role == "desktop_research.original_capture"
                 ]
                 self.assertEqual(originals[0].storage_locator, originals[1].storage_locator)
-                history = [
-                    (item["run_id"], item["capture_id"], item["captured_at"])
-                    for item in healthy["captures"]
-                ]
                 store._locator_path(originals[0].storage_locator, originals[0].digest).unlink()
 
                 missing = facade.list_external_materials()["materials"][0]

@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import tempfile
 
+from test_work_conversation_runtime import input_document, profile_provider, state
+
 from core.conversation import ActionDraft
 from core.conversation.testing import SequenceIdProvider
 from core.execution.testing import StaticClock
 from plugins.local_application import LocalResearchApplication
-from test_work_conversation_runtime import input_document, profile_provider, state
 
 
 class QuestionTextResolver:

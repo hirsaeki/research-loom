@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Mapping
 from copy import deepcopy
 from math import isfinite
-from typing import Any, Mapping
+from typing import Any
 
 from .facade import LocalApplicationError
 
@@ -79,7 +80,7 @@ def _median(values):
 def _item_analysis(item, responses, answer_maps):
     answered = []
     missing = {state: 0 for state in MISSING_STATES}
-    for response, answers in zip(responses, answer_maps):
+    for response, answers in zip(responses, answer_maps, strict=False):
         answer = answers[item["item_id"]]
         if answer["state"] == "answered":
             answered.append((response["participant_id"], answer))

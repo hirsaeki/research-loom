@@ -1,26 +1,28 @@
 from __future__ import annotations
 
-from plugins.local_durable_store import require_optional_available, register_optional_path
-
-from contextlib import contextmanager
-from copy import deepcopy
 import hashlib
 import io
 import json
 import os
-from pathlib import Path
 import re
 import shutil
 import tempfile
-from urllib.parse import urldefrag
-from typing import Any, Mapping
-from xml.etree import ElementTree
 import zipfile
+from collections.abc import Mapping
+from contextlib import contextmanager
+from copy import deepcopy
+from pathlib import Path
+from typing import Any
+from urllib.parse import urldefrag
+from xml.etree import ElementTree
 
 from jsonschema import Draft202012Validator, FormatChecker
 
+from plugins.local_durable_store import register_optional_path, require_optional_available
+
 from .facade import LocalApplicationError
-from .publication_docx import docx_bytes as _docx_bytes, verify_native_docx
+from .publication_docx import docx_bytes as _docx_bytes
+from .publication_docx import verify_native_docx
 from .publication_exhibits import prepare_exhibits, render_input_digest
 from .publication_input import inspect_inputs
 
@@ -591,7 +593,7 @@ class PublicationReleaseService:
 
     @staticmethod
     def _issue(code: str, ref: str, section_id: str | None, blocking: bool) -> dict[str, Any]:
-        basis = f"{code}|{ref}|{section_id or ''}".encode("utf-8")
+        basis = f"{code}|{ref}|{section_id or ''}".encode()
         return {
             "defect_id": "PD-PUB-" + hashlib.sha256(basis).hexdigest()[:20],
             "code": code,
@@ -894,7 +896,7 @@ class PublicationReleaseService:
                 elif block["kind"] == "image":
                     if exhibit.get("generated_visual") is not None:
                         value = exhibit["content"]["value"]
-                        semantics = exhibit["visual_semantics"]
+                        exhibit["visual_semantics"]  # fail closed when semantics are missing
                         note = (
                             "Source: selected verified research data."
                             if "chart_spec" in value
@@ -1514,9 +1516,9 @@ class PublicationReleaseService:
 
     def finalize_pdf(self, build_id: str, input_: Mapping[str, Any]) -> Mapping[str, Any]:
         """Import a Host-rendered PDF into a new immutable, reviewed build."""
-        from .workspace import _safe_locator
-        from .publication_pdf import inspect_pdf, coverage_review
         from .publication_formal_report import inspect_formal
+        from .publication_pdf import coverage_review, inspect_pdf
+        from .workspace import _safe_locator
 
         allowed = {
             "pdf_path",
@@ -1986,7 +1988,7 @@ class PublicationReleaseService:
                             raise LocalApplicationError(
                                 "APPLICATION-PUBLICATION-INTEGRITY-001",
                                 "Publication recovery refuses to replace different existing bytes",
-                            )
+                            ) from None
             finally:
                 if fd is not None:
                     os.close(fd)

@@ -1,17 +1,18 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import json
+from copy import deepcopy
 from unittest.mock import patch
 
+import issue80_writer_composition_suite as composition_support
+import test_issue219_writer_round_trip as round_trip
+from research_package_acceptance_support import ResearchPackageAcceptanceSupport
+
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade
-from plugins.local_application.writer_round_trip_service import WriterRoundTripService
 from plugins.local_application.writer_composition_history_service import (
     WriterCompositionHistoryService,
 )
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-import test_issue219_writer_round_trip as round_trip
-import issue80_writer_composition_suite as composition_support
+from plugins.local_application.writer_round_trip_service import WriterRoundTripService
 
 
 class WriterRecoveryTests(ResearchPackageAcceptanceSupport):
@@ -137,6 +138,8 @@ class WriterRecoveryTests(ResearchPackageAcceptanceSupport):
     def test_bad_head_or_checkpoint_is_preserved_and_exact_backup_allows_retry(self):
         from plugins.local_application.writer_round_trip_service import (
             _digest_document as _digest,
+        )
+        from plugins.local_application.writer_round_trip_service import (
             _json_bytes,
         )
 
@@ -179,6 +182,8 @@ class WriterRecoveryTests(ResearchPackageAcceptanceSupport):
     def test_legacy_writer_history_recovers_unique_head_and_rejects_ambiguous_successors(self):
         from plugins.local_application.writer_round_trip_service import (
             _digest_document as _digest,
+        )
+        from plugins.local_application.writer_round_trip_service import (
             _json_bytes,
         )
 
@@ -345,7 +350,6 @@ class WriterRecoveryTests(ResearchPackageAcceptanceSupport):
         )
 
     def test_composition_staging_failure_has_public_diagnosis_and_retains_original_version(self):
-        import os
         import tempfile
         from pathlib import Path
 

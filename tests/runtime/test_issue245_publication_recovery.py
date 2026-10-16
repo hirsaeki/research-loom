@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import io
 import json
-from pathlib import Path
 import shutil
+from copy import deepcopy
 from unittest.mock import patch
+
+import test_issue220_publication_release as support
+from research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade
 from plugins.local_application.cli import main
@@ -13,8 +15,6 @@ from plugins.local_application.publication_release_service import (
     PublicationReleaseService,
     _json_bytes,
 )
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-import test_issue220_publication_release as support
 
 
 class PublicationRecoveryTests(ResearchPackageAcceptanceSupport):

@@ -1,12 +1,16 @@
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
+import tempfile
+import unittest
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeout
 from copy import deepcopy
 from pathlib import Path
 from threading import Barrier, Event
-import tempfile
-import unittest
 from unittest.mock import patch
+
+from runtime_fixtures import project, rq, seed_state
+from test_external_desktop_research_intake import NullResolver, profile_provider
 
 from plugins.desktop_research import with_context_extension_digest
 from plugins.local_application import (
@@ -15,8 +19,6 @@ from plugins.local_application import (
     LocalResearchApplication,
 )
 from plugins.local_execution_store import LocalExecutionStoreError
-from runtime_fixtures import project, rq, seed_state
-from test_external_desktop_research_intake import NullResolver, profile_provider
 
 
 class ExternalDesktopResearchAtomicityTests(unittest.TestCase):

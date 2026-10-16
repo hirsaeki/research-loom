@@ -1,23 +1,21 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import json
 import math
-from pathlib import Path
 import tempfile
 import unittest
+from pathlib import Path
 
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade
 from plugins.local_application.delphi_analysis import ANALYSIS_CONTRACT
 from tests.runtime.test_delphi_two_round_production import (
-    make_app,
+    approve_instrument,
     design,
     instrument,
+    make_app,
     response,
-    with_digest,
-    approve_instrument,
 )
-from tests.runtime.test_issue252_delphi_lifecycle import proposal, round_input, derived_from
+from tests.runtime.test_issue252_delphi_lifecycle import derived_from, proposal, round_input
 from tests.runtime.test_survey_production import state_signature
 
 

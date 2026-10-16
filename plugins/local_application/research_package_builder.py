@@ -1,19 +1,22 @@
 from __future__ import annotations
-from copy import deepcopy
-from datetime import datetime, timezone
+
 import json
-from typing import Any, Mapping
 import uuid
+from collections.abc import Mapping
+from copy import deepcopy
+from datetime import UTC, datetime
+from typing import Any
+
 import rfc8785
-from plugins.research_visual_semantics import validate_visual_package_bindings
-from plugins.desktop_research.normalization import source_id_for_capture
-from .research_chart import validate_chart_exhibit
-from .generated_explanation import validate_explanation
-from .visual_origin import verify_visual_origin
+
 from core.execution import RunStatus
 from core.runtime import canonical_digest as core_canonical_digest
+from plugins.desktop_research.normalization import source_id_for_capture
+from plugins.research_visual_semantics import validate_visual_package_bindings
+
 from .facade import LocalApplicationError
-from .workspace import workspace_document_path
+from .generated_explanation import validate_explanation
+from .research_chart import validate_chart_exhibit
 from .research_package_format import (
     ALLOWED,
     MAX_EXHIBITS,
@@ -38,6 +41,8 @@ from .research_package_format import (
     str_list,
     validate_schema,
 )
+from .visual_origin import verify_visual_origin
+from .workspace import workspace_document_path
 
 
 def _required_object_refs(obj: Mapping[str, Any]) -> list[tuple[str, str]]:
@@ -923,7 +928,7 @@ def build_package(service, value: Mapping[str, Any]) -> Mapping[str, Any]:
         "project_constraints": {"must_not_claim": project_must_not_claim(config)},
         "publication_requirements": {"requirement_refs": []},
         "provenance": {
-            "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "generated_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
             "generator_id": "research-loom.research-package",
             "tool_version": TOOL_VERSION,
             "input_digests": list(

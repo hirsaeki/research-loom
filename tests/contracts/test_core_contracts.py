@@ -7,8 +7,6 @@ from copy import deepcopy
 from pathlib import Path
 
 import yaml
-from jsonschema import Draft202012Validator
-
 from core_semantic_oracle import (
     canonical_state_bytes,
     core_reference_rule_names,
@@ -17,6 +15,7 @@ from core_semantic_oracle import (
     fixture_object_digest,
     snapshot_member_digest_violations,
 )
+from jsonschema import Draft202012Validator
 
 ROOT = Path(__file__).resolve().parents[2]
 SCHEMA_PATH = ROOT / "core/models/research-object.schema.json"

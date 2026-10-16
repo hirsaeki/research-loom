@@ -1,9 +1,9 @@
-from copy import deepcopy
 import json
-from pathlib import Path
 import unittest
+from copy import deepcopy
+from pathlib import Path
 
-from jsonschema import Draft202012Validator, FormatChecker
+from jsonschema import Draft202012Validator
 
 from plugins.survey_response.contracts import (
     CANONICAL_RESPONSE_SCHEMA_PATH,

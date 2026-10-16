@@ -2,15 +2,16 @@ from __future__ import annotations
 
 import json
 import os
-from pathlib import Path
 import subprocess
 import sys
+from pathlib import Path
 from unittest import skipUnless
 from unittest.mock import patch
 
+from research_package_acceptance_support import ResearchPackageAcceptanceSupport
+
 from plugins.local_application import LocalApplicationError
 from plugins.local_application.research_package_service import verify_export_root
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 
 @skipUnless(os.name == "nt", "Windows ACL regression")

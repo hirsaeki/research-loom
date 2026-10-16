@@ -2,16 +2,16 @@ from __future__ import annotations
 
 import hashlib
 import json
-from pathlib import Path
 import shutil
 import subprocess
 import sys
+from pathlib import Path
 
 import rfc8785
+import test_external_desktop_research_intake as intake
+from research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 from plugins.local_application.profile_resolution import resolve_effective_profile_set
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-import test_external_desktop_research_intake as intake
 
 ROOT = Path(__file__).resolve().parents[2]
 WRITER_MANIFEST = ROOT / "profiles/narrative/misco/profile.json"

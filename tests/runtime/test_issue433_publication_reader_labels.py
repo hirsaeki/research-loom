@@ -1,16 +1,17 @@
 """Synthetic renderer regressions; these do not constitute live visual QA."""
 
-from copy import deepcopy
 import hashlib
 import io
-from pathlib import Path
-from xml.etree import ElementTree as ET
 import unittest
 import zipfile
+from copy import deepcopy
+from pathlib import Path
+from xml.etree import ElementTree as ET
+
+from test_issue256_native_publication import fixture_png
 
 from plugins.local_application.publication_docx import W
 from plugins.local_application.publication_release_service import PublicationReleaseService
-from test_issue256_native_publication import fixture_png
 
 
 class ReaderPresentationTests(unittest.TestCase):

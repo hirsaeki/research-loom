@@ -6,7 +6,6 @@ from copy import deepcopy
 from unittest.mock import patch
 
 from core.conversation.validation import canonical_digest
-
 from plugins.local_application import (
     LocalApplicationError,
     LocalApplicationFacade,
@@ -20,7 +19,6 @@ from tests.runtime.survey_virtual_runner_test_support import (
     make_virtual_app,
 )
 from tests.runtime.test_survey_production import NullResolver, profile_provider, state_signature
-
 
 PROFILES = [
     {

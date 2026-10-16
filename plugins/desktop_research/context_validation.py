@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from jsonschema import Draft202012Validator, FormatChecker
 
@@ -10,7 +11,6 @@ from core.execution.models import ExecutionIssue
 from core.runtime.transition_models import StateView
 
 from .digest import canonical_extension_digest
-
 
 ROOT = Path(__file__).resolve().parents[2]
 DR = ROOT / "core" / "packages" / "desktop-research"

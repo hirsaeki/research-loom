@@ -8,6 +8,7 @@ from plugins.survey_virtual_runner.contracts import (
     document_digest,
     validate_research_method_context,
 )
+
 from .virtual_runner_input import _DEFAULT_LIMITS
 
 

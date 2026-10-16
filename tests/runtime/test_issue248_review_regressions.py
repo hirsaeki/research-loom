@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import io
 import json
-from pathlib import Path
 import sqlite3
 import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade, LocalWorkspace

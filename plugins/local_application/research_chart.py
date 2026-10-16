@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from copy import deepcopy
 import base64
 import hashlib
 import json
 import math
-from typing import Any, Mapping
+from collections.abc import Mapping
+from copy import deepcopy
+from typing import Any
 
 from core.runtime import canonical_digest
 

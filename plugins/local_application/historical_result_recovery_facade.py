@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import hashlib
-from typing import Any, Mapping
+from collections.abc import Mapping
+from copy import deepcopy
+from typing import Any
 
 from core.conversation import ActionDefinition, ConversationRuntimeError, HarnessServiceResult
 from core.runtime import canonical_digest
@@ -18,7 +19,6 @@ from . import historical_finding_recovery_facade as _base
 from .facade import LocalApplicationError, _jsonable
 from .finding_recovery_lineage import RecoveryFailure
 
-
 _REMATERIALIZATION_VERSION = "historical-desktop-result-rematerialization@0.1.0"
 _CANONICAL_FALLBACK_FAILURES = {
     "producer_candidate_not_found": ("missing", 0),
@@ -28,7 +28,7 @@ _CANONICAL_FALLBACK_FAILURES = {
 
 def _recovery_proposal_id(run_id: str, source_digest: str) -> str:
     token = hashlib.sha256(
-        f"{_REMATERIALIZATION_VERSION}:{run_id}:{source_digest}".encode("utf-8")
+        f"{_REMATERIALIZATION_VERSION}:{run_id}:{source_digest}".encode()
     ).hexdigest()[:24]
     return f"SDP-HGR-{token}"
 

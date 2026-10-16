@@ -1,25 +1,27 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import json
+from collections.abc import Mapping
+from copy import deepcopy
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from plugins.local_application.facade import (
-    LocalApplicationError,
     _AUTHORITY_PAYLOAD_FIELDS,
     _INGRESS_FIELDS,
+    LocalApplicationError,
 )
 from plugins.local_application.survey_response_facade import (
     LocalApplicationFacade as SurveyResponseApplicationFacade,
 )
+
 from .virtual_runner_binding import build_survey_virtual_extension
-from .workspace import workspace_document_path
+from .virtual_runner_execute import VirtualRunnerExecuteMixin
 from .virtual_runner_input import _payload
+from .virtual_runner_inspection import VirtualRunnerInspectionMixin
 from .virtual_runner_method_context import build_method_context
 from .virtual_runner_resolve import resolve_virtual_inputs
-from .virtual_runner_execute import VirtualRunnerExecuteMixin
-from .virtual_runner_inspection import VirtualRunnerInspectionMixin
+from .workspace import workspace_document_path
 
 ROOT = Path(__file__).resolve().parents[2]
 DESCRIPTOR_PATH = ROOT / "core/packages/virtual-runner/virtual-runner-capability-descriptor.json"

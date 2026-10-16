@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import re
+from collections.abc import Mapping
+from copy import deepcopy
 from types import SimpleNamespace
-from typing import Any, Mapping
+from typing import Any
 
 from .digest import canonical_extension_digest
 from .normalization import DesktopResearchNormalizer as _BaseNormalizer
 from .result_validation import DesktopResearchResultValidator as _BaseValidator
-
 
 _VALIDATION_WHITESPACE = re.compile(r"[ \t\r\n]+")
 _LARGE_ORIGINAL_PREFIX = "external-original://sha256/"

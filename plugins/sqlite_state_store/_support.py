@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import json
 import math
-from pathlib import Path
 import re
 import sqlite3
-from typing import Any, Iterable, Mapping
+from collections.abc import Iterable, Mapping
+from pathlib import Path
+from typing import Any
 
 from core.runtime.ports import AtomicCommitError, RepositoryError
 from core.runtime.transition_models import (

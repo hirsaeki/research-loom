@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 import tempfile
-from threading import Barrier, Lock, Thread
 import unittest
+from pathlib import Path
+from threading import Barrier, Lock, Thread
 from unittest.mock import patch
+
+from test_local_execution_store import trace_run
 
 from core.execution import RunLifecycleEvent, RunStatus
 from plugins.local_execution_store import (
@@ -13,7 +15,6 @@ from plugins.local_execution_store import (
     LocalExecutionStoreConfig,
     LocalExecutionStoreError,
 )
-from test_local_execution_store import trace_run
 
 
 class LocalExecutionStoreConcurrencySecurityTests(unittest.TestCase):

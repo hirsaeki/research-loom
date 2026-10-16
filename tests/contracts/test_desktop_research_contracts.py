@@ -1,16 +1,14 @@
 from __future__ import annotations
 
 import ast
-from copy import deepcopy
 import hashlib
 import json
 import unittest
+from copy import deepcopy
 from pathlib import Path
 
 import rfc8785
 import yaml
-from jsonschema import Draft202012Validator
-
 from desktop_research_oracle import (
     canonical_digest,
     context_semantic_error,
@@ -18,6 +16,7 @@ from desktop_research_oracle import (
     expected_result_extension_digest,
     result_semantic_error,
 )
+from jsonschema import Draft202012Validator
 
 ROOT = Path(__file__).resolve().parents[2]
 ORACLE_PATH = ROOT / "tests/contracts/desktop_research_oracle.py"

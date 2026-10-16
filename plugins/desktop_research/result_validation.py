@@ -1,13 +1,14 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
 import json
+from collections.abc import Mapping
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 from urllib.parse import urlparse
 
-from jsonschema import Draft202012Validator, FormatChecker
 import yaml
+from jsonschema import Draft202012Validator, FormatChecker
 
 from .attempts import (
     UNSUCCESSFUL_OUTCOMES,
@@ -31,7 +32,7 @@ def _utc(value: str) -> bool:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
         return False
-    return parsed.tzinfo is not None and parsed.utcoffset() == timezone.utc.utcoffset(parsed)
+    return parsed.tzinfo is not None and parsed.utcoffset() == UTC.utcoffset(parsed)
 
 
 def _exact(locator: str) -> bool:

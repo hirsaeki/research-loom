@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
-from copy import deepcopy
 import io
 import json
 import re
 import zipfile
+from copy import deepcopy
 from xml.etree import ElementTree as ET
 
 from .facade import LocalApplicationError
-from .publication_docx import W, R, PKG, _paragraph
+from .publication_docx import PKG, R, W, _paragraph
 
 NS = {"w": W}
 V = "urn:schemas-microsoft-com:vml"

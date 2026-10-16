@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from pathlib import Path
 import sqlite3
 import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 import test_issue92_external_submission_preflight as issue92
+
 from plugins.local_execution_store.capture_query import artifacts_for_capture_ids
 
 

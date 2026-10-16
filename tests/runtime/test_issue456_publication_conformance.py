@@ -1,12 +1,15 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import io
 import json
-from pathlib import Path
 import unittest
 import zipfile
+from copy import deepcopy
+from pathlib import Path
 from xml.etree import ElementTree as ET
+
+import test_external_desktop_research_intake as intake
+import test_misco_publication_profile_application as publication_tests
 
 from plugins.local_application import LocalApplicationError
 from plugins.local_application.publication_docx import W, docx_bytes, verify_native_docx
@@ -14,8 +17,6 @@ from plugins.local_application.publication_release_service import (
     _editorial_status,
     _publication_policy,
 )
-import test_external_desktop_research_intake as intake
-import test_misco_publication_profile_application as publication_tests
 
 
 class EditorialEvidenceTests(unittest.TestCase):

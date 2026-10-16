@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import json
 import unittest
+from copy import deepcopy
 from pathlib import Path
 
 import yaml
 from jsonschema import Draft202012Validator, FormatChecker
-
 from virtual_runner_oracle import (
     ERROR_IDS,
     canonical_digest,

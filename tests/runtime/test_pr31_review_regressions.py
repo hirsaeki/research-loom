@@ -18,7 +18,6 @@ from plugins.local_attention_resume import (
 )
 from plugins.local_attention_store import LocalAttentionStoreError, attention_event_digest
 
-
 _MAP_DIGEST = "sha256:" + "a" * 64
 
 

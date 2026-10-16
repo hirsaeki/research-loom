@@ -1,14 +1,15 @@
 from __future__ import annotations
 
-from dataclasses import replace
 import unittest
+from dataclasses import replace
 from unittest.mock import patch
+
+import test_research_package_acceptance as acceptance
 
 from core.execution import CapabilityRunRecord, RunStatus
 from plugins.local_application import LocalApplicationError
 from plugins.local_application.research_package_format import MAX_OUTPUT_BYTES
 from plugins.local_application.research_package_service import verify_export_root
-import test_research_package_acceptance as acceptance
 
 
 class ResearchPackageReviewFixTests(unittest.TestCase):

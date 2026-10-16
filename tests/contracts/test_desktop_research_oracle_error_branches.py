@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import json
 import unittest
+from copy import deepcopy
 
 from desktop_research_oracle import context_semantic_error, result_semantic_error
 from test_desktop_research_contracts import (

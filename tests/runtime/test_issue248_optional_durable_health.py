@@ -1,16 +1,16 @@
 from __future__ import annotations
 
-import importlib
-from contextlib import closing
 import hashlib
+import importlib
 import io
 import json
-from pathlib import Path
 import sqlite3
 import subprocess
 import sys
 import tempfile
 import unittest
+from contextlib import closing
+from pathlib import Path
 from unittest.mock import patch
 
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade, LocalWorkspace

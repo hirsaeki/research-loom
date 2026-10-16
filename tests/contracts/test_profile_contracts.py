@@ -1,32 +1,28 @@
 from __future__ import annotations
 
-import json
 import random
 import unittest
 
 import rfc8785
 import yaml
 from jsonschema import Draft202012Validator
-
 from semantic_oracle import (
     ROOT,
     canonical_compose_constraints,
     canonical_constraint_source_key,
     canonical_json_bytes,
     canonicalize_set_like,
+    constraint_composition_error,
     core_compatibility_error,
     effective_identity_error,
     effective_provenance_error,
-    key_of,
     keyver_of,
     load_candidate,
     load_json,
     requested_presence_error,
     resolve_candidates,
-    satisfies,
     sha256_bytes,
     strengthening_error,
-    constraint_composition_error,
 )
 
 PROFILE_SCHEMA_PATH = ROOT / "profiles/contracts/profile-manifest.schema.json"

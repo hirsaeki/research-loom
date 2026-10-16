@@ -6,11 +6,13 @@ existing Delphi transaction commits the receipt and its exact Instrument togethe
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from copy import deepcopy
-from typing import Any, Mapping
+from typing import Any
 from uuid import uuid4
 
 from plugins.local_delphi_store import LocalDelphiStoreError, canonical_digest, registry_digest
+
 from .facade import LocalApplicationError
 from .survey_facade import _snapshot
 

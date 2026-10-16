@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import json
+from collections.abc import Mapping
+from copy import deepcopy
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from core.conversation import CapabilityMaterialization, canonical_digest
 from core.execution import (
@@ -15,10 +16,11 @@ from core.runtime import CapabilityNormalizationBoundary
 from plugins.local_application.facade import LocalApplicationError, _jsonable
 from plugins.local_survey_store import LocalSurveyStoreError
 from plugins.survey_virtual_runner.adapter import StructuralSurveyVirtualRunnerAdapter
+from plugins.survey_virtual_runner.contracts import SurveyVirtualRunnerContextValidator
 from plugins.survey_virtual_runner.llm_adapter import LlmSurveyVirtualRunnerAdapter
 from plugins.survey_virtual_runner.llm_backend import OpenAIResponsesVirtualRespondentBackend
-from plugins.survey_virtual_runner.contracts import SurveyVirtualRunnerContextValidator
 from plugins.survey_virtual_runner.normalization import SurveyVirtualRunnerNormalizer
+
 from .virtual_runner_input import _payload
 
 ROOT = Path(__file__).resolve().parents[2]

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from copy import deepcopy
 from dataclasses import asdict
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 from .ports import AtomicCommitError, IdempotencyConflictError, StaleHeadError
 from .transition_models import CommitBundle, CommitReceipt, LineageView, StateView, canonical_digest

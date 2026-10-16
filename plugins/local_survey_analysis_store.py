@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from plugins.local_durable_store import require_optional_available, register_optional_path
-
-from copy import deepcopy
 import json
-from pathlib import Path
 import sqlite3
-from typing import Any, Mapping
+from collections.abc import Mapping
+from copy import deepcopy
+from pathlib import Path
+from typing import Any
 
+from plugins.local_durable_store import register_optional_path, require_optional_available
 from plugins.survey_analysis import validate_aggregate_result, validate_analysis_spec
 
 SURVEY_ANALYSIS_STORE_SCHEMA_VERSION = "0.1.0"

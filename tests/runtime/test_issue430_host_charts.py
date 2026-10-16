@@ -1,30 +1,31 @@
 """Synthetic backend controls, never live Host/Human visual QA."""
 
-from copy import deepcopy
 import base64
 import hashlib
 import io
 import json
-from pathlib import Path
 import tempfile
 import unittest
-from unittest.mock import patch
 import zipfile
+from copy import deepcopy
+from pathlib import Path
+from unittest.mock import patch
 
+import issue80_writer_composition_suite as compositions
 import rfc8785
+import test_issue219_writer_round_trip as writer
+import test_issue405_research_charts as charts
+from research_package_acceptance_support import ResearchPackageAcceptanceSupport
+from test_issue256_native_publication import fixture_png
+from test_research_exhibits import state_signature
+
 from core.runtime import canonical_digest
 from plugins.local_application import LocalApplicationError
 from plugins.local_application.generated_explanation import matching_review
-from plugins.local_application.publication_exhibits import prepare_exhibits
 from plugins.local_application.publication_docx import docx_bytes, verify_native_docx
+from plugins.local_application.publication_exhibits import prepare_exhibits
 from plugins.local_application.research_chart import validate_chart_exhibit
 from plugins.research_visual_semantics import validate_visual_package_bindings
-import test_issue405_research_charts as charts
-from test_issue256_native_publication import fixture_png
-from test_research_exhibits import state_signature
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-import issue80_writer_composition_suite as compositions
-import test_issue219_writer_round_trip as writer
 
 
 class HostChartTests(unittest.TestCase):

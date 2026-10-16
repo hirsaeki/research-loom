@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-from copy import deepcopy
-import hashlib
 import json
-from pathlib import Path
 import tempfile
 import unittest
+from copy import deepcopy
+from pathlib import Path
 
-import rfc8785
+from research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 from core.conversation import ConversationRuntimeError
 from plugins.local_application import LocalApplicationFacade, LocalWorkspace, LocalWorkspaceError
@@ -16,7 +15,6 @@ from plugins.local_application.profile_advancement import (
     prepare_profile_generation,
     profile_history,
 )
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 ROOT = Path(__file__).resolve().parents[2]
 PROJECT_CONFIG = ROOT / "projects/misco-ai-2026/project-config.json"

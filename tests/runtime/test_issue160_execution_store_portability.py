@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import hashlib
-from pathlib import Path
 import shutil
 import tempfile
 import unittest
+from pathlib import Path
 
 from core.execution import CapabilityRunRecord, RunLifecycleEvent, RunStatus
 from plugins.local_execution_store import (
@@ -14,7 +14,6 @@ from plugins.local_execution_store import (
     external_capture_artifact_metadata_for_project,
     open_read_only_execution_store,
 )
-
 
 _ORIGINAL = "desktop_research.original_capture"
 _RENDITION = "desktop_research.text_rendition"

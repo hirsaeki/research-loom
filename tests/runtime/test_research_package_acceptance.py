@@ -1,15 +1,16 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import json
 import os
 import subprocess
+from copy import deepcopy
 from unittest.mock import patch
+
+import research_package_acceptance_baseline as baseline
+import test_external_desktop_research_intake as intake
 
 from plugins.local_application import LocalApplicationError
 from plugins.local_application.research_package_service import verify_export_root
-import research_package_acceptance_baseline as baseline
-import test_external_desktop_research_intake as intake
 
 
 class ResearchPackageAcceptanceTests(baseline.ResearchPackageAcceptanceTests):

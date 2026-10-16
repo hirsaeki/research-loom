@@ -1,19 +1,21 @@
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
-from pathlib import Path
-from threading import Event
 import tempfile
 import unittest
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeout
+from pathlib import Path
+from threading import Event
 from unittest.mock import patch
 
-from plugins.local_application import LocalApplicationFacade, LocalResearchApplication
-from plugins.local_application.facade import LocalApplicationError
-from plugins.local_execution_store import LocalExecutionStoreConfig
 from test_external_desktop_research_intake import NullResolver, profile_provider
 from test_external_desktop_research_intake_atomicity import (
     ExternalDesktopResearchAtomicityTests,
 )
+
+from plugins.local_application import LocalApplicationFacade, LocalResearchApplication
+from plugins.local_application.facade import LocalApplicationError
+from plugins.local_execution_store import LocalExecutionStoreConfig
 
 
 class DesktopResearchRetentionReviewFixTests(unittest.TestCase):

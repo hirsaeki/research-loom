@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from collections import Counter
 import hashlib
 import itertools
 import json
 import re
+from collections import Counter
 from pathlib import Path
 
 import rfc8785
@@ -175,7 +175,7 @@ def effective_provenance_error(eps, manifest_catalog=None):
 
     catalog = fixture_manifest_catalog() if manifest_catalog is None else manifest_catalog
     expected_edges = []
-    for intro_pin, intro in selected.items():
+    for intro_pin in selected:
         manifest = catalog.get(intro_pin)
         if manifest is None:
             return "PROFILE-EFFECTIVE-PROVENANCE-001"
@@ -390,7 +390,7 @@ def resolve_candidates(candidates, requests, core_contracts):
     ]
     solutions = []
     for combo in itertools.product(*choices):
-        assignment = dict(zip(keys, combo))
+        assignment = dict(zip(keys, combo, strict=False))
         if assignment_valid(assignment, requests, core_contracts):
             solutions.append(assignment)
     if not solutions:

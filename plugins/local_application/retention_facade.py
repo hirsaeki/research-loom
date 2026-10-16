@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from copy import deepcopy
-from typing import Any, Mapping
+from typing import Any
 
 from core.execution import RunStatus
 from plugins.desktop_research import DesktopResearchCaptureService
@@ -17,11 +18,10 @@ from .external_desktop_facade import (
     _required_string,
 )
 from .facade import LocalApplicationError
-from .material_inventory_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
 from .material_content_facade import ExternalMaterialContentService
-from .material_recovery_facade import ensure_material_recovery_action
+from .material_inventory_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
 from .material_reacquisition_pypdf_provider import ensure_material_reacquisition_action
-
+from .material_recovery_facade import ensure_material_recovery_action
 
 _LARGE_ORIGINAL_PREFIX = "external-original://sha256/"
 

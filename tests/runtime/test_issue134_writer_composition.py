@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import json
 
-from plugins.local_application import LocalApplicationFacade
 from research_package_acceptance_support import ResearchPackageAcceptanceSupport
+
+from plugins.local_application import LocalApplicationFacade
 
 
 class Issue134WriterCompositionRecoveryTests(ResearchPackageAcceptanceSupport):

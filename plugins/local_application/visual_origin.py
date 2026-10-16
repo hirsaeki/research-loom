@@ -1,6 +1,6 @@
 """Verify exact generation context, independently of model-provided provenance."""
 
-from typing import Mapping
+from collections.abc import Mapping
 
 from core.runtime import canonical_digest
 from plugins.research_visual_semantics import digest

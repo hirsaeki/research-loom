@@ -2,8 +2,9 @@
 
 import unittest
 
-from plugins.local_application import LocalApplicationError
 from research_package_acceptance_support import ResearchPackageAcceptanceSupport
+
+from plugins.local_application import LocalApplicationError
 from plugins.local_application.research_package_format import (
     MAX_MATERIALS,
     MAX_OBJECTS,
@@ -50,8 +51,8 @@ class ResearchPackageIntegrationBoundsTests(unittest.TestCase):
 class ResearchPackageBulkAttachmentVerificationTests(ResearchPackageAcceptanceSupport):
     def test_sixty_material_renditions_verify_without_disabling_integrity(self):
         """Use the actual detached verifier with a >4 MiB, 60-body package."""
-        from copy import deepcopy
         import json
+        from copy import deepcopy
 
         from plugins.local_application.research_package_format import (
             digest_bytes,

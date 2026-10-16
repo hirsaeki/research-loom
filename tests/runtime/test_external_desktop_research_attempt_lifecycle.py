@@ -1,11 +1,19 @@
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
-from pathlib import Path
-from threading import Event
 import tempfile
 import unittest
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeout
+from pathlib import Path
+from threading import Event
 from unittest.mock import patch
+
+from test_external_desktop_research_intake import (
+    ExternalDesktopResearchIntakeTests,
+    NullResolver,
+    golden_submission,
+    profile_provider,
+)
 
 from plugins.desktop_research.attempts import reconstruct_attempts
 from plugins.local_application import (
@@ -14,12 +22,6 @@ from plugins.local_application import (
     LocalResearchApplication,
 )
 from plugins.local_application.facade import LocalApplicationFacade as PreAttemptGuardFacade
-from test_external_desktop_research_intake import (
-    ExternalDesktopResearchIntakeTests,
-    NullResolver,
-    golden_submission,
-    profile_provider,
-)
 
 
 class ExternalDesktopResearchAttemptLifecycleTests(unittest.TestCase):

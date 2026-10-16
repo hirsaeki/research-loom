@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-from pathlib import Path
 import inspect
 import tempfile
 import unittest
+from pathlib import Path
+
+from test_research_question_adoption import _init_workspace, _proposal_input
 
 from core.runtime import canonical_digest
 from plugins.local_application import LocalApplicationFacade
 from plugins.local_application.cli import build_parser
-from test_research_question_adoption import _init_workspace, _proposal_input
-
 
 ROOT = Path(__file__).resolve().parents[2]
 SKILL_ROOT = ROOT / "skills" / "research-conversation"

@@ -1,4 +1,7 @@
-import hashlib, json, re, unittest
+import hashlib
+import json
+import re
+import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -17,7 +20,7 @@ def items(doc, tokens=None):
     tokens = tokens or doc.get("source_tokens", {})
     out = []
     for values in doc["rules"]:
-        row = dict(zip(doc["columns"], values))
+        row = dict(zip(doc["columns"], values, strict=False))
         if "source" in row:
             row["source"] = tokens.get(row["source"], row["source"])
         if row.get("alias_sources"):
@@ -30,7 +33,7 @@ def source_rows(index):
     out = []
     for name in index["source_shards"]:
         doc = load(name)
-        out += [dict(zip(doc["columns"], row)) for row in doc["rows"]]
+        out += [dict(zip(doc["columns"], row, strict=False)) for row in doc["rows"]]
     return out
 
 

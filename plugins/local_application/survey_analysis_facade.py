@@ -1,27 +1,28 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import hashlib
 import json
+from collections.abc import Mapping
+from copy import deepcopy
 from pathlib import Path
 from threading import RLock
-from typing import Any, Mapping
+from typing import Any
 
 from core.conversation import (
     ActionDefinition,
     ConversationRuntimeError,
     HarnessServiceResult,
 )
-from plugins.local_survey_analysis_store import (
-    LocalSurveyAnalysisStore,
-    LocalSurveyAnalysisStoreError,
-)
-from plugins.local_survey_response_store import LocalSurveyResponseStoreError
 from plugins.local_execution_store import (
     LocalExecutionStoreError,
     bind_controlled_import_root,
     read_controlled_file,
 )
+from plugins.local_survey_analysis_store import (
+    LocalSurveyAnalysisStore,
+    LocalSurveyAnalysisStoreError,
+)
+from plugins.local_survey_response_store import LocalSurveyResponseStoreError
 from plugins.survey_analysis import (
     aggregate_dataset,
     analysis_spec_content_digest,
@@ -30,12 +31,13 @@ from plugins.survey_analysis import (
     stable_identity,
     validate_analysis_spec,
 )
+
 from .facade import LocalApplicationError
 from .survey_facade import _snapshot
 from .survey_response_capture import _real_response_provenance
 from .survey_validation import input_object, required_string
-from .virtual_runner_facade import LocalApplicationFacade as VirtualRunnerApplicationFacade
 from .survey_virtual_pretest_inspection import SurveyVirtualPretestInspectionMixin
+from .virtual_runner_facade import LocalApplicationFacade as VirtualRunnerApplicationFacade
 
 _STORE_NAME = "survey-analysis-registry.sqlite3"
 _ANALYSIS_SPEC_CAPTURE_FIELDS = {"dataset_id", "dataset_digest", "analysis_items"}

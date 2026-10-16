@@ -1,15 +1,17 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import hashlib
+from collections.abc import Mapping
+from copy import deepcopy
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 import rfc8785
 
 from core.runtime.ports import StaleHeadError
 from plugins.local_survey_store import LocalSurveyStore, LocalSurveyStoreError, registry_digest
 from plugins.sqlite_state_store.exhibit_guard import guard_research_state_head
+
 from .facade import LocalApplicationError
 from .material_import_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
 from .survey_exchange import exchange_projection, markdown_projection

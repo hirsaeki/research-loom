@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import argparse
+import unittest
 from io import BytesIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
-import unittest
 from unittest.mock import patch
 
 from scripts import writer_reader_quality_probe as probe

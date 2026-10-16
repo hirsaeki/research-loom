@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import json
 import sqlite3
+from copy import deepcopy
 
 from core.conversation import ConversationRuntimeError, canonical_digest
-
 
 _RQ_PRODUCERS = (
     "research_question.propose@0.1.0",

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 from enum import Enum
-from typing import Any, Mapping
+from typing import Any
 
 
 class RunStatus(str, Enum):
@@ -73,7 +74,7 @@ class CapabilityRunRecord:
     failure: ExecutionIssue | None = None
     provenance: Mapping[str, Any] = field(default_factory=dict)
 
-    def with_status(self, status: RunStatus, **changes: Any) -> "CapabilityRunRecord":
+    def with_status(self, status: RunStatus, **changes: Any) -> CapabilityRunRecord:
         return replace(self, status=status, **changes)
 
 

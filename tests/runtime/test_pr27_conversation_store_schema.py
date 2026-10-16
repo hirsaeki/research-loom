@@ -1,18 +1,17 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import hashlib
 import json
-from pathlib import Path
 import sqlite3
 import tempfile
 import unittest
+from copy import deepcopy
+from pathlib import Path
 
 import rfc8785
 
 from plugins.local_application import LocalWorkspace, LocalWorkspaceError
 from plugins.local_conversation_store import LocalConversationStore, LocalConversationStoreError
-
 
 ROOT = Path(__file__).resolve().parents[2]
 PROJECT_CONFIG = ROOT / "projects/fixtures/valid/generic-project-config.json"

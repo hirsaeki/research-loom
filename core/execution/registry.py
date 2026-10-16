@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 from .models import CapabilityExecutionError, ExecutionFailureCode
 from .ports import CapabilityAdapter

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import hashlib
-from typing import Any, Mapping
+from collections.abc import Mapping
+from copy import deepcopy
+from typing import Any
 
 from core.execution import RunStatus
 from plugins.local_conversation_store import find_state_delta_proposals_by_provenance_run_id
@@ -17,7 +18,11 @@ from .facade import LocalApplicationError
 from .material_content_facade import _artifact_pair_for_capture
 from .material_reacquisition_facade import (
     _CAPABILITY_ID as _MRA_CAPABILITY_ID,
+)
+from .material_reacquisition_facade import (
     _NEW_MATERIAL_ROLES,
+)
+from .material_reacquisition_facade import (
     _RESULT_DIAGNOSTIC as _MRA_RESULT_DIAGNOSTIC,
 )
 
@@ -28,13 +33,13 @@ _CONTINUATION_CORRELATION_LIMIT = 16
 
 def _continuation_conversation_id(reacquisition_run_id: str) -> str:
     token = hashlib.sha256(
-        f"new-material-continuation\0{reacquisition_run_id}".encode("utf-8")
+        f"new-material-continuation\0{reacquisition_run_id}".encode()
     ).hexdigest()[:24]
     return f"CONV-NMV-{token}"
 
 
 def _new_id(old: str, reacquisition_run_id: str) -> str:
-    digest = hashlib.sha256(f"{reacquisition_run_id}\0{old}".encode("utf-8")).hexdigest()[:24]
+    digest = hashlib.sha256(f"{reacquisition_run_id}\0{old}".encode()).hexdigest()[:24]
     return f"NMV-{digest}"
 
 

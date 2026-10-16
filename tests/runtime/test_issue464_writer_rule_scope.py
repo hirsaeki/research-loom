@@ -1,20 +1,20 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import hashlib
 import json
-from pathlib import Path
 import shutil
+from copy import deepcopy
+from pathlib import Path
 
+import issue80_writer_composition_suite as composition_tests
 import rfc8785
+import test_external_desktop_research_intake as intake
+import test_misco_writer_profile_application as legacy
+from research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 from plugins.local_application import LocalApplicationError
 from plugins.local_application.profile_resolution import resolve_effective_profile_set
 from plugins.local_application.writer_round_trip_service import WriterRoundTripService
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-import test_external_desktop_research_intake as intake
-import test_misco_writer_profile_application as legacy
-import issue80_writer_composition_suite as composition_tests
 
 ROOT = Path(__file__).resolve().parents[2]
 MANIFEST = ROOT / "profiles/narrative/misco/1.2.0/profile.json"
@@ -69,7 +69,7 @@ class Issue464WriterRuleScopeTests(ResearchPackageAcceptanceSupport):
         response = legacy.MiscoWriterProfileApplicationTests._response.__func__(
             cls, input_doc, response_id="WR-464"
         )
-        for draft, scope in zip(response["sections"], input_doc["sections"]):
+        for draft, scope in zip(response["sections"], input_doc["sections"], strict=False):
             draft["citations"] = deepcopy(
                 scope["section_input"]["section_contract"]["citation_requirements"]
             )

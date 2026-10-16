@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Mapping, Sequence
+from typing import Any
 
+from ._validation_common import _dedupe_issues, _issue
 from .transition_models import (
     StateTransitionRequest,
     StateView,
@@ -12,7 +14,6 @@ from .transition_models import (
     ValidationStage,
     canonical_digest,
 )
-from ._validation_common import _issue, _dedupe_issues
 
 _PROTECTED_RESEARCH_KINDS = {"research_question", "method", "finding", "recommendation"}
 _RESEARCH_CONTENT_KINDS = {

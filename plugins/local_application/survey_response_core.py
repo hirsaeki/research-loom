@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from copy import deepcopy
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from plugins.local_survey_response_store import LocalSurveyResponseStore
 from plugins.local_survey_store import LocalSurveyStoreError
 from plugins.survey_response import normalize_response
+
 from .facade import LocalApplicationError
 from .survey_validation import input_object, required_string
 

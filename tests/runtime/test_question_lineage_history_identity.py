@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import unittest
 
+from runtime_fixtures import decision, make_request, project, rq, seed_state, service
+
 from core.runtime import TransitionAction, TransitionKind
 from core.runtime.transition_models import CommitReceipt
-from runtime_fixtures import decision, make_request, project, rq, seed_state, service
 
 
 class QuestionLineageHistoryIdentityTests(unittest.TestCase):

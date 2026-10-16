@@ -1,16 +1,22 @@
 from __future__ import annotations
+
+import hashlib
+import json
+from collections.abc import Mapping
 from copy import deepcopy
-import hashlib, json
 from pathlib import Path, PureWindowsPath
-from typing import Any, Mapping
-from jsonschema import Draft202012Validator, FormatChecker
+from typing import Any
+
 import rfc8785
-from plugins.research_visual_semantics import validate_visual_package_bindings
+from jsonschema import Draft202012Validator, FormatChecker
+
 from plugins.desktop_research.normalization import source_id_for_capture
 from plugins.local_research_exhibit_store import (
     LocalResearchExhibitStoreError,
     validate_visual_target,
 )
+from plugins.research_visual_semantics import validate_visual_package_bindings
+
 from .facade import LocalApplicationError
 
 SCHEMA_VERSION = "0.2.0"

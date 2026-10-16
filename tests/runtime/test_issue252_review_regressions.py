@@ -1,8 +1,8 @@
 """Regression controls for the first PR #280 review generation."""
 
-from copy import deepcopy
 import tempfile
 import unittest
+from copy import deepcopy
 
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade
 from plugins.local_application.delphi_analysis import analyze_round

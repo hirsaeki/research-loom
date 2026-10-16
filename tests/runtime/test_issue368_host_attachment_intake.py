@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import hashlib
-from pathlib import Path
 import shutil
 import tempfile
 import unittest
+from copy import deepcopy
+from pathlib import Path
 
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade
 from tests.runtime.test_external_desktop_research_intake import golden_submission

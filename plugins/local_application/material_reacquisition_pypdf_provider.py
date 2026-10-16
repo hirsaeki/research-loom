@@ -2,14 +2,13 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 from threading import RLock, Thread
-import tempfile
 from typing import Any
 
 from . import material_reacquisition_facade as _base
 from .facade import LocalApplicationError
-
 
 _PYPDF_VERSION = "6.16.2"
 _PYPDF_BOUND_EXIT = 86

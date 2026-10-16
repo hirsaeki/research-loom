@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import asdict
 import sqlite3
-from typing import Any, TYPE_CHECKING
+from dataclasses import asdict
+from typing import TYPE_CHECKING, Any
 
 from core.runtime.ports import RepositoryError
 
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 class DiagnosticsMixin:
     def integrity_issues(
-        self: "SQLiteResearchStateRepository",
+        self: SQLiteResearchStateRepository,
     ) -> tuple[str, ...]:
         """Return deterministic diagnostics; never repair persisted state."""
 
@@ -223,7 +223,7 @@ class DiagnosticsMixin:
         return tuple(sorted(set(issues)))
 
     def debug_state(
-        self: "SQLiteResearchStateRepository",
+        self: SQLiteResearchStateRepository,
     ) -> dict[str, Any]:
         """Stable test diagnostic, not an authoritative mutation API."""
 

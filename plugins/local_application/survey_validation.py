@@ -1,13 +1,15 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import json
+from collections.abc import Mapping
+from copy import deepcopy
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from jsonschema import Draft202012Validator, FormatChecker
 
 from plugins.local_survey_store import canonical_document_digest
+
 from .facade import LocalApplicationError
 
 HARNESS_OWNED_FIELDS = {

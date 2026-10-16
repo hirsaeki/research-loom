@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import hashlib
 import json
-from pathlib import Path
 import unittest
+from copy import deepcopy
+from pathlib import Path
 
-from jsonschema import Draft202012Validator, FormatChecker
 import rfc8785
+from jsonschema import Draft202012Validator, FormatChecker
 
 ROOT = Path(__file__).resolve().parents[2]
 RESPONSE_SCHEMA = ROOT / "core/packages/survey/survey-response.schema.json"

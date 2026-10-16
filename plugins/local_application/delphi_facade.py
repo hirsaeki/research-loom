@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from copy import deepcopy
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from plugins.local_delphi_store import (
     LocalDelphiStore,
@@ -10,8 +11,7 @@ from plugins.local_delphi_store import (
     canonical_digest,
     registry_digest,
 )
-from .facade import LocalApplicationError
-from .delphi_instrument_approval import DelphiInstrumentApproval, verify_approval
+
 from .delphi_analysis import (
     ANALYSIS_CONTRACT,
     analyze_round,
@@ -20,6 +20,8 @@ from .delphi_analysis import (
     validate_numeric_answer,
     validate_scales,
 )
+from .delphi_instrument_approval import DelphiInstrumentApproval, verify_approval
+from .facade import LocalApplicationError
 from .survey_analysis_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
 from .survey_facade import _snapshot
 from .survey_validation import schema_validate, validate_digest, validate_rqs

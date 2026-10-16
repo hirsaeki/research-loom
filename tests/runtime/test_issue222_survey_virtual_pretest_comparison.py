@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import tempfile
 import unittest
+from copy import deepcopy
 
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade
 from plugins.local_application.survey_virtual_pretest_inspection import (

@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import sqlite3
+from collections.abc import Mapping
+from pathlib import Path
 from threading import RLock
-from typing import Any, Mapping
-
+from typing import Any
 
 _REQUIRED_COLUMNS = {
     "documents": {"message_type", "document_id", "digest", "payload_json"},

@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import base64
 import hashlib
-from typing import Mapping
+from collections.abc import Mapping
 
 from plugins.research_visual_semantics import SEMANTIC_CHANGES, digest
+
 from .publication_exhibits import png_size
 
 EXPLANATION_SCHEMA = "research-generated-explanation/v1"

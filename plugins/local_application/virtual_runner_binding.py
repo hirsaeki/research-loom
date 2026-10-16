@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from copy import deepcopy
 
+from core.conversation.validation import canonical_digest
 from plugins.local_application.facade import LocalApplicationError
 from plugins.survey_virtual_runner.contracts import document_digest, validate_survey_context
 from plugins.survey_virtual_runner.llm_backend import prompt_template_pin
-from core.conversation.validation import canonical_digest
 
 
 def build_survey_virtual_extension(

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import os
-import socket
 import unittest
 from unittest.mock import patch
 
@@ -163,7 +162,7 @@ class SurveyLlmBackendTests(unittest.TestCase):
                 )
         self.assertEqual(missing.exception.code, "AUTH_CONFIGURATION_MISSING")
 
-        transport = _Transport([socket.timeout("slow"), socket.timeout("still slow")])
+        transport = _Transport([TimeoutError("slow"), TimeoutError("still slow")])
         backend = OpenAIResponsesVirtualRespondentBackend(
             transport=transport, credential_env="SURVEY_TEST_KEY"
         )

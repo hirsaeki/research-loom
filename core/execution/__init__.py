@@ -6,6 +6,7 @@ from .context_extensions import (
     CapabilityContextExtensionStore,
     CapabilityContextExtensionValidator,
 )
+from .context_service import CapabilityExecutionService
 from .models import (
     AuthorizationDecision,
     CapabilityExecutionError,
@@ -25,7 +26,6 @@ from .models import (
 from .operational_trace import OperationalTraceEvent, OperationalTraceStore
 from .registry import CapabilityRegistry
 from .resource_access import BoundedResourceAccess
-from .context_service import CapabilityExecutionService
 from .validation import CanonicalCapabilityExecutionValidator
 
 __all__ = [

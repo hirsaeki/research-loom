@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+
 import rfc8785
 
 CANONICAL_FUNCTIONS = {"method_design", "instrument_design", "execute", "analyze"}

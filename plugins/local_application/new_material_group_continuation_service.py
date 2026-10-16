@@ -1,25 +1,26 @@
 from __future__ import annotations
 
+import hashlib
+from collections.abc import Mapping
 from contextlib import ExitStack
 from copy import deepcopy
-import hashlib
-from typing import Any, Mapping
+from typing import Any
 
 from core.execution import RunStatus
 from plugins.desktop_research import DesktopResearchAttemptRecorder, DesktopResearchCaptureService
 from plugins.desktop_research.attempts import reconstruct_attempts
 
+from . import new_material_continuation_admission as admission
 from .facade import LocalApplicationError
 from .material_content_facade import _artifact_pair_for_capture
 from .new_material_continuation_service import (
+    _CONTINUATION_LOCK,
     NewMaterialContinuationService,
     _BaseLocalApplicationFacade,
-    _CONTINUATION_LOCK,
-    _research_result_for_new_run,
     _render_reacquired_html_rendition,
+    _research_result_for_new_run,
     _target_lock,
 )
-from . import new_material_continuation_admission as admission
 
 _GROUP_LIMIT = 16
 _GROUP_RELATION = "new_material_version_group_continuation"

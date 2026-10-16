@@ -1,22 +1,22 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import json
-from pathlib import Path
 import tempfile
-
 import unittest
+from copy import deepcopy
+from pathlib import Path
+
+import test_issue92_external_submission_preflight as external_tests
+import test_issue134_argument_proposal as argument_tests
+import test_issue135_recommendation_proposal as recommendation_tests
+from test_research_question_adoption import _init_workspace, _proposal_input, _run_cli
+from test_research_question_batch_adoption import _batch_input, _question
+from test_research_question_review import _adopt_question, _workspace
 
 from core.conversation import ConversationRuntimeError
 from core.decision import request_digest
 from core.runtime import canonical_digest
 from plugins.local_application import LocalApplicationFacade
-import test_issue134_argument_proposal as argument_tests
-import test_issue135_recommendation_proposal as recommendation_tests
-import test_issue92_external_submission_preflight as external_tests
-from test_research_question_adoption import _init_workspace, _proposal_input, _run_cli
-from test_research_question_batch_adoption import _batch_input, _question
-from test_research_question_review import _adopt_question, _workspace
 
 
 def _canonical_request(value: dict) -> dict:

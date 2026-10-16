@@ -1,17 +1,18 @@
 from __future__ import annotations
 
-from plugins.local_durable_store import require_optional_available, register_optional_path
-
 import base64
 import binascii
-from datetime import datetime, timezone
 import hashlib
 import json
 import os
-from pathlib import Path
 import sqlite3
 import tempfile
-from typing import Any, Mapping
+from collections.abc import Mapping
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
+
+from plugins.local_durable_store import register_optional_path, require_optional_available
 
 _SCHEMA_VERSION = 2
 _BLOB_HASH_CHUNK_BYTES = 1024 * 1024
@@ -26,7 +27,7 @@ class LocalProjectInputStoreError(RuntimeError):
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
 def _encode_cursor(registered_at: str, input_id: str) -> str:
@@ -215,7 +216,7 @@ class LocalProjectInputStore:
         digest = "sha256:" + hashlib.sha256(content).hexdigest()
         identity_seed = (
             f"{project_id}\0{role}\0{digest}\0{lineage_ref}\0{snapshot_id}\0{snapshot_digest}"
-        ).encode("utf-8")
+        ).encode()
         input_id = "PIN-" + hashlib.sha256(identity_seed).hexdigest()[:24]
         registered_at = _now()
         self._store_verified_blob(content, digest)
@@ -399,7 +400,7 @@ class LocalProjectInputStore:
         return checked_path(self.root, self._blob_path(item["content_digest"]))
 
     def diagnose_content(self, input_id: str, project_id: str) -> dict[str, Any]:
-        from plugins.local_payload_repair import PayloadRepairError, REPAIRABLE, inspect_payload
+        from plugins.local_payload_repair import REPAIRABLE, PayloadRepairError, inspect_payload
 
         try:
             item = self.get(input_id, project_id)

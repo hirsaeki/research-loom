@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from contextvars import ContextVar
 from html.parser import HTMLParser
 from threading import RLock
-from typing import Any, Mapping
+from typing import Any
 
-from .facade import LocalApplicationError
 from . import new_material_continuation_service as _base
+from .facade import LocalApplicationError
 
 _INSTALL_LOCK = RLock()
 _INSTALLED = False

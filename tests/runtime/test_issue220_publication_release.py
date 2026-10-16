@@ -1,20 +1,19 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import json
-from pathlib import Path
 import threading
-from unittest.mock import patch
 import zipfile
+from copy import deepcopy
+from pathlib import Path
+from unittest.mock import patch
 
+import issue80_writer_composition_suite as writer_comp_support
 from jsonschema import Draft202012Validator, FormatChecker
+from research_package_acceptance_support import ResearchPackageAcceptanceSupport
+from test_issue219_writer_round_trip import Issue219WriterRoundTripTests
 
 from plugins.local_application import LocalApplicationError
 from plugins.local_application.publication_release_service import PublicationReleaseService
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-from test_issue219_writer_round_trip import Issue219WriterRoundTripTests
-import issue80_writer_composition_suite as writer_comp_support
-
 
 ROOT = Path(__file__).resolve().parents[2]
 PREVIEW_SCHEMA = ROOT / "core/packages/writer-publication/publication-preview.schema.json"

@@ -1,14 +1,14 @@
 """Production local execution trace, artifact, resource, and auxiliary stores."""
 
-from .retention import LocalExecutionStore as _RetentionLocalExecutionStore
-from .diagnosed_artifact_read import DiagnosedArtifactReadMixin
 from .atomic import LocalOperationalTraceStore
 from .context_extensions import LocalCapabilityContextExtensionStore
+from .diagnosed_artifact_read import DiagnosedArtifactReadMixin
 from .inspection import artifact_metadata_for, diagnostics_for, latest_diagnostic_for
 from .intake import bind_controlled_import_root, read_controlled_file
 from .material_inventory import external_capture_artifact_metadata_for_project
-from .recovery import result_extensions_for_run
 from .read_only import ReadOnlyLocalExecutionStore, open_read_only_execution_store
+from .recovery import result_extensions_for_run
+from .retention import LocalExecutionStore as _RetentionLocalExecutionStore
 from .status import child_runs_for_parent, pending_runs_for_project, recent_runs_for_project
 from .store import (
     LocalExecutionStoreConfig,

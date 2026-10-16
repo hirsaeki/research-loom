@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+
 import rfc8785
 
 ERROR_IDS = {

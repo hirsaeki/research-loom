@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import hashlib
-from typing import Mapping
+from collections.abc import Mapping
 
 from .store import LocalExecutionStoreIntegrityError
 from .verified_artifact_read import VerifiedArtifactReadMixin

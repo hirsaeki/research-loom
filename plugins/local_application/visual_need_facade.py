@@ -1,10 +1,11 @@
 """Late visual needs return through existing Package/Composition operations."""
 
+from collections.abc import Mapping
 from copy import deepcopy
-from typing import Mapping
 
 from core.runtime import canonical_digest
 from plugins.research_visual_semantics import SEMANTIC_CHANGES
+
 from .exhibit_facade import _string_list
 from .facade import LocalApplicationError
 from .generated_explanation import matching_review, validate_explanation

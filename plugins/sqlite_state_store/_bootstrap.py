@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 class BootstrapMixin:
     @bootstrap_write
     def initialize_from_validated_state_view(
-        self: "SQLiteResearchStateRepository",
+        self: SQLiteResearchStateRepository,
         seed: StateView,
     ) -> None:
         """Bootstrap an empty DB from an already validated PR20 StateView."""

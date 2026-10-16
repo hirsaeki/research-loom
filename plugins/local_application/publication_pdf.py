@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import io
 import re
-from typing import Mapping
-from pypdf import PdfReader
+from collections.abc import Mapping
+
 from jsonschema import FormatChecker
+from pypdf import PdfReader
 
 from .facade import LocalApplicationError
 
@@ -54,7 +55,10 @@ def inspect_pdf(data: bytes, *, required_text=(), page_ranges=None, expected_par
 
             texts.append(page.extract_text(visitor_text=visit) or "")
             footer_texts.append("".join(footer))
-        normalized = lambda value: re.sub(r"\s+", "", value)
+
+        def normalized(value):
+            return re.sub(r"\s+", "", value)
+
         joined = normalized("\n".join(texts))
         for value in required_text:
             if normalized(value) and normalized(value) not in joined:
