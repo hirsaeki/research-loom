@@ -5,6 +5,7 @@ import os
 import unittest
 from unittest.mock import patch
 
+import plugins.local_application  # noqa: F401  # load first: survey_virtual_runner import cycle (#490)
 from plugins.survey_virtual_runner.llm_backend import (
     OpenAIResponsesVirtualRespondentBackend,
     VirtualRespondentBackendError,
