@@ -23,9 +23,21 @@ def _load_guard():
     return module
 
 
-def _write_transcript(path: Path, user_prompt: str) -> None:
+SKILL_LOAD_EVENT = {
+    "type": "response_item",
+    "payload": {
+        "type": "function_call",
+        "name": "shell",
+        "arguments": json.dumps({"command": ["cat", "skills/research-conversation/SKILL.md"]}),
+    },
+}
+
+
+def _write_transcript(path: Path, user_prompt: str, *, skill_loaded: bool = True) -> None:
+    """Write a minimal Codex rollout; research sessions load the Skill first."""
     items = [
         {"type": "session_meta", "payload": {"id": "test"}},
+        *([SKILL_LOAD_EVENT] if skill_loaded else []),
         {
             "type": "response_item",
             "payload": {
@@ -253,6 +265,55 @@ class CodexStopGuardContractTests(unittest.TestCase):
                 )
                 self.assertEqual(loads.call_count, 1)
 
+    def test_development_session_without_skill_load_is_not_guarded(self):
+        guard = _load_guard()
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop(guard.GUARD_OVERRIDE_ENV, None)
+            transcript = Path(tmp) / "rollout.jsonl"
+            _write_transcript(transcript, "Fix the failing CI job.", skill_loaded=False)
+            payload = {
+                "stop_hook_active": False,
+                "transcript_path": str(transcript),
+                "last_assistant_message": "Updated research-loom and skills/writer/SKILL.md.",
+            }
+            blocked, labels, diagnostic = guard.evaluate(payload)
+            self.assertFalse(blocked)
+            self.assertTrue(labels)
+            self.assertFalse(diagnostic)
+
+    def test_windows_skill_path_in_transcript_marks_research_session(self):
+        guard = _load_guard()
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop(guard.GUARD_OVERRIDE_ENV, None)
+            transcript = Path(tmp) / "rollout.jsonl"
+            transcript.write_text(
+                json.dumps(
+                    {"payload": {"output": "D:\\repo\\skills\\research-conversation\\SKILL.md"}}
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            self.assertTrue(guard.research_conversation_active(str(transcript)))
+
+    def test_missing_transcript_keeps_guard_active(self):
+        guard = _load_guard()
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop(guard.GUARD_OVERRIDE_ENV, None)
+            self.assertTrue(guard.research_conversation_active(None))
+            self.assertTrue(guard.research_conversation_active("does-not-exist.jsonl"))
+
+    def test_environment_override_forces_guard_on_or_off(self):
+        guard = _load_guard()
+        with tempfile.TemporaryDirectory() as tmp:
+            dev = Path(tmp) / "dev.jsonl"
+            _write_transcript(dev, "Refactor the CLI.", skill_loaded=False)
+            research = Path(tmp) / "research.jsonl"
+            _write_transcript(research, "この問いを採用してよい？")
+            with mock.patch.dict(os.environ, {guard.GUARD_OVERRIDE_ENV: "on"}):
+                self.assertTrue(guard.research_conversation_active(str(dev)))
+            with mock.patch.dict(os.environ, {guard.GUARD_OVERRIDE_ENV: "off"}):
+                self.assertFalse(guard.research_conversation_active(str(research)))
+
     def test_stop_hook_active_prevents_rewrite_loop(self):
         guard = _load_guard()
         payload = {
@@ -291,6 +352,7 @@ class CodexStopGuardContractTests(unittest.TestCase):
             }
             env = os.environ.copy()
             env["RESEARCH_LOOM_CODEX_HOOK_LOG"] = str(log)
+            env.pop("RESEARCH_LOOM_STOP_GUARD", None)
             proc = subprocess.run(
                 [sys.executable, str(HOOK_SCRIPT)],
                 input=json.dumps(payload, ensure_ascii=False),
@@ -305,6 +367,7 @@ class CodexStopGuardContractTests(unittest.TestCase):
             record = json.loads(log.read_text(encoding="utf-8").splitlines()[-1])
             self.assertTrue(record["blocked"])
             self.assertEqual(record["hook_event_name"], "Stop")
+            self.assertTrue(record["guard_active"])
 
 
 if __name__ == "__main__":

@@ -74,7 +74,7 @@ No separate script dependency manifest or lockfile exists.
 
 ## Developer checks
 
-Developer tools live in the opt-in `dev` dependency group, so runtime provisioning above stays runtime-only. CI runs the same checks:
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full development guide; coding agents should also read [AGENTS.md](AGENTS.md). Developer tools live in the opt-in `dev` dependency group, so runtime provisioning above stays runtime-only. CI runs the same checks:
 
 ```bash
 uv sync --frozen --group dev

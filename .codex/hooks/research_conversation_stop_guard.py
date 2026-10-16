@@ -71,6 +71,12 @@ _DIAGNOSTIC_REQUEST_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"(?i)why.{0,40}(?:confirmation|question|answer).{0,30}(?:required|needed)"),
 )
 
+# The guard enforces the research-conversation Skill's output contract, so it
+# applies to sessions that loaded that Skill. Repository development sessions
+# do not load it (see skills/research-conversation/references/host-bootstrap.md).
+_SKILL_LOAD_MARKER = re.compile(r"(?i)skills[/\\]+research-conversation[/\\]+SKILL\.md")
+GUARD_OVERRIDE_ENV = "RESEARCH_LOOM_STOP_GUARD"
+
 _ENGLISH_NEGATION_BEFORE_REQUEST = re.compile(
     r"(?i)(?:\bdo\s+not\b|\bdon['’]?t\b|\bshould\s+not\b|\bshouldn['’]?t\b|"
     r"\bnever\b|\bno\s+need\s+to\b|\bwithout\b)\s*$"
@@ -155,6 +161,30 @@ def latest_user_prompt(transcript_path: str | None) -> str:
     return ""
 
 
+def research_conversation_active(transcript_path: str | None) -> bool:
+    """Whether the guard applies to this session.
+
+    ``RESEARCH_LOOM_STOP_GUARD=on|off`` overrides detection. Otherwise the guard
+    stands down only when a readable transcript shows the research-conversation
+    Skill was never loaded; a missing or unreadable transcript keeps it active.
+    """
+    override = os.environ.get(GUARD_OVERRIDE_ENV, "").strip().lower()
+    if override in {"on", "1", "true"}:
+        return True
+    if override in {"off", "0", "false"}:
+        return False
+    if not transcript_path:
+        return True
+    path = Path(transcript_path)
+    if not path.is_file():
+        return True
+    try:
+        with path.open("r", encoding="utf-8", errors="replace") as handle:
+            return any(_SKILL_LOAD_MARKER.search(line) for line in handle)
+    except OSError:
+        return True
+
+
 def _request_is_negated(prompt: str, match: re.Match[str]) -> bool:
     prefix = prompt[max(0, match.start() - 32) : match.start()]
     if _ENGLISH_NEGATION_BEFORE_REQUEST.search(prefix):
@@ -187,6 +217,8 @@ def evaluate(payload: dict[str, Any]) -> tuple[bool, list[str], bool]:
         return False, [], False
     if bool(payload.get("stop_hook_active")):
         return False, labels, False
+    if not research_conversation_active(payload.get("transcript_path")):
+        return False, labels, False
     prompt = latest_user_prompt(payload.get("transcript_path"))
     diagnostic = is_explicit_diagnostic_request(prompt)
     return not diagnostic, labels, diagnostic
@@ -206,6 +238,7 @@ def _append_probe_log(
         "blocked": blocked,
         "labels": labels,
         "diagnostic_exemption": diagnostic,
+        "guard_active": research_conversation_active(payload.get("transcript_path")),
     }
     try:
         path = Path(target)
