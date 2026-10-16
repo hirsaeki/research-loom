@@ -623,7 +623,7 @@ class WriterRoundTripService:
         return result
 
     @staticmethod
-    def _validate_rule_results(row: Mapping[str, Any], expected_rule_ids: set[str], metadata: Mapping[str, Mapping[str, Any]]) -> None:
+    def _validate_rule_results(row: Mapping[str, Any], expected_rule_ids: set[str], metadata: Mapping[str, Mapping[str, Any]], *, scope: str = "section") -> None:
         def refuse(message: str) -> None:
             raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-PROFILE-REVIEW-001", message)
 
@@ -651,7 +651,7 @@ class WriterRoundTripService:
                     refuse("Writer result cannot replace semantic/editorial review with structural presence")
             elif item["method"] != "unevaluated":
                 refuse("Unevaluated Writer result must identify its unperformed review")
-            if review["scope"] == "document" and outcome not in {"unevaluated", "not_applicable"}:
+            if scope == "section" and review["scope"] == "document" and outcome not in {"unevaluated", "not_applicable"}:
                 refuse("Section review cannot establish a document-scoped result")
         if violations != set(row.get("violated_rule_ids", [])):
             refuse("Group violations must match rule results")
@@ -707,6 +707,10 @@ class WriterRoundTripService:
                         raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-REFERENCE-001", "Writer response omits an explicitly required citation: " + str(required["source_ref"]))
             violations_by_section[section_id] = self._validate_profile_review(draft, scope)
         known_refs = self._known_package_refs(package)
+        document_violations = {
+            rule_id for row in response.get("document_review", {}).get("profile_review", [])
+            for rule_id in row.get("violated_rule_ids", [])
+        }
         feedback_rule_ids_by_section: dict[str, set[str]] = {}
         for issue in response.get("feedback", []):
             target_type = issue["target_type"]
@@ -722,16 +726,162 @@ class WriterRoundTripService:
                 raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-REFERENCE-001", "Writer feedback references material outside the pinned Research Package: " + ", ".join(unknown_support))
             profile_rule_ids = {str(x) for x in issue.get("profile_rule_ids", []) if isinstance(x, str)}
             if profile_rule_ids:
-                if target_type != "section":
+                section_rule_ids = profile_rule_ids - document_violations
+                if section_rule_ids and target_type != "section":
                     raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-PROFILE-REVIEW-001", "Profile rule feedback must target a section")
                 allowed = violations_by_section.get(target_id, set())
-                if not profile_rule_ids <= allowed:
+                if not section_rule_ids <= allowed:
                     raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-PROFILE-REVIEW-001", "Writing Feedback names Profile rules not reported as violated for the section")
-                feedback_rule_ids_by_section.setdefault(target_id, set()).update(profile_rule_ids)
+                feedback_rule_ids_by_section.setdefault(target_id, set()).update(section_rule_ids)
         for section_id, violated_rule_ids in violations_by_section.items():
             missing = sorted(violated_rule_ids - feedback_rule_ids_by_section.get(section_id, set()))
             if missing:
                 raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-PROFILE-REVIEW-001", "Writer Profile violations require Writing Feedback for exact rule IDs: " + ", ".join(missing))
+
+    @staticmethod
+    def _document_target(receipt: Mapping[str, Any], sections: list[Mapping[str, Any]]) -> dict[str, Any]:
+        # input_digest already includes the exact package, composition (roles/order)
+        # and Profile pins. Review metadata and revision identity are not content.
+        projection = {
+            "projection_version": "1.0.0",
+            "input_digest": receipt["input_digest"],
+            "sections": [
+                {key: deepcopy(row[key]) for key in ("section_id", "content", "citations", "exhibit_refs")}
+                for row in sections
+            ],
+        }
+        return {"target_digest": canonical_digest(projection), "material": projection}
+
+    @classmethod
+    def _document_plan(cls, receipt: Mapping[str, Any]) -> tuple[dict[str, set[str]], dict[str, Mapping[str, Any]]]:
+        plan: dict[str, set[str]] = {}
+        metadata: dict[str, Mapping[str, Any]] = {}
+        for section in receipt["sections"]:
+            rules = cls._writer_rule_metadata(section)
+            for rule_id, review in rules.items():
+                if rule_id in metadata and metadata[rule_id] != review:
+                    raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-PROFILE-REVIEW-001", "conflicting document rule metadata")
+                metadata[rule_id] = review
+            for review_id, rule_ids in cls._writer_review_plan(section).items():
+                selected = {rule_id for rule_id in rule_ids if rules.get(rule_id, {}).get("scope") == "document"}
+                if selected:
+                    plan.setdefault(review_id, set()).update(selected)
+        return plan, metadata
+
+    @classmethod
+    def _validate_document_review(cls, response: Mapping[str, Any], receipt: Mapping[str, Any], sections: list[Mapping[str, Any]]) -> None:
+        review = response.get("document_review")
+        if review is None:
+            return
+        def refuse(message: str) -> None:
+            raise LocalApplicationError("APPLICATION-WRITER-DOCUMENT-REVIEW-001", message)
+        if not review["reviewer"]["reviewer_id"].strip():
+            refuse("Document review needs an identified reviewer")
+        target = cls._document_target(receipt, sections)
+        if review["target_digest"] != target["target_digest"]:
+            refuse("Document review does not match the assembled manuscript target; remove or review it again")
+        target_ids = [row["section_id"] for row in sections]
+        covered = review["section_ids"]
+        if not set(covered) <= set(target_ids) or covered != [sid for sid in target_ids if sid in covered]:
+            refuse("Document review must name existing sections in target order")
+        if review["coverage"] == "full" and covered != target_ids:
+            refuse("Full review must cover every section in the exported manuscript scope")
+        plan, metadata = cls._document_plan(receipt)
+        rows = review["profile_review"]
+        by_id = {row["review_id"]: row for row in rows}
+        if len(by_id) != len(rows) or set(by_id) != set(plan):
+            refuse("Document review groups must match the delivered document-scoped plan")
+        violations: set[str] = set()
+        for review_id, expected in plan.items():
+            row = by_id[review_id]
+            if not row["rationale"].strip():
+                refuse("Document review group needs a content-based rationale")
+            if set(row["rule_ids"]) != expected:
+                refuse("Document review must cover the exact document-scoped rule IDs")
+            cls._validate_rule_results(row, expected, metadata, scope="document")
+            if review["coverage"] == "partial" and any(
+                item["outcome"] in {"conformant", "not_applicable"} for item in row["rule_results"]
+            ):
+                refuse("Partial review cannot establish document conformance or document N/A")
+            violations.update(row["violated_rule_ids"])
+        feedback_ids = {
+            rule_id for issue in response.get("feedback", [])
+            for rule_id in issue.get("profile_rule_ids", [])
+        }
+        if not violations <= feedback_ids:
+            refuse("Document violations require Writing Feedback for the exact rule IDs")
+        for issue in response.get("feedback", []):
+            if set(issue.get("profile_rule_ids", [])) & violations and issue["target_type"] == "section" and issue["target_id"] not in covered:
+                refuse("Document rule feedback must target a reviewed section or a pinned research/package target")
+
+    @classmethod
+    def _document_review_status(cls, revision: Mapping[str, Any], composition: Mapping[str, Any], receipt: Mapping[str, Any]) -> dict[str, Any]:
+        review = revision.get("document_review", {})
+        results = [item for group in review.get("profile_review", []) for item in group["rule_results"]]
+        _, metadata = cls._document_plan(receipt)
+        evaluated = bool(results) and all(item["outcome"] != "unevaluated" for item in results)
+        return {
+            "status": "partial" if review.get("coverage") == "partial" else "reviewed" if evaluated else "unevaluated",
+            "coverage": review.get("coverage", "unevaluated"),
+            "scope_section_ids": [row["section_id"] for row in revision["sections"]],
+            "reviewed_section_ids": list(review.get("section_ids", [])),
+            "covers_composition": [row["section_id"] for row in revision["sections"]] == [row["section_id"] for row in composition["sections"]],
+            "rule_outcomes": {item["rule_id"]: item["outcome"] for item in results},
+            "results_by_check_kind": {
+                kind: [deepcopy(item) for item in results if metadata[item["rule_id"]]["check_kind"] == kind]
+                for kind in ("structural", "semantic", "editorial")
+            },
+            "semantic_quality_guaranteed": False,
+            "reader_effect_validated": False,
+        }
+
+    def prepare_document_review(self, value: Mapping[str, Any]) -> Mapping[str, Any]:
+        """Materialize a proposed response plus its exact base without saving a draft."""
+        if not isinstance(value, Mapping) or len(json.dumps(value, ensure_ascii=False).encode("utf-8")) > MAX_RESPONSE_BYTES:
+            raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-BOUND-001", "Writer response exceeds supported size or is not an object")
+        _validate_schema(value)
+        receipt = self._load_input(str(value["input_ref"]["input_id"]))
+        if value["input_ref"]["input_digest"] != receipt["input_digest"]:
+            raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-PIN-001", "Writer response does not name the exact exported input digest")
+        composition, package = self._validate_input_context(receipt)
+        self._validate_response_semantics(value, receipt, package)
+        composition_id = str(composition["composition_id"])
+        with self._composition_service()._series_lock(composition_id):
+            head = self._head(composition_id)
+            if head is not None:
+                # Read-only continuity check; an interrupted import must be recovered
+                # through the existing exact-response retry before preparing a review.
+                inspected = self.inspect(composition_id)
+                base = inspected["revision"]
+                exact_base = {key: base[key] for key in ("revision_id", "revision_digest")}
+                if value["base_revision_ref"] != exact_base:
+                    raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-STALE-001", "review preparation requires the exact current base")
+            else:
+                if self._checkpoint_path(composition_id).exists():
+                    raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-RECOVERY-REQUIRED-001", "restore the manuscript head by retrying the exact response")
+                base = None
+                if value["base_revision_ref"] is not None:
+                    raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-STALE-001", "initial review target must not name a base")
+            drafts = {row["section_id"]: row for row in value["sections"]}
+            required_ids = [row["section_id"] for row in receipt["sections"]]
+            if base is None or base["source"]["input_id"] != receipt["input_id"]:
+                if set(drafts) != set(required_ids):
+                    raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-INPUT-001", "initial or changed-input review target requires all exported sections")
+            previous = {row["section_id"]: row for row in base["sections"]} if base else {}
+            sections = [deepcopy(drafts[sid] if sid in drafts else previous[sid]) for sid in required_ids]
+            target = self._document_target(receipt, sections)
+            plan, metadata = self._document_plan(receipt)
+            return {
+                "status": "PREPARED", **target,
+                "input_ref": deepcopy(value["input_ref"]),
+                "base_revision_ref": deepcopy(value["base_revision_ref"]),
+                "writer_input": deepcopy(receipt),
+                "review_plan": [{"review_id": key, "rule_ids": sorted(ids)} for key, ids in plan.items()],
+                "rule_metadata": {key: metadata[key] for ids in plan.values() for key in sorted(ids)},
+                "scope_section_ids": required_ids,
+                "composition_section_ids": [row["section_id"] for row in composition["sections"]],
+                "research_state_mutation_performed": False,
+            }
 
     def import_response(self, value: Mapping[str, Any]) -> Mapping[str, Any]:
         if not isinstance(value, Mapping):
@@ -823,6 +973,7 @@ class WriterRoundTripService:
                 }
                 sections.append(row)
 
+            self._validate_document_review(value, receipt, sections)
             feedback = deepcopy(list(value.get("feedback", [])))
             candidate_follow_ups = [
                 {
@@ -848,6 +999,7 @@ class WriterRoundTripService:
                 "response_digest": response_digest,
                 "writer": deepcopy(dict(value["writer"])),
                 "sections": sections,
+                **({"document_review": deepcopy(value["document_review"])} if "document_review" in value else {}),
                 "writing_feedback": {
                     "issues": feedback,
                     "is_research_evidence": False,
@@ -909,6 +1061,11 @@ class WriterRoundTripService:
         composition, package = self._validate_input_context(receipt)
         if revision["source"]["composition_digest"] != composition["composition_digest"] or revision["source"]["research_package_digest"] != package["package_digest"]:
             raise LocalApplicationError("APPLICATION-WRITER-ROUND-TRIP-PIN-001", "manuscript revision source pins do not match its input")
+        if "document_review" in revision:
+            self._validate_document_review(
+                {"document_review": revision["document_review"], "feedback": revision["writing_feedback"]["issues"]},
+                receipt, list(revision["sections"]),
+            )
 
         lineage: list[dict[str, Any]] = []
         current = revision
@@ -931,6 +1088,8 @@ class WriterRoundTripService:
 
         return {
             "status": "OK",
+            "document_review_target": self._document_target(receipt, list(revision["sections"])),
+            "document_review_status": self._document_review_status(revision, composition, receipt),
             "source_package": {
                 "package_id": package["package_id"],
                 "package_digest": package["package_digest"],

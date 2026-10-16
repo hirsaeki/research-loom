@@ -273,6 +273,13 @@ comprehension/decision support and reader experience as separate findings.
 Return concrete placement, explanation or repetition edits for weak passages
 and use the exact current base for partial revision. Distinguish supplied
 Recommendations from decisions already made in practice.
+For a document-scoped review, materialize the proposed response with public
+`writer-round-trip prepare-review` / `prepare_writer_document_review`, read
+the assembled target and necessary fixed input, and attach an optional exact
+`document_review`. Keep reviewer/method/time, scope and semantic/editorial
+results explicit. A partial edit must not inherit the old document review;
+continue draft work as unevaluated until the new target is actually reviewed.
+Use existing Writing Feedback for concrete edits, not only an added disclaimer.
 Check paragraphs for competing roles using `../writer/references/reader-flow.md`:
 request a concrete edit when unrelated or repeated caveats interrupt the
 argument, while allowing necessary qualifications and supplied contrasts that

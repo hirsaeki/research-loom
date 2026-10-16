@@ -82,6 +82,7 @@ Public CLI:
 ```text
 research-loom writer-round-trip export-input --workspace ... --composition-id COMP-... --section-id SEC-A --section-id SEC-B --output ...
 research-loom writer-round-trip import-response --workspace ... --json writer-response.json
+research-loom writer-round-trip prepare-review --workspace ... --json writer-response.json
 research-loom writer-round-trip inspect --workspace ... --composition-id COMP-... [--revision-id WMR-...] --json
 ```
 

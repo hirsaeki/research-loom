@@ -351,6 +351,9 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
     def import_writer_response(self, value: Mapping[str, Any]) -> Mapping[str, Any]:
         return self._writer_round_trip_service().import_response(value)
 
+    def prepare_writer_document_review(self, value: Mapping[str, Any]) -> Mapping[str, Any]:
+        return self._writer_round_trip_service().prepare_document_review(value)
+
     def inspect_writer_round_trip(
         self, composition_id: str, revision_id: str | None = None
     ) -> Mapping[str, Any]:
