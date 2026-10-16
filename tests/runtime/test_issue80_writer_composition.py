@@ -7,6 +7,8 @@ from unittest.mock import patch
 import tests.runtime.issue80_writer_composition_suite as _suite
 from plugins.local_application import LocalApplicationError
 
+CI_WINDOWS = True
+
 
 class Issue80WriterCompositionTests(_suite.Issue80WriterCompositionTests):
     def _build_complete_support_package(

@@ -10,6 +10,8 @@ from plugins.local_application import LocalApplicationError
 from plugins.local_application.research_package_format import MAX_OUTPUT_BYTES
 from plugins.local_application.research_package_service import verify_export_root
 
+CI_WINDOWS = True
+
 
 class ResearchPackageReviewFixTests(unittest.TestCase):
     def setUp(self) -> None:

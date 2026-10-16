@@ -19,6 +19,8 @@ from plugins.local_application.research_package_format import (
 from plugins.local_application.writer_composition_service import _digest_document
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
+CI_WINDOWS = True
+
 
 class Issue254ItemListingTests(ResearchPackageAcceptanceSupport):
     _proposal = issue80.Issue80WriterCompositionTests._proposal

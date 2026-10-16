@@ -9,6 +9,8 @@ from unittest import mock
 
 from scripts.runtime_wheelhouse import WheelhouseError, create_manifest, verify_bundle
 
+CI_WINDOWS = False  # sys.platform is mocked; behavior is platform-independent
+
 
 class RuntimeWheelhouseContractTests(unittest.TestCase):
     def setUp(self) -> None:

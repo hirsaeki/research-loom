@@ -13,6 +13,8 @@ from plugins.local_application.writer_composition_history_service import (
 from plugins.local_application.writer_round_trip_service import WriterRoundTripService
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
+CI_WINDOWS = True
+
 
 class WriterRecoveryTests(ResearchPackageAcceptanceSupport):
     def _ready(self):

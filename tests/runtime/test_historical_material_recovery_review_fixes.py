@@ -10,6 +10,8 @@ from plugins.local_application.cli import main as cli_main
 from plugins.local_execution_store.verified_artifact_read import VerifiedArtifactReadMixin
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
+CI_WINDOWS = True
+
 
 def _run_cli(argv):
     stream = io.StringIO()

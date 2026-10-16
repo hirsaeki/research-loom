@@ -13,6 +13,8 @@ from plugins.local_application import LocalApplicationError, LocalApplicationFac
 from plugins.local_execution_store import LocalExecutionStoreConfig
 from tests.runtime.test_research_question_review import _adopt_question, _workspace
 
+CI_WINDOWS = True
+
 ROOT = Path(__file__).resolve().parents[2]
 
 

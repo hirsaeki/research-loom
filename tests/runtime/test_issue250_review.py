@@ -12,6 +12,8 @@ from plugins.local_execution_store import LocalExecutionStoreIntegrityError
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 from tests.runtime.test_historical_material_recovery_reacquire import _submit_reacquire
 
+CI_WINDOWS = True
+
 
 class PayloadRepairReviewTests(ResearchPackageAcceptanceSupport):
     _ready = support.ExactPayloadRepairTests._ready

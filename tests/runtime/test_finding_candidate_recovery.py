@@ -12,6 +12,8 @@ from plugins.local_application import LocalApplicationError, LocalApplicationFac
 from plugins.local_application.cli import main as cli_main
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
+CI_WINDOWS = True
+
 
 class FindingCandidateRecoveryTests(ResearchPackageAcceptanceSupport):
     def _legacyize(self, facade, proposal):

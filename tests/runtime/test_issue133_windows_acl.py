@@ -12,6 +12,8 @@ from plugins.local_application import LocalApplicationError
 from plugins.local_application.research_package_service import verify_export_root
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
+CI_WINDOWS = True
+
 
 @skipUnless(os.name == "nt", "Windows ACL regression")
 class Issue133WindowsAclTests(ResearchPackageAcceptanceSupport):

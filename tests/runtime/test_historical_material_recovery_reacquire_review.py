@@ -13,6 +13,8 @@ from plugins.local_application.material_reacquisition_facade import (
 )
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
+CI_WINDOWS = True
+
 
 class HistoricalMaterialReacquisitionReviewTests(ResearchPackageAcceptanceSupport):
     @staticmethod

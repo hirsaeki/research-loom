@@ -25,6 +25,8 @@ from plugins.local_application.publication_exhibits import (
 )
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
+CI_WINDOWS = True
+
 
 def fixture_png(width=320, height=120, *, source_width=None):
     """Small synthetic grayscale bars, generated with stdlib only."""

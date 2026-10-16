@@ -13,6 +13,8 @@ from plugins.local_application.facade import LocalApplicationError
 from plugins.local_application.workspace import LocalWorkspace
 from tests.runtime.test_external_material_inventory import _capture, _create_running, _write_inputs
 
+CI_WINDOWS = True
+
 
 class Issue91ReviewFixTests(unittest.TestCase):
     def _fixture(self, root: Path):

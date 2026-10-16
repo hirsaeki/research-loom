@@ -18,6 +18,8 @@ from tests.runtime.test_delphi_two_round_production import (
 from tests.runtime.test_issue252_delphi_lifecycle import derived_from, proposal, round_input
 from tests.runtime.test_survey_production import state_signature
 
+CI_WINDOWS = True
+
 
 class Issue253DelphiModeScaleTests(unittest.TestCase):
     def fixture(self, root, modes=None, configure=None):

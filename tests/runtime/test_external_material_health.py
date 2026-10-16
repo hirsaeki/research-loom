@@ -11,6 +11,8 @@ from plugins.local_application.material_recovery_facade import HistoricalMateria
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 from tests.runtime.test_external_material_inventory import _capture, _create_running, _write_inputs
 
+CI_WINDOWS = True
+
 
 class ExternalMaterialHealthTests(unittest.TestCase):
     def _workspace(self, root: Path) -> LocalApplicationFacade:

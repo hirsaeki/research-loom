@@ -9,6 +9,8 @@ from plugins.local_application import LocalApplicationFacade
 from plugins.local_application.material_reacquisition_facade import RetrievedMaterial
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
+CI_WINDOWS = True
+
 
 class Issue127MultiMaterialContinuationTests(ResearchPackageAcceptanceSupport):
     @staticmethod

@@ -15,6 +15,8 @@ from plugins.local_application.publication_release_service import (
 )
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
+CI_WINDOWS = True
+
 
 class PublicationRecoveryTests(ResearchPackageAcceptanceSupport):
     def _ready(self):

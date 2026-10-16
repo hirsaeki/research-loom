@@ -19,6 +19,8 @@ from tests.runtime import test_issue221_real_survey_intake as issue221
 from tests.runtime.survey_virtual_runner_test_support import SurveyVirtualRunnerTestBase
 from tests.runtime.test_survey_production import NullResolver, profile_provider, state_signature
 
+CI_WINDOWS = True
+
 
 class Issue251RealSurveyBatchTests(SurveyVirtualRunnerTestBase):
     _fixture = issue221.Issue221RealSurveyIntakeTests._fixture

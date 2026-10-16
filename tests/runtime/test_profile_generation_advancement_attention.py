@@ -20,6 +20,8 @@ from tests.runtime.test_profile_generation_advancement import (
     _run_cli,
 )
 
+CI_WINDOWS = True
+
 
 class ProfileAdvancementAttentionTests(ResearchPackageAcceptanceSupport):
     def _write_structured_workspace_inputs(self):

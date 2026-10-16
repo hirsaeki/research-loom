@@ -12,6 +12,8 @@ from plugins.local_application import LocalApplicationError
 from plugins.local_application.item_listing import directory_page
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
+CI_WINDOWS = True
+
 
 class Issue254InventoryRootTests(unittest.TestCase):
     def test_linked_root_or_ancestor_is_rejected_before_enumeration(self):

@@ -5,6 +5,8 @@ import json
 from plugins.local_application import LocalApplicationFacade
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
+CI_WINDOWS = True
+
 
 class Issue134WriterCompositionRecoveryTests(ResearchPackageAcceptanceSupport):
     @staticmethod

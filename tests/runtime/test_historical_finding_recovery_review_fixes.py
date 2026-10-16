@@ -10,6 +10,8 @@ from tests.runtime.test_historical_finding_lineage_recovery import (
     HistoricalFindingLineageRecoveryTests,
 )
 
+CI_WINDOWS = True
+
 
 class HistoricalFindingRecoveryReviewFixTests(ResearchPackageAcceptanceSupport):
     def test_missing_proposal_identity_is_bounded_without_full_state_load(self):

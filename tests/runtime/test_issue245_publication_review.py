@@ -7,6 +7,8 @@ import tests.runtime.test_issue220_publication_release as support
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
+CI_WINDOWS = True
+
 
 class PublicationReviewTests(ResearchPackageAcceptanceSupport):
     def _ready(self):

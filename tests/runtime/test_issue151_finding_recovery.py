@@ -12,6 +12,8 @@ from plugins.local_application import (
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 from tests.runtime.test_finding_candidate_recovery import FindingCandidateRecoveryTests
 
+CI_WINDOWS = True
+
 
 class Issue151AmbiguousCanonicalRecoveryTests(ResearchPackageAcceptanceSupport):
     _legacyize = FindingCandidateRecoveryTests._legacyize

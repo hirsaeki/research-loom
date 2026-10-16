@@ -10,6 +10,8 @@ from plugins.local_application import LocalApplicationFacade
 from plugins.local_application.cli import main
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
+CI_WINDOWS = True
+
 
 class WriterRecoveryCliTests(ResearchPackageAcceptanceSupport):
     def _cli(self, *args):

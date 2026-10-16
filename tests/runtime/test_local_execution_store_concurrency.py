@@ -15,6 +15,8 @@ from plugins.local_execution_store import (
 )
 from tests.runtime.test_local_execution_store import trace_run
 
+CI_WINDOWS = False  # only POSIX-specific symlink cases branch on the platform
+
 
 class LocalExecutionStoreConcurrencySecurityTests(unittest.TestCase):
     def _seed_run(

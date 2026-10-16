@@ -10,6 +10,8 @@ from plugins.local_application.finding_recovery_lineage import RecoveryFailure
 from plugins.local_execution_store import result_extensions_for_run
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
+CI_WINDOWS = True
+
 
 class HistoricalResultRecoveryTests(ResearchPackageAcceptanceSupport):
     @staticmethod

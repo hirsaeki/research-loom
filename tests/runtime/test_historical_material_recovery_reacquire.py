@@ -18,6 +18,8 @@ from plugins.local_application.material_reacquisition_facade import (
 from plugins.local_execution_store import child_runs_for_parent
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
+CI_WINDOWS = True
+
 
 def _run_cli(argv):
     stream = io.StringIO()
