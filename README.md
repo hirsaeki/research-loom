@@ -80,7 +80,10 @@ uv sync --frozen --group dev
 uv run --frozen --group dev ruff check .
 uv run --frozen --group dev ruff format --check .
 uv run --frozen --group dev mypy          # strict, currently scoped to core/
+uv run --frozen python -m unittest discover -t . -s tests -p 'test_*.py'   # all tests
 ```
+
+`tests/` is a package: shared fixtures are imported as `tests.runtime.*` / `tests.contracts.*`, so no `PYTHONPATH` setup is needed. Narrow a run with `-s tests/runtime` or `-s tests/contracts`, or pass test file paths / dotted module names directly to `python -m unittest`.
 
 Formatting-only commits are listed in `.git-blame-ignore-revs`; run `git config blame.ignoreRevsFile .git-blame-ignore-revs` to skip them in local `git blame`.
 
