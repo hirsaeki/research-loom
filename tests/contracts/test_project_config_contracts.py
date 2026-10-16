@@ -7,7 +7,8 @@ from pathlib import Path
 
 import yaml
 from jsonschema import Draft202012Validator
-from project_config_oracle import (
+
+from tests.contracts.project_config_oracle import (
     apply_fixture_mutation,
     expected_configuration_digest,
     flatten_profile_requests,

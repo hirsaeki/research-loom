@@ -8,9 +8,9 @@ from copy import deepcopy
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
-import test_external_desktop_research_intake as intake
 from pypdf import PdfWriter
 
+import tests.runtime.test_external_desktop_research_intake as intake
 from plugins.local_application import LocalApplicationError
 from plugins.local_application.profile_advancement import _validate_target_project_delta
 from plugins.local_application.profile_resolution import target_project_config

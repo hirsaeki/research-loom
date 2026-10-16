@@ -8,8 +8,14 @@ from contextlib import closing
 from dataclasses import replace
 from pathlib import Path
 
-import test_state_transition as runtime_suite
-from runtime_fixtures import (
+import tests.runtime.test_state_transition as runtime_suite
+from core.runtime import StateTransitionService, TransitionAction, TransitionKind
+from core.runtime.ports import AtomicCommitError, RepositoryError
+from core.runtime.transition_models import CommitReceipt
+from plugins.sqlite_state_store import SQLiteResearchStateRepository
+from plugins.sqlite_state_store import _support as sqlite_support
+from plugins.sqlite_state_store import adapter as sqlite_adapter
+from tests.runtime.runtime_fixtures import (
     SCHEMA_VALIDATOR,
     decision,
     make_request,
@@ -17,13 +23,6 @@ from runtime_fixtures import (
     rq,
     seed_state,
 )
-
-from core.runtime import StateTransitionService, TransitionAction, TransitionKind
-from core.runtime.ports import AtomicCommitError, RepositoryError
-from core.runtime.transition_models import CommitReceipt
-from plugins.sqlite_state_store import SQLiteResearchStateRepository
-from plugins.sqlite_state_store import _support as sqlite_support
-from plugins.sqlite_state_store import adapter as sqlite_adapter
 
 
 class _ParitySQLiteRepository(SQLiteResearchStateRepository):

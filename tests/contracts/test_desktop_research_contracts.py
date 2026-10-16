@@ -9,14 +9,15 @@ from pathlib import Path
 
 import rfc8785
 import yaml
-from desktop_research_oracle import (
+from jsonschema import Draft202012Validator
+
+from tests.contracts.desktop_research_oracle import (
     canonical_digest,
     context_semantic_error,
     expected_context_extension_digest,
     expected_result_extension_digest,
     result_semantic_error,
 )
-from jsonschema import Draft202012Validator
 
 ROOT = Path(__file__).resolve().parents[2]
 ORACLE_PATH = ROOT / "tests/contracts/desktop_research_oracle.py"

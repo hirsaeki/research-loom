@@ -8,7 +8,6 @@ from copy import deepcopy
 from pathlib import Path
 
 import rfc8785
-from runtime_fixtures import SCHEMA_VALIDATOR, make_request, project, rq, seed_state
 
 from core.execution import (
     CapabilityContextExtensionRegistry,
@@ -38,6 +37,7 @@ from plugins.local_execution_store import (
     LocalOperationalTraceStore,
 )
 from plugins.sqlite_state_store import SQLiteResearchStateRepository
+from tests.runtime.runtime_fixtures import SCHEMA_VALIDATOR, make_request, project, rq, seed_state
 
 ROOT = Path(__file__).resolve().parents[2]
 DR_DESCRIPTOR = json.loads(

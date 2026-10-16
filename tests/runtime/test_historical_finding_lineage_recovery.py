@@ -4,12 +4,11 @@ import json
 from copy import deepcopy
 from unittest.mock import patch
 
-import test_external_desktop_research_intake as intake
-import test_issue134_writer_composition as issue134_writer
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-
+import tests.runtime.test_external_desktop_research_intake as intake
+import tests.runtime.test_issue134_writer_composition as issue134_writer
 from core.runtime import canonical_digest
 from plugins.local_application import LocalApplicationError
+from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 
 class HistoricalFindingLineageRecoveryTests(ResearchPackageAcceptanceSupport):

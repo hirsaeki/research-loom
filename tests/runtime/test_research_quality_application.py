@@ -9,7 +9,6 @@ from pathlib import Path
 
 import rfc8785
 import yaml
-from runtime_fixtures import seed_state
 
 from plugins.local_application import LocalApplicationFacade
 from plugins.local_application.profile_resolution import resolve_effective_profile_set
@@ -18,6 +17,7 @@ from plugins.local_application.research_quality_evaluation import (
     evaluate,
     normalize_input,
 )
+from tests.runtime.runtime_fixtures import seed_state
 from tests.runtime.test_external_desktop_research_intake import adopt_rq, bootstrap_config, run_cli
 
 ROOT = Path(__file__).resolve().parents[2]

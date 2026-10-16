@@ -9,9 +9,6 @@ from pathlib import Path
 from threading import Barrier, Event
 from unittest.mock import patch
 
-from runtime_fixtures import project, rq, seed_state
-from test_external_desktop_research_intake import NullResolver, profile_provider
-
 from plugins.desktop_research import with_context_extension_digest
 from plugins.local_application import (
     LocalApplicationError,
@@ -19,6 +16,8 @@ from plugins.local_application import (
     LocalResearchApplication,
 )
 from plugins.local_execution_store import LocalExecutionStoreError
+from tests.runtime.runtime_fixtures import project, rq, seed_state
+from tests.runtime.test_external_desktop_research_intake import NullResolver, profile_provider
 
 
 class ExternalDesktopResearchAtomicityTests(unittest.TestCase):

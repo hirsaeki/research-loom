@@ -2,11 +2,10 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-
 from core.execution import ExecutionFailureCode, ExecutionIssue, RunStatus
 from plugins.local_application import new_material_continuation_admission as admission
 from plugins.local_application.material_reacquisition_facade import RetrievedMaterial
+from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 
 class Issue174NewMaterialContinuationRetryTests(ResearchPackageAcceptanceSupport):

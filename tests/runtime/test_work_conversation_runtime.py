@@ -6,8 +6,6 @@ import unittest
 from copy import deepcopy
 from pathlib import Path
 
-from runtime_fixtures import project, rq, seed_state
-
 from core.conversation import (
     ActionDefinition,
     ActionDraft,
@@ -22,6 +20,7 @@ from core.execution.testing import StaticClock
 from core.runtime import canonical_digest
 from plugins.local_application import LocalResearchApplication
 from plugins.local_conversation_store import LocalConversationStore
+from tests.runtime.runtime_fixtures import project, rq, seed_state
 
 ACTOR = {"actor_id": "HUMAN-1", "actor_type": "human"}
 

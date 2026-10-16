@@ -11,7 +11,6 @@ from pathlib import Path
 from unittest.mock import patch
 
 import rfc8785
-from runtime_fixtures import project, rq, seed_state
 
 from core.conversation import ConversationRuntimeError
 from core.decision import make_response
@@ -24,6 +23,7 @@ from plugins.local_application import (
     LocalWorkspaceError,
 )
 from plugins.local_application.cli import main as cli_main
+from tests.runtime.runtime_fixtures import project, rq, seed_state
 
 ROOT = Path(__file__).resolve().parents[2]
 PROJECT_FIXTURE = ROOT / "projects/fixtures/valid/generic-project-config.json"

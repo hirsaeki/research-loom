@@ -7,8 +7,14 @@ from pathlib import Path
 
 import yaml
 from jsonschema import Draft202012Validator, FormatChecker
-from research_method_oracle import canonical_digest
-from survey_oracle import context_error, descriptor_error, questionnaire_error, result_error
+
+from tests.contracts.research_method_oracle import canonical_digest
+from tests.contracts.survey_oracle import (
+    context_error,
+    descriptor_error,
+    questionnaire_error,
+    result_error,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 PKG = ROOT / "core/packages"

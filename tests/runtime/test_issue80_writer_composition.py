@@ -4,8 +4,7 @@ import json
 from copy import deepcopy
 from unittest.mock import patch
 
-import issue80_writer_composition_suite as _suite
-
+import tests.runtime.issue80_writer_composition_suite as _suite
 from plugins.local_application import LocalApplicationError
 
 

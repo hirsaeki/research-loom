@@ -6,9 +6,8 @@ import subprocess
 from copy import deepcopy
 from unittest.mock import patch
 
-import research_package_acceptance_baseline as baseline
-import test_external_desktop_research_intake as intake
-
+import tests.runtime.research_package_acceptance_baseline as baseline
+import tests.runtime.test_external_desktop_research_intake as intake
 from plugins.local_application import LocalApplicationError
 from plugins.local_application.research_package_service import verify_export_root
 

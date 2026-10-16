@@ -3,15 +3,14 @@ import unittest
 from copy import deepcopy
 from pathlib import Path
 
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-from test_research_exhibits import exhibit_payload, make_app, state_signature
-
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade
 from plugins.local_research_exhibit_store import (
     LocalResearchExhibitStore,
     LocalResearchExhibitStoreError,
 )
 from plugins.research_visual_semantics import validate_visual_package_bindings
+from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
+from tests.runtime.test_research_exhibits import exhibit_payload, make_app, state_signature
 
 
 def visual_payload(**changes):

@@ -1,7 +1,8 @@
 import unittest
 
 from jsonschema import Draft202012Validator
-from semantic_oracle import ROOT, key_of, load_json, requested_presence_error
+
+from tests.contracts.semantic_oracle import ROOT, key_of, load_json, requested_presence_error
 
 
 def mutate_requested_fixture(spec):

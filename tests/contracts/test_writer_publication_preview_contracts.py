@@ -7,7 +7,8 @@ from pathlib import Path
 
 import yaml
 from jsonschema import Draft202012Validator, FormatChecker, ValidationError
-from writer_publication_preview_oracle import (
+
+from tests.contracts.writer_publication_preview_oracle import (
     ERROR_IDS,
     canonical_digest,
     conversation_routing_error,

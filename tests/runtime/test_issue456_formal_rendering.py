@@ -7,13 +7,12 @@ from copy import deepcopy
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
-import test_issue405_research_charts as chart_tests
-from test_issue456_formal_document import representative_report
-
+import tests.runtime.test_issue405_research_charts as chart_tests
 from plugins.local_application.publication_docx import W
 from plugins.local_application.publication_release_service import PublicationReleaseService
 from plugins.local_application.research_chart import validate_chart_spec
 from plugins.local_application.research_chart_png import render_chart
+from tests.runtime.test_issue456_formal_document import representative_report
 
 ROOT = Path(__file__).resolve().parents[2]
 

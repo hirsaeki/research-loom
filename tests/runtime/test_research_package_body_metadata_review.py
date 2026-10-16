@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import json
 
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-
 from plugins.local_application import LocalApplicationError
 from plugins.local_application.research_package_format import (
     digest_bytes,
@@ -11,6 +9,7 @@ from plugins.local_application.research_package_format import (
     verify_export_root,
     without_digest,
 )
+from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 
 class ResearchPackageBodyMetadataReviewTests(ResearchPackageAcceptanceSupport):

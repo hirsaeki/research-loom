@@ -4,13 +4,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from test_external_desktop_research_intake import NullResolver, profile_provider
-from test_external_desktop_research_intake_atomicity import (
-    ExternalDesktopResearchAtomicityTests,
-)
-
 from plugins.local_application import LocalApplicationFacade, LocalResearchApplication
 from plugins.local_execution_store import LocalExecutionStoreConfig
+from tests.runtime.test_external_desktop_research_intake import NullResolver, profile_provider
+from tests.runtime.test_external_desktop_research_intake_atomicity import (
+    ExternalDesktopResearchAtomicityTests,
+)
 
 
 class DesktopResearchRetentionReopenTests(unittest.TestCase):

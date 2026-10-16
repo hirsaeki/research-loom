@@ -3,10 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import patch
 
-import test_issue220_publication_release as support
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-
+import tests.runtime.test_issue220_publication_release as support
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade
+from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 
 class PublicationReviewTests(ResearchPackageAcceptanceSupport):

@@ -11,11 +11,9 @@ from pathlib import Path
 from unittest.mock import patch
 from xml.etree import ElementTree as ET
 
-import issue80_writer_composition_suite as composition_support
-import test_issue219_writer_round_trip as writer
-import test_research_exhibits as exhibits
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-
+import tests.runtime.issue80_writer_composition_suite as composition_support
+import tests.runtime.test_issue219_writer_round_trip as writer
+import tests.runtime.test_research_exhibits as exhibits
 from plugins.local_application import LocalApplicationError, publication_exhibits
 from plugins.local_application import publication_release_service as publication
 from plugins.local_application.publication_docx import A, W, docx_bytes, verify_native_docx
@@ -25,6 +23,7 @@ from plugins.local_application.publication_exhibits import (
     prepare_exhibits,
     table_rows,
 )
+from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 
 def fixture_png(width=320, height=120, *, source_width=None):

@@ -3,10 +3,9 @@ from __future__ import annotations
 from copy import deepcopy
 from unittest.mock import patch
 
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-
 from plugins.local_application import LocalApplicationError
 from plugins.local_application.material_reacquisition_facade import RetrievedMaterial
+from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 
 class Issue171NewMaterialContinuationTests(ResearchPackageAcceptanceSupport):

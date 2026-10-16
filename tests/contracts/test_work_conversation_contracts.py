@@ -7,7 +7,9 @@ from copy import deepcopy
 from pathlib import Path
 
 import yaml
-from conversation_oracle import (
+from jsonschema import Draft202012Validator
+
+from tests.contracts.conversation_oracle import (
     apply_semantic_case,
     binding,
     conversation_semantic_error,
@@ -15,7 +17,6 @@ from conversation_oracle import (
     payload_digest,
     refresh_document_digest,
 )
-from jsonschema import Draft202012Validator
 
 ROOT = Path(__file__).resolve().parents[2]
 ORACLE_PATH = ROOT / "tests/contracts/conversation_oracle.py"

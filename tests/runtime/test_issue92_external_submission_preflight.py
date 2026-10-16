@@ -8,8 +8,7 @@ from contextlib import redirect_stdout
 from copy import deepcopy
 from pathlib import Path
 
-import test_external_desktop_research_intake as intake
-
+import tests.runtime.test_external_desktop_research_intake as intake
 from core.execution import RunStatus
 from plugins.local_application import (
     LocalApplicationError,
@@ -511,7 +510,7 @@ class Issue92ExternalSubmissionPreflightTests(intake.ExternalDesktopResearchInta
                     facade.close()
 
     def test_review_round2_resource_basis_is_verified_before_terminal_intake(self):
-        from runtime_fixtures import project, rq, seed_state
+        from tests.runtime.runtime_fixtures import project, rq, seed_state
 
         catalog = {
             "REF-SOURCE-1": {

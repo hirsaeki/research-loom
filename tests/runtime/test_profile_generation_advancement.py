@@ -15,11 +15,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 import rfc8785
-import test_external_desktop_research_intake as intake
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-from runtime_fixtures import make_request
-from test_profile_constraint_enforcement import _evidence, _source
 
+import tests.runtime.test_external_desktop_research_intake as intake
 from core.runtime import CommitReceipt, TransitionAction, TransitionKind
 from plugins.local_application import LocalApplicationFacade, LocalWorkspace
 from plugins.local_application.cli import main as cli_main
@@ -29,6 +26,9 @@ from plugins.local_application.profile_resolution import (
     effective_profile_digest,
     resolve_effective_profile_set,
 )
+from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
+from tests.runtime.runtime_fixtures import make_request
+from tests.runtime.test_profile_constraint_enforcement import _evidence, _source
 
 ROOT = Path(__file__).resolve().parents[2]
 OLD_EPS = ROOT / "profiles/fixtures/valid/effective-profile-set.json"

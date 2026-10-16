@@ -5,9 +5,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-import test_external_desktop_research_intake as intake
-import test_issue92_external_submission_preflight as submission
-
+import tests.runtime.test_external_desktop_research_intake as intake
+import tests.runtime.test_issue92_external_submission_preflight as submission
 from plugins.local_application import LocalApplicationError
 from plugins.local_execution_store import open_read_only_execution_store
 

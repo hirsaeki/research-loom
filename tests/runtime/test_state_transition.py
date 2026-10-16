@@ -3,8 +3,6 @@ from __future__ import annotations
 import unittest
 from dataclasses import replace
 
-from runtime_fixtures import *
-
 from core.runtime import (
     ReductionError,
     StateTransitionRejected,
@@ -13,6 +11,7 @@ from core.runtime import (
     reduce_state,
 )
 from core.runtime.transition_models import CommitReceipt
+from tests.runtime.runtime_fixtures import *
 
 
 class StateTransitionRuntimeTests(unittest.TestCase):

@@ -11,11 +11,10 @@ from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
 
-from test_research_question_review import _adopt_question, _workspace
-
 from core.decision import HumanDecisionError, make_response
 from core.runtime import canonical_digest
 from plugins.local_application import LocalApplicationFacade, LocalWorkspace
+from tests.runtime.test_research_question_review import _adopt_question, _workspace
 
 
 class DecisionStateRestoreTests(unittest.TestCase):
@@ -258,10 +257,9 @@ class DecisionStateRestoreTests(unittest.TestCase):
         )
 
     def test_lineage_switch_without_new_snapshot_keeps_historical_receipt(self):
-        import test_human_decision_gate as gate_support
-        from runtime_fixtures import project, rq, seed_state
-
+        import tests.runtime.test_human_decision_gate as gate_support
         from core.runtime import TransitionAction, TransitionKind
+        from tests.runtime.runtime_fixtures import project, rq, seed_state
 
         state = seed_state(objects=[project(), rq(state="approved")])
         second = replace(state.lineages[0], lineage_id="LIN-2", lineage_kind="exploratory_fork")

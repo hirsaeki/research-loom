@@ -6,7 +6,9 @@ from copy import deepcopy
 from pathlib import Path
 
 import yaml
-from case_study_oracle import (
+from jsonschema import Draft202012Validator, FormatChecker
+
+from tests.contracts.case_study_oracle import (
     CASE_ERROR_CODES,
     context_error,
     descriptor_error,
@@ -14,8 +16,7 @@ from case_study_oracle import (
     protocol_error,
     result_error,
 )
-from jsonschema import Draft202012Validator, FormatChecker
-from research_method_oracle import canonical_digest
+from tests.contracts.research_method_oracle import canonical_digest
 
 ROOT = Path(__file__).resolve().parents[2]
 PKG = ROOT / "core/packages"

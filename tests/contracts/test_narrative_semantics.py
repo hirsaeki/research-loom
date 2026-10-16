@@ -7,14 +7,15 @@ from pathlib import Path
 
 import yaml
 from jsonschema import Draft202012Validator
-from narrative_semantic_oracle import (
+
+from tests.contracts.narrative_semantic_oracle import (
     apply_mutations,
     catalog_cross_reference_errors,
     narrative_composition_error,
     narrative_constraint_error,
     narrative_projection_error,
 )
-from semantic_oracle import canonical_compose_constraints, load_candidate
+from tests.contracts.semantic_oracle import canonical_compose_constraints, load_candidate
 
 ROOT = Path(__file__).resolve().parents[2]
 PROFILE_SCHEMA = ROOT / "profiles/contracts/profile-manifest.schema.json"

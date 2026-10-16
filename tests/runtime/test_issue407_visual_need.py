@@ -1,10 +1,9 @@
 from copy import deepcopy
 
-import test_issue256_native_publication as native
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-from test_research_exhibits import exhibit_payload, state_signature
-
+import tests.runtime.test_issue256_native_publication as native
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade
+from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
+from tests.runtime.test_research_exhibits import exhibit_payload, state_signature
 
 
 class VisualNeedTests(ResearchPackageAcceptanceSupport):
@@ -170,7 +169,7 @@ class VisualNeedTests(ResearchPackageAcceptanceSupport):
         import base64
         from unittest.mock import patch
 
-        from test_issue256_native_publication import fixture_png
+        from tests.runtime.test_issue256_native_publication import fixture_png
 
         facade, case = self._prepared(matrix=True)
         need = facade.capture_visual_need(

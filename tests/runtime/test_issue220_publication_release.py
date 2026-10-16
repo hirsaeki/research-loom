@@ -7,13 +7,13 @@ from copy import deepcopy
 from pathlib import Path
 from unittest.mock import patch
 
-import issue80_writer_composition_suite as writer_comp_support
 from jsonschema import Draft202012Validator, FormatChecker
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-from test_issue219_writer_round_trip import Issue219WriterRoundTripTests
 
+import tests.runtime.issue80_writer_composition_suite as writer_comp_support
 from plugins.local_application import LocalApplicationError
 from plugins.local_application.publication_release_service import PublicationReleaseService
+from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
+from tests.runtime.test_issue219_writer_round_trip import Issue219WriterRoundTripTests
 
 ROOT = Path(__file__).resolve().parents[2]
 PREVIEW_SCHEMA = ROOT / "core/packages/writer-publication/publication-preview.schema.json"

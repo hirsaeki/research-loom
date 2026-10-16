@@ -6,12 +6,11 @@ from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade
 from plugins.local_application.cli import main as cli_main
 from plugins.local_application.material_recovery_facade import HistoricalMaterialRecoveryService
 from plugins.local_application.research_package_service import verify_export_root
+from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 
 def _run_cli(argv):

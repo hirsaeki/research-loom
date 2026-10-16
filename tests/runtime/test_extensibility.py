@@ -4,8 +4,6 @@ import ast
 import json
 import unittest
 
-from runtime_fixtures import *
-
 from core.runtime import (
     CapabilityNormalizationBoundary,
     NormalizationRejected,
@@ -16,6 +14,7 @@ from core.runtime import (
     canonical_digest,
 )
 from core.runtime.transition_models import CommitReceipt
+from tests.runtime.runtime_fixtures import *
 
 
 class RuntimeDependencyRuleTests(unittest.TestCase):

@@ -1,8 +1,7 @@
 import unittest
 from copy import deepcopy
 
-import test_issue426_source_bibliography as bibliography_tests
-
+import tests.runtime.test_issue426_source_bibliography as bibliography_tests
 from plugins.local_application import LocalApplicationError
 from plugins.local_application.publication_release_service import PublicationReleaseService
 from plugins.local_application.research_package_builder import _bibliography_readiness

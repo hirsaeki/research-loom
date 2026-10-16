@@ -13,11 +13,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-sys.path.insert(0, str(ROOT / "tests/runtime"))
-from test_issue456_formal_rendering import representative_inspection
-
 from plugins.local_application.publication_pdf import inspect_pdf
 from plugins.local_application.publication_release_service import PublicationReleaseService
+from tests.runtime.test_issue456_formal_rendering import representative_inspection
 
 
 def main():

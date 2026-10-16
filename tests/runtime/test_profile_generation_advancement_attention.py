@@ -5,9 +5,12 @@ from copy import deepcopy
 from pathlib import Path
 from unittest import mock
 
-import test_external_desktop_research_intake as intake
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-from test_profile_generation_advancement import (
+import tests.runtime.test_external_desktop_research_intake as intake
+from core.conversation import ConversationRuntimeError
+from plugins.local_application import LocalApplicationFacade
+from plugins.local_application.application import EffectiveResearchAttentionProvider
+from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
+from tests.runtime.test_profile_generation_advancement import (
     GENERIC_NARRATIVE,
     OLD_EPS,
     ORGANIZATION,
@@ -16,10 +19,6 @@ from test_profile_generation_advancement import (
     RESEARCH_STRICT_NEXT,
     _run_cli,
 )
-
-from core.conversation import ConversationRuntimeError
-from plugins.local_application import LocalApplicationFacade
-from plugins.local_application.application import EffectiveResearchAttentionProvider
 
 
 class ProfileAdvancementAttentionTests(ResearchPackageAcceptanceSupport):

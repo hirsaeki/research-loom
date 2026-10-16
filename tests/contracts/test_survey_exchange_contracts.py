@@ -6,7 +6,8 @@ from copy import deepcopy
 from pathlib import Path
 
 from jsonschema import Draft202012Validator, FormatChecker
-from research_method_oracle import canonical_digest
+
+from tests.contracts.research_method_oracle import canonical_digest
 
 ROOT = Path(__file__).resolve().parents[2]
 SURVEY = ROOT / "core/packages/survey"

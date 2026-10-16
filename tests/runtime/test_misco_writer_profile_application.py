@@ -8,14 +8,14 @@ import sys
 from copy import deepcopy
 from pathlib import Path
 
-import issue80_writer_composition_suite as writer_comp
 import rfc8785
-import test_external_desktop_research_intake as intake
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
+import tests.runtime.issue80_writer_composition_suite as writer_comp
+import tests.runtime.test_external_desktop_research_intake as intake
 from plugins.local_application import LocalApplicationError
 from plugins.local_application.profile_resolution import resolve_effective_profile_set
 from plugins.local_application.writer_composition_service import _writer_profile_delivery
+from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 ROOT = Path(__file__).resolve().parents[2]
 WRITER_MANIFEST = ROOT / "profiles/narrative/misco/profile.json"

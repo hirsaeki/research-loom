@@ -5,8 +5,6 @@ import unittest
 from copy import deepcopy
 from pathlib import Path
 
-from runtime_fixtures import project, rq, seed_state
-
 from core.conversation import ConversationRuntimeError
 from plugins.local_application import (
     LocalApplicationError,
@@ -14,6 +12,7 @@ from plugins.local_application import (
     LocalResearchApplication,
 )
 from plugins.local_attention_store import attention_map_digest, validate_attention_store_schema
+from tests.runtime.runtime_fixtures import project, rq, seed_state
 
 
 class NullResolver:

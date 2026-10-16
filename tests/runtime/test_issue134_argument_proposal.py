@@ -4,15 +4,14 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from runtime_fixtures import evidence, finding, project, rq, seed_state, source
-from test_survey_production import NullResolver
-
 from core.conversation import ConversationRuntimeError
 from plugins.local_application import (
     LocalApplicationError,
     LocalApplicationFacade,
     LocalResearchApplication,
 )
+from tests.runtime.runtime_fixtures import evidence, finding, project, rq, seed_state, source
+from tests.runtime.test_survey_production import NullResolver
 
 
 def profile_provider(_project_ref, expected_digest):

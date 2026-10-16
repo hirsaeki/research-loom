@@ -11,7 +11,6 @@ from pathlib import Path
 from unittest.mock import patch
 
 import rfc8785
-from runtime_fixtures import project, rq, seed_state
 
 from core.execution import CapabilityRunRecord, RunStatus
 from plugins.local_application import (
@@ -25,6 +24,7 @@ from plugins.local_research_exhibit_store import (
     LocalResearchExhibitStore,
     LocalResearchExhibitStoreError,
 )
+from tests.runtime.runtime_fixtures import project, rq, seed_state
 
 
 class NullResolver:

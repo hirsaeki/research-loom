@@ -13,7 +13,6 @@ from pathlib import Path
 
 import rfc8785
 from jsonschema import Draft202012Validator, FormatChecker
-from runtime_fixtures import project, rq, seed_state
 
 from plugins.local_application import (
     LocalApplicationError,
@@ -24,6 +23,7 @@ from plugins.local_application.cli import main as cli_main
 from plugins.local_survey_store import (
     canonical_document_digest,
 )
+from tests.runtime.runtime_fixtures import project, rq, seed_state
 
 ROOT = Path(__file__).resolve().parents[2]
 SURVEY_FIXTURE = ROOT / "core/fixtures/capabilities/valid/generic-survey-contract-fixtures.json"
