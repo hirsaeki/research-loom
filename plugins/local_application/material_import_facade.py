@@ -84,12 +84,7 @@ def _assert_link_free(root: Path) -> None:
 
 
 def _stage_id(value: str) -> str:
-    if (
-        not isinstance(value, str)
-        or not value
-        or Path(value).name != value
-        or value in {".", ".."}
-    ):
+    if not isinstance(value, str) or not value or Path(value).name != value or value in {".", ".."}:
         raise LocalApplicationError(
             "APPLICATION-MATERIAL-IMPORT-001",
             "stage_id is invalid",
@@ -285,8 +280,7 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
 
             source_category = str(projection["source_category"])
             allowed_categories = {
-                str(item)
-                for item in context_extension.get("allowed_source_categories", ())
+                str(item) for item in context_extension.get("allowed_source_categories", ())
             }
             if source_category not in allowed_categories:
                 raise LocalApplicationError(
@@ -320,11 +314,7 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                     "destination Desktop Research capture budget is malformed",
                 )
             pair_limit = min(capture_limit, artifact_limit // 2)
-            if (
-                pair_limit <= 0
-                or original.size > original_limit
-                or rendition.size > text_limit
-            ):
+            if pair_limit <= 0 or original.size > original_limit or rendition.size > text_limit:
                 raise LocalApplicationError(
                     "APPLICATION-MATERIAL-IMPORT-001",
                     "selected material exceeds destination Desktop Research capture budget",
@@ -364,12 +354,8 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                     "historical_text_digest": rendition.digest,
                 }
             }
-            original_name = _source_filename(
-                original.provenance, "original_source_filename"
-            )
-            text_name = _source_filename(
-                rendition.provenance, "text_rendition_source_filename"
-            )
+            original_name = _source_filename(original.provenance, "original_source_filename")
+            text_name = _source_filename(rendition.provenance, "text_rendition_source_filename")
             if original_name is not None:
                 import_provenance["original_source_filename"] = original_name
             if text_name is not None:

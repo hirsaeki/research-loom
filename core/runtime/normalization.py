@@ -66,24 +66,36 @@ def _validate_outer_handoff(handoff: Mapping[str, Any], state: StateView) -> Non
     if handoff.get("schema_version") != "0.1.0":
         raise NormalizationRejected("unsupported PR9 Handoff schema_version")
     if handoff.get("project_id") != state.project_ref:
-        raise NormalizationRejected("Capability Handoff project does not match current Research State")
+        raise NormalizationRejected(
+            "Capability Handoff project does not match current Research State"
+        )
     validation = handoff.get("validation")
     if not isinstance(validation, Mapping) or validation.get("status") not in {"valid", "partial"}:
-        raise NormalizationRejected("rejected/invalid Capability Handoff cannot enter normalization")
+        raise NormalizationRejected(
+            "rejected/invalid Capability Handoff cannot enter normalization"
+        )
     boundary = handoff.get("adoption_boundary")
     expected = {
         "research_state_mutation_performed": False,
         "outputs_are_candidates": True,
         "human_decision_required_for_authoritative_transition": True,
     }
-    if not isinstance(boundary, Mapping) or any(boundary.get(key) != value for key, value in expected.items()):
-        raise NormalizationRejected("Capability Handoff violated the candidate-only PR9 adoption boundary")
+    if not isinstance(boundary, Mapping) or any(
+        boundary.get(key) != value for key, value in expected.items()
+    ):
+        raise NormalizationRejected(
+            "Capability Handoff violated the candidate-only PR9 adoption boundary"
+        )
     pins = handoff.get("input_pins")
     snapshot = pins.get("research_snapshot") if isinstance(pins, Mapping) else None
     if not isinstance(snapshot, Mapping):
         raise NormalizationRejected("Capability Handoff is missing its pinned Research Snapshot")
-    if snapshot.get("snapshot_id") != state.current_snapshot.get("id") or snapshot.get("content_digest") != state.current_snapshot.get("content_digest"):
-        raise NormalizationRejected("Capability Handoff is stale relative to the current Research Snapshot")
+    if snapshot.get("snapshot_id") != state.current_snapshot.get("id") or snapshot.get(
+        "content_digest"
+    ) != state.current_snapshot.get("content_digest"):
+        raise NormalizationRejected(
+            "Capability Handoff is stale relative to the current Research Snapshot"
+        )
     if pins.get("project_config_digest") != state.project_config_digest:
         raise NormalizationRejected("Capability Handoff Project Config pin is stale")
     if pins.get("effective_profile_set_digest") != state.effective_profile_set_digest:
@@ -94,8 +106,14 @@ def _validate_proposal(proposal: StateDeltaProposal, state: StateView) -> None:
     if not proposal.candidate_only:
         raise NormalizationRejected("normalizer output must remain candidate-only")
     if proposal.project_ref != state.project_ref or proposal.lineage_ref != state.lineage_ref:
-        raise NormalizationRejected("StateDeltaProposal project/lineage binding is stale or mismatched")
-    if proposal.current_snapshot_ref != state.current_snapshot.get("id") or proposal.current_snapshot_digest != state.current_snapshot.get("content_digest"):
-        raise NormalizationRejected("StateDeltaProposal is not bound to the current Research Snapshot")
+        raise NormalizationRejected(
+            "StateDeltaProposal project/lineage binding is stale or mismatched"
+        )
+    if proposal.current_snapshot_ref != state.current_snapshot.get(
+        "id"
+    ) or proposal.current_snapshot_digest != state.current_snapshot.get("content_digest"):
+        raise NormalizationRejected(
+            "StateDeltaProposal is not bound to the current Research Snapshot"
+        )
     if proposal.proposal_digest != proposal.calculated_digest():
         raise NormalizationRejected("StateDeltaProposal digest is invalid")

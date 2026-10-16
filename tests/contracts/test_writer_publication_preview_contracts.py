@@ -23,7 +23,9 @@ from writer_publication_preview_oracle import (
 
 ROOT = Path(__file__).resolve().parents[2]
 PKG = ROOT / "core/packages/writer-publication"
-FIX = ROOT / "core/fixtures/writer-publication/valid/generic-writer-publication-preview-fixtures.json"
+FIX = (
+    ROOT / "core/fixtures/writer-publication/valid/generic-writer-publication-preview-fixtures.json"
+)
 CONV = ROOT / "core/fixtures/conversation/valid/writer-publication-preview-routing.json"
 WORK = ROOT / "core/packages/work-conversation.schema.json"
 
@@ -69,9 +71,7 @@ class WriterPublicationPreviewContractsTest(unittest.TestCase):
         self.validate("writer-preview.schema.json", f["outline_package"])
         self.validate("writer-preview.schema.json", f["writing_feedback_package"])
         self.validate("manuscript-package.schema.json", f["manuscript_package"])
-        self.validate(
-            "publication-preview.schema.json", f["preview_artifact_manifest"]
-        )
+        self.validate("publication-preview.schema.json", f["preview_artifact_manifest"])
         self.validate("publication-preview.schema.json", f["preview_iteration"])
         for d in f["profile_defect_candidates"]:
             self.validate("publication-preview.schema.json", d)
@@ -86,18 +86,12 @@ class WriterPublicationPreviewContractsTest(unittest.TestCase):
         b = deepcopy(p)
         b["release_eligible"] = True
         refresh(b, "package_digest")
-        self.assertEqual(
-            research_package_error(b), "WP-EPISTEMIC-FIREWALL-001"
-        )
+        self.assertEqual(research_package_error(b), "WP-EPISTEMIC-FIREWALL-001")
 
         b = deepcopy(p)
-        b["provenance"]["input_digests"].remove(
-            p["source_research_snapshot"]["content_digest"]
-        )
+        b["provenance"]["input_digests"].remove(p["source_research_snapshot"]["content_digest"])
         refresh(b, "package_digest")
-        self.assertEqual(
-            research_package_error(b), "WP-RP-SNAPSHOT-BINDING-001"
-        )
+        self.assertEqual(research_package_error(b), "WP-RP-SNAPSHOT-BINDING-001")
 
     def test_preview_source_namespace_is_bidirectional(self):
         p = deepcopy(self.f["research_package"])
@@ -125,9 +119,7 @@ class WriterPublicationPreviewContractsTest(unittest.TestCase):
     def test_writing_feedback(self):
         f = self.f
         fb = f["writing_feedback_package"]
-        self.assertIsNone(
-            feedback_error(fb, f["research_package"], f["outline_package"])
-        )
+        self.assertIsNone(feedback_error(fb, f["research_package"], f["outline_package"]))
         self.assertEqual(
             {i["issue_category"] for i in fb["issues"]},
             {"MISSING_EVIDENCE", "NARRATIVE_CONSTRAINT_CONFLICT"},
@@ -137,14 +129,10 @@ class WriterPublicationPreviewContractsTest(unittest.TestCase):
     def test_preview_manuscript_and_publication(self):
         f = self.f
         self.assertIsNone(
-            manuscript_error(
-                f["manuscript_package"], f["research_package"], f["outline_package"]
-            )
+            manuscript_error(f["manuscript_package"], f["research_package"], f["outline_package"])
         )
         self.assertIsNone(
-            preview_manifest_error(
-                f["preview_artifact_manifest"], f["manuscript_package"]
-            )
+            preview_manifest_error(f["preview_artifact_manifest"], f["manuscript_package"])
         )
 
     def test_docx_pdf_and_defects(self):
@@ -226,17 +214,13 @@ class WriterPublicationPreviewContractsTest(unittest.TestCase):
         m["source_epistemic_status"] = "EMPIRICAL_RESEARCH_STATE"
         m["preview_only"] = False
         m["source"] = deepcopy(o["source"])
-        m["outline_ref"].update(
-            outline_id=o["outline_id"], outline_digest=o["outline_digest"]
-        )
+        m["outline_ref"].update(outline_id=o["outline_id"], outline_digest=o["outline_digest"])
         m["lineage"] = {
             "newly_generated_from_research_package": False,
             "promoted_from_virtual_manuscript_ref": "MS-PREVIEW-1",
         }
         refresh(m, "content_digest")
-        self.assertEqual(
-            manuscript_error(m, p, o), "WP-VIRTUAL-REAL-PROMOTION-001"
-        )
+        self.assertEqual(manuscript_error(m, p, o), "WP-VIRTUAL-REAL-PROMOTION-001")
 
     def test_fabricated_citation_forbidden(self):
         f = self.f
@@ -297,9 +281,7 @@ class WriterPublicationPreviewContractsTest(unittest.TestCase):
                 b = deepcopy(f["manuscript_package"])
                 b[container][field] = value
                 refresh(b, "content_digest")
-                self.assertEqual(
-                    manuscript_error(b, p, o), "WP-MANUSCRIPT-BINDING-001"
-                )
+                self.assertEqual(manuscript_error(b, p, o), "WP-MANUSCRIPT-BINDING-001")
 
         for pin_name in ("narrative_profile_pins", "publication_profile_pin"):
             for field, value in (
@@ -309,16 +291,10 @@ class WriterPublicationPreviewContractsTest(unittest.TestCase):
             ):
                 with self.subTest(kind=pin_name, field=field):
                     b = deepcopy(f["manuscript_package"])
-                    pin = (
-                        b[pin_name][0]
-                        if isinstance(b[pin_name], list)
-                        else b[pin_name]
-                    )
+                    pin = b[pin_name][0] if isinstance(b[pin_name], list) else b[pin_name]
                     pin[field] = value
                     refresh(b, "content_digest")
-                    self.assertEqual(
-                        manuscript_error(b, p, o), "WP-MANUSCRIPT-BINDING-001"
-                    )
+                    self.assertEqual(manuscript_error(b, p, o), "WP-MANUSCRIPT-BINDING-001")
 
         b = deepcopy(f["preview_artifact_manifest"])
         b["source_manuscript"]["manuscript_id"] = "MS-OTHER"
@@ -360,9 +336,7 @@ class WriterPublicationPreviewContractsTest(unittest.TestCase):
         p = self.f["research_package"]
         self.assertIsNone(conversation_routing_error(self.route, p))
         proposal = self.route["action_proposal"]
-        Draft202012Validator(load(WORK), format_checker=FormatChecker()).validate(
-            proposal
-        )
+        Draft202012Validator(load(WORK), format_checker=FormatChecker()).validate(proposal)
         self.assertEqual(proposal["route"]["route_type"], "harness_service")
 
         b = deepcopy(self.route)
@@ -370,15 +344,11 @@ class WriterPublicationPreviewContractsTest(unittest.TestCase):
             "route_type": "unresolved",
             "reason": "wrong",
         }
-        self.assertEqual(
-            conversation_routing_error(b, p), "WP-CONVERSATION-ROUTING-001"
-        )
+        self.assertEqual(conversation_routing_error(b, p), "WP-CONVERSATION-ROUTING-001")
 
     def test_ambiguous_profile_conflict_is_not_lww(self):
         s = self.sem["profile_revision_semantics"]
-        self.assertEqual(
-            s["ambiguous_conflict_resolution"], "human_review_required"
-        )
+        self.assertEqual(s["ambiguous_conflict_resolution"], "human_review_required")
         self.assertFalse(s["last_write_wins_for_ambiguous_conflicts"])
 
 

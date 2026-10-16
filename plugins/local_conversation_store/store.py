@@ -46,15 +46,12 @@ def _schema_issue(connection: sqlite3.Connection) -> str | None:
     for table_name, required_columns in _REQUIRED_COLUMNS.items():
         columns = {
             str(row["name"])
-            for row in connection.execute(
-                f"PRAGMA table_info({table_name})"
-            ).fetchall()
+            for row in connection.execute(f"PRAGMA table_info({table_name})").fetchall()
         }
         missing_columns = sorted(required_columns - columns)
         if missing_columns:
-            return (
-                f"incompatible {table_name} schema; missing columns: "
-                + ", ".join(missing_columns)
+            return f"incompatible {table_name} schema; missing columns: " + ", ".join(
+                missing_columns
             )
     return None
 
@@ -145,9 +142,7 @@ class LocalConversationStore:
             )
             issue = _schema_issue(self._db)
             if issue is not None:
-                raise LocalConversationStoreError(
-                    "CONVERSATION-STORE-SCHEMA-001", issue
-                )
+                raise LocalConversationStoreError("CONVERSATION-STORE-SCHEMA-001", issue)
             self._db.execute(
                 "CREATE INDEX IF NOT EXISTS confirmation_requests_project_pending "
                 "ON confirmation_requests(project_id,status,request_id)"
@@ -237,7 +232,11 @@ class LocalConversationStore:
                 self._db.execute(
                     "INSERT INTO proposals(proposal_id,conversation_id,commitment_mode,status) "
                     "VALUES(?,?,?,'pending') ON CONFLICT(proposal_id) DO NOTHING",
-                    (document["proposal_id"], document["conversation_id"], document["commitment_mode"]),
+                    (
+                        document["proposal_id"],
+                        document["conversation_id"],
+                        document["commitment_mode"],
+                    ),
                 )
                 row = self._db.execute(
                     "SELECT conversation_id,commitment_mode FROM proposals WHERE proposal_id=?",
@@ -300,7 +299,11 @@ class LocalConversationStore:
                     "SELECT request_digest,status FROM confirmation_requests WHERE request_id=?",
                     (request_id,),
                 ).fetchone()
-                if row is None or str(row["request_digest"]) != str(request_digest) or str(row["status"]) != "pending":
+                if (
+                    row is None
+                    or str(row["request_digest"]) != str(request_digest)
+                    or str(row["status"]) != "pending"
+                ):
                     self._db.execute("ROLLBACK")
                     return False
                 self._store_document(receipt)
@@ -328,27 +331,36 @@ class LocalConversationStore:
             try:
                 if target_type == "proposal":
                     row = self._db.execute(
-                        "SELECT commitment_mode,status FROM proposals WHERE proposal_id=?", (target_id,)
+                        "SELECT commitment_mode,status FROM proposals WHERE proposal_id=?",
+                        (target_id,),
                     ).fetchone()
-                    if row is None or row["commitment_mode"] != "proposal_only" or row["status"] != "pending":
+                    if (
+                        row is None
+                        or row["commitment_mode"] != "proposal_only"
+                        or row["status"] != "pending"
+                    ):
                         self._db.execute("ROLLBACK")
                         return False
                     changed = self._db.execute(
-                        "UPDATE proposals SET status='cancelled' WHERE proposal_id=? AND status='pending'", (target_id,)
+                        "UPDATE proposals SET status='cancelled' WHERE proposal_id=? AND status='pending'",
+                        (target_id,),
                     ).rowcount
                 elif target_type == "confirmation_request":
                     row = self._db.execute(
-                        "SELECT status,proposal_id FROM confirmation_requests WHERE request_id=?", (target_id,)
+                        "SELECT status,proposal_id FROM confirmation_requests WHERE request_id=?",
+                        (target_id,),
                     ).fetchone()
                     if row is None or row["status"] != "pending":
                         self._db.execute("ROLLBACK")
                         return False
                     changed = self._db.execute(
-                        "UPDATE confirmation_requests SET status='cancelled' WHERE request_id=? AND status='pending'", (target_id,)
+                        "UPDATE confirmation_requests SET status='cancelled' WHERE request_id=? AND status='pending'",
+                        (target_id,),
                     ).rowcount
                     if changed:
                         self._db.execute(
-                            "UPDATE proposals SET status='cancelled' WHERE proposal_id=? AND status='pending'", (row["proposal_id"],)
+                            "UPDATE proposals SET status='cancelled' WHERE proposal_id=? AND status='pending'",
+                            (row["proposal_id"],),
                         )
                 else:
                     self._db.execute("ROLLBACK")
@@ -366,8 +378,12 @@ class LocalConversationStore:
                 self._store_document(document)
                 self._db.execute(
                     "UPDATE proposals SET status=? WHERE proposal_id=?",
-                    ("completed" if document["status"] in {"succeeded", "rejected", "failed"} else "cancelled",
-                     document["proposal_binding"]["proposal_id"]),
+                    (
+                        "completed"
+                        if document["status"] in {"succeeded", "rejected", "failed"}
+                        else "cancelled",
+                        document["proposal_binding"]["proposal_id"],
+                    ),
                 )
                 self._db.execute("COMMIT")
             except Exception:
@@ -389,7 +405,8 @@ class LocalConversationStore:
                     raise ValueError("immutable capability materialization collision")
                 return
             self._db.execute(
-                "INSERT INTO materializations(proposal_id,payload_json) VALUES(?,?)", (proposal_id, serialized)
+                "INSERT INTO materializations(proposal_id,payload_json) VALUES(?,?)",
+                (proposal_id, serialized),
             )
 
     def load_materialization(self, proposal_id):
@@ -402,7 +419,8 @@ class LocalConversationStore:
     def store_run_correlation(self, run_id, proposal_id, input_id):
         with self._lock:
             self._db.execute(
-                "INSERT INTO run_correlations(run_id,proposal_id,input_id) VALUES(?,?,?)", (run_id, proposal_id, input_id)
+                "INSERT INTO run_correlations(run_id,proposal_id,input_id) VALUES(?,?,?)",
+                (run_id, proposal_id, input_id),
             )
 
     def load_run_correlation(self, run_id):
@@ -441,7 +459,8 @@ class LocalConversationStore:
                     raise ValueError("immutable StateDeltaProposal identity collision")
                 return
             self._db.execute(
-                "INSERT INTO state_delta_proposals(proposal_id,payload_json) VALUES(?,?)", (proposal_id, serialized)
+                "INSERT INTO state_delta_proposals(proposal_id,payload_json) VALUES(?,?)",
+                (proposal_id, serialized),
             )
 
     def load_state_delta_proposal(self, proposal_id):
@@ -454,14 +473,28 @@ class LocalConversationStore:
     def list_pending(self, conversation_id):
         result = []
         with self._lock:
-            proposal_ids = [str(row["proposal_id"]) for row in self._db.execute(
-                "SELECT proposal_id FROM proposals WHERE conversation_id=? AND status='pending' ORDER BY proposal_id", (conversation_id,)
-            ).fetchall()]
-            request_ids = [str(row["request_id"]) for row in self._db.execute(
-                "SELECT request_id FROM confirmation_requests WHERE conversation_id=? AND status='pending' ORDER BY request_id", (conversation_id,)
-            ).fetchall()]
-        result.extend(doc for doc in (self.load_proposal(item) for item in proposal_ids) if doc is not None)
-        result.extend(doc for doc in (self.load_confirmation_request(item) for item in request_ids) if doc is not None)
+            proposal_ids = [
+                str(row["proposal_id"])
+                for row in self._db.execute(
+                    "SELECT proposal_id FROM proposals WHERE conversation_id=? AND status='pending' ORDER BY proposal_id",
+                    (conversation_id,),
+                ).fetchall()
+            ]
+            request_ids = [
+                str(row["request_id"])
+                for row in self._db.execute(
+                    "SELECT request_id FROM confirmation_requests WHERE conversation_id=? AND status='pending' ORDER BY request_id",
+                    (conversation_id,),
+                ).fetchall()
+            ]
+        result.extend(
+            doc for doc in (self.load_proposal(item) for item in proposal_ids) if doc is not None
+        )
+        result.extend(
+            doc
+            for doc in (self.load_confirmation_request(item) for item in request_ids)
+            if doc is not None
+        )
         return tuple(result)
 
     def list_pending_confirmation_requests(

@@ -66,8 +66,7 @@ def external_capture_artifact_metadata_for_project(
     if limit <= 0:
         raise ValueError("external material query limit must be positive")
     if after is not None and (
-        len(after) != 2
-        or not all(isinstance(item, str) and item for item in after)
+        len(after) != 2 or not all(isinstance(item, str) and item for item in after)
     ):
         raise ValueError("external material cursor key is invalid")
 
@@ -147,21 +146,14 @@ def external_capture_artifact_metadata_for_project(
             raise LocalExecutionStoreIntegrityError(
                 "persisted external material page has no original captures"
             )
-        capture_keys = sorted(
-            {
-                (artifact.run_id, _capture_id(artifact))
-                for artifact in originals
-            }
-        )
+        capture_keys = sorted({(artifact.run_id, _capture_id(artifact)) for artifact in originals})
 
         rendition_rows = []
         for offset in range(0, len(capture_keys), _CAPTURE_KEY_BATCH_SIZE):
             capture_batch = capture_keys[offset : offset + _CAPTURE_KEY_BATCH_SIZE]
             selected_values = ",".join("(?, ?)" for _ in capture_batch)
             selected_params = [
-                value
-                for run_id, capture_id in capture_batch
-                for value in (run_id, capture_id)
+                value for run_id, capture_id in capture_batch for value in (run_id, capture_id)
             ]
             rendition_rows.extend(
                 store._connection.execute(

@@ -9,10 +9,21 @@ from core.runtime import ObjectRef, StateDeltaProposal, TransitionAction, Transi
 
 _OPERATIONS = {"KEEP", "REFINE", "SPLIT", "MERGE", "CLOSE"}
 _COMMON_FIELDS = {
-    "operation", "question_ids", "rationale", "review_inputs",
-    "text", "acceptance_criteria", "scope_limits", "questions",
+    "operation",
+    "question_ids",
+    "rationale",
+    "review_inputs",
+    "text",
+    "acceptance_criteria",
+    "scope_limits",
+    "questions",
 }
-_REVIEW_INPUT_FIELDS = {"uncovered_attention_ids", "evidence_gap_ids", "publication_feedback_ids", "project_input_ids"}
+_REVIEW_INPUT_FIELDS = {
+    "uncovered_attention_ids",
+    "evidence_gap_ids",
+    "publication_feedback_ids",
+    "project_input_ids",
+}
 _QUESTION_FIELDS = {"text", "rationale", "acceptance_criteria", "scope_limits"}
 _MAX_QUESTION_IDS = 16
 _MAX_SPLIT_QUESTIONS = 16
@@ -37,9 +48,14 @@ def _non_empty_strings(
     max_items: int = _MAX_LIST_ITEMS,
     max_length: int = _MAX_LIST_ITEM_LENGTH,
 ) -> None:
-    if not isinstance(value, list) or len(value) < min_items or len(value) > max_items or any(
-        not isinstance(item, str) or not item.strip() or len(item) > max_length
-        for item in value
+    if (
+        not isinstance(value, list)
+        or len(value) < min_items
+        or len(value) > max_items
+        or any(
+            not isinstance(item, str) or not item.strip() or len(item) > max_length
+            for item in value
+        )
     ):
         raise ValueError(
             f"{field} must be an array of {min_items} through {max_items} non-empty strings "
@@ -94,9 +110,7 @@ def research_question_review_payload(payload: Mapping[str, Any]) -> None:
             or len(questions) < 2
             or len(questions) > _MAX_SPLIT_QUESTIONS
         ):
-            raise ValueError(
-                f"SPLIT requires between 2 and {_MAX_SPLIT_QUESTIONS} questions"
-            )
+            raise ValueError(f"SPLIT requires between 2 and {_MAX_SPLIT_QUESTIONS} questions")
         for index, item in enumerate(questions):
             if not isinstance(item, Mapping) or set(item) - _QUESTION_FIELDS:
                 raise ValueError(f"questions[{index}] contains unknown fields")
@@ -111,13 +125,17 @@ def research_question_review_payload(payload: Mapping[str, Any]) -> None:
 
 
 def _question_by_id(state, question_id: str) -> Mapping[str, Any]:
-    question = next((
-        item for item in state.effective_objects()
-        if item.get("kind") == "research_question"
-        and item.get("id") == question_id
-        and item.get("project_id") == state.project_ref
-        and item.get("adoption_state") == "approved"
-    ), None)
+    question = next(
+        (
+            item
+            for item in state.effective_objects()
+            if item.get("kind") == "research_question"
+            and item.get("id") == question_id
+            and item.get("project_id") == state.project_ref
+            and item.get("adoption_state") == "approved"
+        ),
+        None,
+    )
     if question is None:
         raise ValueError(
             f"question_ids must resolve to current authoritative approved Research Questions: {question_id}"
@@ -128,10 +146,7 @@ def _question_by_id(state, question_id: str) -> Mapping[str, Any]:
 def _downstream_refs(state, question_ids: set[str]) -> list[dict[str, str]]:
     refs: list[dict[str, str]] = []
     for item in state.effective_objects():
-        if (
-            item.get("kind") == "research_question"
-            and str(item.get("id", "")) in question_ids
-        ):
+        if item.get("kind") == "research_question" and str(item.get("id", "")) in question_ids:
             continue
         linked = False
         for field in ("question_id", "parent_question_id"):
@@ -139,10 +154,16 @@ def _downstream_refs(state, question_ids: set[str]) -> list[dict[str, str]]:
                 linked = True
         for field in ("question_ids", "rq_ids", "research_question_ids"):
             value = item.get(field, ())
-            if isinstance(value, (list, tuple)) and question_ids.intersection(str(x) for x in value):
+            if isinstance(value, (list, tuple)) and question_ids.intersection(
+                str(x) for x in value
+            ):
                 linked = True
         target = item.get("target")
-        if isinstance(target, Mapping) and target.get("kind") == "research_question" and str(target.get("id")) in question_ids:
+        if (
+            isinstance(target, Mapping)
+            and target.get("kind") == "research_question"
+            and str(target.get("id")) in question_ids
+        ):
             linked = True
         if linked and item.get("id"):
             refs.append({"kind": str(item.get("kind", "unknown")), "id": str(item["id"])})
@@ -150,7 +171,12 @@ def _downstream_refs(state, question_ids: set[str]) -> list[dict[str, str]]:
     return refs
 
 
-def _review_meta(operation: str, sources: list[Mapping[str, Any]], payload: Mapping[str, Any], downstream: list[dict[str, str]]) -> dict[str, Any]:
+def _review_meta(
+    operation: str,
+    sources: list[Mapping[str, Any]],
+    payload: Mapping[str, Any],
+    downstream: list[dict[str, str]],
+) -> dict[str, Any]:
     return {
         "question_lineage_id": str(sources[0].get("question_lineage_id") or sources[0]["id"]),
         "derived_from_question_revisions": [
@@ -183,7 +209,9 @@ class ResearchQuestionReviewHandler:
                         "operation": "KEEP",
                         "question_id": str(source["id"]),
                         "active_revision": int(source["revision"]),
-                        "question_lineage_id": str(source.get("question_lineage_id") or source["id"]),
+                        "question_lineage_id": str(
+                            source.get("question_lineage_id") or source["id"]
+                        ),
                         "review_inputs": review_inputs,
                         "bound_snapshot": {
                             "snapshot_id": str(state.current_snapshot["id"]),
@@ -240,18 +268,27 @@ class ResearchQuestionReviewHandler:
             for item in payload["questions"]:
                 new_id = self._ids.new("RQ-")
                 created = {
-                    "schema_version": "0.1.0", "id": new_id, "kind": "research_question",
-                    "revision": 0, "project_id": state.project_ref, "text": str(item["text"]),
+                    "schema_version": "0.1.0",
+                    "id": new_id,
+                    "kind": "research_question",
+                    "revision": 0,
+                    "project_id": state.project_ref,
+                    "text": str(item["text"]),
                     "acceptance_criteria": list(item.get("acceptance_criteria", ())),
-                    "scope_limits": list(item.get("scope_limits", ())), "adoption_state": "approved",
+                    "scope_limits": list(item.get("scope_limits", ())),
+                    "adoption_state": "approved",
                     "rationale": str(item.get("rationale") or payload["rationale"]),
                     "question_lineage_id": str(source.get("question_lineage_id") or source["id"]),
-                    "derived_from_question_revisions": [{"id": str(source["id"]), "revision": int(source["revision"])}],
-                    "question_delta": "SPLIT", "review_inputs": review_inputs,
+                    "derived_from_question_revisions": [
+                        {"id": str(source["id"]), "revision": int(source["revision"])}
+                    ],
+                    "question_delta": "SPLIT",
+                    "review_inputs": review_inputs,
                     "downstream_review_required_refs": deepcopy(downstream),
                 }
                 actions.append(TransitionAction(TransitionKind.CREATE_OBJECT, {"object": created}))
-                affected.append(ObjectRef("research_question", new_id)); outputs.append(created)
+                affected.append(ObjectRef("research_question", new_id))
+                outputs.append(created)
 
         elif operation == "MERGE":
             for source in sources:
@@ -260,25 +297,35 @@ class ResearchQuestionReviewHandler:
                 closed["adoption_state"] = "closed"
                 closed["rationale"] = str(payload["rationale"])
                 closed.update(_review_meta(operation, sources, payload, downstream))
-                closed["question_lineage_id"] = str(source.get("question_lineage_id") or source["id"])
+                closed["question_lineage_id"] = str(
+                    source.get("question_lineage_id") or source["id"]
+                )
                 actions.append(TransitionAction(TransitionKind.REVISE_OBJECT, {"object": closed}))
                 affected.append(ObjectRef("research_question", str(source["id"])))
                 outputs.append(closed)
             new_id = self._ids.new("RQ-")
             created = {
-                "schema_version": "0.1.0", "id": new_id, "kind": "research_question",
-                "revision": 0, "project_id": state.project_ref, "text": str(payload["text"]),
+                "schema_version": "0.1.0",
+                "id": new_id,
+                "kind": "research_question",
+                "revision": 0,
+                "project_id": state.project_ref,
+                "text": str(payload["text"]),
                 "acceptance_criteria": list(payload.get("acceptance_criteria", ())),
-                "scope_limits": list(payload.get("scope_limits", ())), "adoption_state": "approved",
-                "rationale": str(payload["rationale"]), "question_lineage_id": new_id,
+                "scope_limits": list(payload.get("scope_limits", ())),
+                "adoption_state": "approved",
+                "rationale": str(payload["rationale"]),
+                "question_lineage_id": new_id,
                 "derived_from_question_revisions": [
                     {"id": str(item["id"]), "revision": int(item["revision"])} for item in sources
                 ],
-                "question_delta": "MERGE", "review_inputs": review_inputs,
+                "question_delta": "MERGE",
+                "review_inputs": review_inputs,
                 "downstream_review_required_refs": deepcopy(downstream),
             }
             actions.append(TransitionAction(TransitionKind.CREATE_OBJECT, {"object": created}))
-            affected.append(ObjectRef("research_question", new_id)); outputs.append(created)
+            affected.append(ObjectRef("research_question", new_id))
+            outputs.append(created)
 
         provenance = {
             "producer": "research_question.review@0.1.0",
@@ -292,37 +339,57 @@ class ResearchQuestionReviewHandler:
                 {"id": str(item["id"]), "revision": int(item["revision"])} for item in sources
             ],
             "review_inputs": review_inputs,
-            "project_config": {"ref": state.project_config_ref, "digest": state.project_config_digest},
+            "project_config": {
+                "ref": state.project_config_ref,
+                "digest": state.project_config_digest,
+            },
         }
         candidate = StateDeltaProposal(
-            proposal_id=self._ids.new("SDP-"), project_ref=state.project_ref,
-            lineage_ref=state.lineage_ref, source_refs=(), proposed_actions=tuple(actions),
-            affected_refs=tuple(affected), rationale=str(payload["rationale"]),
+            proposal_id=self._ids.new("SDP-"),
+            project_ref=state.project_ref,
+            lineage_ref=state.lineage_ref,
+            source_refs=(),
+            proposed_actions=tuple(actions),
+            affected_refs=tuple(affected),
+            rationale=str(payload["rationale"]),
             required_human_decision_kinds=("research_revision",),
             current_snapshot_ref=str(state.current_snapshot["id"]),
             current_snapshot_digest=str(state.current_snapshot["content_digest"]),
-            provenance=provenance, candidate_only=True,
+            provenance=provenance,
+            candidate_only=True,
         ).with_calculated_digest()
         candidate_wire = {
-            "proposal_id": candidate.proposal_id, "project_ref": candidate.project_ref,
-            "lineage_ref": candidate.lineage_ref, "source_refs": [],
-            "proposed_actions": [{
-                "kind": action.kind.value, "payload": deepcopy(dict(action.payload)),
-                "decision_refs": [], "source_refs": [],
-            } for action in actions],
+            "proposal_id": candidate.proposal_id,
+            "project_ref": candidate.project_ref,
+            "lineage_ref": candidate.lineage_ref,
+            "source_refs": [],
+            "proposed_actions": [
+                {
+                    "kind": action.kind.value,
+                    "payload": deepcopy(dict(action.payload)),
+                    "decision_refs": [],
+                    "source_refs": [],
+                }
+                for action in actions
+            ],
             "affected_refs": [{"kind": ref.kind, "id": ref.id} for ref in affected],
             "rationale": candidate.rationale,
             "required_human_decision_kinds": list(candidate.required_human_decision_kinds),
             "current_snapshot_ref": candidate.current_snapshot_ref,
             "current_snapshot_digest": candidate.current_snapshot_digest,
-            "provenance": deepcopy(provenance), "candidate_only": True,
+            "provenance": deepcopy(provenance),
+            "candidate_only": True,
             "proposal_digest": candidate.proposal_digest,
         }
         self._store.store_state_delta_proposal(candidate.proposal_id, candidate_wire)
         return HarnessServiceResult(
             result_reference=candidate.proposal_id,
             data={
-                "question_delta": {"operation": operation, "questions": deepcopy(outputs), "downstream_review_required_refs": deepcopy(downstream)},
+                "question_delta": {
+                    "operation": operation,
+                    "questions": deepcopy(outputs),
+                    "downstream_review_required_refs": deepcopy(downstream),
+                },
                 "state_delta_proposal_id": candidate.proposal_id,
                 "state_delta_proposal": deepcopy(candidate_wire),
             },

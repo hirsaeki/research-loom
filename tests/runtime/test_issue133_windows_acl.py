@@ -44,7 +44,7 @@ class Issue133WindowsAclTests(ResearchPackageAcceptanceSupport):
             if not stripped or ":(" not in stripped:
                 continue
             if line.startswith(rendered_path):
-                stripped = line[len(rendered_path):].strip()
+                stripped = line[len(rendered_path) :].strip()
             entries.append(stripped)
         return entries
 
@@ -142,13 +142,18 @@ class Issue133WindowsAclTests(ResearchPackageAcceptanceSupport):
         verified = verify_export_root(output)
         self.assertEqual(verified["status"], "VERIFIED")
         self.assertEqual(verified["package_digest"], exported["package_digest"])
-        print(json.dumps({
-            "ISSUE133_ACL1_ACL2": {
-                "control_acl": self._icacls(control).stdout,
-                "final_acl": final_acl,
-                "package_digest": exported["package_digest"],
-            }
-        }, sort_keys=True))
+        print(
+            json.dumps(
+                {
+                    "ISSUE133_ACL1_ACL2": {
+                        "control_acl": self._icacls(control).stdout,
+                        "final_acl": final_acl,
+                        "package_digest": exported["package_digest"],
+                    }
+                },
+                sort_keys=True,
+            )
+        )
 
     def test_issue379_managed_package_resets_staging_acl_and_is_fresh_process_readable(self):
         real_mkdtemp = __import__("tempfile").mkdtemp
@@ -183,7 +188,11 @@ class Issue133WindowsAclTests(ResearchPackageAcceptanceSupport):
                     facade.build_research_package(case["build_input"])
             self.assertEqual(error.exception.code, "APPLICATION-RESEARCH-PACKAGE-WRITE-001")
             packages_root = self.workspace / ".research-loom" / "research-packages"
-            package_dirs = [path for path in packages_root.iterdir() if path.is_dir() and path.name.startswith("RP-")]
+            package_dirs = [
+                path
+                for path in packages_root.iterdir()
+                if path.is_dir() and path.name.startswith("RP-")
+            ]
             self.assertEqual(package_dirs, [])
         finally:
             facade.close()
@@ -196,7 +205,11 @@ class Issue133WindowsAclTests(ResearchPackageAcceptanceSupport):
         def competing_package_replace(src, dst):
             source = Path(src)
             target = Path(dst)
-            if source.name.startswith(".rp-") and target.parent.name == "research-packages" and target.name.startswith("RP-"):
+            if (
+                source.name.startswith(".rp-")
+                and target.parent.name == "research-packages"
+                and target.name.startswith("RP-")
+            ):
                 target.mkdir()
                 marker = target / "foreign.txt"
                 marker.write_text("foreign-package", encoding="utf-8")
@@ -217,14 +230,19 @@ class Issue133WindowsAclTests(ResearchPackageAcceptanceSupport):
         finally:
             facade.close()
 
-    def test_issue379_ablation_managed_rename_retains_restrictive_staging_acl_without_normalization(self):
+    def test_issue379_ablation_managed_rename_retains_restrictive_staging_acl_without_normalization(
+        self,
+    ):
         real_mkdtemp = __import__("tempfile").mkdtemp
-        with patch(
-            "plugins.local_application.research_package_service.tempfile.mkdtemp",
-            side_effect=self._restrict_export_temp(real_mkdtemp),
-        ), patch(
-            "plugins.local_application.research_package_service._normalize_windows_export_acl",
-            return_value=None,
+        with (
+            patch(
+                "plugins.local_application.research_package_service.tempfile.mkdtemp",
+                side_effect=self._restrict_export_temp(real_mkdtemp),
+            ),
+            patch(
+                "plugins.local_application.research_package_service._normalize_windows_export_acl",
+                return_value=None,
+            ),
         ):
             facade, case = self._build()
         managed = self.workspace / ".research-loom" / "research-packages" / case["package_id"]
@@ -250,7 +268,6 @@ class Issue133WindowsAclTests(ResearchPackageAcceptanceSupport):
             self.assertFalse(output.exists())
         finally:
             facade.close()
-
 
     def test_acl3_replace_race_does_not_delete_competing_output(self):
         facade, case = self._build()
@@ -279,12 +296,15 @@ class Issue133WindowsAclTests(ResearchPackageAcceptanceSupport):
         output = self.root / "issue133-ablation"
         real_mkdtemp = __import__("tempfile").mkdtemp
         try:
-            with patch(
-                "plugins.local_application.research_package_service.tempfile.mkdtemp",
-                side_effect=self._restrict_export_temp(real_mkdtemp),
-            ), patch(
-                "plugins.local_application.research_package_service._normalize_windows_export_acl",
-                return_value=None,
+            with (
+                patch(
+                    "plugins.local_application.research_package_service.tempfile.mkdtemp",
+                    side_effect=self._restrict_export_temp(real_mkdtemp),
+                ),
+                patch(
+                    "plugins.local_application.research_package_service._normalize_windows_export_acl",
+                    return_value=None,
+                ),
             ):
                 facade.export_research_package(case["package_id"], output)
         finally:
@@ -294,14 +314,20 @@ class Issue133WindowsAclTests(ResearchPackageAcceptanceSupport):
         control = self._normal_acl_control_tree(output, "ordinary-ablation-control")
         self.assertTrue(self._tree_acl_differs_from_normal_creation(output, control))
         self.assertEqual(verify_export_root(output)["status"], "VERIFIED")
-        print(json.dumps({
-            "ISSUE133_ABLATION": {
-                "control_acl": self._icacls(control).stdout,
-                "final_acl": ablated_acl,
-            }
-        }, sort_keys=True))
+        print(
+            json.dumps(
+                {
+                    "ISSUE133_ABLATION": {
+                        "control_acl": self._icacls(control).stdout,
+                        "final_acl": ablated_acl,
+                    }
+                },
+                sort_keys=True,
+            )
+        )
 
 
 if __name__ == "__main__":
     import unittest
+
     unittest.main()

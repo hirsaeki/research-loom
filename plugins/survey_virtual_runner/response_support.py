@@ -120,12 +120,10 @@ def reachable_questions(
 ) -> set[str]:
     questions = list(questionnaire.get("questions", ()))
     key_by_question = {
-        str(question["question_id"]): stable_response_key(question)
-        for question in questions
+        str(question["question_id"]): stable_response_key(question) for question in questions
     }
     index_by_question = {
-        str(question["question_id"]): index
-        for index, question in enumerate(questions)
+        str(question["question_id"]): index for index, question in enumerate(questions)
     }
     rules_by_target: dict[str, list[Mapping[str, Any]]] = {}
     end_after_index: int | None = None
@@ -138,10 +136,7 @@ def reachable_questions(
             target = str(rule.get("target_question_id") or "")
             if target:
                 rules_by_target.setdefault(target, []).append(rule)
-            if (
-                rule.get("action") == "end"
-                and _condition_matches(rule, answers, key_by_question)
-            ):
+            if rule.get("action") == "end" and _condition_matches(rule, answers, key_by_question):
                 condition_index = index_by_question.get(
                     str(rule["condition_question_id"]),
                     owner_index,
@@ -162,13 +157,9 @@ def reachable_questions(
         skip_rules = [rule for rule in rules if rule.get("action") == "skip"]
         visible = True
         if show_rules:
-            visible = any(
-                _condition_matches(rule, answers, key_by_question)
-                for rule in show_rules
-            )
+            visible = any(_condition_matches(rule, answers, key_by_question) for rule in show_rules)
         if visible and any(
-            _condition_matches(rule, answers, key_by_question)
-            for rule in skip_rules
+            _condition_matches(rule, answers, key_by_question) for rule in skip_rules
         ):
             visible = False
         if visible:
@@ -208,17 +199,11 @@ def _validate_answer_value(
     value = answer.get("value")
     qtype = str(question["question_type"])
     if qtype in {"single_choice", "multiple_choice"}:
-        allowed = {
-            _stable_option_value(option)
-            for option in question.get("response_options", ())
-        }
+        allowed = {_stable_option_value(option) for option in question.get("response_options", ())}
         values = value if qtype == "multiple_choice" else [value]
         if (
             not isinstance(values, list)
-            or (
-                qtype == "multiple_choice"
-                and len(values) != len(set(map(str, values)))
-            )
+            or (qtype == "multiple_choice" and len(values) != len(set(map(str, values))))
             or any(not isinstance(item, str) or item not in allowed for item in values)
         ):
             issues.append(

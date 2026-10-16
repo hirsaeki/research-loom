@@ -13,7 +13,11 @@ from unittest.mock import patch
 import rfc8785
 
 from core.execution import CapabilityRunRecord, RunStatus
-from plugins.local_application import LocalApplicationError, LocalApplicationFacade, LocalResearchApplication
+from plugins.local_application import (
+    LocalApplicationError,
+    LocalApplicationFacade,
+    LocalResearchApplication,
+)
 from plugins.local_application.cli import main as cli_main
 from plugins.local_research_exhibit_store import (
     EXHIBIT_CONTENT_MAX_BYTES,
@@ -35,12 +39,14 @@ def profile_provider(_project_ref, expected_digest):
             "research_contract": "0.1.0",
             "invariant_contract": "0.1.0",
         },
-        "profile_pins": [{
-            "profile_id": "fixture.research",
-            "profile_type": "research",
-            "profile_version": "1.0.0",
-            "manifest_sha256": "1" * 64,
-        }],
+        "profile_pins": [
+            {
+                "profile_id": "fixture.research",
+                "profile_type": "research",
+                "profile_version": "1.0.0",
+                "manifest_sha256": "1" * 64,
+            }
+        ],
         "content_digest": expected_digest,
     }
 
@@ -117,10 +123,7 @@ def state_signature(app: LocalResearchApplication) -> tuple:
             (str(item["kind"]), str(item["id"]), int(item.get("revision", 0)))
             for item in state.effective_objects()
         ),
-        tuple(
-            str(item["request_id"])
-            for item in app.human_decisions.pending("PRJ-1")
-        ),
+        tuple(str(item["request_id"]) for item in app.human_decisions.pending("PRJ-1")),
     )
 
 
@@ -188,10 +191,14 @@ class ResearchExhibitTests(unittest.TestCase):
             self.assertEqual(captured["exhibit"]["content_digest"], expected_digest)
             self.assertNotIn("content", captured["exhibit"])
             self.assertEqual(state_signature(app), before)
-            self.assertFalse(any(
-                item["kind"] in {"evidence", "finding"}
-                for item in app.state_repository.load_state_view("PRJ-1", "LIN-1").effective_objects()
-            ))
+            self.assertFalse(
+                any(
+                    item["kind"] in {"evidence", "finding"}
+                    for item in app.state_repository.load_state_view(
+                        "PRJ-1", "LIN-1"
+                    ).effective_objects()
+                )
+            )
             app.close()
 
             reopened = LocalResearchApplication(
@@ -215,17 +222,23 @@ class ResearchExhibitTests(unittest.TestCase):
                 facade = LocalApplicationFacade(app, "PRJ-1")
                 value_a = {"z": [3, 2, 1], "a": {"right": 2, "left": 1}}
                 value_b = {"a": {"left": 1, "right": 2}, "z": [3, 2, 1]}
-                first = facade.capture_exhibit(exhibit_payload(
-                    kind="matrix", representation="json", value=value_a, title="Matrix A"
-                ))
-                second = facade.capture_exhibit(exhibit_payload(
-                    kind="matrix", representation="json", value=value_b, title="Matrix B"
-                ))
+                first = facade.capture_exhibit(
+                    exhibit_payload(
+                        kind="matrix", representation="json", value=value_a, title="Matrix A"
+                    )
+                )
+                second = facade.capture_exhibit(
+                    exhibit_payload(
+                        kind="matrix", representation="json", value=value_b, title="Matrix B"
+                    )
+                )
                 expected = "sha256:" + hashlib.sha256(rfc8785.dumps(value_a)).hexdigest()
                 self.assertEqual(first["exhibit"]["content_digest"], expected)
                 self.assertEqual(second["exhibit"]["content_digest"], expected)
                 self.assertEqual(
-                    facade.show_exhibit(first["exhibit"]["exhibit_id"])["exhibit"]["content"]["value"],
+                    facade.show_exhibit(first["exhibit"]["exhibit_id"])["exhibit"]["content"][
+                        "value"
+                    ],
                     value_a,
                 )
             finally:
@@ -237,9 +250,15 @@ class ResearchExhibitTests(unittest.TestCase):
             try:
                 facade = LocalApplicationFacade(app, "PRJ-1")
                 a = facade.capture_exhibit(exhibit_payload(rq_id="RQ-1", title="G1 table"))
-                facade.capture_exhibit(exhibit_payload(
-                    rq_id="RQ-2", title="G2 note", kind="note", representation="text", value="note"
-                ))
+                facade.capture_exhibit(
+                    exhibit_payload(
+                        rq_id="RQ-2",
+                        title="G2 note",
+                        kind="note",
+                        representation="text",
+                        value="note",
+                    )
+                )
                 listed = facade.list_exhibits(rq_id="RQ-1")
                 self.assertEqual(
                     [item["exhibit_id"] for item in listed["exhibits"]],
@@ -298,10 +317,12 @@ class ResearchExhibitTests(unittest.TestCase):
                 first = facade.capture_exhibit(exhibit_payload(title="v0"))
                 first_id = first["exhibit"]["exhibit_id"]
                 first_before = facade.show_exhibit(first_id)["exhibit"]
-                second = facade.capture_exhibit(exhibit_payload(
-                    title="v1",
-                    derived_from_exhibit_ids=[first_id],
-                ))
+                second = facade.capture_exhibit(
+                    exhibit_payload(
+                        title="v1",
+                        derived_from_exhibit_ids=[first_id],
+                    )
+                )
                 self.assertEqual(
                     facade.show_exhibit(second["exhibit"]["exhibit_id"])["exhibit"][
                         "derived_from_exhibit_ids"
@@ -311,9 +332,9 @@ class ResearchExhibitTests(unittest.TestCase):
                 self.assertEqual(facade.show_exhibit(first_id)["exhibit"], first_before)
 
                 with self.assertRaises(LocalApplicationError) as unknown:
-                    facade.capture_exhibit(exhibit_payload(
-                        title="bad", derived_from_exhibit_ids=["EXH-UNKNOWN"]
-                    ))
+                    facade.capture_exhibit(
+                        exhibit_payload(title="bad", derived_from_exhibit_ids=["EXH-UNKNOWN"])
+                    )
                 self.assertEqual(unknown.exception.code, "APPLICATION-EXHIBIT-DERIVED-001")
 
                 store = LocalResearchExhibitStore(Path(temp) / "research-exhibits.sqlite3")
@@ -339,9 +360,7 @@ class ResearchExhibitTests(unittest.TestCase):
                     payload[field] = value
                     with self.assertRaises(LocalApplicationError) as owned:
                         facade.capture_exhibit(payload)
-                    self.assertEqual(
-                        owned.exception.code, "APPLICATION-EXHIBIT-AUTHORITY-001"
-                    )
+                    self.assertEqual(owned.exception.code, "APPLICATION-EXHIBIT-AUTHORITY-001")
 
                 bad_values = [
                     exhibit_payload(kind="figure"),
@@ -399,11 +418,13 @@ class ResearchExhibitTests(unittest.TestCase):
             try:
                 facade = LocalApplicationFacade(app, "PRJ-1")
                 for index in range(101):
-                    facade.capture_exhibit(exhibit_payload(
-                        title=f"Fixture table {index:03d}",
-                        representation="text",
-                        value=f"fixture-{index}",
-                    ))
+                    facade.capture_exhibit(
+                        exhibit_payload(
+                            title=f"Fixture table {index:03d}",
+                            representation="text",
+                            value=f"fixture-{index}",
+                        )
+                    )
                 listed = facade.list_exhibits()
                 self.assertEqual(len(listed["exhibits"]), 100)
                 self.assertTrue(listed["truncated"])
@@ -427,20 +448,34 @@ class ResearchExhibitTests(unittest.TestCase):
                     self.assertEqual(code, 0)
                     exhibit_id = captured["exhibit"]["exhibit_id"]
 
-                    code, listed = run_cli([
-                        "exhibit", "list", "--workspace", str(temp),
-                        "--rq-id", "RQ-1", "--json",
-                    ])
+                    code, listed = run_cli(
+                        [
+                            "exhibit",
+                            "list",
+                            "--workspace",
+                            str(temp),
+                            "--rq-id",
+                            "RQ-1",
+                            "--json",
+                        ]
+                    )
                     self.assertEqual(code, 0)
                     self.assertEqual(
                         [item["exhibit_id"] for item in listed["exhibits"]],
                         [exhibit_id],
                     )
 
-                    code, shown = run_cli([
-                        "exhibit", "show", "--workspace", str(temp),
-                        "--exhibit-id", exhibit_id, "--json",
-                    ])
+                    code, shown = run_cli(
+                        [
+                            "exhibit",
+                            "show",
+                            "--workspace",
+                            str(temp),
+                            "--exhibit-id",
+                            exhibit_id,
+                            "--json",
+                        ]
+                    )
                     self.assertEqual(code, 0)
                     self.assertEqual(shown["exhibit"]["exhibit_id"], exhibit_id)
                     self.assertIn("content", shown["exhibit"])

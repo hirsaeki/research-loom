@@ -29,19 +29,23 @@ class ResearchAttentionMapContractTests(unittest.TestCase):
             "project_id": "PRJ-1",
             "project_config": {"ref": "project-config.json", "digest": "sha256:" + "1" * 64},
             "base": {"source": "project_config_baseline"},
-            "items": [{
-                "attention_id": "ATT-FIXTURE-001",
-                "statement": "Keep a synthetic cross-cutting issue visible.",
-                "source_reference_ids": ["REF-1"],
-                "related_question_ids": ["RQ-1"],
-                "related_question_seed_ids": ["RQ-SEED-1"],
-                "disposition": "active",
-                "projection_hints": [{
-                    "hint_type": "publication_location",
-                    "value": "synthetic location",
-                    "normative": False,
-                }],
-            }],
+            "items": [
+                {
+                    "attention_id": "ATT-FIXTURE-001",
+                    "statement": "Keep a synthetic cross-cutting issue visible.",
+                    "source_reference_ids": ["REF-1"],
+                    "related_question_ids": ["RQ-1"],
+                    "related_question_seed_ids": ["RQ-SEED-1"],
+                    "disposition": "active",
+                    "projection_hints": [
+                        {
+                            "hint_type": "publication_location",
+                            "value": "synthetic location",
+                            "normative": False,
+                        }
+                    ],
+                }
+            ],
             "provenance": {
                 "source_action_proposal_id": "PROP-1",
                 "source_action_proposal_digest": "sha256:" + "2" * 64,
@@ -53,16 +57,28 @@ class ResearchAttentionMapContractTests(unittest.TestCase):
         return value
 
     def test_attention_item_semantics_are_identical_to_project_config(self):
-        self.assertEqual(self.map_schema["$defs"]["attention_item"], self.project_schema["$defs"]["attention_item"])
-        self.assertEqual(self.map_schema["$defs"]["projection_hint"], self.project_schema["$defs"]["projection_hint"])
+        self.assertEqual(
+            self.map_schema["$defs"]["attention_item"],
+            self.project_schema["$defs"]["attention_item"],
+        )
+        self.assertEqual(
+            self.map_schema["$defs"]["projection_hint"],
+            self.project_schema["$defs"]["projection_hint"],
+        )
 
     def test_valid_complete_snapshot_and_active_base_validate(self):
         value = self.map()
         self.assertEqual(list(self.validator.iter_errors(value)), [])
         active = deepcopy(value)
         active["map_id"] = "ATTMAP-FIXTURE-002"
-        active["base"] = {"source": "active_map", "map_id": value["map_id"], "map_digest": value["map_digest"]}
-        active["map_digest"] = canonical_digest({k: v for k, v in active.items() if k != "map_digest"})
+        active["base"] = {
+            "source": "active_map",
+            "map_id": value["map_id"],
+            "map_digest": value["map_digest"],
+        }
+        active["map_digest"] = canonical_digest(
+            {k: v for k, v in active.items() if k != "map_digest"}
+        )
         self.assertEqual(list(self.validator.iter_errors(active)), [])
 
     def test_dropped_attention_requires_reason_and_unknown_item_fields_fail(self):

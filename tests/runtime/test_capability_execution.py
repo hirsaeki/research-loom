@@ -58,10 +58,7 @@ class MutableStateProvider:
         self.state = state
 
     def load_state_view(self, project_ref: str, lineage_ref: str) -> StateView:
-        if (
-            project_ref != self.state.project_ref
-            or lineage_ref != self.state.lineage_ref
-        ):
+        if project_ref != self.state.project_ref or lineage_ref != self.state.lineage_ref:
             raise KeyError((project_ref, lineage_ref))
         return self.state
 
@@ -83,13 +80,9 @@ def state_for_context(context: dict = CONTEXT) -> StateView:
         pin["revision"],
         "virtual",
         project_config_ref="CFG-1",
-        project_config_digest=context["pins"]["project_config"][
-            "configuration_digest"
-        ],
+        project_config_digest=context["pins"]["project_config"]["configuration_digest"],
         effective_profile_set_ref="EPS-1",
-        effective_profile_set_digest=context["pins"]["effective_profile_set"][
-            "content_digest"
-        ],
+        effective_profile_set_digest=context["pins"]["effective_profile_set"]["content_digest"],
     )
     return StateView(
         context["project_id"],
@@ -189,17 +182,13 @@ class CapabilityExecutionRuntimeTests(unittest.TestCase):
         traces = InMemoryExecutionTraceStore()
         states = MutableStateProvider(state or state_for_context())
         authorization = AllowListedAuthorizationProvider(
-            (invocation["runtime_authorization_evidence"]["authorization_digest"],)
-            if auth
-            else (),
+            (invocation["runtime_authorization_evidence"]["authorization_digest"],) if auth else (),
             denied=not auth,
         )
         resources = InMemoryResourceProvider(
             {
                 ref: b"fixture"
-                for ref in invocation["runtime_authorization_evidence"][
-                    "resource_reference_ids"
-                ]
+                for ref in invocation["runtime_authorization_evidence"]["resource_reference_ids"]
             }
         )
         service = CapabilityExecutionService(
@@ -208,9 +197,7 @@ class CapabilityExecutionRuntimeTests(unittest.TestCase):
             states,
             authorization,
             resources,
-            CapabilityNormalizationBoundary(
-                tuple(normalizers or (GenericNormalizer(),))
-            ),
+            CapabilityNormalizationBoundary(tuple(normalizers or (GenericNormalizer(),))),
             StaticClock(),
         )
         return service, traces, states, registry
@@ -538,9 +525,7 @@ class CapabilityExecutionRuntimeTests(unittest.TestCase):
         )
         self.assertEqual(result.run.status, RunStatus.ABORTED)
         self.assertIsNone(result.state_delta_proposal)
-        self.assertTrue(
-            any(kind == "late_or_racing_result" for _, kind, _ in traces.diagnostics)
-        )
+        self.assertTrue(any(kind == "late_or_racing_result" for _, kind, _ in traces.diagnostics))
         self.assertEqual(
             [event.to_status for event in traces.events_for("RUN-001")],
             [RunStatus.PREPARED, RunStatus.RUNNING, RunStatus.ABORTED],
@@ -617,9 +602,9 @@ class CapabilityExecutionRuntimeTests(unittest.TestCase):
 
     def test_duplicate_guard_identity_fails_closed(self):
         duplicate = deepcopy(CONTEXT)
-        duplicate["project_constraints"]["prohibitions"][0]["guard_id"] = (
-            duplicate["project_constraints"]["requirements"][0]["guard_id"]
-        )
+        duplicate["project_constraints"]["prohibitions"][0]["guard_id"] = duplicate[
+            "project_constraints"
+        ]["requirements"][0]["guard_id"]
         refresh(duplicate, "context_pack_digest")
         validator = CanonicalCapabilityExecutionValidator()
         with self.assertRaises(CapabilityExecutionError) as cm:
@@ -666,9 +651,7 @@ class FutureCapabilityExecutionTests(unittest.TestCase):
             "descriptor_digest": descriptor["descriptor_digest"],
             "function_id": "evaluate",
         }
-        invocation["runtime_authorization_evidence"]["capability_id"] = (
-            descriptor["capability_id"]
-        )
+        invocation["runtime_authorization_evidence"]["capability_id"] = descriptor["capability_id"]
         invocation["runtime_authorization_evidence"]["function_id"] = "evaluate"
         invocation["trace"]["trace_id"] = "TRACE-FUTURE"
         refresh(invocation, "invocation_digest")
@@ -678,13 +661,9 @@ class FutureCapabilityExecutionTests(unittest.TestCase):
         handoff["invocation_id"] = invocation["invocation_id"]
         handoff["run_id"] = invocation["run_id"]
         handoff["capability"] = deepcopy(invocation["capability"])
-        handoff["input_pins"]["invocation_digest"] = invocation[
-            "invocation_digest"
-        ]
+        handoff["input_pins"]["invocation_digest"] = invocation["invocation_digest"]
         handoff["provenance"]["trace_id"] = "TRACE-FUTURE"
-        handoff["provenance"]["implementation_id"] = (
-            FutureCapabilityAdapter.implementation_id
-        )
+        handoff["provenance"]["implementation_id"] = FutureCapabilityAdapter.implementation_id
         handoff["provenance"]["implementation_version"] = (
             FutureCapabilityAdapter.implementation_version
         )
@@ -701,18 +680,12 @@ class FutureCapabilityExecutionTests(unittest.TestCase):
         traces = InMemoryExecutionTraceStore()
         state = MutableStateProvider(state_for_context())
         authorization = AllowListedAuthorizationProvider(
-            (
-                invocation["runtime_authorization_evidence"][
-                    "authorization_digest"
-                ],
-            )
+            (invocation["runtime_authorization_evidence"]["authorization_digest"],)
         )
         resources = InMemoryResourceProvider(
             {
                 ref: b"fixture"
-                for ref in invocation["runtime_authorization_evidence"][
-                    "resource_reference_ids"
-                ]
+                for ref in invocation["runtime_authorization_evidence"]["resource_reference_ids"]
             }
         )
         service = CapabilityExecutionService(
@@ -738,8 +711,7 @@ class FutureCapabilityExecutionTests(unittest.TestCase):
 class DependencyBoundaryTests(unittest.TestCase):
     def test_execution_core_has_no_capability_specific_or_sqlite_dependency(self):
         text = "\n".join(
-            path.read_text(encoding="utf-8")
-            for path in (ROOT / "core/execution").glob("*.py")
+            path.read_text(encoding="utf-8") for path in (ROOT / "core/execution").glob("*.py")
         )
         for forbidden in (
             "import sqlite3",

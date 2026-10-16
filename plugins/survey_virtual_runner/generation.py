@@ -5,10 +5,19 @@ from typing import Any, Mapping, Sequence
 from .response_validation import reachable_questions, stable_response_key
 
 DEFAULT_STRESS_FAULTS = (
-    "required_missing", "optional_missing", "unknown", "not_applicable",
-    "prefer_not_to_answer", "invalid_choice", "out_of_range_scale",
-    "branch_violation", "duplicate_record", "duplicate_identity",
-    "partial_completion", "malformed_response", "extreme_valid",
+    "required_missing",
+    "optional_missing",
+    "unknown",
+    "not_applicable",
+    "prefer_not_to_answer",
+    "invalid_choice",
+    "out_of_range_scale",
+    "branch_violation",
+    "duplicate_record",
+    "duplicate_identity",
+    "partial_completion",
+    "malformed_response",
+    "extreme_valid",
 )
 
 
@@ -81,9 +90,7 @@ def _prune_unreachable(questionnaire: Mapping[str, Any], record: dict[str, Any])
     seen: set[tuple[str, ...]] = set()
     while True:
         signature = tuple(
-            str(item.get("response_key"))
-            for item in working
-            if isinstance(item, Mapping)
+            str(item.get("response_key")) for item in working if isinstance(item, Mapping)
         )
         if signature in seen:
             # Cyclic/ambiguous branching is not repaired by the generator. Preserve the
@@ -156,7 +163,9 @@ def _inject_branch_violation(questionnaire: Mapping[str, Any], record: dict[str,
                 ]
                 expected = str(rule.get("value"))
                 alternate = next((item for item in values if item != expected), "__NON_MATCHING__")
-                _set_value(record, condition, alternate if rule.get("action") == "show" else expected)
+                _set_value(
+                    record, condition, alternate if rule.get("action") == "show" else expected
+                )
             _set_value(record, target, _value(target))
             return
 

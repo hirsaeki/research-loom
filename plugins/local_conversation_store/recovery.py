@@ -56,14 +56,11 @@ def persist_state_delta_proposal_idempotently(
             ).fetchone()
             if row is not None:
                 if str(row["payload_json"]) != serialized:
-                    raise ValueError(
-                        "immutable StateDeltaProposal identity collision"
-                    )
+                    raise ValueError("immutable StateDeltaProposal identity collision")
                 store._db.execute("COMMIT")
                 return True
             store._db.execute(
-                "INSERT INTO state_delta_proposals(proposal_id,payload_json) "
-                "VALUES(?,?)",
+                "INSERT INTO state_delta_proposals(proposal_id,payload_json) VALUES(?,?)",
                 (proposal_id, serialized),
             )
             store._db.execute("COMMIT")

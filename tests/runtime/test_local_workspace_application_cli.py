@@ -40,6 +40,7 @@ def _configuration_digest(config: dict) -> str:
     value = deepcopy(config)
     value.pop("configuration_digest", None)
     import hashlib
+
     return "sha256:" + hashlib.sha256(rfc8785.dumps(value)).hexdigest()
 
 
@@ -68,12 +69,14 @@ def profile_provider(_project_ref, expected_digest):
     return {
         "schema_version": "0.1.0",
         "core_contracts": {"research_contract": "0.1.0", "invariant_contract": "0.1.0"},
-        "profile_pins": [{
-            "profile_id": "fixture.research",
-            "profile_type": "research",
-            "profile_version": "1.0.0",
-            "manifest_sha256": "1" * 64,
-        }],
+        "profile_pins": [
+            {
+                "profile_id": "fixture.research",
+                "profile_type": "research",
+                "profile_version": "1.0.0",
+                "manifest_sha256": "1" * 64,
+            }
+        ],
         "content_digest": expected_digest,
     }
 
@@ -140,11 +143,17 @@ class LocalWorkspaceBootstrapTests(unittest.TestCase):
             try:
                 state = reopened.application.state_repository.load_state_view(
                     reopened.project_id,
-                    reopened.application.state_repository.load_active_lineage_ref(reopened.project_id),
+                    reopened.application.state_repository.load_active_lineage_ref(
+                        reopened.project_id
+                    ),
                 )
                 self.assertEqual(
                     first_head,
-                    (state.active_lineage_ref, state.current_snapshot["id"], state.current_snapshot["content_digest"]),
+                    (
+                        state.active_lineage_ref,
+                        state.current_snapshot["id"],
+                        state.current_snapshot["content_digest"],
+                    ),
                 )
             finally:
                 reopened.close()
@@ -188,17 +197,28 @@ class LocalWorkspaceBootstrapTests(unittest.TestCase):
                     binding["project_id"] = "PRJ-OTHER"
                     binding_path.write_text(json.dumps(binding))
                 elif case == "config":
-                    config = json.loads((workspace / ".research-loom/project-config.json").read_text())
+                    config = json.loads(
+                        (workspace / ".research-loom/project-config.json").read_text()
+                    )
                     config["project"]["title"] += " tampered"
-                    (workspace / ".research-loom/project-config.json").write_text(json.dumps(config))
+                    (workspace / ".research-loom/project-config.json").write_text(
+                        json.dumps(config)
+                    )
                 elif case == "profiles":
-                    profiles = json.loads((workspace / ".research-loom/effective-profile-set.json").read_text())
+                    profiles = json.loads(
+                        (workspace / ".research-loom/effective-profile-set.json").read_text()
+                    )
                     profiles["core_contracts"]["research_contract"] = "0.1.1"
-                    (workspace / ".research-loom/effective-profile-set.json").write_text(json.dumps(profiles))
+                    (workspace / ".research-loom/effective-profile-set.json").write_text(
+                        json.dumps(profiles)
+                    )
                 elif case == "db_pin":
                     db = sqlite3.connect(workspace / ".research-loom/research-state.sqlite3")
                     try:
-                        db.execute("UPDATE project_state SET effective_profile_set_digest=?", ("sha256:" + "0" * 64,))
+                        db.execute(
+                            "UPDATE project_state SET effective_profile_set_digest=?",
+                            ("sha256:" + "0" * 64,),
+                        )
                         db.commit()
                     finally:
                         db.close()
@@ -226,9 +246,15 @@ class LocalWorkspaceBootstrapTests(unittest.TestCase):
             binding_mtime = (workspace / ".research-loom/workspace-binding.json").stat().st_mtime_ns
             result = LocalWorkspace.doctor(workspace)
             self.assertEqual(result["status"], "OK")
-            self.assertEqual(binding_mtime, (workspace / ".research-loom/workspace-binding.json").stat().st_mtime_ns)
+            self.assertEqual(
+                binding_mtime,
+                (workspace / ".research-loom/workspace-binding.json").stat().st_mtime_ns,
+            )
             checks = {item["check"] for item in result["checks"]}
-            self.assertTrue({"research_state", "conversation_store", "decision_store", "execution_store"} <= checks)
+            self.assertTrue(
+                {"research_state", "conversation_store", "decision_store", "execution_store"}
+                <= checks
+            )
 
 
 class LocalApplicationFacadeTests(unittest.TestCase):
@@ -263,10 +289,15 @@ class LocalApplicationFacadeTests(unittest.TestCase):
             app = self.make_app(temp)
             try:
                 facade = LocalApplicationFacade(app, "PRJ-1")
-                result = facade.submit_action({
-                    "action_type": "desktop_research.investigate",
-                    "payload": {"question_id": "RQ-1", "purpose": "Investigate current evidence."},
-                })
+                result = facade.submit_action(
+                    {
+                        "action_type": "desktop_research.investigate",
+                        "payload": {
+                            "question_id": "RQ-1",
+                            "purpose": "Investigate current evidence.",
+                        },
+                    }
+                )
                 self.assertEqual(result["status"], "CAPABILITY_EXECUTION_PREPARED")
                 run = app.execution_store.load_run(result["run_id"])
                 self.assertEqual(run.capability_id, "desktop-research")
@@ -284,17 +315,25 @@ class LocalApplicationFacadeTests(unittest.TestCase):
                 with self.assertRaises(ConversationRuntimeError):
                     facade.submit_action({"action_type": "unknown.action", "payload": {}})
                 with self.assertRaises(LocalApplicationError) as payload_error:
-                    facade.submit_action({"action_type": "research.status", "payload": {"not_allowed": True}})
+                    facade.submit_action(
+                        {"action_type": "research.status", "payload": {"not_allowed": True}}
+                    )
                 self.assertEqual(payload_error.exception.code, "APPLICATION-PAYLOAD-001")
                 with self.assertRaises(LocalApplicationError) as route:
-                    facade.submit_action({"action_type": "research.status", "payload": {}, "route": "override"})
+                    facade.submit_action(
+                        {"action_type": "research.status", "payload": {}, "route": "override"}
+                    )
                 self.assertEqual(route.exception.code, "APPLICATION-INGRESS-001")
                 for forbidden in ("decision_reference_ids", "state_transition_request"):
                     with self.assertRaises(LocalApplicationError) as authority:
-                        facade.submit_action({
-                            "action_type": "research.status",
-                            "payload": {forbidden: ["DEC-X"] if forbidden.endswith("ids") else {}},
-                        })
+                        facade.submit_action(
+                            {
+                                "action_type": "research.status",
+                                "payload": {
+                                    forbidden: ["DEC-X"] if forbidden.endswith("ids") else {}
+                                },
+                            }
+                        )
                     self.assertEqual(authority.exception.code, "APPLICATION-AUTHORITY-001")
             finally:
                 app.close()
@@ -308,24 +347,36 @@ class LocalApplicationFacadeTests(unittest.TestCase):
                 revised = deepcopy(dict(prior))
                 revised["revision"] = int(prior["revision"]) + 1
                 revised["text"] = "Materially revised question?"
-                candidate = state_delta(state, "SDP-FACADE", {
-                    "kind": "REVISE_OBJECT",
-                    "payload": {"object": revised},
-                    "decision_refs": [],
-                    "source_refs": ["TEST-SETUP"],
-                })
-                app.conversation_store.store_state_delta_proposal(candidate["proposal_id"], candidate)
+                candidate = state_delta(
+                    state,
+                    "SDP-FACADE",
+                    {
+                        "kind": "REVISE_OBJECT",
+                        "payload": {"object": revised},
+                        "decision_refs": [],
+                        "source_refs": ["TEST-SETUP"],
+                    },
+                )
+                app.conversation_store.store_state_delta_proposal(
+                    candidate["proposal_id"], candidate
+                )
                 facade = LocalApplicationFacade(app, "PRJ-1")
-                action = facade.submit_action({
-                    "action_type": "state.apply_candidate",
-                    "payload": {"state_delta_proposal_id": "SDP-FACADE"},
-                    "actor_id": "HUMAN-1",
-                })
+                action = facade.submit_action(
+                    {
+                        "action_type": "state.apply_candidate",
+                        "payload": {"state_delta_proposal_id": "SDP-FACADE"},
+                        "actor_id": "HUMAN-1",
+                    }
+                )
                 self.assertEqual(action["status"], "CONFIRMATION_REQUIRED")
-                confirmed = facade.submit_confirmation({
-                    "confirmation_request_id": action["confirmation_request"]["confirmation_request_id"],
-                    "actor_id": "HUMAN-1",
-                })
+                confirmed = facade.submit_confirmation(
+                    {
+                        "confirmation_request_id": action["confirmation_request"][
+                            "confirmation_request_id"
+                        ],
+                        "actor_id": "HUMAN-1",
+                    }
+                )
                 self.assertEqual(confirmed["status"], "HUMAN_DECISION_REQUIRED")
                 self.assertTrue(facade.status()["pending_human_decisions"])
             finally:
@@ -338,10 +389,18 @@ class JsonCliTests(unittest.TestCase):
             root = Path(temp)
             config_path, profile_path = write_inputs(root)
             workspace = root / "workspace"
-            code, raw, init = run_cli([
-                "init", "--workspace", str(workspace), "--project-config", str(config_path),
-                "--effective-profile-set", str(profile_path), "--json",
-            ])
+            code, raw, init = run_cli(
+                [
+                    "init",
+                    "--workspace",
+                    str(workspace),
+                    "--project-config",
+                    str(config_path),
+                    "--effective-profile-set",
+                    str(profile_path),
+                    "--json",
+                ]
+            )
             self.assertEqual(code, 0)
             self.assertEqual(json.loads(raw), init)
             self.assertEqual(init["status"], "INITIALIZED")
@@ -364,16 +423,26 @@ class JsonCliTests(unittest.TestCase):
             root = Path(temp)
             config_path, profile_path = write_inputs(root)
             workspace = root / "workspace"
-            run_cli([
-                "init", "--workspace", str(workspace), "--project-config", str(config_path),
-                "--effective-profile-set", str(profile_path), "--json",
-            ])
+            run_cli(
+                [
+                    "init",
+                    "--workspace",
+                    str(workspace),
+                    "--project-config",
+                    str(config_path),
+                    "--effective-profile-set",
+                    str(profile_path),
+                    "--json",
+                ]
+            )
             code, _raw, pending = run_cli(
                 ["action", "submit", "--workspace", str(workspace), "--json", "-"],
-                json.dumps({
-                    "action_type": "state.apply_candidate",
-                    "payload": {"state_delta_proposal_id": "MISSING-CANDIDATE"},
-                }),
+                json.dumps(
+                    {
+                        "action_type": "state.apply_candidate",
+                        "payload": {"state_delta_proposal_id": "MISSING-CANDIDATE"},
+                    }
+                ),
             )
             self.assertEqual(code, 0)
             self.assertEqual(pending["status"], "CONFIRMATION_REQUIRED")
@@ -392,10 +461,18 @@ class JsonCliTests(unittest.TestCase):
             root = Path(temp)
             config_path, profile_path = write_inputs(root)
             workspace = root / "workspace"
-            run_cli([
-                "init", "--workspace", str(workspace), "--project-config", str(config_path),
-                "--effective-profile-set", str(profile_path), "--json",
-            ])
+            run_cli(
+                [
+                    "init",
+                    "--workspace",
+                    str(workspace),
+                    "--project-config",
+                    str(config_path),
+                    "--effective-profile-set",
+                    str(profile_path),
+                    "--json",
+                ]
+            )
 
             opened = LocalWorkspace.open(workspace)
             try:
@@ -404,33 +481,51 @@ class JsonCliTests(unittest.TestCase):
                     opened.application.state_repository.load_active_lineage_ref(opened.project_id),
                 )
                 candidate_rq = {
-                    "schema_version": "0.1.0", "id": "RQ-CLI", "kind": "research_question",
-                    "revision": 0, "project_id": opened.project_id, "text": "CLI RQ?",
+                    "schema_version": "0.1.0",
+                    "id": "RQ-CLI",
+                    "kind": "research_question",
+                    "revision": 0,
+                    "project_id": opened.project_id,
+                    "text": "CLI RQ?",
                     "adoption_state": "candidate",
                 }
-                create = state_delta(state, "SDP-CLI-CREATE", {
-                    "kind": "CREATE_OBJECT", "payload": {"object": candidate_rq},
-                    "decision_refs": [], "source_refs": ["TEST-SETUP"],
-                })
-                opened.application.conversation_store.store_state_delta_proposal(create["proposal_id"], create)
+                create = state_delta(
+                    state,
+                    "SDP-CLI-CREATE",
+                    {
+                        "kind": "CREATE_OBJECT",
+                        "payload": {"object": candidate_rq},
+                        "decision_refs": [],
+                        "source_refs": ["TEST-SETUP"],
+                    },
+                )
+                opened.application.conversation_store.store_state_delta_proposal(
+                    create["proposal_id"], create
+                )
             finally:
                 opened.close()
 
             code, _raw, pending = run_cli(
                 ["action", "submit", "--workspace", str(workspace), "--json", "-"],
-                json.dumps({
-                    "action_type": "state.apply_candidate",
-                    "payload": {"state_delta_proposal_id": "SDP-CLI-CREATE"},
-                    "actor_id": "HUMAN-CLI",
-                }),
+                json.dumps(
+                    {
+                        "action_type": "state.apply_candidate",
+                        "payload": {"state_delta_proposal_id": "SDP-CLI-CREATE"},
+                        "actor_id": "HUMAN-CLI",
+                    }
+                ),
             )
             self.assertEqual((code, pending["status"]), (0, "CONFIRMATION_REQUIRED"))
             code, _raw, committed = run_cli(
                 ["confirmation", "submit", "--workspace", str(workspace), "--json", "-"],
-                json.dumps({
-                    "confirmation_request_id": pending["confirmation_request"]["confirmation_request_id"],
-                    "actor_id": "HUMAN-CLI",
-                }),
+                json.dumps(
+                    {
+                        "confirmation_request_id": pending["confirmation_request"][
+                            "confirmation_request_id"
+                        ],
+                        "actor_id": "HUMAN-CLI",
+                    }
+                ),
             )
             self.assertEqual(code, 0)
             self.assertEqual(committed["status"], "SUCCEEDED")
@@ -445,29 +540,43 @@ class JsonCliTests(unittest.TestCase):
                 approved = deepcopy(dict(prior))
                 approved["revision"] = 1
                 approved["adoption_state"] = "approved"
-                adopt = state_delta(state, "SDP-CLI-ADOPT", {
-                    "kind": "ADOPT_OBJECT", "payload": {"object": approved},
-                    "decision_refs": [], "source_refs": ["TEST-SETUP"],
-                })
-                opened.application.conversation_store.store_state_delta_proposal(adopt["proposal_id"], adopt)
+                adopt = state_delta(
+                    state,
+                    "SDP-CLI-ADOPT",
+                    {
+                        "kind": "ADOPT_OBJECT",
+                        "payload": {"object": approved},
+                        "decision_refs": [],
+                        "source_refs": ["TEST-SETUP"],
+                    },
+                )
+                opened.application.conversation_store.store_state_delta_proposal(
+                    adopt["proposal_id"], adopt
+                )
             finally:
                 opened.close()
 
             code, _raw, pending = run_cli(
                 ["action", "submit", "--workspace", str(workspace), "--json", "-"],
-                json.dumps({
-                    "action_type": "state.apply_candidate",
-                    "payload": {"state_delta_proposal_id": "SDP-CLI-ADOPT"},
-                    "actor_id": "HUMAN-CLI",
-                }),
+                json.dumps(
+                    {
+                        "action_type": "state.apply_candidate",
+                        "payload": {"state_delta_proposal_id": "SDP-CLI-ADOPT"},
+                        "actor_id": "HUMAN-CLI",
+                    }
+                ),
             )
             self.assertEqual((code, pending["status"]), (0, "CONFIRMATION_REQUIRED"))
             code, _raw, decision = run_cli(
                 ["confirmation", "submit", "--workspace", str(workspace), "--json", "-"],
-                json.dumps({
-                    "confirmation_request_id": pending["confirmation_request"]["confirmation_request_id"],
-                    "actor_id": "HUMAN-CLI",
-                }),
+                json.dumps(
+                    {
+                        "confirmation_request_id": pending["confirmation_request"][
+                            "confirmation_request_id"
+                        ],
+                        "actor_id": "HUMAN-CLI",
+                    }
+                ),
             )
             self.assertEqual(code, 0)
             self.assertEqual(decision["status"], "HUMAN_DECISION_REQUIRED")

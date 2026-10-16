@@ -117,9 +117,23 @@ class CoreContractTests(unittest.TestCase):
         """Require one schema-valid fixture for each canonical research-object kind."""
         objects = self.valid_fixture["objects"]
         expected_kinds = {
-            "project", "research_question", "claim", "method", "source", "evidence",
-            "analysis", "finding", "counter_review", "argument", "contribution",
-            "recommendation", "next_action", "decision", "artifact", "snapshot", "audit_event",
+            "project",
+            "research_question",
+            "claim",
+            "method",
+            "source",
+            "evidence",
+            "analysis",
+            "finding",
+            "counter_review",
+            "argument",
+            "contribution",
+            "recommendation",
+            "next_action",
+            "decision",
+            "artifact",
+            "snapshot",
+            "audit_event",
         }
         self.assertEqual(expected_kinds, {obj["kind"] for obj in objects})
         self.assertEqual(len(expected_kinds), len(objects))
@@ -154,7 +168,9 @@ class CoreContractTests(unittest.TestCase):
             for lane in ("prior_objects", "objects"):
                 for obj in case.get(lane, []):
                     errors = list(self.validator.iter_errors(obj))
-                    self.assertFalse(errors, f"{case['id']}:{lane}:{obj['kind']}:{obj['id']}: {errors}")
+                    self.assertFalse(
+                        errors, f"{case['id']}:{lane}:{obj['kind']}:{obj['id']}: {errors}"
+                    )
 
     def test_semantic_fixtures_exercise_exact_invariant_outcomes(self):
         """Require every semantic fixture to produce exactly its declared invariant set."""
@@ -229,7 +245,9 @@ class CoreContractTests(unittest.TestCase):
             target = next(obj for obj in graph if obj["id"] == mutation["object_id"])
             target[mutation["field"]] = deepcopy(mutation["value"])
             errors = list(self.validator.iter_errors(target))
-            self.assertFalse(errors, f"{mutation['rule']}: mutation must remain schema-valid: {errors}")
+            self.assertFalse(
+                errors, f"{mutation['rule']}: mutation must remain schema-valid: {errors}"
+            )
             self.assertEqual(
                 {"CORE-REF-001"},
                 core_reference_violations(graph),
@@ -267,9 +285,13 @@ class CoreContractTests(unittest.TestCase):
                 random.Random(seed).shuffle(objects)
                 prior = list(case.get("prior_objects", []))
                 random.Random(seed + 1000).shuffle(prior)
-                actual = evaluate_core_invariants(objects, prior if "prior_objects" in case else None)
+                actual = evaluate_core_invariants(
+                    objects, prior if "prior_objects" in case else None
+                )
                 self.assertEqual(expected_invariants, actual, f"{case['id']} seed={seed}")
-                self.assertEqual(baseline_bytes, canonical_state_bytes(objects), f"{case['id']} seed={seed}")
+                self.assertEqual(
+                    baseline_bytes, canonical_state_bytes(objects), f"{case['id']} seed={seed}"
+                )
 
     def test_invariant_catalog_and_profile_strengthening_registry_are_one_to_one(self):
         """Require the Profile strengthening registry to match the active Core catalog exactly."""
@@ -277,8 +299,13 @@ class CoreContractTests(unittest.TestCase):
         registry_ids = list(self.registry["invariants"])
         self.assertEqual(len(catalog_ids), len(set(catalog_ids)))
         self.assertEqual(set(catalog_ids), set(registry_ids))
-        self.assertEqual(self.catalog["contract_version"], self.registry["authoritative_for_invariant_contract"])
-        self.assertEqual(self.catalog["contract_version"], self.profile_semantics["semantic_floor"]["invariant_contract"])
+        self.assertEqual(
+            self.catalog["contract_version"], self.registry["authoritative_for_invariant_contract"]
+        )
+        self.assertEqual(
+            self.catalog["contract_version"],
+            self.profile_semantics["semantic_floor"]["invariant_contract"],
+        )
 
         allowed_policies = {"registered_forms", "no_registered_forms"}
         for invariant_id, entry in self.registry["invariants"].items():
@@ -291,7 +318,11 @@ class CoreContractTests(unittest.TestCase):
                 for validator in validators:
                     self.assertTrue(validator.get("approved_forms"), invariant_id)
                     for form in validator["approved_forms"]:
-                        binding = (validator["validator_id"], validator["validator_version"], form["form_id"])
+                        binding = (
+                            validator["validator_id"],
+                            validator["validator_version"],
+                            form["form_id"],
+                        )
                         self.assertNotIn(binding, bindings, invariant_id)
                         bindings.add(binding)
             else:
@@ -300,7 +331,9 @@ class CoreContractTests(unittest.TestCase):
     def test_all_profile_strengthening_declarations_reference_cataloged_invariants(self):
         """Require fixture strengthening declarations to target existing Core invariants."""
         catalog_ids = {entry["id"] for entry in self.catalog["invariants"]}
-        manifests = list((PROFILE_FIXTURES / "valid").glob("*.profile.json")) + list((PROFILE_FIXTURES / "invalid").glob("*.profile.json"))
+        manifests = list((PROFILE_FIXTURES / "valid").glob("*.profile.json")) + list(
+            (PROFILE_FIXTURES / "invalid").glob("*.profile.json")
+        )
         self.assertTrue(manifests, f"no profile manifests found under {PROFILE_FIXTURES}")
         for path in manifests:
             profile = load_json(path)

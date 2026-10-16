@@ -39,9 +39,7 @@ def registry_digest(document: Mapping[str, Any]) -> str:
 
 def _nonempty_string(value: Any, field: str) -> str:
     if not isinstance(value, str) or not value:
-        raise LocalSurveyStoreError(
-            "SURVEY-STORE-INTEGRITY-001", f"Survey {field} is invalid"
-        )
+        raise LocalSurveyStoreError("SURVEY-STORE-INTEGRITY-001", f"Survey {field} is invalid")
     return value
 
 
@@ -77,9 +75,7 @@ def _validate_common(document: Mapping[str, Any]) -> None:
         or any(not isinstance(item, str) or not item for item in rq_ids)
         or len(rq_ids) != len(set(rq_ids))
     ):
-        raise LocalSurveyStoreError(
-            "SURVEY-STORE-INTEGRITY-001", "Survey RQ bindings are invalid"
-        )
+        raise LocalSurveyStoreError("SURVEY-STORE-INTEGRITY-001", "Survey RQ bindings are invalid")
     _validate_snapshot_binding(document.get("captured_against"))
     if document["registry_digest"] != registry_digest(document):
         raise LocalSurveyStoreError(
@@ -107,9 +103,7 @@ def validate_design_record(document: Mapping[str, Any]) -> None:
     _validate_common(document)
     design = document.get("design")
     if not isinstance(design, Mapping):
-        raise LocalSurveyStoreError(
-            "SURVEY-STORE-INTEGRITY-001", "stored Survey Design is invalid"
-        )
+        raise LocalSurveyStoreError("SURVEY-STORE-INTEGRITY-001", "stored Survey Design is invalid")
     for field in ("survey_design_id", "version", "content_digest"):
         _nonempty_string(design.get(field), f"Survey Design {field}")
     if design["content_digest"] != canonical_document_digest(design, "content_digest"):
@@ -146,7 +140,9 @@ def validate_instrument_record(document: Mapping[str, Any]) -> None:
         )
     design_ref = document.get("design_ref")
     if not isinstance(design_ref, Mapping) or set(design_ref) != {
-        "survey_design_id", "version", "content_digest"
+        "survey_design_id",
+        "version",
+        "content_digest",
     }:
         raise LocalSurveyStoreError(
             "SURVEY-STORE-INTEGRITY-001", "stored Survey Instrument Design binding is invalid"
@@ -155,9 +151,7 @@ def validate_instrument_record(document: Mapping[str, Any]) -> None:
         _nonempty_string(design_ref.get(field), f"Survey Instrument Design binding {field}")
     questionnaire = document.get("questionnaire")
     if not isinstance(questionnaire, Mapping):
-        raise LocalSurveyStoreError(
-            "SURVEY-STORE-INTEGRITY-001", "stored Questionnaire is invalid"
-        )
+        raise LocalSurveyStoreError("SURVEY-STORE-INTEGRITY-001", "stored Questionnaire is invalid")
     for field in ("questionnaire_id", "version", "content_digest"):
         _nonempty_string(questionnaire.get(field), f"Questionnaire {field}")
     if questionnaire["content_digest"] != canonical_document_digest(
@@ -347,7 +341,14 @@ class LocalSurveyStore:
                 )
             connection.execute(
                 f"INSERT INTO {table}(project_id,{id_column},version,content_digest,captured_at,document_json) VALUES (?,?,?,?,?,?)",
-                (project_id, identity, version, content_digest, captured_at, self._encoded(document)),
+                (
+                    project_id,
+                    identity,
+                    version,
+                    content_digest,
+                    captured_at,
+                    self._encoded(document),
+                ),
             )
             connection.commit()
             return True

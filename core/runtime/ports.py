@@ -36,19 +36,19 @@ class ResearchStateRepository(Protocol):
     storage. The reducer never depends on an adapter implementation.
     """
 
-    def load_state_view(self, project_ref: str, lineage_ref: str) -> StateView:
-        ...
+    def load_state_view(self, project_ref: str, lineage_ref: str) -> StateView: ...
 
-    def load_snapshot(self, snapshot_ref: str) -> Mapping[str, Any] | None:
-        ...
+    def load_snapshot(self, snapshot_ref: str) -> Mapping[str, Any] | None: ...
 
-    def load_object_revision(self, kind: str, object_id: str, revision: int) -> Mapping[str, Any] | None:
-        ...
+    def load_object_revision(
+        self, kind: str, object_id: str, revision: int
+    ) -> Mapping[str, Any] | None: ...
 
-    def resolve_refs(self, refs: Sequence[tuple[str, str]]) -> Mapping[tuple[str, str], bool]:
-        ...
+    def resolve_refs(self, refs: Sequence[tuple[str, str]]) -> Mapping[tuple[str, str], bool]: ...
 
-    def find_commit_by_idempotency_key(self, idempotency_key: str) -> tuple[str, CommitReceipt] | None:
+    def find_commit_by_idempotency_key(
+        self, idempotency_key: str
+    ) -> tuple[str, CommitReceipt] | None:
         """Return (request_digest, receipt) for a prior committed request."""
         ...
 
@@ -70,8 +70,7 @@ class StatePolicyValidator(Protocol):
         current_state: StateView,
         request: StateTransitionRequest,
         reduction: ReductionResult,
-    ) -> tuple[ValidationIssue, ...]:
-        ...
+    ) -> tuple[ValidationIssue, ...]: ...
 
 
 class CapabilityResultNormalizer(Protocol):
@@ -81,31 +80,28 @@ class CapabilityResultNormalizer(Protocol):
     it never dispatches on capability IDs or imports concrete capability code.
     """
 
-    def supports(self, capability_contract_id: str, function_id: str, contract_version: str) -> bool:
-        ...
+    def supports(
+        self, capability_contract_id: str, function_id: str, contract_version: str
+    ) -> bool: ...
 
     def validate_extension(
         self,
         handoff: Mapping[str, Any],
         extension: Mapping[str, Any] | None,
         context: Mapping[str, Any],
-    ) -> tuple[str, ...]:
-        ...
+    ) -> tuple[str, ...]: ...
 
     def normalize(
         self,
         handoff: Mapping[str, Any],
         extension: Mapping[str, Any] | None,
         context: Mapping[str, Any],
-    ) -> StateDeltaProposal:
-        ...
+    ) -> StateDeltaProposal: ...
 
 
 class StateSchemaValidator(Protocol):
     """Canonical object-schema validation used before and after reduction."""
 
-    def validate_request(self, request: StateTransitionRequest) -> tuple[ValidationIssue, ...]:
-        ...
+    def validate_request(self, request: StateTransitionRequest) -> tuple[ValidationIssue, ...]: ...
 
-    def validate_reduction(self, reduction: ReductionResult) -> tuple[ValidationIssue, ...]:
-        ...
+    def validate_reduction(self, reduction: ReductionResult) -> tuple[ValidationIssue, ...]: ...

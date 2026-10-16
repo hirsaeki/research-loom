@@ -34,7 +34,8 @@ def _validated_activation_event(row, *, project_id: str, map_id: str, map_digest
         or attention_event_digest(event) != str(row["event_digest"])
     ):
         raise LocalAttentionStoreError(
-            "ATTENTION-STORE-INTEGRITY-001", "stored Attention activation binding or digest is invalid"
+            "ATTENTION-STORE-INTEGRITY-001",
+            "stored Attention activation binding or digest is invalid",
         )
     return event
 
@@ -179,11 +180,13 @@ def attention_maps_for_project(
                 map_digest=str(row["map_digest"]),
                 limit=int(activation_limit),
             )
-            result.append({
-                "map": document,
-                "activation_ids": activation_ids,
-                "activation_ids_truncated": activations_truncated,
-            })
+            result.append(
+                {
+                    "map": document,
+                    "activation_ids": activation_ids,
+                    "activation_ids_truncated": activations_truncated,
+                }
+            )
         return tuple(result)
     except LocalAttentionStoreError:
         raise

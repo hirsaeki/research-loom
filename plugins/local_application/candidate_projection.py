@@ -79,17 +79,23 @@ def build_candidate_projection(
             or not object_id
             or obj.get("project_id") != state.project_ref
         ):
-            raise ConversationRuntimeError(_ERROR, "candidate object identity or project is invalid")
+            raise ConversationRuntimeError(
+                _ERROR, "candidate object identity or project is invalid"
+            )
         key = (kind, object_id)
         if action["kind"] == "VERIFY_EVIDENCE" and kind != "evidence":
-            raise ConversationRuntimeError(_ERROR, "Evidence qualification requires an Evidence object")
+            raise ConversationRuntimeError(
+                _ERROR, "Evidence qualification requires an Evidence object"
+            )
         if key not in affected_refs:
             raise ConversationRuntimeError(_ERROR, "candidate affected_refs do not bind its object")
-        subjects.append({
-            "subject": {"kind": kind, "id": object_id},
-            "current_value": deepcopy(current.get(key)),
-            "candidate_value": deepcopy(dict(obj)),
-        })
+        subjects.append(
+            {
+                "subject": {"kind": kind, "id": object_id},
+                "current_value": deepcopy(current.get(key)),
+                "candidate_value": deepcopy(dict(obj)),
+            }
+        )
 
     return {
         "candidate_only": True,

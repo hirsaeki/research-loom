@@ -27,9 +27,7 @@ class DecisionAwareResearchCoordinator(WorkConversationService):
         request_id = str(input_document["target"]["target_id"])
         request = self._store.load_confirmation_request(request_id)
         if request is not None:
-            proposal = self._store.load_proposal(
-                str(request["proposal_binding"]["proposal_id"])
-            )
+            proposal = self._store.load_proposal(str(request["proposal_binding"]["proposal_id"]))
             if proposal is None:
                 raise ConversationRuntimeError(
                     "CONV-CONFIRMATION-BINDING-001",
@@ -37,11 +35,9 @@ class DecisionAwareResearchCoordinator(WorkConversationService):
                 )
             if (
                 str(input_document.get("project_id")) != str(request.get("project_id"))
-                or str(input_document.get("conversation_id"))
-                != str(request.get("conversation_id"))
+                or str(input_document.get("conversation_id")) != str(request.get("conversation_id"))
                 or str(proposal.get("project_id")) != str(request.get("project_id"))
-                or str(proposal.get("conversation_id"))
-                != str(request.get("conversation_id"))
+                or str(proposal.get("conversation_id")) != str(request.get("conversation_id"))
                 or str(proposal.get("proposal_digest"))
                 != str(request["proposal_binding"].get("proposal_digest"))
             ):
@@ -68,7 +64,9 @@ class DecisionAwareResearchCoordinator(WorkConversationService):
         candidate_digest = None
         if action.get("action_type") == "state.apply_candidate":
             candidate_id = action.get("payload", {}).get("state_delta_proposal_id")
-            candidate = self._store.load_state_delta_proposal(str(candidate_id)) if candidate_id else None
+            candidate = (
+                self._store.load_state_delta_proposal(str(candidate_id)) if candidate_id else None
+            )
             if candidate is not None:
                 candidate_digest = candidate.get("proposal_digest")
         matching_pending = tuple(
@@ -99,10 +97,12 @@ class DecisionAwareResearchCoordinator(WorkConversationService):
                         str(item["request_id"]) for item in matching_pending
                     ]
                 },
-                issues=({
-                    "code": "CONV-HUMAN-DECISION-PENDING-001",
-                    "message": "the exact candidate is already governed by a pending Human Decision Request",
-                },),
+                issues=(
+                    {
+                        "code": "CONV-HUMAN-DECISION-PENDING-001",
+                        "message": "the exact candidate is already governed by a pending Human Decision Request",
+                    },
+                ),
             )
 
         result = super()._execute(source_input, proposal, state, confirmation_receipt)

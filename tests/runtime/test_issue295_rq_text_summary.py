@@ -17,8 +17,7 @@ class QuestionTextResolver:
     def resolve(self, conversation_input, bounded_state_summary, registered_actions):
         self.seen_summary = bounded_state_summary
         if any(
-            item.get("kind") == "research_question"
-            and item.get("text") == self.expected_text
+            item.get("kind") == "research_question" and item.get("text") == self.expected_text
             for item in bounded_state_summary["objects"]
         ):
             return ActionDraft("research.status", {"kinds": ["research_question"]})

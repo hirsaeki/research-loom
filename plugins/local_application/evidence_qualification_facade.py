@@ -6,7 +6,13 @@ from threading import RLock
 from typing import Any, Mapping
 
 from core.conversation import ActionDefinition, ConversationRuntimeError, HarnessServiceResult
-from core.runtime import ObjectRef, StateDeltaProposal, TransitionAction, TransitionKind, canonical_digest
+from core.runtime import (
+    ObjectRef,
+    StateDeltaProposal,
+    TransitionAction,
+    TransitionKind,
+    canonical_digest,
+)
 
 from .visual_need_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
 
@@ -28,7 +34,11 @@ def research_evidence_qualification_payload(payload: Mapping[str, Any]) -> None:
             "research.evidence.qualify requires evidence_id, expected_revision, expected_digest and rationale"
         )
     evidence_id = payload.get("evidence_id")
-    if not isinstance(evidence_id, str) or not evidence_id.strip() or len(evidence_id) > _MAX_ID_LENGTH:
+    if (
+        not isinstance(evidence_id, str)
+        or not evidence_id.strip()
+        or len(evidence_id) > _MAX_ID_LENGTH
+    ):
         raise ValueError("evidence_id must be a bounded non-empty ID")
     revision = payload.get("expected_revision")
     if isinstance(revision, bool) or not isinstance(revision, int) or revision < 0:

@@ -174,8 +174,7 @@ class LocalExecutionStore:
         self.staging_root.mkdir(parents=True, exist_ok=True)
         self.database = self.root / "execution.db"
         self._allowed_import_roots = tuple(
-            Path(item).resolve(strict=True)
-            for item in allowed_import_roots
+            Path(item).resolve(strict=True) for item in allowed_import_roots
         )
         self._lock = RLock()
         try:
@@ -187,30 +186,18 @@ class LocalExecutionStore:
             )
             self._connection.row_factory = sqlite3.Row
             self._connection.execute("PRAGMA foreign_keys = ON")
-            self._connection.execute(
-                f"PRAGMA busy_timeout = {int(self.config.busy_timeout_ms)}"
-            )
+            self._connection.execute(f"PRAGMA busy_timeout = {int(self.config.busy_timeout_ms)}")
             actual_journal = str(
-                self._connection.execute(
-                    f"PRAGMA journal_mode = {journal_mode}"
-                ).fetchone()[0]
+                self._connection.execute(f"PRAGMA journal_mode = {journal_mode}").fetchone()[0]
             ).upper()
-            self._connection.execute(
-                f"PRAGMA synchronous = {synchronous}"
-            )
+            self._connection.execute(f"PRAGMA synchronous = {synchronous}")
             if actual_journal != journal_mode:
                 raise LocalExecutionStoreError(
                     "SQLite refused requested journal_mode "
                     f"{journal_mode!r}; got {actual_journal!r}"
                 )
-            if int(
-                self._connection.execute(
-                    "PRAGMA foreign_keys"
-                ).fetchone()[0]
-            ) != 1:
-                raise LocalExecutionStoreError(
-                    "SQLite foreign_keys pragma is not enabled"
-                )
+            if int(self._connection.execute("PRAGMA foreign_keys").fetchone()[0]) != 1:
+                raise LocalExecutionStoreError("SQLite foreign_keys pragma is not enabled")
             self._migrate()
         except Exception:
             connection = getattr(self, "_connection", None)
@@ -298,20 +285,15 @@ class LocalExecutionStore:
                     )
                 if sorted(applied) != versions[: len(applied)]:
                     raise LocalExecutionStoreError(
-                        "applied execution-store migration history is not a "
-                        "contiguous known prefix"
+                        "applied execution-store migration history is not a contiguous known prefix"
                     )
                 for version, name, _sql in migrations:
                     if version in applied and applied[version] != name:
-                        raise LocalExecutionStoreError(
-                            f"migration {version:04d} name mismatch"
-                        )
+                        raise LocalExecutionStoreError(f"migration {version:04d} name mismatch")
                 for version, name, sql in migrations:
                     if version in applied:
                         continue
-                    for statement in (
-                        part.strip() for part in sql.split(";") if part.strip()
-                    ):
+                    for statement in (part.strip() for part in sql.split(";") if part.strip()):
                         self._connection.execute(statement)
                     self._connection.execute(
                         "INSERT INTO schema_migrations(version, name) VALUES (?, ?)",
@@ -381,8 +363,7 @@ class LocalExecutionStore:
                 or str(row["status"]) != RunStatus.PREPARED.value
             ):
                 raise ValueError(
-                    "initial lifecycle event must be sequence 1, "
-                    "None -> PREPARED, and append-only"
+                    "initial lifecycle event must be sequence 1, None -> PREPARED, and append-only"
                 )
             self._insert_event(event)
 
@@ -409,10 +390,7 @@ class LocalExecutionStore:
                 "SELECT * FROM runs WHERE run_id = ?",
                 (updated_run.run_id,),
             ).fetchone()
-            if (
-                current is None
-                or str(current["status"]) != expected_status.value
-            ):
+            if current is None or str(current["status"]) != expected_status.value:
                 return False
             persisted = self._decode_run(current)
             for name in _RUN_IMMUTABLE_FIELDS:
@@ -429,9 +407,7 @@ class LocalExecutionStore:
             ).fetchone()
             expected_sequence = int(row["sequence"]) + 1
             if event.sequence != expected_sequence:
-                raise ValueError(
-                    "lifecycle sequence must be contiguous and never reused"
-                )
+                raise ValueError("lifecycle sequence must be contiguous and never reused")
             update = self._connection.execute(
                 """
                 UPDATE runs SET
@@ -468,9 +444,7 @@ class LocalExecutionStore:
             RunLifecycleEvent(
                 str(row["run_id"]),
                 int(row["sequence"]),
-                RunStatus(str(row["from_status"]))
-                if row["from_status"] is not None
-                else None,
+                RunStatus(str(row["from_status"])) if row["from_status"] is not None else None,
                 RunStatus(str(row["to_status"])),
                 str(row["occurred_at"]),
                 str(row["reason"]),
@@ -517,10 +491,7 @@ class LocalExecutionStore:
         run_id: str,
         extension: Mapping[str, Any],
     ) -> str:
-        identity = str(
-            extension.get("extension_digest")
-            or canonical_digest(extension)
-        )
+        identity = str(extension.get("extension_digest") or canonical_digest(extension))
         self._store_document(
             "extension",
             identity,
@@ -629,14 +600,10 @@ class LocalExecutionStore:
         if not isinstance(content, bytes):
             raise TypeError("artifact content must be bytes")
         if len(content) > self.config.max_artifact_bytes:
-            raise LocalExecutionStoreError(
-                "artifact exceeds configured max_artifact_bytes"
-            )
+            raise LocalExecutionStoreError("artifact exceeds configured max_artifact_bytes")
         persisted = self.load_run(run.run_id)
         if persisted is None:
-            raise LocalExecutionStoreError(
-                "artifact Run must already exist in the execution trace"
-            )
+            raise LocalExecutionStoreError("artifact Run must already exist in the execution trace")
         if (
             persisted.execution_mode != run.execution_mode
             or persisted.capability_id != run.capability_id
@@ -666,9 +633,7 @@ class LocalExecutionStore:
             ).fetchone()
             current_total = int(row["total"])
             if current_total + len(content) > self.config.max_run_output_bytes:
-                raise LocalExecutionStoreError(
-                    "Run output exceeds configured max_run_output_bytes"
-                )
+                raise LocalExecutionStoreError("Run output exceeds configured max_run_output_bytes")
 
             digest, locator = self._store_blob(content, scheme="artifact")
             metadata = ExecutionArtifactMetadata(
@@ -776,9 +741,7 @@ class LocalExecutionStore:
         if not isinstance(content, bytes):
             raise TypeError("resource content must be bytes")
         if len(content) > self.config.max_resource_bytes:
-            raise LocalExecutionStoreError(
-                "resource exceeds configured max_resource_bytes"
-            )
+            raise LocalExecutionStoreError("resource exceeds configured max_resource_bytes")
         digest, locator = self._store_blob(content, scheme="resource")
         trusted_provenance = dict(provenance or {})
         trusted_provenance.update(
@@ -865,10 +828,7 @@ class LocalExecutionStore:
                 "Context Pack resource locator does not match registered locator"
             )
         expected_digest = resource.get("digest")
-        if (
-            expected_digest is not None
-            and str(expected_digest) != str(row["digest"])
-        ):
+        if expected_digest is not None and str(expected_digest) != str(row["digest"]):
             raise LocalExecutionStoreIntegrityError(
                 "Context Pack resource digest does not match registered digest"
             )
@@ -906,8 +866,7 @@ class LocalExecutionStore:
                         ),
                     )
             run_rows = self._connection.execute(
-                "SELECT * FROM runs"
-                + (" WHERE run_id = ?" if run_id is not None else ""),
+                "SELECT * FROM runs" + (" WHERE run_id = ?" if run_id is not None else ""),
                 (run_id,) if run_id is not None else (),
             ).fetchall()
             if run_id is None:
@@ -932,8 +891,7 @@ class LocalExecutionStore:
                     clauses.append("(document_type = ? AND identity = ?)")
                     args.extend(("handoff", str(run_row["handoff_ref"])))
                 document_rows = self._connection.execute(
-                    "SELECT * FROM execution_documents WHERE "
-                    + " OR ".join(clauses),
+                    "SELECT * FROM execution_documents WHERE " + " OR ".join(clauses),
                     tuple(args),
                 ).fetchall()
                 diagnostic_rows = self._connection.execute(
@@ -946,10 +904,7 @@ class LocalExecutionStore:
                 (run_id,) if run_id is not None else (),
             ).fetchall()
 
-        docs = {
-            (str(row["document_type"]), str(row["identity"])): row
-            for row in document_rows
-        }
+        docs = {(str(row["document_type"]), str(row["identity"])): row for row in document_rows}
         for row in document_rows:
             document_run_id = str(row["run_id"]) if row["run_id"] else None
             if document_run_id is not None:
@@ -1017,10 +972,14 @@ class LocalExecutionStore:
                             run_id=rid,
                         )
                     )
-            if run_row["handoff_ref"] is not None and (
-                "handoff",
-                str(run_row["handoff_ref"]),
-            ) not in docs:
+            if (
+                run_row["handoff_ref"] is not None
+                and (
+                    "handoff",
+                    str(run_row["handoff_ref"]),
+                )
+                not in docs
+            ):
                 diagnostics.append(
                     StoreIntegrityDiagnostic(
                         "MISSING_HANDOFF",
@@ -1051,10 +1010,7 @@ class LocalExecutionStore:
                     )
                     break
                 if index == 1:
-                    if (
-                        event.from_status is not None
-                        or event.to_status is not RunStatus.PREPARED
-                    ):
+                    if event.from_status is not None or event.to_status is not RunStatus.PREPARED:
                         diagnostics.append(
                             StoreIntegrityDiagnostic(
                                 "ILLEGAL_LIFECYCLE_TRANSITION",
@@ -1265,8 +1221,7 @@ class LocalExecutionStore:
                     or str(prior["payload_json"]) != payload_json
                 ):
                     raise ValueError(
-                        f"immutable execution identity collision: "
-                        f"{document_type}:{identity}"
+                        f"immutable execution identity collision: {document_type}:{identity}"
                     )
                 return
             self._connection.execute(
@@ -1324,10 +1279,7 @@ class LocalExecutionStore:
                 raise LocalExecutionStoreIntegrityError(
                     f"stored {document_type} declared digest mismatch"
                 )
-            if (
-                document_type == "descriptor"
-                and str(declared) != identity
-            ):
+            if document_type == "descriptor" and str(declared) != identity:
                 raise LocalExecutionStoreIntegrityError(
                     "stored descriptor identity disagrees with descriptor digest"
                 )
@@ -1396,24 +1348,16 @@ class LocalExecutionStore:
 
     def _locator_path(self, locator: str, expected_digest: str) -> Path:
         if not (
-            locator.startswith("artifact://sha256/")
-            or locator.startswith("resource://sha256/")
+            locator.startswith("artifact://sha256/") or locator.startswith("resource://sha256/")
         ):
-            raise LocalExecutionStoreIntegrityError(
-                "unsupported or non-local storage locator"
-            )
+            raise LocalExecutionStoreIntegrityError("unsupported or non-local storage locator")
         digest_hex = locator.rsplit("/", 1)[-1]
         if expected_digest != f"sha256:{digest_hex}":
             raise LocalExecutionStoreIntegrityError(
                 "storage locator digest disagrees with metadata"
             )
-        if (
-            len(digest_hex) != 64
-            or any(ch not in "0123456789abcdef" for ch in digest_hex)
-        ):
-            raise LocalExecutionStoreIntegrityError(
-                "invalid content-addressed storage locator"
-            )
+        if len(digest_hex) != 64 or any(ch not in "0123456789abcdef" for ch in digest_hex):
+            raise LocalExecutionStoreIntegrityError("invalid content-addressed storage locator")
         return self.blob_root / digest_hex[:2] / digest_hex
 
     def _read_controlled_file(
@@ -1440,9 +1384,7 @@ class LocalExecutionStore:
                 candidate = anchored
                 root = self._matching_import_root(candidate)
         if root is None:
-            raise PermissionError(
-                "file is outside configured artifact/resource intake roots"
-            )
+            raise PermissionError("file is outside configured artifact/resource intake roots")
         relative = candidate.relative_to(root)
         self._reject_reparse_components(root, relative)
 
@@ -1483,9 +1425,7 @@ class LocalExecutionStore:
             current = current / part
             info = current.lstat()
             is_junction = getattr(current, "is_junction", None)
-            if stat.S_ISLNK(info.st_mode) or (
-                callable(is_junction) and is_junction()
-            ):
+            if stat.S_ISLNK(info.st_mode) or (callable(is_junction) and is_junction()):
                 raise PermissionError("symlink/reparse-point intake is forbidden")
 
     def _read_controlled_file_dirfd(
@@ -1513,9 +1453,7 @@ class LocalExecutionStore:
                     next_fd = os.open(part, flags, dir_fd=current_fd)
                 except OSError as exc:
                     if exc.errno in {errno.ELOOP, errno.ENOTDIR}:
-                        raise PermissionError(
-                            "symlink/reparse-point intake is forbidden"
-                        ) from exc
+                        raise PermissionError("symlink/reparse-point intake is forbidden") from exc
                     raise
                 if current_fd != root_fd:
                     os.close(current_fd)
@@ -1524,9 +1462,7 @@ class LocalExecutionStore:
             if not stat.S_ISREG(info.st_mode):
                 raise PermissionError("only regular files may be imported")
             if info.st_size > max_bytes:
-                raise LocalExecutionStoreError(
-                    "file exceeds configured intake size limit"
-                )
+                raise LocalExecutionStoreError("file exceeds configured intake size limit")
             return self._read_fd_limited(current_fd, max_bytes)
         finally:
             if current_fd != root_fd:
@@ -1551,28 +1487,20 @@ class LocalExecutionStore:
             if not stat.S_ISREG(opened.st_mode):
                 raise PermissionError("only regular files may be imported")
             if opened.st_size > max_bytes:
-                raise LocalExecutionStoreError(
-                    "file exceeds configured intake size limit"
-                )
+                raise LocalExecutionStoreError("file exceeds configured intake size limit")
             self._reject_reparse_components(root, relative)
             after = candidate.lstat()
             before_identity = (before.st_dev, before.st_ino)
             opened_identity = (opened.st_dev, opened.st_ino)
             after_identity = (after.st_dev, after.st_ino)
-            if not (
-                before_identity == opened_identity == after_identity
-            ):
-                raise PermissionError(
-                    "file changed during controlled intake"
-                )
+            if not (before_identity == opened_identity == after_identity):
+                raise PermissionError("file changed during controlled intake")
             if os.name == "nt":
                 final_path = self._windows_final_path_for_fd(fd)
                 if os.path.normcase(os.path.abspath(final_path)) != os.path.normcase(
                     os.path.abspath(candidate)
                 ):
-                    raise PermissionError(
-                        "symlink/reparse-point intake is forbidden"
-                    )
+                    raise PermissionError("symlink/reparse-point intake is forbidden")
             return self._read_fd_limited(fd, max_bytes)
         finally:
             os.close(fd)

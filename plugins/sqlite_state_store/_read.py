@@ -33,9 +33,7 @@ class ReadMixin:
             (project_ref,),
         ).fetchone()
         if row is None:
-            raise RepositoryError(
-                f"project {project_ref!r} has no active lineage pointer"
-            )
+            raise RepositoryError(f"project {project_ref!r} has no active lineage pointer")
         return str(row["active_lineage_ref"])
 
     @repository_read
@@ -75,9 +73,7 @@ class ReadMixin:
             str(row["snapshot_content_digest"]) != digest
             or str(row["object_content_digest"]) != digest
         ):
-            raise RepositoryError(
-                "lineage HEAD digest does not match stored Snapshot metadata"
-            )
+            raise RepositoryError("lineage HEAD digest does not match stored Snapshot metadata")
         return (
             str(row["active_lineage_ref"]),
             str(row["head_snapshot_ref"]),
@@ -109,15 +105,10 @@ class ReadMixin:
         snapshot = self.load_snapshot(str(lineage_row["head_snapshot_ref"]))
         if snapshot is None:
             raise RepositoryError(
-                f"lineage head snapshot {lineage_row['head_snapshot_ref']!r} "
-                "does not resolve"
+                f"lineage head snapshot {lineage_row['head_snapshot_ref']!r} does not resolve"
             )
-        if str(snapshot["content_digest"]) != str(
-            lineage_row["head_snapshot_digest"]
-        ):
-            raise RepositoryError(
-                "lineage HEAD digest does not match stored Snapshot"
-            )
+        if str(snapshot["content_digest"]) != str(lineage_row["head_snapshot_digest"]):
+            raise RepositoryError("lineage HEAD digest does not match stored Snapshot")
 
         objects = tuple(
             decode_payload_row(row)
@@ -168,13 +159,8 @@ class ReadMixin:
             (project_ref,),
         ).fetchone()
         if active is None:
-            raise RepositoryError(
-                f"project {project_ref!r} has no active lineage pointer"
-            )
-        if not any(
-            lineage.lineage_id == str(active["active_lineage_ref"])
-            for lineage in lineages
-        ):
+            raise RepositoryError(f"project {project_ref!r} has no active lineage pointer")
+        if not any(lineage.lineage_id == str(active["active_lineage_ref"]) for lineage in lineages):
             raise RepositoryError("project active lineage pointer is dangling")
 
         used = tuple(
@@ -233,13 +219,9 @@ class ReadMixin:
             project_config_ref=str(project["project_config_ref"]),
             project_config_digest=str(project["project_config_digest"]),
             effective_profile_set_ref=str(project["effective_profile_set_ref"]),
-            effective_profile_set_digest=str(
-                project["effective_profile_set_digest"]
-            ),
+            effective_profile_set_digest=str(project["effective_profile_set_digest"]),
             project_config=decode_json(str(project["project_config_json"])),
-            effective_constraints=decode_json(
-                str(project["effective_constraints_json"])
-            ),
+            effective_constraints=decode_json(str(project["effective_constraints_json"])),
             adoption_refs=adoptions,
             non_reusable_refs=non_reusable,
             source_modes=source_modes,
@@ -298,10 +280,7 @@ class ReadMixin:
         self: "SQLiteResearchStateRepository",
         refs: Sequence[tuple[str, str]],
     ) -> Mapping[tuple[str, str], bool]:
-        requested = tuple(
-            (str(ref[0]), str(ref[1]))
-            for ref in refs
-        )
+        requested = tuple((str(ref[0]), str(ref[1])) for ref in refs)
         if not requested:
             return {}
 
@@ -321,10 +300,7 @@ class ReadMixin:
                 """,
                 (kind, *ordered_ids),
             )
-            known.update(
-                (str(row["kind"]), str(row["object_id"]))
-                for row in rows
-            )
+            known.update((str(row["kind"]), str(row["object_id"])) for row in rows)
 
         snapshot_ids = sorted(by_kind.get("snapshot", ()))
         if snapshot_ids:

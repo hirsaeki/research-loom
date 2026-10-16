@@ -14,7 +14,11 @@ import unittest
 from jsonschema import Draft202012Validator, FormatChecker
 import rfc8785
 
-from plugins.local_application import LocalApplicationError, LocalApplicationFacade, LocalResearchApplication
+from plugins.local_application import (
+    LocalApplicationError,
+    LocalApplicationFacade,
+    LocalResearchApplication,
+)
 from plugins.local_application.cli import main as cli_main
 from plugins.local_survey_store import (
     LocalSurveyStoreError,
@@ -42,12 +46,14 @@ def profile_provider(_project_ref, expected_digest):
             "research_contract": "0.1.0",
             "invariant_contract": "0.1.0",
         },
-        "profile_pins": [{
-            "profile_id": "fixture.research",
-            "profile_type": "research",
-            "profile_version": "1.0.0",
-            "manifest_sha256": "1" * 64,
-        }],
+        "profile_pins": [
+            {
+                "profile_id": "fixture.research",
+                "profile_type": "research",
+                "profile_version": "1.0.0",
+                "manifest_sha256": "1" * 64,
+            }
+        ],
         "content_digest": expected_digest,
     }
 
@@ -81,10 +87,7 @@ def state_signature(app: LocalResearchApplication) -> tuple:
             (str(item["kind"]), str(item["id"]), int(item.get("revision", 0)))
             for item in state.effective_objects()
         ),
-        tuple(
-            str(item["request_id"])
-            for item in app.human_decisions.pending("PRJ-1")
-        ),
+        tuple(str(item["request_id"]) for item in app.human_decisions.pending("PRJ-1")),
     )
 
 
@@ -110,25 +113,23 @@ def extended_questionnaire(*, rq_id: str = "RQ-1") -> dict:
     first = questionnaire["questions"][0]
     first["response_options"][0]["value"] = "manager"
     first["response_options"][1]["value"] = "contributor"
-    first["response_options"].append(
-        {"option_id": "U", "value": "unknown", "label": "Unknown"}
-    )
+    first["response_options"].append({"option_id": "U", "value": "unknown", "label": "Unknown"})
     first["missing_value_semantics"] = {
         "missing": "no_response",
         "unknown_option_id": "U",
         "not_applicable_option_id": None,
         "prefer_not_to_answer_option_id": None,
     }
-    questionnaire["questions"][1]["branching"] = [{
-        "condition_question_id": "Q1",
-        "operator": "equals",
-        "value": "manager",
-        "action": "show",
-        "target_question_id": "Q2",
-    }]
-    questionnaire["content_digest"] = canonical_document_digest(
-        questionnaire, "content_digest"
-    )
+    questionnaire["questions"][1]["branching"] = [
+        {
+            "condition_question_id": "Q1",
+            "operator": "equals",
+            "value": "manager",
+            "action": "show",
+            "target_question_id": "Q2",
+        }
+    ]
+    questionnaire["content_digest"] = canonical_document_digest(questionnaire, "content_digest")
     return questionnaire
 
 
@@ -156,6 +157,7 @@ def run_cli(argv: list[str], stdin_text: str = "") -> tuple[int, dict]:
     with redirect_stdout(stream):
         if stdin_text:
             import unittest.mock
+
             with unittest.mock.patch("sys.stdin", io.StringIO(stdin_text)):
                 code = cli_main(argv)
         else:
@@ -191,33 +193,39 @@ def initialize_workspace(root: Path) -> Path:
 
 def adopt_rq(workspace: Path) -> str:
     with LocalApplicationFacade.open_workspace(workspace) as facade:
-        proposed = facade.submit_action({
-            "action_type": "research_question.propose",
-            "payload": {
-                "text": "Which bounded Survey observations answer this research question?",
-                "derived_from_seed_ids": ["RQ-SEED-001"],
-            },
-            "actor_id": "HUMAN-SURVEY",
-        })
+        proposed = facade.submit_action(
+            {
+                "action_type": "research_question.propose",
+                "payload": {
+                    "text": "Which bounded Survey observations answer this research question?",
+                    "derived_from_seed_ids": ["RQ-SEED-001"],
+                },
+                "actor_id": "HUMAN-SURVEY",
+            }
+        )
         rq_id = proposed["data"]["research_question_candidate"]["id"]
-        apply = facade.submit_action({
-            "action_type": "state.apply_candidate",
-            "payload": {
-                "state_delta_proposal_id": proposed["data"]["state_delta_proposal_id"]
-            },
-            "actor_id": "HUMAN-SURVEY",
-        })
-        confirmed = facade.submit_confirmation({
-            "confirmation_request_id": apply["confirmation_request"]["confirmation_request_id"],
-            "actor_id": "HUMAN-SURVEY",
-        })
+        apply = facade.submit_action(
+            {
+                "action_type": "state.apply_candidate",
+                "payload": {"state_delta_proposal_id": proposed["data"]["state_delta_proposal_id"]},
+                "actor_id": "HUMAN-SURVEY",
+            }
+        )
+        confirmed = facade.submit_confirmation(
+            {
+                "confirmation_request_id": apply["confirmation_request"]["confirmation_request_id"],
+                "actor_id": "HUMAN-SURVEY",
+            }
+        )
         request = confirmed["decision_request"]
-        resolved = facade.resolve_human_decision({
-            "request_id": request["request_id"],
-            "request_digest": request["request_digest"],
-            "disposition": "approve_exact",
-            "actor_id": "HUMAN-SURVEY",
-        })
+        resolved = facade.resolve_human_decision(
+            {
+                "request_id": request["request_id"],
+                "request_digest": request["request_digest"],
+                "disposition": "approve_exact",
+                "actor_id": "HUMAN-SURVEY",
+            }
+        )
         assert resolved["status"] == "RESOLVED"
         return rq_id
 
@@ -237,8 +245,13 @@ class SurveyProductionFacadeTests(unittest.TestCase):
             shown_design = facade.show_survey_design("SV-DES-1", "1.0.0")["survey_design"]
             shown_instrument = facade.show_survey_instrument("QNR-1", "1.0.0")["instrument"]
             self.assertEqual(shown_design["rq_ids"], ["RQ-1"])
-            self.assertEqual(shown_instrument["design_ref"]["content_digest"], shown_design["design"]["content_digest"])
-            self.assertEqual(shown_instrument["questionnaire"]["questions"][0]["response_key"], "role")
+            self.assertEqual(
+                shown_instrument["design_ref"]["content_digest"],
+                shown_design["design"]["content_digest"],
+            )
+            self.assertEqual(
+                shown_instrument["questionnaire"]["questions"][0]["response_key"], "role"
+            )
 
             json_a = facade.export_survey_instrument("QNR-1", "1.0.0", format="json")
             json_b = facade.export_survey_instrument("QNR-1", "1.0.0", format="json")
@@ -297,10 +310,12 @@ class SurveyProductionFacadeTests(unittest.TestCase):
                 self.assertEqual(authority.exception.code, "APPLICATION-SURVEY-AUTHORITY-001")
 
                 with self.assertRaises(LocalApplicationError) as missing_design:
-                    facade.capture_survey_instrument({
-                        **instrument_payload(),
-                        "survey_design_id": "SV-MISSING",
-                    })
+                    facade.capture_survey_instrument(
+                        {
+                            **instrument_payload(),
+                            "survey_design_id": "SV-MISSING",
+                        }
+                    )
                 self.assertEqual(
                     missing_design.exception.code,
                     "APPLICATION-SURVEY-DESIGN-BINDING-001",
@@ -310,13 +325,9 @@ class SurveyProductionFacadeTests(unittest.TestCase):
 
                 duplicate = extended_questionnaire()
                 duplicate["questions"][1]["response_key"] = "role"
-                duplicate["content_digest"] = canonical_document_digest(
-                    duplicate, "content_digest"
-                )
+                duplicate["content_digest"] = canonical_document_digest(duplicate, "content_digest")
                 with self.assertRaises(LocalApplicationError) as duplicate_error:
-                    facade.capture_survey_instrument(
-                        instrument_payload(questionnaire=duplicate)
-                    )
+                    facade.capture_survey_instrument(instrument_payload(questionnaire=duplicate))
                 self.assertEqual(
                     duplicate_error.exception.code,
                     "APPLICATION-SURVEY-QUESTIONNAIRE-001",
@@ -328,22 +339,18 @@ class SurveyProductionFacadeTests(unittest.TestCase):
                     bad_branch, "content_digest"
                 )
                 with self.assertRaises(LocalApplicationError) as branch_error:
-                    facade.capture_survey_instrument(
-                        instrument_payload(questionnaire=bad_branch)
-                    )
-                self.assertEqual(
-                    branch_error.exception.code, "APPLICATION-SURVEY-BRANCH-001"
-                )
+                    facade.capture_survey_instrument(instrument_payload(questionnaire=bad_branch))
+                self.assertEqual(branch_error.exception.code, "APPLICATION-SURVEY-BRANCH-001")
 
                 bad_missing = extended_questionnaire()
-                bad_missing["questions"][0]["missing_value_semantics"]["unknown_option_id"] = "NO-SUCH-OPTION"
+                bad_missing["questions"][0]["missing_value_semantics"]["unknown_option_id"] = (
+                    "NO-SUCH-OPTION"
+                )
                 bad_missing["content_digest"] = canonical_document_digest(
                     bad_missing, "content_digest"
                 )
                 with self.assertRaises(LocalApplicationError) as missing_error:
-                    facade.capture_survey_instrument(
-                        instrument_payload(questionnaire=bad_missing)
-                    )
+                    facade.capture_survey_instrument(instrument_payload(questionnaire=bad_missing))
                 self.assertEqual(
                     missing_error.exception.code,
                     "APPLICATION-SURVEY-QUESTIONNAIRE-001",
@@ -363,15 +370,15 @@ class SurveyProductionFacadeTests(unittest.TestCase):
 
                 changed = deepcopy(fixtures()["design"])
                 changed["target_population"]["definition"] += " Changed."
-                changed["content_digest"] = canonical_document_digest(
-                    changed, "content_digest"
-                )
+                changed["content_digest"] = canonical_document_digest(changed, "content_digest")
                 with self.assertRaises(LocalApplicationError) as immutable:
-                    facade.capture_survey_design({
-                        "rq_ids": ["RQ-1"],
-                        "design": changed,
-                        "capture_origin": "test_probe",
-                    })
+                    facade.capture_survey_design(
+                        {
+                            "rq_ids": ["RQ-1"],
+                            "design": changed,
+                            "capture_origin": "test_probe",
+                        }
+                    )
                 self.assertEqual(immutable.exception.code, "SURVEY-IMMUTABLE-001")
 
                 db = sqlite3.connect(Path(temp) / "survey-registry.sqlite3")
@@ -404,11 +411,17 @@ class SurveyProductionCliTests(unittest.TestCase):
                 json.dumps(design_payload(rq_id=rq_id), ensure_ascii=False),
                 encoding="utf-8",
             )
-            code, captured_design = run_cli([
-                "survey", "design", "capture",
-                "--workspace", str(workspace),
-                "--json", str(design_file),
-            ])
+            code, captured_design = run_cli(
+                [
+                    "survey",
+                    "design",
+                    "capture",
+                    "--workspace",
+                    str(workspace),
+                    "--json",
+                    str(design_file),
+                ]
+            )
             self.assertEqual((code, captured_design["status"]), (0, "CAPTURED"))
 
             questionnaire = deepcopy(fixtures()["questionnaire"])
@@ -425,52 +438,89 @@ class SurveyProductionCliTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            code, captured_instrument = run_cli([
-                "survey", "instrument", "capture",
-                "--workspace", str(workspace),
-                "--json", str(instrument_file),
-            ])
+            code, captured_instrument = run_cli(
+                [
+                    "survey",
+                    "instrument",
+                    "capture",
+                    "--workspace",
+                    str(workspace),
+                    "--json",
+                    str(instrument_file),
+                ]
+            )
             self.assertEqual((code, captured_instrument["status"]), (0, "CAPTURED"))
 
-            code, shown = run_cli([
-                "survey", "instrument", "show",
-                "--workspace", str(workspace),
-                "--instrument-id", "QNR-1",
-                "--version", "1.0.0",
-                "--json",
-            ])
+            code, shown = run_cli(
+                [
+                    "survey",
+                    "instrument",
+                    "show",
+                    "--workspace",
+                    str(workspace),
+                    "--instrument-id",
+                    "QNR-1",
+                    "--version",
+                    "1.0.0",
+                    "--json",
+                ]
+            )
             self.assertEqual((code, shown["status"]), (0, "OK"))
             self.assertEqual(shown["instrument"]["rq_ids"], [rq_id])
 
-            code, exported_json = run_cli([
-                "survey", "instrument", "export",
-                "--workspace", str(workspace),
-                "--instrument-id", "QNR-1",
-                "--version", "1.0.0",
-                "--format", "json",
-                "--json",
-            ])
+            code, exported_json = run_cli(
+                [
+                    "survey",
+                    "instrument",
+                    "export",
+                    "--workspace",
+                    str(workspace),
+                    "--instrument-id",
+                    "QNR-1",
+                    "--version",
+                    "1.0.0",
+                    "--format",
+                    "json",
+                    "--json",
+                ]
+            )
             self.assertEqual((code, exported_json["status"]), (0, "OK"))
-            code, exported_markdown = run_cli([
-                "survey", "instrument", "export",
-                "--workspace", str(workspace),
-                "--instrument-id", "QNR-1",
-                "--version", "1.0.0",
-                "--format", "markdown",
-                "--json",
-            ])
+            code, exported_markdown = run_cli(
+                [
+                    "survey",
+                    "instrument",
+                    "export",
+                    "--workspace",
+                    str(workspace),
+                    "--instrument-id",
+                    "QNR-1",
+                    "--version",
+                    "1.0.0",
+                    "--format",
+                    "markdown",
+                    "--json",
+                ]
+            )
             self.assertEqual((code, exported_markdown["status"]), (0, "OK"))
             self.assertTrue(exported_json["content"].startswith("{"))
             self.assertTrue(exported_markdown["content"].startswith("# "))
 
-            code, repeated = run_cli([
-                "survey", "instrument", "export",
-                "--workspace", str(workspace),
-                "--instrument-id", "QNR-1",
-                "--version", "1.0.0",
-                "--format", "json",
-                "--json",
-            ])
+            code, repeated = run_cli(
+                [
+                    "survey",
+                    "instrument",
+                    "export",
+                    "--workspace",
+                    str(workspace),
+                    "--instrument-id",
+                    "QNR-1",
+                    "--version",
+                    "1.0.0",
+                    "--format",
+                    "json",
+                    "--json",
+                ]
+            )
             self.assertEqual(code, 0)
             self.assertEqual(repeated["export_digest"], exported_json["export_digest"])
             self.assertEqual(repeated["content"], exported_json["content"])
@@ -478,9 +528,7 @@ class SurveyProductionCliTests(unittest.TestCase):
             code, after = run_cli(["status", "--workspace", str(workspace), "--json"])
             self.assertEqual(code, 0)
             self.assertEqual(after["snapshot"], before["snapshot"])
-            self.assertEqual(
-                after["pending_human_decisions"], before["pending_human_decisions"]
-            )
+            self.assertEqual(after["pending_human_decisions"], before["pending_human_decisions"])
 
     def test_repository_launcher_exposes_survey_namespace(self):
         result = subprocess.run(

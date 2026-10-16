@@ -29,11 +29,14 @@ class ExternalDesktopResearchAttemptLifecycleTests(unittest.TestCase):
             app, facade = helper.make_facade(Path(temp))
             try:
                 run_id = helper.prepare(facade)["run_id"]
-                facade.start_external_retrieval_attempt(run_id, {
-                    "attempt_id": "ATT-IN-PROGRESS",
-                    "strategy": "support search",
-                    "coverage_dimension_ids": ["COV-SUPPORT"],
-                })
+                facade.start_external_retrieval_attempt(
+                    run_id,
+                    {
+                        "attempt_id": "ATT-IN-PROGRESS",
+                        "strategy": "support search",
+                        "coverage_dimension_ids": ["COV-SUPPORT"],
+                    },
+                )
 
                 with self.assertRaises(LocalApplicationError) as blocked:
                     facade.collect_external(run_id, {"handoff": {"invalid": True}, "extension": {}})
@@ -41,10 +44,13 @@ class ExternalDesktopResearchAttemptLifecycleTests(unittest.TestCase):
                 self.assertIn("ATT-IN-PROGRESS", str(blocked.exception))
                 self.assertEqual(app.execution_store.load_run(run_id).status.value, "RUNNING")
 
-                completed = facade.complete_external_retrieval_attempt(run_id, {
-                    "attempt_id": "ATT-IN-PROGRESS",
-                    "outcome": "no_relevant_source",
-                })
+                completed = facade.complete_external_retrieval_attempt(
+                    run_id,
+                    {
+                        "attempt_id": "ATT-IN-PROGRESS",
+                        "outcome": "no_relevant_source",
+                    },
+                )
                 self.assertEqual(completed["attempt"]["outcome"], "no_relevant_source")
             finally:
                 app.close()
@@ -56,37 +62,52 @@ class ExternalDesktopResearchAttemptLifecycleTests(unittest.TestCase):
             setup_app, setup_facade = helper.make_facade(root)
             try:
                 run_id = helper.prepare(setup_facade)["run_id"]
-                setup_facade.start_external_retrieval_attempt(run_id, {
-                    "attempt_id": "ATT-1",
-                    "strategy": "support search",
-                    "coverage_dimension_ids": ["COV-SUPPORT"],
-                })
+                setup_facade.start_external_retrieval_attempt(
+                    run_id,
+                    {
+                        "attempt_id": "ATT-1",
+                        "strategy": "support search",
+                        "coverage_dimension_ids": ["COV-SUPPORT"],
+                    },
+                )
                 helper.write_capture_files(root)
-                capture = setup_facade.capture_external_source(run_id, {
-                    "capture_id": "CAP-1",
-                    "source_category": "other",
-                    "exact_locator": "https://example.test/source-a#section-1",
-                    "acquired_at": "2026-08-31T00:00:00Z",
-                    "original_file": "captures/raw/source-a.html",
-                    "original_media_type": "text/html",
-                    "text_rendition_file": "captures/text/source-a.txt",
-                    "provenance": {},
-                })["capture"]
-                setup_facade.complete_external_retrieval_attempt(run_id, {
-                    "attempt_id": "ATT-1",
-                    "outcome": "source_captured",
-                    "target_locator": "https://example.test/source-a#section-1",
-                    "resulting_capture_id": "CAP-1",
-                })
-                setup_facade.start_external_retrieval_attempt(run_id, {
-                    "attempt_id": "ATT-2",
-                    "strategy": "counter search",
-                    "coverage_dimension_ids": ["COV-COUNTER"],
-                })
-                setup_facade.complete_external_retrieval_attempt(run_id, {
-                    "attempt_id": "ATT-2",
-                    "outcome": "no_relevant_source",
-                })
+                capture = setup_facade.capture_external_source(
+                    run_id,
+                    {
+                        "capture_id": "CAP-1",
+                        "source_category": "other",
+                        "exact_locator": "https://example.test/source-a#section-1",
+                        "acquired_at": "2026-08-31T00:00:00Z",
+                        "original_file": "captures/raw/source-a.html",
+                        "original_media_type": "text/html",
+                        "text_rendition_file": "captures/text/source-a.txt",
+                        "provenance": {},
+                    },
+                )["capture"]
+                setup_facade.complete_external_retrieval_attempt(
+                    run_id,
+                    {
+                        "attempt_id": "ATT-1",
+                        "outcome": "source_captured",
+                        "target_locator": "https://example.test/source-a#section-1",
+                        "resulting_capture_id": "CAP-1",
+                    },
+                )
+                setup_facade.start_external_retrieval_attempt(
+                    run_id,
+                    {
+                        "attempt_id": "ATT-2",
+                        "strategy": "counter search",
+                        "coverage_dimension_ids": ["COV-COUNTER"],
+                    },
+                )
+                setup_facade.complete_external_retrieval_attempt(
+                    run_id,
+                    {
+                        "attempt_id": "ATT-2",
+                        "outcome": "no_relevant_source",
+                    },
+                )
                 handoff, extension = golden_submission(setup_app, run_id, capture)
             finally:
                 setup_app.close()
@@ -101,7 +122,9 @@ class ExternalDesktopResearchAttemptLifecycleTests(unittest.TestCase):
                     resolver=NullResolver(),
                     effective_profile_set_provider=profile_provider,
                 )
-                return LocalApplicationFacade(app, "PRJ-1", workspace_root=root, owns_application=True)
+                return LocalApplicationFacade(
+                    app, "PRJ-1", workspace_root=root, owns_application=True
+                )
 
             def collect_in_worker():
                 facade = open_facade()
@@ -157,34 +180,41 @@ class ExternalDesktopResearchAttemptLifecycleTests(unittest.TestCase):
                     inspect_facade._application.execution_store.load_run(run_id).status.value,
                     "COMPLETED",
                 )
-                attempts = reconstruct_attempts(inspect_facade._application.operational_store, run_id)
+                attempts = reconstruct_attempts(
+                    inspect_facade._application.operational_store, run_id
+                )
                 self.assertNotIn("ATT-RACE", attempts)
                 self.assertTrue(all(item["completed_at"] is not None for item in attempts.values()))
             finally:
                 inspect_facade.close()
-
 
     def _completed_historical_run_with_open_attempt(self, root: Path):
         helper = ExternalDesktopResearchIntakeTests(methodName="runTest")
         app, facade = helper.make_facade(root)
         run_id = helper.prepare(facade)["run_id"]
         helper.write_capture_files(root)
-        capture = facade.capture_external_source(run_id, {
-            "capture_id": "CAP-REPLAY",
-            "source_category": "other",
-            "exact_locator": "https://example.test/replay#source",
-            "acquired_at": "2026-08-31T00:00:00Z",
-            "original_file": "captures/raw/source-a.html",
-            "original_media_type": "text/html",
-            "text_rendition_file": "captures/text/source-a.txt",
-            "provenance": {},
-        })["capture"]
-        facade.start_external_retrieval_attempt(run_id, {
-            "attempt_id": "ATT-OPEN",
-            "strategy": "counter search",
-            "coverage_dimension_ids": ["COV-COUNTER"],
-            "query_or_target": "missing counter source",
-        })
+        capture = facade.capture_external_source(
+            run_id,
+            {
+                "capture_id": "CAP-REPLAY",
+                "source_category": "other",
+                "exact_locator": "https://example.test/replay#source",
+                "acquired_at": "2026-08-31T00:00:00Z",
+                "original_file": "captures/raw/source-a.html",
+                "original_media_type": "text/html",
+                "text_rendition_file": "captures/text/source-a.txt",
+                "provenance": {},
+            },
+        )["capture"]
+        facade.start_external_retrieval_attempt(
+            run_id,
+            {
+                "attempt_id": "ATT-OPEN",
+                "strategy": "counter search",
+                "coverage_dimension_ids": ["COV-COUNTER"],
+                "query_or_target": "missing counter source",
+            },
+        )
         handoff, extension = golden_submission(app, run_id, capture)
         historical = PreAttemptGuardFacade.collect_external(
             facade,
@@ -214,18 +244,21 @@ class ExternalDesktopResearchAttemptLifecycleTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             app, facade, run_id = self._completed_historical_run_with_open_attempt(Path(temp))
             try:
-                with patch.object(
-                    facade,
-                    "start_external_retrieval_attempt",
-                    side_effect=LocalApplicationError(
-                        "APPLICATION-EXTERNAL-ATTEMPT-001",
-                        "synthetic carry failure",
+                with (
+                    patch.object(
+                        facade,
+                        "start_external_retrieval_attempt",
+                        side_effect=LocalApplicationError(
+                            "APPLICATION-EXTERNAL-ATTEMPT-001",
+                            "synthetic carry failure",
+                        ),
                     ),
-                ), patch.object(
-                    app.capability_execution_service,
-                    "abort",
-                    wraps=app.capability_execution_service.abort,
-                ) as abort:
+                    patch.object(
+                        app.capability_execution_service,
+                        "abort",
+                        wraps=app.capability_execution_service.abort,
+                    ) as abort,
+                ):
                     with self.assertRaises(LocalApplicationError) as blocked:
                         facade.replay_completed_desktop_research_run(run_id)
 
@@ -246,33 +279,45 @@ class ExternalDesktopResearchAttemptLifecycleTests(unittest.TestCase):
             try:
                 run_id = helper.prepare(facade)["run_id"]
                 helper.write_capture_files(root)
-                capture = facade.capture_external_source(run_id, {
-                    "capture_id": "CAP-1",
-                    "source_category": "other",
-                    "exact_locator": "https://example.test/source-a#section-1",
-                    "acquired_at": "2026-08-31T00:00:00Z",
-                    "original_file": "captures/raw/source-a.html",
-                    "original_media_type": "text/html",
-                    "text_rendition_file": "captures/text/source-a.txt",
-                    "provenance": {},
-                })["capture"]
-                facade.start_external_retrieval_attempt(run_id, {
-                    "attempt_id": "ATT-DONE",
-                    "strategy": "support search",
-                    "coverage_dimension_ids": ["COV-SUPPORT"],
-                })
-                facade.complete_external_retrieval_attempt(run_id, {
-                    "attempt_id": "ATT-DONE",
-                    "outcome": "source_captured",
-                    "target_locator": "https://example.test/source-a#section-1",
-                    "resulting_capture_id": "CAP-1",
-                })
-                facade.start_external_retrieval_attempt(run_id, {
-                    "attempt_id": "ATT-OPEN",
-                    "strategy": "counter search",
-                    "coverage_dimension_ids": ["COV-COUNTER"],
-                    "query_or_target": "missing counter source",
-                })
+                capture = facade.capture_external_source(
+                    run_id,
+                    {
+                        "capture_id": "CAP-1",
+                        "source_category": "other",
+                        "exact_locator": "https://example.test/source-a#section-1",
+                        "acquired_at": "2026-08-31T00:00:00Z",
+                        "original_file": "captures/raw/source-a.html",
+                        "original_media_type": "text/html",
+                        "text_rendition_file": "captures/text/source-a.txt",
+                        "provenance": {},
+                    },
+                )["capture"]
+                facade.start_external_retrieval_attempt(
+                    run_id,
+                    {
+                        "attempt_id": "ATT-DONE",
+                        "strategy": "support search",
+                        "coverage_dimension_ids": ["COV-SUPPORT"],
+                    },
+                )
+                facade.complete_external_retrieval_attempt(
+                    run_id,
+                    {
+                        "attempt_id": "ATT-DONE",
+                        "outcome": "source_captured",
+                        "target_locator": "https://example.test/source-a#section-1",
+                        "resulting_capture_id": "CAP-1",
+                    },
+                )
+                facade.start_external_retrieval_attempt(
+                    run_id,
+                    {
+                        "attempt_id": "ATT-OPEN",
+                        "strategy": "counter search",
+                        "coverage_dimension_ids": ["COV-COUNTER"],
+                        "query_or_target": "missing counter source",
+                    },
+                )
                 handoff, extension = golden_submission(app, run_id, capture)
 
                 # Simulate a historical pre-guard Run without rewriting its provenance.
@@ -314,7 +359,6 @@ class ExternalDesktopResearchAttemptLifecycleTests(unittest.TestCase):
                 )
             finally:
                 app.close()
-
 
 
 if __name__ == "__main__":

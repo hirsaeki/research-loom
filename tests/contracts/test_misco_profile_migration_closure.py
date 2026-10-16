@@ -51,7 +51,9 @@ class MiscoProfileMigrationClosureTests(unittest.TestCase):
         project_knowledge = closure["rule_classes"]["project-knowledge"]
         self.assertEqual(project_knowledge["disposition"], "validation_only")
         self.assertEqual(project_knowledge["consumer"], "none in fresh production runtime")
-        config = json.loads((ROOT / "projects/misco-ai-2026/project-config.json").read_text(encoding="utf-8"))
+        config = json.loads(
+            (ROOT / "projects/misco-ai-2026/project-config.json").read_text(encoding="utf-8")
+        )
         locators = {row["locator"] for row in config["resource_references"]}
         self.assertNotIn("research-profile/project_feedback/virtual_run_feedback_v0.1.md", locators)
 
@@ -60,7 +62,9 @@ class MiscoProfileMigrationClosureTests(unittest.TestCase):
         missing = closure["missing_inputs"]
         self.assertEqual(missing["INPUT-FORMAL-SPEC"]["status"], "resolved")
         self.assertEqual(missing["INPUT-URL-DISPLAY"]["status"], "resolved")
-        self.assertEqual(missing["INPUT-RESEARCH-GROUP-TYPE"]["status"], "not_required_by_current_formal_profile")
+        self.assertEqual(
+            missing["INPUT-RESEARCH-GROUP-TYPE"]["status"], "not_required_by_current_formal_profile"
+        )
         self.assertEqual(missing["INPUT-PERMISSION"]["status"], "conditional_runtime_input")
 
     def test_live_acceptance_records_g3_without_falsely_closing_host_uat(self):

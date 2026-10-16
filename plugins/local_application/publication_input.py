@@ -1,4 +1,5 @@
 """Diagnostic Publication reads reuse Writer pins without repairing source bytes."""
+
 from __future__ import annotations
 
 from .facade import LocalApplicationError
@@ -16,11 +17,16 @@ class _PublicationCompositionReader(WriterCompositionHistoryService):
     def _package(self, package_id, **_kwargs):
         if package_id not in self.packages:
             service = self._package_service()
-            report = verify_export_root(service.root / safe_component(package_id, "package_id"),
-                                        _visual_diagnostics=self.diagnostics)
+            report = verify_export_root(
+                service.root / safe_component(package_id, "package_id"),
+                _visual_diagnostics=self.diagnostics,
+            )
             package = service._load_metadata(package_id, MAX_OUTPUT_BYTES)
             if package["package_digest"] != report["package_digest"]:
-                raise LocalApplicationError("APPLICATION-PUBLICATION-INTEGRITY-001", "Package changed during Publication inspection")
+                raise LocalApplicationError(
+                    "APPLICATION-PUBLICATION-INTEGRITY-001",
+                    "Package changed during Publication inspection",
+                )
             self.packages[package_id] = package
         return self.packages[package_id]
 
@@ -48,7 +54,9 @@ def inspect_inputs(facade, composition_id, revision_id):
         # still execute; source text, schema, digest and reference errors still fail.
         reader = _PublicationInputReader(facade)
         inspection = reader.inspect(composition_id, revision_id)
-        package = reader.composer._package(inspection["writer_input"]["source"]["research_package_id"])
+        package = reader.composer._package(
+            inspection["writer_input"]["source"]["research_package_id"]
+        )
         diagnostics = reader.composer.diagnostics
         if not diagnostics:
             raise exc

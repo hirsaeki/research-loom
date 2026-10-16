@@ -9,7 +9,11 @@ import sqlite3
 import tempfile
 from unittest.mock import patch
 
-from plugins.local_application import LocalApplicationError, LocalApplicationFacade, LocalResearchApplication
+from plugins.local_application import (
+    LocalApplicationError,
+    LocalApplicationFacade,
+    LocalResearchApplication,
+)
 from plugins.local_survey_response_store import LocalSurveyResponseStore
 from tests.runtime.survey_virtual_runner_test_support import SurveyVirtualRunnerTestBase
 from tests.runtime import test_issue221_real_survey_intake as issue221
@@ -34,10 +38,19 @@ class Issue251RealSurveyBatchTests(SurveyVirtualRunnerTestBase):
         identity = {
             "intake_format": "provider-neutral-json@0.1.0",
             "intake_file": payload["file"],
-            "file_digest": "sha256:" + hashlib.sha256((root / payload["file"]).read_bytes()).hexdigest(),
-            **{key: payload[key] for key in ("instrument_id", "instrument_version", "instrument_digest")},
+            "file_digest": "sha256:"
+            + hashlib.sha256((root / payload["file"]).read_bytes()).hexdigest(),
+            **{
+                key: payload[key]
+                for key in ("instrument_id", "instrument_version", "instrument_digest")
+            },
         }
-        return "SRD-REAL-" + hashlib.sha256(json.dumps(identity, sort_keys=True, separators=(",", ":")).encode()).hexdigest()[:32]
+        return (
+            "SRD-REAL-"
+            + hashlib.sha256(
+                json.dumps(identity, sort_keys=True, separators=(",", ":")).encode()
+            ).hexdigest()[:32]
+        )
 
     def test_alias_and_cumulative_export_reuse_first_responses_not_population_counts(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -59,11 +72,26 @@ class Issue251RealSurveyBatchTests(SurveyVirtualRunnerTestBase):
                 self.assertEqual(third["accepted_count"], 3)
                 self.assertEqual(third["rejected_count"], 1)
                 shown = facade.show_real_survey_intake(third["dataset_id"], limit=100)
-                self.assertEqual(shown["aggregate_result"]["population"]["accepted_response_count"], 3)
-                self.assertEqual({entry["canonical_response"]["response_id"] for entry in shown["responses"] if entry["kind"] == "accepted_response"}, {"REAL-A", "REAL-B", "REAL-C"})
+                self.assertEqual(
+                    shown["aggregate_result"]["population"]["accepted_response_count"], 3
+                )
+                self.assertEqual(
+                    {
+                        entry["canonical_response"]["response_id"]
+                        for entry in shown["responses"]
+                        if entry["kind"] == "accepted_response"
+                    },
+                    {"REAL-A", "REAL-B", "REAL-C"},
+                )
                 self.assertEqual(facade.show_survey_response("REAL-A"), first_response)
-                self.assertEqual(facade.show_survey_response_dataset(first["dataset_id"])["dataset"], first_dataset)
-                self.assertNotEqual(shown["intake_source"]["intake_file_digest"], first["intake_source"]["intake_file_digest"])
+                self.assertEqual(
+                    facade.show_survey_response_dataset(first["dataset_id"])["dataset"],
+                    first_dataset,
+                )
+                self.assertNotEqual(
+                    shown["intake_source"]["intake_file_digest"],
+                    first["intake_source"]["intake_file_digest"],
+                )
                 replay = facade.capture_real_survey_intake(payload)
                 self.assertEqual(replay["status"], "ALREADY_CAPTURED")
                 self.assertEqual(replay["aggregate_result_id"], third["aggregate_result_id"])
@@ -91,8 +119,12 @@ class Issue251RealSurveyBatchTests(SurveyVirtualRunnerTestBase):
                         facade.capture_real_survey_intake(payload)
                     self.assertEqual(error.exception.code, "SURVEY_RESPONSE_DUPLICATE_RECORD")
                     self.assertEqual(facade.show_survey_response("REAL-A"), original)
-                    self.assertIsNone(facade._survey_response_store().load_response("PRJ-1", "REAL-C"))
-                    self.assertEqual(facade.show_real_survey_intake(first["dataset_id"])["accepted_count"], 2)
+                    self.assertIsNone(
+                        facade._survey_response_store().load_response("PRJ-1", "REAL-C")
+                    )
+                    self.assertEqual(
+                        facade.show_real_survey_intake(first["dataset_id"])["accepted_count"], 2
+                    )
                 finally:
                     app.close()
 
@@ -114,14 +146,20 @@ class Issue251RealSurveyBatchTests(SurveyVirtualRunnerTestBase):
                 with patch.object(facade, "_capture_dataset", side_effect=legacy_capture):
                     first = facade.capture_real_survey_intake(payload)
                 original = facade.show_survey_response("REAL-A")
-                self.assertEqual(original["response"]["source_provenance"]["intake_file"], payload["file"])
+                self.assertEqual(
+                    original["response"]["source_provenance"]["intake_file"], payload["file"]
+                )
                 alias = {**payload, "file": "legacy-alias.json"}
                 (root / alias["file"]).write_bytes(source.read_bytes())
                 second = facade.capture_real_survey_intake(alias)
                 self.assertEqual(second["accepted_count"], 2)
                 self.assertEqual(facade.show_survey_response("REAL-A"), original)
-                self.assertEqual(facade.capture_real_survey_intake(alias)["status"], "ALREADY_CAPTURED")
-                self.assertEqual(facade.capture_real_survey_intake(payload)["dataset_id"], first["dataset_id"])
+                self.assertEqual(
+                    facade.capture_real_survey_intake(alias)["status"], "ALREADY_CAPTURED"
+                )
+                self.assertEqual(
+                    facade.capture_real_survey_intake(payload)["dataset_id"], first["dataset_id"]
+                )
             finally:
                 app.close()
 
@@ -130,12 +168,20 @@ class Issue251RealSurveyBatchTests(SurveyVirtualRunnerTestBase):
             root = Path(temp)
             app, facade, _, payload = self._fixture(temp)
             try:
-                with patch.object(facade, "capture_survey_analysis_spec", side_effect=OSError("aggregation interrupted")):
+                with patch.object(
+                    facade,
+                    "capture_survey_analysis_spec",
+                    side_effect=OSError("aggregation interrupted"),
+                ):
                     with self.assertRaises(OSError):
                         facade.capture_real_survey_intake(payload)
                 dataset_id = self._batch_id(root, payload)
                 saved = facade.show_survey_response_dataset(dataset_id)["dataset"]
-                with patch.object(facade, "_capture_dataset", side_effect=AssertionError("batch must not be captured again")):
+                with patch.object(
+                    facade,
+                    "_capture_dataset",
+                    side_effect=AssertionError("batch must not be captured again"),
+                ):
                     resumed = facade.capture_real_survey_intake(payload)
                 self.assertEqual(resumed["status"], "ALREADY_CAPTURED")
                 self.assertEqual(facade.show_survey_response_dataset(dataset_id)["dataset"], saved)
@@ -150,7 +196,10 @@ class Issue251RealSurveyBatchTests(SurveyVirtualRunnerTestBase):
             original_encoded = LocalSurveyResponseStore._encoded
 
             def interrupt_dataset(value):
-                if isinstance(value, dict) and value.get("object_type") == "survey_response_dataset":
+                if (
+                    isinstance(value, dict)
+                    and value.get("object_type") == "survey_response_dataset"
+                ):
                     raise sqlite3.OperationalError("interrupted after response inserts")
                 return original_encoded(value)
 
@@ -158,7 +207,9 @@ class Issue251RealSurveyBatchTests(SurveyVirtualRunnerTestBase):
                 facade.capture_real_survey_intake(payload)
                 original = facade.show_survey_response("REAL-A")
                 self._append_response(root, payload)
-                with patch.object(LocalSurveyResponseStore, "_encoded", side_effect=interrupt_dataset):
+                with patch.object(
+                    LocalSurveyResponseStore, "_encoded", side_effect=interrupt_dataset
+                ):
                     with self.assertRaises(LocalApplicationError) as error:
                         facade.capture_real_survey_intake(payload)
                 self.assertEqual(error.exception.code, "SURVEY-RESPONSE-STORE-DB-001")
@@ -166,7 +217,9 @@ class Issue251RealSurveyBatchTests(SurveyVirtualRunnerTestBase):
                 self.assertEqual(facade.show_survey_response("REAL-A"), original)
             finally:
                 app.close()
-            reopened = LocalResearchApplication(root, resolver=NullResolver(), effective_profile_set_provider=profile_provider)
+            reopened = LocalResearchApplication(
+                root, resolver=NullResolver(), effective_profile_set_provider=profile_provider
+            )
             try:
                 facade = LocalApplicationFacade(reopened, "PRJ-1", workspace_root=root)
                 resumed = facade.capture_real_survey_intake(payload)
@@ -184,9 +237,13 @@ class Issue251RealSurveyBatchTests(SurveyVirtualRunnerTestBase):
             (root / alias["file"]).write_bytes((root / payload["file"]).read_bytes())
 
             def capture(item):
-                application = LocalResearchApplication(root, resolver=NullResolver(), effective_profile_set_provider=profile_provider)
+                application = LocalResearchApplication(
+                    root, resolver=NullResolver(), effective_profile_set_provider=profile_provider
+                )
                 try:
-                    return LocalApplicationFacade(application, "PRJ-1", workspace_root=root).capture_real_survey_intake(item)
+                    return LocalApplicationFacade(
+                        application, "PRJ-1", workspace_root=root
+                    ).capture_real_survey_intake(item)
                 finally:
                     application.close()
 
@@ -194,14 +251,27 @@ class Issue251RealSurveyBatchTests(SurveyVirtualRunnerTestBase):
                 results = list(executor.map(capture, [payload, alias]))
             self.assertEqual([result["accepted_count"] for result in results], [2, 2])
             self.assertEqual(len({result["dataset_id"] for result in results}), 2)
-            reopened = LocalResearchApplication(root, resolver=NullResolver(), effective_profile_set_provider=profile_provider)
+            reopened = LocalResearchApplication(
+                root, resolver=NullResolver(), effective_profile_set_provider=profile_provider
+            )
             try:
                 facade = LocalApplicationFacade(reopened, "PRJ-1", workspace_root=root)
-                datasets = [facade.show_survey_response_dataset(result["dataset_id"]) for result in results]
-                refs = [[entry["response_ref"] for entry in dataset["entries"] if entry["kind"] == "accepted_response"] for dataset in datasets]
+                datasets = [
+                    facade.show_survey_response_dataset(result["dataset_id"]) for result in results
+                ]
+                refs = [
+                    [
+                        entry["response_ref"]
+                        for entry in dataset["entries"]
+                        if entry["kind"] == "accepted_response"
+                    ]
+                    for dataset in datasets
+                ]
                 self.assertEqual(refs[0], refs[1])
                 for item in (payload, alias):
-                    self.assertEqual(facade.capture_real_survey_intake(item)["status"], "ALREADY_CAPTURED")
+                    self.assertEqual(
+                        facade.capture_real_survey_intake(item)["status"], "ALREADY_CAPTURED"
+                    )
             finally:
                 reopened.close()
 
@@ -220,13 +290,19 @@ class Issue251RealSurveyBatchTests(SurveyVirtualRunnerTestBase):
                 result = facade.capture_real_survey_intake(payload)
                 self.assertEqual(result["accepted_count"], 2)
                 self.assertEqual(result["rejected_count"], 2)
-                self.assertIn("SURVEY_RESPONSE_DUPLICATE_RECORD", result["validation_summary"]["issue_code_counts"])
-                self.assertEqual(facade.capture_real_survey_intake(payload)["status"], "ALREADY_CAPTURED")
+                self.assertIn(
+                    "SURVEY_RESPONSE_DUPLICATE_RECORD",
+                    result["validation_summary"]["issue_code_counts"],
+                )
+                self.assertEqual(
+                    facade.capture_real_survey_intake(payload)["status"], "ALREADY_CAPTURED"
+                )
             finally:
                 app.close()
 
     def test_same_batch_concurrent_retry_reuses_one_dataset_and_aggregate(self):
         from threading import Barrier
+
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             app, _, _, payload = self._fixture(temp)
@@ -234,20 +310,27 @@ class Issue251RealSurveyBatchTests(SurveyVirtualRunnerTestBase):
             barrier = Barrier(2)
 
             def capture(_):
-                application = LocalResearchApplication(root, resolver=NullResolver(), effective_profile_set_provider=profile_provider)
+                application = LocalResearchApplication(
+                    root, resolver=NullResolver(), effective_profile_set_provider=profile_provider
+                )
                 try:
                     facade = LocalApplicationFacade(application, "PRJ-1", workspace_root=root)
                     original_capture = facade._capture_dataset
+
                     def compete(*args, **kwargs):
                         barrier.wait(timeout=10)
                         return original_capture(*args, **kwargs)
+
                     with patch.object(facade, "_capture_dataset", side_effect=compete):
                         return facade.capture_real_survey_intake(payload)
                 finally:
                     application.close()
+
             with ThreadPoolExecutor(max_workers=2) as executor:
                 results = list(executor.map(capture, range(2)))
-            self.assertEqual({result["status"] for result in results}, {"CAPTURED", "ALREADY_CAPTURED"})
+            self.assertEqual(
+                {result["status"] for result in results}, {"CAPTURED", "ALREADY_CAPTURED"}
+            )
             self.assertEqual(len({result["dataset_id"] for result in results}), 1)
             self.assertEqual(len({result["aggregate_result_id"] for result in results}), 1)
 
@@ -255,6 +338,7 @@ class Issue251RealSurveyBatchTests(SurveyVirtualRunnerTestBase):
         from plugins.local_survey_store import canonical_document_digest
         from tests.runtime.test_survey_production import instrument_payload
         from tests.runtime.test_survey_response_dataset import intake
+
         for mismatch in ("instrument", "origin"):
             with self.subTest(mismatch=mismatch), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp)
@@ -264,19 +348,41 @@ class Issue251RealSurveyBatchTests(SurveyVirtualRunnerTestBase):
                         facade.capture_real_survey_intake(payload)
                         changed = deepcopy(questionnaire)
                         changed["version"] = "2.0.0"
-                        changed["content_digest"] = canonical_document_digest(changed, "content_digest")
-                        instrument = facade.capture_survey_instrument(instrument_payload(questionnaire=changed))
-                        payload = {**payload, "instrument_version": instrument["version"], "instrument_digest": instrument["content_digest"]}
+                        changed["content_digest"] = canonical_document_digest(
+                            changed, "content_digest"
+                        )
+                        instrument = facade.capture_survey_instrument(
+                            instrument_payload(questionnaire=changed)
+                        )
+                        payload = {
+                            **payload,
+                            "instrument_version": instrument["version"],
+                            "instrument_digest": instrument["content_digest"],
+                        }
                     else:
                         document = json.loads((root / payload["file"]).read_text(encoding="utf-8"))
                         synthetic = deepcopy(document["responses"][0])
                         synthetic["identity_namespace"] = "synthetic:issue251"
-                        facade.capture_survey_response_dataset(intake(questionnaire, responses=[synthetic]))
-                        stored = facade.show_survey_response("REAL-A", identity_namespace="synthetic:issue251")
+                        facade.capture_survey_response_dataset(
+                            intake(questionnaire, responses=[synthetic])
+                        )
+                        stored = facade.show_survey_response(
+                            "REAL-A", identity_namespace="synthetic:issue251"
+                        )
                         captured = facade.capture_real_survey_intake(payload)
                         self.assertEqual(captured["accepted_count"], 2)
-                        self.assertEqual(facade.show_survey_response("REAL-A", identity_namespace="real:issue221")["response"]["response_origin"], "real")
-                        self.assertEqual(facade.show_survey_response("REAL-A", identity_namespace="synthetic:issue251"), stored)
+                        self.assertEqual(
+                            facade.show_survey_response(
+                                "REAL-A", identity_namespace="real:issue221"
+                            )["response"]["response_origin"],
+                            "real",
+                        )
+                        self.assertEqual(
+                            facade.show_survey_response(
+                                "REAL-A", identity_namespace="synthetic:issue251"
+                            ),
+                            stored,
+                        )
                         continue
                     with self.assertRaises(LocalApplicationError) as error:
                         facade.capture_real_survey_intake(payload)
@@ -286,6 +392,7 @@ class Issue251RealSurveyBatchTests(SurveyVirtualRunnerTestBase):
 
     def test_schema_is_not_visible_until_initialization_is_committed(self):
         from threading import Event
+
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             app, facade, _, payload = self._fixture(temp)
@@ -302,18 +409,26 @@ class Issue251RealSurveyBatchTests(SurveyVirtualRunnerTestBase):
                         raise AssertionError("reader did not finish")
 
             def capture():
-                application = LocalResearchApplication(root, resolver=NullResolver(), effective_profile_set_provider=profile_provider)
+                application = LocalResearchApplication(
+                    root, resolver=NullResolver(), effective_profile_set_provider=profile_provider
+                )
                 try:
-                    return LocalApplicationFacade(application, "PRJ-1", workspace_root=root).capture_real_survey_intake(payload)
+                    return LocalApplicationFacade(
+                        application, "PRJ-1", workspace_root=root
+                    ).capture_real_survey_intake(payload)
                 finally:
                     application.close()
 
-            with patch.object(LocalSurveyResponseStore, "_schema_version", side_effect=pause_initialization):
+            with patch.object(
+                LocalSurveyResponseStore, "_schema_version", side_effect=pause_initialization
+            ):
                 with ThreadPoolExecutor(max_workers=1) as executor:
                     pending = executor.submit(capture)
                     try:
                         self.assertTrue(entered.wait(timeout=10))
-                        store = LocalSurveyResponseStore(root / ".research-loom" / "survey-response-registry.sqlite3")
+                        store = LocalSurveyResponseStore(
+                            root / ".research-loom" / "survey-response-registry.sqlite3"
+                        )
                         self.assertFalse(store.exists)
                         self.assertIsNone(store.load_response("PRJ-1", "REAL-A"))
                     finally:
@@ -325,7 +440,10 @@ class Issue251RealSurveyBatchTests(SurveyVirtualRunnerTestBase):
             root = Path(temp)
             app, facade, _, payload = self._fixture(temp)
             try:
-                with patch("plugins.local_survey_response_store.os.link", side_effect=PermissionError("cannot publish")):
+                with patch(
+                    "plugins.local_survey_response_store.os.link",
+                    side_effect=PermissionError("cannot publish"),
+                ):
                     with self.assertRaises(LocalApplicationError) as error:
                         facade.capture_real_survey_intake(payload)
                 self.assertEqual(error.exception.code, "SURVEY-RESPONSE-STORE-DB-001")

@@ -35,39 +35,28 @@ PATHS = {
     "semantics": ROOT / "core/packages/capability-semantics.schema.json",
 }
 FIX = {
-    "descriptor": ROOT
-    / "core/fixtures/capabilities/valid/generic-capability-descriptor.json",
-    "context": ROOT
-    / "core/fixtures/capabilities/valid/generic-capability-context-pack.json",
-    "invocation": ROOT
-    / "core/fixtures/capabilities/valid/generic-capability-invocation.json",
-    "handoff": ROOT
-    / "core/fixtures/capabilities/valid/generic-capability-handoff.json",
+    "descriptor": ROOT / "core/fixtures/capabilities/valid/generic-capability-descriptor.json",
+    "context": ROOT / "core/fixtures/capabilities/valid/generic-capability-context-pack.json",
+    "invocation": ROOT / "core/fixtures/capabilities/valid/generic-capability-invocation.json",
+    "handoff": ROOT / "core/fixtures/capabilities/valid/generic-capability-handoff.json",
 }
 
 
 class CapabilityContracts(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.schemas = {
-            key: json.loads(path.read_text()) for key, path in PATHS.items()
-        }
-        cls.validators = {
-            key: Draft202012Validator(schema)
-            for key, schema in cls.schemas.items()
-        }
-        cls.fixtures = {
-            key: json.loads(path.read_text()) for key, path in FIX.items()
-        }
+        cls.schemas = {key: json.loads(path.read_text()) for key, path in PATHS.items()}
+        cls.validators = {key: Draft202012Validator(schema) for key, schema in cls.schemas.items()}
+        cls.fixtures = {key: json.loads(path.read_text()) for key, path in FIX.items()}
         cls.project = json.loads(
             (ROOT / "projects/fixtures/valid/generic-project-config.json").read_text()
         )
         cls.effective_profiles = json.loads(
             (ROOT / "profiles/fixtures/valid/effective-profile-set.json").read_text()
         )
-        cls.objects = json.loads(
-            (ROOT / "core/fixtures/research-objects/valid.json").read_text()
-        )["objects"]
+        cls.objects = json.loads((ROOT / "core/fixtures/research-objects/valid.json").read_text())[
+            "objects"
+        ]
         cls.semantics = yaml.safe_load(
             (ROOT / "core/packages/capability-semantics.yaml").read_text()
         )
@@ -76,9 +65,7 @@ class CapabilityContracts(unittest.TestCase):
         errors = list(self.validators[key].iter_errors(document))
         self.assertFalse(
             errors,
-            "\n".join(
-                f"{list(error.path)}: {error.message}" for error in errors
-            ),
+            "\n".join(f"{list(error.path)}: {error.message}" for error in errors),
         )
 
     def assert_invalid(self, key, document):
@@ -129,9 +116,9 @@ class CapabilityContracts(unittest.TestCase):
             handoff["handoff_digest"],
             expected_handoff_digest(handoff),
         )
-        expected_effective_digest = "sha256:" + hashlib.sha256(
-            rfc8785.dumps(self.effective_profiles)
-        ).hexdigest()
+        expected_effective_digest = (
+            "sha256:" + hashlib.sha256(rfc8785.dumps(self.effective_profiles)).hexdigest()
+        )
         self.assertEqual(
             context["pins"]["effective_profile_set"]["content_digest"],
             expected_effective_digest,
@@ -228,9 +215,7 @@ class CapabilityContracts(unittest.TestCase):
             ("research_attention", 0, "max_attention_items", None, None),
             ("effective_constraints", 0, "max_effective_constraints", None, None),
         )
-        for collection, index, bound, changed_key, changed_value in (
-            duplicate_context_cases
-        ):
+        for collection, index, bound, changed_key, changed_value in duplicate_context_cases:
             with self.subTest(collection=collection):
                 bad = deepcopy(context)
                 duplicate = deepcopy(bad[collection][index])
@@ -278,9 +263,7 @@ class CapabilityContracts(unittest.TestCase):
         )
 
         bad = deepcopy(descriptor)
-        bad["runtime_authorization_evidence"] = invocation[
-            "runtime_authorization_evidence"
-        ]
+        bad["runtime_authorization_evidence"] = invocation["runtime_authorization_evidence"]
         self.assert_invalid("descriptor", bad)
 
         bad = deepcopy(invocation)
@@ -303,9 +286,7 @@ class CapabilityContracts(unittest.TestCase):
         )
 
         bad = deepcopy(invocation)
-        bad["runtime_authorization_evidence"]["resource_reference_ids"].remove(
-            "REF-ARTIFACT-001"
-        )
+        bad["runtime_authorization_evidence"]["resource_reference_ids"].remove("REF-ARTIFACT-001")
         refresh_digest("invocation", bad)
         self.assertEqual(
             "CAP-AUTH-001",
@@ -336,14 +317,10 @@ class CapabilityContracts(unittest.TestCase):
             handoff_semantic_error(bad, invocation, context),
         )
         self.assertFalse(
-            self.semantics["execution_modes"]["virtual"][
-                "empirical_candidate_possible"
-            ]
+            self.semantics["execution_modes"]["virtual"]["empirical_candidate_possible"]
         )
         self.assertFalse(
-            self.semantics["execution_modes"]["synthetic_test"][
-                "empirical_candidate_possible"
-            ]
+            self.semantics["execution_modes"]["synthetic_test"]["empirical_candidate_possible"]
         )
 
     def test_sources_may_be_pre_registered_or_newly_acquired_but_artifacts_are_not_evidence(
@@ -457,9 +434,7 @@ class CapabilityContracts(unittest.TestCase):
         )
 
         bad = deepcopy(handoff)
-        bad["outputs"]["candidate_findings"][0]["question_ids"] = [
-            "RQ-NOT-IN-CONTEXT"
-        ]
+        bad["outputs"]["candidate_findings"][0]["question_ids"] = ["RQ-NOT-IN-CONTEXT"]
         refresh_digest("handoff", bad)
         self.assertEqual(
             "CAP-HANDOFF-REF-001",
@@ -493,12 +468,8 @@ class CapabilityContracts(unittest.TestCase):
                     ],
                 }
                 refresh_digest("handoff", candidate)
-                self.assertIsNone(
-                    handoff_semantic_error(candidate, invocation, context)
-                )
-                self.assertTrue(
-                    candidate["adoption_boundary"]["outputs_are_candidates"]
-                )
+                self.assertIsNone(handoff_semantic_error(candidate, invocation, context))
+                self.assertTrue(candidate["adoption_boundary"]["outputs_are_candidates"])
 
         bad = deepcopy(handoff)
         bad["validation"]["status"] = "partial"
@@ -510,9 +481,9 @@ class CapabilityContracts(unittest.TestCase):
 
     def test_semantic_mutation_fixtures(self):
         bases = self.fixtures
-        cases = json.loads(
-            (ROOT / "core/fixtures/capabilities/semantic/cases.json").read_text()
-        )["cases"]
+        cases = json.loads((ROOT / "core/fixtures/capabilities/semantic/cases.json").read_text())[
+            "cases"
+        ]
 
         for case in cases:
             with self.subTest(case=case["id"]):
@@ -536,9 +507,7 @@ class CapabilityContracts(unittest.TestCase):
                 self.assertEqual(case["expected_error"], error, case["id"])
 
     def test_semantics_closes_ownership_and_authority_boundaries(self):
-        self.assertTrue(
-            all(value is False for value in self.semantics["principles"].values())
-        )
+        self.assertTrue(all(value is False for value in self.semantics["principles"].values()))
         self.assertEqual(
             {
                 "common_contracts": "core/packages",

@@ -68,8 +68,12 @@ def _conversation_counts(path: Path) -> dict[str, int]:
         return {
             table: int(connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0])
             for table in (
-                "documents", "proposals", "confirmation_requests", "materializations",
-                "run_correlations", "state_delta_proposals",
+                "documents",
+                "proposals",
+                "confirmation_requests",
+                "materializations",
+                "run_correlations",
+                "state_delta_proposals",
             )
         }
     finally:
@@ -78,22 +82,28 @@ def _conversation_counts(path: Path) -> dict[str, int]:
 
 def _adopt(facade, proposed, *, disposition="approve_exact"):
     candidate_id = proposed["data"]["state_delta_proposal_id"]
-    apply = facade.submit_action({
-        "action_type": "state.apply_candidate",
-        "payload": {"state_delta_proposal_id": candidate_id},
-        "actor_id": "HUMAN-RESUME",
-    })
+    apply = facade.submit_action(
+        {
+            "action_type": "state.apply_candidate",
+            "payload": {"state_delta_proposal_id": candidate_id},
+            "actor_id": "HUMAN-RESUME",
+        }
+    )
     confirmation_id = apply["confirmation_request"]["confirmation_request_id"]
-    decision = facade.submit_confirmation({
-        "confirmation_request_id": confirmation_id,
-        "actor_id": "HUMAN-RESUME",
-    })["decision_request"]
-    resolved = facade.resolve_human_decision({
-        "request_id": decision["request_id"],
-        "request_digest": decision["request_digest"],
-        "disposition": disposition,
-        "actor_id": "HUMAN-RESUME",
-    })
+    decision = facade.submit_confirmation(
+        {
+            "confirmation_request_id": confirmation_id,
+            "actor_id": "HUMAN-RESUME",
+        }
+    )["decision_request"]
+    resolved = facade.resolve_human_decision(
+        {
+            "request_id": decision["request_id"],
+            "request_digest": decision["request_digest"],
+            "disposition": disposition,
+            "actor_id": "HUMAN-RESUME",
+        }
+    )
     return candidate_id, confirmation_id, decision, resolved
 
 
@@ -118,7 +128,9 @@ class ProductionResearchResumeContextTests(unittest.TestCase):
             self.assertEqual(result["research_questions"]["authoritative"], [])
             self.assertEqual(result["research_questions"]["candidates"], [])
             self.assertTrue(result["research_attention"]["baseline"])
-            self.assertEqual(result["research_attention"]["effective"], result["research_attention"]["baseline"])
+            self.assertEqual(
+                result["research_attention"]["effective"], result["research_attention"]["baseline"]
+            )
             self.assertIsNone(result["research_attention"]["active_map"])
             self.assertEqual(result["research_attention"]["stored_maps"], [])
             self.assertEqual(result["workflow"]["pending_confirmations"], [])
@@ -130,7 +142,14 @@ class ProductionResearchResumeContextTests(unittest.TestCase):
             self.assertFalse(attention_path.exists())
 
             completed = subprocess.run(
-                [sys.executable, str(ROOT / "research-loom"), "resume", "--workspace", str(workspace), "--json"],
+                [
+                    sys.executable,
+                    str(ROOT / "research-loom"),
+                    "resume",
+                    "--workspace",
+                    str(workspace),
+                    "--json",
+                ],
                 cwd=ROOT,
                 capture_output=True,
                 text=True,
@@ -146,18 +165,26 @@ class ProductionResearchResumeContextTests(unittest.TestCase):
             with LocalApplicationFacade.open_workspace(workspace) as facade:
                 first = facade.submit_action(_rq_input())
                 second = facade.submit_action(_rq_input())
-                attention = facade.submit_action({
-                    "action_type": "research_attention.propose",
-                    "payload": {"additions": [{
-                        "statement": "横断的な責任分界を調査時に保持する。",
-                        "related_question_seed_ids": ["RQ-SEED-001"],
-                    }]},
-                })["data"]["attention_map"]
+                attention = facade.submit_action(
+                    {
+                        "action_type": "research_attention.propose",
+                        "payload": {
+                            "additions": [
+                                {
+                                    "statement": "横断的な責任分界を調査時に保持する。",
+                                    "related_question_seed_ids": ["RQ-SEED-001"],
+                                }
+                            ]
+                        },
+                    }
+                )["data"]["attention_map"]
                 result = facade.resume_context()
-                bounded = facade.resume_context(limits={
-                    "research_question_candidates": 1,
-                    "attention_maps": 1,
-                })
+                bounded = facade.resume_context(
+                    limits={
+                        "research_question_candidates": 1,
+                        "attention_maps": 1,
+                    }
+                )
 
             self.assertEqual(result["research_state"]["snapshot"]["revision"], 0)
             self.assertEqual(result["research_questions"]["authoritative"], [])
@@ -165,13 +192,21 @@ class ProductionResearchResumeContextTests(unittest.TestCase):
             self.assertEqual(len(candidates), 2)
             self.assertEqual(
                 {item["state_delta_proposal_id"] for item in candidates},
-                {first["data"]["state_delta_proposal_id"], second["data"]["state_delta_proposal_id"]},
+                {
+                    first["data"]["state_delta_proposal_id"],
+                    second["data"]["state_delta_proposal_id"],
+                },
             )
             self.assertTrue(all(item["bound_to_current_snapshot"] for item in candidates))
             self.assertTrue(all(not item["authoritative_same_id"] for item in candidates))
             self.assertIsNone(result["research_attention"]["active_map"])
-            self.assertEqual([item["map_id"] for item in result["research_attention"]["stored_maps"]], [attention["map_id"]])
-            self.assertEqual(result["research_attention"]["effective"], result["research_attention"]["baseline"])
+            self.assertEqual(
+                [item["map_id"] for item in result["research_attention"]["stored_maps"]],
+                [attention["map_id"]],
+            )
+            self.assertEqual(
+                result["research_attention"]["effective"], result["research_attention"]["baseline"]
+            )
             self.assertEqual(len(bounded["research_questions"]["candidates"]), 1)
             self.assertTrue(bounded["truncated"]["research_question_candidates"])
 
@@ -181,54 +216,89 @@ class ProductionResearchResumeContextTests(unittest.TestCase):
             with LocalApplicationFacade.open_workspace(workspace) as facade:
                 proposed = facade.submit_action(_rq_input())
                 candidate_id = proposed["data"]["state_delta_proposal_id"]
-                apply = facade.submit_action({
-                    "action_type": "state.apply_candidate",
-                    "payload": {"state_delta_proposal_id": candidate_id},
-                    "actor_id": "HUMAN-RESUME",
-                })
+                apply = facade.submit_action(
+                    {
+                        "action_type": "state.apply_candidate",
+                        "payload": {"state_delta_proposal_id": candidate_id},
+                        "actor_id": "HUMAN-RESUME",
+                    }
+                )
                 confirmation_id = apply["confirmation_request"]["confirmation_request_id"]
                 pending = facade.resume_context()["research_questions"]["candidates"][0]
                 self.assertEqual(pending["pending_confirmation_request_ids"], [confirmation_id])
 
-                decision = facade.submit_confirmation({
-                    "confirmation_request_id": confirmation_id,
-                    "actor_id": "HUMAN-RESUME",
-                })["decision_request"]
+                decision = facade.submit_confirmation(
+                    {
+                        "confirmation_request_id": confirmation_id,
+                        "actor_id": "HUMAN-RESUME",
+                    }
+                )["decision_request"]
                 waiting = facade.resume_context()
                 candidate = waiting["research_questions"]["candidates"][0]
                 self.assertEqual(candidate["pending_confirmation_request_ids"], [])
                 self.assertEqual(candidate["human_decision_requests"][0]["status"], "PENDING")
-                self.assertEqual(waiting["workflow"]["pending_human_decisions"][0]["request_id"], decision["request_id"])
+                self.assertEqual(
+                    waiting["workflow"]["pending_human_decisions"][0]["request_id"],
+                    decision["request_id"],
+                )
 
-                declined = facade.resolve_human_decision({
-                    "request_id": decision["request_id"],
-                    "request_digest": decision["request_digest"],
-                    "disposition": "decline",
-                    "actor_id": "HUMAN-RESUME",
-                })
+                declined = facade.resolve_human_decision(
+                    {
+                        "request_id": decision["request_id"],
+                        "request_digest": decision["request_digest"],
+                        "disposition": "decline",
+                        "actor_id": "HUMAN-RESUME",
+                    }
+                )
                 self.assertEqual(declined["status"], "DECLINED")
                 terminal = facade.resume_context()
                 self.assertEqual(terminal["workflow"]["pending_human_decisions"], [])
-                self.assertEqual(terminal["research_questions"]["candidates"][0]["human_decision_requests"][0]["status"], "DECLINED")
+                self.assertEqual(
+                    terminal["research_questions"]["candidates"][0]["human_decision_requests"][0][
+                        "status"
+                    ],
+                    "DECLINED",
+                )
                 self.assertEqual(terminal["research_questions"]["authoritative"], [])
 
-                approved_proposal = facade.submit_action(_rq_input("AI委任条件をどの軸で評価するか"))
+                approved_proposal = facade.submit_action(
+                    _rq_input("AI委任条件をどの軸で評価するか")
+                )
                 approved_id, _, _, approved = _adopt(facade, approved_proposal)
                 self.assertEqual(approved["status"], "RESOLVED")
                 adopted = facade.resume_context()
-                authoritative_ids = {item["id"] for item in adopted["research_questions"]["authoritative"]}
-                candidate = next(item for item in adopted["research_questions"]["candidates"] if item["state_delta_proposal_id"] == approved_id)
+                authoritative_ids = {
+                    item["id"] for item in adopted["research_questions"]["authoritative"]
+                }
+                candidate = next(
+                    item
+                    for item in adopted["research_questions"]["candidates"]
+                    if item["state_delta_proposal_id"] == approved_id
+                )
                 self.assertIn(candidate["question"]["id"], authoritative_ids)
                 self.assertTrue(candidate["authoritative_same_id"])
                 self.assertFalse(candidate["bound_to_current_snapshot"])
 
-                revision_proposal = facade.submit_action(_rq_input("委任評価をどの範囲で限定するか"))
-                _, _, revision_request, revision = _adopt(facade, revision_proposal, disposition="request_revision")
+                revision_proposal = facade.submit_action(
+                    _rq_input("委任評価をどの範囲で限定するか")
+                )
+                _, _, revision_request, revision = _adopt(
+                    facade, revision_proposal, disposition="request_revision"
+                )
                 self.assertEqual(revision["status"], "REVISION_REQUESTED")
                 history = facade.resume_context()["research_questions"]["candidates"]
-                revised = next(item for item in history if item["question"]["text"] == "委任評価をどの範囲で限定するか")
-                self.assertEqual(revised["human_decision_requests"][0]["request_id"], revision_request["request_id"])
-                self.assertEqual(revised["human_decision_requests"][0]["status"], "REVISION_REQUESTED")
+                revised = next(
+                    item
+                    for item in history
+                    if item["question"]["text"] == "委任評価をどの範囲で限定するか"
+                )
+                self.assertEqual(
+                    revised["human_decision_requests"][0]["request_id"],
+                    revision_request["request_id"],
+                )
+                self.assertEqual(
+                    revised["human_decision_requests"][0]["status"], "REVISION_REQUESTED"
+                )
 
     def test_attention_activation_history_and_recent_runs_are_factual_only(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -239,36 +309,58 @@ class ProductionResearchResumeContextTests(unittest.TestCase):
                 self.assertEqual(resolved["status"], "RESOLVED")
                 rq_id = adopted["data"]["research_question_candidate"]["id"]
 
-                map_a = facade.submit_action({
-                    "action_type": "research_attention.propose",
-                    "payload": {"additions": [{"statement": "Map A guidance.", "related_question_ids": [rq_id]}]},
-                })["data"]["attention_map"]
-                pending_a = facade.submit_action({
-                    "action_type": "research_attention.activate_candidate",
-                    "payload": {"attention_map_id": map_a["map_id"]},
-                    "actor_id": "HUMAN-RESUME",
-                })
-                facade.submit_confirmation({
-                    "confirmation_request_id": pending_a["confirmation_request"]["confirmation_request_id"],
-                    "actor_id": "HUMAN-RESUME",
-                })
-                map_b = facade.submit_action({
-                    "action_type": "research_attention.propose",
-                    "payload": {"additions": [{"statement": "Map B guidance."}]},
-                })["data"]["attention_map"]
-                pending_b = facade.submit_action({
-                    "action_type": "research_attention.activate_candidate",
-                    "payload": {"attention_map_id": map_b["map_id"]},
-                    "actor_id": "HUMAN-RESUME",
-                })
-                facade.submit_confirmation({
-                    "confirmation_request_id": pending_b["confirmation_request"]["confirmation_request_id"],
-                    "actor_id": "HUMAN-RESUME",
-                })
-                map_c = facade.submit_action({
-                    "action_type": "research_attention.propose",
-                    "payload": {"additions": [{"statement": "Never activated guidance."}]},
-                })["data"]["attention_map"]
+                map_a = facade.submit_action(
+                    {
+                        "action_type": "research_attention.propose",
+                        "payload": {
+                            "additions": [
+                                {"statement": "Map A guidance.", "related_question_ids": [rq_id]}
+                            ]
+                        },
+                    }
+                )["data"]["attention_map"]
+                pending_a = facade.submit_action(
+                    {
+                        "action_type": "research_attention.activate_candidate",
+                        "payload": {"attention_map_id": map_a["map_id"]},
+                        "actor_id": "HUMAN-RESUME",
+                    }
+                )
+                facade.submit_confirmation(
+                    {
+                        "confirmation_request_id": pending_a["confirmation_request"][
+                            "confirmation_request_id"
+                        ],
+                        "actor_id": "HUMAN-RESUME",
+                    }
+                )
+                map_b = facade.submit_action(
+                    {
+                        "action_type": "research_attention.propose",
+                        "payload": {"additions": [{"statement": "Map B guidance."}]},
+                    }
+                )["data"]["attention_map"]
+                pending_b = facade.submit_action(
+                    {
+                        "action_type": "research_attention.activate_candidate",
+                        "payload": {"attention_map_id": map_b["map_id"]},
+                        "actor_id": "HUMAN-RESUME",
+                    }
+                )
+                facade.submit_confirmation(
+                    {
+                        "confirmation_request_id": pending_b["confirmation_request"][
+                            "confirmation_request_id"
+                        ],
+                        "actor_id": "HUMAN-RESUME",
+                    }
+                )
+                map_c = facade.submit_action(
+                    {
+                        "action_type": "research_attention.propose",
+                        "payload": {"additions": [{"statement": "Never activated guidance."}]},
+                    }
+                )["data"]["attention_map"]
 
                 state = facade._application.state_repository.load_state_view(
                     "PRJ-1",
@@ -329,7 +421,14 @@ class ProductionResearchResumeContextTests(unittest.TestCase):
             self.assertEqual(result["workflow"]["pending_runs"], [])
             recent = result["workflow"]["recent_runs"][0]
             self.assertEqual((recent["run_id"], recent["status"]), (run_id, "ABORTED"))
-            for forbidden in ("research_completed", "finding_adopted", "evidence_verified", "stage", "next_step", "recommended_action"):
+            for forbidden in (
+                "research_completed",
+                "finding_adopted",
+                "evidence_verified",
+                "stage",
+                "next_step",
+                "recommended_action",
+            ):
                 self.assertNotIn(forbidden, recent)
                 self.assertNotIn(forbidden, result)
 

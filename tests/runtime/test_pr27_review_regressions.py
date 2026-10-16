@@ -43,12 +43,14 @@ def profile_provider(_project_ref, expected_digest):
     return {
         "schema_version": "0.1.0",
         "core_contracts": {"research_contract": "0.1.0", "invariant_contract": "0.1.0"},
-        "profile_pins": [{
-            "profile_id": "fixture.research",
-            "profile_type": "research",
-            "profile_version": "1.0.0",
-            "manifest_sha256": "1" * 64,
-        }],
+        "profile_pins": [
+            {
+                "profile_id": "fixture.research",
+                "profile_type": "research",
+                "profile_version": "1.0.0",
+                "manifest_sha256": "1" * 64,
+            }
+        ],
         "content_digest": expected_digest,
     }
 
@@ -133,7 +135,9 @@ class PR27ReviewRegressionTests(unittest.TestCase):
                 # directories that may already hold State or concurrent user input.
                 self.assertTrue(workspace.is_dir())
                 marker = workspace / ".research-loom" / ".initializing"
-                self.assertEqual(json.loads(marker.read_text(encoding="utf-8"))["phase"], "STATE_STARTED")
+                self.assertEqual(
+                    json.loads(marker.read_text(encoding="utf-8"))["phase"], "STATE_STARTED"
+                )
                 self.assertTrue(config.is_file())
                 result = LocalWorkspace.doctor(workspace)
                 self.assertEqual(result["initialization"]["classification"], "INDETERMINATE")
@@ -253,21 +257,25 @@ class PR27ReviewRegressionTests(unittest.TestCase):
                 for index, project_id in enumerate(("PRJ-A", "PRJ-B", "PRJ-A")):
                     proposal_id = f"PROP-{index}"
                     conversation_id = f"CONV-{index}"
-                    store.store_proposal({
-                        "message_type": "action_proposal",
-                        "proposal_id": proposal_id,
-                        "proposal_digest": f"sha256:{index:064x}",
-                        "conversation_id": conversation_id,
-                        "commitment_mode": "commit_requested",
-                    })
-                    store.store_confirmation_request({
-                        "message_type": "confirmation_request",
-                        "confirmation_request_id": f"CONF-{index}",
-                        "request_digest": f"sha256:{index + 10:064x}",
-                        "proposal_binding": {"proposal_id": proposal_id},
-                        "conversation_id": conversation_id,
-                        "project_id": project_id,
-                    })
+                    store.store_proposal(
+                        {
+                            "message_type": "action_proposal",
+                            "proposal_id": proposal_id,
+                            "proposal_digest": f"sha256:{index:064x}",
+                            "conversation_id": conversation_id,
+                            "commitment_mode": "commit_requested",
+                        }
+                    )
+                    store.store_confirmation_request(
+                        {
+                            "message_type": "confirmation_request",
+                            "confirmation_request_id": f"CONF-{index}",
+                            "request_digest": f"sha256:{index + 10:064x}",
+                            "proposal_binding": {"proposal_id": proposal_id},
+                            "conversation_id": conversation_id,
+                            "project_id": project_id,
+                        }
+                    )
 
                 result = store.list_pending_confirmation_requests("PRJ-A", limit=1)
                 self.assertEqual(len(result), 1)
@@ -288,23 +296,29 @@ class PR27ReviewRegressionTests(unittest.TestCase):
             )
             try:
                 owner = LocalApplicationFacade(app, "PRJ-1")
-                pending = owner.submit_action({
-                    "action_type": "state.apply_candidate",
-                    "payload": {"state_delta_proposal_id": "MISSING-CROSS-PROJECT"},
-                    "actor_id": "HUMAN-1",
-                })
+                pending = owner.submit_action(
+                    {
+                        "action_type": "state.apply_candidate",
+                        "payload": {"state_delta_proposal_id": "MISSING-CROSS-PROJECT"},
+                        "actor_id": "HUMAN-1",
+                    }
+                )
                 request_id = pending["confirmation_request"]["confirmation_request_id"]
                 wrong_project = LocalApplicationFacade(app, "PRJ-OTHER")
                 with self.assertRaises(ConversationRuntimeError) as raised:
-                    wrong_project.submit_confirmation({
-                        "confirmation_request_id": request_id,
-                        "actor_id": "HUMAN-1",
-                    })
+                    wrong_project.submit_confirmation(
+                        {
+                            "confirmation_request_id": request_id,
+                            "actor_id": "HUMAN-1",
+                        }
+                    )
                 self.assertEqual(raised.exception.code, "CONV-CONFIRMATION-BINDING-001")
                 remaining = app.conversation_store.list_pending_confirmation_requests(
                     "PRJ-1", limit=10
                 )
-                self.assertEqual([item["confirmation_request_id"] for item in remaining], [request_id])
+                self.assertEqual(
+                    [item["confirmation_request_id"] for item in remaining], [request_id]
+                )
             finally:
                 app.close()
 
@@ -322,18 +336,22 @@ class PR27ReviewRegressionTests(unittest.TestCase):
             try:
                 facade = LocalApplicationFacade(app, "PRJ-1")
                 for index in range(3):
-                    pending = facade.submit_action({
-                        "action_type": "state.apply_candidate",
-                        "payload": {"state_delta_proposal_id": f"MISSING-{index}"},
-                    })
+                    pending = facade.submit_action(
+                        {
+                            "action_type": "state.apply_candidate",
+                            "payload": {"state_delta_proposal_id": f"MISSING-{index}"},
+                        }
+                    )
                     self.assertEqual(pending["status"], "CONFIRMATION_REQUIRED")
-                    prepared = facade.submit_action({
-                        "action_type": "desktop_research.investigate",
-                        "payload": {
-                            "question_id": "RQ-1",
-                            "purpose": f"bounded status fixture {index}",
-                        },
-                    })
+                    prepared = facade.submit_action(
+                        {
+                            "action_type": "desktop_research.investigate",
+                            "payload": {
+                                "question_id": "RQ-1",
+                                "purpose": f"bounded status fixture {index}",
+                            },
+                        }
+                    )
                     self.assertEqual(prepared["status"], "CAPABILITY_EXECUTION_PREPARED")
 
                 with patch.object(facade_module, "_STATUS_ITEM_LIMIT", 2):
@@ -362,8 +380,7 @@ class PR27ReviewRegressionTests(unittest.TestCase):
             connection = sqlite3.connect(Path(temp) / "execution/execution.db")
             try:
                 indexes = {
-                    str(row[1])
-                    for row in connection.execute("PRAGMA index_list(runs)").fetchall()
+                    str(row[1]) for row in connection.execute("PRAGMA index_list(runs)").fetchall()
                 }
             finally:
                 connection.close()

@@ -128,14 +128,19 @@ class LocalProjectInputStore:
 
     def _has_current_unique_binding(self) -> bool:
         expected = [
-            "project_id", "role", "content_digest",
-            "lineage_ref", "snapshot_id", "snapshot_digest",
+            "project_id",
+            "role",
+            "content_digest",
+            "lineage_ref",
+            "snapshot_id",
+            "snapshot_digest",
         ]
         for index in self.db.execute("PRAGMA index_list(project_inputs)").fetchall():
             if not bool(index[2]):
                 continue
             columns = [
-                row[2] for row in self.db.execute(
+                row[2]
+                for row in self.db.execute(
                     f"PRAGMA index_info({json.dumps(str(index[1]))})"
                 ).fetchall()
             ]
@@ -259,13 +264,13 @@ class LocalProjectInputStore:
         if (
             not digest.startswith(prefix)
             or len(digest) != len(prefix) + 64
-            or any(character not in "0123456789abcdef" for character in digest[len(prefix):])
+            or any(character not in "0123456789abcdef" for character in digest[len(prefix) :])
         ):
             raise LocalProjectInputStoreError(
                 "APPLICATION-PROJECT-INPUT-INTEGRITY-001",
                 "project-input content digest is malformed",
             )
-        hex_digest = digest[len(prefix):]
+        hex_digest = digest[len(prefix) :]
         return self.blobs / hex_digest[:2] / hex_digest
 
     def _store_verified_blob(self, content: bytes, digest: str) -> None:
@@ -381,6 +386,7 @@ class LocalProjectInputStore:
 
     def _repair_target(self, item: Mapping[str, Any]) -> Path:
         from plugins.local_payload_repair import checked_path
+
         size = item["byte_length"]
         if not isinstance(size, int) or isinstance(size, bool) or not 0 <= size <= 8 * 1024 * 1024:
             raise LocalProjectInputStoreError(
@@ -394,28 +400,43 @@ class LocalProjectInputStore:
 
     def diagnose_content(self, input_id: str, project_id: str) -> dict[str, Any]:
         from plugins.local_payload_repair import PayloadRepairError, REPAIRABLE, inspect_payload
+
         try:
             item = self.get(input_id, project_id)
             if item is None:
-                return {"status": "metadata_missing", "next_action": "restore exact registry backup or register a new input"}
+                return {
+                    "status": "metadata_missing",
+                    "next_action": "restore exact registry backup or register a new input",
+                }
             target = self._repair_target(item)
             health = inspect_payload(target, item["content_digest"], item["byte_length"])
         except OSError:
-            return {"status": "content_unreadable", "next_action": "restore filesystem access, then retry"}
+            return {
+                "status": "content_unreadable",
+                "next_action": "restore filesystem access, then retry",
+            }
         except PayloadRepairError:
-            return {"status": "locator_invalid", "next_action": "restore safe store paths; do not overwrite links"}
+            return {
+                "status": "locator_invalid",
+                "next_action": "restore safe store paths; do not overwrite links",
+            }
         except (LocalProjectInputStoreError, ValueError, TypeError, KeyError):
-            return {"status": "metadata_invalid", "next_action": "restore exact registry backup; payload repair cannot reconstruct metadata"}
+            return {
+                "status": "metadata_invalid",
+                "next_action": "restore exact registry backup; payload repair cannot reconstruct metadata",
+            }
         health["next_action"] = (
             "research-input recover --input-id ID --source-file EXACT_WORKSPACE_FILE"
-            if health["status"] in REPAIRABLE else
-            "restore filesystem access, then retry" if health["status"] == "content_unreadable" else
-            "show or consume the verified input"
+            if health["status"] in REPAIRABLE
+            else "restore filesystem access, then retry"
+            if health["status"] == "content_unreadable"
+            else "show or consume the verified input"
         )
         return health
 
     def restore_content(self, input_id: str, project_id: str, staged: Path) -> dict[str, Any]:
         from plugins.local_payload_repair import PayloadRepairError, install_exact_payload
+
         item = self.get(input_id, project_id)
         if item is None:
             raise LocalProjectInputStoreError(
@@ -426,7 +447,11 @@ class LocalProjectInputStore:
             # Validate the supplied bytes even on a verified-reuse request.
             self._verify_blob(staged, item["content_digest"], item["byte_length"])
             result = install_exact_payload(
-                self.root, target, staged, item["content_digest"], item["byte_length"],
+                self.root,
+                target,
+                staged,
+                item["content_digest"],
+                item["byte_length"],
                 verify=self._verify_blob,
             )
         except (OSError, PayloadRepairError) as exc:
@@ -434,8 +459,13 @@ class LocalProjectInputStore:
                 "APPLICATION-PROJECT-INPUT-RECOVERY-001",
                 "exact payload repair failed; retain existing bytes and restore access or retry",
             ) from exc
-        return {**result, "project_input": item, "historical_metadata_rewritten": False,
-                "research_state_mutation_performed": False, "verification_status": "verified"}
+        return {
+            **result,
+            "project_input": item,
+            "historical_metadata_rewritten": False,
+            "research_state_mutation_performed": False,
+            "verification_status": "verified",
+        }
 
     def verify_content(self, input_id: str, project_id: str) -> dict[str, Any] | None:
         if not self._open_read():
@@ -477,7 +507,12 @@ class LocalProjectInputStore:
         limit: int = _MAX_PAGE_SIZE,
         cursor: str | None = None,
     ) -> dict[str, Any]:
-        if not isinstance(limit, int) or isinstance(limit, bool) or limit < 1 or limit > _MAX_PAGE_SIZE:
+        if (
+            not isinstance(limit, int)
+            or isinstance(limit, bool)
+            or limit < 1
+            or limit > _MAX_PAGE_SIZE
+        ):
             raise LocalProjectInputStoreError(
                 "APPLICATION-PROJECT-INPUT-PAGE-001",
                 f"limit must be between 1 and {_MAX_PAGE_SIZE}",

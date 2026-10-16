@@ -97,26 +97,32 @@ def _state_delta_count(workspace: Path) -> int:
 
 
 def _apply_to_decision(facade, candidate_id: str):
-    apply = facade.submit_action({
-        "action_type": "state.apply_candidate",
-        "payload": {"state_delta_proposal_id": candidate_id},
-        "actor_id": "HUMAN-BATCH",
-    })
+    apply = facade.submit_action(
+        {
+            "action_type": "state.apply_candidate",
+            "payload": {"state_delta_proposal_id": candidate_id},
+            "actor_id": "HUMAN-BATCH",
+        }
+    )
     confirmation_id = apply["confirmation_request"]["confirmation_request_id"]
-    confirmed = facade.submit_confirmation({
-        "confirmation_request_id": confirmation_id,
-        "actor_id": "HUMAN-BATCH",
-    })
+    confirmed = facade.submit_confirmation(
+        {
+            "confirmation_request_id": confirmation_id,
+            "actor_id": "HUMAN-BATCH",
+        }
+    )
     return apply, confirmed
 
 
 def _resolve(facade, request: dict, disposition: str):
-    return facade.resolve_human_decision({
-        "request_id": request["request_id"],
-        "request_digest": request["request_digest"],
-        "disposition": disposition,
-        "actor_id": "HUMAN-BATCH",
-    })
+    return facade.resolve_human_decision(
+        {
+            "request_id": request["request_id"],
+            "request_digest": request["request_digest"],
+            "disposition": disposition,
+            "actor_id": "HUMAN-BATCH",
+        }
+    )
 
 
 class ResearchQuestionBatchProposalTests(unittest.TestCase):
@@ -138,7 +144,9 @@ class ResearchQuestionBatchProposalTests(unittest.TestCase):
                 self.assertEqual(facade.status()["snapshot"], before)
 
                 questions = result["data"]["research_questions"]
-                self.assertEqual([item["text"] for item in questions], ["Main RQ", "G1", "G2", "M1", "M2"])
+                self.assertEqual(
+                    [item["text"] for item in questions], ["Main RQ", "G1", "G2", "M1", "M2"]
+                )
                 ids = [item["id"] for item in questions]
                 self.assertEqual(len(ids), len(set(ids)))
                 self.assertTrue(all(item.startswith("RQ-") for item in ids))
@@ -149,9 +157,11 @@ class ResearchQuestionBatchProposalTests(unittest.TestCase):
                     [action["payload"]["object"]["id"] for action in proposal["proposed_actions"]],
                     ids,
                 )
-                self.assertTrue(all(
-                    action["kind"] == "CREATE_OBJECT" for action in proposal["proposed_actions"]
-                ))
+                self.assertTrue(
+                    all(
+                        action["kind"] == "CREATE_OBJECT" for action in proposal["proposed_actions"]
+                    )
+                )
                 self.assertEqual([ref["id"] for ref in proposal["affected_refs"]], ids)
                 self.assertEqual(proposal["current_snapshot_ref"], before["snapshot_id"])
                 self.assertEqual(proposal["current_snapshot_digest"], before["content_digest"])
@@ -159,7 +169,10 @@ class ResearchQuestionBatchProposalTests(unittest.TestCase):
                 supplied_digest = basis.pop("proposal_digest")
                 self.assertEqual(canonical_digest(basis), supplied_digest)
                 self.assertEqual(
-                    [item["research_question_id"] for item in proposal["provenance"]["research_question_seed_bindings"]],
+                    [
+                        item["research_question_id"]
+                        for item in proposal["provenance"]["research_question_seed_bindings"]
+                    ],
                     ids,
                 )
 
@@ -167,9 +180,9 @@ class ResearchQuestionBatchProposalTests(unittest.TestCase):
                     facade.project_id,
                     facade._application.state_repository.load_active_lineage_ref(facade.project_id),
                 )
-                self.assertFalse(any(
-                    item["kind"] == "research_question" for item in state.effective_objects()
-                ))
+                self.assertFalse(
+                    any(item["kind"] == "research_question" for item in state.effective_objects())
+                )
 
     def test_invalid_or_caller_owned_member_rejects_without_partial_candidate(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -192,7 +205,10 @@ class ResearchQuestionBatchProposalTests(unittest.TestCase):
                 ):
                     questions = list(_five_questions())
                     questions[1] = _question("G1", **{forbidden: value})
-                    with self.subTest(forbidden=forbidden), self.assertRaises(LocalApplicationError):
+                    with (
+                        self.subTest(forbidden=forbidden),
+                        self.assertRaises(LocalApplicationError),
+                    ):
                         facade.submit_action(_batch_input(*questions))
                     self.assertEqual(_state_delta_count(workspace), before_count)
 
@@ -203,39 +219,45 @@ class ResearchQuestionBatchProposalTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             workspace = _init_workspace(Path(temp))
             with LocalApplicationFacade.open_workspace(workspace) as facade:
-                parent = facade.submit_action({
-                    "action_type": "research_question.propose",
-                    "payload": _question("Existing parent"),
-                    "actor_id": "HUMAN-BATCH",
-                })
-                parent_id = parent["data"]["research_question_candidate"]["id"]
-                _, confirmed = _apply_to_decision(
-                    facade, parent["data"]["state_delta_proposal_id"]
+                parent = facade.submit_action(
+                    {
+                        "action_type": "research_question.propose",
+                        "payload": _question("Existing parent"),
+                        "actor_id": "HUMAN-BATCH",
+                    }
                 )
+                parent_id = parent["data"]["research_question_candidate"]["id"]
+                _, confirmed = _apply_to_decision(facade, parent["data"]["state_delta_proposal_id"])
                 resolved = _resolve(facade, confirmed["decision_request"], "approve_exact")
                 self.assertEqual(resolved["status"], "RESOLVED")
 
-                accepted = facade.submit_action(_batch_input(
-                    _question("Child A", parent_question_id=parent_id),
-                    _question("Child B"),
-                ))
+                accepted = facade.submit_action(
+                    _batch_input(
+                        _question("Child A", parent_question_id=parent_id),
+                        _question("Child B"),
+                    )
+                )
                 self.assertEqual(accepted["status"], "SUCCEEDED")
                 self.assertEqual(
                     accepted["data"]["research_questions"][0]["parent_question_id"], parent_id
                 )
 
                 before_count = _state_delta_count(workspace)
-                unknown = facade.submit_action(_batch_input(
-                    _question("Unknown parent child", parent_question_id="RQ-NOT-CURRENT"),
-                    _question("Other"),
-                ))
+                unknown = facade.submit_action(
+                    _batch_input(
+                        _question("Unknown parent child", parent_question_id="RQ-NOT-CURRENT"),
+                        _question("Other"),
+                    )
+                )
                 self.assertEqual(unknown["status"], "FAILED")
                 self.assertEqual(_state_delta_count(workspace), before_count)
 
-                batch_local = facade.submit_action(_batch_input(
-                    _question("Would-be parent"),
-                    _question("Would-be child", parent_question_id="questions[0]"),
-                ))
+                batch_local = facade.submit_action(
+                    _batch_input(
+                        _question("Would-be parent"),
+                        _question("Would-be child", parent_question_id="questions[0]"),
+                    )
+                )
                 self.assertEqual(batch_local["status"], "FAILED")
                 self.assertEqual(_state_delta_count(workspace), before_count)
 
@@ -280,14 +302,16 @@ class ResearchQuestionBatchAdoptionTests(unittest.TestCase):
                 )
                 self.assertIsNotNone(state.latest_object("snapshot", before["snapshot_id"]))
                 authoritative = [
-                    item for item in state.effective_objects()
-                    if item.get("kind") == "research_question"
-                    and item.get("id") in generated_ids
+                    item
+                    for item in state.effective_objects()
+                    if item.get("kind") == "research_question" and item.get("id") in generated_ids
                 ]
                 self.assertEqual({item["id"] for item in authoritative}, set(generated_ids))
                 self.assertEqual(len(state.decisions), 1)
                 decision_id = state.decisions[0]["id"]
-                self.assertTrue(all(item["decision_ids"] == [decision_id] for item in authoritative))
+                self.assertTrue(
+                    all(item["decision_ids"] == [decision_id] for item in authoritative)
+                )
                 self.assertEqual(
                     {item["id"]: item["text"] for item in authoritative},
                     {item["id"]: item["text"] for item in generated},
@@ -295,7 +319,8 @@ class ResearchQuestionBatchAdoptionTests(unittest.TestCase):
 
                 resumed = facade.resume_context()
                 row = next(
-                    item for item in resumed["research_questions"]["candidates"]
+                    item
+                    for item in resumed["research_questions"]["candidates"]
                     if item["state_delta_proposal_id"] == candidate_id
                 )
                 self.assertEqual(row["batch_size"], 5)
@@ -315,24 +340,33 @@ class ResearchQuestionBatchAdoptionTests(unittest.TestCase):
                     before = facade.status()["snapshot"]
                     proposed = facade.submit_action(_batch_input(*_five_questions()))
                     candidate_id = proposed["data"]["state_delta_proposal_id"]
-                    stored_before = facade._application.conversation_store.load_state_delta_proposal(
-                        candidate_id
+                    stored_before = (
+                        facade._application.conversation_store.load_state_delta_proposal(
+                            candidate_id
+                        )
                     )
                     _, confirmed = _apply_to_decision(facade, candidate_id)
                     resolved = _resolve(facade, confirmed["decision_request"], disposition)
                     self.assertEqual(resolved["status"], expected)
                     self.assertEqual(facade.status()["snapshot"], before)
                     self.assertEqual(
-                        facade._application.conversation_store.load_state_delta_proposal(candidate_id),
+                        facade._application.conversation_store.load_state_delta_proposal(
+                            candidate_id
+                        ),
                         stored_before,
                     )
                     state = facade._application.state_repository.load_state_view(
                         facade.project_id,
-                        facade._application.state_repository.load_active_lineage_ref(facade.project_id),
+                        facade._application.state_repository.load_active_lineage_ref(
+                            facade.project_id
+                        ),
                     )
-                    self.assertFalse(any(
-                        item["kind"] == "research_question" for item in state.effective_objects()
-                    ))
+                    self.assertFalse(
+                        any(
+                            item["kind"] == "research_question"
+                            for item in state.effective_objects()
+                        )
+                    )
 
     def test_stale_batch_fails_closed_without_rebase_or_partial_commit(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -358,29 +392,40 @@ class ResearchQuestionBatchAdoptionTests(unittest.TestCase):
                     "source_type": "report",
                     "canonical_locator": "fixture://batch-head-advance",
                 }
-                head_advance = _state_delta(state, "SDP-BATCH-HEAD-ADVANCE", {
-                    "kind": "CREATE_OBJECT",
-                    "payload": {"object": source},
-                    "decision_refs": [],
-                    "source_refs": [],
-                })
+                head_advance = _state_delta(
+                    state,
+                    "SDP-BATCH-HEAD-ADVANCE",
+                    {
+                        "kind": "CREATE_OBJECT",
+                        "payload": {"object": source},
+                        "decision_refs": [],
+                        "source_refs": [],
+                    },
+                )
                 facade._application.conversation_store.store_state_delta_proposal(
                     head_advance["proposal_id"], head_advance
                 )
-                advance_apply = facade.submit_action({
-                    "action_type": "state.apply_candidate",
-                    "payload": {"state_delta_proposal_id": head_advance["proposal_id"]},
-                    "actor_id": "HUMAN-BATCH",
-                })
-                advanced = facade.submit_confirmation({
-                    "confirmation_request_id": advance_apply["confirmation_request"]["confirmation_request_id"],
-                    "actor_id": "HUMAN-BATCH",
-                })
+                advance_apply = facade.submit_action(
+                    {
+                        "action_type": "state.apply_candidate",
+                        "payload": {"state_delta_proposal_id": head_advance["proposal_id"]},
+                        "actor_id": "HUMAN-BATCH",
+                    }
+                )
+                advanced = facade.submit_confirmation(
+                    {
+                        "confirmation_request_id": advance_apply["confirmation_request"][
+                            "confirmation_request_id"
+                        ],
+                        "actor_id": "HUMAN-BATCH",
+                    }
+                )
                 self.assertEqual(advanced["status"], "SUCCEEDED")
 
                 resumed = facade.resume_context()
                 row = next(
-                    item for item in resumed["research_questions"]["candidates"]
+                    item
+                    for item in resumed["research_questions"]["candidates"]
                     if item["state_delta_proposal_id"] == candidate_id
                 )
                 self.assertEqual(row["batch_size"], 5)
@@ -399,7 +444,8 @@ class ResearchQuestionBatchAdoptionTests(unittest.TestCase):
                     facade._application.state_repository.load_active_lineage_ref(facade.project_id),
                 )
                 authoritative_ids = {
-                    item["id"] for item in state.effective_objects()
+                    item["id"]
+                    for item in state.effective_objects()
                     if item.get("kind") == "research_question"
                 }
                 self.assertTrue(set(generated_ids).isdisjoint(authoritative_ids))
@@ -408,23 +454,27 @@ class ResearchQuestionBatchAdoptionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             workspace = _init_workspace(Path(temp))
             with LocalApplicationFacade.open_workspace(workspace) as facade:
-                single = facade.submit_action({
-                    "action_type": "research_question.propose",
-                    "payload": _question("Single RQ"),
-                    "actor_id": "HUMAN-BATCH",
-                })
-                batch = facade.submit_action(_batch_input(
-                    _question("Batch A"), _question("Batch B")
-                ))
+                single = facade.submit_action(
+                    {
+                        "action_type": "research_question.propose",
+                        "payload": _question("Single RQ"),
+                        "actor_id": "HUMAN-BATCH",
+                    }
+                )
+                batch = facade.submit_action(
+                    _batch_input(_question("Batch A"), _question("Batch B"))
+                )
                 resumed = facade.resume_context()
 
                 rows = resumed["research_questions"]["candidates"]
                 single_row = next(
-                    item for item in rows
+                    item
+                    for item in rows
                     if item["state_delta_proposal_id"] == single["data"]["state_delta_proposal_id"]
                 )
                 batch_rows = [
-                    item for item in rows
+                    item
+                    for item in rows
                     if item["state_delta_proposal_id"] == batch["data"]["state_delta_proposal_id"]
                 ]
                 self.assertIn("question", single_row)

@@ -84,7 +84,7 @@ class LocalExecutionStore(_AtomicExecutionStore):
         prefix = f"{_LARGE_ORIGINAL_SCHEME}://sha256/"
         if not locator.startswith(prefix):
             return super()._locator_path(locator, expected_digest)
-        digest_hex = locator[len(prefix):]
+        digest_hex = locator[len(prefix) :]
         if (
             len(digest_hex) != 64
             or any(ch not in "0123456789abcdef" for ch in digest_hex)
@@ -123,9 +123,7 @@ class LocalExecutionStore(_AtomicExecutionStore):
                 candidate = anchored
                 root = self._matching_import_root(candidate)
         if root is None:
-            raise PermissionError(
-                "file is outside configured artifact/resource intake roots"
-            )
+            raise PermissionError("file is outside configured artifact/resource intake roots")
         relative = candidate.relative_to(root)
         self._reject_reparse_components(root, relative)
 
@@ -163,9 +161,7 @@ class LocalExecutionStore(_AtomicExecutionStore):
                 if not stat.S_ISREG(info.st_mode):
                     raise PermissionError("only regular files may be imported")
                 if info.st_size > max_bytes:
-                    raise LocalExecutionStoreError(
-                        "file exceeds configured intake size limit"
-                    )
+                    raise LocalExecutionStoreError("file exceeds configured intake size limit")
                 yield current_fd, int(info.st_size)
             finally:
                 if current_fd != root_fd:
@@ -182,9 +178,7 @@ class LocalExecutionStore(_AtomicExecutionStore):
             if not stat.S_ISREG(opened.st_mode):
                 raise PermissionError("only regular files may be imported")
             if opened.st_size > max_bytes:
-                raise LocalExecutionStoreError(
-                    "file exceeds configured intake size limit"
-                )
+                raise LocalExecutionStoreError("file exceeds configured intake size limit")
             self._reject_reparse_components(root, relative)
             after = candidate.lstat()
             if not (
@@ -198,9 +192,7 @@ class LocalExecutionStore(_AtomicExecutionStore):
                 if os.path.normcase(os.path.abspath(final_path)) != os.path.normcase(
                     os.path.abspath(candidate)
                 ):
-                    raise PermissionError(
-                        "symlink/reparse-point intake is forbidden"
-                    )
+                    raise PermissionError("symlink/reparse-point intake is forbidden")
             yield fd, int(opened.st_size)
         finally:
             os.close(fd)
@@ -217,7 +209,10 @@ class LocalExecutionStore(_AtomicExecutionStore):
         digest = hashlib.sha256()
         total = 0
         try:
-            with self._controlled_file_fd(source_path, max_bytes=max_bytes) as (source_fd, declared_size):
+            with self._controlled_file_fd(source_path, max_bytes=max_bytes) as (
+                source_fd,
+                declared_size,
+            ):
                 with temporary.open("wb") as target:
                     while True:
                         chunk = os.read(source_fd, 1024 * 1024)
@@ -301,9 +296,7 @@ class LocalExecutionStore(_AtomicExecutionStore):
         text_role = "desktop_research.text_rendition"
         persisted = self.load_run(run.run_id)
         if persisted is None:
-            raise LocalExecutionStoreError(
-                "artifact Run must already exist in the execution trace"
-            )
+            raise LocalExecutionStoreError("artifact Run must already exist in the execution trace")
         if (
             persisted.execution_mode != run.execution_mode
             or persisted.capability_id != run.capability_id
@@ -312,9 +305,7 @@ class LocalExecutionStore(_AtomicExecutionStore):
                 "artifact Run binding does not match persisted Run"
             )
         if persisted.status is not expected_status:
-            raise LocalExecutionStoreError(
-                f"artifact Run must remain {expected_status.value}"
-            )
+            raise LocalExecutionStoreError(f"artifact Run must remain {expected_status.value}")
 
         existing = self.artifacts_for(run.run_id)
         counts = Counter(item.role for item in existing)
@@ -323,17 +314,11 @@ class LocalExecutionStore(_AtomicExecutionStore):
             role_bytes[artifact.role] += artifact.size
         for role in (original_role, text_role):
             if counts[role] + 1 > int(role_count_limits[role]):
-                raise LocalExecutionStoreError(
-                    f"artifact role count limit exceeded: {role}"
-                )
+                raise LocalExecutionStoreError(f"artifact role count limit exceeded: {role}")
         if role_bytes[original_role] + original_size > int(role_byte_limits[original_role]):
-            raise LocalExecutionStoreError(
-                f"artifact role byte limit exceeded: {original_role}"
-            )
+            raise LocalExecutionStoreError(f"artifact role byte limit exceeded: {original_role}")
         if role_bytes[text_role] + text_size > int(role_byte_limits[text_role]):
-            raise LocalExecutionStoreError(
-                f"artifact role byte limit exceeded: {text_role}"
-            )
+            raise LocalExecutionStoreError(f"artifact role byte limit exceeded: {text_role}")
 
         generic_total_row = self._connection.execute(
             """
@@ -346,9 +331,7 @@ class LocalExecutionStore(_AtomicExecutionStore):
         large = original_size > self.config.max_artifact_bytes
         generic_planned = text_size + (0 if large else original_size)
         if int(generic_total_row["total"]) + generic_planned > self.config.max_run_output_bytes:
-            raise LocalExecutionStoreError(
-                "Run output exceeds configured max_run_output_bytes"
-            )
+            raise LocalExecutionStoreError("Run output exceeds configured max_run_output_bytes")
 
         collision = self._connection.execute(
             "SELECT artifact_id FROM execution_artifacts WHERE artifact_id IN (?,?)",
@@ -381,9 +364,7 @@ class LocalExecutionStore(_AtomicExecutionStore):
         if not isinstance(text_content, bytes):
             raise TypeError("text rendition content must be bytes")
         if len(text_content) > self.config.max_artifact_bytes:
-            raise LocalExecutionStoreError(
-                "text rendition exceeds configured max_artifact_bytes"
-            )
+            raise LocalExecutionStoreError("text rendition exceeds configured max_artifact_bytes")
         try:
             text_content.decode("utf-8")
         except UnicodeDecodeError as exc:
@@ -462,11 +443,13 @@ class LocalExecutionStore(_AtomicExecutionStore):
                         expected_status=expected_status,
                     )
 
-                    original_locator, original_target, original_created = self._install_staged_original(
-                        staged,
-                        digest=original_digest,
-                        size=original_size,
-                        large=large,
+                    original_locator, original_target, original_created = (
+                        self._install_staged_original(
+                            staged,
+                            digest=original_digest,
+                            size=original_size,
+                            large=large,
+                        )
                     )
                     text_digest, text_locator = self._store_blob(text_content, scheme="artifact")
                     original_trusted = dict(original_provenance)

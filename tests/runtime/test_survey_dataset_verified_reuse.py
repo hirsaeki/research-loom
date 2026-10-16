@@ -9,7 +9,10 @@ from unittest.mock import patch
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade
 from plugins.survey_virtual_runner.llm_backend import DeterministicFakeVirtualRespondentBackend
 from tests.runtime.survey_analysis_test_support import analysis_questionnaire
-from tests.runtime.survey_virtual_runner_test_support import SurveyVirtualRunnerTestBase, make_virtual_app
+from tests.runtime.survey_virtual_runner_test_support import (
+    SurveyVirtualRunnerTestBase,
+    make_virtual_app,
+)
 from tests.runtime.test_survey_llm_virtual_respondent import ANSWERS, llm_payload
 from tests.runtime.test_survey_production import state_signature
 
@@ -17,9 +20,11 @@ from tests.runtime.test_survey_production import state_signature
 class SurveyDatasetVerifiedReuseTests(SurveyVirtualRunnerTestBase):
     def _completed_llm_run(self, facade: LocalApplicationFacade):
         questionnaire = self._capture(facade, questionnaire=analysis_questionnaire())
-        facade._virtual_respondent_backend = lambda _payload: DeterministicFakeVirtualRespondentBackend(
-            ANSWERS,
-            backend_id="openai_responses",
+        facade._virtual_respondent_backend = lambda _payload: (
+            DeterministicFakeVirtualRespondentBackend(
+                ANSWERS,
+                backend_id="openai_responses",
+            )
         )
         result = facade.submit_action(
             {
@@ -90,20 +95,28 @@ class SurveyDatasetVerifiedReuseTests(SurveyVirtualRunnerTestBase):
                 )["response"]
                 self.assertEqual(stored_again, first_dataset)
                 self.assertEqual(response_again["ingested_at"], first_response["ingested_at"])
-                self.assertEqual(response_again["registry_digest"], first_response["registry_digest"])
+                self.assertEqual(
+                    response_again["registry_digest"], first_response["registry_digest"]
+                )
 
                 # Ablation: without verified reuse, the old recreate path still conflicts.
                 with patch.object(store, "load_dataset", return_value=None):
                     with patch.object(facade, "_survey_response_store", return_value=store):
                         with self.assertRaises(LocalApplicationError) as immutable:
-                            facade.capture_virtual_run_response_dataset(run_id, instrument_ref=instrument_ref)
+                            facade.capture_virtual_run_response_dataset(
+                                run_id, instrument_ref=instrument_ref
+                            )
                 self.assertEqual(immutable.exception.code, "SURVEY-RESPONSE-DATASET-IMMUTABLE-001")
 
                 wrong_instrument = dict(instrument_ref)
                 wrong_instrument["id"] = "QNR-WRONG"
                 with self.assertRaises(LocalApplicationError) as instrument_error:
-                    facade.capture_virtual_run_response_dataset(run_id, instrument_ref=wrong_instrument)
-                self.assertEqual(instrument_error.exception.code, "APPLICATION-SURVEY-RESPONSE-INSTRUMENT-001")
+                    facade.capture_virtual_run_response_dataset(
+                        run_id, instrument_ref=wrong_instrument
+                    )
+                self.assertEqual(
+                    instrument_error.exception.code, "APPLICATION-SURVEY-RESPONSE-INSTRUMENT-001"
+                )
 
                 self_outer = self
 
@@ -120,7 +133,9 @@ class SurveyDatasetVerifiedReuseTests(SurveyVirtualRunnerTestBase):
                         return store.load_responses(project_id, response_keys)
 
                 wrong_artifact = deepcopy(first_dataset)
-                wrong_artifact["source_provenance"]["response_artifact_digest"] = "sha256:" + "0" * 64
+                wrong_artifact["source_provenance"]["response_artifact_digest"] = (
+                    "sha256:" + "0" * 64
+                )
                 wrong_origin = deepcopy(first_dataset)
                 wrong_origin["response_origin"] = "real"
                 wrong_producer = deepcopy(first_dataset)
@@ -141,7 +156,9 @@ class SurveyDatasetVerifiedReuseTests(SurveyVirtualRunnerTestBase):
                                     run_id,
                                     instrument_ref=instrument_ref,
                                 )
-                        self.assertEqual(caught.exception.code, "APPLICATION-SURVEY-RESPONSE-REUSE-001")
+                        self.assertEqual(
+                            caught.exception.code, "APPLICATION-SURVEY-RESPONSE-REUSE-001"
+                        )
 
                 class RawMismatchProxy(ResponseStoreProxy):
                     def load_responses(self, project_id, response_keys):
@@ -160,7 +177,9 @@ class SurveyDatasetVerifiedReuseTests(SurveyVirtualRunnerTestBase):
                             run_id,
                             instrument_ref=instrument_ref,
                         )
-                self.assertEqual(answer_error.exception.code, "APPLICATION-SURVEY-RESPONSE-REUSE-001")
+                self.assertEqual(
+                    answer_error.exception.code, "APPLICATION-SURVEY-RESPONSE-REUSE-001"
+                )
 
                 # Guard ablation: bypassing producer/artifact verification would
                 # accept the deliberately wrong immutable Dataset binding.

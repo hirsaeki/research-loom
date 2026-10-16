@@ -56,9 +56,7 @@ class SurveyProductionHardeningTests(unittest.TestCase):
                     facade.capture_survey_instrument(
                         instrument_payload(questionnaire=unstable_branch)
                     )
-                self.assertEqual(
-                    branch_error.exception.code, "APPLICATION-SURVEY-BRANCH-001"
-                )
+                self.assertEqual(branch_error.exception.code, "APPLICATION-SURVEY-BRANCH-001")
 
                 collapsed_missing = extended_questionnaire()
                 collapsed_missing["questions"][0]["missing_value_semantics"][
@@ -91,11 +89,17 @@ class SurveyProductionHardeningTests(unittest.TestCase):
                 json.dumps(design_payload(rq_id=rq_id), ensure_ascii=False),
                 encoding="utf-8",
             )
-            code, captured_design = run_launcher([
-                "survey", "design", "capture",
-                "--workspace", str(workspace),
-                "--json", str(design_file),
-            ])
+            code, captured_design = run_launcher(
+                [
+                    "survey",
+                    "design",
+                    "capture",
+                    "--workspace",
+                    str(workspace),
+                    "--json",
+                    str(design_file),
+                ]
+            )
             self.assertEqual((code, captured_design["status"]), (0, "CAPTURED"))
 
             questionnaire = deepcopy(fixtures()["questionnaire"])
@@ -112,55 +116,78 @@ class SurveyProductionHardeningTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            code, captured_instrument = run_launcher([
-                "survey", "instrument", "capture",
-                "--workspace", str(workspace),
-                "--json", str(instrument_file),
-            ])
+            code, captured_instrument = run_launcher(
+                [
+                    "survey",
+                    "instrument",
+                    "capture",
+                    "--workspace",
+                    str(workspace),
+                    "--json",
+                    str(instrument_file),
+                ]
+            )
             self.assertEqual((code, captured_instrument["status"]), (0, "CAPTURED"))
 
-            code, shown = run_launcher([
-                "survey", "instrument", "show",
-                "--workspace", str(workspace),
-                "--instrument-id", "QNR-1",
-                "--version", "1.0.0",
-                "--json",
-            ])
+            code, shown = run_launcher(
+                [
+                    "survey",
+                    "instrument",
+                    "show",
+                    "--workspace",
+                    str(workspace),
+                    "--instrument-id",
+                    "QNR-1",
+                    "--version",
+                    "1.0.0",
+                    "--json",
+                ]
+            )
             self.assertEqual((code, shown["status"]), (0, "OK"))
             self.assertEqual(shown["instrument"]["rq_ids"], [rq_id])
 
-            code, exported_json = run_launcher([
-                "survey", "instrument", "export",
-                "--workspace", str(workspace),
-                "--instrument-id", "QNR-1",
-                "--version", "1.0.0",
-                "--format", "json",
-                "--json",
-            ])
-            self.assertEqual((code, exported_json["status"]), (0, "OK"))
-            code, exported_markdown = run_launcher([
-                "survey", "instrument", "export",
-                "--workspace", str(workspace),
-                "--instrument-id", "QNR-1",
-                "--version", "1.0.0",
-                "--format", "markdown",
-                "--json",
-            ])
-            self.assertEqual((code, exported_markdown["status"]), (0, "OK"))
-            self.assertEqual(
-                json.loads(exported_json["content"])["instrument_id"], "QNR-1"
+            code, exported_json = run_launcher(
+                [
+                    "survey",
+                    "instrument",
+                    "export",
+                    "--workspace",
+                    str(workspace),
+                    "--instrument-id",
+                    "QNR-1",
+                    "--version",
+                    "1.0.0",
+                    "--format",
+                    "json",
+                    "--json",
+                ]
             )
+            self.assertEqual((code, exported_json["status"]), (0, "OK"))
+            code, exported_markdown = run_launcher(
+                [
+                    "survey",
+                    "instrument",
+                    "export",
+                    "--workspace",
+                    str(workspace),
+                    "--instrument-id",
+                    "QNR-1",
+                    "--version",
+                    "1.0.0",
+                    "--format",
+                    "markdown",
+                    "--json",
+                ]
+            )
+            self.assertEqual((code, exported_markdown["status"]), (0, "OK"))
+            self.assertEqual(json.loads(exported_json["content"])["instrument_id"], "QNR-1")
             self.assertTrue(exported_markdown["content"].startswith("# "))
 
             with LocalApplicationFacade.open_workspace(workspace) as facade:
                 after = facade.status()["snapshot"]
                 self.assertEqual(after, before)
-                repeat = facade.export_survey_instrument(
-                    "QNR-1", "1.0.0", format="json"
-                )
-                self.assertEqual(
-                    repeat["export_digest"], exported_json["export_digest"]
-                )
+                repeat = facade.export_survey_instrument("QNR-1", "1.0.0", format="json")
+                self.assertEqual(repeat["export_digest"], exported_json["export_digest"])
                 self.assertEqual(repeat["content"], exported_json["content"])
 
 

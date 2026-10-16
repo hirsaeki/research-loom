@@ -22,7 +22,9 @@ STRENGTHENING_REGISTRY = ROOT / "profiles/contracts/invariant-strengthening-vali
 NARRATIVE_SEMANTICS = ROOT / "profiles/contracts/narrative-semantics.yaml"
 RESEARCH_QUALITY_POLICY = ROOT / "profiles/contracts/research-quality-policy.yaml"
 CORE_CONTRACTS = {"research_contract": "0.1.0", "invariant_contract": "0.1.0"}
-TYPE_RANK = {name: i for i, name in enumerate(("research", "organization", "narrative", "publication"))}
+TYPE_RANK = {
+    name: i for i, name in enumerate(("research", "organization", "narrative", "publication"))
+}
 MAX_PROFILE_MANIFESTS = 128
 MAX_PROFILE_RESOLUTION_STATES = 10_000
 MAX_PROFILE_RESOURCES = 32
@@ -71,7 +73,9 @@ def _satisfies(version: str, requirement: str) -> bool:
     for token in requirement.split():
         match = _COMPARATOR.fullmatch(token)
         if match is None:
-            raise LocalWorkspaceError("PROFILE-VERSION-001", f"unsupported version requirement {requirement!r}")
+            raise LocalWorkspaceError(
+                "PROFILE-VERSION-001", f"unsupported version requirement {requirement!r}"
+            )
         op, rhs_text = match.groups()
         rhs = _semver(rhs_text)
         if op == ">=" and not value >= rhs:
@@ -163,10 +167,12 @@ def _valid_narrative_purpose(item: Any, vocabularies: Mapping[str, list[str]]) -
 
 def _validate_manifest_semantics(manifest: Mapping[str, Any]) -> None:
     compat = manifest["core_compatibility"]
-    if not _satisfies(CORE_CONTRACTS["research_contract"], str(compat["research_contract"])) or not _satisfies(
-        CORE_CONTRACTS["invariant_contract"], str(compat["invariant_contract"])
-    ):
-        raise LocalWorkspaceError("PROFILE-CORE-COMPAT-001", "Profile is incompatible with current Core contracts")
+    if not _satisfies(
+        CORE_CONTRACTS["research_contract"], str(compat["research_contract"])
+    ) or not _satisfies(CORE_CONTRACTS["invariant_contract"], str(compat["invariant_contract"])):
+        raise LocalWorkspaceError(
+            "PROFILE-CORE-COMPAT-001", "Profile is incompatible with current Core contracts"
+        )
 
     research_contract = yaml.safe_load(RESEARCH_QUALITY_POLICY.read_text(encoding="utf-8"))
     research_paths = {item["path"]: item for item in research_contract["constraint_paths"]}
@@ -176,22 +182,39 @@ def _validate_manifest_semantics(manifest: Mapping[str, Any]) -> None:
         if not path.startswith("research_quality."):
             continue
         if manifest["profile_type"] != "research":
-            raise LocalWorkspaceError("PROFILE-RESEARCH-QUALITY-OWNER-001", "research_quality.* constraints are owned by Research Profiles")
+            raise LocalWorkspaceError(
+                "PROFILE-RESEARCH-QUALITY-OWNER-001",
+                "research_quality.* constraints are owned by Research Profiles",
+            )
         spec = research_paths.get(path)
         if spec is None:
-            raise LocalWorkspaceError("PROFILE-RESEARCH-QUALITY-PATH-001", f"unknown canonical Research quality path {path}")
+            raise LocalWorkspaceError(
+                "PROFILE-RESEARCH-QUALITY-PATH-001",
+                f"unknown canonical Research quality path {path}",
+            )
         if constraint["merge_strategy"] != spec["merge_strategy"]:
-            raise LocalWorkspaceError("PROFILE-RESEARCH-QUALITY-MERGE-001", f"wrong merge strategy for {path}")
+            raise LocalWorkspaceError(
+                "PROFILE-RESEARCH-QUALITY-MERGE-001", f"wrong merge strategy for {path}"
+            )
         value = constraint["value"]
         if spec["value_shape"] == "enum_set":
             if not _unique_strings(value, set(research_vocabularies[spec["vocabulary"]])):
-                raise LocalWorkspaceError("PROFILE-RESEARCH-QUALITY-VALUE-001", f"Research quality vocabulary violation at {path}")
+                raise LocalWorkspaceError(
+                    "PROFILE-RESEARCH-QUALITY-VALUE-001",
+                    f"Research quality vocabulary violation at {path}",
+                )
         elif spec["value_shape"] == "integer":
             minimum = int(spec.get("minimum", 0))
             if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
-                raise LocalWorkspaceError("PROFILE-RESEARCH-QUALITY-VALUE-001", f"Research quality threshold violation at {path}")
+                raise LocalWorkspaceError(
+                    "PROFILE-RESEARCH-QUALITY-VALUE-001",
+                    f"Research quality threshold violation at {path}",
+                )
         else:
-            raise LocalWorkspaceError("PROFILE-RESEARCH-QUALITY-VALUE-001", f"unsupported Research quality value shape at {path}")
+            raise LocalWorkspaceError(
+                "PROFILE-RESEARCH-QUALITY-VALUE-001",
+                f"unsupported Research quality value shape at {path}",
+            )
 
     narrative_contract = yaml.safe_load(NARRATIVE_SEMANTICS.read_text(encoding="utf-8"))
     narrative_paths = {item["path"]: item for item in narrative_contract["constraint_paths"]}
@@ -201,39 +224,69 @@ def _validate_manifest_semantics(manifest: Mapping[str, Any]) -> None:
         if not path.startswith("narrative."):
             continue
         if manifest["profile_type"] != "narrative":
-            raise LocalWorkspaceError("PROFILE-NARRATIVE-OWNER-001", "narrative.* constraints are owned by Narrative Profiles")
+            raise LocalWorkspaceError(
+                "PROFILE-NARRATIVE-OWNER-001",
+                "narrative.* constraints are owned by Narrative Profiles",
+            )
         spec = narrative_paths.get(path)
         if spec is None:
-            raise LocalWorkspaceError("PROFILE-NARRATIVE-PATH-001", f"unknown canonical Narrative path {path}")
+            raise LocalWorkspaceError(
+                "PROFILE-NARRATIVE-PATH-001", f"unknown canonical Narrative path {path}"
+            )
         if constraint["merge_strategy"] != spec["merge_strategy"]:
-            raise LocalWorkspaceError("PROFILE-NARRATIVE-MERGE-001", f"wrong merge strategy for {path}")
+            raise LocalWorkspaceError(
+                "PROFILE-NARRATIVE-MERGE-001", f"wrong merge strategy for {path}"
+            )
         value = constraint["value"]
         if not isinstance(value, list):
-            raise LocalWorkspaceError("PROFILE-NARRATIVE-VALUE-001", f"Narrative value for {path} must be a list")
+            raise LocalWorkspaceError(
+                "PROFILE-NARRATIVE-VALUE-001", f"Narrative value for {path} must be a list"
+            )
         shape = spec["value_shape"]
         if shape == "enum_set":
             if not _unique_strings(value, set(vocabularies[spec["vocabulary"]])):
-                raise LocalWorkspaceError("PROFILE-NARRATIVE-VALUE-001", f"Narrative vocabulary violation at {path}")
+                raise LocalWorkspaceError(
+                    "PROFILE-NARRATIVE-VALUE-001", f"Narrative vocabulary violation at {path}"
+                )
         elif shape == "stage_set":
             if any(not _valid_narrative_stage(item, vocabularies) for item in value):
-                raise LocalWorkspaceError("PROFILE-NARRATIVE-VALUE-001", f"Narrative stage definition violation at {path}")
+                raise LocalWorkspaceError(
+                    "PROFILE-NARRATIVE-VALUE-001", f"Narrative stage definition violation at {path}"
+                )
             identities = [item["id"] for item in value]
             if len(identities) != len(set(identities)):
-                raise LocalWorkspaceError("PROFILE-NARRATIVE-IDENTITY-001", f"duplicate Narrative stage identity at {path}")
+                raise LocalWorkspaceError(
+                    "PROFILE-NARRATIVE-IDENTITY-001",
+                    f"duplicate Narrative stage identity at {path}",
+                )
         elif shape == "dependency_set":
             if any(not _valid_narrative_dependency(item, vocabularies) for item in value):
-                raise LocalWorkspaceError("PROFILE-NARRATIVE-VALUE-001", f"Narrative dependency definition violation at {path}")
+                raise LocalWorkspaceError(
+                    "PROFILE-NARRATIVE-VALUE-001",
+                    f"Narrative dependency definition violation at {path}",
+                )
             identities = [(item["from_stage"], item["to_stage"]) for item in value]
             if len(identities) != len(set(identities)):
-                raise LocalWorkspaceError("PROFILE-NARRATIVE-IDENTITY-001", f"duplicate Narrative dependency identity at {path}")
+                raise LocalWorkspaceError(
+                    "PROFILE-NARRATIVE-IDENTITY-001",
+                    f"duplicate Narrative dependency identity at {path}",
+                )
         elif shape == "section_purpose_set":
             if any(not _valid_narrative_purpose(item, vocabularies) for item in value):
-                raise LocalWorkspaceError("PROFILE-NARRATIVE-VALUE-001", f"Narrative section-purpose definition violation at {path}")
+                raise LocalWorkspaceError(
+                    "PROFILE-NARRATIVE-VALUE-001",
+                    f"Narrative section-purpose definition violation at {path}",
+                )
             identities = [item["id"] for item in value]
             if len(identities) != len(set(identities)):
-                raise LocalWorkspaceError("PROFILE-NARRATIVE-IDENTITY-001", f"duplicate Narrative section-purpose identity at {path}")
+                raise LocalWorkspaceError(
+                    "PROFILE-NARRATIVE-IDENTITY-001",
+                    f"duplicate Narrative section-purpose identity at {path}",
+                )
         else:
-            raise LocalWorkspaceError("PROFILE-NARRATIVE-VALUE-001", f"unsupported Narrative value shape at {path}")
+            raise LocalWorkspaceError(
+                "PROFILE-NARRATIVE-VALUE-001", f"unsupported Narrative value shape at {path}"
+            )
 
     registry = yaml.safe_load(STRENGTHENING_REGISTRY.read_text(encoding="utf-8"))
     declarations = {str(item["id"]): item for item in manifest.get("constraints", [])}
@@ -244,7 +297,10 @@ def _validate_manifest_semantics(manifest: Mapping[str, Any]) -> None:
         matched_validator = None
         if invariant and invariant.get("strengthening_policy") == "registered_forms":
             for validator in invariant.get("validators", []):
-                if validator["validator_id"] != binding["validator_id"] or validator["validator_version"] != binding["validator_version"]:
+                if (
+                    validator["validator_id"] != binding["validator_id"]
+                    or validator["validator_version"] != binding["validator_version"]
+                ):
                     continue
                 for form in validator.get("approved_forms", []):
                     if form["form_id"] == binding["form_id"]:
@@ -252,31 +308,54 @@ def _validate_manifest_semantics(manifest: Mapping[str, Any]) -> None:
                         matched_form = form
                         break
         if matched_form is None or matched_validator is None:
-            raise LocalWorkspaceError("PROFILE-CORE-STRENGTHENING-001", "Profile strengthening is not registered")
+            raise LocalWorkspaceError(
+                "PROFILE-CORE-STRENGTHENING-001", "Profile strengthening is not registered"
+            )
         applicability = matched_validator.get("applicability", {})
         prefix = applicability.get("profile_id_prefix")
         prefixes = applicability.get("profile_id_prefixes")
         profile_id = str(manifest["profile_id"])
         if isinstance(prefix, str) and not profile_id.startswith(prefix):
-            raise LocalWorkspaceError("PROFILE-CORE-STRENGTHENING-001", "Profile strengthening is outside the registered applicability")
-        if isinstance(prefixes, list) and (not prefixes or any(not isinstance(item, str) or not item for item in prefixes) or not any(profile_id.startswith(item) for item in prefixes)):
-            raise LocalWorkspaceError("PROFILE-CORE-STRENGTHENING-001", "Profile strengthening is outside the registered applicability")
+            raise LocalWorkspaceError(
+                "PROFILE-CORE-STRENGTHENING-001",
+                "Profile strengthening is outside the registered applicability",
+            )
+        if isinstance(prefixes, list) and (
+            not prefixes
+            or any(not isinstance(item, str) or not item for item in prefixes)
+            or not any(profile_id.startswith(item) for item in prefixes)
+        ):
+            raise LocalWorkspaceError(
+                "PROFILE-CORE-STRENGTHENING-001",
+                "Profile strengthening is outside the registered applicability",
+            )
         referenced = []
         for constraint_id in strengthening["constraint_ids"]:
             declaration = declarations.get(str(constraint_id))
             if declaration is None:
-                raise LocalWorkspaceError("PROFILE-MANIFEST-REF-001", "Profile strengthening references an unknown constraint")
+                raise LocalWorkspaceError(
+                    "PROFILE-MANIFEST-REF-001",
+                    "Profile strengthening references an unknown constraint",
+                )
             referenced.append(declaration)
         for required in matched_form.get("required_constraints", []):
             match = next(
                 (
-                    item for item in referenced
-                    if item["path"] == required["path"] and item["merge_strategy"] == required["merge_strategy"]
+                    item
+                    for item in referenced
+                    if item["path"] == required["path"]
+                    and item["merge_strategy"] == required["merge_strategy"]
                 ),
                 None,
             )
-            if match is None or ("const" in required.get("value_schema", {}) and match["value"] != required["value_schema"]["const"]):
-                raise LocalWorkspaceError("PROFILE-CORE-STRENGTHENING-001", "Profile strengthening does not satisfy its registered form")
+            if match is None or (
+                "const" in required.get("value_schema", {})
+                and match["value"] != required["value_schema"]["const"]
+            ):
+                raise LocalWorkspaceError(
+                    "PROFILE-CORE-STRENGTHENING-001",
+                    "Profile strengthening does not satisfy its registered form",
+                )
 
 
 def _load_candidates(paths: Iterable[str | Path]) -> list[dict[str, Any]]:
@@ -298,7 +377,9 @@ def _load_candidates(paths: Iterable[str | Path]) -> list[dict[str, Any]]:
                 "production Profile resolution accepts only canonical repository Profile sources",
             ) from exc
         if path.is_symlink():
-            raise LocalWorkspaceError("PROFILE-MANIFEST-SOURCE-001", "Profile manifest may not be a symlink")
+            raise LocalWorkspaceError(
+                "PROFILE-MANIFEST-SOURCE-001", "Profile manifest may not be a symlink"
+            )
         manifest = _load_json(path, "PROFILE-MANIFEST-READ-001")
         _validate_schema(manifest, PROFILE_MANIFEST_SCHEMA, "PROFILE-MANIFEST-SCHEMA-001")
         _validate_manifest_semantics(manifest)
@@ -315,7 +396,9 @@ def _load_candidates(paths: Iterable[str | Path]) -> list[dict[str, Any]]:
         identities[identity] = digest
         candidates.append({"manifest": manifest, "manifest_sha256": digest, "path": str(path)})
     if not candidates:
-        raise LocalWorkspaceError("PROFILE-CANDIDATE-EMPTY-001", "at least one Profile manifest is required")
+        raise LocalWorkspaceError(
+            "PROFILE-CANDIDATE-EMPTY-001", "at least one Profile manifest is required"
+        )
     return candidates
 
 
@@ -324,7 +407,9 @@ def _assignment_valid(assignment, requests) -> bool:
     requested_keys = {_key(request) for request in requests}
     for request in requests:
         candidate = selected.get(_key(request))
-        if candidate is None or not _satisfies(str(candidate["manifest"]["profile_version"]), str(request["version"])):
+        if candidate is None or not _satisfies(
+            str(candidate["manifest"]["profile_version"]), str(request["version"])
+        ):
             return False
     reachable = set(requested_keys)
     frontier = list(requested_keys)
@@ -335,7 +420,9 @@ def _assignment_valid(assignment, requests) -> bool:
             return False
         manifest = candidate["manifest"]
         compat = manifest["core_compatibility"]
-        if not _satisfies(CORE_CONTRACTS["research_contract"], str(compat["research_contract"])) or not _satisfies(
+        if not _satisfies(
+            CORE_CONTRACTS["research_contract"], str(compat["research_contract"])
+        ) or not _satisfies(
             CORE_CONTRACTS["invariant_contract"], str(compat["invariant_contract"])
         ):
             return False
@@ -345,7 +432,9 @@ def _assignment_valid(assignment, requests) -> bool:
                 if relation == "extends" and dependency["profile_type"] != manifest["profile_type"]:
                     return False
                 target = selected.get(dep_key)
-                if target is None or not _satisfies(str(target["manifest"]["profile_version"]), str(dependency["version"])):
+                if target is None or not _satisfies(
+                    str(target["manifest"]["profile_version"]), str(dependency["version"])
+                ):
                     return False
                 if dep_key not in reachable:
                     reachable.add(dep_key)
@@ -355,7 +444,9 @@ def _assignment_valid(assignment, requests) -> bool:
     graph = {key: [] for key in selected}
     for key, candidate in selected.items():
         for relation in ("extends", "requires"):
-            graph[key].extend(_key(dependency) for dependency in candidate["manifest"].get(relation, []))
+            graph[key].extend(
+                _key(dependency) for dependency in candidate["manifest"].get(relation, [])
+            )
     visiting: set[tuple[str, str]] = set()
     done: set[tuple[str, str]] = set()
 
@@ -404,7 +495,10 @@ def _resolve_selected(candidates, requests):
                 continue
             possible = by_key.get(key, [])
             if not any(
-                all(_satisfies(str(candidate["manifest"]["profile_version"]), requirement) for requirement in required_versions)
+                all(
+                    _satisfies(str(candidate["manifest"]["profile_version"]), requirement)
+                    for requirement in required_versions
+                )
                 for candidate in possible
             ):
                 return None
@@ -433,7 +527,9 @@ def _resolve_selected(candidates, requests):
         for candidate in candidates_for_key:
             manifest = candidate["manifest"]
             compat = manifest["core_compatibility"]
-            if not _satisfies(CORE_CONTRACTS["research_contract"], str(compat["research_contract"])) or not _satisfies(
+            if not _satisfies(
+                CORE_CONTRACTS["research_contract"], str(compat["research_contract"])
+            ) or not _satisfies(
                 CORE_CONTRACTS["invariant_contract"], str(compat["invariant_contract"])
             ):
                 continue
@@ -441,10 +537,15 @@ def _resolve_selected(candidates, requests):
             invalid_relation = False
             for relation in ("extends", "requires"):
                 for dependency in manifest.get(relation, []):
-                    if relation == "extends" and dependency["profile_type"] != manifest["profile_type"]:
+                    if (
+                        relation == "extends"
+                        and dependency["profile_type"] != manifest["profile_type"]
+                    ):
                         invalid_relation = True
                         break
-                    next_requirements.setdefault(_key(dependency), []).append(str(dependency["version"]))
+                    next_requirements.setdefault(_key(dependency), []).append(
+                        str(dependency["version"])
+                    )
                 if invalid_relation:
                     break
             if invalid_relation:
@@ -456,7 +557,10 @@ def _resolve_selected(candidates, requests):
 
     winner = search({}, initial_requirements)
     if winner is None:
-        raise LocalWorkspaceError("PROFILE-VERSION-001", "no compatible Profile resolution exists for the requested generation")
+        raise LocalWorkspaceError(
+            "PROFILE-VERSION-001",
+            "no compatible Profile resolution exists for the requested generation",
+        )
 
     selected = {key: candidate for key, candidate in winner.items() if candidate is not None}
     output = []
@@ -471,11 +575,19 @@ def _resolve_selected(candidates, requests):
             for relation in ("extends", "requires"):
                 for dependency in introduced["manifest"].get(relation, []):
                     if _key(dependency) == key:
-                        sources.append({"relation": relation, "introduced_by": _pin(introduced), "required_version": dependency["version"]})
+                        sources.append(
+                            {
+                                "relation": relation,
+                                "introduced_by": _pin(introduced),
+                                "required_version": dependency["version"],
+                            }
+                        )
         sources.sort(
             key=lambda source: (
                 relation_rank[source["relation"]],
-                TYPE_RANK[(source.get("introduced_by") or {"profile_type": "research"})["profile_type"]],
+                TYPE_RANK[
+                    (source.get("introduced_by") or {"profile_type": "research"})["profile_type"]
+                ],
                 (source.get("introduced_by") or {}).get("profile_id", ""),
                 source["required_version"],
             )
@@ -502,7 +614,9 @@ def _compose_constraints(selected) -> list[dict[str, Any]]:
         declarations = groups[path]
         strategy = declarations[0][1]["merge_strategy"]
         if any(item[1]["merge_strategy"] != strategy for item in declarations):
-            raise LocalWorkspaceError("PROFILE-COMP-STRATEGY-001", f"conflicting merge strategy at {path}")
+            raise LocalWorkspaceError(
+                "PROFILE-COMP-STRATEGY-001", f"conflicting merge strategy at {path}"
+            )
         values = [item[1]["value"] for item in declarations]
         if strategy == "union":
             value = _canonicalize_set(member for members in values for member in members)
@@ -514,7 +628,9 @@ def _compose_constraints(selected) -> list[dict[str, Any]]:
             resolution = "single" if len(declarations) == 1 else "intersection"
         elif strategy == "must_equal":
             if any(item != values[0] for item in values[1:]):
-                raise LocalWorkspaceError("PROFILE-COMP-CONFLICT-001", f"must_equal conflict at {path}")
+                raise LocalWorkspaceError(
+                    "PROFILE-COMP-CONFLICT-001", f"must_equal conflict at {path}"
+                )
             value = values[0]
             resolution = "single" if len(declarations) == 1 else "identical"
         elif strategy == "max":
@@ -525,14 +641,37 @@ def _compose_constraints(selected) -> list[dict[str, Any]]:
             resolution = "single" if len(declarations) == 1 else "min"
         elif strategy == "replace":
             if any(item != values[0] for item in values[1:]):
-                raise LocalWorkspaceError("PROFILE-COMP-REPLACE-001", f"ambiguous replace at {path}")
+                raise LocalWorkspaceError(
+                    "PROFILE-COMP-REPLACE-001", f"ambiguous replace at {path}"
+                )
             value = values[0]
             resolution = "single" if len(declarations) == 1 else "identical"
         else:
-            raise LocalWorkspaceError("PROFILE-COMP-STRATEGY-001", f"unsupported merge strategy {strategy}")
-        provenance = [{**_pin(candidate), "constraint_id": declaration["id"]} for candidate, declaration in declarations]
-        provenance.sort(key=lambda item: (TYPE_RANK[item["profile_type"]], item["profile_id"], _semver(item["profile_version"]), item["manifest_sha256"], item["constraint_id"]))
-        result.append({"path": path, "merge_strategy": strategy, "value": value, "resolution": resolution, "provenance": provenance})
+            raise LocalWorkspaceError(
+                "PROFILE-COMP-STRATEGY-001", f"unsupported merge strategy {strategy}"
+            )
+        provenance = [
+            {**_pin(candidate), "constraint_id": declaration["id"]}
+            for candidate, declaration in declarations
+        ]
+        provenance.sort(
+            key=lambda item: (
+                TYPE_RANK[item["profile_type"]],
+                item["profile_id"],
+                _semver(item["profile_version"]),
+                item["manifest_sha256"],
+                item["constraint_id"],
+            )
+        )
+        result.append(
+            {
+                "path": path,
+                "merge_strategy": strategy,
+                "value": value,
+                "resolution": resolution,
+                "provenance": provenance,
+            }
+        )
     return result
 
 
@@ -540,7 +679,9 @@ def _normalized_resource_bytes(path: Path) -> bytes:
     try:
         return path.read_bytes().replace(b"\r\n", b"\n")
     except OSError as exc:
-        raise LocalWorkspaceError("PROFILE-RESOURCE-READ-001", f"cannot read Profile resource {path}") from exc
+        raise LocalWorkspaceError(
+            "PROFILE-RESOURCE-READ-001", f"cannot read Profile resource {path}"
+        ) from exc
 
 
 def _effective_resources(selected) -> list[dict[str, Any]]:
@@ -553,37 +694,61 @@ def _effective_resources(selected) -> list[dict[str, Any]]:
         manifest_path = Path(candidate["path"])
         declarations = list(manifest.get("resources", []))
         if len(declarations) > MAX_PROFILE_RESOURCES:
-            raise LocalWorkspaceError("PROFILE-RESOURCE-BOUND-001", "Profile declares too many resources")
+            raise LocalWorkspaceError(
+                "PROFILE-RESOURCE-BOUND-001", "Profile declares too many resources"
+            )
         resource_count += len(declarations)
         if resource_count > MAX_EFFECTIVE_RESOURCES:
-            raise LocalWorkspaceError("PROFILE-RESOURCE-BOUND-001", "Effective Profile Set declares too many resources")
+            raise LocalWorkspaceError(
+                "PROFILE-RESOURCE-BOUND-001", "Effective Profile Set declares too many resources"
+            )
         for declaration in declarations:
             declared_path = str(declaration["path"])
             raw_path = manifest_path.parent / declared_path
             if raw_path.is_symlink():
-                raise LocalWorkspaceError("PROFILE-RESOURCE-SOURCE-001", "Profile resource may not be a symlink")
+                raise LocalWorkspaceError(
+                    "PROFILE-RESOURCE-SOURCE-001", "Profile resource may not be a symlink"
+                )
             try:
                 path = raw_path.resolve(strict=True)
                 path.relative_to(profile_root)
                 byte_size = path.stat().st_size
             except (OSError, ValueError) as exc:
-                raise LocalWorkspaceError("PROFILE-RESOURCE-SOURCE-001", "Profile resource must exist inside canonical profiles/") from exc
+                raise LocalWorkspaceError(
+                    "PROFILE-RESOURCE-SOURCE-001",
+                    "Profile resource must exist inside canonical profiles/",
+                ) from exc
             if byte_size > MAX_PROFILE_RESOURCE_BYTES:
-                raise LocalWorkspaceError("PROFILE-RESOURCE-BOUND-001", f"Profile resource exceeds size bound: {declared_path}")
+                raise LocalWorkspaceError(
+                    "PROFILE-RESOURCE-BOUND-001",
+                    f"Profile resource exceeds size bound: {declared_path}",
+                )
             resource_bytes += byte_size
             if resource_bytes > MAX_EFFECTIVE_RESOURCE_BYTES:
-                raise LocalWorkspaceError("PROFILE-RESOURCE-BOUND-001", "Effective Profile Set resources exceed size bound")
+                raise LocalWorkspaceError(
+                    "PROFILE-RESOURCE-BOUND-001",
+                    "Effective Profile Set resources exceed size bound",
+                )
             expected = declaration.get("sha256")
             if not isinstance(expected, str):
-                raise LocalWorkspaceError("PROFILE-RESOURCE-DIGEST-001", "production Profile resources require a sha256 pin")
+                raise LocalWorkspaceError(
+                    "PROFILE-RESOURCE-DIGEST-001",
+                    "production Profile resources require a sha256 pin",
+                )
             payload = _normalized_resource_bytes(path)
             actual = hashlib.sha256(payload).hexdigest()
             if actual != expected:
-                raise LocalWorkspaceError("PROFILE-RESOURCE-DIGEST-001", f"Profile resource digest mismatch: {declared_path}")
+                raise LocalWorkspaceError(
+                    "PROFILE-RESOURCE-DIGEST-001",
+                    f"Profile resource digest mismatch: {declared_path}",
+                )
             try:
                 content = payload.decode("utf-8")
             except UnicodeDecodeError as exc:
-                raise LocalWorkspaceError("PROFILE-RESOURCE-ENCODING-001", "production Profile resources must be UTF-8 text") from exc
+                raise LocalWorkspaceError(
+                    "PROFILE-RESOURCE-ENCODING-001",
+                    "production Profile resources must be UTF-8 text",
+                ) from exc
             canonical_path = path.relative_to(profile_root).as_posix()
             role = str(declaration["role"])
             key = (canonical_path, role, actual)
@@ -603,7 +768,15 @@ def _effective_resources(selected) -> list[dict[str, Any]]:
                 item["provenance"].append(source)
     result = list(grouped.values())
     for item in result:
-        item["provenance"].sort(key=lambda source: (TYPE_RANK[source["profile_type"]], source["profile_id"], _semver(source["profile_version"]), source["manifest_sha256"], source["declared_path"]))
+        item["provenance"].sort(
+            key=lambda source: (
+                TYPE_RANK[source["profile_type"]],
+                source["profile_id"],
+                _semver(source["profile_version"]),
+                source["manifest_sha256"],
+                source["declared_path"],
+            )
+        )
     result.sort(key=lambda item: (item["path"], item["role"], item["sha256"]))
     return result
 
@@ -623,8 +796,21 @@ def _effective_invariants(selected) -> list[dict[str, Any]]:
     result = []
     for invariant in registry["invariants"]:
         provenance = strengthenings.get(str(invariant["id"]), [])
-        provenance.sort(key=lambda item: (TYPE_RANK[item["profile_type"]], item["profile_id"], _semver(item["profile_version"]), item["manifest_sha256"]))
-        result.append({"invariant_id": invariant["id"], "status": "strengthened" if provenance else "preserved", "provenance": provenance})
+        provenance.sort(
+            key=lambda item: (
+                TYPE_RANK[item["profile_type"]],
+                item["profile_id"],
+                _semver(item["profile_version"]),
+                item["manifest_sha256"],
+            )
+        )
+        result.append(
+            {
+                "invariant_id": invariant["id"],
+                "status": "strengthened" if provenance else "preserved",
+                "provenance": provenance,
+            }
+        )
     return result
 
 
@@ -636,40 +822,63 @@ def _validate_effective_narrative(constraints: list[Mapping[str, Any]]) -> None:
     stage_defs: dict[str, Any] = {}
     for stage in stages:
         if not isinstance(stage, Mapping) or not isinstance(stage.get("id"), str):
-            raise LocalWorkspaceError("PROFILE-NARRATIVE-VALUE-001", "invalid Narrative stage definition")
+            raise LocalWorkspaceError(
+                "PROFILE-NARRATIVE-VALUE-001", "invalid Narrative stage definition"
+            )
         identifier = str(stage["id"])
         if identifier in stage_defs and stage_defs[identifier] != stage:
-            raise LocalWorkspaceError("PROFILE-NARRATIVE-IDENTITY-001", f"divergent Narrative stage {identifier}")
+            raise LocalWorkspaceError(
+                "PROFILE-NARRATIVE-IDENTITY-001", f"divergent Narrative stage {identifier}"
+            )
         stage_defs[identifier] = stage
     graph = {identifier: [] for identifier in stage_defs}
     edge_defs: dict[tuple[str, str], Any] = {}
     for edge in dependencies:
-        if not isinstance(edge, Mapping) or not all(isinstance(edge.get(key), str) for key in ("from_stage", "to_stage", "relation")):
+        if not isinstance(edge, Mapping) or not all(
+            isinstance(edge.get(key), str) for key in ("from_stage", "to_stage", "relation")
+        ):
             raise LocalWorkspaceError("PROFILE-NARRATIVE-VALUE-001", "invalid Narrative dependency")
         source, target = str(edge["from_stage"]), str(edge["to_stage"])
         if source not in graph or target not in graph:
-            raise LocalWorkspaceError("PROFILE-NARRATIVE-REF-001", "Narrative dependency references an unknown stage")
+            raise LocalWorkspaceError(
+                "PROFILE-NARRATIVE-REF-001", "Narrative dependency references an unknown stage"
+            )
         identity = (source, target)
         if identity in edge_defs and edge_defs[identity] != edge:
-            raise LocalWorkspaceError("PROFILE-NARRATIVE-IDENTITY-001", "divergent Narrative dependency")
+            raise LocalWorkspaceError(
+                "PROFILE-NARRATIVE-IDENTITY-001", "divergent Narrative dependency"
+            )
         edge_defs[identity] = edge
         graph[source].append(target)
     purpose_defs: dict[str, Any] = {}
     for purpose in purposes:
-        if not isinstance(purpose, Mapping) or not isinstance(purpose.get("id"), str) or not isinstance(purpose.get("stage_ids"), list):
-            raise LocalWorkspaceError("PROFILE-NARRATIVE-VALUE-001", "invalid Narrative section purpose")
+        if (
+            not isinstance(purpose, Mapping)
+            or not isinstance(purpose.get("id"), str)
+            or not isinstance(purpose.get("stage_ids"), list)
+        ):
+            raise LocalWorkspaceError(
+                "PROFILE-NARRATIVE-VALUE-001", "invalid Narrative section purpose"
+            )
         identifier = str(purpose["id"])
         if identifier in purpose_defs and purpose_defs[identifier] != purpose:
-            raise LocalWorkspaceError("PROFILE-NARRATIVE-IDENTITY-001", f"divergent Narrative section purpose {identifier}")
+            raise LocalWorkspaceError(
+                "PROFILE-NARRATIVE-IDENTITY-001",
+                f"divergent Narrative section purpose {identifier}",
+            )
         if any(stage_id not in graph for stage_id in purpose["stage_ids"]):
-            raise LocalWorkspaceError("PROFILE-NARRATIVE-REF-001", "Narrative section purpose references an unknown stage")
+            raise LocalWorkspaceError(
+                "PROFILE-NARRATIVE-REF-001", "Narrative section purpose references an unknown stage"
+            )
         purpose_defs[identifier] = purpose
     visiting: set[str] = set()
     done: set[str] = set()
 
     def visit(node: str) -> None:
         if node in visiting:
-            raise LocalWorkspaceError("NARRATIVE-DEPENDENCY-CYCLE-001", "Narrative dependency graph contains a cycle")
+            raise LocalWorkspaceError(
+                "NARRATIVE-DEPENDENCY-CYCLE-001", "Narrative dependency graph contains a cycle"
+            )
         if node in done:
             return
         visiting.add(node)
@@ -722,7 +931,8 @@ def target_project_config(
     current: Mapping[str, Any],
     replacements: Iterable[Mapping[str, Any]],
     additions: Iterable[Mapping[str, Any]] = (),
-    *, publication_metadata: Mapping[str, Any] | None = None,
+    *,
+    publication_metadata: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     target = deepcopy(dict(current))
     changed = False
@@ -730,35 +940,63 @@ def target_project_config(
         old = replacement.get("from")
         new = replacement.get("to")
         if not isinstance(old, Mapping) or not isinstance(new, Mapping):
-            raise LocalWorkspaceError("PROFILE-ADVANCE-REQUEST-001", "each request replacement needs from/to objects")
+            raise LocalWorkspaceError(
+                "PROFILE-ADVANCE-REQUEST-001", "each request replacement needs from/to objects"
+            )
         profile_type = str(old.get("profile_type", ""))
-        if profile_type not in ("research", "organization", "narrative", "publication") or str(new.get("profile_type", "")) != profile_type:
-            raise LocalWorkspaceError("PROFILE-ADVANCE-REQUEST-001", "request replacement must stay within one Profile type")
+        if (
+            profile_type not in ("research", "organization", "narrative", "publication")
+            or str(new.get("profile_type", "")) != profile_type
+        ):
+            raise LocalWorkspaceError(
+                "PROFILE-ADVANCE-REQUEST-001",
+                "request replacement must stay within one Profile type",
+            )
         items = target["profile_requests"][profile_type]
         matches = [index for index, item in enumerate(items) if item == dict(old)]
         if len(matches) != 1:
-            raise LocalWorkspaceError("PROFILE-ADVANCE-REQUEST-001", "request replacement source must match exactly once")
+            raise LocalWorkspaceError(
+                "PROFILE-ADVANCE-REQUEST-001", "request replacement source must match exactly once"
+            )
         items[matches[0]] = deepcopy(dict(new))
         changed = changed or dict(old) != dict(new)
     for addition in additions:
         if not isinstance(addition, Mapping):
-            raise LocalWorkspaceError("PROFILE-ADVANCE-REQUEST-001", "request addition must be an object")
+            raise LocalWorkspaceError(
+                "PROFILE-ADVANCE-REQUEST-001", "request addition must be an object"
+            )
         item = deepcopy(dict(addition))
         profile_type = str(item.get("profile_type", ""))
         profile_id = str(item.get("profile_id", ""))
-        if profile_type not in ("research", "organization", "narrative", "publication") or not profile_id:
-            raise LocalWorkspaceError("PROFILE-ADVANCE-REQUEST-001", "request addition must identify a supported Profile type and id")
+        if (
+            profile_type not in ("research", "organization", "narrative", "publication")
+            or not profile_id
+        ):
+            raise LocalWorkspaceError(
+                "PROFILE-ADVANCE-REQUEST-001",
+                "request addition must identify a supported Profile type and id",
+            )
         items = target["profile_requests"][profile_type]
         if item in items:
             continue
         if any(str(existing.get("profile_id")) == profile_id for existing in items):
-            raise LocalWorkspaceError("PROFILE-ADVANCE-REQUEST-001", "request addition collides with an existing Profile id")
+            raise LocalWorkspaceError(
+                "PROFILE-ADVANCE-REQUEST-001",
+                "request addition collides with an existing Profile id",
+            )
         items.append(item)
         changed = True
-    metadata_changed = publication_metadata is not None and dict(publication_metadata) != current.get("publication_metadata", {})
+    metadata_changed = publication_metadata is not None and dict(
+        publication_metadata
+    ) != current.get("publication_metadata", {})
     if metadata_changed:
-        if set(publication_metadata) != {"research_group_type"} or publication_metadata.get("research_group_type") not in {"G", "M"}:
-            raise LocalWorkspaceError("INPUT-RESEARCH-GROUP-TYPE", "Publication metadata requires an explicit G or M answer")
+        if set(publication_metadata) != {"research_group_type"} or publication_metadata.get(
+            "research_group_type"
+        ) not in {"G", "M"}:
+            raise LocalWorkspaceError(
+                "INPUT-RESEARCH-GROUP-TYPE",
+                "Publication metadata requires an explicit G or M answer",
+            )
         target["publication_metadata"] = deepcopy(dict(publication_metadata))
         major, minor, patch = str(current["config_version"]).split(".")
         target["config_version"] = f"{major}.{minor}.{int(patch) + 1}"
@@ -777,12 +1015,19 @@ def target_project_config(
             if note not in notes:
                 notes.append(note)
         target.pop("configuration_digest", None)
-        target["configuration_digest"] = "sha256:" + hashlib.sha256(rfc8785.dumps(target)).hexdigest()
+        target["configuration_digest"] = (
+            "sha256:" + hashlib.sha256(rfc8785.dumps(target)).hexdigest()
+        )
     return target
 
 
-def exact_manifest_identity_map(manifest_files: Iterable[str | Path]) -> dict[tuple[str, str, str], str]:
-    return {_keyver(item["manifest"]): str(item["manifest_sha256"]) for item in _load_candidates(manifest_files)}
+def exact_manifest_identity_map(
+    manifest_files: Iterable[str | Path],
+) -> dict[tuple[str, str, str], str]:
+    return {
+        _keyver(item["manifest"]): str(item["manifest_sha256"])
+        for item in _load_candidates(manifest_files)
+    }
 
 
 def effective_profile_digest(eps: Mapping[str, Any]) -> str:

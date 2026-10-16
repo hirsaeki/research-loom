@@ -9,7 +9,11 @@ import unittest
 from unittest.mock import patch
 
 from plugins.desktop_research import with_context_extension_digest
-from plugins.local_application import LocalApplicationError, LocalApplicationFacade, LocalResearchApplication
+from plugins.local_application import (
+    LocalApplicationError,
+    LocalApplicationFacade,
+    LocalResearchApplication,
+)
 from plugins.local_execution_store import LocalExecutionStoreError
 from runtime_fixtures import project, rq, seed_state
 from test_external_desktop_research_intake import NullResolver, profile_provider
@@ -211,8 +215,7 @@ class ExternalDesktopResearchAtomicityTests(unittest.TestCase):
                 artifacts = app.execution_store.artifacts_for(run_id)
                 self.assertEqual(len(artifacts), 2)
                 rendition = next(
-                    item for item in artifacts
-                    if item.role == "desktop_research.text_rendition"
+                    item for item in artifacts if item.role == "desktop_research.text_rendition"
                 )
                 self.assertEqual(rendition.size, 0)
             finally:

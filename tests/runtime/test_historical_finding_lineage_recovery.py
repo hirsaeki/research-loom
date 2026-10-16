@@ -31,50 +31,65 @@ class HistoricalFindingLineageRecoveryTests(ResearchPackageAcceptanceSupport):
         return legacy
 
     def _advance_head(self, facade):
-        proposed = facade.submit_action({
-            "action_type": "research_question.propose",
-            "payload": {
-                "text": "Which later condition advances the lineage-test head?",
-                "acceptance_criteria": ["The condition can be inspected."],
-                "scope_limits": ["Lineage-test only."],
-            },
-            "actor_id": "HUMAN-HCL",
-        })
-        pending = facade.submit_action({
-            "action_type": "state.apply_candidate",
-            "payload": {"state_delta_proposal_id": proposed["data"]["state_delta_proposal_id"]},
-            "actor_id": "HUMAN-HCL",
-        })
-        confirmed = facade.submit_confirmation({
-            "confirmation_request_id": pending["confirmation_request"]["confirmation_request_id"],
-            "actor_id": "HUMAN-HCL",
-        })
+        proposed = facade.submit_action(
+            {
+                "action_type": "research_question.propose",
+                "payload": {
+                    "text": "Which later condition advances the lineage-test head?",
+                    "acceptance_criteria": ["The condition can be inspected."],
+                    "scope_limits": ["Lineage-test only."],
+                },
+                "actor_id": "HUMAN-HCL",
+            }
+        )
+        pending = facade.submit_action(
+            {
+                "action_type": "state.apply_candidate",
+                "payload": {"state_delta_proposal_id": proposed["data"]["state_delta_proposal_id"]},
+                "actor_id": "HUMAN-HCL",
+            }
+        )
+        confirmed = facade.submit_confirmation(
+            {
+                "confirmation_request_id": pending["confirmation_request"][
+                    "confirmation_request_id"
+                ],
+                "actor_id": "HUMAN-HCL",
+            }
+        )
         request = confirmed["decision_request"]
-        facade.resolve_human_decision({
-            "request_id": request["request_id"],
-            "request_digest": request["request_digest"],
-            "disposition": "approve_exact",
-            "actor_id": "HUMAN-HCL",
-        })
+        facade.resolve_human_decision(
+            {
+                "request_id": request["request_id"],
+                "request_digest": request["request_digest"],
+                "disposition": "approve_exact",
+                "actor_id": "HUMAN-HCL",
+            }
+        )
 
     def _prepare_replay_child_case(self):
         facade, case = self._prepare_case()
         parent_run_id = case["run_id"]
-        child_run_id = facade.submit_action({
-            "action_type": "desktop_research.investigate",
-            "payload": {
-                "question_id": case["rq_id"],
-                "purpose": "RP1 fixed-source acceptance.",
-                "parent_run_id": parent_run_id,
+        child_run_id = facade.submit_action(
+            {
+                "action_type": "desktop_research.investigate",
+                "payload": {
+                    "question_id": case["rq_id"],
+                    "purpose": "RP1 fixed-source acceptance.",
+                    "parent_run_id": parent_run_id,
+                },
+                "actor_id": "HUMAN-HCL",
+            }
+        )["run_id"]
+        facade.start_external_retrieval_attempt(
+            child_run_id,
+            {
+                "attempt_id": "ATT-1",
+                "strategy": "support search",
+                "coverage_dimension_ids": ["COV-SUPPORT"],
+                "target_locator": "https://example.test/source-a",
             },
-            "actor_id": "HUMAN-HCL",
-        })["run_id"]
-        facade.start_external_retrieval_attempt(child_run_id, {
-            "attempt_id": "ATT-1",
-            "strategy": "support search",
-            "coverage_dimension_ids": ["COV-SUPPORT"],
-            "target_locator": "https://example.test/source-a",
-        })
+        )
         raw = self.workspace / "captures/raw/source-a.html"
         text = self.workspace / "captures/text/source-a.txt"
         raw.write_bytes(b"<html>fixed source body</html>")
@@ -82,32 +97,42 @@ class HistoricalFindingLineageRecoveryTests(ResearchPackageAcceptanceSupport):
             "Source A contains the exact supporting excerpt used here.",
             encoding="utf-8",
         )
-        capture = facade.capture_external_source(child_run_id, {
-            "capture_id": "CAP-1",
-            "source_category": "other",
-            "exact_locator": "https://example.test/source-a#section-1",
-            "acquired_at": "2026-09-14T00:00:00Z",
-            "original_file": "captures/raw/source-a.html",
-            "original_media_type": "text/html",
-            "text_rendition_file": "captures/text/source-a.txt",
-        })["capture"]
-        facade.complete_external_retrieval_attempt(child_run_id, {
-            "attempt_id": "ATT-1",
-            "outcome": "source_captured",
-            "resulting_capture_id": "CAP-1",
-        })
-        facade.start_external_retrieval_attempt(child_run_id, {
-            "attempt_id": "ATT-2",
-            "strategy": "counter search",
-            "coverage_dimension_ids": ["COV-COUNTER"],
-        })
-        facade.complete_external_retrieval_attempt(child_run_id, {
-            "attempt_id": "ATT-2",
-            "outcome": "no_relevant_source",
-        })
-        handoff, extension = intake.golden_submission(
-            facade._application, child_run_id, capture
+        capture = facade.capture_external_source(
+            child_run_id,
+            {
+                "capture_id": "CAP-1",
+                "source_category": "other",
+                "exact_locator": "https://example.test/source-a#section-1",
+                "acquired_at": "2026-09-14T00:00:00Z",
+                "original_file": "captures/raw/source-a.html",
+                "original_media_type": "text/html",
+                "text_rendition_file": "captures/text/source-a.txt",
+            },
+        )["capture"]
+        facade.complete_external_retrieval_attempt(
+            child_run_id,
+            {
+                "attempt_id": "ATT-1",
+                "outcome": "source_captured",
+                "resulting_capture_id": "CAP-1",
+            },
         )
+        facade.start_external_retrieval_attempt(
+            child_run_id,
+            {
+                "attempt_id": "ATT-2",
+                "strategy": "counter search",
+                "coverage_dimension_ids": ["COV-COUNTER"],
+            },
+        )
+        facade.complete_external_retrieval_attempt(
+            child_run_id,
+            {
+                "attempt_id": "ATT-2",
+                "outcome": "no_relevant_source",
+            },
+        )
+        handoff, extension = intake.golden_submission(facade._application, child_run_id, capture)
         collected = facade.collect_external(
             child_run_id, {"handoff": handoff, "extension": extension}
         )
@@ -117,11 +142,13 @@ class HistoricalFindingLineageRecoveryTests(ResearchPackageAcceptanceSupport):
             "DELETE FROM state_delta_proposals WHERE proposal_id=?",
             (case["proposal"]["proposal_id"],),
         )
-        case.update({
-            "parent_run_id": parent_run_id,
-            "child_run_id": child_run_id,
-            "child_proposal": child_proposal,
-        })
+        case.update(
+            {
+                "parent_run_id": parent_run_id,
+                "child_run_id": child_run_id,
+                "child_proposal": child_proposal,
+            }
+        )
         return facade, case
 
     def _tamper_child_action_question(self, facade, child_run_id: str):
@@ -130,9 +157,7 @@ class HistoricalFindingLineageRecoveryTests(ResearchPackageAcceptanceSupport):
         proposal = store.load_proposal(correlation["proposal_id"])
         tampered = deepcopy(proposal)
         tampered["action"]["payload"]["question_id"] = "RQ-WRONG-LINEAGE"
-        tampered["action"]["payload_digest"] = canonical_digest(
-            tampered["action"]["payload"]
-        )
+        tampered["action"]["payload_digest"] = canonical_digest(tampered["action"]["payload"])
         tampered.pop("proposal_digest", None)
         tampered["proposal_digest"] = canonical_digest(tampered)
         store._db.execute(
@@ -163,9 +188,7 @@ class HistoricalFindingLineageRecoveryTests(ResearchPackageAcceptanceSupport):
             self.assertEqual(diagnosis["stage"], "producer_candidate_lookup")
             self.assertEqual(diagnosis["failure_class"], "producer_candidate_not_found")
             self.assertEqual(diagnosis["recovery_class"], "proposal_rematerializable")
-            self.assertEqual(
-                diagnosis["recovery_route"], "canonical_result_rematerialization"
-            )
+            self.assertEqual(diagnosis["recovery_route"], "canonical_result_rematerialization")
             after = facade._application.state_repository.load_state_view(
                 facade.project_id,
                 facade._application.state_repository.load_active_lineage_ref(facade.project_id),
@@ -234,9 +257,7 @@ class HistoricalFindingLineageRecoveryTests(ResearchPackageAcceptanceSupport):
                 ),
                 historical,
             )
-            direct = facade.recover_legacy_desktop_research_finding_candidate(
-                case["child_run_id"]
-            )
+            direct = facade.recover_legacy_desktop_research_finding_candidate(case["child_run_id"])
             self.assertEqual(
                 recovered["state_delta_proposal_id"], direct["state_delta_proposal_id"]
             )
@@ -257,29 +278,21 @@ class HistoricalFindingLineageRecoveryTests(ResearchPackageAcceptanceSupport):
             diagnosis = facade.show_run(case["parent_run_id"])["finding_recovery"]
             self.assertEqual(diagnosis["failure_class"], "multiple_producer_candidates")
             self.assertEqual(diagnosis["recovery_class"], "proposal_rematerializable")
-            self.assertEqual(
-                diagnosis["recovery_route"], "canonical_result_rematerialization"
-            )
+            self.assertEqual(diagnosis["recovery_route"], "canonical_result_rematerialization")
             recovered = facade.recover_legacy_desktop_research_finding_candidate(
                 case["parent_run_id"]
             )
             self.assertEqual(recovered["route"], "canonical_result_rematerialization")
-            proposal = store.load_state_delta_proposal(
-                recovered["state_delta_proposal_id"]
-            )
+            proposal = store.load_state_delta_proposal(recovered["state_delta_proposal_id"])
             provenance = proposal["provenance"]["historical_recovery"]
             self.assertEqual(provenance["recovery_source"], "canonical_result")
-            self.assertEqual(
-                provenance["historical_candidate_lineage_status"], "ambiguous"
-            )
+            self.assertEqual(provenance["historical_candidate_lineage_status"], "ambiguous")
             self.assertEqual(provenance["historical_candidate_count"], "multiple")
             self.assertEqual(
                 store.load_state_delta_proposal(case["child_proposal"]["proposal_id"]),
                 legacy,
             )
-            self.assertEqual(
-                store.load_state_delta_proposal(duplicate["proposal_id"]), duplicate
-            )
+            self.assertEqual(store.load_state_delta_proposal(duplicate["proposal_id"]), duplicate)
         finally:
             facade.close()
 
@@ -289,16 +302,10 @@ class HistoricalFindingLineageRecoveryTests(ResearchPackageAcceptanceSupport):
             self._tamper_child_action_question(facade, case["child_run_id"])
             diagnosis = facade.show_run(case["parent_run_id"])["finding_recovery"]
             self.assertEqual(diagnosis["stage"], "producer_lineage")
-            self.assertEqual(
-                diagnosis["failure_class"], "legacy_replay_lineage_unresolved"
-            )
+            self.assertEqual(diagnosis["failure_class"], "legacy_replay_lineage_unresolved")
             with self.assertRaises(LocalApplicationError) as caught:
-                facade.recover_legacy_desktop_research_finding_candidate(
-                    case["parent_run_id"]
-                )
-            self.assertEqual(
-                caught.exception.code, "APPLICATION-FINDING-RECOVERY-PROVENANCE-001"
-            )
+                facade.recover_legacy_desktop_research_finding_candidate(case["parent_run_id"])
+            self.assertEqual(caught.exception.code, "APPLICATION-FINDING-RECOVERY-PROVENANCE-001")
 
             with patch(
                 "plugins.local_application.finding_recovery_lineage._validate_replay_relation"
@@ -317,81 +324,103 @@ class HistoricalFindingLineageRecoveryTests(ResearchPackageAcceptanceSupport):
             recovered = facade.recover_legacy_desktop_research_finding_candidate(
                 case["parent_run_id"]
             )
-            pending = facade.submit_action({
-                "action_type": "state.apply_candidate",
-                "payload": {"state_delta_proposal_id": recovered["state_delta_proposal_id"]},
-                "actor_id": "HUMAN-HCL6",
-            })
-            confirmed = facade.submit_confirmation({
-                "confirmation_request_id": pending["confirmation_request"]["confirmation_request_id"],
-                "actor_id": "HUMAN-HCL6",
-            })
+            pending = facade.submit_action(
+                {
+                    "action_type": "state.apply_candidate",
+                    "payload": {"state_delta_proposal_id": recovered["state_delta_proposal_id"]},
+                    "actor_id": "HUMAN-HCL6",
+                }
+            )
+            confirmed = facade.submit_confirmation(
+                {
+                    "confirmation_request_id": pending["confirmation_request"][
+                        "confirmation_request_id"
+                    ],
+                    "actor_id": "HUMAN-HCL6",
+                }
+            )
             request = confirmed["decision_request"]
-            facade.resolve_human_decision({
-                "request_id": request["request_id"],
-                "request_digest": request["request_digest"],
-                "disposition": "approve_exact",
-                "actor_id": "HUMAN-HCL6",
-            })
+            facade.resolve_human_decision(
+                {
+                    "request_id": request["request_id"],
+                    "request_digest": request["request_digest"],
+                    "disposition": "approve_exact",
+                    "actor_id": "HUMAN-HCL6",
+                }
+            )
             state = facade._application.state_repository.load_state_view(
                 facade.project_id,
                 facade._application.state_repository.load_active_lineage_ref(facade.project_id),
             )
             finding = next(obj for obj in state.effective_objects() if obj.get("kind") == "finding")
-            evidence = next(obj for obj in state.effective_objects() if obj.get("kind") == "evidence")
+            evidence = next(
+                obj for obj in state.effective_objects() if obj.get("kind") == "evidence"
+            )
             source = next(obj for obj in state.effective_objects() if obj.get("kind") == "source")
-            proposed = facade.submit_action({
-                "action_type": "research.argument.propose",
-                "payload": {
-                    "conclusion": "The recovered Finding supports the bounded validation conclusion.",
-                    "warrant": "The approved Finding and Evidence resolve in the exact current Snapshot.",
-                    "question_ids": [case["rq_id"]],
-                    "finding_ids": [finding["id"]],
-                    "evidence_ids": [evidence["id"]],
-                    "qualifier": "Within the captured source scope.",
-                },
-                "actor_id": "HUMAN-HCL6",
-            })
-            arg_pending = facade.submit_action({
-                "action_type": "state.apply_candidate",
-                "payload": {"state_delta_proposal_id": proposed["data"]["state_delta_proposal_id"]},
-                "actor_id": "HUMAN-HCL6",
-            })
-            committed = facade.submit_confirmation({
-                "confirmation_request_id": arg_pending["confirmation_request"]["confirmation_request_id"],
-                "actor_id": "HUMAN-HCL6",
-            })
+            proposed = facade.submit_action(
+                {
+                    "action_type": "research.argument.propose",
+                    "payload": {
+                        "conclusion": "The recovered Finding supports the bounded validation conclusion.",
+                        "warrant": "The approved Finding and Evidence resolve in the exact current Snapshot.",
+                        "question_ids": [case["rq_id"]],
+                        "finding_ids": [finding["id"]],
+                        "evidence_ids": [evidence["id"]],
+                        "qualifier": "Within the captured source scope.",
+                    },
+                    "actor_id": "HUMAN-HCL6",
+                }
+            )
+            arg_pending = facade.submit_action(
+                {
+                    "action_type": "state.apply_candidate",
+                    "payload": {
+                        "state_delta_proposal_id": proposed["data"]["state_delta_proposal_id"]
+                    },
+                    "actor_id": "HUMAN-HCL6",
+                }
+            )
+            committed = facade.submit_confirmation(
+                {
+                    "confirmation_request_id": arg_pending["confirmation_request"][
+                        "confirmation_request_id"
+                    ],
+                    "actor_id": "HUMAN-HCL6",
+                }
+            )
             self.assertEqual(committed["status"], "SUCCEEDED")
             argument_id = proposed["data"]["argument_candidate"]["id"]
             current = facade._application.state_repository.load_state_view(
                 facade.project_id,
                 facade._application.state_repository.load_active_lineage_ref(facade.project_id),
             )
-            built = facade.build_research_package({
-                **case["build_input"],
-                "snapshot_id": current.current_snapshot["id"],
-                "snapshot_digest": current.current_snapshot["content_digest"],
-                "lineage_ref": current.active_lineage_ref,
-                "object_ids": [source["id"], evidence["id"], finding["id"], argument_id],
-            })["package"]
+            built = facade.build_research_package(
+                {
+                    **case["build_input"],
+                    "snapshot_id": current.current_snapshot["id"],
+                    "snapshot_digest": current.current_snapshot["content_digest"],
+                    "lineage_ref": current.active_lineage_ref,
+                    "object_ids": [source["id"], evidence["id"], finding["id"], argument_id],
+                }
+            )["package"]
             composition = facade.capture_writer_composition(
                 built["package_id"],
                 issue134_writer.Issue134WriterCompositionRecoveryTests._proposal(
                     case, argument_id, finding["id"], evidence["id"]
                 ),
             )["composition"]
-            self.assertFalse(any(
-                item.get("section_id") == "SEC-G1-05"
-                and item.get("code") == "WRITER-COMPOSITION-NARRATIVE-UNMET"
-                for item in composition["validation"]["diagnostics"]
-            ))
+            self.assertFalse(
+                any(
+                    item.get("section_id") == "SEC-G1-05"
+                    and item.get("code") == "WRITER-COMPOSITION-NARRATIVE-UNMET"
+                    for item in composition["validation"]["diagnostics"]
+                )
+            )
             facade.select_writer_composition(
                 composition["composition_id"], 1, composition["composition_digest"]
             )
             output = self.root / "hcl6-sec-g1-05"
-            facade.export_writer_section_input(
-                composition["composition_id"], "SEC-G1-05", output
-            )
+            facade.export_writer_section_input(composition["composition_id"], "SEC-G1-05", output)
             detached = json.loads(
                 (output / "section-writer-input.json").read_text(encoding="utf-8")
             )

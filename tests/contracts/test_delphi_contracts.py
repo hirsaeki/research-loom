@@ -36,9 +36,17 @@ class DelphiContracts(unittest.TestCase):
     def test_schemas_semantics_and_descriptor(self):
         Draft202012Validator.check_schema(self.schema)
         Draft202012Validator.check_schema(self.design_schema)
-        self.assertEqual(list(Draft202012Validator(self.descriptor_schema).iter_errors(self.descriptor)), [])
-        self.assertEqual(self.descriptor["descriptor_digest"], canonical_digest(self.descriptor, "descriptor_digest"))
-        self.assertEqual({f["function_id"] for f in self.descriptor["declared_functions"]}, {"method_design", "instrument_design", "execute", "analyze"})
+        self.assertEqual(
+            list(Draft202012Validator(self.descriptor_schema).iter_errors(self.descriptor)), []
+        )
+        self.assertEqual(
+            self.descriptor["descriptor_digest"],
+            canonical_digest(self.descriptor, "descriptor_digest"),
+        )
+        self.assertEqual(
+            {f["function_id"] for f in self.descriptor["declared_functions"]},
+            {"method_design", "instrument_design", "execute", "analyze"},
+        )
         semantics = yaml.safe_load((DLP / "delphi-semantics.yaml").read_text(encoding="utf-8"))
         self.assertFalse(semantics["capability"]["pr9_context_or_handoff_redefined"])
         self.assertFalse(semantics["capability"]["pr12_method_envelopes_redefined"])
@@ -53,15 +61,24 @@ class DelphiContracts(unittest.TestCase):
         self.assertEqual(list(Draft202012Validator(self.design_schema).iter_errors(design)), [])
         self.assertEqual(design_error(design), None)
         validator = Draft202012Validator(self.schema, format_checker=FormatChecker())
-        for name in ("round1_instrument", "round2_revised_instrument", "real_multi_round", "no_consensus"):
+        for name in (
+            "round1_instrument",
+            "round2_revised_instrument",
+            "real_multi_round",
+            "no_consensus",
+        ):
             self.assertEqual(list(validator.iter_errors(self.fixtures[name])), [])
         self.assertEqual(design["content_digest"], canonical_digest(design, "content_digest"))
         for name in ("round1_instrument", "round2_revised_instrument"):
             instrument = self.fixtures[name]
-            self.assertEqual(instrument["content_digest"], canonical_digest(instrument, "content_digest"))
+            self.assertEqual(
+                instrument["content_digest"], canonical_digest(instrument, "content_digest")
+            )
         for name in ("real_multi_round", "no_consensus"):
             result = self.fixtures[name]
-            self.assertEqual(result["extension_digest"], canonical_digest(result, "extension_digest"))
+            self.assertEqual(
+                result["extension_digest"], canonical_digest(result, "extension_digest")
+            )
         self.assertTrue(design["candidate_only"])
         self.assertFalse(design["participation_targets"]["target_is_research_sufficiency"])
         self.assertTrue(design["stopping"]["no_universal_numeric_threshold"])
@@ -114,7 +131,11 @@ class DelphiContracts(unittest.TestCase):
         above_maximum = deepcopy(self.fixtures["design"])
         above_maximum["planned_rounds"]["minimum_rounds"] = 2
         above_maximum["planned_rounds"]["maximum_approved_rounds"] = 2
-        above_maximum["planned_rounds"]["round_plan"] = [{"sequence": 1}, {"sequence": 2}, {"sequence": 3}]
+        above_maximum["planned_rounds"]["round_plan"] = [
+            {"sequence": 1},
+            {"sequence": 2},
+            {"sequence": 3},
+        ]
         self.assertEqual(design_error(above_maximum), "DLP-DESIGN-ROUNDS-001")
 
         exact_bounds = deepcopy(self.fixtures["design"])
@@ -128,7 +149,10 @@ class DelphiContracts(unittest.TestCase):
         validator = Draft202012Validator(self.conversation_schema, format_checker=FormatChecker())
         self.assertEqual(list(validator.iter_errors(proposal)), [])
         self.assertEqual(proposal["route"]["invocation_contract"], "capability-invocation@0.1.0")
-        self.assertEqual(proposal["route"]["capability"]["descriptor_digest"], self.descriptor["descriptor_digest"])
+        self.assertEqual(
+            proposal["route"]["capability"]["descriptor_digest"],
+            self.descriptor["descriptor_digest"],
+        )
         self.assertFalse(proposal["human_decision_boundary"]["confirmation_is_human_decision"])
         self.assertIn("DEC-MAT-2", proposal["human_decision_boundary"]["decision_reference_ids"])
 

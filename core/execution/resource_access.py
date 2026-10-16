@@ -21,8 +21,7 @@ class BoundedResourceAccess:
         artifact_store: ExecutionArtifactStore | None = None,
     ) -> None:
         self._resources = {
-            str(item["reference_id"]): dict(item)
-            for item in context_pack["resources"]
+            str(item["reference_id"]): dict(item) for item in context_pack["resources"]
         }
         self._authorized = frozenset(authorized_reference_ids)
         self._provider = provider

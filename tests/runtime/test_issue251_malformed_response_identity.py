@@ -43,8 +43,12 @@ class Issue251MalformedResponseIdentityTests(SurveyVirtualRunnerTestBase):
                         facade.capture_real_survey_intake(payload)
                     self.assertEqual(error.exception.code, "SURVEY_RESPONSE_DUPLICATE_RECORD")
                     self.assertEqual(facade.show_survey_response("REAL-A"), original)
-                    self.assertIsNone(facade._survey_response_store().load_response("PRJ-1", "REAL-C"))
-                    self.assertEqual(facade.show_real_survey_intake(first["dataset_id"])["accepted_count"], 2)
+                    self.assertIsNone(
+                        facade._survey_response_store().load_response("PRJ-1", "REAL-C")
+                    )
+                    self.assertEqual(
+                        facade.show_real_survey_intake(first["dataset_id"])["accepted_count"], 2
+                    )
                     self.assertEqual(state_signature(app), before)
                 finally:
                     app.close()
@@ -67,7 +71,9 @@ class Issue251MalformedResponseIdentityTests(SurveyVirtualRunnerTestBase):
                 self.assertEqual(result["rejected_count"], 2)
                 shown = facade.show_real_survey_intake(result["dataset_id"], limit=100)
                 self.assertIn(malformed, [entry["raw_input"] for entry in shown["responses"]])
-                self.assertEqual(facade.capture_real_survey_intake(payload)["status"], "ALREADY_CAPTURED")
+                self.assertEqual(
+                    facade.capture_real_survey_intake(payload)["status"], "ALREADY_CAPTURED"
+                )
             finally:
                 app.close()
 
@@ -86,7 +92,12 @@ class Issue251MalformedResponseIdentityTests(SurveyVirtualRunnerTestBase):
                 result = facade.capture_real_survey_intake(payload)
                 self.assertEqual(result["accepted_count"], 2)
                 self.assertEqual(result["rejected_count"], 2)
-                self.assertIn("SURVEY_RESPONSE_DUPLICATE_RECORD", result["validation_summary"]["issue_code_counts"])
-                self.assertEqual(facade.capture_real_survey_intake(payload)["status"], "ALREADY_CAPTURED")
+                self.assertIn(
+                    "SURVEY_RESPONSE_DUPLICATE_RECORD",
+                    result["validation_summary"]["issue_code_counts"],
+                )
+                self.assertEqual(
+                    facade.capture_real_survey_intake(payload)["status"], "ALREADY_CAPTURED"
+                )
             finally:
                 app.close()

@@ -30,18 +30,14 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
     """PR39 facade: preserve the normal capture path and add oversized fallback."""
 
     def list_actions(self) -> Mapping[str, Any]:
-        ensure_material_recovery_action(
-            self._application, self._project_id, self._workspace_root
-        )
+        ensure_material_recovery_action(self._application, self._project_id, self._workspace_root)
         ensure_material_reacquisition_action(
             self._application, self._project_id, self._workspace_root
         )
         return super().list_actions()
 
     def submit_action(self, draft_input: Mapping[str, Any]) -> Mapping[str, Any]:
-        ensure_material_recovery_action(
-            self._application, self._project_id, self._workspace_root
-        )
+        ensure_material_recovery_action(self._application, self._project_id, self._workspace_root)
         ensure_material_reacquisition_action(
             self._application, self._project_id, self._workspace_root
         )
@@ -61,9 +57,7 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
         service = ExternalMaterialContentService(
             self._application.execution_store, self._project_id, self._workspace_root
         )
-        return service.export(
-            run_id, capture_id, kind=kind, output_file=output_file
-        )
+        return service.export(run_id, capture_id, kind=kind, output_file=output_file)
 
     def capture_external_source(
         self,

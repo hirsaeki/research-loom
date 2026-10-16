@@ -18,10 +18,7 @@ class DesktopResearchReviewRegressionTests(unittest.TestCase):
             proposal = result.state_delta_proposal
             self.assertIsNotNone(proposal)
 
-            kinds = {
-                action.payload["object"]["kind"]
-                for action in proposal.proposed_actions
-            }
+            kinds = {action.payload["object"]["kind"] for action in proposal.proposed_actions}
             self.assertNotIn("source", kinds)
             self.assertNotIn("evidence", kinds)
 
@@ -31,13 +28,11 @@ class DesktopResearchReviewRegressionTests(unittest.TestCase):
                 "unknown",
             )
             self.assertEqual(
-                desktop["coverage_assessment"]["remaining_information_value"]
-                ["level"],
+                desktop["coverage_assessment"]["remaining_information_value"]["level"],
                 "unknown",
             )
             self.assertFalse(
-                desktop["coverage_assessment"]["stopping_recommendation"]
-                ["stop_recommended"]
+                desktop["coverage_assessment"]["stopping_recommendation"]["stop_recommended"]
             )
             self.assertEqual(
                 desktop["handoff_outputs"]["unknowns"][0]["unknown_id"],

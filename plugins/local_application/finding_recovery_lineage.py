@@ -95,18 +95,10 @@ def _validate_replay_relation(application, parent, producer) -> None:
             failure_class="legacy_replay_lineage_unresolved",
         ) from exc
     trace = invocation.get("trace") if isinstance(invocation, Mapping) else None
-    parent_action = (
-        parent_proposal.get("action") if isinstance(parent_proposal, Mapping) else None
-    )
-    child_action = (
-        child_proposal.get("action") if isinstance(child_proposal, Mapping) else None
-    )
-    parent_payload = (
-        parent_action.get("payload") if isinstance(parent_action, Mapping) else None
-    )
-    child_payload = (
-        child_action.get("payload") if isinstance(child_action, Mapping) else None
-    )
+    parent_action = parent_proposal.get("action") if isinstance(parent_proposal, Mapping) else None
+    child_action = child_proposal.get("action") if isinstance(child_proposal, Mapping) else None
+    parent_payload = parent_action.get("payload") if isinstance(parent_action, Mapping) else None
+    child_payload = child_action.get("payload") if isinstance(child_action, Mapping) else None
     expected_child_payload = (
         {**deepcopy(dict(parent_payload)), "parent_run_id": parent.run_id}
         if isinstance(parent_payload, Mapping)

@@ -11,8 +11,12 @@ from plugins.local_survey_store import canonical_document_digest
 from .facade import LocalApplicationError
 
 HARNESS_OWNED_FIELDS = {
-    "project_id", "captured_against", "project_config_digest",
-    "effective_profile_set_digest", "captured_at", "registry_digest",
+    "project_id",
+    "captured_against",
+    "project_config_digest",
+    "effective_profile_set_digest",
+    "captured_at",
+    "registry_digest",
 }
 
 
@@ -70,9 +74,7 @@ def capture_origin(value: Mapping[str, Any]) -> str:
 def string_list(value: Any, field: str, *, required: bool = False) -> list[str]:
     if value is None:
         if required:
-            raise LocalApplicationError(
-                "APPLICATION-SURVEY-INPUT-001", f"{field} is required"
-            )
+            raise LocalApplicationError("APPLICATION-SURVEY-INPUT-001", f"{field} is required")
         return []
     if (
         not isinstance(value, list)
@@ -108,8 +110,7 @@ def validate_rqs(rq_ids: list[str], state) -> None:
     if missing:
         raise LocalApplicationError(
             "APPLICATION-SURVEY-RQ-001",
-            "Survey RQ binding is not current authoritative Research State: "
-            + ", ".join(missing),
+            "Survey RQ binding is not current authoritative Research State: " + ", ".join(missing),
         )
 
 
@@ -121,8 +122,7 @@ def validate_questionnaire(
     questions = list(questionnaire.get("questions", []))
     ids = [str(question.get("question_id")) for question in questions]
     variables = [
-        str(question.get("response_key", question.get("question_id")))
-        for question in questions
+        str(question.get("response_key", question.get("question_id"))) for question in questions
     ]
     if len(ids) != len(set(ids)) or len(variables) != len(set(variables)):
         raise LocalApplicationError(
@@ -130,9 +130,7 @@ def validate_questionnaire(
             "question_id and response variable identities must be unique",
         )
     id_set = set(ids)
-    question_by_id = {
-        str(question["question_id"]): question for question in questions
-    }
+    question_by_id = {str(question["question_id"]): question for question in questions}
     sections = list(questionnaire.get("sections") or [])
     section_ids = [str(item.get("section_id")) for item in sections]
     if len(section_ids) != len(set(section_ids)):
@@ -147,9 +145,7 @@ def validate_questionnaire(
         question_id = str(question.get("question_id"))
         q_rqs = {
             str(item)
-            for item in (question.get("traceability") or {}).get(
-                "research_question_ids", []
-            )
+            for item in (question.get("traceability") or {}).get("research_question_ids", [])
         }
         traced.update(q_rqs)
         if not q_rqs <= design_rqs:
@@ -165,13 +161,8 @@ def validate_questionnaire(
 
         options = list(question.get("response_options", []))
         option_ids = [str(item.get("option_id")) for item in options]
-        option_values = [
-            str(item.get("value", item.get("option_id"))) for item in options
-        ]
-        if (
-            len(option_ids) != len(set(option_ids))
-            or len(option_values) != len(set(option_values))
-        ):
+        option_values = [str(item.get("value", item.get("option_id"))) for item in options]
+        if len(option_ids) != len(set(option_ids)) or len(option_values) != len(set(option_values)):
             raise LocalApplicationError(
                 "APPLICATION-SURVEY-QUESTIONNAIRE-001",
                 f"response option identity/value must be unique for {question_id}",
@@ -202,9 +193,7 @@ def validate_questionnaire(
         for branch in question.get("branching", []):
             condition = str(branch.get("condition_question_id"))
             target = branch.get("target_question_id")
-            if condition not in id_set or (
-                target is not None and str(target) not in id_set
-            ):
+            if condition not in id_set or (target is not None and str(target) not in id_set):
                 raise LocalApplicationError(
                     "APPLICATION-SURVEY-BRANCH-001",
                     "branch question reference does not resolve",
@@ -214,17 +203,14 @@ def validate_questionnaire(
                     "APPLICATION-SURVEY-BRANCH-001",
                     "show/skip branching requires target_question_id",
                 )
-            condition_options = list(
-                question_by_id[condition].get("response_options", [])
-            )
+            condition_options = list(question_by_id[condition].get("response_options", []))
             if (
                 condition_options
                 and branch.get("operator") in {"equals", "not_equals", "contains"}
                 and "value" in branch
             ):
                 stable_values = {
-                    str(option.get("value", option["option_id"]))
-                    for option in condition_options
+                    str(option.get("value", option["option_id"])) for option in condition_options
                 }
                 if str(branch["value"]) not in stable_values:
                     raise LocalApplicationError(

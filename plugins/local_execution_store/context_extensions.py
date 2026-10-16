@@ -64,7 +64,9 @@ class LocalCapabilityContextExtensionStore:
     ) -> str:
         digest, payload_json = self._payload(extension)
         key = (
-            str(capability_id), str(capability_version), str(function_id),
+            str(capability_id),
+            str(capability_version),
+            str(function_id),
             str(context_pack_id),
         )
         with self._lock:
@@ -118,7 +120,9 @@ class LocalCapabilityContextExtensionStore:
                   AND function_id=? AND context_pack_id=?
                 """,
                 (
-                    str(capability_id), str(capability_version), str(function_id),
+                    str(capability_id),
+                    str(capability_version),
+                    str(function_id),
                     str(context_pack_id),
                 ),
             ).fetchone()

@@ -71,9 +71,7 @@ class LocalExecutionStore(_BaseExecutionStore):
             ).fetchall()
             if rows:
                 if len(rows) != 1 or str(rows[0]["payload_json"]) != payload_json:
-                    raise LocalExecutionStoreIntegrityError(
-                        "immutable diagnostic claim collision"
-                    )
+                    raise LocalExecutionStoreIntegrityError("immutable diagnostic claim collision")
                 return False
             self._connection.execute(
                 """
@@ -135,9 +133,7 @@ class LocalExecutionStore(_BaseExecutionStore):
             if not isinstance(content, bytes):
                 raise TypeError("artifact content must be bytes")
             if len(content) > self.config.max_artifact_bytes:
-                raise LocalExecutionStoreError(
-                    "artifact exceeds configured max_artifact_bytes"
-                )
+                raise LocalExecutionStoreError("artifact exceeds configured max_artifact_bytes")
             role = str(item.get("role") or "")
             media_type = str(item.get("media_type") or "")
             if not role or not media_type:
@@ -190,9 +186,7 @@ class LocalExecutionStore(_BaseExecutionStore):
                     "artifact Run binding does not match persisted Run"
                 )
             if expected_status is not None and persisted.status is not expected_status:
-                raise LocalExecutionStoreError(
-                    f"artifact Run must remain {expected_status.value}"
-                )
+                raise LocalExecutionStoreError(f"artifact Run must remain {expected_status.value}")
 
             existing = self.artifacts_for(run.run_id)
             existing_counts = Counter(item.role for item in existing)
@@ -202,20 +196,14 @@ class LocalExecutionStore(_BaseExecutionStore):
 
             for role, limit in count_limits.items():
                 if existing_counts[role] + planned_counts[role] > limit:
-                    raise LocalExecutionStoreError(
-                        f"artifact role count limit exceeded: {role}"
-                    )
+                    raise LocalExecutionStoreError(f"artifact role count limit exceeded: {role}")
             for role, limit in byte_limits.items():
                 if existing_bytes[role] + planned_bytes[role] > limit:
-                    raise LocalExecutionStoreError(
-                        f"artifact role byte limit exceeded: {role}"
-                    )
+                    raise LocalExecutionStoreError(f"artifact role byte limit exceeded: {role}")
 
             current_total = sum(item.size for item in existing)
             if current_total + planned_total > self.config.max_run_output_bytes:
-                raise LocalExecutionStoreError(
-                    "Run output exceeds configured max_run_output_bytes"
-                )
+                raise LocalExecutionStoreError("Run output exceeds configured max_run_output_bytes")
 
             if identities:
                 placeholders = ",".join("?" for _ in identities)

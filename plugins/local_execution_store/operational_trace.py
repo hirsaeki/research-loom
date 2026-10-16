@@ -98,8 +98,13 @@ class LocalOperationalTraceStore:
                     ) VALUES (?,?,?,?,?,?,?)
                     """,
                     (
-                        str(run_id), sequence, eid, str(event_type), str(occurred_at),
-                        payload_digest, payload_json,
+                        str(run_id),
+                        sequence,
+                        eid,
+                        str(event_type),
+                        str(occurred_at),
+                        payload_digest,
+                        payload_json,
                     ),
                 )
                 self._connection.execute("COMMIT")
@@ -107,7 +112,11 @@ class LocalOperationalTraceStore:
                 self._connection.execute("ROLLBACK")
                 raise
         return OperationalTraceEvent(
-            str(run_id), sequence, eid, str(event_type), str(occurred_at),
+            str(run_id),
+            sequence,
+            eid,
+            str(event_type),
+            str(occurred_at),
             json.loads(payload_json),
         )
 

@@ -73,7 +73,9 @@ class LocalExecutionStoreConcurrencySecurityTests(unittest.TestCase):
                 for thread in threads:
                     thread.join(timeout=10)
                 self.assertTrue(all(not thread.is_alive() for thread in threads))
-                self.assertEqual(sorted(value for kind, value in outcomes if kind == "ok"), [False, True])
+                self.assertEqual(
+                    sorted(value for kind, value in outcomes if kind == "ok"), [False, True]
+                )
                 self.assertEqual([value for kind, value in outcomes if kind == "error"], [])
             finally:
                 first.close()
@@ -191,11 +193,7 @@ class LocalExecutionStoreConcurrencySecurityTests(unittest.TestCase):
 
             def racing_open(path, flags, *args, **kwargs):
                 nonlocal swapped
-                if (
-                    path == source.name
-                    and kwargs.get("dir_fd") is not None
-                    and not swapped
-                ):
+                if path == source.name and kwargs.get("dir_fd") is not None and not swapped:
                     swapped = True
                     source.unlink()
                     source.symlink_to(outside)

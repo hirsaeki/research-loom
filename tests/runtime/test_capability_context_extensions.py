@@ -29,18 +29,10 @@ from core.runtime import (
 
 ROOT = Path(__file__).resolve().parents[2]
 FIX = ROOT / "core/fixtures/capabilities/valid"
-DESCRIPTOR = json.loads(
-    (FIX / "generic-capability-descriptor.json").read_text()
-)
-CONTEXT = json.loads(
-    (FIX / "generic-capability-context-pack.json").read_text()
-)
-INVOCATION = json.loads(
-    (FIX / "generic-capability-invocation.json").read_text()
-)
-HANDOFF = json.loads(
-    (FIX / "generic-capability-handoff.json").read_text()
-)
+DESCRIPTOR = json.loads((FIX / "generic-capability-descriptor.json").read_text())
+CONTEXT = json.loads((FIX / "generic-capability-context-pack.json").read_text())
+INVOCATION = json.loads((FIX / "generic-capability-invocation.json").read_text())
+HANDOFF = json.loads((FIX / "generic-capability-handoff.json").read_text())
 
 
 class StateProvider:
@@ -61,13 +53,9 @@ class StateProvider:
             pin["revision"],
             "virtual",
             project_config_ref="CFG-1",
-            project_config_digest=CONTEXT["pins"]["project_config"][
-                "configuration_digest"
-            ],
+            project_config_digest=CONTEXT["pins"]["project_config"]["configuration_digest"],
             effective_profile_set_ref="EPS-1",
-            effective_profile_set_digest=CONTEXT["pins"]["effective_profile_set"][
-                "content_digest"
-            ],
+            effective_profile_set_digest=CONTEXT["pins"]["effective_profile_set"]["content_digest"],
         )
         self.state = StateView(
             CONTEXT["project_id"],
@@ -85,10 +73,7 @@ class StateProvider:
         )
 
     def load_state_view(self, project_ref, lineage_ref):
-        if (
-            project_ref != self.state.project_ref
-            or lineage_ref != self.state.lineage_ref
-        ):
+        if project_ref != self.state.project_ref or lineage_ref != self.state.lineage_ref:
             raise KeyError((project_ref, lineage_ref))
         return self.state
 
@@ -214,23 +199,19 @@ class GenericContextExtensionHookTests(unittest.TestCase):
             traces,
             StateProvider(),
             AllowListedAuthorizationProvider(
-                (
-                    INVOCATION["runtime_authorization_evidence"]
-                    ["authorization_digest"],
-                )
+                (INVOCATION["runtime_authorization_evidence"]["authorization_digest"],)
             ),
             InMemoryResourceProvider(
                 {
                     ref: b"fixture"
-                    for ref in INVOCATION["runtime_authorization_evidence"]
-                    ["resource_reference_ids"]
+                    for ref in INVOCATION["runtime_authorization_evidence"][
+                        "resource_reference_ids"
+                    ]
                 }
             ),
             CapabilityNormalizationBoundary((Normalizer(),)),
             StaticClock(),
-            context_extension_registry=CapabilityContextExtensionRegistry(
-                validators
-            ),
+            context_extension_registry=CapabilityContextExtensionRegistry(validators),
             context_extension_store=store,
         )
         return service, traces, store

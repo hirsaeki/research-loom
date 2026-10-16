@@ -31,7 +31,9 @@ class HumanDecisionResponseShapeContractTests(unittest.TestCase):
                 self.assertIn(phrase, skill)
 
     def test_work_bootstrap_forbids_diagnostic_preamble_and_postscript(self):
-        bootstrap = compact((SKILL_ROOT / "references" / "host-bootstrap.md").read_text(encoding="utf-8"))
+        bootstrap = compact(
+            (SKILL_ROOT / "references" / "host-bootstrap.md").read_text(encoding="utf-8")
+        )
         for phrase in (
             "whole user-visible response",
             "Do not prepend or append a diagnostic rationale",
@@ -44,7 +46,11 @@ class HumanDecisionResponseShapeContractTests(unittest.TestCase):
                 self.assertIn(phrase, bootstrap)
 
     def test_uat_marks_observed_skill_rationale_leak_as_blocking(self):
-        runbook = compact((ROOT / "docs" / "architecture" / "misco-integrated-acceptance.md").read_text(encoding="utf-8"))
+        runbook = compact(
+            (ROOT / "docs" / "architecture" / "misco-integrated-acceptance.md").read_text(
+                encoding="utf-8"
+            )
+        )
         for phrase in (
             "covers the entire ordinary decision response",
             "semantically good decision prompt is still a blocking failure",
@@ -59,8 +65,13 @@ class HumanDecisionResponseShapeContractTests(unittest.TestCase):
 
     def test_explicit_diagnostics_remain_allowed(self):
         skill = compact((SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8"))
-        bootstrap = compact((SKILL_ROOT / "references" / "host-bootstrap.md").read_text(encoding="utf-8"))
-        self.assertIn("explicitly asks for diagnostics, implementation details, or why the system is asking", skill)
+        bootstrap = compact(
+            (SKILL_ROOT / "references" / "host-bootstrap.md").read_text(encoding="utf-8")
+        )
+        self.assertIn(
+            "explicitly asks for diagnostics, implementation details, or why the system is asking",
+            skill,
+        )
         self.assertIn("Only a later explicit human request for diagnostics/mechanics", bootstrap)
 
 

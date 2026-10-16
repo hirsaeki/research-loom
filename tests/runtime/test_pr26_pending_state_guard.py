@@ -44,12 +44,14 @@ def _profile_provider(project_ref, expected_digest):
     return {
         "schema_version": "0.1.0",
         "core_contracts": {"research_contract": "0.1.0", "invariant_contract": "0.1.0"},
-        "profile_pins": [{
-            "profile_id": "fixture.research",
-            "profile_type": "research",
-            "profile_version": "1.0.0",
-            "manifest_sha256": "1" * 64,
-        }],
+        "profile_pins": [
+            {
+                "profile_id": "fixture.research",
+                "profile_type": "research",
+                "profile_version": "1.0.0",
+                "manifest_sha256": "1" * 64,
+            }
+        ],
         "content_digest": expected_digest,
     }
 
@@ -87,10 +89,12 @@ class PendingStateChangingGuardTests(unittest.TestCase):
         seed = seed_state(objects=[project(), rq()])
         unapproved = make_request(
             seed,
-            [TransitionAction(
-                TransitionKind.ADOPT_OBJECT,
-                {"object": rq(revision=1, state="approved")},
-            )],
+            [
+                TransitionAction(
+                    TransitionKind.ADOPT_OBJECT,
+                    {"object": rq(revision=1, state="approved")},
+                )
+            ],
             suffix="hdg-ablation",
         )
 
@@ -101,8 +105,9 @@ class PendingStateChangingGuardTests(unittest.TestCase):
             committed = service_without_guard.apply(unapproved)
         self.assertIsInstance(committed, CommitReceipt)
         self.assertEqual(
-            repo_without_guard.load_state_view("PRJ-1", "LIN-1")
-            .latest_object("research_question", "RQ-1")["adoption_state"],
+            repo_without_guard.load_state_view("PRJ-1", "LIN-1").latest_object(
+                "research_question", "RQ-1"
+            )["adoption_state"],
             "approved",
         )
 
@@ -139,8 +144,16 @@ class PendingStateChangingGuardTests(unittest.TestCase):
             ),
         }
         ids = [
-            "PROP-A", "CONFREQ-A", "CONFREC-A", "ACTREC-A", "CONVTRACE-A",
-            "PROP-B", "CONFREQ-B", "CONFREC-B", "ACTREC-B", "CONVTRACE-B",
+            "PROP-A",
+            "CONFREQ-A",
+            "CONFREC-A",
+            "ACTREC-A",
+            "CONVTRACE-A",
+            "PROP-B",
+            "CONFREQ-B",
+            "CONFREC-B",
+            "ACTREC-B",
+            "CONVTRACE-B",
         ]
         with tempfile.TemporaryDirectory() as temp:
             app = LocalResearchApplication(
@@ -180,29 +193,33 @@ class PendingStateChangingGuardTests(unittest.TestCase):
                 )
                 app.conversation_store.store_state_delta_proposal("SDP-SECOND", second)
 
-                first = app.coordinator.process_input(_input(
-                    "IN-A", "COMMITTABLE_ACTION", "apply guarded"
-                ))
+                first = app.coordinator.process_input(
+                    _input("IN-A", "COMMITTABLE_ACTION", "apply guarded")
+                )
                 self.assertEqual(first.status, "CONFIRMATION_REQUIRED")
-                gated = app.coordinator.process_input(_input(
-                    "IN-AC",
-                    "CONFIRMATION",
-                    "yes",
-                    target={"target_type": "confirmation_request", "target_id": "CONFREQ-A"},
-                ))
+                gated = app.coordinator.process_input(
+                    _input(
+                        "IN-AC",
+                        "CONFIRMATION",
+                        "yes",
+                        target={"target_type": "confirmation_request", "target_id": "CONFREQ-A"},
+                    )
+                )
                 request_id = gated.data["decision_request"]["request_id"]
                 before = app.state_repository.load_state_view("PRJ-1", "LIN-1")
 
-                second_confirmation = app.coordinator.process_input(_input(
-                    "IN-B", "COMMITTABLE_ACTION", "apply second"
-                ))
+                second_confirmation = app.coordinator.process_input(
+                    _input("IN-B", "COMMITTABLE_ACTION", "apply second")
+                )
                 self.assertEqual(second_confirmation.status, "CONFIRMATION_REQUIRED")
-                committed = app.coordinator.process_input(_input(
-                    "IN-BC",
-                    "CONFIRMATION",
-                    "yes",
-                    target={"target_type": "confirmation_request", "target_id": "CONFREQ-B"},
-                ))
+                committed = app.coordinator.process_input(
+                    _input(
+                        "IN-BC",
+                        "CONFIRMATION",
+                        "yes",
+                        target={"target_type": "confirmation_request", "target_id": "CONFREQ-B"},
+                    )
+                )
                 self.assertEqual(committed.status, "SUCCEEDED")
                 after = app.state_repository.load_state_view("PRJ-1", "LIN-1")
                 self.assertNotEqual(
@@ -230,8 +247,16 @@ class PendingStateChangingGuardTests(unittest.TestCase):
             ),
         }
         ids = [
-            "PROP-A", "CONFREQ-A", "CONFREC-A", "ACTREC-A", "CONVTRACE-A",
-            "PROP-B", "CONFREQ-B", "CONFREC-B", "ACTREC-B", "CONVTRACE-B",
+            "PROP-A",
+            "CONFREQ-A",
+            "CONFREC-A",
+            "ACTREC-A",
+            "CONVTRACE-A",
+            "PROP-B",
+            "CONFREQ-B",
+            "CONFREC-B",
+            "ACTREC-B",
+            "CONVTRACE-B",
         ]
         with tempfile.TemporaryDirectory() as temp:
             app = LocalResearchApplication(
@@ -254,28 +279,32 @@ class PendingStateChangingGuardTests(unittest.TestCase):
                 )
                 app.conversation_store.store_state_delta_proposal("SDP-GUARDED", guarded)
 
-                first = app.coordinator.process_input(_input(
-                    "IN-A", "COMMITTABLE_ACTION", "apply guarded"
-                ))
+                first = app.coordinator.process_input(
+                    _input("IN-A", "COMMITTABLE_ACTION", "apply guarded")
+                )
                 self.assertEqual(first.status, "CONFIRMATION_REQUIRED")
-                gated = app.coordinator.process_input(_input(
-                    "IN-AC",
-                    "CONFIRMATION",
-                    "yes",
-                    target={"target_type": "confirmation_request", "target_id": "CONFREQ-A"},
-                ))
+                gated = app.coordinator.process_input(
+                    _input(
+                        "IN-AC",
+                        "CONFIRMATION",
+                        "yes",
+                        target={"target_type": "confirmation_request", "target_id": "CONFREQ-A"},
+                    )
+                )
                 request_id = gated.data["decision_request"]["request_id"]
 
-                second = app.coordinator.process_input(_input(
-                    "IN-B", "COMMITTABLE_ACTION", "apply guarded"
-                ))
+                second = app.coordinator.process_input(
+                    _input("IN-B", "COMMITTABLE_ACTION", "apply guarded")
+                )
                 self.assertEqual(second.status, "CONFIRMATION_REQUIRED")
-                blocked = app.coordinator.process_input(_input(
-                    "IN-BC",
-                    "CONFIRMATION",
-                    "yes",
-                    target={"target_type": "confirmation_request", "target_id": "CONFREQ-B"},
-                ))
+                blocked = app.coordinator.process_input(
+                    _input(
+                        "IN-BC",
+                        "CONFIRMATION",
+                        "yes",
+                        target={"target_type": "confirmation_request", "target_id": "CONFREQ-B"},
+                    )
+                )
                 self.assertEqual(blocked.status, "DECISION_PENDING")
                 self.assertEqual(
                     blocked.data["pending_human_decision_request_ids"],

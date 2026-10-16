@@ -4,7 +4,12 @@ from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any, Mapping
 
-from core.runtime import CommitReceipt, StateTransitionRejected, StateTransitionRequest, canonical_digest
+from core.runtime import (
+    CommitReceipt,
+    StateTransitionRejected,
+    StateTransitionRequest,
+    canonical_digest,
+)
 
 
 class HumanDecisionError(RuntimeError):

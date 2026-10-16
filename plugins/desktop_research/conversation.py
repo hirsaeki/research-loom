@@ -28,7 +28,9 @@ _PROFILE_PIN_FIELDS = (
 
 def _desktop_profile_set_pin(effective: Mapping[str, Any], expected_digest: str) -> dict[str, Any]:
     if effective.get("content_digest") != expected_digest:
-        raise ConversationRuntimeError("CONV-PIN-001", "Effective Profile Set provider returned wrong pin")
+        raise ConversationRuntimeError(
+            "CONV-PIN-001", "Effective Profile Set provider returned wrong pin"
+        )
 
     profiles = effective.get("profile_pins")
     if profiles is None:
@@ -129,8 +131,12 @@ class DesktopResearchConversationMaterializer:
                 )
             role_bindings.append({"reference_id": item, "role": role})
 
-        effective_profile_set = deepcopy(dict(self._profiles(state.project_ref, state.effective_profile_set_digest)))
-        effective = _desktop_profile_set_pin(effective_profile_set, state.effective_profile_set_digest)
+        effective_profile_set = deepcopy(
+            dict(self._profiles(state.project_ref, state.effective_profile_set_digest))
+        )
+        effective = _desktop_profile_set_pin(
+            effective_profile_set, state.effective_profile_set_digest
+        )
         snapshot = state.current_snapshot
         project = state.project_config
         attention = deepcopy(list(self._attention(state)))
@@ -150,17 +156,25 @@ class DesktopResearchConversationMaterializer:
             raise ConversationRuntimeError(
                 "CONV-PIN-001", "Effective Research Attention IDs must be present and unique"
             )
-        guards = project.get("project_constraints", project.get("guards", project.get("project_guards", {})))
+        guards = project.get(
+            "project_constraints", project.get("guards", project.get("project_guards", {}))
+        )
         if not isinstance(guards, Mapping):
             guards = {}
         project_constraints = {
             "requirements": deepcopy(list(guards.get("requirements", ()))),
             "prohibitions": deepcopy(list(guards.get("prohibitions", ()))),
-            "must_not_claim": deepcopy(list(project.get("must_not_claim", guards.get("must_not_claim", ())))),
+            "must_not_claim": deepcopy(
+                list(project.get("must_not_claim", guards.get("must_not_claim", ())))
+            ),
         }
         raw_constraints = state.effective_constraints
         if isinstance(raw_constraints, Mapping):
-            effective_constraints = [deepcopy(dict(item)) for item in raw_constraints.values() if isinstance(item, Mapping)]
+            effective_constraints = [
+                deepcopy(dict(item))
+                for item in raw_constraints.values()
+                if isinstance(item, Mapping)
+            ]
         else:
             effective_constraints = [deepcopy(dict(item)) for item in raw_constraints]
 
@@ -172,10 +186,7 @@ class DesktopResearchConversationMaterializer:
             "max_project_guards": sum(len(value) for value in project_constraints.values()),
             "max_effective_constraints": len(effective_constraints),
         }
-        exceeded = [
-            name for name, count in counts.items()
-            if count > int(self._limits[name])
-        ]
+        exceeded = [name for name, count in counts.items() if count > int(self._limits[name])]
         if exceeded:
             raise ConversationRuntimeError(
                 "CONV-PIN-001",
@@ -186,7 +197,9 @@ class DesktopResearchConversationMaterializer:
             "schema_version": "0.1.0",
             "context_pack_id": context_pack_id,
             "project_id": state.project_ref,
-            "purpose": str(proposal_payload.get("purpose") or f"Bounded Desktop Research for {question_id}."),
+            "purpose": str(
+                proposal_payload.get("purpose") or f"Bounded Desktop Research for {question_id}."
+            ),
             "pins": {
                 "project_config": {"configuration_digest": state.project_config_digest},
                 "effective_profile_set": effective,
@@ -197,11 +210,13 @@ class DesktopResearchConversationMaterializer:
                 },
             },
             "question_ids": [question_id],
-            "research_object_references": [{
-                "kind": "research_question",
-                "id": question_id,
-                "revision": int(rq.get("revision", 0)),
-            }],
+            "research_object_references": [
+                {
+                    "kind": "research_question",
+                    "id": question_id,
+                    "revision": int(rq.get("revision", 0)),
+                }
+            ],
             "resources": resources,
             "research_attention": attention,
             "project_constraints": project_constraints,
@@ -212,40 +227,70 @@ class DesktopResearchConversationMaterializer:
 
         dimensions = deepcopy(list(proposal_payload.get("coverage_dimensions", ()))) or [
             {"dimension_id": "COV-SUPPORT", "label": "Supporting material", "required": True},
-            {"dimension_id": "COV-COUNTER", "label": "Counterevidence and limitations", "required": True},
+            {
+                "dimension_id": "COV-COUNTER",
+                "label": "Counterevidence and limitations",
+                "required": True,
+            },
         ]
         policy = proposal_payload.get("desktop_policy", {})
-        extension = with_context_extension_digest({
-            "schema_version": "0.1.0",
-            "extension_type": "desktop_research_context",
-            "context_binding": {
-                "context_pack_id": context_pack_id,
-                "context_pack_digest": context["context_pack_digest"],
-                "project_id": state.project_ref,
-            },
-            "target": {"target_type": "research_question", "question_id": question_id},
-            "retrieval_scope": {
-                "scope_statement": str(policy.get("scope_statement") or f"Investigate bounded external information relevant to {question_id}."),
-                "in_scope": list(policy.get("in_scope", ["authorized external source retrieval"])),
-                "out_of_scope": list(policy.get("out_of_scope", ["Writer/Publication material as research evidence"])),
-            },
-            "allowed_source_categories": list(policy.get("allowed_source_categories", ["other"])),
-            "resource_role_bindings": role_bindings,
-            "forbidden_resource_roles": [
-                "writer_material", "publication_material", "publication_feedback", "archive_provenance"
-            ],
-            "coverage_dimensions": dimensions,
-            "budget": {
-                "max_total_resources": len(resources),
-                "max_candidate_source_resources": sum(item["role"] == "candidate_source" for item in role_bindings),
-                "max_artifact_resources": sum(item["role"] == "research_artifact" for item in role_bindings),
-                "max_acquired_source_captures": int(policy.get("max_acquired_source_captures", 20)),
-                "max_search_trace_entries": int(policy.get("max_search_trace_entries", 50)),
-                "max_text_rendition_bytes": int(policy.get("max_text_rendition_bytes", 2_000_000)),
-                "max_original_capture_bytes": int(policy.get("max_original_capture_bytes", 10_000_000)),
-                "max_capture_artifacts": int(policy.get("max_capture_artifacts", 40)),
-            },
-        })
+        extension = with_context_extension_digest(
+            {
+                "schema_version": "0.1.0",
+                "extension_type": "desktop_research_context",
+                "context_binding": {
+                    "context_pack_id": context_pack_id,
+                    "context_pack_digest": context["context_pack_digest"],
+                    "project_id": state.project_ref,
+                },
+                "target": {"target_type": "research_question", "question_id": question_id},
+                "retrieval_scope": {
+                    "scope_statement": str(
+                        policy.get("scope_statement")
+                        or f"Investigate bounded external information relevant to {question_id}."
+                    ),
+                    "in_scope": list(
+                        policy.get("in_scope", ["authorized external source retrieval"])
+                    ),
+                    "out_of_scope": list(
+                        policy.get(
+                            "out_of_scope", ["Writer/Publication material as research evidence"]
+                        )
+                    ),
+                },
+                "allowed_source_categories": list(
+                    policy.get("allowed_source_categories", ["other"])
+                ),
+                "resource_role_bindings": role_bindings,
+                "forbidden_resource_roles": [
+                    "writer_material",
+                    "publication_material",
+                    "publication_feedback",
+                    "archive_provenance",
+                ],
+                "coverage_dimensions": dimensions,
+                "budget": {
+                    "max_total_resources": len(resources),
+                    "max_candidate_source_resources": sum(
+                        item["role"] == "candidate_source" for item in role_bindings
+                    ),
+                    "max_artifact_resources": sum(
+                        item["role"] == "research_artifact" for item in role_bindings
+                    ),
+                    "max_acquired_source_captures": int(
+                        policy.get("max_acquired_source_captures", 20)
+                    ),
+                    "max_search_trace_entries": int(policy.get("max_search_trace_entries", 50)),
+                    "max_text_rendition_bytes": int(
+                        policy.get("max_text_rendition_bytes", 2_000_000)
+                    ),
+                    "max_original_capture_bytes": int(
+                        policy.get("max_original_capture_bytes", 10_000_000)
+                    ),
+                    "max_capture_artifacts": int(policy.get("max_capture_artifacts", 40)),
+                },
+            }
+        )
         return CapabilityMaterialization(
             descriptor=deepcopy(dict(descriptor)),
             context_pack=context,

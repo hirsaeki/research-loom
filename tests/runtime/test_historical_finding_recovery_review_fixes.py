@@ -32,9 +32,7 @@ class HistoricalFindingRecoveryReviewFixTests(ResearchPackageAcceptanceSupport):
             ):
                 diagnosis = facade.show_run(case["run_id"])["finding_recovery"]
             self.assertEqual(diagnosis["stage"], "candidate_integrity")
-            self.assertEqual(
-                diagnosis["failure_class"], "candidate_integrity_failure"
-            )
+            self.assertEqual(diagnosis["failure_class"], "candidate_integrity_failure")
         finally:
             facade.close()
 
@@ -46,11 +44,7 @@ class HistoricalFindingRecoveryReviewFixTests(ResearchPackageAcceptanceSupport):
                 side_effect=RuntimeError("simulated candidate-store read failure"),
             ):
                 with self.assertRaises(LocalApplicationError) as caught:
-                    facade.recover_legacy_desktop_research_finding_candidate(
-                        case["run_id"]
-                    )
-            self.assertEqual(
-                caught.exception.code, "APPLICATION-FINDING-RECOVERY-CANDIDATE-001"
-            )
+                    facade.recover_legacy_desktop_research_finding_candidate(case["run_id"])
+            self.assertEqual(caught.exception.code, "APPLICATION-FINDING-RECOVERY-CANDIDATE-001")
         finally:
             facade.close()

@@ -10,7 +10,9 @@ from pathlib import Path
 import rfc8785
 
 ROOT = Path(__file__).resolve().parents[2]
-TYPE_RANK = {name: i for i, name in enumerate(["research", "organization", "narrative", "publication"])}
+TYPE_RANK = {
+    name: i for i, name in enumerate(["research", "organization", "narrative", "publication"])
+}
 COMPARATOR = re.compile(r"^(>=|>|<=|<|=)(\d+\.\d+\.\d+)$")
 
 
@@ -148,11 +150,20 @@ def effective_identity_error(eps):
 
 def fixture_manifest_catalog():
     paths = list((ROOT / "profiles/fixtures/valid").glob("*.profile.json"))
-    paths += list((ROOT / "profiles/fixtures/semantic/version-resolution/candidates").glob("*.profile.json"))
+    paths += list(
+        (ROOT / "profiles/fixtures/semantic/version-resolution/candidates").glob("*.profile.json")
+    )
     catalog = {}
     for path in paths:
         manifest = load_json(path)
-        catalog[(manifest["profile_type"], manifest["profile_id"], manifest["profile_version"], sha256_bytes(path))] = manifest
+        catalog[
+            (
+                manifest["profile_type"],
+                manifest["profile_id"],
+                manifest["profile_version"],
+                sha256_bytes(path),
+            )
+        ] = manifest
     return catalog
 
 
@@ -171,7 +182,9 @@ def effective_provenance_error(eps, manifest_catalog=None):
         for relation in ("extends", "requires"):
             for dep in manifest.get(relation, []):
                 targets = [p for p in eps["effective_profiles"] if key_of(p) == key_of(dep)]
-                if len(targets) != 1 or not satisfies(targets[0]["profile_version"], dep["version"]):
+                if len(targets) != 1 or not satisfies(
+                    targets[0]["profile_version"], dep["version"]
+                ):
                     return "PROFILE-EFFECTIVE-PROVENANCE-001"
                 expected_edges.append((pin_tuple(targets[0]), relation, intro_pin, dep["version"]))
 
@@ -181,9 +194,13 @@ def effective_provenance_error(eps, manifest_catalog=None):
             if source["relation"] == "requested":
                 continue
             intro_pin = pin_tuple(source["introduced_by"])
-            if intro_pin not in selected or not satisfies(target["profile_version"], source["required_version"]):
+            if intro_pin not in selected or not satisfies(
+                target["profile_version"], source["required_version"]
+            ):
                 return "PROFILE-EFFECTIVE-PROVENANCE-001"
-            actual_edges.append((pin_tuple(target), source["relation"], intro_pin, source["required_version"]))
+            actual_edges.append(
+                (pin_tuple(target), source["relation"], intro_pin, source["required_version"])
+            )
     if Counter(actual_edges) != Counter(expected_edges):
         return "PROFILE-EFFECTIVE-PROVENANCE-001"
 
@@ -205,7 +222,11 @@ def requested_presence_error(eps):
 
     expected = []
     for request in eps["requested_profiles"]:
-        matches = [p for p in selected_by_key.get(key_of(request), []) if satisfies(p["profile_version"], request["version"])]
+        matches = [
+            p
+            for p in selected_by_key.get(key_of(request), [])
+            if satisfies(p["profile_version"], request["version"])
+        ]
         if len(matches) != 1:
             return "PROFILE-EFFECTIVE-REQUEST-001"
         expected.append((pin_tuple(matches[0]), request["version"]))
@@ -230,7 +251,10 @@ def find_registry_form(registry, strengthening):
         return None
     binding = strengthening["validator_binding"]
     for validator in inv.get("validators", []):
-        if validator["validator_id"] != binding["validator_id"] or validator["validator_version"] != binding["validator_version"]:
+        if (
+            validator["validator_id"] != binding["validator_id"]
+            or validator["validator_version"] != binding["validator_version"]
+        ):
             continue
         for form in validator.get("approved_forms", []):
             if form["form_id"] == binding["form_id"]:
@@ -255,7 +279,8 @@ def strengthening_error(manifest, registry):
                 (
                     c
                     for c in referenced
-                    if c["path"] == required["path"] and c["merge_strategy"] == required["merge_strategy"]
+                    if c["path"] == required["path"]
+                    and c["merge_strategy"] == required["merge_strategy"]
                 ),
                 None,
             )
@@ -295,7 +320,9 @@ def assignment_valid(assignment, requests, core_contracts):
     requested_keys = {key_of(request) for request in requests}
     for request in requests:
         candidate = selected.get(key_of(request))
-        if candidate is None or not satisfies(candidate["manifest"]["profile_version"], request["version"]):
+        if candidate is None or not satisfies(
+            candidate["manifest"]["profile_version"], request["version"]
+        ):
             return False
     reachable = set(requested_keys)
     frontier = list(requested_keys)
@@ -313,7 +340,9 @@ def assignment_valid(assignment, requests, core_contracts):
                 if relation == "extends" and dep["profile_type"] != manifest["profile_type"]:
                     return False
                 target = selected.get(dep_key)
-                if target is None or not satisfies(target["manifest"]["profile_version"], dep["version"]):
+                if target is None or not satisfies(
+                    target["manifest"]["profile_version"], dep["version"]
+                ):
                     return False
                 if dep_key not in reachable:
                     reachable.add(dep_key)
@@ -355,7 +384,10 @@ def resolve_candidates(candidates, requests, core_contracts):
         identities[keyver] = candidate["manifest_sha256"]
         by_key.setdefault(key_of(candidate["manifest"]), []).append(candidate)
     keys = sorted(by_key, key=canonical_profile_key)
-    choices = [[None] + sorted(by_key[key], key=lambda c: semver(c["manifest"]["profile_version"])) for key in keys]
+    choices = [
+        [None] + sorted(by_key[key], key=lambda c: semver(c["manifest"]["profile_version"]))
+        for key in keys
+    ]
     solutions = []
     for combo in itertools.product(*choices):
         assignment = dict(zip(keys, combo))
@@ -367,7 +399,9 @@ def resolve_candidates(candidates, requests, core_contracts):
 
     def vector(assignment):
         return tuple(
-            absent if assignment[key] is None else semver(assignment[key]["manifest"]["profile_version"])
+            absent
+            if assignment[key] is None
+            else semver(assignment[key]["manifest"]["profile_version"])
             for key in keys
         )
 
@@ -435,7 +469,10 @@ def canonical_compose_constraints(candidates):
             resolution = "single" if len(declarations) == 1 else "identical"
         else:
             raise ValueError(f"unsupported merge strategy: {strategy}")
-        provenance = [{**pinned_ref(candidate), "constraint_id": decl["id"]} for candidate, decl in declarations]
+        provenance = [
+            {**pinned_ref(candidate), "constraint_id": decl["id"]}
+            for candidate, decl in declarations
+        ]
         provenance.sort(key=canonical_constraint_source_key)
         result.append(
             {

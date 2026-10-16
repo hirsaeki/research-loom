@@ -114,7 +114,9 @@ def _inspect_historical_candidate(
             failure_class="candidate_integrity_failure",
         )
     declared_digest = historical.get("proposal_digest")
-    if not isinstance(declared_digest, str) or declared_digest != _base._proposal_digest(historical):
+    if not isinstance(declared_digest, str) or declared_digest != _base._proposal_digest(
+        historical
+    ):
         raise RecoveryFailure(
             "APPLICATION-FINDING-RECOVERY-INTEGRITY-001",
             "persisted candidate digest is invalid",
@@ -196,12 +198,8 @@ def _resolve_candidate(application, project_id: str, run_id: str):
         return requested_run, requested_run, historical, "exact_run"
 
     producer_run, historical = resolve_replay_child(application, requested_run)
-    producer_run = _eligible_completed_desktop_run(
-        application, project_id, producer_run.run_id
-    )
-    _inspect_historical_candidate(
-        application, project_id, requested_run, producer_run, historical
-    )
+    producer_run = _eligible_completed_desktop_run(application, project_id, producer_run.run_id)
+    _inspect_historical_candidate(application, project_id, requested_run, producer_run, historical)
     return requested_run, producer_run, historical, "replay_child"
 
 
@@ -250,15 +248,9 @@ def _recover(application, project_id: str, run_id: str) -> Mapping[str, Any]:
 
     requested_run = _eligible_completed_desktop_run(application, project_id, run_id)
     producer_run, historical = resolve_replay_child(application, requested_run)
-    producer_run = _eligible_completed_desktop_run(
-        application, project_id, producer_run.run_id
-    )
-    _inspect_historical_candidate(
-        application, project_id, requested_run, producer_run, historical
-    )
-    recovered = dict(
-        _base._recover_legacy_candidate(application, project_id, producer_run.run_id)
-    )
+    producer_run = _eligible_completed_desktop_run(application, project_id, producer_run.run_id)
+    _inspect_historical_candidate(application, project_id, requested_run, producer_run, historical)
+    recovered = dict(_base._recover_legacy_candidate(application, project_id, producer_run.run_id))
     recovered["run_id"] = requested_run.run_id
     recovered["producer_run_id"] = producer_run.run_id
     recovered["producer_relation"] = "replay_child"
@@ -300,14 +292,10 @@ class LocalApplicationFacade(_base.LocalApplicationFacade):
             and run.get("execution_mode") == "real"
             and run.get("status") == RunStatus.COMPLETED.value
         ):
-            result["finding_recovery"] = _diagnose(
-                self._application, self._project_id, run_id
-            )
+            result["finding_recovery"] = _diagnose(self._application, self._project_id, run_id)
         return result
 
-    def recover_legacy_desktop_research_finding_candidate(
-        self, run_id: str
-    ) -> Mapping[str, Any]:
+    def recover_legacy_desktop_research_finding_candidate(self, run_id: str) -> Mapping[str, Any]:
         return _recover(self._application, self._project_id, run_id)
 
     def _ensure_finding_recovery_action(self) -> None:
@@ -340,9 +328,7 @@ class LocalApplicationFacade(_base.LocalApplicationFacade):
                 or definition.confirmation_required
                 or definition.service_id != _base._ACTION_TYPE
             ):
-                raise RuntimeError(
-                    "desktop_research.finding.recover action registration conflict"
-                )
+                raise RuntimeError("desktop_research.finding.recover action registration conflict")
             try:
                 service_registry.resolve(_base._ACTION_TYPE)
             except ConversationRuntimeError as exc:
@@ -350,7 +336,5 @@ class LocalApplicationFacade(_base.LocalApplicationFacade):
                     raise
                 service_registry.register(
                     _base._ACTION_TYPE,
-                    HistoricalFindingRecoveryHandler(
-                        self._application, self._project_id
-                    ),
+                    HistoricalFindingRecoveryHandler(self._application, self._project_id),
                 )

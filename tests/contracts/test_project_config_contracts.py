@@ -38,10 +38,14 @@ class ProjectConfigContractTests(unittest.TestCase):
     def setUpClass(cls):
         cls.project_schema = json.loads(PROJECT_SCHEMA.read_text(encoding="utf-8"))
         cls.core_schema = json.loads(CORE_SCHEMA.read_text(encoding="utf-8"))
-        cls.profile_manifest_schema = json.loads(PROFILE_MANIFEST_SCHEMA.read_text(encoding="utf-8"))
+        cls.profile_manifest_schema = json.loads(
+            PROFILE_MANIFEST_SCHEMA.read_text(encoding="utf-8")
+        )
         cls.semantics_schema = json.loads(SEMANTICS_SCHEMA.read_text(encoding="utf-8"))
         cls.semantics = yaml.safe_load(SEMANTICS_CATALOG.read_text(encoding="utf-8"))
-        cls.effective_profile_schema = json.loads(EFFECTIVE_PROFILE_SCHEMA.read_text(encoding="utf-8"))
+        cls.effective_profile_schema = json.loads(
+            EFFECTIVE_PROFILE_SCHEMA.read_text(encoding="utf-8")
+        )
         cls.project_validator = Draft202012Validator(cls.project_schema)
         cls.core_validator = Draft202012Validator(cls.core_schema)
         cls.semantics_validator = Draft202012Validator(cls.semantics_schema)
@@ -58,7 +62,9 @@ class ProjectConfigContractTests(unittest.TestCase):
         errors = list(self.project_validator.iter_errors(self.fixture))
         self.assertFalse(errors, errors)
         self.assertIsNone(project_config_semantic_error(self.fixture))
-        self.assertEqual(self.fixture["configuration_digest"], expected_configuration_digest(self.fixture))
+        self.assertEqual(
+            self.fixture["configuration_digest"], expected_configuration_digest(self.fixture)
+        )
 
     def test_project_identity_and_profile_request_grammars_reuse_existing_contracts(self):
         self.assertEqual(
@@ -90,13 +96,20 @@ class ProjectConfigContractTests(unittest.TestCase):
         wrong_question = deepcopy(self.fixture)
         wrong_question["research_questions"]["references"][0]["question_id"] = "FND-1"
         refresh_configuration_digest(wrong_question)
-        self.assertEqual("PROJECT-CORE-BINDING-001", project_core_binding_error(wrong_question, self.core_objects))
+        self.assertEqual(
+            "PROJECT-CORE-BINDING-001",
+            project_core_binding_error(wrong_question, self.core_objects),
+        )
 
         wrong_source = deepcopy(self.fixture)
-        source_ref = next(ref for ref in wrong_source["resource_references"] if ref["reference_type"] == "source")
+        source_ref = next(
+            ref for ref in wrong_source["resource_references"] if ref["reference_type"] == "source"
+        )
         source_ref["object_id"] = "ART-1"
         refresh_configuration_digest(wrong_source)
-        self.assertEqual("PROJECT-CORE-BINDING-001", project_core_binding_error(wrong_source, self.core_objects))
+        self.assertEqual(
+            "PROJECT-CORE-BINDING-001", project_core_binding_error(wrong_source, self.core_objects)
+        )
 
     def test_project_config_semantics_catalog_is_valid_and_keeps_boundaries_closed(self):
         Draft202012Validator.check_schema(self.semantics_schema)
@@ -120,7 +133,9 @@ class ProjectConfigContractTests(unittest.TestCase):
         self.assertEqual("PROJECT-CONFIG-DIGEST-001", project_config_semantic_error(mutated))
 
         reordered = {key: self.fixture[key] for key in reversed(list(self.fixture))}
-        self.assertEqual(self.fixture["configuration_digest"], expected_configuration_digest(reordered))
+        self.assertEqual(
+            self.fixture["configuration_digest"], expected_configuration_digest(reordered)
+        )
 
     def test_semantic_fixture_cases_have_exact_expected_outcomes(self):
         cases = json.loads(SEMANTIC_CASES.read_text(encoding="utf-8"))
@@ -130,7 +145,9 @@ class ProjectConfigContractTests(unittest.TestCase):
                 refresh_configuration_digest(config)
             errors = list(self.project_validator.iter_errors(config))
             self.assertFalse(errors, f"{case['id']}: {errors}")
-            self.assertEqual(case["expected_error"], project_config_semantic_error(config), case["id"])
+            self.assertEqual(
+                case["expected_error"], project_config_semantic_error(config), case["id"]
+            )
 
     def test_attention_is_guidance_not_answer_method_or_normative_chapter_map(self):
         without_reason = deepcopy(self.fixture)
@@ -185,7 +202,11 @@ class ProjectConfigContractTests(unittest.TestCase):
         top_level["effective_constraints"] = []
         self.assert_schema_invalid(top_level)
 
-        self.assertFalse(self.semantics["profile_request_bridge"]["project_constraints_join_effective_constraints"])
+        self.assertFalse(
+            self.semantics["profile_request_bridge"][
+                "project_constraints_join_effective_constraints"
+            ]
+        )
         self.assertFalse(self.semantics["principles"]["cli_override_precedence_defined"])
 
     def test_communication_and_capability_hints_do_not_absorb_other_contracts(self):
@@ -218,21 +239,29 @@ class ProjectConfigContractTests(unittest.TestCase):
         eps_errors = list(self.effective_profile_validator.iter_errors(self.effective_profiles))
         self.assertFalse(eps_errors, eps_errors)
         self.assertIsNone(project_profile_binding_error(self.fixture, self.effective_profiles))
-        self.assertEqual(self.effective_profiles["requested_profiles"], flatten_profile_requests(self.fixture))
+        self.assertEqual(
+            self.effective_profiles["requested_profiles"], flatten_profile_requests(self.fixture)
+        )
 
         self.assertEqual([], self.fixture["profile_requests"]["research"])
         self.assertEqual([], self.fixture["profile_requests"]["organization"])
-        effective_types = {profile["profile_type"] for profile in self.effective_profiles["effective_profiles"]}
+        effective_types = {
+            profile["profile_type"] for profile in self.effective_profiles["effective_profiles"]
+        }
         self.assertEqual({"research", "organization", "narrative", "publication"}, effective_types)
 
         missing = deepcopy(self.effective_profiles)
         missing["requested_profiles"] = missing["requested_profiles"][:-1]
-        self.assertEqual("PROJECT-PROFILE-BINDING-001", project_profile_binding_error(self.fixture, missing))
+        self.assertEqual(
+            "PROJECT-PROFILE-BINDING-001", project_profile_binding_error(self.fixture, missing)
+        )
 
     def test_profile_request_bridge_contract_targets_pr4_direct_request_field_only(self):
         bridge = self.semantics["profile_request_bridge"]
         self.assertEqual("profile_requests", bridge["source_path"])
-        self.assertEqual("urn:research-loom:profiles:effective-profile-set:0.1.0", bridge["target_contract"])
+        self.assertEqual(
+            "urn:research-loom:profiles:effective-profile-set:0.1.0", bridge["target_contract"]
+        )
         self.assertEqual("requested_profiles", bridge["target_field"])
         self.assertTrue(bridge["direct_requests_only"])
         self.assertFalse(bridge["transitive_profiles_written_back"])

@@ -13,7 +13,11 @@ from unittest.mock import patch
 import rfc8785
 
 from core.execution import CapabilityRunRecord, ExecutionIssue, RunLifecycleEvent, RunStatus
-from plugins.desktop_research.attempts import ATTEMPT_COMPLETED, ATTEMPT_STARTED, OPERATIONAL_TERMINATION
+from plugins.desktop_research.attempts import (
+    ATTEMPT_COMPLETED,
+    ATTEMPT_STARTED,
+    OPERATIONAL_TERMINATION,
+)
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade, LocalWorkspace
 from plugins.local_application.cli import main as cli_main
 
@@ -50,7 +54,9 @@ def _run_cli(argv):
     return code, json.loads(stream.getvalue())
 
 
-def _prepared_run(project_id: str, run_id: str, *, capability_id: str = "desktop-research") -> CapabilityRunRecord:
+def _prepared_run(
+    project_id: str, run_id: str, *, capability_id: str = "desktop-research"
+) -> CapabilityRunRecord:
     return CapabilityRunRecord(
         run_id=run_id,
         invocation_id=f"INV-{run_id}",
@@ -58,7 +64,9 @@ def _prepared_run(project_id: str, run_id: str, *, capability_id: str = "desktop
         capability_id=capability_id,
         capability_version="0.1.0",
         descriptor_digest="sha256:" + "2" * 64,
-        implementation_id="desktop-research.external-first" if capability_id == "desktop-research" else "fixture.impl",
+        implementation_id="desktop-research.external-first"
+        if capability_id == "desktop-research"
+        else "fixture.impl",
         implementation_version="0.1.0",
         function_id="investigate" if capability_id == "desktop-research" else "run",
         execution_mode="real",
@@ -75,19 +83,25 @@ def _prepared_run(project_id: str, run_id: str, *, capability_id: str = "desktop
     )
 
 
-def _create_running(store, project_id: str, run_id: str, *, capability_id: str = "desktop-research"):
+def _create_running(
+    store, project_id: str, run_id: str, *, capability_id: str = "desktop-research"
+):
     prepared = _prepared_run(project_id, run_id, capability_id=capability_id)
     store.create_run(prepared)
-    store.append_run_event(RunLifecycleEvent(
-        run_id, 1, None, RunStatus.PREPARED, "2026-08-31T00:00:00Z", "prepared"
-    ))
+    store.append_run_event(
+        RunLifecycleEvent(run_id, 1, None, RunStatus.PREPARED, "2026-08-31T00:00:00Z", "prepared")
+    )
     running = prepared.with_status(RunStatus.RUNNING, started_at="2026-08-31T00:01:00Z")
     changed = store.transition_run(
         RunStatus.PREPARED,
         running,
         RunLifecycleEvent(
-            run_id, 2, RunStatus.PREPARED, RunStatus.RUNNING,
-            "2026-08-31T00:01:00Z", "started",
+            run_id,
+            2,
+            RunStatus.PREPARED,
+            RunStatus.RUNNING,
+            "2026-08-31T00:01:00Z",
+            "started",
         ),
     )
     assert changed
@@ -105,8 +119,12 @@ class RunInspectionTests(unittest.TestCase):
             try:
                 app = opened.application
                 run = _create_running(app.execution_store, opened.project_id, "RUN-INSPECT")
-                app.execution_store.store_diagnostic("RUN-INSPECT", "desktop_research.normalization", {"issues": [{"code": "D1"}]})
-                app.execution_store.store_diagnostic("RUN-INSPECT", "desktop_research.validation", {"issues": [{"code": "D2"}]})
+                app.execution_store.store_diagnostic(
+                    "RUN-INSPECT", "desktop_research.normalization", {"issues": [{"code": "D1"}]}
+                )
+                app.execution_store.store_diagnostic(
+                    "RUN-INSPECT", "desktop_research.validation", {"issues": [{"code": "D2"}]}
+                )
                 app.execution_store.put_bytes(
                     run,
                     role="desktop_research.original_capture",
@@ -132,7 +150,9 @@ class RunInspectionTests(unittest.TestCase):
                     artifact_id="ART-2",
                     provenance={"capture_id": "CAP-1"},
                 )
-                for index, outcome in enumerate(("source_captured", "blocked", "out_of_scope", "no_relevant_source"), start=1):
+                for index, outcome in enumerate(
+                    ("source_captured", "blocked", "out_of_scope", "no_relevant_source"), start=1
+                ):
                     attempt_id = f"ATT-{index}"
                     app.operational_store.append(
                         run.run_id,
@@ -155,9 +175,13 @@ class RunInspectionTests(unittest.TestCase):
                         {
                             "attempt_id": attempt_id,
                             "outcome": outcome,
-                            "failure_or_blocking_reason": "blocked" if outcome == "blocked" else None,
+                            "failure_or_blocking_reason": "blocked"
+                            if outcome == "blocked"
+                            else None,
                             "target_locator": f"https://example.test/{index}",
-                            "resulting_capture_id": "CAP-1" if outcome == "source_captured" else None,
+                            "resulting_capture_id": "CAP-1"
+                            if outcome == "source_captured"
+                            else None,
                             "provenance": {},
                         },
                     )
@@ -181,14 +205,23 @@ class RunInspectionTests(unittest.TestCase):
                 )
                 facade = LocalApplicationFacade.from_opened_workspace(opened)
                 opened = None
-                with patch("plugins.local_application.run_inspection_facade._RUN_INSPECTION_ITEM_LIMIT", 1), patch.object(
-                    facade._application.execution_store,
-                    "diagnose_integrity",
-                    side_effect=AssertionError("run show must not call diagnose_integrity"),
-                ), patch.object(
-                    facade._application.execution_store,
-                    "artifacts_for",
-                    side_effect=AssertionError("run show must use bounded artifact metadata read"),
+                with (
+                    patch(
+                        "plugins.local_application.run_inspection_facade._RUN_INSPECTION_ITEM_LIMIT",
+                        1,
+                    ),
+                    patch.object(
+                        facade._application.execution_store,
+                        "diagnose_integrity",
+                        side_effect=AssertionError("run show must not call diagnose_integrity"),
+                    ),
+                    patch.object(
+                        facade._application.execution_store,
+                        "artifacts_for",
+                        side_effect=AssertionError(
+                            "run show must use bounded artifact metadata read"
+                        ),
+                    ),
                 ):
                     result = facade.show_run(run.run_id)
                 self.assertEqual(result["run"]["status"], "RUNNING")
@@ -237,51 +270,81 @@ class RunInspectionTests(unittest.TestCase):
             workspace = opened.root
             try:
                 store = opened.application.execution_store
-                failed_running = _create_running(store, opened.project_id, "RUN-FAILED", capability_id="fixture")
+                failed_running = _create_running(
+                    store, opened.project_id, "RUN-FAILED", capability_id="fixture"
+                )
                 failed = failed_running.with_status(
                     RunStatus.FAILED,
                     completed_at="2026-08-31T00:02:00Z",
-                    failure=ExecutionIssue("HANDOFF_INVALID", "fixture handoff binding error", False),
-                )
-                self.assertTrue(store.transition_run(
-                    RunStatus.RUNNING,
-                    failed,
-                    RunLifecycleEvent(
-                        failed.run_id, 3, RunStatus.RUNNING, RunStatus.FAILED,
-                        "2026-08-31T00:02:00Z", "handoff invalid",
+                    failure=ExecutionIssue(
+                        "HANDOFF_INVALID", "fixture handoff binding error", False
                     ),
-                ))
+                )
+                self.assertTrue(
+                    store.transition_run(
+                        RunStatus.RUNNING,
+                        failed,
+                        RunLifecycleEvent(
+                            failed.run_id,
+                            3,
+                            RunStatus.RUNNING,
+                            RunStatus.FAILED,
+                            "2026-08-31T00:02:00Z",
+                            "handoff invalid",
+                        ),
+                    )
+                )
 
-                completed_running = _create_running(store, opened.project_id, "RUN-COMPLETED", capability_id="fixture")
-                store.store_diagnostic(completed_running.run_id, "fixture.normalization", {"issues": [{"code": "WARN"}]})
+                completed_running = _create_running(
+                    store, opened.project_id, "RUN-COMPLETED", capability_id="fixture"
+                )
+                store.store_diagnostic(
+                    completed_running.run_id,
+                    "fixture.normalization",
+                    {"issues": [{"code": "WARN"}]},
+                )
                 completed = completed_running.with_status(
                     RunStatus.COMPLETED,
                     completed_at="2026-08-31T00:03:00Z",
                     handoff_ref="HND-1",
                     handoff_digest="sha256:" + "5" * 64,
                 )
-                self.assertTrue(store.transition_run(
-                    RunStatus.RUNNING,
-                    completed,
-                    RunLifecycleEvent(
-                        completed.run_id, 3, RunStatus.RUNNING, RunStatus.COMPLETED,
-                        "2026-08-31T00:03:00Z", "completed",
-                    ),
-                ))
+                self.assertTrue(
+                    store.transition_run(
+                        RunStatus.RUNNING,
+                        completed,
+                        RunLifecycleEvent(
+                            completed.run_id,
+                            3,
+                            RunStatus.RUNNING,
+                            RunStatus.COMPLETED,
+                            "2026-08-31T00:03:00Z",
+                            "completed",
+                        ),
+                    )
+                )
             finally:
                 opened.close()
 
-            code, failed_show = _run_cli([
-                "run", "show", "--workspace", str(workspace), "--run-id", "RUN-FAILED", "--json"
-            ])
+            code, failed_show = _run_cli(
+                ["run", "show", "--workspace", str(workspace), "--run-id", "RUN-FAILED", "--json"]
+            )
             self.assertEqual(code, 0)
             self.assertEqual(failed_show["run"]["status"], "FAILED")
             self.assertEqual(failed_show["run"]["failure"]["code"], "HANDOFF_INVALID")
             self.assertEqual(failed_show["lifecycle"][-1]["to_status"], "FAILED")
 
-            code, completed_show = _run_cli([
-                "run", "show", "--workspace", str(workspace), "--run-id", "RUN-COMPLETED", "--json"
-            ])
+            code, completed_show = _run_cli(
+                [
+                    "run",
+                    "show",
+                    "--workspace",
+                    str(workspace),
+                    "--run-id",
+                    "RUN-COMPLETED",
+                    "--json",
+                ]
+            )
             self.assertEqual(code, 0)
             self.assertEqual(completed_show["run"]["status"], "COMPLETED")
             self.assertIsNone(completed_show["run"]["failure"])
@@ -292,7 +355,12 @@ class RunInspectionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             opened = self._workspace(Path(temp))
             try:
-                run = _create_running(opened.application.execution_store, opened.project_id, "RUN-BINDING", capability_id="fixture")
+                run = _create_running(
+                    opened.application.execution_store,
+                    opened.project_id,
+                    "RUN-BINDING",
+                    capability_id="fixture",
+                )
                 facade = LocalApplicationFacade(opened.application, opened.project_id)
                 with self.assertRaises(LocalApplicationError) as unknown:
                     facade.show_run("RUN-MISSING")
@@ -303,7 +371,11 @@ class RunInspectionTests(unittest.TestCase):
                     wrong.show_run(run.run_id)
                 self.assertEqual(binding.exception.code, "APPLICATION-RUN-BINDING-001")
 
-                with patch.object(opened.application.execution_store, "events_for", side_effect=RuntimeError("SELECT secret_table")):
+                with patch.object(
+                    opened.application.execution_store,
+                    "events_for",
+                    side_effect=RuntimeError("SELECT secret_table"),
+                ):
                     with self.assertRaises(LocalApplicationError) as corrupt:
                         facade.show_run(run.run_id)
                 self.assertEqual(corrupt.exception.code, "APPLICATION-RUN-READ-001")

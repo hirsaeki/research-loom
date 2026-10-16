@@ -20,13 +20,9 @@ class BootstrapMixin:
         """Bootstrap an empty DB from an already validated PR20 StateView."""
 
         with self._write_transaction():
-            row = self._connection.execute(
-                "SELECT COUNT(*) AS n FROM project_state"
-            ).fetchone()
+            row = self._connection.execute("SELECT COUNT(*) AS n FROM project_state").fetchone()
             if row is None or int(row["n"]) != 0:
-                raise AtomicCommitError(
-                    "SQLite bootstrap requires an empty Research State store"
-                )
+                raise AtomicCommitError("SQLite bootstrap requires an empty Research State store")
 
             self._connection.execute(
                 """
@@ -62,14 +58,8 @@ class BootstrapMixin:
                 )
                 seen.add(current_key)
 
-            snapshots = [
-                obj for obj in seed.objects
-                if str(obj.get("kind")) == "snapshot"
-            ]
-            if not any(
-                str(obj.get("id")) == str(seed.current_snapshot["id"])
-                for obj in snapshots
-            ):
+            snapshots = [obj for obj in seed.objects if str(obj.get("kind")) == "snapshot"]
+            if not any(str(obj.get("id")) == str(seed.current_snapshot["id"]) for obj in snapshots):
                 snapshots.append(seed.current_snapshot)
             for snapshot in sorted(
                 snapshots,
@@ -101,13 +91,8 @@ class BootstrapMixin:
                     updated_commit_id=None,
                 )
 
-            if not any(
-                item.lineage_id == seed.active_lineage_ref
-                for item in seed.lineages
-            ):
-                raise AtomicCommitError(
-                    "bootstrap active lineage does not resolve"
-                )
+            if not any(item.lineage_id == seed.active_lineage_ref for item in seed.lineages):
+                raise AtomicCommitError("bootstrap active lineage does not resolve")
             self._connection.execute(
                 """
                 INSERT INTO project_active_lineage(

@@ -74,14 +74,16 @@ def _create_running(store, project_id: str, run_id: str, prepared_at: str) -> Ca
         prepared_at=prepared_at,
     )
     store.create_run(prepared)
-    store.append_run_event(RunLifecycleEvent(
-        run_id,
-        1,
-        None,
-        RunStatus.PREPARED,
-        prepared_at,
-        "prepared",
-    ))
+    store.append_run_event(
+        RunLifecycleEvent(
+            run_id,
+            1,
+            None,
+            RunStatus.PREPARED,
+            prepared_at,
+            "prepared",
+        )
+    )
     started_at = prepared_at.replace("00Z", "10Z")
     running = prepared.with_status(RunStatus.RUNNING, started_at=started_at)
     changed = store.transition_run(
@@ -200,16 +202,28 @@ class ExternalMaterialInventoryTests(unittest.TestCase):
                 ).list_external_materials()
                 self.assertEqual(len(result["materials"]), 1)
                 material = result["materials"][0]
-                self.assertEqual(material["material_id"], capture["original_capture"]["content_digest"])
-                self.assertEqual(material["original_digest"], capture["original_capture"]["content_digest"])
+                self.assertEqual(
+                    material["material_id"], capture["original_capture"]["content_digest"]
+                )
+                self.assertEqual(
+                    material["original_digest"], capture["original_capture"]["content_digest"]
+                )
                 self.assertEqual(material["run_ids"], [run.run_id])
                 self.assertEqual(material["source_locators"], ["https://example.test/source-one"])
-                self.assertEqual(material["original"]["artifact_id"], capture["original_capture"]["content_reference"])
-                self.assertEqual(material["renditions"][0]["artifact_id"], capture["text_rendition"]["content_reference"])
+                self.assertEqual(
+                    material["original"]["artifact_id"],
+                    capture["original_capture"]["content_reference"],
+                )
+                self.assertEqual(
+                    material["renditions"][0]["artifact_id"],
+                    capture["text_rendition"]["content_reference"],
+                )
                 self.assertEqual(material["renditions"][0]["kind"], "utf8_text")
                 self.assertEqual(material["renditions"][0]["encoding"], "UTF-8")
                 self.assertEqual(material["captures"][0]["capture_id"], "CAP-ONE")
-                self.assertEqual(material["captures"][0]["source_locator"], "https://example.test/source-one")
+                self.assertEqual(
+                    material["captures"][0]["source_locator"], "https://example.test/source-one"
+                )
             finally:
                 opened.close()
 
@@ -306,7 +320,9 @@ class ExternalMaterialInventoryTests(unittest.TestCase):
             finally:
                 opened.close()
 
-    def test_captured_material_excludes_failed_attempt_and_read_is_deterministic_and_read_only(self):
+    def test_captured_material_excludes_failed_attempt_and_read_is_deterministic_and_read_only(
+        self,
+    ):
         with tempfile.TemporaryDirectory() as temp:
             opened = self._workspace(Path(temp))
             try:
@@ -397,18 +413,16 @@ class ExternalMaterialInventoryTests(unittest.TestCase):
             finally:
                 opened.close()
 
-            code, human = _run_cli([
-                "external", "materials", "list", "--workspace", str(workspace)
-            ])
+            code, human = _run_cli(["external", "materials", "list", "--workspace", str(workspace)])
             self.assertEqual(code, 0)
             self.assertIn("Captured external materials: 1", human)
             self.assertIn("https://example.test/cli-source", human)
             self.assertIn("RUN-CLI", human)
             self.assertIn(capture["original_capture"]["content_digest"], human)
 
-            code, raw_json = _run_cli([
-                "external", "materials", "list", "--workspace", str(workspace), "--json"
-            ])
+            code, raw_json = _run_cli(
+                ["external", "materials", "list", "--workspace", str(workspace), "--json"]
+            )
             self.assertEqual(code, 0)
             payload = json.loads(raw_json)
             self.assertEqual(payload["status"], "OK")

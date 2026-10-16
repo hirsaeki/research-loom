@@ -60,9 +60,7 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                     "Survey registry requires a local application root",
                 )
             return LocalSurveyStore(Path(root) / _STORE_NAME)
-        return LocalSurveyStore(
-            self._workspace_root / ".research-loom" / _STORE_NAME
-        )
+        return LocalSurveyStore(self._workspace_root / ".research-loom" / _STORE_NAME)
 
     def _state(self):
         repository = self._application.state_repository
@@ -98,9 +96,7 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
             "rq_ids": list(rq_ids),
             "captured_against": _snapshot(state),
             "project_config_digest": str(state.project_config_digest),
-            "effective_profile_set_digest": str(
-                state.effective_profile_set_digest
-            ),
+            "effective_profile_set_digest": str(state.effective_profile_set_digest),
             "captured_at": "",
             "capture_origin": origin,
         }
@@ -120,10 +116,8 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
             )
         if (
             str(binding["snapshot_ref"]) != str(state.current_snapshot["id"])
-            or str(binding["snapshot_digest"])
-            != str(state.current_snapshot["content_digest"])
-            or str(design_record["project_config_digest"])
-            != str(state.project_config_digest)
+            or str(binding["snapshot_digest"]) != str(state.current_snapshot["content_digest"])
+            or str(design_record["project_config_digest"]) != str(state.project_config_digest)
             or str(design_record["effective_profile_set_digest"])
             != str(state.effective_profile_set_digest)
         ):
@@ -132,18 +126,12 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                 "Survey Design provenance does not match the current Snapshot/project/profile binding",
             )
 
-    def capture_survey_design(
-        self, input_value: Mapping[str, Any]
-    ) -> Mapping[str, Any]:
-        value = input_object(
-            input_value, _DESIGN_FIELDS, "Survey Design capture"
-        )
+    def capture_survey_design(self, input_value: Mapping[str, Any]) -> Mapping[str, Any]:
+        value = input_object(input_value, _DESIGN_FIELDS, "Survey Design capture")
         rq_ids = string_list(value.get("rq_ids"), "rq_ids", required=True)
         design = value.get("design")
         if not isinstance(design, Mapping):
-            raise LocalApplicationError(
-                "APPLICATION-SURVEY-INPUT-001", "design must be an object"
-            )
+            raise LocalApplicationError("APPLICATION-SURVEY-INPUT-001", "design must be an object")
         design = deepcopy(dict(design))
         schema_validate(
             design,
@@ -167,9 +155,7 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
         document["design"] = design
         document["registry_digest"] = registry_digest(document)
         try:
-            created = self._capture(
-                state, lambda: self._survey_store().capture_design(document)
-            )
+            created = self._capture(state, lambda: self._survey_store().capture_design(document))
         except LocalSurveyStoreError as exc:
             raise LocalApplicationError(exc.code, exc.message) from exc
         return {
@@ -182,18 +168,14 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
             "captured_against": deepcopy(document["captured_against"]),
         }
 
-    def show_survey_design(
-        self, survey_design_id: str, version: str
-    ) -> Mapping[str, Any]:
+    def show_survey_design(self, survey_design_id: str, version: str) -> Mapping[str, Any]:
         if not survey_design_id or not version:
             raise LocalApplicationError(
                 "APPLICATION-SURVEY-INPUT-001",
                 "survey_design_id and version are required",
             )
         try:
-            record = self._survey_store().load_design(
-                self._project_id, survey_design_id, version
-            )
+            record = self._survey_store().load_design(self._project_id, survey_design_id, version)
         except LocalSurveyStoreError as exc:
             raise LocalApplicationError(exc.code, exc.message) from exc
         if record is None:
@@ -207,12 +189,8 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
             "survey_design": record,
         }
 
-    def capture_survey_instrument(
-        self, input_value: Mapping[str, Any]
-    ) -> Mapping[str, Any]:
-        value = input_object(
-            input_value, _INSTRUMENT_FIELDS, "Survey Instrument capture"
-        )
+    def capture_survey_instrument(self, input_value: Mapping[str, Any]) -> Mapping[str, Any]:
+        value = input_object(input_value, _INSTRUMENT_FIELDS, "Survey Instrument capture")
         design_id = required_string(value, "survey_design_id")
         design_version = required_string(value, "survey_design_version")
         title = required_string(value, "title")
@@ -246,9 +224,7 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
         )
         store = self._survey_store()
         try:
-            design_record = store.load_design(
-                self._project_id, design_id, design_version
-            )
+            design_record = store.load_design(self._project_id, design_id, design_version)
         except LocalSurveyStoreError as exc:
             raise LocalApplicationError(exc.code, exc.message) from exc
         if design_record is None:
@@ -283,9 +259,7 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
         )
         document["registry_digest"] = registry_digest(document)
         try:
-            created = self._capture(
-                state, lambda: store.capture_instrument(document)
-            )
+            created = self._capture(state, lambda: store.capture_instrument(document))
         except LocalSurveyStoreError as exc:
             raise LocalApplicationError(exc.code, exc.message) from exc
         return {
@@ -299,18 +273,14 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
             "captured_against": deepcopy(document["captured_against"]),
         }
 
-    def show_survey_instrument(
-        self, instrument_id: str, version: str
-    ) -> Mapping[str, Any]:
+    def show_survey_instrument(self, instrument_id: str, version: str) -> Mapping[str, Any]:
         if not instrument_id or not version:
             raise LocalApplicationError(
                 "APPLICATION-SURVEY-INPUT-001",
                 "instrument_id and version are required",
             )
         try:
-            record = self._survey_store().load_instrument(
-                self._project_id, instrument_id, version
-            )
+            record = self._survey_store().load_instrument(self._project_id, instrument_id, version)
         except LocalSurveyStoreError as exc:
             raise LocalApplicationError(exc.code, exc.message) from exc
         if record is None:
@@ -331,9 +301,7 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
         *,
         format: str,
     ) -> Mapping[str, Any]:
-        record = self.show_survey_instrument(instrument_id, version)[
-            "instrument"
-        ]
+        record = self.show_survey_instrument(instrument_id, version)["instrument"]
         ref = record["design_ref"]
         try:
             design_record = self._survey_store().load_design(
@@ -345,8 +313,7 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
             raise LocalApplicationError(exc.code, exc.message) from exc
         if (
             design_record is None
-            or design_record["design"]["content_digest"]
-            != ref["content_digest"]
+            or design_record["design"]["content_digest"] != ref["content_digest"]
         ):
             raise LocalApplicationError(
                 "APPLICATION-SURVEY-DESIGN-BINDING-001",

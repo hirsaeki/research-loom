@@ -48,7 +48,12 @@ _AGGREGATE_RUN_FIELDS = {
 }
 _AGGREGATE_SHOW_FIELDS = {"aggregate_result_id", "limit", "offset"}
 _VIRTUAL_PRETEST_SHOW_FIELDS = {"run_id", "aggregate_result_id"}
-_VIRTUAL_PRETEST_COMPARE_FIELDS = {"run_a_id", "run_b_id", "aggregate_a_result_id", "aggregate_b_result_id"}
+_VIRTUAL_PRETEST_COMPARE_FIELDS = {
+    "run_a_id",
+    "run_b_id",
+    "aggregate_a_result_id",
+    "aggregate_b_result_id",
+}
 _REAL_INTAKE_CAPTURE_FIELDS = {
     "file",
     "instrument_id",
@@ -108,8 +113,7 @@ def _payload_fields(payload: Mapping[str, Any], allowed: set[str], label: str) -
     unknown = set(payload) - allowed
     if unknown:
         raise ValueError(
-            f"{label} payload contains unknown fields: "
-            + ", ".join(sorted(map(str, unknown)))
+            f"{label} payload contains unknown fields: " + ", ".join(sorted(map(str, unknown)))
         )
 
 
@@ -216,9 +220,7 @@ class _SurveyAnalysisActionHandler:
         if self._operation == "capture_spec":
             result = facade.capture_survey_analysis_spec(payload)
         elif self._operation == "show_spec":
-            result = facade.show_survey_analysis_spec(
-                _nonempty_string(payload, "analysis_spec_id")
-            )
+            result = facade.show_survey_analysis_spec(_nonempty_string(payload, "analysis_spec_id"))
         elif self._operation == "aggregate":
             result = facade.run_survey_aggregation(payload)
         elif self._operation == "show_result":
@@ -279,9 +281,7 @@ class LocalApplicationFacade(SurveyVirtualPretestInspectionMixin, VirtualRunnerA
                     "Survey analysis registry requires a local application root",
                 )
             return LocalSurveyAnalysisStore(Path(root) / _STORE_NAME)
-        return LocalSurveyAnalysisStore(
-            self._workspace_root / ".research-loom" / _STORE_NAME
-        )
+        return LocalSurveyAnalysisStore(self._workspace_root / ".research-loom" / _STORE_NAME)
 
     def list_actions(self) -> Mapping[str, Any]:
         self._ensure_survey_analysis_actions()
@@ -370,9 +370,7 @@ class LocalApplicationFacade(SurveyVirtualPretestInspectionMixin, VirtualRunnerA
                 "analysis_spec_digest must be a sha256 digest",
             )
         try:
-            spec = self._survey_analysis_store().load_spec(
-                self._project_id, analysis_spec_id
-            )
+            spec = self._survey_analysis_store().load_spec(self._project_id, analysis_spec_id)
         except LocalSurveyAnalysisStoreError as exc:
             raise LocalApplicationError(exc.code, exc.message) from exc
         if spec is None:
@@ -389,11 +387,13 @@ class LocalApplicationFacade(SurveyVirtualPretestInspectionMixin, VirtualRunnerA
 
     def _questionnaire_for_dataset(self, dataset: Mapping[str, Any]) -> dict[str, Any]:
         instrument = dataset["instrument_ref"]
-        questionnaire, resolved = self._resolve_instrument({
-            "instrument_id": str(instrument["id"]),
-            "instrument_version": str(instrument["version"]),
-            "instrument_digest": str(instrument["content_digest"]),
-        })
+        questionnaire, resolved = self._resolve_instrument(
+            {
+                "instrument_id": str(instrument["id"]),
+                "instrument_version": str(instrument["version"]),
+                "instrument_digest": str(instrument["content_digest"]),
+            }
+        )
         if resolved != instrument:
             raise LocalApplicationError(
                 "APPLICATION-SURVEY-ANALYSIS-INSTRUMENT-001",
@@ -510,10 +510,7 @@ class LocalApplicationFacade(SurveyVirtualPretestInspectionMixin, VirtualRunnerA
             )
 
         refs = list(dataset["accepted_response_refs"]) + list(dataset["rejected_response_refs"])
-        response_keys = [
-            (str(ref["identity_namespace"]), str(ref["response_id"]))
-            for ref in refs
-        ]
+        response_keys = [(str(ref["identity_namespace"]), str(ref["response_id"])) for ref in refs]
         try:
             loaded = self._survey_response_store().load_responses(
                 self._project_id,
@@ -684,9 +681,7 @@ class LocalApplicationFacade(SurveyVirtualPretestInspectionMixin, VirtualRunnerA
         )
         return {
             "status": (
-                "CAPTURED"
-                if dataset_capture["status"] == "CAPTURED"
-                else "ALREADY_CAPTURED"
+                "CAPTURED" if dataset_capture["status"] == "CAPTURED" else "ALREADY_CAPTURED"
             ),
             "project_id": self._project_id,
             "intake_source": deepcopy(provenance),
@@ -836,13 +831,9 @@ class LocalApplicationFacade(SurveyVirtualPretestInspectionMixin, VirtualRunnerA
         dataset = self._load_dataset_exact(dataset_id, dataset_digest)
         questionnaire = self._questionnaire_for_dataset(dataset)
         try:
-            analysis_items = normalize_analysis_items(
-                questionnaire, value.get("analysis_items")
-            )
+            analysis_items = normalize_analysis_items(questionnaire, value.get("analysis_items"))
         except ValueError as exc:
-            raise LocalApplicationError(
-                "APPLICATION-SURVEY-ANALYSIS-SPEC-001", str(exc)
-            ) from exc
+            raise LocalApplicationError("APPLICATION-SURVEY-ANALYSIS-SPEC-001", str(exc)) from exc
 
         document: dict[str, Any] = {
             "schema_version": "0.1.0",
@@ -857,16 +848,12 @@ class LocalApplicationFacade(SurveyVirtualPretestInspectionMixin, VirtualRunnerA
             "created_at": self._application.clock.now(),
         }
         document["content_digest"] = analysis_spec_content_digest(document)
-        document["analysis_spec_id"] = stable_identity(
-            "SAS-", document["content_digest"]
-        )
+        document["analysis_spec_id"] = stable_identity("SAS-", document["content_digest"])
         document["registry_digest"] = registry_digest(document)
         try:
             validate_analysis_spec(document)
         except ValueError as exc:
-            raise LocalApplicationError(
-                "APPLICATION-SURVEY-ANALYSIS-SPEC-001", str(exc)
-            ) from exc
+            raise LocalApplicationError("APPLICATION-SURVEY-ANALYSIS-SPEC-001", str(exc)) from exc
 
         state = self._state()
         before = _snapshot(state)
@@ -896,9 +883,7 @@ class LocalApplicationFacade(SurveyVirtualPretestInspectionMixin, VirtualRunnerA
 
     def show_survey_analysis_spec(self, analysis_spec_id: str) -> Mapping[str, Any]:
         try:
-            document = self._survey_analysis_store().load_spec(
-                self._project_id, analysis_spec_id
-            )
+            document = self._survey_analysis_store().load_spec(self._project_id, analysis_spec_id)
         except LocalSurveyAnalysisStoreError as exc:
             raise LocalApplicationError(exc.code, exc.message) from exc
         if document is None:
@@ -917,9 +902,7 @@ class LocalApplicationFacade(SurveyVirtualPretestInspectionMixin, VirtualRunnerA
         self,
         input_value: Mapping[str, Any],
     ) -> Mapping[str, Any]:
-        value = input_object(
-            input_value, _AGGREGATE_RUN_FIELDS, "Survey aggregate run"
-        )
+        value = input_object(input_value, _AGGREGATE_RUN_FIELDS, "Survey aggregate run")
         analysis_spec_id = required_string(value, "analysis_spec_id")
         analysis_spec_digest = required_string(value, "analysis_spec_digest")
         dataset_id = required_string(value, "dataset_id")
@@ -941,13 +924,9 @@ class LocalApplicationFacade(SurveyVirtualPretestInspectionMixin, VirtualRunnerA
             )
         questionnaire = self._questionnaire_for_dataset(dataset)
         try:
-            normalized_items = normalize_analysis_items(
-                questionnaire, spec["analysis_items"]
-            )
+            normalized_items = normalize_analysis_items(questionnaire, spec["analysis_items"])
         except ValueError as exc:
-            raise LocalApplicationError(
-                "APPLICATION-SURVEY-ANALYSIS-SPEC-001", str(exc)
-            ) from exc
+            raise LocalApplicationError("APPLICATION-SURVEY-ANALYSIS-SPEC-001", str(exc)) from exc
         if normalized_items != spec["analysis_items"]:
             raise LocalApplicationError(
                 "APPLICATION-SURVEY-ANALYSIS-SPEC-001",
@@ -964,9 +943,7 @@ class LocalApplicationFacade(SurveyVirtualPretestInspectionMixin, VirtualRunnerA
                 generated_at=self._application.clock.now(),
             )
         except ValueError as exc:
-            raise LocalApplicationError(
-                "APPLICATION-SURVEY-AGGREGATE-001", str(exc)
-            ) from exc
+            raise LocalApplicationError("APPLICATION-SURVEY-AGGREGATE-001", str(exc)) from exc
 
         state = self._state()
         before = _snapshot(state)

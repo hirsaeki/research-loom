@@ -32,11 +32,7 @@ class DiagnosticsMixin:
             for row in self._connection.execute("PRAGMA foreign_key_check"):
                 issues.append(
                     "foreign-key:"
-                    + ":".join(
-                        str(row[key])
-                        for key in row.keys()
-                        if row[key] is not None
-                    )
+                    + ":".join(str(row[key]) for key in row.keys() if row[key] is not None)
                 )
 
             for row in self._connection.execute(
@@ -47,9 +43,7 @@ class DiagnosticsMixin:
                 ORDER BY kind, object_id, revision
                 """
             ):
-                label = (
-                    f"{row['kind']}:{row['object_id']}@{row['revision']}"
-                )
+                label = f"{row['kind']}:{row['object_id']}@{row['revision']}"
                 try:
                     payload = decode_payload_row(row)
                     if str(row["kind"]) == "snapshot":
@@ -72,9 +66,7 @@ class DiagnosticsMixin:
             ):
                 snapshot_ref = str(row["snapshot_ref"])
                 if row["payload_json"] is None:
-                    issues.append(
-                        f"snapshot-object-missing:{snapshot_ref}"
-                    )
+                    issues.append(f"snapshot-object-missing:{snapshot_ref}")
                     continue
                 try:
                     payload = decode_payload_row(
@@ -85,17 +77,10 @@ class DiagnosticsMixin:
                         }
                     )
                 except RepositoryError as exc:
-                    issues.append(
-                        f"snapshot-payload:{snapshot_ref}:{exc}"
-                    )
+                    issues.append(f"snapshot-payload:{snapshot_ref}:{exc}")
                     continue
-                if (
-                    str(payload.get("content_digest"))
-                    != str(row["content_digest"])
-                ):
-                    issues.append(
-                        f"snapshot-content-digest-mismatch:{snapshot_ref}"
-                    )
+                if str(payload.get("content_digest")) != str(row["content_digest"]):
+                    issues.append(f"snapshot-content-digest-mismatch:{snapshot_ref}")
 
                 indexed = [
                     {
@@ -116,9 +101,7 @@ class DiagnosticsMixin:
                     )
                 ]
                 if indexed != list(payload.get("members", ())):
-                    issues.append(
-                        f"snapshot-member-index-mismatch:{snapshot_ref}"
-                    )
+                    issues.append(f"snapshot-member-index-mismatch:{snapshot_ref}")
                 for member in indexed:
                     target = self._connection.execute(
                         """
@@ -137,10 +120,7 @@ class DiagnosticsMixin:
                             f"{snapshot_ref}:{member['kind']}:"
                             f"{member['id']}@{member['revision']}"
                         )
-                    elif (
-                        str(target["payload_digest"])
-                        != member["digest"]
-                    ):
+                    elif str(target["payload_digest"]) != member["digest"]:
                         issues.append(
                             "snapshot-member-digest-mismatch:"
                             f"{snapshot_ref}:{member['kind']}:"
@@ -164,9 +144,7 @@ class DiagnosticsMixin:
                     """,
                     (kind,),
                 ):
-                    issues.append(
-                        f"{kind}-object-missing:{row['ref']}"
-                    )
+                    issues.append(f"{kind}-object-missing:{row['ref']}")
 
             for row in self._connection.execute(
                 """
@@ -183,19 +161,11 @@ class DiagnosticsMixin:
                     (row["head_snapshot_ref"],),
                 ).fetchone()
                 if head is None:
-                    issues.append(
-                        f"lineage-head-missing:{row['lineage_id']}"
-                    )
-                elif (
-                    str(head["content_digest"])
-                    != str(row["head_snapshot_digest"])
-                    or int(head["revision"])
-                    != int(row["head_snapshot_revision"])
-                ):
-                    issues.append(
-                        f"lineage-head-metadata-mismatch:"
-                        f"{row['lineage_id']}"
-                    )
+                    issues.append(f"lineage-head-missing:{row['lineage_id']}")
+                elif str(head["content_digest"]) != str(row["head_snapshot_digest"]) or int(
+                    head["revision"]
+                ) != int(row["head_snapshot_revision"]):
+                    issues.append(f"lineage-head-metadata-mismatch:{row['lineage_id']}")
 
             for row in self._connection.execute(
                 """
@@ -208,9 +178,7 @@ class DiagnosticsMixin:
                 ORDER BY p.project_ref
                 """
             ):
-                issues.append(
-                    f"active-lineage-missing:{row['project_ref']}"
-                )
+                issues.append(f"active-lineage-missing:{row['project_ref']}")
 
             for row in self._connection.execute(
                 """
@@ -222,24 +190,16 @@ class DiagnosticsMixin:
                 """
             ):
                 try:
-                    receipt = receipt_from_json(
-                        str(row["receipt_json"])
-                    )
+                    receipt = receipt_from_json(str(row["receipt_json"]))
                 except RepositoryError as exc:
-                    issues.append(
-                        f"commit-receipt:{row['commit_id']}:{exc}"
-                    )
+                    issues.append(f"commit-receipt:{row['commit_id']}:{exc}")
                     continue
                 checks = {
                     "id": receipt.commit_id == str(row["commit_id"]),
-                    "transition": receipt.transition_id
-                    == str(row["transition_id"]),
-                    "bundle": receipt.bundle_digest
-                    == str(row["bundle_digest"]),
-                    "idempotency": receipt.idempotency_key
-                    == str(row["idempotency_key"]),
-                    "prior-ref": receipt.prior_snapshot_ref
-                    == str(row["prior_snapshot_ref"]),
+                    "transition": receipt.transition_id == str(row["transition_id"]),
+                    "bundle": receipt.bundle_digest == str(row["bundle_digest"]),
+                    "idempotency": receipt.idempotency_key == str(row["idempotency_key"]),
+                    "prior-ref": receipt.prior_snapshot_ref == str(row["prior_snapshot_ref"]),
                     "prior-digest": receipt.prior_snapshot_digest
                     == str(row["prior_snapshot_digest"]),
                     "new-ref": receipt.new_snapshot_ref
@@ -257,14 +217,9 @@ class DiagnosticsMixin:
                 }
                 for label, okay in checks.items():
                     if not okay:
-                        issues.append(
-                            f"commit-receipt-{label}-mismatch:"
-                            f"{row['commit_id']}"
-                        )
+                        issues.append(f"commit-receipt-{label}-mismatch:{row['commit_id']}")
         except sqlite3.Error as exc:
-            raise RepositoryError(
-                "SQLite integrity diagnostics failed"
-            ) from exc
+            raise RepositoryError("SQLite integrity diagnostics failed") from exc
         return tuple(sorted(set(issues)))
 
     def debug_state(
@@ -319,9 +274,7 @@ class DiagnosticsMixin:
                     str(row["lineage_id"]),
                     asdict(lineage_from_row(row)),
                 )
-                for row in self._connection.execute(
-                    "SELECT * FROM lineages ORDER BY lineage_id"
-                )
+                for row in self._connection.execute("SELECT * FROM lineages ORDER BY lineage_id")
             ],
             "active": debug_active_lineage(self._connection),
             "used_decisions": [

@@ -46,9 +46,7 @@ def _validated_request_row(row, *, project_ref: str):
         raise ConversationRuntimeError(
             "RESUME-DECISION-001", "stored Human Decision Request identity or binding is invalid"
         )
-    if any(
-        key in request for key in ("operational_status", "commit_id", "status_detail")
-    ):
+    if any(key in request for key in ("operational_status", "commit_id", "status_detail")):
         raise ConversationRuntimeError(
             "RESUME-DECISION-001",
             "stored Human Decision Request contains operational fields",

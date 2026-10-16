@@ -10,11 +10,13 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
     """Production facade extended with the read-only research resume projection."""
 
     def resume_context(self, *, limits: Mapping[str, int] | None = None) -> Mapping[str, Any]:
-        result = dict(build_resume_context(
-            self._application,
-            self._project_id,
-            limits=limits,
-        ))
+        result = dict(
+            build_resume_context(
+                self._application,
+                self._project_id,
+                limits=limits,
+            )
+        )
         if self._workspace_root is not None:
             from plugins.local_durable_store import inspect_optional_children
             from .workspace import _read_json, BINDING_NAME, INTERNAL_DIR

@@ -12,7 +12,9 @@ from .material_reacquisition_facade import (
     _CAPABILITY_ID as _MRA_CAPABILITY_ID,
     _RESULT_DIAGNOSTIC as _MRA_RESULT_DIAGNOSTIC,
 )
-from .material_reacquisition_public_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
+from .material_reacquisition_public_facade import (
+    LocalApplicationFacade as _BaseLocalApplicationFacade,
+)
 from . import new_material_continuation_admission as admission
 from .new_material_continuation_admission import _find_reacquisition_result
 from .new_material_continuation_service import NewMaterialContinuationService
@@ -25,6 +27,7 @@ _ACTION_TYPE = "desktop_research.material.continue_new_version"
 _PAYLOAD_CONTRACT = "desktop-research-new-material-continuation@0.2.0"
 _ACTION_REGISTRATION_LOCK = RLock()
 _GROUP_INSPECTION_ARTIFACT_LIMIT = 100
+
 
 def _payload(payload: Mapping[str, Any]) -> dict[str, Any]:
     allowed = {"reacquisition_run_id", "paired_reacquisition_run_ids"}
@@ -57,11 +60,10 @@ def _payload(payload: Mapping[str, Any]) -> dict[str, Any]:
         normalized["paired_reacquisition_run_ids"] = sorted(paired)
     return normalized
 
+
 class NewMaterialContinuationHandler:
     def __init__(self, application, project_id: str, workspace_root) -> None:
-        self._service = NewMaterialContinuationService(
-            application, project_id, workspace_root
-        )
+        self._service = NewMaterialContinuationService(application, project_id, workspace_root)
         self._paired_service = PairedNewMaterialContinuationService(
             application, project_id, workspace_root
         )
@@ -89,9 +91,7 @@ class NewMaterialContinuationHandler:
         )
 
 
-def ensure_new_material_continuation_action(
-    application, project_id: str, workspace_root
-) -> None:
+def ensure_new_material_continuation_action(application, project_id: str, workspace_root) -> None:
     coordinator = application.coordinator
     with _ACTION_REGISTRATION_LOCK:
         definitions = {item.action_type: item for item in coordinator.action_definitions()}
@@ -124,9 +124,7 @@ def ensure_new_material_continuation_action(
                 raise
             coordinator._services.register(
                 _ACTION_TYPE,
-                NewMaterialContinuationHandler(
-                    application, project_id, workspace_root
-                ),
+                NewMaterialContinuationHandler(application, project_id, workspace_root),
             )
 
 
@@ -169,10 +167,8 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
             if len(nmv_records) != 1:
                 return result
             try:
-                _run, mra, _artifact, historical, _original, _capture = (
-                    _find_reacquisition_result(
-                        self._application, self._project_id, run_id
-                    )
+                _run, mra, _artifact, historical, _original, _capture = _find_reacquisition_result(
+                    self._application, self._project_id, run_id
                 )
             except LocalApplicationError as exc:
                 result["new_material_continuation"] = {
@@ -183,9 +179,7 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                 }
                 return result
             try:
-                binding = admission._continuation_binding(
-                    self._application.execution_store, run_id
-                )
+                binding = admission._continuation_binding(self._application.execution_store, run_id)
                 if binding is None:
                     status, new_run_id = "available", None
                 else:
@@ -289,18 +283,14 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                     limit=_GROUP_INSPECTION_ARTIFACT_LIMIT,
                 )
                 grouped = [
-                    item
-                    for item in artifacts
-                    if item.provenance.get("relation") == _GROUP_RELATION
+                    item for item in artifacts if item.provenance.get("relation") == _GROUP_RELATION
                 ]
                 if grouped:
                     group_ids = {
-                        str(item.provenance.get("continuation_group_id") or "")
-                        for item in grouped
+                        str(item.provenance.get("continuation_group_id") or "") for item in grouped
                     }
                     historical_ids = {
-                        str(item.provenance.get("historical_run_id") or "")
-                        for item in grouped
+                        str(item.provenance.get("historical_run_id") or "") for item in grouped
                     }
                     run_id_lists = {
                         tuple(item.provenance.get("reacquisition_run_ids") or ())

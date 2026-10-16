@@ -52,13 +52,17 @@ def research_argument_proposal_payload(payload: Mapping[str, Any]) -> dict[str, 
             raise ValueError(f"{field} must be a non-empty string")
     for field in _LIST_ID_FIELDS:
         value = normalized.get(field, [])
-        if not isinstance(value, list) or any(not isinstance(item, str) or not item for item in value):
+        if not isinstance(value, list) or any(
+            not isinstance(item, str) or not item for item in value
+        ):
             raise ValueError(f"{field} must be an array of non-empty IDs")
         if len(set(value)) != len(value):
             raise ValueError(f"{field} must not contain duplicate IDs")
         normalized[field] = list(value)
     if sum(len(normalized[field]) for field in _LIST_ID_FIELDS) > _MAX_SUPPORT_IDS:
-        raise ValueError(f"Argument support references may contain at most {_MAX_SUPPORT_IDS} IDs in total")
+        raise ValueError(
+            f"Argument support references may contain at most {_MAX_SUPPORT_IDS} IDs in total"
+        )
     for field in ("conclusion_claim_id", "qualifier", "rationale"):
         if field not in normalized:
             continue
@@ -66,11 +70,15 @@ def research_argument_proposal_payload(payload: Mapping[str, Any]) -> dict[str, 
         if value is not None and (not isinstance(value, str) or not value.strip()):
             raise ValueError(f"{field} must be a non-empty string when provided")
     implications = normalized.get("implications", [])
-    if not isinstance(implications, list) or any(not isinstance(item, str) or not item.strip() for item in implications):
+    if not isinstance(implications, list) or any(
+        not isinstance(item, str) or not item.strip() for item in implications
+    ):
         raise ValueError("implications must be an array of non-empty strings")
     normalized["implications"] = list(implications)
     if not normalized["finding_ids"] and not normalized["evidence_ids"]:
-        raise ValueError("Argument requires at least one authoritative Finding or Evidence reference")
+        raise ValueError(
+            "Argument requires at least one authoritative Finding or Evidence reference"
+        )
     return normalized
 
 
@@ -95,11 +103,12 @@ class ResearchArgumentProposeHandler:
         self._store = store
         self._ids = id_provider
 
-    def execute(self, payload: Mapping[str, Any], *, state: Any, actor: Any, proposal: Mapping[str, Any]) -> HarnessServiceResult:
+    def execute(
+        self, payload: Mapping[str, Any], *, state: Any, actor: Any, proposal: Mapping[str, Any]
+    ) -> HarnessServiceResult:
         del actor
         effective = {
-            (str(item.get("kind")), str(item.get("id"))): item
-            for item in state.effective_objects()
+            (str(item.get("kind")), str(item.get("id"))): item for item in state.effective_objects()
         }
         for field, kind in _ALLOWED_SUPPORT.items():
             for object_id in payload.get(field, ()):  # type: ignore[arg-type]
@@ -152,10 +161,12 @@ class ResearchArgumentProposeHandler:
                 "proposal_digest": str(proposal["proposal_digest"]),
             },
             "source_input_id": str(proposal["source"]["input_id"]),
-            "support_refs": {
-                field: list(payload.get(field, ())) for field in _LIST_ID_FIELDS
-            }
-            | ({"conclusion_claim_id": str(conclusion_claim_id)} if conclusion_claim_id is not None else {}),
+            "support_refs": {field: list(payload.get(field, ())) for field in _LIST_ID_FIELDS}
+            | (
+                {"conclusion_claim_id": str(conclusion_claim_id)}
+                if conclusion_claim_id is not None
+                else {}
+            ),
         }
         candidate = StateDeltaProposal(
             proposal_id=self._ids.new("SDP-"),
@@ -164,7 +175,10 @@ class ResearchArgumentProposeHandler:
             source_refs=(),
             proposed_actions=(transition_action,),
             affected_refs=(ObjectRef("argument", argument_id),),
-            rationale=str(payload.get("rationale") or "Evidence-linked Argument candidate proposed through bounded Research synthesis ingress."),
+            rationale=str(
+                payload.get("rationale")
+                or "Evidence-linked Argument candidate proposed through bounded Research synthesis ingress."
+            ),
             required_human_decision_kinds=(),
             current_snapshot_ref=str(state.current_snapshot["id"]),
             current_snapshot_digest=str(state.current_snapshot["content_digest"]),
@@ -176,12 +190,14 @@ class ResearchArgumentProposeHandler:
             "project_ref": candidate.project_ref,
             "lineage_ref": candidate.lineage_ref,
             "source_refs": list(candidate.source_refs),
-            "proposed_actions": [{
-                "kind": transition_action.kind.value,
-                "payload": deepcopy(dict(transition_action.payload)),
-                "decision_refs": list(transition_action.decision_refs),
-                "source_refs": list(transition_action.source_refs),
-            }],
+            "proposed_actions": [
+                {
+                    "kind": transition_action.kind.value,
+                    "payload": deepcopy(dict(transition_action.payload)),
+                    "decision_refs": list(transition_action.decision_refs),
+                    "source_refs": list(transition_action.source_refs),
+                }
+            ],
             "affected_refs": [{"kind": "argument", "id": argument_id}],
             "rationale": candidate.rationale,
             "required_human_decision_kinds": list(candidate.required_human_decision_kinds),
@@ -219,7 +235,10 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
         action_registry = coordinator._actions
         service_registry = coordinator._services
         with _ACTION_REGISTRATION_LOCK:
-            existing = {definition.action_type: definition for definition in coordinator.action_definitions()}
+            existing = {
+                definition.action_type: definition
+                for definition in coordinator.action_definitions()
+            }
             definition = existing.get(_ACTION_TYPE)
             if definition is None:
                 action_registry.register(

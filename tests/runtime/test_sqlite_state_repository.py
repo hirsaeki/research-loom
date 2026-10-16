@@ -67,9 +67,7 @@ class _DecisionReadFailureSQLiteRepository(SQLiteResearchStateRepository):
         raise RepositoryError("simulated Decision revision read failure")
 
 
-class SQLiteStateTransitionRuntimeParityTests(
-    runtime_suite.StateTransitionRuntimeTests
-):
+class SQLiteStateTransitionRuntimeParityTests(runtime_suite.StateTransitionRuntimeTests):
     """Run the complete PR20 StateTransitionService suite against SQLite."""
 
     def setUp(self):
@@ -87,9 +85,7 @@ class SQLiteStateTransitionRuntimeParityTests(
 
     def _sqlite_service(self, seed):
         tempdir = tempfile.TemporaryDirectory()
-        repository = _ParitySQLiteRepository(
-            Path(tempdir.name) / "research-state.sqlite3"
-        )
+        repository = _ParitySQLiteRepository(Path(tempdir.name) / "research-state.sqlite3")
         repository.initialize_from_validated_state_view(seed)
         self._tempdirs.append(tempdir)
         self._repositories.append(repository)
@@ -155,9 +151,7 @@ class SQLiteRepositorySpecificTests(unittest.TestCase):
         with closing(sqlite3.connect(self.db_path)) as connection:
             tables = {
                 row[0]
-                for row in connection.execute(
-                    "SELECT name FROM sqlite_master WHERE type='table'"
-                )
+                for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")
             }
         for required in (
             "object_revisions",
@@ -224,9 +218,7 @@ class SQLiteRepositorySpecificTests(unittest.TestCase):
                 )
                 """
             )
-            connection.execute(
-                "INSERT INTO schema_migrations(version, name) VALUES (2, 'noop')"
-            )
+            connection.execute("INSERT INTO schema_migrations(version, name) VALUES (2, 'noop')")
         prior = sqlite_adapter.MIGRATION_DIR
         sqlite_adapter.MIGRATION_DIR = migration_dir
         try:
@@ -243,8 +235,7 @@ class SQLiteRepositorySpecificTests(unittest.TestCase):
             migration_dir / "0001_research_state.sql",
         )
         (migration_dir / "0002_broken.sql").write_text(
-            "CREATE TABLE should_rollback(id INTEGER PRIMARY KEY);\n"
-            "THIS IS NOT VALID SQL;\n",
+            "CREATE TABLE should_rollback(id INTEGER PRIMARY KEY);\nTHIS IS NOT VALID SQL;\n",
             encoding="utf-8",
         )
         prior = sqlite_adapter.MIGRATION_DIR
@@ -258,9 +249,7 @@ class SQLiteRepositorySpecificTests(unittest.TestCase):
         with closing(sqlite3.connect(broken)) as connection:
             tables = {
                 row[0]
-                for row in connection.execute(
-                    "SELECT name FROM sqlite_master WHERE type='table'"
-                )
+                for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")
             }
         self.assertNotIn("project_state", tables)
         self.assertNotIn("should_rollback", tables)
@@ -291,9 +280,7 @@ class SQLiteRepositorySpecificTests(unittest.TestCase):
         receipt = self.service(repository).apply(request)
         self.assertIsInstance(receipt, CommitReceipt)
         self.assertEqual(
-            repository.load_object_revision("claim", "CLM-JP", 0)[
-                "statement"
-            ],
+            repository.load_object_revision("claim", "CLM-JP", 0)["statement"],
             "日本語の主張 🧪",
         )
         self.assertEqual(
@@ -360,9 +347,7 @@ class SQLiteRepositorySpecificTests(unittest.TestCase):
             "RT-HEAD-002",
             {issue.error_code for issue in rejected.issues},
         )
-        self.assertIsNone(
-            second.load_object_revision("claim", "CLM-B", 0)
-        )
+        self.assertIsNone(second.load_object_revision("claim", "CLM-B", 0))
 
     def test_missing_active_lineage_pointer_cannot_commit_switch(self):
         base = seed_state(objects=[project(), rq()])
@@ -386,9 +371,7 @@ class SQLiteRepositorySpecificTests(unittest.TestCase):
 
         def remove_active_pointer():
             with closing(sqlite3.connect(self.db_path)) as connection, connection:
-                connection.execute(
-                    "DELETE FROM project_active_lineage WHERE project_ref = 'PRJ-1'"
-                )
+                connection.execute("DELETE FROM project_active_lineage WHERE project_ref = 'PRJ-1'")
 
         repository.before_commit = remove_active_pointer
         request = make_request(
@@ -410,9 +393,7 @@ class SQLiteRepositorySpecificTests(unittest.TestCase):
             {issue.error_code for issue in rejected.issues},
         )
         self.assertIn("active lineage pointer is missing", rejected.issues[0].message)
-        self.assertIsNone(
-            repository.find_commit_by_idempotency_key("IDEMP-SWITCH-MISSING")
-        )
+        self.assertIsNone(repository.find_commit_by_idempotency_key("IDEMP-SWITCH-MISSING"))
 
     def test_used_decision_uniqueness_defends_against_commit_time_replay(self):
         adopted_decision = decision(
@@ -468,9 +449,7 @@ class SQLiteRepositorySpecificTests(unittest.TestCase):
         )
         self.assertIn("cannot be consumed twice", rejected.issues[0].message)
         self.assertIsNone(repository.load_snapshot("SNP-DECISION-RACE"))
-        self.assertIsNone(
-            repository.find_commit_by_idempotency_key("IDEMP-DECISION-RACE")
-        )
+        self.assertIsNone(repository.find_commit_by_idempotency_key("IDEMP-DECISION-RACE"))
 
     def test_decision_revision_read_failure_is_atomic_commit_error(self):
         base = seed_state(objects=[project(), rq()])
@@ -503,9 +482,7 @@ class SQLiteRepositorySpecificTests(unittest.TestCase):
             {issue.error_code for issue in rejected.issues},
         )
         self.assertIn("failed to validate Decision", rejected.issues[0].message)
-        self.assertIsNone(
-            repository.find_commit_by_idempotency_key("IDEMP-DECISION-READ")
-        )
+        self.assertIsNone(repository.find_commit_by_idempotency_key("IDEMP-DECISION-READ"))
 
     def test_mid_transaction_fault_rolls_back_all_research_state(self):
         seed = seed_state(objects=[project(), rq()])
@@ -539,13 +516,9 @@ class SQLiteRepositorySpecificTests(unittest.TestCase):
             {issue.error_code for issue in rejected.issues},
         )
         self.assertEqual(repository.debug_state(), before)
-        self.assertIsNone(
-            repository.load_object_revision("claim", "CLM-FAULT", 0)
-        )
+        self.assertIsNone(repository.load_object_revision("claim", "CLM-FAULT", 0))
         self.assertIsNone(repository.load_snapshot("SNP-FAULT"))
-        self.assertIsNone(
-            repository.find_commit_by_idempotency_key("IDEMP-FAULT")
-        )
+        self.assertIsNone(repository.find_commit_by_idempotency_key("IDEMP-FAULT"))
 
     def test_doctor_reports_foreign_key_corruption_without_repair(self):
         seed = seed_state(objects=[project(), rq()])
@@ -572,11 +545,7 @@ class SQLiteRepositorySpecificTests(unittest.TestCase):
             ),
             issues,
         )
-        self.assertIsNone(
-            reopened.load_object_revision(
-                "research_question", "RQ-1", 0
-            )
-        )
+        self.assertIsNone(reopened.load_object_revision("research_question", "RQ-1", 0))
 
     def test_external_content_digest_is_preserved_not_reinterpreted(self):
         seed = seed_state(objects=[project()])
@@ -600,9 +569,7 @@ class SQLiteRepositorySpecificTests(unittest.TestCase):
                 created_commit_id=None,
             )
         self.assertEqual(
-            repository.load_object_revision("artifact", "ART-1", 0)[
-                "content_digest"
-            ],
+            repository.load_object_revision("artifact", "ART-1", 0)["content_digest"],
             "sha256:external-bytes-digest",
         )
 

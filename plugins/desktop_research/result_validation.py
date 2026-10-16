@@ -19,14 +19,10 @@ from .digest import canonical_extension_digest
 ROOT = Path(__file__).resolve().parents[2]
 DR = ROOT / "core" / "packages" / "desktop-research"
 _SCHEMA = json.loads(
-    (DR / "desktop-research-result-extension.schema.json").read_text(
-        encoding="utf-8"
-    )
+    (DR / "desktop-research-result-extension.schema.json").read_text(encoding="utf-8")
 )
 _VALIDATOR = Draft202012Validator(_SCHEMA, format_checker=FormatChecker())
-_SEMANTICS = yaml.safe_load(
-    (DR / "desktop-research-semantics.yaml").read_text(encoding="utf-8")
-)
+_SEMANTICS = yaml.safe_load((DR / "desktop-research-semantics.yaml").read_text(encoding="utf-8"))
 _ERRORS = {str(item["id"]) for item in _SEMANTICS["errors"]}
 
 
@@ -35,10 +31,7 @@ def _utc(value: str) -> bool:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
         return False
-    return (
-        parsed.tzinfo is not None
-        and parsed.utcoffset() == timezone.utc.utcoffset(parsed)
-    )
+    return parsed.tzinfo is not None and parsed.utcoffset() == timezone.utc.utcoffset(parsed)
 
 
 def _exact(locator: str) -> bool:
@@ -46,11 +39,7 @@ def _exact(locator: str) -> bool:
         return False
     if locator.startswith(("http://", "https://")):
         parsed = urlparse(locator)
-        return bool(
-            (parsed.path and parsed.path != "/")
-            or parsed.query
-            or parsed.fragment
-        )
+        return bool((parsed.path and parsed.path != "/") or parsed.query or parsed.fragment)
     return True
 
 
@@ -154,29 +143,20 @@ class DesktopResearchResultValidator:
         if (
             extension["handoff_binding"] != expected
             or run_id != handoff["run_id"]
-            or capability_binding
-            != ("desktop-research", "0.1.0", "investigate")
+            or capability_binding != ("desktop-research", "0.1.0", "investigate")
             or context_extension["context_binding"]["context_pack_digest"]
             != context_pack["context_pack_digest"]
         ):
             _add(codes, "DR-RESULT-BINDING-001")
 
-        captures = {
-            str(item["capture_id"]): item
-            for item in handoff["outputs"]["source_captures"]
-        }
+        captures = {str(item["capture_id"]): item for item in handoff["outputs"]["source_captures"]}
         details = extension["source_capture_details"]
         detail_ids = {str(item["capture_id"]) for item in details}
         if len(detail_ids) != len(details) or detail_ids != set(captures):
             _add(codes, "DR-CAPTURE-PROVENANCE-001")
 
-        detail_index = {
-            str(item["capture_id"]): item for item in details
-        }
-        metadata = {
-            item.artifact_id: item
-            for item in self._artifacts.artifacts_for(run_id)
-        }
+        detail_index = {str(item["capture_id"]): item for item in details}
+        metadata = {item.artifact_id: item for item in self._artifacts.artifacts_for(run_id)}
         texts: dict[str, str] = {}
         original_bytes = 0
         text_bytes = 0
@@ -200,12 +180,9 @@ class DesktopResearchResultValidator:
                 reasons.append("exact_locator is not sufficiently specific")
             if (
                 capture is not None
-                and detail["original_capture"]["content_digest"]
-                != capture["content_digest"]
+                and detail["original_capture"]["content_digest"] != capture["content_digest"]
             ):
-                reasons.append(
-                    "original_capture digest does not match Handoff source_capture"
-                )
+                reasons.append("original_capture digest does not match Handoff source_capture")
 
             for key, role in (
                 ("original_capture", "desktop_research.original_capture"),
@@ -230,9 +207,7 @@ class DesktopResearchResultValidator:
                     reasons.append(f"{key} metadata digest does not match declaration")
                     metadata_mismatched = True
                 if meta.media_type != declaration["media_type"]:
-                    reasons.append(
-                        f"{key} metadata media_type does not match declaration"
-                    )
+                    reasons.append(f"{key} metadata media_type does not match declaration")
                     metadata_mismatched = True
                 if meta.size != declaration["byte_length"]:
                     reasons.append(f"{key} metadata size does not match declaration")
@@ -243,9 +218,7 @@ class DesktopResearchResultValidator:
                 try:
                     payload = self._artifacts.load_artifact(ref)
                 except Exception as exc:
-                    reasons.append(
-                        f"{key} artifact loading failed: {type(exc).__name__}"
-                    )
+                    reasons.append(f"{key} artifact loading failed: {type(exc).__name__}")
                     continue
                 if payload.digest != declaration["content_digest"]:
                     reasons.append(f"{key} stored digest does not match declaration")
@@ -268,9 +241,7 @@ class DesktopResearchResultValidator:
                     declaration.get("inline_text") is not None
                     and declaration["inline_text"] != text
                 ):
-                    reasons.append(
-                        "text_rendition inline_text does not match stored UTF-8 text"
-                    )
+                    reasons.append("text_rendition inline_text does not match stored UTF-8 text")
                 texts[capture_id] = text
 
             if reasons:
@@ -284,8 +255,7 @@ class DesktopResearchResultValidator:
         )
         if (
             len(details) > budget["max_acquired_source_captures"]
-            or len(extension["search_trace"]["entries"])
-            > budget["max_search_trace_entries"]
+            or len(extension["search_trace"]["entries"]) > budget["max_search_trace_entries"]
             or text_bytes > budget["max_text_rendition_bytes"]
             or len(refs) > max_capture_artifacts
             or (
@@ -338,29 +308,21 @@ class DesktopResearchResultValidator:
                 or detail is None
                 or text is None
                 or output["source_basis"] != expected_basis
-                or citation["text_rendition_digest"]
-                != detail["text_rendition"]["content_digest"]
+                or citation["text_rendition_digest"] != detail["text_rendition"]["content_digest"]
                 or output["locator"] != citation["excerpt_locator"]
                 or citation["excerpt"] not in text
             ):
                 _add(codes, "DR-CITATION-001")
             cited.add(key)
-        if (
-            not required_citations.issubset(cited)
-            or (
-                "DR-CAPTURE-PROVENANCE-001" in codes
-                and extension["citation_details"]
-            )
+        if not required_citations.issubset(cited) or (
+            "DR-CAPTURE-PROVENANCE-001" in codes and extension["citation_details"]
         ):
             _add(codes, "DR-CITATION-001")
 
         entries = extension["search_trace"]["entries"]
-        entry_index = {
-            str(item["trace_entry_id"]): item for item in entries
-        }
+        entry_index = {str(item["trace_entry_id"]): item for item in entries}
         dimensions = {
-            str(item["dimension_id"])
-            for item in context_extension["coverage_dimensions"]
+            str(item["dimension_id"]) for item in context_extension["coverage_dimensions"]
         }
         if len(entry_index) != len(entries):
             _add(codes, "DR-SEARCH-TRACE-001")
@@ -386,20 +348,14 @@ class DesktopResearchResultValidator:
             if entry is None:
                 continue
             expected_captures = (
-                [attempt["resulting_capture_id"]]
-                if attempt["outcome"] == "source_captured"
-                else []
+                [attempt["resulting_capture_id"]] if attempt["outcome"] == "source_captured" else []
             )
             if (
                 entry["strategy"] != attempt["strategy"]
-                or set(entry["coverage_dimension_ids"])
-                != set(attempt["coverage_dimension_ids"])
+                or set(entry["coverage_dimension_ids"]) != set(attempt["coverage_dimension_ids"])
                 or entry["outcome"] != attempt["outcome"]
                 or list(entry["source_capture_ids"]) != expected_captures
-                or (
-                    expected_captures
-                    and expected_captures[0] not in captures
-                )
+                or (expected_captures and expected_captures[0] not in captures)
             ):
                 _add(codes, "DR-SEARCH-TRACE-001")
         unsuccessful = {
@@ -425,19 +381,13 @@ class DesktopResearchResultValidator:
                 _add(codes, "DR-NULL-001")
             null_ids.add(null_result["null_id"])
         if extension["null_results"] and not any(
-            attempt.get("outcome") == "no_relevant_source"
-            for attempt in attempts.values()
+            attempt.get("outcome") == "no_relevant_source" for attempt in attempts.values()
         ):
             _add(codes, "DR-NULL-001")
 
-        gaps = {
-            str(item["gap_id"])
-            for item in handoff["outputs"]["evidence_gaps"]
-        }
+        gaps = {str(item["gap_id"]) for item in handoff["outputs"]["evidence_gaps"]}
         gap_assessments = extension["evidence_gap_assessments"]
-        assessment_ids = {
-            str(item["gap_id"]) for item in gap_assessments
-        }
+        assessment_ids = {str(item["gap_id"]) for item in gap_assessments}
         if (
             len(assessment_ids) != len(gap_assessments)
             or assessment_ids != gaps
@@ -449,10 +399,7 @@ class DesktopResearchResultValidator:
             _add(codes, "DR-EVIDENCE-GAP-001")
 
         dimension_assessments = extension["coverage_assessment"]["dimensions"]
-        dimension_index = {
-            str(item["dimension_id"]): item
-            for item in dimension_assessments
-        }
+        dimension_index = {str(item["dimension_id"]): item for item in dimension_assessments}
         if (
             len(dimension_index) != len(dimension_assessments)
             or set(dimension_index) != dimensions
@@ -469,8 +416,7 @@ class DesktopResearchResultValidator:
                 if dimension_id in attempt["coverage_dimension_ids"]
             ]
             if assessment["status"] == "covered" and not any(
-                attempt.get("outcome") == "source_captured"
-                for attempt in relevant
+                attempt.get("outcome") == "source_captured" for attempt in relevant
             ):
                 _add(codes, "DR-COVERAGE-001")
 
@@ -486,8 +432,7 @@ class DesktopResearchResultValidator:
                     for output_id in related
                 )
                 limited = any(
-                    dimension_index.get(dimension_id, {}).get("status")
-                    in {"partial", "uncovered"}
+                    dimension_index.get(dimension_id, {}).get("status") in {"partial", "uncovered"}
                     for dimension_id in attempt["coverage_dimension_ids"]
                 )
                 if not (visible or limited):
@@ -498,13 +443,11 @@ class DesktopResearchResultValidator:
             "remaining_information_value"
         ]["level"]
         if set(stop["basis"]) == {"source_count"} or (
-            stop["stop_recommended"]
-            and operational_terminations(self._operations, run_id)
+            stop["stop_recommended"] and operational_terminations(self._operations, run_id)
         ):
             _add(codes, "DR-STOP-BASIS-001")
         if stop["stop_recommended"] and any(
-            item["materiality"] in {"material", "unknown"}
-            for item in gap_assessments
+            item["materiality"] in {"material", "unknown"} for item in gap_assessments
         ):
             _add(codes, "DR-STOP-GAP-001")
         if stop["stop_recommended"] and remaining_information_value in {
@@ -514,8 +457,7 @@ class DesktopResearchResultValidator:
             _add(codes, "DR-STOP-RIV-001")
 
         methods = {
-            str(item["proposal_id"])
-            for item in handoff["outputs"]["candidate_next_methods"]
+            str(item["proposal_id"]) for item in handoff["outputs"]["candidate_next_methods"]
         }
         if set(extension["candidate_next_method_ids"]) != methods:
             _add(codes, "DR-NEXT-METHOD-001")

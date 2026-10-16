@@ -38,14 +38,24 @@ class ExternalMaterialHealthTests(unittest.TestCase):
                         acquired_at=f"2026-09-01T00:0{index + 1}:20Z",
                     )
 
-                with patch.object(store, "diagnose_artifact_content", wraps=store.diagnose_artifact_content) as diagnose:
+                with patch.object(
+                    store, "diagnose_artifact_content", wraps=store.diagnose_artifact_content
+                ) as diagnose:
                     healthy = facade.list_external_materials()["materials"][0]
                 self.assertEqual(healthy["capture_count"], 2)
                 self.assertEqual(healthy["backing_content_status"], "verified")
                 self.assertEqual(healthy["verified_backing_copy_count"], 1)
-                self.assertEqual(diagnose.call_count, 2)  # one original + one representative rendition
-                self.assertEqual(healthy["captures"][0]["renditions"][0]["content_health"]["status"], "verified")
-                self.assertFalse(healthy["captures"][1]["renditions"][0]["content_health"]["verification_performed"])
+                self.assertEqual(
+                    diagnose.call_count, 2
+                )  # one original + one representative rendition
+                self.assertEqual(
+                    healthy["captures"][0]["renditions"][0]["content_health"]["status"], "verified"
+                )
+                self.assertFalse(
+                    healthy["captures"][1]["renditions"][0]["content_health"][
+                        "verification_performed"
+                    ]
+                )
 
                 originals = [
                     artifact
@@ -54,7 +64,10 @@ class ExternalMaterialHealthTests(unittest.TestCase):
                     if artifact.role == "desktop_research.original_capture"
                 ]
                 self.assertEqual(originals[0].storage_locator, originals[1].storage_locator)
-                history = [(item["run_id"], item["capture_id"], item["captured_at"]) for item in healthy["captures"]]
+                history = [
+                    (item["run_id"], item["capture_id"], item["captured_at"])
+                    for item in healthy["captures"]
+                ]
                 store._locator_path(originals[0].storage_locator, originals[0].digest).unlink()
 
                 missing = facade.list_external_materials()["materials"][0]
@@ -63,8 +76,15 @@ class ExternalMaterialHealthTests(unittest.TestCase):
                 self.assertEqual(missing["verified_backing_copy_count"], 0)
                 self.assertFalse(missing["content_available"])
                 self.assertTrue(all(item["capture_record_present"] for item in missing["captures"]))
-                self.assertTrue(all(item["original"]["content_health"]["status"] == "content_missing" for item in missing["captures"]))
-                self.assertEqual(missing["captures"][0]["renditions"][0]["content_health"]["status"], "verified")
+                self.assertTrue(
+                    all(
+                        item["original"]["content_health"]["status"] == "content_missing"
+                        for item in missing["captures"]
+                    )
+                )
+                self.assertEqual(
+                    missing["captures"][0]["renditions"][0]["content_health"]["status"], "verified"
+                )
 
                 # Ablation: metadata grouping alone cannot observe the vanished shared CAS bytes.
                 with patch.object(
@@ -78,7 +98,9 @@ class ExternalMaterialHealthTests(unittest.TestCase):
                         "actual_size": originals[0].size,
                     },
                 ):
-                    self.assertTrue(facade.list_external_materials()["materials"][0]["content_available"])
+                    self.assertTrue(
+                        facade.list_external_materials()["materials"][0]["content_available"]
+                    )
 
             finally:
                 facade.close()
@@ -89,7 +111,12 @@ class ExternalMaterialHealthTests(unittest.TestCase):
             try:
                 store = facade._application.execution_store
                 for index in range(12):
-                    run = _create_running(store, facade.project_id, f"RUN-{index:02d}", f"2026-09-01T00:{index:02d}:00Z")
+                    run = _create_running(
+                        store,
+                        facade.project_id,
+                        f"RUN-{index:02d}",
+                        f"2026-09-01T00:{index:02d}:00Z",
+                    )
                     _capture(
                         store,
                         run,
@@ -98,13 +125,17 @@ class ExternalMaterialHealthTests(unittest.TestCase):
                         f"https://example.test/{index}",
                         acquired_at=f"2026-09-01T00:{index:02d}:20Z",
                     )
-                with patch.object(store, "diagnose_artifact_content", wraps=store.diagnose_artifact_content) as diagnose:
+                with patch.object(
+                    store, "diagnose_artifact_content", wraps=store.diagnose_artifact_content
+                ) as diagnose:
                     material = facade.list_external_materials(limit=1)["materials"][0]
                 self.assertEqual(material["capture_count"], 12)
                 self.assertEqual(diagnose.call_count, 2)
                 health = [item["renditions"][0]["content_health"] for item in material["captures"]]
                 self.assertEqual(sum(item["status"] == "verified" for item in health), 1)
-                self.assertEqual(sum(item["verification_performed"] is False for item in health), 11)
+                self.assertEqual(
+                    sum(item["verification_performed"] is False for item in health), 11
+                )
             finally:
                 facade.close()
 
@@ -114,9 +145,15 @@ class ExternalMaterialHealthTests(unittest.TestCase):
             try:
                 store = facade._application.execution_store
                 capture = DesktopResearchCaptureService(store)
-                run_a = _create_running(store, facade.project_id, "RUN-CACHE-A", "2026-09-01T00:01:00Z")
-                run_b1 = _create_running(store, facade.project_id, "RUN-CACHE-B1", "2026-09-01T00:02:00Z")
-                run_b2 = _create_running(store, facade.project_id, "RUN-CACHE-B2", "2026-09-01T00:03:00Z")
+                run_a = _create_running(
+                    store, facade.project_id, "RUN-CACHE-A", "2026-09-01T00:01:00Z"
+                )
+                run_b1 = _create_running(
+                    store, facade.project_id, "RUN-CACHE-B1", "2026-09-01T00:02:00Z"
+                )
+                run_b2 = _create_running(
+                    store, facade.project_id, "RUN-CACHE-B2", "2026-09-01T00:03:00Z"
+                )
 
                 capture.capture(
                     run_a,
@@ -149,14 +186,20 @@ class ExternalMaterialHealthTests(unittest.TestCase):
                     text_rendition="distinct rendition",
                 )
 
-                with patch.object(store, "diagnose_artifact_content", wraps=store.diagnose_artifact_content) as diagnose:
+                with patch.object(
+                    store, "diagnose_artifact_content", wraps=store.diagnose_artifact_content
+                ) as diagnose:
                     materials = facade.list_external_materials()["materials"]
 
                 self.assertEqual(diagnose.call_count, 3)
                 material_b = next(item for item in materials if item["capture_count"] == 2)
-                rendition_health = [item["renditions"][0]["content_health"] for item in material_b["captures"]]
+                rendition_health = [
+                    item["renditions"][0]["content_health"] for item in material_b["captures"]
+                ]
                 self.assertEqual(sum(item["status"] == "verified" for item in rendition_health), 1)
-                self.assertEqual(sum(item["verification_performed"] is False for item in rendition_health), 1)
+                self.assertEqual(
+                    sum(item["verification_performed"] is False for item in rendition_health), 1
+                )
             finally:
                 facade.close()
 
@@ -165,19 +208,37 @@ class ExternalMaterialHealthTests(unittest.TestCase):
             facade = self._workspace(Path(temp))
             try:
                 store = facade._application.execution_store
-                run = _create_running(store, facade.project_id, "RUN-CORRUPT", "2026-09-01T00:03:00Z")
-                _capture(store, run, "CAP-CORRUPT", b"0123456789", "https://example.test/corrupt", acquired_at="2026-09-01T00:03:20Z")
-                original = next(item for item in store.artifacts_for(run.run_id) if item.role == "desktop_research.original_capture")
+                run = _create_running(
+                    store, facade.project_id, "RUN-CORRUPT", "2026-09-01T00:03:00Z"
+                )
+                _capture(
+                    store,
+                    run,
+                    "CAP-CORRUPT",
+                    b"0123456789",
+                    "https://example.test/corrupt",
+                    acquired_at="2026-09-01T00:03:20Z",
+                )
+                original = next(
+                    item
+                    for item in store.artifacts_for(run.run_id)
+                    if item.role == "desktop_research.original_capture"
+                )
                 blob = store._locator_path(original.storage_locator, original.digest)
                 saved = blob.read_bytes()
 
                 blob.write_bytes(b"X" + saved[1:])
-                health = facade.list_external_materials()["materials"][0]["original"]["content_health"]
+                health = facade.list_external_materials()["materials"][0]["original"][
+                    "content_health"
+                ]
                 self.assertEqual(health["status"], "digest_mismatch")
 
                 blob.write_bytes(saved + b"extra")
                 listed = facade.list_external_materials()
-                self.assertEqual(listed["materials"][0]["original"]["content_health"]["status"], "digest_and_size_mismatch")
+                self.assertEqual(
+                    listed["materials"][0]["original"]["content_health"]["status"],
+                    "digest_and_size_mismatch",
+                )
                 self.assertNotIn(str(blob), repr(listed))
             finally:
                 facade.close()
@@ -193,13 +254,15 @@ class ExternalMaterialRecoveryHealthTests(ResearchPackageAcceptanceSupport):
             )
             store = facade._application.execution_store
             original = next(
-                item for item in store.artifacts_for(case["run_id"])
+                item
+                for item in store.artifacts_for(case["run_id"])
                 if item.role == "desktop_research.original_capture"
                 and item.provenance.get("capture_id") == "CAP-1"
             )
             store._locator_path(original.storage_locator, original.digest).unlink()
             missing = next(
-                item for item in facade.list_external_materials()["materials"]
+                item
+                for item in facade.list_external_materials()["materials"]
                 if item["material_id"] == original.digest
             )
             history = [
@@ -222,13 +285,17 @@ class ExternalMaterialRecoveryHealthTests(ResearchPackageAcceptanceSupport):
             self.assertFalse(recovered["historical_metadata_rewritten"])
 
             healthy = next(
-                item for item in facade.list_external_materials()["materials"]
+                item
+                for item in facade.list_external_materials()["materials"]
                 if item["material_id"] == original.digest
             )
             self.assertEqual(healthy["backing_content_status"], "verified")
             self.assertEqual(healthy["verified_backing_copy_count"], 1)
             self.assertEqual(
-                [(item["run_id"], item["capture_id"], item["captured_at"]) for item in healthy["captures"]],
+                [
+                    (item["run_id"], item["capture_id"], item["captured_at"])
+                    for item in healthy["captures"]
+                ],
                 history,
             )
         finally:

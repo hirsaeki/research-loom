@@ -69,9 +69,7 @@ class InMemoryExecutionTraceStore:
         prior = store.get(identity)
         if prior is not None:
             if single_use or canonical_digest(prior) != canonical_digest(frozen):
-                raise ValueError(
-                    f"immutable execution identity collision: {identity}"
-                )
+                raise ValueError(f"immutable execution identity collision: {identity}")
             return
         store[identity] = frozen
 
@@ -102,9 +100,7 @@ class InMemoryExecutionTraceStore:
                 return False
             for name in _RUN_IMMUTABLE_FIELDS:
                 if getattr(current, name) != getattr(updated_run, name):
-                    raise ValueError(
-                        f"immutable Run field {name} cannot change on transition"
-                    )
+                    raise ValueError(f"immutable Run field {name} cannot change on transition")
             self.runs[updated_run.run_id] = updated_run
             self.events[updated_run.run_id].append(event)
             return True
@@ -181,9 +177,7 @@ class InMemoryExecutionTraceStore:
         kind: str,
         payload: Mapping[str, Any],
     ) -> None:
-        self.diagnostics.append(
-            (run_id, kind, deepcopy(dict(payload)))
-        )
+        self.diagnostics.append((run_id, kind, deepcopy(dict(payload))))
 
 
 class StaticClock:
@@ -213,10 +207,7 @@ class AllowListedAuthorizationProvider:
         now: str,
     ) -> AuthorizationDecision:
         del context_pack, now
-        if (
-            self._denied
-            or evidence.get("authorization_digest") not in self._digests
-        ):
+        if self._denied or evidence.get("authorization_digest") not in self._digests:
             return AuthorizationDecision(
                 False,
                 (),
@@ -228,12 +219,9 @@ class AllowListedAuthorizationProvider:
                 ),
             )
         if (
-            evidence.get("capability_id")
-            != invocation["capability"]["capability_id"]
-            or evidence.get("function_id")
-            != invocation["capability"]["function_id"]
-            or invocation["execution_mode"]
-            not in evidence.get("execution_modes", ())
+            evidence.get("capability_id") != invocation["capability"]["capability_id"]
+            or evidence.get("function_id") != invocation["capability"]["function_id"]
+            or invocation["execution_mode"] not in evidence.get("execution_modes", ())
         ):
             return AuthorizationDecision(
                 False,

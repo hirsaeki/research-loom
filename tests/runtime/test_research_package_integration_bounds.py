@@ -17,9 +17,11 @@ class ResearchPackageIntegrationBoundsTests(unittest.TestCase):
     def test_full_manuscript_object_selection(self):
         # All evidence, its 60 distinct Sources, and eight recommendations
         # can be selected in one bounded input without dropping references.
-        ids = ([f"EVD-{n:04d}" for n in range(143)]
-               + [f"SRC-{n:04d}" for n in range(60)]
-               + [f"REC-{n:04d}" for n in range(8)])
+        ids = (
+            [f"EVD-{n:04d}" for n in range(143)]
+            + [f"SRC-{n:04d}" for n in range(60)]
+            + [f"REC-{n:04d}" for n in range(8)]
+        )
         with self.assertRaises(LocalApplicationError):
             str_list(ids, "object_ids", 64)  # Prior cap: ablation.
         self.assertEqual(str_list(ids, "object_ids", MAX_OBJECTS), ids)
@@ -44,6 +46,7 @@ class ResearchPackageIntegrationBoundsTests(unittest.TestCase):
             str_list(["EVD-0001", "EVD-0001"], "object_ids", MAX_OBJECTS)
         self.assertEqual(duplicate.exception.code, "APPLICATION-RESEARCH-PACKAGE-INPUT-001")
 
+
 class ResearchPackageBulkAttachmentVerificationTests(ResearchPackageAcceptanceSupport):
     def test_sixty_material_renditions_verify_without_disabling_integrity(self):
         """Use the actual detached verifier with a >4 MiB, 60-body package."""
@@ -51,7 +54,10 @@ class ResearchPackageBulkAttachmentVerificationTests(ResearchPackageAcceptanceSu
         import json
 
         from plugins.local_application.research_package_format import (
-            digest_bytes, digest_json, verify_export_root, without_digest,
+            digest_bytes,
+            digest_json,
+            verify_export_root,
+            without_digest,
         )
         from plugins.local_application.research_package_service import ResearchPackageService
 
@@ -76,13 +82,15 @@ class ResearchPackageBulkAttachmentVerificationTests(ResearchPackageAcceptanceSu
                     "attachment_path": attachment,
                 }
                 package["resolved_content"]["materials"].append(row)
-                package["attachments"].append({
-                    "path": attachment,
-                    "media_type": "text/plain",
-                    "byte_length": len(payload),
-                    "content_digest": digest_bytes(payload),
-                    "source": f"external_material:{run_id}:{capture_id}",
-                })
+                package["attachments"].append(
+                    {
+                        "path": attachment,
+                        "media_type": "text/plain",
+                        "byte_length": len(payload),
+                        "content_digest": digest_bytes(payload),
+                        "source": f"external_material:{run_id}:{capture_id}",
+                    }
+                )
                 output = root / attachment
                 output.parent.mkdir(parents=True, exist_ok=True)
                 output.write_bytes(payload)
@@ -95,10 +103,15 @@ class ResearchPackageBulkAttachmentVerificationTests(ResearchPackageAcceptanceSu
                 "content_digest": digest_bytes(md),
             }
             package["package_digest"] = digest_json(without_digest(package))
-            filename.write_text(json.dumps(package, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+            filename.write_text(
+                json.dumps(package, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
+                encoding="utf-8",
+            )
 
             self.assertEqual(len(package["resolved_content"]["materials"]), 60)
-            self.assertGreater(sum(a["byte_length"] for a in package["attachments"]), 4 * 1024 * 1024)
+            self.assertGreater(
+                sum(a["byte_length"] for a in package["attachments"]), 4 * 1024 * 1024
+            )
             self.assertEqual(verify_export_root(root)["status"], "VERIFIED")
             # The higher budget must not weaken digest/size validation.
             (root / attachment).write_bytes(payload + b"tampered")

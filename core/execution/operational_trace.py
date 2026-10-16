@@ -27,12 +27,10 @@ class OperationalTraceStore(Protocol):
         payload: Mapping[str, Any],
         *,
         event_id: str | None = None,
-    ) -> OperationalTraceEvent:
-        ...
+    ) -> OperationalTraceEvent: ...
 
     def events_for(
         self,
         run_id: str,
         event_type: str | None = None,
-    ) -> tuple[OperationalTraceEvent, ...]:
-        ...
+    ) -> tuple[OperationalTraceEvent, ...]: ...

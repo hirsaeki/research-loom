@@ -1,4 +1,5 @@
 """Shared Workspace lifetimes and exclusive Profile updates, bounded by OS locks."""
+
 from __future__ import annotations
 
 from contextlib import contextmanager
@@ -18,6 +19,7 @@ _LOCK_STATE = threading.local()
 def _try_lock(handle, *, shared: bool) -> None:
     if os.name != "nt":
         import fcntl
+
         fcntl.flock(handle.fileno(), (fcntl.LOCK_SH if shared else fcntl.LOCK_EX) | fcntl.LOCK_NB)
         return
     import ctypes
@@ -28,17 +30,33 @@ def _try_lock(handle, *, shared: bool) -> None:
     # provide this distinction. FAIL_IMMEDIATELY keeps every attempt bounded.
     # https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-lockfileex
     class Overlapped(ctypes.Structure):
-        _fields_ = [("Internal", ctypes.c_size_t), ("InternalHigh", ctypes.c_size_t),
-                    ("Offset", wintypes.DWORD), ("OffsetHigh", wintypes.DWORD),
-                    ("hEvent", wintypes.HANDLE)]
+        _fields_ = [
+            ("Internal", ctypes.c_size_t),
+            ("InternalHigh", ctypes.c_size_t),
+            ("Offset", wintypes.DWORD),
+            ("OffsetHigh", wintypes.DWORD),
+            ("hEvent", wintypes.HANDLE),
+        ]
 
     lock = ctypes.WinDLL("kernel32", use_last_error=True).LockFileEx
-    lock.argtypes = [wintypes.HANDLE, wintypes.DWORD, wintypes.DWORD,
-                     wintypes.DWORD, wintypes.DWORD, ctypes.POINTER(Overlapped)]
+    lock.argtypes = [
+        wintypes.HANDLE,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        ctypes.POINTER(Overlapped),
+    ]
     lock.restype = wintypes.BOOL
     overlapped = Overlapped()
-    if not lock(msvcrt.get_osfhandle(handle.fileno()), 1 | (0 if shared else 2),
-                0, 1, 0, ctypes.byref(overlapped)):
+    if not lock(
+        msvcrt.get_osfhandle(handle.fileno()),
+        1 | (0 if shared else 2),
+        0,
+        1,
+        0,
+        ctypes.byref(overlapped),
+    ):
         raise ctypes.WinError(ctypes.get_last_error())
 
 
@@ -68,16 +86,24 @@ def workspace_lock(root: Path, *, shared: bool = False, timeout: float = 5.0):
         _LOCK_STATE.leases = leases
     lease = leases.get(key)
     if lease is not None and lease["shared"] and not shared:
-        raise LocalWorkspaceError("WORKSPACE-LOCK-BUSY-001", "Profile update requires exclusive access; close this thread's Workspace handles and retry")
+        raise LocalWorkspaceError(
+            "WORKSPACE-LOCK-BUSY-001",
+            "Profile update requires exclusive access; close this thread's Workspace handles and retry",
+        )
     if lease is None:
         internal = _safe_locator(root, INTERNAL_DIR)
         if not internal.is_dir():
-            raise LocalWorkspaceError("WORKSPACE-MISSING-001", "workspace internal directory is missing")
+            raise LocalWorkspaceError(
+                "WORKSPACE-MISSING-001", "workspace internal directory is missing"
+            )
         lock_path = _safe_locator(root, f"{INTERNAL_DIR}/{ADVANCEMENT_LOCK}", require_exists=False)
         try:
             handle = lock_path.open("a+b")
         except OSError as exc:
-            raise LocalWorkspaceError("WORKSPACE-LOCK-IO-001", "cannot open Workspace lock; resolve permissions or filesystem I/O, then retry") from exc
+            raise LocalWorkspaceError(
+                "WORKSPACE-LOCK-IO-001",
+                "cannot open Workspace lock; resolve permissions or filesystem I/O, then retry",
+            ) from exc
         try:
             # A byte-range past EOF is valid. Do not write a sentinel: a second
             # reader could otherwise race a shared lock on an initially empty file.
@@ -88,10 +114,16 @@ def workspace_lock(root: Path, *, shared: bool = False, timeout: float = 5.0):
                     break
                 except OSError as exc:
                     if not _contention(exc):
-                        raise LocalWorkspaceError("WORKSPACE-LOCK-IO-001", "cannot acquire Workspace lock; resolve permissions, unsupported locking or filesystem I/O, then retry") from exc
+                        raise LocalWorkspaceError(
+                            "WORKSPACE-LOCK-IO-001",
+                            "cannot acquire Workspace lock; resolve permissions, unsupported locking or filesystem I/O, then retry",
+                        ) from exc
                     remaining = deadline - time.monotonic()
                     if remaining <= 0:
-                        raise LocalWorkspaceError("WORKSPACE-LOCK-BUSY-001", "Workspace is in use; close active handles or finish Profile update, then retry. Do not delete the lock file") from exc
+                        raise LocalWorkspaceError(
+                            "WORKSPACE-LOCK-BUSY-001",
+                            "Workspace is in use; close active handles or finish Profile update, then retry. Do not delete the lock file",
+                        ) from exc
                     time.sleep(min(0.05, remaining))
         except BaseException:
             handle.close()

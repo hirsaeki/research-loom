@@ -31,7 +31,15 @@ def _record_from_payload(
     answers = []
     if isinstance(source_answers, Mapping):
         iterable = [
-            {"response_key": key, "state": (str(raw.get("state")) if isinstance(raw, Mapping) and "state" in raw else "answered"), "value": (None if isinstance(raw, Mapping) and "state" in raw else raw)}
+            {
+                "response_key": key,
+                "state": (
+                    str(raw.get("state"))
+                    if isinstance(raw, Mapping) and "state" in raw
+                    else "answered"
+                ),
+                "value": (None if isinstance(raw, Mapping) and "state" in raw else raw),
+            }
             for key, raw in source_answers.items()
         ]
     elif isinstance(source_answers, list):
@@ -63,26 +71,43 @@ def _record_from_payload(
         "verified_evidence_claimed": False,
         "dropout": False,
         "answers": answers,
-        **({"producer_provenance": deepcopy(dict(producer_provenance))} if producer_provenance else {}),
+        **(
+            {"producer_provenance": deepcopy(dict(producer_provenance))}
+            if producer_provenance
+            else {}
+        ),
     }
 
 
-def _profile_digest_map(extension: Mapping[str, Any], profiles: list[Mapping[str, Any]]) -> dict[str, str]:
+def _profile_digest_map(
+    extension: Mapping[str, Any], profiles: list[Mapping[str, Any]]
+) -> dict[str, str]:
     plan = extension.get("respondent_plan")
     if not isinstance(plan, Mapping) or not isinstance(plan.get("profile_digests"), list):
-        raise CapabilityExecutionError("VR-PROFILE-LINEAGE-001", "LLM respondent plan is missing profile digests")
+        raise CapabilityExecutionError(
+            "VR-PROFILE-LINEAGE-001", "LLM respondent plan is missing profile digests"
+        )
     expected_ids = [str(profile.get("profile_id", "")) for profile in profiles]
     digests: dict[str, str] = {}
     for item in plan["profile_digests"]:
         if not isinstance(item, Mapping):
-            raise CapabilityExecutionError("VR-PROFILE-LINEAGE-001", "LLM respondent plan contains malformed profile digest binding")
+            raise CapabilityExecutionError(
+                "VR-PROFILE-LINEAGE-001",
+                "LLM respondent plan contains malformed profile digest binding",
+            )
         profile_id = str(item.get("profile_id", ""))
         content_digest = str(item.get("content_digest", ""))
         if not profile_id or not content_digest.startswith("sha256:") or profile_id in digests:
-            raise CapabilityExecutionError("VR-PROFILE-LINEAGE-001", "LLM respondent plan contains invalid or duplicate profile digest binding")
+            raise CapabilityExecutionError(
+                "VR-PROFILE-LINEAGE-001",
+                "LLM respondent plan contains invalid or duplicate profile digest binding",
+            )
         digests[profile_id] = content_digest
     if set(digests) != set(expected_ids) or len(expected_ids) != len(set(expected_ids)):
-        raise CapabilityExecutionError("VR-PROFILE-LINEAGE-001", "LLM respondent plan profile digest bindings do not match the explicit profiles")
+        raise CapabilityExecutionError(
+            "VR-PROFILE-LINEAGE-001",
+            "LLM respondent plan profile digest bindings do not match the explicit profiles",
+        )
     return digests
 
 
@@ -104,16 +129,28 @@ class LlmSurveyVirtualRunnerAdapter:
     def execute(self, request):
         extension = getattr(request, "context_extension", None)
         if not isinstance(extension, Mapping):
-            raise CapabilityExecutionError("VR-CONTEXT-BINDING-001", "Survey Virtual Runner requires its validated immutable Context extension")
+            raise CapabilityExecutionError(
+                "VR-CONTEXT-BINDING-001",
+                "Survey Virtual Runner requires its validated immutable Context extension",
+            )
         questionnaire = extension.get("instrument")
         population = extension.get("synthetic_population")
         profiles = extension.get("respondent_profiles")
         backend_config = extension.get("llm_backend_configuration")
         prompt_template = extension.get("prompt_template")
-        if not all(isinstance(item, Mapping) for item in (questionnaire, population, backend_config, prompt_template)) or not isinstance(profiles, list):
-            raise CapabilityExecutionError("VR-CONTEXT-BINDING-001", "LLM Virtual Respondent immutable execution inputs are incomplete")
+        if not all(
+            isinstance(item, Mapping)
+            for item in (questionnaire, population, backend_config, prompt_template)
+        ) or not isinstance(profiles, list):
+            raise CapabilityExecutionError(
+                "VR-CONTEXT-BINDING-001",
+                "LLM Virtual Respondent immutable execution inputs are incomplete",
+            )
         if str(backend_config.get("backend_id")) != str(self._backend.backend_id):
-            raise CapabilityExecutionError("BACKEND_UNAVAILABLE", "configured Virtual Respondent backend does not match the bound production adapter")
+            raise CapabilityExecutionError(
+                "BACKEND_UNAVAILABLE",
+                "configured Virtual Respondent backend does not match the bound production adapter",
+            )
 
         provenance = generation_provenance(request, extension)
         build_virtual_context(request, extension, provenance)
@@ -132,17 +169,19 @@ class LlmSurveyVirtualRunnerAdapter:
                     prompt_template=prompt_template,
                 )
             except VirtualRespondentBackendError as exc:
-                generation_attempts.append({
-                    "generation_attempt_id": attempt_id,
-                    "respondent_profile_id": profile_id,
-                    "respondent_profile_digest": profile_digests[profile_id],
-                    "status": "failed",
-                    "failure_code": exc.code,
-                    "failure_message": exc.message,
-                    "attempt_count": len(exc.attempts),
-                    "generated_at": self._clock.now(),
-                    "attempts": deepcopy(exc.attempts),
-                })
+                generation_attempts.append(
+                    {
+                        "generation_attempt_id": attempt_id,
+                        "respondent_profile_id": profile_id,
+                        "respondent_profile_digest": profile_digests[profile_id],
+                        "status": "failed",
+                        "failure_code": exc.code,
+                        "failure_message": exc.message,
+                        "attempt_count": len(exc.attempts),
+                        "generated_at": self._clock.now(),
+                        "attempts": deepcopy(exc.attempts),
+                    }
+                )
                 continue
             parsed_payload = generated.get("parsed_answer_payload")
             if not isinstance(parsed_payload, Mapping):
@@ -174,26 +213,28 @@ class LlmSurveyVirtualRunnerAdapter:
                 },
             )
             records.append(record)
-            generation_attempts.append({
-                "generation_attempt_id": attempt_id,
-                "respondent_profile_id": profile_id,
-                "respondent_profile_digest": profile_digests[profile_id],
-                "status": "generated",
-                "provider_request_id": generated.get("provider_request_id"),
-                "attempt_count": len(generated.get("attempts", [])),
-                "generated_at": self._clock.now(),
-                "usage": deepcopy(generated.get("usage")),
-                "attempts": deepcopy(generated.get("attempts", [])),
-                "semantic_input_digest": generated.get("semantic_input_digest"),
-                "request_digest": generated.get("request_digest"),
-                "parsed_answer_payload_digest": parsed_digest,
-                "provider_response_digest": generated.get("provider_response_digest"),
-                "provider_response": deepcopy(generated.get("provider_response")),
-                "response_ref": {
-                    "response_id": record["response_id"],
-                    "identity_namespace": record["identity_namespace"],
-                },
-            })
+            generation_attempts.append(
+                {
+                    "generation_attempt_id": attempt_id,
+                    "respondent_profile_id": profile_id,
+                    "respondent_profile_digest": profile_digests[profile_id],
+                    "status": "generated",
+                    "provider_request_id": generated.get("provider_request_id"),
+                    "attempt_count": len(generated.get("attempts", [])),
+                    "generated_at": self._clock.now(),
+                    "usage": deepcopy(generated.get("usage")),
+                    "attempts": deepcopy(generated.get("attempts", [])),
+                    "semantic_input_digest": generated.get("semantic_input_digest"),
+                    "request_digest": generated.get("request_digest"),
+                    "parsed_answer_payload_digest": parsed_digest,
+                    "provider_response_digest": generated.get("provider_response_digest"),
+                    "provider_response": deepcopy(generated.get("provider_response")),
+                    "response_ref": {
+                        "response_id": record["response_id"],
+                        "identity_namespace": record["identity_namespace"],
+                    },
+                }
+            )
 
         validation = SurveyResponseValidator().validate(
             questionnaire,
@@ -218,7 +259,9 @@ class LlmSurveyVirtualRunnerAdapter:
         ]
         failed = sum(1 for item in generation_attempts if item["status"] == "failed")
         if failed:
-            warnings.append(f"{failed} synthetic respondent generation(s) failed and were preserved as generation diagnostics")
+            warnings.append(
+                f"{failed} synthetic respondent generation(s) failed and were preserved as generation diagnostics"
+            )
         readiness = readiness_assessment(
             scenario_class=str(extension["scenario_class"]),
             prior=[],

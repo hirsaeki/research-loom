@@ -34,31 +34,41 @@ class FindingCandidateRecoveryTests(ResearchPackageAcceptanceSupport):
         return legacy
 
     def _advance_head(self, facade):
-        proposed = facade.submit_action({
-            "action_type": "research_question.propose",
-            "payload": {
-                "text": "Which later condition advances the recovery-test head?",
-                "acceptance_criteria": ["The condition can be inspected."],
-                "scope_limits": ["Recovery-test only."],
-            },
-            "actor_id": "HUMAN-FCR",
-        })
-        pending = facade.submit_action({
-            "action_type": "state.apply_candidate",
-            "payload": {"state_delta_proposal_id": proposed["data"]["state_delta_proposal_id"]},
-            "actor_id": "HUMAN-FCR",
-        })
-        confirmed = facade.submit_confirmation({
-            "confirmation_request_id": pending["confirmation_request"]["confirmation_request_id"],
-            "actor_id": "HUMAN-FCR",
-        })
+        proposed = facade.submit_action(
+            {
+                "action_type": "research_question.propose",
+                "payload": {
+                    "text": "Which later condition advances the recovery-test head?",
+                    "acceptance_criteria": ["The condition can be inspected."],
+                    "scope_limits": ["Recovery-test only."],
+                },
+                "actor_id": "HUMAN-FCR",
+            }
+        )
+        pending = facade.submit_action(
+            {
+                "action_type": "state.apply_candidate",
+                "payload": {"state_delta_proposal_id": proposed["data"]["state_delta_proposal_id"]},
+                "actor_id": "HUMAN-FCR",
+            }
+        )
+        confirmed = facade.submit_confirmation(
+            {
+                "confirmation_request_id": pending["confirmation_request"][
+                    "confirmation_request_id"
+                ],
+                "actor_id": "HUMAN-FCR",
+            }
+        )
         request = confirmed["decision_request"]
-        facade.resolve_human_decision({
-            "request_id": request["request_id"],
-            "request_digest": request["request_digest"],
-            "disposition": "approve_exact",
-            "actor_id": "HUMAN-FCR",
-        })
+        facade.resolve_human_decision(
+            {
+                "request_id": request["request_id"],
+                "request_digest": request["request_digest"],
+                "disposition": "approve_exact",
+                "actor_id": "HUMAN-FCR",
+            }
+        )
 
     def test_public_cli_recovers_by_run_id_only(self):
         facade, case = self._prepare_case()
@@ -67,18 +77,28 @@ class FindingCandidateRecoveryTests(ResearchPackageAcceptanceSupport):
         finally:
             facade.close()
         input_path = self.root / "recover-input.json"
-        input_path.write_text(json.dumps({
-            "action_type": "desktop_research.finding.recover",
-            "payload": {"run_id": case["run_id"]},
-            "actor_id": "HUMAN-FCR-CLI",
-        }), encoding="utf-8")
+        input_path.write_text(
+            json.dumps(
+                {
+                    "action_type": "desktop_research.finding.recover",
+                    "payload": {"run_id": case["run_id"]},
+                    "actor_id": "HUMAN-FCR-CLI",
+                }
+            ),
+            encoding="utf-8",
+        )
         stream = io.StringIO()
         with redirect_stdout(stream):
-            code = cli_main([
-                "action", "submit",
-                "--workspace", str(self.workspace),
-                "--json", str(input_path),
-            ])
+            code = cli_main(
+                [
+                    "action",
+                    "submit",
+                    "--workspace",
+                    str(self.workspace),
+                    "--json",
+                    str(input_path),
+                ]
+            )
         self.assertEqual(code, 0)
         payload = json.loads(stream.getvalue())
         self.assertEqual(payload["status"], "SUCCEEDED")
@@ -103,7 +123,9 @@ class FindingCandidateRecoveryTests(ResearchPackageAcceptanceSupport):
             self.assertTrue(second["idempotent_reuse"])
             self.assertEqual(first["state_delta_proposal_id"], second["state_delta_proposal_id"])
             self.assertEqual(
-                facade._application.conversation_store.load_state_delta_proposal(historical["proposal_id"]),
+                facade._application.conversation_store.load_state_delta_proposal(
+                    historical["proposal_id"]
+                ),
                 historical,
             )
             recovered = facade._application.conversation_store.load_state_delta_proposal(
@@ -122,7 +144,13 @@ class FindingCandidateRecoveryTests(ResearchPackageAcceptanceSupport):
                 facade.project_id,
                 facade._application.state_repository.load_active_lineage_ref(facade.project_id),
             )
-            self.assertEqual(before, (after_state.current_snapshot["id"], after_state.current_snapshot["content_digest"]))
+            self.assertEqual(
+                before,
+                (
+                    after_state.current_snapshot["id"],
+                    after_state.current_snapshot["content_digest"],
+                ),
+            )
         finally:
             facade.close()
 
@@ -131,23 +159,31 @@ class FindingCandidateRecoveryTests(ResearchPackageAcceptanceSupport):
         try:
             self._legacyize(facade, case["proposal"])
             recovered = facade.recover_legacy_desktop_research_finding_candidate(case["run_id"])
-            pending = facade.submit_action({
-                "action_type": "state.apply_candidate",
-                "payload": {"state_delta_proposal_id": recovered["state_delta_proposal_id"]},
-                "actor_id": "HUMAN-FCR3",
-            })
-            confirmed = facade.submit_confirmation({
-                "confirmation_request_id": pending["confirmation_request"]["confirmation_request_id"],
-                "actor_id": "HUMAN-FCR3",
-            })
+            pending = facade.submit_action(
+                {
+                    "action_type": "state.apply_candidate",
+                    "payload": {"state_delta_proposal_id": recovered["state_delta_proposal_id"]},
+                    "actor_id": "HUMAN-FCR3",
+                }
+            )
+            confirmed = facade.submit_confirmation(
+                {
+                    "confirmation_request_id": pending["confirmation_request"][
+                        "confirmation_request_id"
+                    ],
+                    "actor_id": "HUMAN-FCR3",
+                }
+            )
             self.assertEqual(confirmed["status"], "HUMAN_DECISION_REQUIRED")
             request = confirmed["decision_request"]
-            facade.resolve_human_decision({
-                "request_id": request["request_id"],
-                "request_digest": request["request_digest"],
-                "disposition": "approve_exact",
-                "actor_id": "HUMAN-FCR3",
-            })
+            facade.resolve_human_decision(
+                {
+                    "request_id": request["request_id"],
+                    "request_digest": request["request_digest"],
+                    "disposition": "approve_exact",
+                    "actor_id": "HUMAN-FCR3",
+                }
+            )
             facade.close()
             facade = LocalApplicationFacade.open_workspace(self.workspace)
             state = facade._application.state_repository.load_state_view(
@@ -156,11 +192,13 @@ class FindingCandidateRecoveryTests(ResearchPackageAcceptanceSupport):
             )
             finding = next(obj for obj in state.effective_objects() if obj.get("kind") == "finding")
             self.assertEqual(finding["adoption_state"], "approved")
-            public = facade.submit_action({
-                "action_type": "research.status",
-                "payload": {"kinds": ["finding"]},
-                "actor_id": "HUMAN-FCR3",
-            })
+            public = facade.submit_action(
+                {
+                    "action_type": "research.status",
+                    "payload": {"kinds": ["finding"]},
+                    "actor_id": "HUMAN-FCR3",
+                }
+            )
             public_finding = next(
                 obj for obj in public["data"]["objects"] if obj.get("kind") == "finding"
             )
@@ -180,7 +218,9 @@ class FindingCandidateRecoveryTests(ResearchPackageAcceptanceSupport):
             # Ablation: disabling only the exact-current-Snapshot eligibility guard
             # lets the same stale historical proposal enter recovery. Restoring the
             # guard above is therefore necessary, not decorative.
-            with patch("plugins.local_application.finding_recovery_facade._require_exact_current_snapshot"):
+            with patch(
+                "plugins.local_application.finding_recovery_facade._require_exact_current_snapshot"
+            ):
                 ablated = facade.recover_legacy_desktop_research_finding_candidate(case["run_id"])
             self.assertEqual(ablated["status"], "RECOVERED")
         finally:
@@ -200,9 +240,7 @@ class FindingCandidateRecoveryTests(ResearchPackageAcceptanceSupport):
             )
             with self.assertRaises(LocalApplicationError) as caught:
                 facade.recover_legacy_desktop_research_finding_candidate(case["run_id"])
-            self.assertEqual(
-                caught.exception.code, "APPLICATION-FINDING-RECOVERY-PROVENANCE-001"
-            )
+            self.assertEqual(caught.exception.code, "APPLICATION-FINDING-RECOVERY-PROVENANCE-001")
         finally:
             facade.close()
 
@@ -226,9 +264,7 @@ class FindingCandidateRecoveryTests(ResearchPackageAcceptanceSupport):
             )
             with self.assertRaises(LocalApplicationError) as caught:
                 facade.recover_legacy_desktop_research_finding_candidate(case["run_id"])
-            self.assertEqual(
-                caught.exception.code, "APPLICATION-FINDING-RECOVERY-INTEGRITY-001"
-            )
+            self.assertEqual(caught.exception.code, "APPLICATION-FINDING-RECOVERY-INTEGRITY-001")
         finally:
             facade.close()
 
@@ -243,25 +279,15 @@ class FindingCandidateRecoveryTests(ResearchPackageAcceptanceSupport):
             store = facade._application.conversation_store
             store.store_state_delta_proposal(duplicate["proposal_id"], duplicate)
 
-            recovered = facade.recover_legacy_desktop_research_finding_candidate(
-                case["run_id"]
-            )
+            recovered = facade.recover_legacy_desktop_research_finding_candidate(case["run_id"])
             self.assertEqual(recovered["route"], "canonical_result_rematerialization")
-            proposal = store.load_state_delta_proposal(
-                recovered["state_delta_proposal_id"]
-            )
+            proposal = store.load_state_delta_proposal(recovered["state_delta_proposal_id"])
             provenance = proposal["provenance"]["historical_recovery"]
             self.assertEqual(provenance["recovery_source"], "canonical_result")
-            self.assertEqual(
-                provenance["historical_candidate_lineage_status"], "ambiguous"
-            )
+            self.assertEqual(provenance["historical_candidate_lineage_status"], "ambiguous")
             self.assertEqual(provenance["historical_candidate_count"], "multiple")
-            self.assertEqual(
-                store.load_state_delta_proposal(legacy["proposal_id"]), legacy
-            )
-            self.assertEqual(
-                store.load_state_delta_proposal(duplicate["proposal_id"]), duplicate
-            )
+            self.assertEqual(store.load_state_delta_proposal(legacy["proposal_id"]), legacy)
+            self.assertEqual(store.load_state_delta_proposal(duplicate["proposal_id"]), duplicate)
         finally:
             facade.close()
 
@@ -280,13 +306,13 @@ class FindingCandidateRecoveryTests(ResearchPackageAcceptanceSupport):
                 facade.recover_legacy_desktop_research_finding_candidate(case["run_id"])
             self.assertEqual(caught.exception.code, "APPLICATION-FINDING-RECOVERY-INTEGRITY-001")
 
-            db.execute("DELETE FROM state_delta_proposals WHERE proposal_id=?", (legacy["proposal_id"],))
+            db.execute(
+                "DELETE FROM state_delta_proposals WHERE proposal_id=?", (legacy["proposal_id"],)
+            )
             rematerialized = facade.recover_legacy_desktop_research_finding_candidate(
                 case["run_id"]
             )
-            self.assertEqual(
-                rematerialized["route"], "canonical_result_rematerialization"
-            )
+            self.assertEqual(rematerialized["route"], "canonical_result_rematerialization")
         finally:
             facade.close()
 
@@ -295,82 +321,106 @@ class FindingCandidateRecoveryTests(ResearchPackageAcceptanceSupport):
         try:
             self._legacyize(facade, case["proposal"])
             recovered = facade.recover_legacy_desktop_research_finding_candidate(case["run_id"])
-            pending = facade.submit_action({
-                "action_type": "state.apply_candidate",
-                "payload": {"state_delta_proposal_id": recovered["state_delta_proposal_id"]},
-                "actor_id": "HUMAN-FCR5",
-            })
-            confirmed = facade.submit_confirmation({
-                "confirmation_request_id": pending["confirmation_request"]["confirmation_request_id"],
-                "actor_id": "HUMAN-FCR5",
-            })
+            pending = facade.submit_action(
+                {
+                    "action_type": "state.apply_candidate",
+                    "payload": {"state_delta_proposal_id": recovered["state_delta_proposal_id"]},
+                    "actor_id": "HUMAN-FCR5",
+                }
+            )
+            confirmed = facade.submit_confirmation(
+                {
+                    "confirmation_request_id": pending["confirmation_request"][
+                        "confirmation_request_id"
+                    ],
+                    "actor_id": "HUMAN-FCR5",
+                }
+            )
             request = confirmed["decision_request"]
-            facade.resolve_human_decision({
-                "request_id": request["request_id"],
-                "request_digest": request["request_digest"],
-                "disposition": "approve_exact",
-                "actor_id": "HUMAN-FCR5",
-            })
+            facade.resolve_human_decision(
+                {
+                    "request_id": request["request_id"],
+                    "request_digest": request["request_digest"],
+                    "disposition": "approve_exact",
+                    "actor_id": "HUMAN-FCR5",
+                }
+            )
             state = facade._application.state_repository.load_state_view(
                 facade.project_id,
                 facade._application.state_repository.load_active_lineage_ref(facade.project_id),
             )
             finding = next(obj for obj in state.effective_objects() if obj.get("kind") == "finding")
-            evidence = next(obj for obj in state.effective_objects() if obj.get("kind") == "evidence")
+            evidence = next(
+                obj for obj in state.effective_objects() if obj.get("kind") == "evidence"
+            )
             source = next(obj for obj in state.effective_objects() if obj.get("kind") == "source")
-            proposed = facade.submit_action({
-                "action_type": "research.argument.propose",
-                "payload": {
-                    "conclusion": "The recovered Finding supports the bounded validation conclusion.",
-                    "warrant": "The approved Finding and Evidence resolve in the exact current Snapshot.",
-                    "question_ids": [case["rq_id"]],
-                    "finding_ids": [finding["id"]],
-                    "evidence_ids": [evidence["id"]],
-                    "qualifier": "Within the captured source scope.",
-                },
-                "actor_id": "HUMAN-FCR5",
-            })
-            arg_pending = facade.submit_action({
-                "action_type": "state.apply_candidate",
-                "payload": {"state_delta_proposal_id": proposed["data"]["state_delta_proposal_id"]},
-                "actor_id": "HUMAN-FCR5",
-            })
-            committed = facade.submit_confirmation({
-                "confirmation_request_id": arg_pending["confirmation_request"]["confirmation_request_id"],
-                "actor_id": "HUMAN-FCR5",
-            })
+            proposed = facade.submit_action(
+                {
+                    "action_type": "research.argument.propose",
+                    "payload": {
+                        "conclusion": "The recovered Finding supports the bounded validation conclusion.",
+                        "warrant": "The approved Finding and Evidence resolve in the exact current Snapshot.",
+                        "question_ids": [case["rq_id"]],
+                        "finding_ids": [finding["id"]],
+                        "evidence_ids": [evidence["id"]],
+                        "qualifier": "Within the captured source scope.",
+                    },
+                    "actor_id": "HUMAN-FCR5",
+                }
+            )
+            arg_pending = facade.submit_action(
+                {
+                    "action_type": "state.apply_candidate",
+                    "payload": {
+                        "state_delta_proposal_id": proposed["data"]["state_delta_proposal_id"]
+                    },
+                    "actor_id": "HUMAN-FCR5",
+                }
+            )
+            committed = facade.submit_confirmation(
+                {
+                    "confirmation_request_id": arg_pending["confirmation_request"][
+                        "confirmation_request_id"
+                    ],
+                    "actor_id": "HUMAN-FCR5",
+                }
+            )
             self.assertEqual(committed["status"], "SUCCEEDED")
             argument_id = proposed["data"]["argument_candidate"]["id"]
             current = facade._application.state_repository.load_state_view(
                 facade.project_id,
                 facade._application.state_repository.load_active_lineage_ref(facade.project_id),
             )
-            built = facade.build_research_package({
-                **case["build_input"],
-                "snapshot_id": current.current_snapshot["id"],
-                "snapshot_digest": current.current_snapshot["content_digest"],
-                "lineage_ref": current.active_lineage_ref,
-                "object_ids": [source["id"], evidence["id"], finding["id"], argument_id],
-            })["package"]
+            built = facade.build_research_package(
+                {
+                    **case["build_input"],
+                    "snapshot_id": current.current_snapshot["id"],
+                    "snapshot_digest": current.current_snapshot["content_digest"],
+                    "lineage_ref": current.active_lineage_ref,
+                    "object_ids": [source["id"], evidence["id"], finding["id"], argument_id],
+                }
+            )["package"]
             composition = facade.capture_writer_composition(
                 built["package_id"],
                 issue134_writer.Issue134WriterCompositionRecoveryTests._proposal(
                     case, argument_id, finding["id"], evidence["id"]
                 ),
             )["composition"]
-            self.assertFalse(any(
-                item.get("section_id") == "SEC-G1-05"
-                and item.get("code") == "WRITER-COMPOSITION-NARRATIVE-UNMET"
-                for item in composition["validation"]["diagnostics"]
-            ))
+            self.assertFalse(
+                any(
+                    item.get("section_id") == "SEC-G1-05"
+                    and item.get("code") == "WRITER-COMPOSITION-NARRATIVE-UNMET"
+                    for item in composition["validation"]["diagnostics"]
+                )
+            )
             facade.select_writer_composition(
                 composition["composition_id"], 1, composition["composition_digest"]
             )
             output = self.root / "fcr5-sec-g1-05"
-            facade.export_writer_section_input(
-                composition["composition_id"], "SEC-G1-05", output
+            facade.export_writer_section_input(composition["composition_id"], "SEC-G1-05", output)
+            detached = json.loads(
+                (output / "section-writer-input.json").read_text(encoding="utf-8")
             )
-            detached = json.loads((output / "section-writer-input.json").read_text(encoding="utf-8"))
             self.assertIn(argument_id, detached["resolved_object_ids"])
             self.assertIn(finding["id"], detached["resolved_object_ids"])
         finally:

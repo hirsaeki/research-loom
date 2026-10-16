@@ -62,10 +62,12 @@ class CanonicalResearchObjectSchemaValidator:
             )
             for error in errors:
                 path = ".".join(str(item) for item in error.absolute_path) or "$"
-                issues.append(ValidationIssue(
-                    error_code="RT-SCHEMA-CORE-001",
-                    stage=ValidationStage.SCHEMA,
-                    message=f"Canonical Core object schema violation at {path}: {error.message}",
-                    affected_refs=(str(obj.get("id", "")),),
-                ))
+                issues.append(
+                    ValidationIssue(
+                        error_code="RT-SCHEMA-CORE-001",
+                        stage=ValidationStage.SCHEMA,
+                        message=f"Canonical Core object schema violation at {path}: {error.message}",
+                        affected_refs=(str(obj.get("id", "")),),
+                    )
+                )
         return tuple(issues)

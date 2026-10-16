@@ -55,11 +55,13 @@ def semantic_object(value: Mapping[str, Any], *, authoritative: bool = False) ->
     if kind == "research_question":
         if not isinstance(value.get("text"), str):
             raise ConversationViewError("Research Question text is malformed")
-        base.update({
-            "text": value["text"],
-            "acceptance_criteria": _copy_list(value.get("acceptance_criteria", [])),
-            "scope_limits": _copy_list(value.get("scope_limits", [])),
-        })
+        base.update(
+            {
+                "text": value["text"],
+                "acceptance_criteria": _copy_list(value.get("acceptance_criteria", [])),
+                "scope_limits": _copy_list(value.get("scope_limits", [])),
+            }
+        )
         for key in (
             "rationale",
             "parent_question_id",
@@ -77,30 +79,36 @@ def semantic_object(value: Mapping[str, Any], *, authoritative: bool = False) ->
     if kind == "recommendation":
         if not isinstance(value.get("statement"), str):
             raise ConversationViewError("Recommendation statement is malformed")
-        base.update({
-            "statement": value["statement"],
-            "finding_ids": _copy_list(value.get("finding_ids", [])),
-            "conditions": _copy_list(value.get("conditions", [])),
-            "scope": _copy_list(value.get("scope", [])),
-        })
+        base.update(
+            {
+                "statement": value["statement"],
+                "finding_ids": _copy_list(value.get("finding_ids", [])),
+                "conditions": _copy_list(value.get("conditions", [])),
+                "scope": _copy_list(value.get("scope", [])),
+            }
+        )
         _copy_optional(value, "rationale", base)
         return base
 
     if kind == "argument":
-        if not isinstance(value.get("conclusion"), str) or not isinstance(value.get("warrant"), str):
+        if not isinstance(value.get("conclusion"), str) or not isinstance(
+            value.get("warrant"), str
+        ):
             raise ConversationViewError("Argument content is malformed")
-        base.update({
-            "conclusion": value["conclusion"],
-            "warrant": value["warrant"],
-            "question_ids": _copy_list(value.get("question_ids", [])),
-            "conclusion_claim_id": deepcopy(value.get("conclusion_claim_id")),
-            "premise_claim_ids": _copy_list(value.get("premise_claim_ids", [])),
-            "finding_ids": _copy_list(value.get("finding_ids", [])),
-            "evidence_ids": _copy_list(value.get("evidence_ids", [])),
-            "qualifier": deepcopy(value.get("qualifier")),
-            "counter_review_ids": _copy_list(value.get("counter_review_ids", [])),
-            "implications": _copy_list(value.get("implications", [])),
-        })
+        base.update(
+            {
+                "conclusion": value["conclusion"],
+                "warrant": value["warrant"],
+                "question_ids": _copy_list(value.get("question_ids", [])),
+                "conclusion_claim_id": deepcopy(value.get("conclusion_claim_id")),
+                "premise_claim_ids": _copy_list(value.get("premise_claim_ids", [])),
+                "finding_ids": _copy_list(value.get("finding_ids", [])),
+                "evidence_ids": _copy_list(value.get("evidence_ids", [])),
+                "qualifier": deepcopy(value.get("qualifier")),
+                "counter_review_ids": _copy_list(value.get("counter_review_ids", [])),
+                "implications": _copy_list(value.get("implications", [])),
+            }
+        )
         _copy_optional(value, "rationale", base)
         return base
 
@@ -108,12 +116,38 @@ def semantic_object(value: Mapping[str, Any], *, authoritative: bool = False) ->
     # without serializing the canonical object envelope.
     if kind in {"research_input", "source", "evidence", "finding", "next_action", "method"}:
         for key in (
-            "title", "statement", "description", "result_summary", "normalized_statement",
-            "locator", "source_id", "source_ids", "question_ids", "finding_ids", "evidence_ids",
-            "counter_evidence_ids", "boundary_conditions", "limitations", "confidence", "rationale",
-            "action_type", "instruction", "reason", "priority", "blocked_by", "source_type",
-            "canonical_locator", "content_digest", "media_type", "byte_length", "origin_type",
-            "verification_status", "excerpt", "capture_digest", "evidence_kind", "evidence_mode",
+            "title",
+            "statement",
+            "description",
+            "result_summary",
+            "normalized_statement",
+            "locator",
+            "source_id",
+            "source_ids",
+            "question_ids",
+            "finding_ids",
+            "evidence_ids",
+            "counter_evidence_ids",
+            "boundary_conditions",
+            "limitations",
+            "confidence",
+            "rationale",
+            "action_type",
+            "instruction",
+            "reason",
+            "priority",
+            "blocked_by",
+            "source_type",
+            "canonical_locator",
+            "content_digest",
+            "media_type",
+            "byte_length",
+            "origin_type",
+            "verification_status",
+            "excerpt",
+            "capture_digest",
+            "evidence_kind",
+            "evidence_mode",
         ):
             _copy_optional(value, key, base)
         return base
@@ -137,17 +171,20 @@ def candidate_relation(projection: Mapping[str, Any]) -> dict[str, Any]:
         if not isinstance(candidate, Mapping):
             raise ConversationViewError("candidate_projection candidate value is malformed")
         current_present = isinstance(current, Mapping)
-        output.append({
-            "subject": {
-                "kind": str(subject.get("kind") or ""),
-                "id": str(subject.get("id") or ""),
-            },
-            "current_value_present": current_present,
-            "candidate_value_matches_current": (
-                canonical_digest(current) == canonical_digest(candidate)
-                if current_present else None
-            ),
-        })
+        output.append(
+            {
+                "subject": {
+                    "kind": str(subject.get("kind") or ""),
+                    "id": str(subject.get("id") or ""),
+                },
+                "current_value_present": current_present,
+                "candidate_value_matches_current": (
+                    canonical_digest(current) == canonical_digest(candidate)
+                    if current_present
+                    else None
+                ),
+            }
+        )
     return {
         "bound_to_current_lineage": bool(projection.get("bound_to_current_lineage")),
         "bound_to_current_snapshot": bool(projection.get("bound_to_current_snapshot")),
@@ -163,10 +200,12 @@ def candidate_summary(candidate: Mapping[str, Any], state: Any) -> dict[str, Any
         action_map = _mapping(action, field="candidate.proposed_action")
         payload = _mapping(action_map.get("payload"), field="candidate.action.payload")
         obj = _mapping(payload.get("object"), field="candidate.action.object")
-        content.append({
-            "change": str(action_map.get("kind") or ""),
-            "content": semantic_object(obj),
-        })
+        content.append(
+            {
+                "change": str(action_map.get("kind") or ""),
+                "content": semantic_object(obj),
+            }
+        )
     provenance = candidate.get("provenance")
     summary: dict[str, Any] = {
         "candidate_id": str(candidate.get("proposal_id") or ""),
@@ -186,7 +225,9 @@ def _candidate_from_detail(detail: Mapping[str, Any]) -> Mapping[str, Any] | Non
     if isinstance(data, Mapping) and isinstance(data.get("state_delta_proposal"), Mapping):
         return data["state_delta_proposal"]
     execution = detail.get("execution_result")
-    if isinstance(execution, Mapping) and isinstance(execution.get("state_delta_proposal"), Mapping):
+    if isinstance(execution, Mapping) and isinstance(
+        execution.get("state_delta_proposal"), Mapping
+    ):
         return execution["state_delta_proposal"]
     return None
 
@@ -246,7 +287,9 @@ def decision_request_summary(request: Any) -> dict[str, Any] | None:
     if not isinstance(request, Mapping):
         return None
     if any(key in request for key in _OPERATIONAL_REQUEST_FIELDS):
-        raise ConversationViewError("immutable Decision Request contains operational projection fields")
+        raise ConversationViewError(
+            "immutable Decision Request contains operational projection fields"
+        )
     result: dict[str, Any] = {
         "request_id": str(request.get("request_id") or ""),
         "request_digest": str(request.get("request_digest") or ""),
@@ -304,7 +347,9 @@ def decision_with_operational_summary(request: Any) -> dict[str, Any] | None:
     return result
 
 
-def project_action_result(detail: Mapping[str, Any], *, action_type: str, state: Any) -> dict[str, Any]:
+def project_action_result(
+    detail: Mapping[str, Any], *, action_type: str, state: Any
+) -> dict[str, Any]:
     result: dict[str, Any] = {
         "status": str(detail.get("status") or ""),
         "operation": {"action_type": action_type},
@@ -331,15 +376,21 @@ def project_action_result(detail: Mapping[str, Any], *, action_type: str, state:
                 "rationale": deepcopy(review.get("rationale")),
                 "question_ids": _copy_list(review.get("question_ids", [])),
             }
-    if action_type not in {
-        "research_question.propose",
-        "research_question.propose_many",
-        "research_question.review",
-        "research.argument.propose",
-        "research.recommendation.propose",
-        "state.apply_candidate",
-        "desktop_research.investigate",
-    } and candidate is None and confirmation is None and decision is None:
+    if (
+        action_type
+        not in {
+            "research_question.propose",
+            "research_question.propose_many",
+            "research_question.review",
+            "research.argument.propose",
+            "research.recommendation.propose",
+            "state.apply_candidate",
+            "desktop_research.investigate",
+        }
+        and candidate is None
+        and confirmation is None
+        and decision is None
+    ):
         result["interpretation"] = {
             "status": "UNSUPPORTED",
             "message": "The operation result is recorded, but conversation interpretation is not implemented for this action type.",
@@ -419,8 +470,16 @@ def project_issues(issues: list[Any] | tuple[Any, ...]) -> list[dict[str, Any]]:
 def run_summary(run: Mapping[str, Any]) -> dict[str, Any]:
     result: dict[str, Any] = {}
     for key in (
-        "run_id", "capability_id", "function_id", "execution_mode", "attempt", "parent_run_id",
-        "status", "prepared_at", "started_at", "completed_at",
+        "run_id",
+        "capability_id",
+        "function_id",
+        "execution_mode",
+        "attempt",
+        "parent_run_id",
+        "status",
+        "prepared_at",
+        "started_at",
+        "completed_at",
     ):
         if key in run:
             result[key] = deepcopy(run[key])
@@ -455,13 +514,15 @@ def project_status(detail: Mapping[str, Any]) -> dict[str, Any]:
     confirmations = detail.get("pending_confirmations")
     if isinstance(confirmations, list):
         result["pending_confirmations"] = [
-            value for item in confirmations
+            value
+            for item in confirmations
             if (value := confirmation_request_summary(item)) is not None
         ]
     decisions = detail.get("pending_human_decisions")
     if isinstance(decisions, list):
         result["pending_human_decisions"] = [
-            value for item in decisions
+            value
+            for item in decisions
             if (value := decision_with_operational_summary(item)) is not None
         ]
     runs = detail.get("pending_runs")
@@ -477,7 +538,9 @@ def _research_question_resume_candidate(row: Mapping[str, Any]) -> dict[str, Any
     result: dict[str, Any] = {
         "candidate_id": candidate_id,
         "source_action_proposal": deepcopy(row.get("source_action_proposal")),
-        "pending_confirmation_request_ids": _copy_list(row.get("pending_confirmation_request_ids", [])),
+        "pending_confirmation_request_ids": _copy_list(
+            row.get("pending_confirmation_request_ids", [])
+        ),
         "human_decision_requests": [
             {
                 key: deepcopy(item.get(key))
@@ -520,8 +583,13 @@ def _research_question_resume_candidate(row: Mapping[str, Any]) -> dict[str, Any
 def _attention_item(item: Mapping[str, Any]) -> dict[str, Any]:
     result = {}
     for key in (
-        "statement", "rationale", "disposition", "disposition_reason",
-        "related_question_seed_ids", "source_reference_ids", "projection_hints",
+        "statement",
+        "rationale",
+        "disposition",
+        "disposition_reason",
+        "related_question_seed_ids",
+        "source_reference_ids",
+        "projection_hints",
     ):
         _copy_optional(item, key, result)
     return result
@@ -530,7 +598,9 @@ def _attention_item(item: Mapping[str, Any]) -> dict[str, Any]:
 def project_resume(detail: Mapping[str, Any]) -> dict[str, Any]:
     result: dict[str, Any] = {
         "status": str(detail.get("status") or ""),
-        "project": deepcopy(detail.get("project")) if isinstance(detail.get("project"), Mapping) else {},
+        "project": deepcopy(detail.get("project"))
+        if isinstance(detail.get("project"), Mapping)
+        else {},
     }
     optional = detail.get("optional_children")
     if isinstance(optional, list):
@@ -547,7 +617,9 @@ def project_resume(detail: Mapping[str, Any]) -> dict[str, Any]:
     if isinstance(state, Mapping):
         snapshot = state.get("snapshot")
         result["research_state"] = {
-            "snapshot_revision": snapshot.get("revision") if isinstance(snapshot, Mapping) else None,
+            "snapshot_revision": snapshot.get("revision")
+            if isinstance(snapshot, Mapping)
+            else None,
         }
     rq = detail.get("research_questions")
     if isinstance(rq, Mapping):
@@ -568,9 +640,19 @@ def project_resume(detail: Mapping[str, Any]) -> dict[str, Any]:
     if isinstance(attention, Mapping):
         result["research_attention"] = {
             "status": deepcopy(attention.get("status")),
-            "issues": project_issues(attention.get("issues", [])) if isinstance(attention.get("issues"), (list, tuple)) else [],
-            "baseline": [_attention_item(item) for item in (attention.get("baseline") or []) if isinstance(item, Mapping)],
-            "effective": [_attention_item(item) for item in (attention.get("effective") or []) if isinstance(item, Mapping)],
+            "issues": project_issues(attention.get("issues", []))
+            if isinstance(attention.get("issues"), (list, tuple))
+            else [],
+            "baseline": [
+                _attention_item(item)
+                for item in (attention.get("baseline") or [])
+                if isinstance(item, Mapping)
+            ],
+            "effective": [
+                _attention_item(item)
+                for item in (attention.get("effective") or [])
+                if isinstance(item, Mapping)
+            ],
         }
         if isinstance(attention.get("active_map"), Mapping):
             result["research_attention"]["active_map"] = {
@@ -582,28 +664,42 @@ def project_resume(detail: Mapping[str, Any]) -> dict[str, Any]:
     if isinstance(workflow, Mapping):
         result["workflow"] = {
             "pending_confirmations": [
-                value for item in (workflow.get("pending_confirmations") or [])
+                value
+                for item in (workflow.get("pending_confirmations") or [])
                 if (value := confirmation_request_summary(item)) is not None
             ],
             "pending_human_decisions": [
-                value for item in (workflow.get("pending_human_decisions") or [])
+                value
+                for item in (workflow.get("pending_human_decisions") or [])
                 if (value := decision_with_operational_summary(item)) is not None
             ],
-            "pending_runs": [run_summary(item) for item in (workflow.get("pending_runs") or []) if isinstance(item, Mapping)],
-            "recent_runs": [run_summary(item) for item in (workflow.get("recent_runs") or []) if isinstance(item, Mapping)],
+            "pending_runs": [
+                run_summary(item)
+                for item in (workflow.get("pending_runs") or [])
+                if isinstance(item, Mapping)
+            ],
+            "recent_runs": [
+                run_summary(item)
+                for item in (workflow.get("recent_runs") or [])
+                if isinstance(item, Mapping)
+            ],
         }
     if isinstance(detail.get("truncated"), Mapping):
         result["truncated"] = deepcopy(dict(detail["truncated"]))
     saved = detail.get("saved_synthesis_candidates")
     if isinstance(saved, Mapping):
-        result["saved_synthesis_candidates"] = project_synthesis_list({
-            "status": detail.get("status", "OK"),
-            "project_id": detail.get("project", {}).get("project_id") if isinstance(detail.get("project"), Mapping) else "",
-            "items": saved.get("items", []),
-            "truncated": saved.get("truncated", False),
-            "next_cursor": saved.get("next_cursor"),
-            "issues": saved.get("issues", []),
-        })
+        result["saved_synthesis_candidates"] = project_synthesis_list(
+            {
+                "status": detail.get("status", "OK"),
+                "project_id": detail.get("project", {}).get("project_id")
+                if isinstance(detail.get("project"), Mapping)
+                else "",
+                "items": saved.get("items", []),
+                "truncated": saved.get("truncated", False),
+                "next_cursor": saved.get("next_cursor"),
+                "issues": saved.get("issues", []),
+            }
+        )
     return result
 
 
@@ -639,7 +735,9 @@ def project_synthesis_list(detail: Mapping[str, Any]) -> dict[str, Any]:
         "items": items,
         "truncated": bool(detail.get("truncated")),
         "next_cursor": deepcopy(detail.get("next_cursor")),
-        "issues": project_issues(detail.get("issues", [])) if isinstance(detail.get("issues"), (list, tuple)) else [],
+        "issues": project_issues(detail.get("issues", []))
+        if isinstance(detail.get("issues"), (list, tuple))
+        else [],
     }
 
 
@@ -668,8 +766,15 @@ def _handoff_outputs(handoff: Mapping[str, Any]) -> dict[str, Any]:
         return {}
     result: dict[str, Any] = {}
     for key in (
-        "observations", "evidence_candidates", "candidate_findings", "counterevidence",
-        "conflicts", "unknowns", "evidence_gaps", "candidate_next_actions", "candidate_next_methods",
+        "observations",
+        "evidence_candidates",
+        "candidate_findings",
+        "counterevidence",
+        "conflicts",
+        "unknowns",
+        "evidence_gaps",
+        "candidate_next_actions",
+        "candidate_next_methods",
     ):
         if isinstance(outputs.get(key), list):
             result[key] = deepcopy(outputs[key])
@@ -681,7 +786,8 @@ def _handoff_outputs(handoff: Mapping[str, Any]) -> dict[str, Any]:
                 for key in ("capture_id", "locator", "origin", "content_digest")
                 if key in item
             }
-            for item in captures if isinstance(item, Mapping)
+            for item in captures
+            if isinstance(item, Mapping)
         ]
     return result
 
@@ -698,7 +804,9 @@ def project_collect(detail: Mapping[str, Any], *, state: Any) -> dict[str, Any]:
                 result[key] = deepcopy(execution[key])
         if isinstance(execution.get("issues"), (list, tuple)):
             result["issues"] = project_issues(execution["issues"])
-        result["normalized_candidate_available"] = isinstance(execution.get("state_delta_proposal"), Mapping)
+        result["normalized_candidate_available"] = isinstance(
+            execution.get("state_delta_proposal"), Mapping
+        )
     data = detail.get("data")
     if isinstance(data, Mapping) and isinstance(data.get("handoff"), Mapping):
         result["research_outputs"] = _handoff_outputs(data["handoff"])
@@ -709,7 +817,12 @@ def project_collect(detail: Mapping[str, Any], *, state: Any) -> dict[str, Any]:
         desktop = provenance.get("desktop_research") if isinstance(provenance, Mapping) else None
         if isinstance(desktop, Mapping):
             research_context = {}
-            for key in ("coverage_assessment", "evidence_gap_assessments", "null_results", "search_trace"):
+            for key in (
+                "coverage_assessment",
+                "evidence_gap_assessments",
+                "null_results",
+                "search_trace",
+            ):
                 if key in desktop:
                     research_context[key] = deepcopy(desktop[key])
             if research_context:
@@ -736,11 +849,14 @@ def project_run(detail: Mapping[str, Any]) -> dict[str, Any]:
                 for key in ("from_status", "to_status", "occurred_at", "reason")
                 if key in item
             }
-            for item in lifecycle if isinstance(item, Mapping)
+            for item in lifecycle
+            if isinstance(item, Mapping)
         ]
     diagnostics = detail.get("diagnostics")
     if isinstance(diagnostics, list):
-        result["diagnostics"] = [project_issue(item) for item in diagnostics if isinstance(item, Mapping)]
+        result["diagnostics"] = [
+            project_issue(item) for item in diagnostics if isinstance(item, Mapping)
+        ]
     artifacts = detail.get("artifacts")
     if isinstance(artifacts, list):
         result["artifacts"] = [
@@ -749,7 +865,8 @@ def project_run(detail: Mapping[str, Any]) -> dict[str, Any]:
                 for key in ("artifact_id", "role", "media_type", "byte_length")
                 if key in item
             }
-            for item in artifacts if isinstance(item, Mapping)
+            for item in artifacts
+            if isinstance(item, Mapping)
         ]
     desktop = detail.get("desktop_research")
     if isinstance(desktop, Mapping):
@@ -758,32 +875,65 @@ def project_run(detail: Mapping[str, Any]) -> dict[str, Any]:
             "retrieval_attempts": [
                 {
                     key: deepcopy(item.get(key))
-                    for key in ("attempt_id", "strategy", "outcome", "target_locator", "failure_or_blocking_reason", "resulting_capture_id")
+                    for key in (
+                        "attempt_id",
+                        "strategy",
+                        "outcome",
+                        "target_locator",
+                        "failure_or_blocking_reason",
+                        "resulting_capture_id",
+                    )
                     if key in item
                 }
-                for item in (desktop.get("retrieval_attempts") or []) if isinstance(item, Mapping)
+                for item in (desktop.get("retrieval_attempts") or [])
+                if isinstance(item, Mapping)
             ],
             "operational_terminations": [
-                project_issue(item) for item in (desktop.get("operational_terminations") or []) if isinstance(item, Mapping)
+                project_issue(item)
+                for item in (desktop.get("operational_terminations") or [])
+                if isinstance(item, Mapping)
             ],
         }
-    known = {"status", "project_id", "run", "lifecycle", "diagnostics", "artifacts", "truncated", "desktop_research"}
+    known = {
+        "status",
+        "project_id",
+        "run",
+        "lifecycle",
+        "diagnostics",
+        "artifacts",
+        "truncated",
+        "desktop_research",
+    }
     extension_keys = [key for key in detail if key not in known]
     for key in extension_keys:
         value = detail[key]
         if key in {
-            "finding_recovery", "historical_finding_recovery", "historical_result_recovery",
-            "material_reacquisition", "new_material_continuation",
+            "finding_recovery",
+            "historical_finding_recovery",
+            "historical_result_recovery",
+            "material_reacquisition",
+            "new_material_continuation",
         } and isinstance(value, Mapping):
             result[key] = {
                 field: deepcopy(value.get(field))
                 for field in (
-                    "status", "stage", "failure_class", "code", "message", "source_run_id",
-                    "recovery_run_id", "continuation_run_id", "reacquisition_run_id", "eligible",
-                ) if field in value
+                    "status",
+                    "stage",
+                    "failure_class",
+                    "code",
+                    "message",
+                    "source_run_id",
+                    "recovery_run_id",
+                    "continuation_run_id",
+                    "reacquisition_run_id",
+                    "eligible",
+                )
+                if field in value
             }
         else:
-            result.setdefault("interpretation", {"status": "UNSUPPORTED_EXTENSIONS", "keys": []})["keys"].append(key)
+            result.setdefault("interpretation", {"status": "UNSUPPORTED_EXTENSIONS", "keys": []})[
+                "keys"
+            ].append(key)
     if isinstance(detail.get("truncated"), Mapping):
         result["truncated"] = deepcopy(dict(detail["truncated"]))
     return result
@@ -798,10 +948,17 @@ def project_replay(detail: Mapping[str, Any]) -> dict[str, Any]:
         "carried_unresolved_attempts": [
             {
                 key: deepcopy(item.get(key))
-                for key in ("attempt_id", "strategy", "coverage_dimension_ids", "query_or_target", "target_locator")
+                for key in (
+                    "attempt_id",
+                    "strategy",
+                    "coverage_dimension_ids",
+                    "query_or_target",
+                    "target_locator",
+                )
                 if key in item
             }
-            for item in (detail.get("carried_unresolved_attempts") or []) if isinstance(item, Mapping)
+            for item in (detail.get("carried_unresolved_attempts") or [])
+            if isinstance(item, Mapping)
         ],
     }
 
@@ -825,10 +982,14 @@ def projection_unavailable(
         receipt = detail.get("action_receipt")
         if isinstance(receipt, Mapping):
             execution = receipt.get("execution")
-            if isinstance(execution, Mapping) and isinstance(execution.get("result_reference"), str):
+            if isinstance(execution, Mapping) and isinstance(
+                execution.get("result_reference"), str
+            ):
                 refs["result_reference"] = execution["result_reference"]
         confirmation = detail.get("confirmation_request")
-        if isinstance(confirmation, Mapping) and isinstance(confirmation.get("confirmation_request_id"), str):
+        if isinstance(confirmation, Mapping) and isinstance(
+            confirmation.get("confirmation_request_id"), str
+        ):
             refs["confirmation_request_id"] = confirmation["confirmation_request_id"]
         decision = detail.get("decision_request")
         if isinstance(decision, Mapping):

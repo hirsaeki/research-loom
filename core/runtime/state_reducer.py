@@ -45,7 +45,9 @@ def reduce_state(current_state: StateView, request: StateTransitionRequest) -> R
         raise ReductionError("one atomic transition may apply at most one lineage plan")
     if lineage_actions:
         if len(semantic_actions) != 1:
-            raise ReductionError("APPLY_LINEAGE_PLAN may only be mixed with RECORD_DECISION actions")
+            raise ReductionError(
+                "APPLY_LINEAGE_PLAN may only be mixed with RECORD_DECISION actions"
+            )
         base = _reduce_lineage_plan(current_state, request, lineage_actions[0])
         decisions = _validated_decision_objects(current_state, decision_actions)
         return replace(
@@ -56,7 +58,9 @@ def reduce_state(current_state: StateView, request: StateTransitionRequest) -> R
         )
     if switch_actions:
         if len(switch_actions) > 1 or len(semantic_actions) != 1:
-            raise ReductionError("SWITCH_ACTIVE_LINEAGE may only be mixed with RECORD_DECISION actions")
+            raise ReductionError(
+                "SWITCH_ACTIVE_LINEAGE may only be mixed with RECORD_DECISION actions"
+            )
         target = str(switch_actions[0].payload.get("target_lineage_ref", ""))
         if not target:
             raise ReductionError("active lineage switch requires target_lineage_ref")
@@ -229,7 +233,9 @@ def _reduce_lineage_plan(
                 raise ReductionError("reconfirmed object must carry a non-negative revision")
             existing = current_state.latest_object(str(derived.get("kind", "")), derived_id)
             if existing is not None and int(derived["revision"]) != int(existing["revision"]) + 1:
-                raise ReductionError("reconfirmed existing object requires the next monotonic revision")
+                raise ReductionError(
+                    "reconfirmed existing object requires the next monotonic revision"
+                )
             if existing is None and int(derived["revision"]) != 0:
                 raise ReductionError("new reconfirmed object identity starts at revision 0")
             child_members[(str(derived["kind"]), derived_id)] = derived
@@ -240,7 +246,9 @@ def _reduce_lineage_plan(
     extras = set(by_ref) - baseline_keys
     if extras:
         formatted = ", ".join(f"{kind}:{object_id}" for kind, object_id in sorted(extras))
-        raise ReductionError(f"lineage plan treats objects outside the pinned baseline: {formatted}")
+        raise ReductionError(
+            f"lineage plan treats objects outside the pinned baseline: {formatted}"
+        )
 
     execution_mode = str(payload.get("execution_mode", current_state.current_snapshot_ref.mode))
     snapshot = _build_snapshot(
@@ -295,13 +303,19 @@ def _validate_action_object_semantics(action: TransitionAction, obj: Mapping[str
         raise ReductionError("ADOPT_OBJECT requires adoption_state=approved")
     if action.kind == TransitionKind.REJECT_OBJECT and obj.get("adoption_state") != "rejected":
         raise ReductionError("REJECT_OBJECT requires adoption_state=rejected")
-    if action.kind == TransitionKind.VERIFY_EVIDENCE and obj.get("verification_status") != "verified":
+    if (
+        action.kind == TransitionKind.VERIFY_EVIDENCE
+        and obj.get("verification_status") != "verified"
+    ):
         raise ReductionError("VERIFY_EVIDENCE requires verification_status=verified")
     if action.kind == TransitionKind.RECLASSIFY_EVIDENCE and obj.get("kind") != "evidence":
         raise ReductionError("RECLASSIFY_EVIDENCE requires an Evidence revision")
     if action.kind == TransitionKind.RECORD_DECISION and obj.get("kind") != "decision":
         raise ReductionError("RECORD_DECISION requires a Core Decision object")
-    if action.kind == TransitionKind.REGISTER_WRITING_FEEDBACK_ACTION and obj.get("kind") != "next_action":
+    if (
+        action.kind == TransitionKind.REGISTER_WRITING_FEEDBACK_ACTION
+        and obj.get("kind") != "next_action"
+    ):
         raise ReductionError("Writing Feedback may only register a NextAction candidate")
 
 
@@ -313,7 +327,9 @@ def _validate_revision_semantics(
     revision = int(obj.get("revision", -1))
     if action.kind in {TransitionKind.CREATE_OBJECT, TransitionKind.RECORD_DECISION}:
         if prior is not None:
-            raise ReductionError(f"{action.kind.value} cannot reuse existing identity {obj.get('kind')}:{obj.get('id')}")
+            raise ReductionError(
+                f"{action.kind.value} cannot reuse existing identity {obj.get('kind')}:{obj.get('id')}"
+            )
         if revision != 0:
             raise ReductionError("new Core object identity starts at revision 0")
         return
@@ -344,7 +360,12 @@ def _build_snapshot(
     mode: str,
 ) -> Mapping[str, Any]:
     member_rows = [
-        {"kind": kind, "id": object_id, "revision": int(obj["revision"]), "digest": canonical_digest(obj)}
+        {
+            "kind": kind,
+            "id": object_id,
+            "revision": int(obj["revision"]),
+            "digest": canonical_digest(obj),
+        }
         for (kind, object_id), obj in sorted(members.items())
     ]
     payload: dict[str, Any] = {
@@ -369,15 +390,19 @@ def _audit_event(current_state: StateView, request: StateTransitionRequest) -> M
         if target is not None:
             subjects.append({"kind": target.kind, "id": target.id})
         elif action.kind == TransitionKind.APPLY_LINEAGE_PLAN:
-            subjects.append({
-                "kind": "research_lineage",
-                "id": str(action.payload.get("target_lineage_id", request.lineage_ref)),
-            })
+            subjects.append(
+                {
+                    "kind": "research_lineage",
+                    "id": str(action.payload.get("target_lineage_id", request.lineage_ref)),
+                }
+            )
         elif action.kind == TransitionKind.SWITCH_ACTIVE_LINEAGE:
-            subjects.append({
-                "kind": "research_lineage",
-                "id": str(action.payload.get("target_lineage_ref", request.lineage_ref)),
-            })
+            subjects.append(
+                {
+                    "kind": "research_lineage",
+                    "id": str(action.payload.get("target_lineage_ref", request.lineage_ref)),
+                }
+            )
         else:
             subjects.append({"kind": "research_transition", "id": request.transition_id})
     actor_type = "human" if request.actor.actor_type == "human" else "system"

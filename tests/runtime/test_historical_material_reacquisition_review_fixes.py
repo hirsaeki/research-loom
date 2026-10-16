@@ -119,9 +119,7 @@ class HistoricalMaterialReacquisitionReviewFixTests(ResearchPackageAcceptanceSup
 
             def run_second():
                 second_started.set()
-                outcome["second"] = service2.reacquire(
-                    case["run_id"], "CAP-1", kind="original"
-                )
+                outcome["second"] = service2.reacquire(case["run_id"], "CAP-1", kind="original")
 
             thread2 = Thread(target=run_second)
             thread2.start()
@@ -153,15 +151,16 @@ class HistoricalMaterialReacquisitionReviewFixTests(ResearchPackageAcceptanceSup
                 facade.close()
 
     def test_builtin_retrieval_rejects_non_public_targets_and_pins_approved_dns(self):
-        with self.assertRaisesRegex(
-            MaterialReacquisitionRetrievalError, "public HTTPS"
-        ):
+        with self.assertRaisesRegex(MaterialReacquisitionRetrievalError, "public HTTPS"):
             _retrieve_exact_locator("file:///etc/passwd", max_bytes=1024)
 
-        with patch(
-            "plugins.local_application.material_reacquisition_facade.socket.getaddrinfo",
-            return_value=[(2, 1, 6, "", ("127.0.0.1", 443))],
-        ), patch.object(_PinnedHTTPSConnection, "connect") as connect:
+        with (
+            patch(
+                "plugins.local_application.material_reacquisition_facade.socket.getaddrinfo",
+                return_value=[(2, 1, 6, "", ("127.0.0.1", 443))],
+            ),
+            patch.object(_PinnedHTTPSConnection, "connect") as connect,
+        ):
             with self.assertRaisesRegex(MaterialReacquisitionRetrievalError, "non-public"):
                 _retrieve_exact_locator("https://internal.example/secret", max_bytes=1024)
             connect.assert_not_called()
@@ -204,19 +203,20 @@ class HistoricalMaterialReacquisitionReviewFixTests(ResearchPackageAcceptanceSup
             def close():
                 return None
 
-        with patch(
-            "plugins.local_application.material_reacquisition_facade.socket.getaddrinfo",
-            side_effect=[
-                [(2, 1, 6, "", ("8.8.8.8", 443))],
-                [(2, 1, 6, "", ("127.0.0.1", 443))],
-            ],
-        ) as resolver, patch(
-            "plugins.local_application.material_reacquisition_facade._PinnedHTTPSConnection",
-            FakePinnedConnection,
+        with (
+            patch(
+                "plugins.local_application.material_reacquisition_facade.socket.getaddrinfo",
+                side_effect=[
+                    [(2, 1, 6, "", ("8.8.8.8", 443))],
+                    [(2, 1, 6, "", ("127.0.0.1", 443))],
+                ],
+            ) as resolver,
+            patch(
+                "plugins.local_application.material_reacquisition_facade._PinnedHTTPSConnection",
+                FakePinnedConnection,
+            ),
         ):
-            result = _retrieve_exact_locator(
-                "https://public.example/source?q=1", max_bytes=1024
-            )
+            result = _retrieve_exact_locator("https://public.example/source?q=1", max_bytes=1024)
 
         self.assertEqual(result.content, b"ok")
         self.assertEqual(resolver.call_count, 1)
@@ -238,15 +238,18 @@ class HistoricalMaterialReacquisitionReviewFixTests(ResearchPackageAcceptanceSup
             def getresponse():
                 return RedirectResponse()
 
-        with patch(
-            "plugins.local_application.material_reacquisition_facade.socket.getaddrinfo",
-            side_effect=[
-                [(2, 1, 6, "", ("8.8.8.8", 443))],
-                [(2, 1, 6, "", ("127.0.0.1", 443))],
-            ],
-        ) as resolver, patch(
-            "plugins.local_application.material_reacquisition_facade._PinnedHTTPSConnection",
-            RedirectConnection,
+        with (
+            patch(
+                "plugins.local_application.material_reacquisition_facade.socket.getaddrinfo",
+                side_effect=[
+                    [(2, 1, 6, "", ("8.8.8.8", 443))],
+                    [(2, 1, 6, "", ("127.0.0.1", 443))],
+                ],
+            ) as resolver,
+            patch(
+                "plugins.local_application.material_reacquisition_facade._PinnedHTTPSConnection",
+                RedirectConnection,
+            ),
         ):
             with self.assertRaisesRegex(MaterialReacquisitionRetrievalError, "non-public"):
                 _retrieve_exact_locator("https://public.example/start", max_bytes=1024)
@@ -263,13 +266,16 @@ class HistoricalMaterialReacquisitionReviewFixTests(ResearchPackageAcceptanceSup
                 return wrapped_socket
 
         context = FakeContext()
-        with patch(
-            "plugins.local_application.material_reacquisition_facade.ssl.create_default_context",
-            return_value=context,
-        ), patch(
-            "plugins.local_application.material_reacquisition_facade.socket.create_connection",
-            return_value=raw_socket,
-        ) as create_connection:
+        with (
+            patch(
+                "plugins.local_application.material_reacquisition_facade.ssl.create_default_context",
+                return_value=context,
+            ),
+            patch(
+                "plugins.local_application.material_reacquisition_facade.socket.create_connection",
+                return_value=raw_socket,
+            ) as create_connection,
+        ):
             connection = _PinnedHTTPSConnection(
                 "public.example",
                 "8.8.8.8",

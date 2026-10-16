@@ -236,9 +236,7 @@ def _recover_legacy_candidate(application, project_id: str, run_id: str) -> Mapp
             "persisted Run could not be read",
         ) from exc
     if run is None:
-        raise LocalApplicationError(
-            "APPLICATION-FINDING-RECOVERY-RUN-001", "unknown Run"
-        )
+        raise LocalApplicationError("APPLICATION-FINDING-RECOVERY-RUN-001", "unknown Run")
     if (
         run.project_ref != project_id
         or run.capability_id != "desktop-research"
@@ -263,9 +261,7 @@ def _recover_legacy_candidate(application, project_id: str, run_id: str) -> Mapp
     snapshot_digest = str(snapshot["content_digest"])
     store = application.conversation_store
     try:
-        matches = find_state_delta_proposals_by_provenance_run_id(
-            store, run_id, limit=3
-        )
+        matches = find_state_delta_proposals_by_provenance_run_id(store, run_id, limit=3)
     except Exception as exc:
         raise LocalApplicationError(
             "APPLICATION-FINDING-RECOVERY-CANDIDATE-001",
@@ -399,9 +395,7 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
         self._ensure_finding_recovery_action()
         return super().submit_action(draft_input)
 
-    def recover_legacy_desktop_research_finding_candidate(
-        self, run_id: str
-    ) -> Mapping[str, Any]:
+    def recover_legacy_desktop_research_finding_candidate(self, run_id: str) -> Mapping[str, Any]:
         return _recover_legacy_candidate(self._application, self._project_id, run_id)
 
     def _ensure_finding_recovery_action(self) -> None:
@@ -434,9 +428,7 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                 or definition.confirmation_required
                 or definition.service_id != _ACTION_TYPE
             ):
-                raise RuntimeError(
-                    "desktop_research.finding.recover action registration conflict"
-                )
+                raise RuntimeError("desktop_research.finding.recover action registration conflict")
             try:
                 service_registry.resolve(_ACTION_TYPE)
             except ConversationRuntimeError as exc:

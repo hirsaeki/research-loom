@@ -27,7 +27,9 @@ def _canonical_request(value: dict) -> dict:
     return result
 
 
-def _synthetic_candidate(facade, proposal_id: str, *, producer: str, action_kind: str = "CREATE_OBJECT") -> dict:
+def _synthetic_candidate(
+    facade, proposal_id: str, *, producer: str, action_kind: str = "CREATE_OBJECT"
+) -> dict:
     state = facade._current_state_view()
     object_id = "OBJ-" + proposal_id
     obj = {
@@ -44,12 +46,14 @@ def _synthetic_candidate(facade, proposal_id: str, *, producer: str, action_kind
         "project_ref": facade.project_id,
         "lineage_ref": state.lineage_ref,
         "source_refs": ["HND-RUN-1"] if producer.startswith("desktop-research") else [],
-        "proposed_actions": [{
-            "kind": action_kind,
-            "payload": {"object": obj},
-            "decision_refs": [],
-            "source_refs": ["HND-RUN-1"] if producer.startswith("desktop-research") else [],
-        }],
+        "proposed_actions": [
+            {
+                "kind": action_kind,
+                "payload": {"object": obj},
+                "decision_refs": [],
+                "source_refs": ["HND-RUN-1"] if producer.startswith("desktop-research") else [],
+            }
+        ],
         "affected_refs": [{"kind": "finding", "id": object_id}],
         "rationale": "exact detail fixture",
         "required_human_decision_kinds": ["research_adoption"],
@@ -68,10 +72,16 @@ class Issue305PublicDetailReadTests(unittest.TestCase):
             workspace = _init_workspace(Path(temp))
             with LocalApplicationFacade.open_workspace(workspace) as facade:
                 single = facade.submit_action(_proposal_input())
-                batch = facade.submit_action(_batch_input(_question("Batch A"), _question("Batch B")))
+                batch = facade.submit_action(
+                    _batch_input(_question("Batch A"), _question("Batch B"))
+                )
                 expected = {
-                    single["data"]["state_delta_proposal_id"]: deepcopy(single["data"]["state_delta_proposal"]),
-                    batch["data"]["state_delta_proposal_id"]: deepcopy(batch["data"]["state_delta_proposal"]),
+                    single["data"]["state_delta_proposal_id"]: deepcopy(
+                        single["data"]["state_delta_proposal"]
+                    ),
+                    batch["data"]["state_delta_proposal_id"]: deepcopy(
+                        batch["data"]["state_delta_proposal"]
+                    ),
                 }
                 before_count = facade._application.conversation_store._db.execute(
                     "SELECT COUNT(*) FROM state_delta_proposals"
@@ -87,33 +97,44 @@ class Issue305PublicDetailReadTests(unittest.TestCase):
                         "candidate_id": candidate_id,
                         "candidate": document,
                     }
-                    code, cli = _run_cli([
-                        "candidate", "show", "--workspace", str(workspace),
-                        "--candidate-id", candidate_id, "--json",
-                    ])
+                    code, cli = _run_cli(
+                        [
+                            "candidate",
+                            "show",
+                            "--workspace",
+                            str(workspace),
+                            "--candidate-id",
+                            candidate_id,
+                            "--json",
+                        ]
+                    )
                     assert code == 0
                     assert cli == shown
-                assert reopened._application.conversation_store._db.execute(
-                    "SELECT COUNT(*) FROM state_delta_proposals"
-                ).fetchone()[0] == before_count
+                assert (
+                    reopened._application.conversation_store._db.execute(
+                        "SELECT COUNT(*) FROM state_delta_proposals"
+                    ).fetchone()[0]
+                    == before_count
+                )
                 assert reopened._current_state_view().current_snapshot == before_snapshot
-
 
     def test_candidate_show_covers_review_recommendation_argument_and_run_candidates(self):
         # Material Research Question review candidate.
         with tempfile.TemporaryDirectory() as temp:
             with LocalApplicationFacade.open_workspace(_workspace(Path(temp))) as facade:
                 question_id = _adopt_question(facade)
-                review = facade.submit_action({
-                    "action_type": "research_question.review",
-                    "payload": {
-                        "operation": "REFINE",
-                        "question_ids": [question_id],
-                        "rationale": "tighten scope",
-                        "text": "Refined exact-detail question",
-                    },
-                    "actor_id": "H",
-                })
+                review = facade.submit_action(
+                    {
+                        "action_type": "research_question.review",
+                        "payload": {
+                            "operation": "REFINE",
+                            "question_ids": [question_id],
+                            "rationale": "tighten scope",
+                            "text": "Refined exact-detail question",
+                        },
+                        "actor_id": "H",
+                    }
+                )
                 candidate = review["data"]["state_delta_proposal"]
                 assert facade.show_candidate(candidate["proposal_id"])["candidate"] == candidate
 
@@ -152,22 +173,27 @@ class Issue305PublicDetailReadTests(unittest.TestCase):
             finally:
                 facade.close()
 
-
     def test_decision_show_preserves_immutable_request_and_separates_operational_state(self):
         with tempfile.TemporaryDirectory() as temp:
             workspace = _init_workspace(Path(temp))
             with LocalApplicationFacade.open_workspace(workspace) as facade:
                 proposed = facade.submit_action(_proposal_input())
                 candidate_id = proposed["data"]["state_delta_proposal_id"]
-                pending = facade.submit_action({
-                    "action_type": "state.apply_candidate",
-                    "payload": {"state_delta_proposal_id": candidate_id},
-                    "actor_id": "HUMAN-RQ",
-                })
-                confirmed = facade.submit_confirmation({
-                    "confirmation_request_id": pending["confirmation_request"]["confirmation_request_id"],
-                    "actor_id": "HUMAN-RQ",
-                })
+                pending = facade.submit_action(
+                    {
+                        "action_type": "state.apply_candidate",
+                        "payload": {"state_delta_proposal_id": candidate_id},
+                        "actor_id": "HUMAN-RQ",
+                    }
+                )
+                confirmed = facade.submit_confirmation(
+                    {
+                        "confirmation_request_id": pending["confirmation_request"][
+                            "confirmation_request_id"
+                        ],
+                        "actor_id": "HUMAN-RQ",
+                    }
+                )
                 issued = _canonical_request(confirmed["decision_request"])
                 request_id = issued["request_id"]
                 assert request_digest(issued) == issued["request_digest"]
@@ -189,33 +215,50 @@ class Issue305PublicDetailReadTests(unittest.TestCase):
                     "detail": None,
                 }
 
-                resolved = facade.resolve_human_decision({
-                    "request_id": request_id,
-                    "request_digest": issued["request_digest"],
-                    "disposition": "approve_exact",
-                    "actor_id": "HUMAN-RQ",
-                })
+                resolved = facade.resolve_human_decision(
+                    {
+                        "request_id": request_id,
+                        "request_digest": issued["request_digest"],
+                        "disposition": "approve_exact",
+                        "actor_id": "HUMAN-RQ",
+                    }
+                )
                 assert resolved["status"] == "RESOLVED"
 
                 after = facade.show_human_decision_request(request_id)
                 assert after["request"] == issued
                 assert after["operational"]["status"] == "RESOLVED"
                 assert after["operational"]["commit_id"] == resolved["commit_receipt"]["commit_id"]
-                assert facade.show_candidate(candidate_id)["candidate"] == proposed["data"]["state_delta_proposal"]
+                assert (
+                    facade.show_candidate(candidate_id)["candidate"]
+                    == proposed["data"]["state_delta_proposal"]
+                )
 
-                code, cli = _run_cli([
-                    "decision", "show", "--workspace", str(workspace),
-                    "--request-id", request_id, "--json",
-                ])
+                code, cli = _run_cli(
+                    [
+                        "decision",
+                        "show",
+                        "--workspace",
+                        str(workspace),
+                        "--request-id",
+                        request_id,
+                        "--json",
+                    ]
+                )
                 assert code == 0
                 assert cli == after
-                assert facade._application.conversation_store._db.execute(
-                    "SELECT COUNT(*) FROM state_delta_proposals"
-                ).fetchone()[0] == before_candidate_count
-                assert facade._application.decision_store._db.execute(
-                    "SELECT COUNT(*) FROM decision_requests"
-                ).fetchone()[0] == before_request_count
-
+                assert (
+                    facade._application.conversation_store._db.execute(
+                        "SELECT COUNT(*) FROM state_delta_proposals"
+                    ).fetchone()[0]
+                    == before_candidate_count
+                )
+                assert (
+                    facade._application.decision_store._db.execute(
+                        "SELECT COUNT(*) FROM decision_requests"
+                    ).fetchone()[0]
+                    == before_request_count
+                )
 
     def test_candidate_and_decision_show_fail_closed_on_missing_foreign_or_corrupt_records(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -248,7 +291,10 @@ class Issue305PublicDetailReadTests(unittest.TestCase):
                 raw["proposal_digest"] = canonical_digest(raw)
                 facade._application.conversation_store._db.execute(
                     "UPDATE state_delta_proposals SET payload_json=? WHERE proposal_id=?",
-                    (json.dumps(raw, ensure_ascii=False, sort_keys=True, separators=(",", ":")), candidate_id),
+                    (
+                        json.dumps(raw, ensure_ascii=False, sort_keys=True, separators=(",", ":")),
+                        candidate_id,
+                    ),
                 )
                 with self.assertRaises(ConversationRuntimeError) as malformed:
                     facade.show_candidate(candidate_id)
@@ -260,15 +306,23 @@ class Issue305PublicDetailReadTests(unittest.TestCase):
             clean = _init_workspace(decision_root)
             with LocalApplicationFacade.open_workspace(clean) as facade:
                 proposed = facade.submit_action(_proposal_input())
-                pending = facade.submit_action({
-                    "action_type": "state.apply_candidate",
-                    "payload": {"state_delta_proposal_id": proposed["data"]["state_delta_proposal_id"]},
-                    "actor_id": "HUMAN-RQ",
-                })
-                confirmed = facade.submit_confirmation({
-                    "confirmation_request_id": pending["confirmation_request"]["confirmation_request_id"],
-                    "actor_id": "HUMAN-RQ",
-                })
+                pending = facade.submit_action(
+                    {
+                        "action_type": "state.apply_candidate",
+                        "payload": {
+                            "state_delta_proposal_id": proposed["data"]["state_delta_proposal_id"]
+                        },
+                        "actor_id": "HUMAN-RQ",
+                    }
+                )
+                confirmed = facade.submit_confirmation(
+                    {
+                        "confirmation_request_id": pending["confirmation_request"][
+                            "confirmation_request_id"
+                        ],
+                        "actor_id": "HUMAN-RQ",
+                    }
+                )
                 request_id = confirmed["decision_request"]["request_id"]
                 row = facade._application.decision_store._db.execute(
                     "SELECT payload_json FROM decision_requests WHERE request_id=?", (request_id,)
@@ -277,7 +331,12 @@ class Issue305PublicDetailReadTests(unittest.TestCase):
                 request["human_actor_id"] = "TAMPERED"
                 facade._application.decision_store._db.execute(
                     "UPDATE decision_requests SET payload_json=? WHERE request_id=?",
-                    (json.dumps(request, ensure_ascii=False, sort_keys=True, separators=(",", ":")), request_id),
+                    (
+                        json.dumps(
+                            request, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+                        ),
+                        request_id,
+                    ),
                 )
                 with self.assertRaises(ConversationRuntimeError) as corrupt_request:
                     facade.show_human_decision_request(request_id)
@@ -288,15 +347,23 @@ class Issue305PublicDetailReadTests(unittest.TestCase):
             workspace = _init_workspace(Path(temp))
             with LocalApplicationFacade.open_workspace(workspace) as facade:
                 proposed = facade.submit_action(_proposal_input())
-                pending = facade.submit_action({
-                    "action_type": "state.apply_candidate",
-                    "payload": {"state_delta_proposal_id": proposed["data"]["state_delta_proposal_id"]},
-                    "actor_id": "HUMAN-RQ",
-                })
-                confirmed = facade.submit_confirmation({
-                    "confirmation_request_id": pending["confirmation_request"]["confirmation_request_id"],
-                    "actor_id": "HUMAN-RQ",
-                })
+                pending = facade.submit_action(
+                    {
+                        "action_type": "state.apply_candidate",
+                        "payload": {
+                            "state_delta_proposal_id": proposed["data"]["state_delta_proposal_id"]
+                        },
+                        "actor_id": "HUMAN-RQ",
+                    }
+                )
+                confirmed = facade.submit_confirmation(
+                    {
+                        "confirmation_request_id": pending["confirmation_request"][
+                            "confirmation_request_id"
+                        ],
+                        "actor_id": "HUMAN-RQ",
+                    }
+                )
                 request_id = confirmed["decision_request"]["request_id"]
                 facade._application.decision_store._db.execute(
                     "UPDATE decision_requests SET project_ref=? WHERE request_id=?",
@@ -311,15 +378,23 @@ class Issue305PublicDetailReadTests(unittest.TestCase):
             workspace = _init_workspace(Path(temp))
             with LocalApplicationFacade.open_workspace(workspace) as facade:
                 proposed = facade.submit_action(_proposal_input())
-                pending = facade.submit_action({
-                    "action_type": "state.apply_candidate",
-                    "payload": {"state_delta_proposal_id": proposed["data"]["state_delta_proposal_id"]},
-                    "actor_id": "HUMAN-RQ",
-                })
-                confirmed = facade.submit_confirmation({
-                    "confirmation_request_id": pending["confirmation_request"]["confirmation_request_id"],
-                    "actor_id": "HUMAN-RQ",
-                })
+                pending = facade.submit_action(
+                    {
+                        "action_type": "state.apply_candidate",
+                        "payload": {
+                            "state_delta_proposal_id": proposed["data"]["state_delta_proposal_id"]
+                        },
+                        "actor_id": "HUMAN-RQ",
+                    }
+                )
+                confirmed = facade.submit_confirmation(
+                    {
+                        "confirmation_request_id": pending["confirmation_request"][
+                            "confirmation_request_id"
+                        ],
+                        "actor_id": "HUMAN-RQ",
+                    }
+                )
                 request_id = confirmed["decision_request"]["request_id"]
                 row = facade._application.decision_store._db.execute(
                     "SELECT payload_json FROM decision_requests WHERE request_id=?", (request_id,)
@@ -334,7 +409,12 @@ class Issue305PublicDetailReadTests(unittest.TestCase):
                 assert request_digest(request) == request["request_digest"]
                 facade._application.decision_store._db.execute(
                     "UPDATE decision_requests SET payload_json=? WHERE request_id=?",
-                    (json.dumps(request, ensure_ascii=False, sort_keys=True, separators=(",", ":")), request_id),
+                    (
+                        json.dumps(
+                            request, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+                        ),
+                        request_id,
+                    ),
                 )
                 with self.assertRaises(ConversationRuntimeError) as corrupt_request:
                     facade.show_human_decision_request(request_id)

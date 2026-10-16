@@ -19,8 +19,12 @@ class RecoverableLocalHumanDecisionStore(_BaseStore):
             return None
         return {
             "status": str(row["status"]),
-            "response_digest": str(row["claimed_response_digest"]) if row["claimed_response_digest"] is not None else None,
-            "commit_receipt": json.loads(str(row["commit_receipt_json"])) if row["commit_receipt_json"] is not None else None,
+            "response_digest": str(row["claimed_response_digest"])
+            if row["claimed_response_digest"] is not None
+            else None,
+            "commit_receipt": json.loads(str(row["commit_receipt_json"]))
+            if row["commit_receipt_json"] is not None
+            else None,
             "detail": str(row["detail"]) if row["detail"] is not None else None,
         }
 
@@ -35,12 +39,15 @@ class RecoverableLocalHumanDecisionStore(_BaseStore):
                 "SELECT q.status,q.claimed_response_digest,r.payload_json "
                 "FROM decision_requests q LEFT JOIN decision_responses r "
                 "ON r.response_digest=q.claimed_response_digest AND r.request_id=q.request_id "
-                "WHERE q.request_id=?", (request_id,),
+                "WHERE q.request_id=?",
+                (request_id,),
             ).fetchone()
         if row is None:
             return None
         return {
             "status": str(row["status"]),
             "response_digest": row["claimed_response_digest"],
-            "response": json.loads(row["payload_json"]) if row["payload_json"] is not None else None,
+            "response": json.loads(row["payload_json"])
+            if row["payload_json"] is not None
+            else None,
         }

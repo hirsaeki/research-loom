@@ -37,11 +37,7 @@ class Issue220PublicationReleaseTests(ResearchPackageAcceptanceSupport):
         source_ref = scope[0]["source_ref"]
         locator = scope[0]["locators"][0]
         exhibit_ref = input_doc["sections"][0]["exhibit_refs"][0]
-        token = (
-            "[[citation:MISSING-SOURCE]]"
-            if broken_token
-            else f"[[citation:{source_ref}]]"
-        )
+        token = "[[citation:MISSING-SOURCE]]" if broken_token else f"[[citation:{source_ref}]]"
         content = frame_content or (
             f"Framing uses {token} and see [[exhibit:{exhibit_ref}]]. "
             "Continue at [[section:SEC-VALIDATE]]."
@@ -114,15 +110,13 @@ class Issue220PublicationReleaseTests(ResearchPackageAcceptanceSupport):
             self.assertEqual(preview_manifest["object_type"], "preview_artifact_manifest")
             self.assertEqual(preview_manifest["preview_id"], build["build_id"])
             schema = json.loads(PREVIEW_SCHEMA.read_text(encoding="utf-8"))
-            Draft202012Validator(
-                schema, format_checker=FormatChecker()
-            ).validate(preview_manifest)
+            Draft202012Validator(schema, format_checker=FormatChecker()).validate(preview_manifest)
 
             root = facade._publication_release_service()._build_path(build["build_id"])
             markdown = (root / "preview.md").read_text(encoding="utf-8")
             self.assertIn("[1]", markdown)
             self.assertIn("Table 1", markdown)
-            self.assertIn('Section “Validation plan”', markdown)
+            self.assertIn("Section “Validation plan”", markdown)
             with zipfile.ZipFile(root / "formal.docx") as archive:
                 self.assertIn("word/document.xml", archive.namelist())
                 doc = archive.read("word/document.xml").decode("utf-8")
@@ -140,16 +134,10 @@ class Issue220PublicationReleaseTests(ResearchPackageAcceptanceSupport):
                         "actor_id": "HUMAN-RELEASE",
                     },
                 )
-            self.assertEqual(
-                error.exception.code, "APPLICATION-PUBLICATION-RELEASE-DECISION-001"
-            )
-            self.assertFalse(
-                (facade._publication_release_service().root / "releases").exists()
-            )
+            self.assertEqual(error.exception.code, "APPLICATION-PUBLICATION-RELEASE-DECISION-001")
+            self.assertFalse((facade._publication_release_service().root / "releases").exists())
 
-            request_result = facade.request_publication_release(
-                build["build_id"], "HUMAN-RELEASE"
-            )
+            request_result = facade.request_publication_release(build["build_id"], "HUMAN-RELEASE")
             request = request_result["decision_request"]
             self.assertEqual(request_result["status"], "PENDING")
             self.assertEqual(request["project_ref"], facade.project_id)
@@ -164,9 +152,7 @@ class Issue220PublicationReleaseTests(ResearchPackageAcceptanceSupport):
                 side_effect=AssertionError("Publication release must not mutate Research State"),
             ):
                 released = facade.release_publication(build["build_id"], approval)
-                released_again = facade.release_publication(
-                    build["build_id"], deepcopy(approval)
-                )
+                released_again = facade.release_publication(build["build_id"], deepcopy(approval))
             self.assertEqual(released["status"], "RELEASED")
             self.assertEqual(released_again["status"], "VERIFIED_REUSE")
             manifest = released["release"]
@@ -201,9 +187,7 @@ class Issue220PublicationReleaseTests(ResearchPackageAcceptanceSupport):
             facade.close()
 
     def test_broken_reference_is_visible_in_preview_but_blocks_release_request(self):
-        facade, _case, composition, imported, _source_ref = self._prepared(
-            broken_token=True
-        )
+        facade, _case, composition, imported, _source_ref = self._prepared(broken_token=True)
         try:
             built = facade.build_publication_preview(
                 composition["composition_id"], imported["revision_id"]
@@ -222,9 +206,7 @@ class Issue220PublicationReleaseTests(ResearchPackageAcceptanceSupport):
             )
             with self.assertRaises(LocalApplicationError) as error:
                 facade.request_publication_release(build["build_id"], "HUMAN-RELEASE")
-            self.assertEqual(
-                error.exception.code, "APPLICATION-PUBLICATION-RELEASE-CHECK-001"
-            )
+            self.assertEqual(error.exception.code, "APPLICATION-PUBLICATION-RELEASE-CHECK-001")
         finally:
             facade.close()
 
@@ -275,9 +257,7 @@ class Issue220PublicationReleaseTests(ResearchPackageAcceptanceSupport):
             facade.close()
 
     def test_token_only_citation_resolves_from_pinned_package(self):
-        facade, _case, composition, imported, source_ref = self._prepared(
-            structured_citation=False
-        )
+        facade, _case, composition, imported, source_ref = self._prepared(structured_citation=False)
         try:
             built = facade.build_publication_preview(
                 composition["composition_id"], imported["revision_id"]
@@ -292,8 +272,8 @@ class Issue220PublicationReleaseTests(ResearchPackageAcceptanceSupport):
             facade.close()
 
     def test_cross_reference_to_composition_section_absent_from_revision_is_unresolved(self):
-        facade, case = writer_comp_support.Issue80WriterCompositionTests._build_complete_support_package(
-            self
+        facade, case = (
+            writer_comp_support.Issue80WriterCompositionTests._build_complete_support_package(self)
         )
         try:
             proposal = writer_comp_support.Issue80WriterCompositionTests._proposal(self, case)
@@ -327,14 +307,10 @@ class Issue220PublicationReleaseTests(ResearchPackageAcceptanceSupport):
             built = facade.build_publication_preview(
                 composition["composition_id"], imported["revision_id"]
             )
-            self.assertEqual(
-                built["build"]["verification"]["cross_reference_resolution"], "failed"
-            )
+            self.assertEqual(built["build"]["verification"]["cross_reference_resolution"], "failed")
             self.assertIn(
                 "[unresolved section:SEC-VALIDATE]",
-                facade.show_publication_preview(built["build"]["build_id"])[
-                    "preview_markdown"
-                ],
+                facade.show_publication_preview(built["build"]["build_id"])["preview_markdown"],
             )
         finally:
             facade.close()
@@ -346,9 +322,9 @@ class Issue220PublicationReleaseTests(ResearchPackageAcceptanceSupport):
                 composition["composition_id"], imported["revision_id"]
             )
             build = built["build"]
-            request = facade.request_publication_release(
-                build["build_id"], "HUMAN-RELEASE"
-            )["decision_request"]
+            request = facade.request_publication_release(build["build_id"], "HUMAN-RELEASE")[
+                "decision_request"
+            ]
             root = facade._publication_release_service()._build_path(build["build_id"])
             (root / "formal.docx").write_bytes(b"PK-tampered")
             with self.assertRaises(LocalApplicationError) as error:
@@ -423,9 +399,7 @@ class Issue220PublicationReleaseTests(ResearchPackageAcceptanceSupport):
                 if is_second:
                     second_started.set()
                 results.append(
-                    service.build_preview(
-                        composition["composition_id"], imported["revision_id"]
-                    )
+                    service.build_preview(composition["composition_id"], imported["revision_id"])
                 )
             except Exception as exc:  # pragma: no cover - assertion captures details
                 errors.append(exc)
@@ -443,9 +417,7 @@ class Issue220PublicationReleaseTests(ResearchPackageAcceptanceSupport):
                 first.join(5)
                 second.join(5)
             self.assertFalse(errors)
-            self.assertEqual(
-                {row["status"] for row in results}, {"BUILT", "VERIFIED_REUSE"}
-            )
+            self.assertEqual({row["status"] for row in results}, {"BUILT", "VERIFIED_REUSE"})
             self.assertEqual(call_count, 1)
         finally:
             facade.close()

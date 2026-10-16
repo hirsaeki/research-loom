@@ -26,31 +26,43 @@ class MiscoIntegratedAcceptanceTests(ResearchPackageAcceptanceSupport):
 
     @staticmethod
     def _adopt_current_rq(facade: LocalApplicationFacade) -> str:
-        proposed = facade.submit_action({
-            "action_type": "research_question.propose",
-            "payload": {
-                "text": "Which current evidence should this MISCO research checkpoint test first?",
-                "acceptance_criteria": ["Current evidence can be compared without importing legacy research state."],
-                "scope_limits": ["Use only material captured in this current Workspace."],
-            },
-            "actor_id": "HUMAN-337",
-        })
+        proposed = facade.submit_action(
+            {
+                "action_type": "research_question.propose",
+                "payload": {
+                    "text": "Which current evidence should this MISCO research checkpoint test first?",
+                    "acceptance_criteria": [
+                        "Current evidence can be compared without importing legacy research state."
+                    ],
+                    "scope_limits": ["Use only material captured in this current Workspace."],
+                },
+                "actor_id": "HUMAN-337",
+            }
+        )
         rq_id = proposed["data"]["research_question_candidate"]["id"]
-        pending = facade.submit_action({
-            "action_type": "state.apply_candidate",
-            "payload": {"state_delta_proposal_id": proposed["data"]["state_delta_proposal_id"]},
-            "actor_id": "HUMAN-337",
-        })
-        decision = facade.submit_confirmation({
-            "confirmation_request_id": pending["confirmation_request"]["confirmation_request_id"],
-            "actor_id": "HUMAN-337",
-        })["decision_request"]
-        resolved = facade.resolve_human_decision({
-            "request_id": decision["request_id"],
-            "request_digest": decision["request_digest"],
-            "disposition": "approve_exact",
-            "actor_id": "HUMAN-337",
-        })
+        pending = facade.submit_action(
+            {
+                "action_type": "state.apply_candidate",
+                "payload": {"state_delta_proposal_id": proposed["data"]["state_delta_proposal_id"]},
+                "actor_id": "HUMAN-337",
+            }
+        )
+        decision = facade.submit_confirmation(
+            {
+                "confirmation_request_id": pending["confirmation_request"][
+                    "confirmation_request_id"
+                ],
+                "actor_id": "HUMAN-337",
+            }
+        )["decision_request"]
+        resolved = facade.resolve_human_decision(
+            {
+                "request_id": decision["request_id"],
+                "request_digest": decision["request_digest"],
+                "disposition": "approve_exact",
+                "actor_id": "HUMAN-337",
+            }
+        )
         assert resolved["status"] == "RESOLVED"
         return rq_id
 
@@ -88,27 +100,34 @@ class MiscoIntegratedAcceptanceTests(ResearchPackageAcceptanceSupport):
 
             response = self._response(input_doc, response_id="WR-G337-1")
             scope = input_doc["sections"][0]["citation_scope"][0]
-            response["sections"][0]["citations"] = [{
-                "source_ref": scope["source_ref"],
-                "locator_ref": scope["locators"][0],
-            }]
+            response["sections"][0]["citations"] = [
+                {
+                    "source_ref": scope["source_ref"],
+                    "locator_ref": scope["locators"][0],
+                }
+            ]
             response["sections"][0]["content"] += f" [[citation:{scope['source_ref']}]]"
             first = facade.import_writer_response(response)
 
             revision = self._response(
                 input_doc,
                 response_id="WR-G337-2",
-                base={"revision_id": first["revision_id"], "revision_digest": first["revision_digest"]},
+                base={
+                    "revision_id": first["revision_id"],
+                    "revision_digest": first["revision_digest"],
+                },
                 partial=True,
             )
             revision["sections"][0]["content"] = (
                 "Revised framing remains bounded by the current Workspace material. "
                 f"[[citation:{scope['source_ref']}]]"
             )
-            revision["sections"][0]["citations"] = [{
-                "source_ref": scope["source_ref"],
-                "locator_ref": scope["locators"][0],
-            }]
+            revision["sections"][0]["citations"] = [
+                {
+                    "source_ref": scope["source_ref"],
+                    "locator_ref": scope["locators"][0],
+                }
+            ]
             second = facade.import_writer_response(revision)
             self.assertEqual(second["revision_number"], 2)
             self.assertEqual(second["reused_section_ids"], ["SEC-VALIDATE"])
@@ -117,9 +136,13 @@ class MiscoIntegratedAcceptanceTests(ResearchPackageAcceptanceSupport):
                 facade.project_id,
                 facade._application.state_repository.load_active_lineage_ref(facade.project_id),
             )
-            self.assertEqual(after_writer.current_snapshot["content_digest"], research_snapshot_before)
+            self.assertEqual(
+                after_writer.current_snapshot["content_digest"], research_snapshot_before
+            )
 
-            preview = facade.build_publication_preview(composition["composition_id"], second["revision_id"])["build"]
+            preview = facade.build_publication_preview(
+                composition["composition_id"], second["revision_id"]
+            )["build"]
             self.assertEqual(preview["publication_profile"]["profile_id"], "misco.publication")
             self.assertEqual(preview["verification"]["formal_specification"], "passed")
             self.assertEqual(preview["verification"]["editorial_qa"], "warning")
@@ -133,25 +156,41 @@ class MiscoIntegratedAcceptanceTests(ResearchPackageAcceptanceSupport):
                 facade.project_id,
                 facade._application.state_repository.load_active_lineage_ref(facade.project_id),
             )
-            self.assertEqual(after_preview.current_snapshot["content_digest"], research_snapshot_before)
+            self.assertEqual(
+                after_preview.current_snapshot["content_digest"], research_snapshot_before
+            )
 
             # Returning to Research after Writer/Publication preview remains a normal operation.
-            attention = facade.submit_action({
-                "action_type": "research_attention.propose",
-                "payload": {"additions": [{"statement": "Investigate the unresolved gap exposed by the checkpoint draft."}]},
-                "actor_id": "HUMAN-337",
-            })["data"]["attention_map"]
+            attention = facade.submit_action(
+                {
+                    "action_type": "research_attention.propose",
+                    "payload": {
+                        "additions": [
+                            {
+                                "statement": "Investigate the unresolved gap exposed by the checkpoint draft."
+                            }
+                        ]
+                    },
+                    "actor_id": "HUMAN-337",
+                }
+            )["data"]["attention_map"]
             self.assertTrue(attention["map_id"])
         finally:
             facade.close()
 
         with LocalApplicationFacade.open_workspace(self.workspace) as reopened:
-            shown = reopened.inspect_writer_round_trip(composition["composition_id"], second["revision_id"])
+            shown = reopened.inspect_writer_round_trip(
+                composition["composition_id"], second["revision_id"]
+            )
             self.assertEqual(shown["revision"]["revision_id"], second["revision_id"])
-            self.assertEqual(reopened.show_publication_preview(preview["build_id"])["build"]["build_id"], preview["build_id"])
+            self.assertEqual(
+                reopened.show_publication_preview(preview["build_id"])["build"]["build_id"],
+                preview["build_id"],
+            )
             self.assertEqual(reopened.status()["project_id"], "misco-m3-2026")
 
 
 if __name__ == "__main__":
     import unittest
+
     unittest.main()

@@ -28,6 +28,7 @@ def repository_read(method):
             raise
         except sqlite3.Error as exc:
             raise RepositoryError(f"SQLite read failed in {method.__name__}") from exc
+
     wrapped.__name__ = method.__name__
     wrapped.__doc__ = method.__doc__
     return wrapped
@@ -41,6 +42,7 @@ def bootstrap_write(method):
             raise
         except sqlite3.Error as exc:
             raise AtomicCommitError("SQLite bootstrap failed atomically") from exc
+
     wrapped.__name__ = method.__name__
     wrapped.__doc__ = method.__doc__
     return wrapped

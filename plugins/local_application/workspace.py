@@ -17,12 +17,17 @@ import rfc8785
 
 from plugins.local_durable_store import (
     OPTIONAL_DURABLE_CHILDREN as _OPTIONAL_DURABLE_CHILDREN,
-    inspect_optional_children, register_optional_path,
+    inspect_optional_children,
+    register_optional_path,
 )
 
 from core.runtime import LineageView, StateView, canonical_digest
 from core.runtime.transition_models import with_content_digest
-from plugins.local_application.application import LocalResearchApplication, SystemClock, UUIDIdProvider
+from plugins.local_application.application import (
+    LocalResearchApplication,
+    SystemClock,
+    UUIDIdProvider,
+)
 from plugins.local_conversation_store import (
     LocalConversationStoreError,
     validate_conversation_store_schema,
@@ -62,6 +67,7 @@ _BASE_DURABLE_CHILDREN = {
     "decision": {"locator": _STORAGE["decision"], "kind": "file"},
     "execution_material": {"locator": _STORAGE["execution_root"], "kind": "directory"},
 }
+
 
 class LocalWorkspaceError(RuntimeError):
     def __init__(self, code: str, message: str) -> None:
@@ -154,12 +160,12 @@ def _has_duplicates(values) -> bool:
 def _validate_project_semantics(config: Mapping[str, Any]) -> None:
     if config.get("configuration_digest") != _project_configuration_digest(config):
         raise LocalWorkspaceError(
-            "PROJECT-CONFIG-DIGEST-001", "Project Config configuration_digest does not match content"
+            "PROJECT-CONFIG-DIGEST-001",
+            "Project Config configuration_digest does not match content",
         )
 
     requests = [
-        (item["profile_type"], item["profile_id"])
-        for item in _flatten_profile_requests(config)
+        (item["profile_type"], item["profile_id"]) for item in _flatten_profile_requests(config)
     ]
     if _has_duplicates(requests):
         raise LocalWorkspaceError(
@@ -179,10 +185,14 @@ def _validate_project_semantics(config: Mapping[str, Any]) -> None:
         ],
     ]
     if any(_has_duplicates(items) for items in identities):
-        raise LocalWorkspaceError("PROJECT-CONFIG-IDENTITY-001", "duplicate Project Config identity")
+        raise LocalWorkspaceError(
+            "PROJECT-CONFIG-IDENTITY-001", "duplicate Project Config identity"
+        )
 
     if set(config["scope"]["in_scope"]) & set(config["scope"]["out_of_scope"]):
-        raise LocalWorkspaceError("PROJECT-CONFIG-SCOPE-001", "in-scope and out-of-scope entries overlap")
+        raise LocalWorkspaceError(
+            "PROJECT-CONFIG-SCOPE-001", "in-scope and out-of-scope entries overlap"
+        )
 
     question_ids = {item["question_id"] for item in config["research_questions"]["references"]}
     seed_ids = {item["seed_id"] for item in config["research_questions"]["seeds"]}
@@ -193,13 +203,21 @@ def _validate_project_semantics(config: Mapping[str, Any]) -> None:
             raise LocalWorkspaceError("PROJECT-CONFIG-REF-001", "RQ seed parent does not resolve")
     for attention in config["research_attention"]:
         if not set(attention.get("source_reference_ids", ())) <= resource_ids:
-            raise LocalWorkspaceError("PROJECT-CONFIG-REF-001", "research attention source reference does not resolve")
+            raise LocalWorkspaceError(
+                "PROJECT-CONFIG-REF-001", "research attention source reference does not resolve"
+            )
         if not set(attention.get("related_question_ids", ())) <= question_ids:
-            raise LocalWorkspaceError("PROJECT-CONFIG-REF-001", "research attention RQ reference does not resolve")
+            raise LocalWorkspaceError(
+                "PROJECT-CONFIG-REF-001", "research attention RQ reference does not resolve"
+            )
         if not set(attention.get("related_question_seed_ids", ())) <= seed_ids:
-            raise LocalWorkspaceError("PROJECT-CONFIG-REF-001", "research attention RQ seed reference does not resolve")
+            raise LocalWorkspaceError(
+                "PROJECT-CONFIG-REF-001", "research attention RQ seed reference does not resolve"
+            )
     if not set(config["provenance"]["source_reference_ids"]) <= resource_ids:
-        raise LocalWorkspaceError("PROJECT-CONFIG-REF-001", "Project Config provenance reference does not resolve")
+        raise LocalWorkspaceError(
+            "PROJECT-CONFIG-REF-001", "Project Config provenance reference does not resolve"
+        )
 
 
 def _validate_profile_binding(config: Mapping[str, Any], effective: Mapping[str, Any]) -> None:
@@ -248,11 +266,17 @@ def _safe_locator(root: Path, locator: str, *, require_exists: bool = True) -> P
     try:
         resolved.relative_to(normalized_root)
     except ValueError as exc:
-        raise LocalWorkspaceError("WORKSPACE-PATH-001", f"workspace locator escapes root: {locator}") from exc
+        raise LocalWorkspaceError(
+            "WORKSPACE-PATH-001", f"workspace locator escapes root: {locator}"
+        ) from exc
     if target.is_symlink():
-        raise LocalWorkspaceError("WORKSPACE-PATH-001", f"workspace locator may not be a symlink: {locator}")
+        raise LocalWorkspaceError(
+            "WORKSPACE-PATH-001", f"workspace locator may not be a symlink: {locator}"
+        )
     if require_exists and not target.exists():
-        raise LocalWorkspaceError("WORKSPACE-MISSING-001", f"required workspace path is missing: {locator}")
+        raise LocalWorkspaceError(
+            "WORKSPACE-MISSING-001", f"required workspace path is missing: {locator}"
+        )
     return target
 
 
@@ -311,22 +335,26 @@ def _bootstrap_state(
         core_project["out_of_scope"] = list(scope["out_of_scope"])
 
     _schema_validate(core_project, RESEARCH_OBJECT_SCHEMA, "WORKSPACE-BOOTSTRAP-CORE-001")
-    snapshot = with_content_digest({
-        "schema_version": "0.1.0",
-        "id": ids.new("SNP-"),
-        "kind": "snapshot",
-        "revision": 0,
-        "project_id": project_id,
-        "snapshot_type": "research",
-        "created_at": clock.now(),
-        "mode": "real",
-        "members": [{
-            "kind": "project",
-            "id": project_id,
+    snapshot = with_content_digest(
+        {
+            "schema_version": "0.1.0",
+            "id": ids.new("SNP-"),
+            "kind": "snapshot",
             "revision": 0,
-            "digest": canonical_digest(core_project),
-        }],
-    })
+            "project_id": project_id,
+            "snapshot_type": "research",
+            "created_at": clock.now(),
+            "mode": "real",
+            "members": [
+                {
+                    "kind": "project",
+                    "id": project_id,
+                    "revision": 0,
+                    "digest": canonical_digest(core_project),
+                }
+            ],
+        }
+    )
     _schema_validate(snapshot, RESEARCH_OBJECT_SCHEMA, "WORKSPACE-BOOTSTRAP-CORE-001")
 
     lineage_id = ids.new("LIN-")
@@ -378,7 +406,11 @@ def _binding(
         "workspace_format": WORKSPACE_FORMAT,
         "workspace_version": WORKSPACE_VERSION,
         "project_id": project_id,
-        "project_config": {"locator": project_config_locator, "ref": PROJECT_CONFIG_NAME, "digest": config_digest},
+        "project_config": {
+            "locator": project_config_locator,
+            "ref": PROJECT_CONFIG_NAME,
+            "digest": config_digest,
+        },
         "effective_profile_set": {
             "locator": effective_profile_set_locator,
             "ref": EFFECTIVE_PROFILE_SET_NAME,
@@ -399,41 +431,74 @@ def _binding_document_ref(binding: Mapping[str, Any], key: str) -> str:
 
 def _validate_binding_shape(binding: Mapping[str, Any]) -> None:
     required_keys = {
-        "workspace_format", "workspace_version", "project_id", "project_config",
-        "effective_profile_set", "storage", "initialized_at",
+        "workspace_format",
+        "workspace_version",
+        "project_id",
+        "project_config",
+        "effective_profile_set",
+        "storage",
+        "initialized_at",
     }
     if not required_keys <= set(binding) or set(binding) - required_keys - {"durable_children"}:
-        raise LocalWorkspaceError("WORKSPACE-BINDING-001", "workspace binding has unexpected or missing fields")
-    if binding.get("workspace_format") != WORKSPACE_FORMAT or binding.get("workspace_version") != WORKSPACE_VERSION:
-        raise LocalWorkspaceError("WORKSPACE-FORMAT-001", "workspace format/version is incompatible")
+        raise LocalWorkspaceError(
+            "WORKSPACE-BINDING-001", "workspace binding has unexpected or missing fields"
+        )
+    if (
+        binding.get("workspace_format") != WORKSPACE_FORMAT
+        or binding.get("workspace_version") != WORKSPACE_VERSION
+    ):
+        raise LocalWorkspaceError(
+            "WORKSPACE-FORMAT-001", "workspace format/version is incompatible"
+        )
     for key in ("project_config", "effective_profile_set"):
         value = binding.get(key)
-        if (
-            not isinstance(value, Mapping)
-            or set(value) not in ({"locator", "digest"}, {"locator", "ref", "digest"})
+        if not isinstance(value, Mapping) or set(value) not in (
+            {"locator", "digest"},
+            {"locator", "ref", "digest"},
         ):
             raise LocalWorkspaceError("WORKSPACE-BINDING-001", f"malformed {key} binding")
     storage = binding.get("storage")
     if not isinstance(storage, Mapping) or dict(storage) != _STORAGE:
-        raise LocalWorkspaceError("WORKSPACE-BINDING-001", "runtime storage layout does not match this workspace version")
+        raise LocalWorkspaceError(
+            "WORKSPACE-BINDING-001", "runtime storage layout does not match this workspace version"
+        )
     children = binding.get("durable_children")
     if children is not None:
         if not isinstance(children, Mapping):
             raise LocalWorkspaceError("WORKSPACE-BINDING-001", "durable_children must be an object")
         for name, spec in children.items():
-            if not isinstance(name, str) or not isinstance(spec, Mapping) or set(spec) != {"locator", "kind"}:
-                raise LocalWorkspaceError("WORKSPACE-BINDING-001", "durable child entry is malformed")
+            if (
+                not isinstance(name, str)
+                or not isinstance(spec, Mapping)
+                or set(spec) != {"locator", "kind"}
+            ):
+                raise LocalWorkspaceError(
+                    "WORKSPACE-BINDING-001", "durable child entry is malformed"
+                )
             if spec.get("kind") not in {"file", "directory"}:
                 raise LocalWorkspaceError("WORKSPACE-BINDING-001", "durable child kind is invalid")
             locator = Path(str(spec.get("locator", "")))
-            if locator.is_absolute() or ".." in locator.parts or not locator.parts or locator.parts[0] != INTERNAL_DIR:
-                raise LocalWorkspaceError("WORKSPACE-BINDING-001", "durable child locator must stay under Parent Durable Store Root")
+            if (
+                locator.is_absolute()
+                or ".." in locator.parts
+                or not locator.parts
+                or locator.parts[0] != INTERNAL_DIR
+            ):
+                raise LocalWorkspaceError(
+                    "WORKSPACE-BINDING-001",
+                    "durable child locator must stay under Parent Durable Store Root",
+                )
         for name, spec in _BASE_DURABLE_CHILDREN.items():
             if children.get(name) != spec:
-                raise LocalWorkspaceError("WORKSPACE-BINDING-001", f"required durable child binding is missing or changed: {name}")
+                raise LocalWorkspaceError(
+                    "WORKSPACE-BINDING-001",
+                    f"required durable child binding is missing or changed: {name}",
+                )
         for name, spec in children.items():
             if name not in _BASE_DURABLE_CHILDREN and _OPTIONAL_DURABLE_CHILDREN.get(name) != spec:
-                raise LocalWorkspaceError("WORKSPACE-BINDING-001", f"unknown durable child binding: {name}")
+                raise LocalWorkspaceError(
+                    "WORKSPACE-BINDING-001", f"unknown durable child binding: {name}"
+                )
 
 
 def _validate_registered_children(root: Path, binding: Mapping[str, Any]) -> bool:
@@ -450,9 +515,15 @@ def _validate_registered_children(root: Path, binding: Mapping[str, Any]) -> boo
                 f"registered durable child is missing: {name} ({spec['locator']})",
             )
         if spec["kind"] == "file" and not path.is_file():
-            raise LocalWorkspaceError("WORKSPACE-DURABLE-CHILD-MISSING-001", f"registered durable child is not a file: {name}")
+            raise LocalWorkspaceError(
+                "WORKSPACE-DURABLE-CHILD-MISSING-001",
+                f"registered durable child is not a file: {name}",
+            )
         if spec["kind"] == "directory" and not path.is_dir():
-            raise LocalWorkspaceError("WORKSPACE-DURABLE-CHILD-MISSING-001", f"registered durable child is not a directory: {name}")
+            raise LocalWorkspaceError(
+                "WORKSPACE-DURABLE-CHILD-MISSING-001",
+                f"registered durable child is not a directory: {name}",
+            )
     return True
 
 
@@ -477,6 +548,7 @@ def _sqlite_quick_check(path: Path, *, code: str) -> None:
             if row is None or str(row[0]).lower() != "ok":
                 raise LocalWorkspaceError(code, f"SQLite quick_check failed: {path}")
             from .workspace_initialization import validate_required_store_schema
+
             validate_required_store_schema(connection, code)
         finally:
             connection.close()
@@ -490,9 +562,7 @@ def _validate_conversation_database(path: Path) -> None:
     try:
         validate_conversation_store_schema(path)
     except LocalConversationStoreError as exc:
-        raise LocalWorkspaceError(
-            "WORKSPACE-CONVERSATION-DB-001", exc.message
-        ) from exc
+        raise LocalWorkspaceError("WORKSPACE-CONVERSATION-DB-001", exc.message) from exc
 
 
 def _validate_state_database(path: Path, binding: Mapping[str, Any]) -> None:
@@ -505,44 +575,71 @@ def _validate_state_database(path: Path, binding: Mapping[str, Any]) -> None:
                 "SELECT * FROM project_state WHERE project_ref=?", (project_id,)
             ).fetchone()
             if project is None:
-                raise LocalWorkspaceError("WORKSPACE-STATE-PROJECT-001", "Research State belongs to another or missing project")
+                raise LocalWorkspaceError(
+                    "WORKSPACE-STATE-PROJECT-001",
+                    "Research State belongs to another or missing project",
+                )
             if (
-                str(project["project_config_ref"]) != _binding_document_ref(binding, "project_config")
+                str(project["project_config_ref"])
+                != _binding_document_ref(binding, "project_config")
                 or str(project["project_config_digest"]) != str(binding["project_config"]["digest"])
-                or str(project["effective_profile_set_ref"]) != _binding_document_ref(binding, "effective_profile_set")
-                or str(project["effective_profile_set_digest"]) != str(binding["effective_profile_set"]["digest"])
+                or str(project["effective_profile_set_ref"])
+                != _binding_document_ref(binding, "effective_profile_set")
+                or str(project["effective_profile_set_digest"])
+                != str(binding["effective_profile_set"]["digest"])
             ):
-                raise LocalWorkspaceError("WORKSPACE-STATE-PIN-001", "Research State Config/Profile pins do not match workspace binding")
+                raise LocalWorkspaceError(
+                    "WORKSPACE-STATE-PIN-001",
+                    "Research State Config/Profile pins do not match workspace binding",
+                )
             active = connection.execute(
-                "SELECT active_lineage_ref FROM project_active_lineage WHERE project_ref=?", (project_id,)
+                "SELECT active_lineage_ref FROM project_active_lineage WHERE project_ref=?",
+                (project_id,),
             ).fetchone()
             if active is None:
-                raise LocalWorkspaceError("WORKSPACE-STATE-HEAD-001", "active Research Lineage is missing")
+                raise LocalWorkspaceError(
+                    "WORKSPACE-STATE-HEAD-001", "active Research Lineage is missing"
+                )
             lineage = connection.execute(
                 "SELECT * FROM lineages WHERE lineage_id=? AND project_ref=?",
                 (str(active["active_lineage_ref"]), project_id),
             ).fetchone()
             if lineage is None:
-                raise LocalWorkspaceError("WORKSPACE-STATE-HEAD-001", "active Research Lineage does not resolve")
+                raise LocalWorkspaceError(
+                    "WORKSPACE-STATE-HEAD-001", "active Research Lineage does not resolve"
+                )
             if (
-                str(lineage["project_config_ref"]) != _binding_document_ref(binding, "project_config")
+                str(lineage["project_config_ref"])
+                != _binding_document_ref(binding, "project_config")
                 or str(lineage["project_config_digest"]) != str(binding["project_config"]["digest"])
-                or str(lineage["effective_profile_set_ref"]) != _binding_document_ref(binding, "effective_profile_set")
-                or str(lineage["effective_profile_set_digest"]) != str(binding["effective_profile_set"]["digest"])
+                or str(lineage["effective_profile_set_ref"])
+                != _binding_document_ref(binding, "effective_profile_set")
+                or str(lineage["effective_profile_set_digest"])
+                != str(binding["effective_profile_set"]["digest"])
             ):
-                raise LocalWorkspaceError("WORKSPACE-STATE-PIN-001", "active Lineage Config/Profile pins do not match workspace binding")
+                raise LocalWorkspaceError(
+                    "WORKSPACE-STATE-PIN-001",
+                    "active Lineage Config/Profile pins do not match workspace binding",
+                )
             snapshot = connection.execute(
                 "SELECT snapshot_ref,content_digest FROM snapshots WHERE snapshot_ref=?",
                 (str(lineage["head_snapshot_ref"]),),
             ).fetchone()
-            if snapshot is None or str(snapshot["content_digest"]) != str(lineage["head_snapshot_digest"]):
-                raise LocalWorkspaceError("WORKSPACE-STATE-HEAD-001", "active Lineage HEAD snapshot does not resolve exactly")
+            if snapshot is None or str(snapshot["content_digest"]) != str(
+                lineage["head_snapshot_digest"]
+            ):
+                raise LocalWorkspaceError(
+                    "WORKSPACE-STATE-HEAD-001",
+                    "active Lineage HEAD snapshot does not resolve exactly",
+                )
         finally:
             connection.close()
     except LocalWorkspaceError:
         raise
     except sqlite3.Error as exc:
-        raise LocalWorkspaceError("WORKSPACE-STATE-DB-001", "Research State DB is unreadable or incompatible") from exc
+        raise LocalWorkspaceError(
+            "WORKSPACE-STATE-DB-001", "Research State DB is unreadable or incompatible"
+        ) from exc
 
 
 def workspace_document_path(root: str | Path, key: str) -> Path:
@@ -557,18 +654,28 @@ def workspace_document_path(root: str | Path, key: str) -> Path:
     return _safe_locator(root, str(binding[key]["locator"]))
 
 
-def _validated_documents(root: Path, binding: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+def _validated_documents(
+    root: Path, binding: Mapping[str, Any]
+) -> tuple[dict[str, Any], dict[str, Any]]:
     config_path = _safe_locator(root, str(binding["project_config"]["locator"]))
     profile_path = _safe_locator(root, str(binding["effective_profile_set"]["locator"]))
     config = _read_json(config_path, code="WORKSPACE-PROJECT-CONFIG-001")
     effective = _read_json(profile_path, code="WORKSPACE-PROFILE-SET-001")
     config_digest, profile_digest = _validate_inputs(config, effective)
     if str(config["project"]["project_id"]) != str(binding["project_id"]):
-        raise LocalWorkspaceError("WORKSPACE-PROJECT-ID-001", "Project Config project identity does not match workspace binding")
+        raise LocalWorkspaceError(
+            "WORKSPACE-PROJECT-ID-001",
+            "Project Config project identity does not match workspace binding",
+        )
     if config_digest != str(binding["project_config"]["digest"]):
-        raise LocalWorkspaceError("WORKSPACE-CONFIG-DIGEST-001", "Project Config digest does not match workspace binding")
+        raise LocalWorkspaceError(
+            "WORKSPACE-CONFIG-DIGEST-001", "Project Config digest does not match workspace binding"
+        )
     if profile_digest != str(binding["effective_profile_set"]["digest"]):
-        raise LocalWorkspaceError("WORKSPACE-PROFILE-DIGEST-001", "Effective Profile Set digest does not match workspace binding")
+        raise LocalWorkspaceError(
+            "WORKSPACE-PROFILE-DIGEST-001",
+            "Effective Profile Set digest does not match workspace binding",
+        )
     return config, effective
 
 
@@ -588,7 +695,9 @@ class LocalWorkspace:
         if root_preexisting and not root.is_dir():
             raise LocalWorkspaceError("WORKSPACE-PATH-001", "workspace path is not a directory")
         if root_preexisting and any(root.iterdir()):
-            raise LocalWorkspaceError("WORKSPACE-INIT-EXISTS-001", "workspace directory must be absent or empty")
+            raise LocalWorkspaceError(
+                "WORKSPACE-INIT-EXISTS-001", "workspace directory must be absent or empty"
+            )
 
         # Validate all explicit inputs before creating any workspace-owned path.
         config = _read_json(Path(project_config_file), code="WORKSPACE-PROJECT-CONFIG-001")
@@ -613,6 +722,7 @@ class LocalWorkspace:
         internal.mkdir(parents=False, exist_ok=False)
         from .workspace_initialization import initial_intent
         from .workspace_lock import workspace_lock
+
         # Failed initialization is retained, not recursively deleted. In
         # particular, a failure after a State commit must not erase that commit.
         with workspace_lock(root):
@@ -625,12 +735,16 @@ class LocalWorkspace:
                 app = LocalResearchApplication(
                     internal,
                     resolver=_TypedOnlyResolver(),
-                    effective_profile_set_provider=_runtime_profile_provider(project_id, profile_digest, effective),
+                    effective_profile_set_provider=_runtime_profile_provider(
+                        project_id, profile_digest, effective
+                    ),
                     seed_state=seed,
                     clock=clock,
                     id_provider=ids,
                 )
-                binding = _binding(project_id, config_digest, profile_digest, initialized_at=clock.now())
+                binding = _binding(
+                    project_id, config_digest, profile_digest, initialized_at=clock.now()
+                )
                 app.close()
                 app = None
                 _atomic_json_write(internal / BINDING_NAME, binding)
@@ -648,7 +762,11 @@ class LocalWorkspace:
         root = _assert_safe_workspace_root(Path(workspace))
         if not root.is_dir():
             raise LocalWorkspaceError("WORKSPACE-MISSING-001", "workspace directory does not exist")
-        from plugins.local_application.profile_advancement import _workspace_advancement_lock, recover_incomplete_profile_advancement
+        from plugins.local_application.profile_advancement import (
+            _workspace_advancement_lock,
+            recover_incomplete_profile_advancement,
+        )
+
         # Recovery writes require exclusivity before taking a shared lifetime.
         # _open_locked rechecks the marker after acquisition to catch a racing crash.
         recover_incomplete_profile_advancement(root)
@@ -666,11 +784,17 @@ class LocalWorkspace:
     def _open_locked(cls, root: Path) -> OpenedLocalWorkspace:
         if not root.is_dir():
             raise LocalWorkspaceError("WORKSPACE-MISSING-001", "workspace directory does not exist")
-        from plugins.local_application.profile_advancement import recover_incomplete_profile_advancement
+        from plugins.local_application.profile_advancement import (
+            recover_incomplete_profile_advancement,
+        )
+
         recover_incomplete_profile_advancement(root)
         internal = _safe_locator(root, INTERNAL_DIR)
         if (internal / INITIALIZING_MARKER).exists():
-            raise LocalWorkspaceError("WORKSPACE-PARTIAL-001", "workspace initialization is incomplete; run doctor for classification and the safe next operation")
+            raise LocalWorkspaceError(
+                "WORKSPACE-PARTIAL-001",
+                "workspace initialization is incomplete; run doctor for classification and the safe next operation",
+            )
         binding_path = _safe_locator(root, f"{INTERNAL_DIR}/{BINDING_NAME}")
         binding = _read_json(binding_path, code="WORKSPACE-BINDING-001")
         _validate_binding_shape(binding)
@@ -679,7 +803,9 @@ class LocalWorkspace:
         for key, locator in binding["storage"].items():
             path = _safe_locator(root, str(locator))
             if key != "execution_root" and not path.is_file():
-                raise LocalWorkspaceError("WORKSPACE-MISSING-001", f"required workspace path is missing: {locator}")
+                raise LocalWorkspaceError(
+                    "WORKSPACE-MISSING-001", f"required workspace path is missing: {locator}"
+                )
             if key == "execution_root" and not path.is_dir():
                 raise LocalWorkspaceError("WORKSPACE-MISSING-001", "execution root is missing")
         state_path = _safe_locator(root, str(binding["storage"]["research_state"]))
@@ -699,7 +825,9 @@ class LocalWorkspace:
         application = LocalResearchApplication(
             internal,
             resolver=_TypedOnlyResolver(),
-            effective_profile_set_provider=_runtime_profile_provider(project_id, profile_digest, effective),
+            effective_profile_set_provider=_runtime_profile_provider(
+                project_id, profile_digest, effective
+            ),
         )
         try:
             lineage = application.state_repository.load_active_lineage_ref(project_id)
@@ -709,7 +837,10 @@ class LocalWorkspace:
                 or state.project_config_digest != str(binding["project_config"]["digest"])
                 or state.effective_profile_set_digest != profile_digest
             ):
-                raise LocalWorkspaceError("WORKSPACE-STATE-PIN-001", "opened Research State does not match workspace binding")
+                raise LocalWorkspaceError(
+                    "WORKSPACE-STATE-PIN-001",
+                    "opened Research State does not match workspace binding",
+                )
         except Exception:
             application.close()
             raise
@@ -720,7 +851,9 @@ class LocalWorkspace:
         integrity = cls._doctor_integrity(workspace)
         try:
             root = _assert_safe_workspace_root(Path(workspace))
-            marker = _safe_locator(root, f"{INTERNAL_DIR}/{INITIALIZING_MARKER}", require_exists=False)
+            marker = _safe_locator(
+                root, f"{INTERNAL_DIR}/{INITIALIZING_MARKER}", require_exists=False
+            )
             try:
                 marker.lstat()
             except FileNotFoundError:
@@ -730,16 +863,29 @@ class LocalWorkspace:
                 if integrity.get("status") != "ERROR" or not (root / INTERNAL_DIR).is_dir():
                     return integrity
                 from .workspace_initialization import diagnose_initialization
+
                 diagnosis = diagnose_initialization(root, integrity)["initialization"]
                 return {**integrity, "initialization": {**diagnosis, "marker_present": False}}
             from .workspace_initialization import diagnose_initialization
+
             return diagnose_initialization(root, integrity)
         except LocalWorkspaceError as exc:
-            return {"status": "ERROR", "checks": integrity.get("checks", []),
-                    "issues": [{"code": exc.code, "message": exc.message}]}
+            return {
+                "status": "ERROR",
+                "checks": integrity.get("checks", []),
+                "issues": [{"code": exc.code, "message": exc.message}],
+            }
         except OSError:
-            return {"status": "ERROR", "checks": integrity.get("checks", []),
-                    "issues": [{"code": "WORKSPACE-PARTIAL-001", "message": "initialization marker cannot be inspected; preserve the Workspace and resolve access/I/O"}]}
+            return {
+                "status": "ERROR",
+                "checks": integrity.get("checks", []),
+                "issues": [
+                    {
+                        "code": "WORKSPACE-PARTIAL-001",
+                        "message": "initialization marker cannot be inspected; preserve the Workspace and resolve access/I/O",
+                    }
+                ],
+            }
         return integrity
 
     @classmethod
@@ -749,7 +895,9 @@ class LocalWorkspace:
         try:
             root = _assert_safe_workspace_root(Path(workspace))
             if not root.is_dir():
-                raise LocalWorkspaceError("WORKSPACE-MISSING-001", "workspace directory does not exist")
+                raise LocalWorkspaceError(
+                    "WORKSPACE-MISSING-001", "workspace directory does not exist"
+                )
             internal = _safe_locator(root, INTERNAL_DIR)
             binding_path = _safe_locator(root, f"{INTERNAL_DIR}/{BINDING_NAME}")
             binding = _read_json(binding_path, code="WORKSPACE-BINDING-001")
@@ -758,11 +906,13 @@ class LocalWorkspace:
             if _validate_registered_children(root, binding):
                 checks.append({"check": "durable_children", "status": "OK"})
             else:
-                checks.append({
-                    "check": "durable_children",
-                    "status": "LEGACY_AMBIGUOUS",
-                    "message": "legacy workspace has no durable child registry; prior optional-child initialization cannot be proven",
-                })
+                checks.append(
+                    {
+                        "check": "durable_children",
+                        "status": "LEGACY_AMBIGUOUS",
+                        "message": "legacy workspace has no durable child registry; prior optional-child initialization cannot be proven",
+                    }
+                )
 
             config, effective = _validated_documents(root, binding)
             checks.append({"check": "project_config", "status": "OK"})
@@ -772,9 +922,13 @@ class LocalWorkspace:
                 path = _safe_locator(root, str(locator))
                 if key == "execution_root":
                     if not path.is_dir():
-                        raise LocalWorkspaceError("WORKSPACE-MISSING-001", "execution root is missing")
+                        raise LocalWorkspaceError(
+                            "WORKSPACE-MISSING-001", "execution root is missing"
+                        )
                 elif not path.is_file():
-                    raise LocalWorkspaceError("WORKSPACE-MISSING-001", f"required workspace path is missing: {locator}")
+                    raise LocalWorkspaceError(
+                        "WORKSPACE-MISSING-001", f"required workspace path is missing: {locator}"
+                    )
 
             state_path = _safe_locator(root, str(binding["storage"]["research_state"]))
             _sqlite_quick_check(state_path, code="WORKSPACE-STATE-DB-001")
@@ -809,10 +963,14 @@ class LocalWorkspace:
                 raise LocalWorkspaceError(
                     "WORKSPACE-STATE-DB-001", "Research State DB is unreadable or incompatible"
                 ) from exc
-            checks.append({
-                "check": "research_state", "status": "OK",
-                "active_lineage": active_lineage, "snapshot_id": snapshot_id,
-            })
+            checks.append(
+                {
+                    "check": "research_state",
+                    "status": "OK",
+                    "active_lineage": active_lineage,
+                    "snapshot_id": snapshot_id,
+                }
+            )
 
             conversation_path = _safe_locator(root, str(binding["storage"]["conversation"]))
             _sqlite_quick_check(conversation_path, code="WORKSPACE-CONVERSATION-DB-001")
@@ -831,7 +989,10 @@ class LocalWorkspace:
                 )
                 checks.append({"check": label, "status": "OK"})
 
-            from plugins.local_application.decision_state_health import check_decision_state_receipts
+            from plugins.local_application.decision_state_health import (
+                check_decision_state_receipts,
+            )
+
             try:
                 checked = check_decision_state_receipts(
                     state_path,
@@ -839,8 +1000,16 @@ class LocalWorkspace:
                     str(binding["project_id"]),
                 )
             except (sqlite3.Error, ValueError) as exc:
-                raise LocalWorkspaceError("WORKSPACE-DECISION-STATE-MISMATCH-001", str(exc)) from exc
-            checks.append({"check": "decision_state_receipts", "status": "OK", "resolved_decisions_checked": checked})
+                raise LocalWorkspaceError(
+                    "WORKSPACE-DECISION-STATE-MISMATCH-001", str(exc)
+                ) from exc
+            checks.append(
+                {
+                    "check": "decision_state_receipts",
+                    "status": "OK",
+                    "resolved_decisions_checked": checked,
+                }
+            )
 
             optional = inspect_optional_children(root, binding, quick=True)
             unavailable = [row for row in optional if row["status"] == "UNAVAILABLE"]
@@ -849,8 +1018,15 @@ class LocalWorkspace:
                 "status": "DEGRADED" if unavailable else "OK",
                 "project_id": str(config["project"]["project_id"]),
                 "checks": checks,
-                "issues": [{"code": row["code"], "message": row["message"],
-                            "child": row["name"], "next_action": row["next_action"]} for row in unavailable],
+                "issues": [
+                    {
+                        "code": row["code"],
+                        "message": row["message"],
+                        "child": row["name"],
+                        "next_action": row["next_action"],
+                    }
+                    for row in unavailable
+                ],
             }
         except LocalWorkspaceError as exc:
             return {

@@ -38,15 +38,11 @@ def build_result_extension(
             "capability_id": handoff["capability"]["capability_id"],
             "function_id": handoff["capability"]["function_id"],
         },
-        "source_capture_details": [
-            deepcopy(dict(item)) for item in source_capture_details
-        ],
+        "source_capture_details": [deepcopy(dict(item)) for item in source_capture_details],
         "citation_details": [deepcopy(dict(item)) for item in citation_details],
         "search_trace": deepcopy(dict(search_trace)),
         "null_results": [deepcopy(dict(item)) for item in null_results],
-        "evidence_gap_assessments": [
-            deepcopy(dict(item)) for item in evidence_gap_assessments
-        ],
+        "evidence_gap_assessments": [deepcopy(dict(item)) for item in evidence_gap_assessments],
         "coverage_assessment": deepcopy(dict(coverage_assessment)),
         "candidate_next_method_ids": list(candidate_next_method_ids),
     }

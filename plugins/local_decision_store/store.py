@@ -79,16 +79,26 @@ class LocalHumanDecisionStore:
                     "source_candidate_id,source_candidate_digest,snapshot_ref,snapshot_digest,payload_json,status) "
                     "VALUES(?,?,?,?,?,?,?,?,?,'PENDING') ON CONFLICT(request_id) DO NOTHING",
                     (
-                        request["request_id"], request["request_digest"], request["project_ref"],
-                        request["lineage_ref"], candidate["proposal_id"], candidate["proposal_digest"],
-                        snapshot["snapshot_ref"], snapshot["snapshot_digest"], payload,
+                        request["request_id"],
+                        request["request_digest"],
+                        request["project_ref"],
+                        request["lineage_ref"],
+                        candidate["proposal_id"],
+                        candidate["proposal_digest"],
+                        snapshot["snapshot_ref"],
+                        snapshot["snapshot_digest"],
+                        payload,
                     ),
                 )
                 row = self._db.execute(
                     "SELECT request_digest,payload_json FROM decision_requests WHERE request_id=?",
                     (request["request_id"],),
                 ).fetchone()
-                if row is None or str(row["request_digest"]) != str(request["request_digest"]) or str(row["payload_json"]) != payload:
+                if (
+                    row is None
+                    or str(row["request_digest"]) != str(request["request_digest"])
+                    or str(row["payload_json"]) != payload
+                ):
                     raise ValueError("immutable Human Decision Request identity collision")
                 self._db.execute("COMMIT")
             except Exception:
@@ -128,12 +138,20 @@ class LocalHumanDecisionStore:
                     (project_ref,),
                 ).fetchall()
             ]
-        return tuple(item for item in (self.get_request(request_id) for request_id in ids) if item is not None)
+        return tuple(
+            item
+            for item in (self.get_request(request_id) for request_id in ids)
+            if item is not None
+        )
 
-    def record_rejected_response(self, request_id: str, response: Mapping[str, Any], reason: str) -> None:
+    def record_rejected_response(
+        self, request_id: str, response: Mapping[str, Any], reason: str
+    ) -> None:
         self._insert_response(request_id, response, outcome="REJECTED", detail=reason)
 
-    def claim_response(self, request_id: str, request_digest: str, response: Mapping[str, Any]) -> str:
+    def claim_response(
+        self, request_id: str, request_digest: str, response: Mapping[str, Any]
+    ) -> str:
         digest = str(response["response_digest"])
         with self._lock:
             self._db.execute("BEGIN IMMEDIATE")
@@ -146,7 +164,11 @@ class LocalHumanDecisionStore:
                     self._db.execute("ROLLBACK")
                     return "rejected"
                 status = str(row["status"])
-                claimed = str(row["claimed_response_digest"]) if row["claimed_response_digest"] is not None else None
+                claimed = (
+                    str(row["claimed_response_digest"])
+                    if row["claimed_response_digest"] is not None
+                    else None
+                )
                 if status == "RESOLVING":
                     self._db.execute("ROLLBACK")
                     return "retry" if claimed == digest else "rejected"
@@ -191,7 +213,11 @@ class LocalHumanDecisionStore:
                 if row is None:
                     raise ValueError("unknown Human Decision Request")
                 prior_status = str(row["status"])
-                claimed = str(row["claimed_response_digest"]) if row["claimed_response_digest"] is not None else None
+                claimed = (
+                    str(row["claimed_response_digest"])
+                    if row["claimed_response_digest"] is not None
+                    else None
+                )
                 if prior_status == status:
                     if claimed != response_digest:
                         raise ValueError("terminal Human Decision response digest mismatch")
@@ -235,14 +261,26 @@ class LocalHumanDecisionStore:
             "INSERT INTO decision_responses(response_digest,request_id,response_id,disposition,actor_id,actor_type,payload_json,outcome,detail) "
             "VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(response_digest) DO NOTHING",
             (
-                digest, request_id, str(response.get("response_id", "")), str(response.get("disposition", "")),
-                str(actor.get("actor_id", "")), str(actor.get("actor_type", "")), payload, outcome, detail,
+                digest,
+                request_id,
+                str(response.get("response_id", "")),
+                str(response.get("disposition", "")),
+                str(actor.get("actor_id", "")),
+                str(actor.get("actor_type", "")),
+                payload,
+                outcome,
+                detail,
             ),
         )
         row = self._db.execute(
-            "SELECT request_id,payload_json FROM decision_responses WHERE response_digest=?", (digest,)
+            "SELECT request_id,payload_json FROM decision_responses WHERE response_digest=?",
+            (digest,),
         ).fetchone()
-        if row is None or str(row["request_id"]) != request_id or str(row["payload_json"]) != payload:
+        if (
+            row is None
+            or str(row["request_id"]) != request_id
+            or str(row["payload_json"]) != payload
+        ):
             raise ValueError("immutable Human Decision Response digest collision")
 
     def close(self) -> None:

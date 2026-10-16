@@ -55,8 +55,7 @@ def _payload_fields(payload: Mapping[str, Any], allowed: set[str], label: str) -
     unknown = set(payload) - allowed
     if unknown:
         raise ValueError(
-            f"{label} payload contains unknown fields: "
-            + ", ".join(sorted(map(str, unknown)))
+            f"{label} payload contains unknown fields: " + ", ".join(sorted(map(str, unknown)))
         )
 
 

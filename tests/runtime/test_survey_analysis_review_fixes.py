@@ -6,28 +6,39 @@ from unittest.mock import patch
 
 from plugins.local_application import LocalApplicationFacade
 from plugins.local_survey_response_store import LocalSurveyResponseStore
-from tests.runtime.survey_analysis_test_support import analysis_questionnaire, analysis_responses, find_item
-from tests.runtime.survey_virtual_runner_test_support import SurveyVirtualRunnerTestBase, make_virtual_app
+from tests.runtime.survey_analysis_test_support import (
+    analysis_questionnaire,
+    analysis_responses,
+    find_item,
+)
+from tests.runtime.survey_virtual_runner_test_support import (
+    SurveyVirtualRunnerTestBase,
+    make_virtual_app,
+)
 from tests.runtime.test_survey_response_dataset import intake, raw_response
 
 
 class SurveyAnalysisReviewFixTests(SurveyVirtualRunnerTestBase):
     @staticmethod
     def _spec(facade, dataset, items):
-        return facade.capture_survey_analysis_spec({
-            "dataset_id": dataset["dataset_id"],
-            "dataset_digest": dataset["content_digest"],
-            "analysis_items": items,
-        })
+        return facade.capture_survey_analysis_spec(
+            {
+                "dataset_id": dataset["dataset_id"],
+                "dataset_digest": dataset["content_digest"],
+                "analysis_items": items,
+            }
+        )
 
     @staticmethod
     def _aggregate(facade, dataset, spec):
-        return facade.run_survey_aggregation({
-            "analysis_spec_id": spec["analysis_spec_id"],
-            "analysis_spec_digest": spec["content_digest"],
-            "dataset_id": dataset["dataset_id"],
-            "dataset_digest": dataset["content_digest"],
-        })
+        return facade.run_survey_aggregation(
+            {
+                "analysis_spec_id": spec["analysis_spec_id"],
+                "analysis_spec_digest": spec["content_digest"],
+                "dataset_id": dataset["dataset_id"],
+                "dataset_digest": dataset["content_digest"],
+            }
+        )
 
     def test_aggregation_uses_batch_response_loading(self):
         with tempfile.TemporaryDirectory() as temp:

@@ -54,7 +54,9 @@ class WorkHostNonBypassContractTests(unittest.TestCase):
         self.assertIn("must not be reported as successful completion", surfaces)
 
     def test_misco_live_uat_treats_host_native_bypass_as_blocking(self):
-        runbook = (ROOT / "docs" / "architecture" / "misco-integrated-acceptance.md").read_text(encoding="utf-8")
+        runbook = (ROOT / "docs" / "architecture" / "misco-integrated-acceptance.md").read_text(
+            encoding="utf-8"
+        )
         self.assertIn("blocking bypass", runbook)
         self.assertIn("external research material must be captured", runbook)
         self.assertIn("Research Package /", runbook)

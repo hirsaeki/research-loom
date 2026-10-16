@@ -39,18 +39,36 @@ class ProfileAdvancementAttentionTests(ResearchPackageAcceptanceSupport):
                 str(RESEARCH_BASE),
                 str(GENERIC_NARRATIVE),
             ],
-            "request_replacements": [{
-                "from": {"profile_id": "fixture.narrative", "profile_type": "narrative", "version": "1.0.0"},
-                "to": {"profile_id": "fixture.generic-narrative", "profile_type": "narrative", "version": "1.0.0"},
-            }],
+            "request_replacements": [
+                {
+                    "from": {
+                        "profile_id": "fixture.narrative",
+                        "profile_type": "narrative",
+                        "version": "1.0.0",
+                    },
+                    "to": {
+                        "profile_id": "fixture.generic-narrative",
+                        "profile_type": "narrative",
+                        "version": "1.0.0",
+                    },
+                }
+            ],
         }
         request_path = self.root / "resolve-request.json"
         request_path.write_text(json.dumps(request), encoding="utf-8")
         output = self.root / "resolved"
-        code, result = _run_cli([
-            "profile", "resolve", "--workspace", self.workspace,
-            "--output", output, "--json", request_path,
-        ])
+        code, result = _run_cli(
+            [
+                "profile",
+                "resolve",
+                "--workspace",
+                self.workspace,
+                "--output",
+                output,
+                "--json",
+                request_path,
+            ]
+        )
         self.assertEqual(code, 0, result)
         return request, output
 
@@ -67,27 +85,45 @@ class ProfileAdvancementAttentionTests(ResearchPackageAcceptanceSupport):
 
     def test_active_attention_survives_profile_advancement_without_rebinding_candidates(self):
         with LocalApplicationFacade.open_workspace(self.workspace) as facade:
-            attention_map = facade.submit_action({
-                "action_type": "research_attention.propose",
-                "payload": {"additions": [{"statement": "Keep operator focus through Profile advancement."}]},
-                "actor_id": "HUMAN-ATT-128",
-            })["data"]["attention_map"]
-            pending = facade.submit_action({
-                "action_type": "research_attention.activate_candidate",
-                "payload": {"attention_map_id": attention_map["map_id"]},
-                "actor_id": "HUMAN-ATT-128",
-            })
-            confirmed = facade.submit_confirmation({
-                "confirmation_request_id": pending["confirmation_request"]["confirmation_request_id"],
-                "actor_id": "HUMAN-ATT-128",
-            })
+            attention_map = facade.submit_action(
+                {
+                    "action_type": "research_attention.propose",
+                    "payload": {
+                        "additions": [
+                            {"statement": "Keep operator focus through Profile advancement."}
+                        ]
+                    },
+                    "actor_id": "HUMAN-ATT-128",
+                }
+            )["data"]["attention_map"]
+            pending = facade.submit_action(
+                {
+                    "action_type": "research_attention.activate_candidate",
+                    "payload": {"attention_map_id": attention_map["map_id"]},
+                    "actor_id": "HUMAN-ATT-128",
+                }
+            )
+            confirmed = facade.submit_confirmation(
+                {
+                    "confirmation_request_id": pending["confirmation_request"][
+                        "confirmation_request_id"
+                    ],
+                    "actor_id": "HUMAN-ATT-128",
+                }
+            )
             self.assertEqual(confirmed["status"], "SUCCEEDED")
-            stale_candidate = facade.submit_action({
-                "action_type": "research_attention.propose",
-                "payload": {"additions": [{"statement": "Do not auto-rebind unapproved guidance."}]},
-                "actor_id": "HUMAN-ATT-128",
-            })["data"]["attention_map"]
-            active_before = deepcopy(facade._application.attention_store.load_active(facade.project_id))
+            stale_candidate = facade.submit_action(
+                {
+                    "action_type": "research_attention.propose",
+                    "payload": {
+                        "additions": [{"statement": "Do not auto-rebind unapproved guidance."}]
+                    },
+                    "actor_id": "HUMAN-ATT-128",
+                }
+            )["data"]["attention_map"]
+            active_before = deepcopy(
+                facade._application.attention_store.load_active(facade.project_id)
+            )
 
         request, output = self._resolve()
         code, advanced = self._advance(request, output)
@@ -101,23 +137,33 @@ class ProfileAdvancementAttentionTests(ResearchPackageAcceptanceSupport):
         code, resumed = _run_cli(["resume", "--workspace", self.workspace, "--json"])
         self.assertEqual(code, 0, resumed)
         with LocalApplicationFacade.open_workspace(self.workspace) as facade:
-            self.assertEqual(facade._application.attention_store.load_active(facade.project_id), active_before)
-            status = facade.submit_action({"action_type": "research_attention.status", "payload": {}})
+            self.assertEqual(
+                facade._application.attention_store.load_active(facade.project_id), active_before
+            )
+            status = facade.submit_action(
+                {"action_type": "research_attention.status", "payload": {}}
+            )
             self.assertEqual(status["data"]["active_map"]["map_id"], active_before["map_id"])
             self.assertIn(
                 "Keep operator focus through Profile advancement.",
                 [item["statement"] for item in status["data"]["effective_attention"]],
             )
-            pending_stale = facade.submit_action({
-                "action_type": "research_attention.activate_candidate",
-                "payload": {"attention_map_id": stale_candidate["map_id"]},
-                "actor_id": "HUMAN-ATT-128",
-            })
-            with self.assertRaises(ConversationRuntimeError) as stale:
-                facade.submit_confirmation({
-                    "confirmation_request_id": pending_stale["confirmation_request"]["confirmation_request_id"],
+            pending_stale = facade.submit_action(
+                {
+                    "action_type": "research_attention.activate_candidate",
+                    "payload": {"attention_map_id": stale_candidate["map_id"]},
                     "actor_id": "HUMAN-ATT-128",
-                })
+                }
+            )
+            with self.assertRaises(ConversationRuntimeError) as stale:
+                facade.submit_confirmation(
+                    {
+                        "confirmation_request_id": pending_stale["confirmation_request"][
+                            "confirmation_request_id"
+                        ],
+                        "actor_id": "HUMAN-ATT-128",
+                    }
+                )
             self.assertEqual(stale.exception.code, "ATTENTION-STALE-001")
 
         code, history = _run_cli(["profile", "history", "--workspace", self.workspace, "--json"])
@@ -154,20 +200,30 @@ class ProfileAdvancementAttentionTests(ResearchPackageAcceptanceSupport):
 
     def test_active_attention_rejects_noncanonical_history_digest_before_path_traversal(self):
         with LocalApplicationFacade.open_workspace(self.workspace) as facade:
-            attention_map = facade.submit_action({
-                "action_type": "research_attention.propose",
-                "payload": {"additions": [{"statement": "Reject forged profile-history links."}]},
-                "actor_id": "HUMAN-ATT-FORGED",
-            })["data"]["attention_map"]
-            pending = facade.submit_action({
-                "action_type": "research_attention.activate_candidate",
-                "payload": {"attention_map_id": attention_map["map_id"]},
-                "actor_id": "HUMAN-ATT-FORGED",
-            })
-            confirmed = facade.submit_confirmation({
-                "confirmation_request_id": pending["confirmation_request"]["confirmation_request_id"],
-                "actor_id": "HUMAN-ATT-FORGED",
-            })
+            attention_map = facade.submit_action(
+                {
+                    "action_type": "research_attention.propose",
+                    "payload": {
+                        "additions": [{"statement": "Reject forged profile-history links."}]
+                    },
+                    "actor_id": "HUMAN-ATT-FORGED",
+                }
+            )["data"]["attention_map"]
+            pending = facade.submit_action(
+                {
+                    "action_type": "research_attention.activate_candidate",
+                    "payload": {"attention_map_id": attention_map["map_id"]},
+                    "actor_id": "HUMAN-ATT-FORGED",
+                }
+            )
+            confirmed = facade.submit_confirmation(
+                {
+                    "confirmation_request_id": pending["confirmation_request"][
+                        "confirmation_request_id"
+                    ],
+                    "actor_id": "HUMAN-ATT-FORGED",
+                }
+            )
             self.assertEqual(confirmed["status"], "SUCCEEDED")
 
         request, output = self._resolve()
@@ -210,12 +266,16 @@ class ProfileAdvancementAttentionTests(ResearchPackageAcceptanceSupport):
         source_dir.mkdir(parents=True, exist_ok=True)
         event_path = source_dir / "PGA-BOUND.json"
         event_path.write_text(
-            json.dumps({
-                "event_type": "project_profile_generation_advanced",
-                "project_id": "PRJ-BOUND",
-                "old_binding": {"project_config_digest": source_digest},
-                "new_binding": {"project_config_digest": successor_digest},
-            }, sort_keys=True) + "\n",
+            json.dumps(
+                {
+                    "event_type": "project_profile_generation_advanced",
+                    "project_id": "PRJ-BOUND",
+                    "old_binding": {"project_config_digest": source_digest},
+                    "new_binding": {"project_config_digest": successor_digest},
+                },
+                sort_keys=True,
+            )
+            + "\n",
             encoding="utf-8",
         )
         provider = EffectiveResearchAttentionProvider(None, profile_history_root=history_root)
@@ -226,19 +286,24 @@ class ProfileAdvancementAttentionTests(ResearchPackageAcceptanceSupport):
             if path == events_root and pattern == "PGA-*.json":
                 return iter(())
             if path == source_dir and pattern == "PGA-*.json":
+
                 def iterator():
                     for _ in range(4):
                         observed["indexed_yields"] += 1
                         yield event_path
                     raise AssertionError("bounded history traversal consumed beyond limit + 1")
+
                 return iterator()
             return real_glob(path, pattern)
 
-        with mock.patch.object(
-            EffectiveResearchAttentionProvider,
-            "_PROFILE_HISTORY_EVENT_READ_LIMIT",
-            3,
-        ), mock.patch.object(Path, "glob", new=bounded_glob):
+        with (
+            mock.patch.object(
+                EffectiveResearchAttentionProvider,
+                "_PROFILE_HISTORY_EVENT_READ_LIMIT",
+                3,
+            ),
+            mock.patch.object(Path, "glob", new=bounded_glob),
+        ):
             connected = provider._profile_generation_connects(
                 project_id="PRJ-BOUND",
                 source_config_digest=source_digest,
@@ -250,20 +315,30 @@ class ProfileAdvancementAttentionTests(ResearchPackageAcceptanceSupport):
 
     def test_active_attention_accepts_profile_chain_longer_than_256_events(self):
         with LocalApplicationFacade.open_workspace(self.workspace) as facade:
-            attention_map = facade.submit_action({
-                "action_type": "research_attention.propose",
-                "payload": {"additions": [{"statement": "Preserve long-running operator focus."}]},
-                "actor_id": "HUMAN-ATT-LONG",
-            })["data"]["attention_map"]
-            pending = facade.submit_action({
-                "action_type": "research_attention.activate_candidate",
-                "payload": {"attention_map_id": attention_map["map_id"]},
-                "actor_id": "HUMAN-ATT-LONG",
-            })
-            confirmed = facade.submit_confirmation({
-                "confirmation_request_id": pending["confirmation_request"]["confirmation_request_id"],
-                "actor_id": "HUMAN-ATT-LONG",
-            })
+            attention_map = facade.submit_action(
+                {
+                    "action_type": "research_attention.propose",
+                    "payload": {
+                        "additions": [{"statement": "Preserve long-running operator focus."}]
+                    },
+                    "actor_id": "HUMAN-ATT-LONG",
+                }
+            )["data"]["attention_map"]
+            pending = facade.submit_action(
+                {
+                    "action_type": "research_attention.activate_candidate",
+                    "payload": {"attention_map_id": attention_map["map_id"]},
+                    "actor_id": "HUMAN-ATT-LONG",
+                }
+            )
+            confirmed = facade.submit_confirmation(
+                {
+                    "confirmation_request_id": pending["confirmation_request"][
+                        "confirmation_request_id"
+                    ],
+                    "actor_id": "HUMAN-ATT-LONG",
+                }
+            )
             self.assertEqual(confirmed["status"], "SUCCEEDED")
             source_digest = attention_map["project_config"]["digest"]
 
@@ -295,5 +370,7 @@ class ProfileAdvancementAttentionTests(ResearchPackageAcceptanceSupport):
         code, resumed = _run_cli(["resume", "--workspace", self.workspace, "--json"])
         self.assertEqual(code, 0, resumed)
         with LocalApplicationFacade.open_workspace(self.workspace) as facade:
-            status = facade.submit_action({"action_type": "research_attention.status", "payload": {}})
+            status = facade.submit_action(
+                {"action_type": "research_attention.status", "payload": {}}
+            )
             self.assertEqual(status["data"]["active_map"]["map_id"], attention_map["map_id"])

@@ -11,9 +11,7 @@ class CapabilityRegistry:
     """Explicit deterministic registry for exact Capability runtime bindings."""
 
     def __init__(self) -> None:
-        self._bindings: dict[
-            tuple[str, str, str, str], list[CapabilityAdapter]
-        ] = defaultdict(list)
+        self._bindings: dict[tuple[str, str, str, str], list[CapabilityAdapter]] = defaultdict(list)
 
     def register(
         self,
@@ -21,10 +19,9 @@ class CapabilityRegistry:
         descriptor: Mapping[str, Any],
     ) -> None:
         """Validate one adapter completely, then atomically publish its bindings."""
-        if (
-            adapter.capability_id != descriptor.get("capability_id")
-            or adapter.capability_version != descriptor.get("capability_version")
-        ):
+        if adapter.capability_id != descriptor.get(
+            "capability_id"
+        ) or adapter.capability_version != descriptor.get("capability_version"):
             raise CapabilityExecutionError(
                 ExecutionFailureCode.DESCRIPTOR_INVALID,
                 "adapter capability identity/version does not match descriptor",
@@ -95,12 +92,10 @@ class CapabilityRegistry:
             )
         if len(matches) != 1:
             identities = ", ".join(
-                f"{item.implementation_id}@{item.implementation_version}"
-                for item in matches
+                f"{item.implementation_id}@{item.implementation_version}" for item in matches
             )
             raise CapabilityExecutionError(
                 ExecutionFailureCode.IMPLEMENTATION_AMBIGUOUS,
-                "multiple registered implementations for one exact binding: "
-                + identities,
+                "multiple registered implementations for one exact binding: " + identities,
             )
         return matches[0]

@@ -49,14 +49,10 @@ def _validate_question_item(payload: Mapping[str, Any], *, index: int) -> None:
         if not isinstance(value, list) or any(
             not isinstance(item, str) or not item.strip() for item in value
         ):
-            raise ValueError(
-                f"questions[{index}].{field} must be an array of non-empty strings"
-            )
+            raise ValueError(f"questions[{index}].{field} must be an array of non-empty strings")
     seed_ids = payload.get("derived_from_seed_ids", ())
     if len(seed_ids) != len(set(seed_ids)):
-        raise ValueError(
-            f"questions[{index}].derived_from_seed_ids must not contain duplicates"
-        )
+        raise ValueError(f"questions[{index}].derived_from_seed_ids must not contain duplicates")
 
 
 def research_question_propose_many_payload(payload: Mapping[str, Any]) -> None:
@@ -143,22 +139,24 @@ class ResearchQuestionProposeManyHandler:
                 rq_candidate["parent_question_id"] = str(parent_question_id)
 
             rq_candidates.append(rq_candidate)
-            transition_actions.append(TransitionAction(
-                TransitionKind.CREATE_OBJECT,
-                {"object": rq_candidate},
-                decision_refs=(),
-                source_refs=(),
-            ))
+            transition_actions.append(
+                TransitionAction(
+                    TransitionKind.CREATE_OBJECT,
+                    {"object": rq_candidate},
+                    decision_refs=(),
+                    source_refs=(),
+                )
+            )
             affected_refs.append(ObjectRef("research_question", rq_id))
 
-            derived_seed_ids = [
-                str(seed_id) for seed_id in item.get("derived_from_seed_ids", ())
-            ]
+            derived_seed_ids = [str(seed_id) for seed_id in item.get("derived_from_seed_ids", ())]
             if derived_seed_ids:
-                seed_bindings.append({
-                    "research_question_id": rq_id,
-                    "project_config_seed_ids": derived_seed_ids,
-                })
+                seed_bindings.append(
+                    {
+                        "research_question_id": rq_id,
+                        "project_config_seed_ids": derived_seed_ids,
+                    }
+                )
                 for seed_id in derived_seed_ids:
                     if seed_id not in all_seed_ids:
                         all_seed_ids.append(seed_id)
@@ -209,8 +207,7 @@ class ResearchQuestionProposeManyHandler:
                 for action in transition_actions
             ],
             "affected_refs": [
-                {"kind": "research_question", "id": question["id"]}
-                for question in rq_candidates
+                {"kind": "research_question", "id": question["id"]} for question in rq_candidates
             ],
             "rationale": candidate.rationale,
             "required_human_decision_kinds": list(candidate.required_human_decision_kinds),

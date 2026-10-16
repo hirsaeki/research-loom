@@ -14,15 +14,32 @@ SURVEY_ANALYSIS_STORE_SCHEMA_VERSION = "0.1.0"
 _REQUIRED_COLUMNS = {
     "survey_analysis_store_meta": {"schema_version"},
     "survey_analysis_specs": {
-        "project_id", "analysis_spec_id", "content_digest", "dataset_id",
-        "dataset_digest", "instrument_id", "instrument_version", "instrument_digest",
-        "created_at", "document_json",
+        "project_id",
+        "analysis_spec_id",
+        "content_digest",
+        "dataset_id",
+        "dataset_digest",
+        "instrument_id",
+        "instrument_version",
+        "instrument_digest",
+        "created_at",
+        "document_json",
     },
     "survey_aggregate_results": {
-        "project_id", "aggregate_result_id", "content_digest", "analysis_spec_id",
-        "analysis_spec_digest", "dataset_id", "dataset_digest", "instrument_id",
-        "instrument_version", "instrument_digest", "response_origin", "epistemic_status",
-        "generated_at", "document_json",
+        "project_id",
+        "aggregate_result_id",
+        "content_digest",
+        "analysis_spec_id",
+        "analysis_spec_digest",
+        "dataset_id",
+        "dataset_digest",
+        "instrument_id",
+        "instrument_version",
+        "instrument_digest",
+        "response_origin",
+        "epistemic_status",
+        "generated_at",
+        "document_json",
     },
 }
 
@@ -101,9 +118,7 @@ class LocalSurveyAnalysisStore:
             for table_name, required in _REQUIRED_COLUMNS.items():
                 columns = {
                     str(row["name"])
-                    for row in connection.execute(
-                        f"PRAGMA table_info({table_name})"
-                    ).fetchall()
+                    for row in connection.execute(f"PRAGMA table_info({table_name})").fetchall()
                 }
                 if not required <= columns:
                     raise LocalSurveyAnalysisStoreError(
@@ -385,7 +400,6 @@ class LocalSurveyAnalysisStore:
             ) from exc
         finally:
             connection.close()
-
 
     def find_results_by_dataset(self, project_id: str, dataset_id: str) -> list[dict[str, Any]]:
         connection = self._read()

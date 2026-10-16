@@ -113,8 +113,7 @@ class DesktopResearchContextValidator:
         if target["target_type"] == "research_question":
             qid = str(target["question_id"])
             effective = {
-                (str(obj.get("kind")), str(obj.get("id"))): obj
-                for obj in state.effective_objects()
+                (str(obj.get("kind")), str(obj.get("id"))): obj for obj in state.effective_objects()
             }
             rq = effective.get(("research_question", qid))
             if (
@@ -130,15 +129,12 @@ class DesktopResearchContextValidator:
                 )
         else:
             attention_ids = {
-                str(item["attention_id"])
-                for item in context_pack["research_attention"]
+                str(item["attention_id"]) for item in context_pack["research_attention"]
             }
             if (
                 target.get("authoritative_question") is not False
                 or target["source_attention_id"] not in attention_ids
-                or not set(target.get("related_question_ids", ())).issubset(
-                    question_ids
-                )
+                or not set(target.get("related_question_ids", ())).issubset(question_ids)
             ):
                 issues.append(
                     _issue(
@@ -149,10 +145,7 @@ class DesktopResearchContextValidator:
 
         bindings = extension["resource_role_bindings"]
         refs = [str(item["reference_id"]) for item in bindings]
-        dimensions = [
-            str(item["dimension_id"])
-            for item in extension["coverage_dimensions"]
-        ]
+        dimensions = [str(item["dimension_id"]) for item in extension["coverage_dimensions"]]
         if len(refs) != len(set(refs)) or len(dimensions) != len(set(dimensions)):
             issues.append(
                 _issue(
@@ -161,10 +154,7 @@ class DesktopResearchContextValidator:
                 )
             )
 
-        resources = {
-            str(item["reference_id"]): item
-            for item in context_pack["resources"]
-        }
+        resources = {str(item["reference_id"]): item for item in context_pack["resources"]}
         if set(refs) != set(resources):
             issues.append(
                 _issue(
@@ -203,20 +193,14 @@ class DesktopResearchContextValidator:
                         f"candidate_source role is not bound to an evidentiary source: {ref}",
                     )
                 )
-            elif (
-                role == "research_artifact"
-                and resource["reference_type"] != "artifact"
-            ):
+            elif role == "research_artifact" and resource["reference_type"] != "artifact":
                 issues.append(
                     _issue(
                         "DR-CONTEXT-RESOURCE-ROLE-001",
                         f"research_artifact role is not bound to an artifact: {ref}",
                     )
                 )
-            elif (
-                role == "research_context"
-                and resource["evidentiary_use"] != "context_only"
-            ):
+            elif role == "research_context" and resource["evidentiary_use"] != "context_only":
                 issues.append(
                     _issue(
                         "DR-CONTEXT-RESOURCE-ROLE-001",
@@ -225,16 +209,13 @@ class DesktopResearchContextValidator:
                 )
 
         budget = extension["budget"]
-        candidate_sources = sum(
-            item["role"] == "candidate_source" for item in bindings
-        )
+        candidate_sources = sum(item["role"] == "candidate_source" for item in bindings)
         artifacts = sum(item["role"] == "research_artifact" for item in bindings)
         if (
             len(resources) > budget["max_total_resources"]
             or candidate_sources > budget["max_candidate_source_resources"]
             or artifacts > budget["max_artifact_resources"]
-            or budget["max_candidate_source_resources"]
-            > budget["max_total_resources"]
+            or budget["max_candidate_source_resources"] > budget["max_total_resources"]
             or budget["max_artifact_resources"] > budget["max_total_resources"]
         ):
             issues.append(

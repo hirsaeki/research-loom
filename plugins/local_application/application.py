@@ -9,42 +9,63 @@ from typing import Any, Mapping
 import uuid
 
 from core.conversation import (
-    ActionDefinition, ActionRegistry, CapabilityActionMaterializerRegistry,
-    CapabilityDescriptorRegistry, ConversationRuntimeError, HarnessServiceRegistry,
-    HarnessServiceResult, canonical_digest,
+    ActionDefinition,
+    ActionRegistry,
+    CapabilityActionMaterializerRegistry,
+    CapabilityDescriptorRegistry,
+    ConversationRuntimeError,
+    HarnessServiceRegistry,
+    HarnessServiceResult,
+    canonical_digest,
 )
 from core.decision import HumanDecisionService
 from core.decision.conversation import DecisionAwareResearchCoordinator
 from core.execution import (
-    AuthorizationDecision, CapabilityContextExtensionRegistry,
-    CapabilityExecutionService, CapabilityRegistry, ExecutionIssue,
+    AuthorizationDecision,
+    CapabilityContextExtensionRegistry,
+    CapabilityExecutionService,
+    CapabilityRegistry,
+    ExecutionIssue,
 )
 from core.runtime import (
-    CanonicalResearchObjectSchemaValidator, CapabilityNormalizationBoundary,
-    ObjectRef, StateDeltaProposal, StateTransitionService, TransitionAction,
+    CanonicalResearchObjectSchemaValidator,
+    CapabilityNormalizationBoundary,
+    ObjectRef,
+    StateDeltaProposal,
+    StateTransitionService,
+    TransitionAction,
     TransitionKind,
 )
 from core.runtime.ports import RepositoryError
 from plugins.desktop_research import (
-    DesktopResearchContextValidator, DesktopResearchConversationMaterializer,
-    DesktopResearchExternalAdapter, DesktopResearchNormalizer,
+    DesktopResearchContextValidator,
+    DesktopResearchConversationMaterializer,
+    DesktopResearchExternalAdapter,
+    DesktopResearchNormalizer,
 )
 from plugins.local_application.research_question_batch import (
-    ResearchQuestionProposeManyHandler, research_question_propose_many_payload,
+    ResearchQuestionProposeManyHandler,
+    research_question_propose_many_payload,
 )
 from plugins.local_attention_store import (
-    LocalAttentionStore, LocalAttentionStoreError, attention_map_digest,
+    LocalAttentionStore,
+    LocalAttentionStoreError,
+    attention_map_digest,
 )
 from plugins.local_conversation_store import LocalConversationStore
 from plugins.local_decision_store import LocalHumanDecisionStore
 from plugins.local_execution_store import (
-    LocalCapabilityContextExtensionStore, LocalExecutionStore, LocalOperationalTraceStore,
+    LocalCapabilityContextExtensionStore,
+    LocalExecutionStore,
+    LocalOperationalTraceStore,
 )
 from plugins.sqlite_state_store import SQLiteResearchStateRepository
 
 
 ROOT = Path(__file__).resolve().parents[2]
-DESCRIPTOR_PATH = ROOT / "core/packages/desktop-research/desktop-research-capability-descriptor.json"
+DESCRIPTOR_PATH = (
+    ROOT / "core/packages/desktop-research/desktop-research-capability-descriptor.json"
+)
 RESEARCH_SCHEMA_PATH = ROOT / "core/models/research-object.schema.json"
 ATTENTION_STORE_NAME = "attention.sqlite3"
 
@@ -63,7 +84,9 @@ class LocalStaticAuthorizationProvider:
     """Local PR9 authorization boundary, deliberately independent of PR10 confirmation."""
 
     def evidence_for(self, proposal, materialization, *, invocation_id, run_id):
-        resources = [str(item["reference_id"]) for item in materialization.context_pack["resources"]]
+        resources = [
+            str(item["reference_id"]) for item in materialization.context_pack["resources"]
+        ]
         evidence = {
             "authorization_id": "AUTH-" + uuid.uuid4().hex,
             "capability_id": proposal["route"]["capability"]["capability_id"],
@@ -87,9 +110,15 @@ class LocalStaticAuthorizationProvider:
         )
         if valid:
             return AuthorizationDecision(True, tuple(evidence.get("resource_reference_ids", ())))
-        return AuthorizationDecision(False, (), (
-            ExecutionIssue("CAP-AUTHORIZATION-001", "local runtime authorization evidence is invalid"),
-        ))
+        return AuthorizationDecision(
+            False,
+            (),
+            (
+                ExecutionIssue(
+                    "CAP-AUTHORIZATION-001", "local runtime authorization evidence is invalid"
+                ),
+            ),
+        )
 
 
 class ResearchStatusHandler:
@@ -103,16 +132,21 @@ class ResearchStatusHandler:
             objects = [item for item in objects if str(item.get("kind")) in allowed]
         pending = []
         for request in self._human_decisions.pending(state.project_ref):
-            pending.append({
-                "request_id": request["request_id"],
-                "source_candidate": deepcopy(request["source_state_delta_proposal"]),
-                "subjects": [deepcopy(unit["subject"]) for unit in request["decision_units"]],
-                "decision_kinds": list(dict.fromkeys(
-                    str(unit["required_decision_kind"]) for unit in request["decision_units"]
-                )),
-                "snapshot_binding": deepcopy(request["snapshot_binding"]),
-                "status": request.get("operational_status", "PENDING"),
-            })
+            pending.append(
+                {
+                    "request_id": request["request_id"],
+                    "source_candidate": deepcopy(request["source_state_delta_proposal"]),
+                    "subjects": [deepcopy(unit["subject"]) for unit in request["decision_units"]],
+                    "decision_kinds": list(
+                        dict.fromkeys(
+                            str(unit["required_decision_kind"])
+                            for unit in request["decision_units"]
+                        )
+                    ),
+                    "snapshot_binding": deepcopy(request["snapshot_binding"]),
+                    "status": request.get("operational_status", "PENDING"),
+                }
+            )
         return HarnessServiceResult(
             result_reference=str(state.current_snapshot["id"]),
             data={
@@ -227,12 +261,14 @@ class ResearchQuestionProposeHandler:
             "project_ref": candidate.project_ref,
             "lineage_ref": candidate.lineage_ref,
             "source_refs": list(candidate.source_refs),
-            "proposed_actions": [{
-                "kind": transition_action.kind.value,
-                "payload": deepcopy(dict(transition_action.payload)),
-                "decision_refs": list(transition_action.decision_refs),
-                "source_refs": list(transition_action.source_refs),
-            }],
+            "proposed_actions": [
+                {
+                    "kind": transition_action.kind.value,
+                    "payload": deepcopy(dict(transition_action.payload)),
+                    "decision_refs": list(transition_action.decision_refs),
+                    "source_refs": list(transition_action.source_refs),
+                }
+            ],
             "affected_refs": [{"kind": "research_question", "id": rq_id}],
             "rationale": candidate.rationale,
             "required_human_decision_kinds": list(candidate.required_human_decision_kinds),
@@ -259,16 +295,22 @@ class EffectiveResearchAttentionProvider:
 
     _PROFILE_HISTORY_EVENT_READ_LIMIT = 10_000
 
-    def __init__(self, store: LocalAttentionStore, *, profile_history_root: Path | None = None) -> None:
+    def __init__(
+        self, store: LocalAttentionStore, *, profile_history_root: Path | None = None
+    ) -> None:
         self._store = store
-        self._profile_history_root = Path(profile_history_root) if profile_history_root is not None else None
+        self._profile_history_root = (
+            Path(profile_history_root) if profile_history_root is not None else None
+        )
 
     @staticmethod
     def _is_canonical_config_digest(value: object) -> bool:
         return isinstance(value, str) and re.fullmatch(r"sha256:[0-9a-f]{64}", value) is not None
 
     @classmethod
-    def _event_successor(cls, event: Mapping[str, Any], *, project_id: str, source_config_digest: str) -> str | None:
+    def _event_successor(
+        cls, event: Mapping[str, Any], *, project_id: str, source_config_digest: str
+    ) -> str | None:
         if event.get("event_type") != "project_profile_generation_advanced":
             return None
         if str(event.get("project_id") or "") != project_id:
@@ -279,7 +321,9 @@ class EffectiveResearchAttentionProvider:
             raise ValueError("Profile advancement event binding is malformed")
         old_digest = old_binding.get("project_config_digest")
         new_digest = new_binding.get("project_config_digest")
-        if not cls._is_canonical_config_digest(old_digest) or not cls._is_canonical_config_digest(new_digest):
+        if not cls._is_canonical_config_digest(old_digest) or not cls._is_canonical_config_digest(
+            new_digest
+        ):
             raise ValueError("Profile advancement event digest is malformed")
         if old_digest != source_config_digest:
             return None
@@ -300,7 +344,9 @@ class EffectiveResearchAttentionProvider:
         if not events_root.is_dir():
             return False
 
-        if not self._is_canonical_config_digest(source_config_digest) or not self._is_canonical_config_digest(target_config_digest):
+        if not self._is_canonical_config_digest(
+            source_config_digest
+        ) or not self._is_canonical_config_digest(target_config_digest):
             return False
 
         # Pre-merge Issue #128 builds wrote flat PGA-*.json events. Parse that
@@ -327,7 +373,9 @@ class EffectiveResearchAttentionProvider:
                 return False
             old_digest = old_binding.get("project_config_digest")
             new_digest = new_binding.get("project_config_digest")
-            if not self._is_canonical_config_digest(old_digest) or not self._is_canonical_config_digest(new_digest):
+            if not self._is_canonical_config_digest(
+                old_digest
+            ) or not self._is_canonical_config_digest(new_digest):
                 return False
             legacy_by_source.setdefault(old_digest, set()).add(new_digest)
 
@@ -412,7 +460,9 @@ class ResearchAttentionStatusHandler:
     def execute(self, payload, *, state, actor, proposal):
         active, effective_attention = self._effective.resolve(state)
         return HarnessServiceResult(
-            result_reference=(str(active["map_id"]) if active is not None else state.project_config_ref),
+            result_reference=(
+                str(active["map_id"]) if active is not None else state.project_config_ref
+            ),
             data={
                 "baseline": {
                     "project_config_digest": state.project_config_digest,
@@ -424,7 +474,8 @@ class ResearchAttentionStatusHandler:
                         "map_digest": str(active["map_digest"]),
                         "activation_id": str(active["activation_id"]),
                     }
-                    if active is not None else None
+                    if active is not None
+                    else None
                 ),
                 "effective_attention": effective_attention,
             },
@@ -462,13 +513,15 @@ def _validate_attention_references(items, state) -> None:
         if unknown_resources:
             raise ConversationRuntimeError(
                 "ATTENTION-REF-001",
-                "Attention source_reference_ids do not resolve: " + ", ".join(sorted(unknown_resources)),
+                "Attention source_reference_ids do not resolve: "
+                + ", ".join(sorted(unknown_resources)),
             )
         unknown_seeds = set(map(str, item.get("related_question_seed_ids", ()))) - seed_ids
         if unknown_seeds:
             raise ConversationRuntimeError(
                 "ATTENTION-REF-001",
-                "Attention related_question_seed_ids do not resolve: " + ", ".join(sorted(unknown_seeds)),
+                "Attention related_question_seed_ids do not resolve: "
+                + ", ".join(sorted(unknown_seeds)),
             )
         unknown_rqs = set(map(str, item.get("related_question_ids", ()))) - rq_ids
         if unknown_rqs:
@@ -497,7 +550,8 @@ class ResearchAttentionProposeHandler:
             attention_id = self._ids.new("ATT-")
             if attention_id in by_id:
                 raise ConversationRuntimeError(
-                    "ATTENTION-IDENTITY-001", "Harness-generated Attention ID collides with current effective Attention"
+                    "ATTENTION-IDENTITY-001",
+                    "Harness-generated Attention ID collides with current effective Attention",
                 )
             item: dict[str, Any] = {
                 "attention_id": attention_id,
@@ -505,8 +559,11 @@ class ResearchAttentionProposeHandler:
                 "disposition": "active",
             }
             for field in (
-                "rationale", "source_reference_ids", "related_question_ids",
-                "related_question_seed_ids", "projection_hints",
+                "rationale",
+                "source_reference_ids",
+                "related_question_ids",
+                "related_question_seed_ids",
+                "projection_hints",
             ):
                 if field in addition:
                     item[field] = deepcopy(addition[field])
@@ -544,7 +601,8 @@ class ResearchAttentionProposeHandler:
                 "map_id": str(active["map_id"]),
                 "map_digest": str(active["map_digest"]),
             }
-            if active is not None else {"source": "project_config_baseline"}
+            if active is not None
+            else {"source": "project_config_baseline"}
         )
         candidate: dict[str, Any] = {
             "schema_version": "0.1.0",
@@ -588,14 +646,17 @@ class ResearchAttentionActivateHandler:
         except LocalAttentionStoreError as exc:
             raise ConversationRuntimeError(exc.code, exc.message) from exc
         if candidate is None:
-            raise ConversationRuntimeError("ATTENTION-MAP-UNKNOWN-001", f"unknown Attention Map: {map_id}")
+            raise ConversationRuntimeError(
+                "ATTENTION-MAP-UNKNOWN-001", f"unknown Attention Map: {map_id}"
+            )
         if (
             candidate["project_id"] != state.project_ref
             or candidate["project_config"]["ref"] != state.project_config_ref
             or candidate["project_config"]["digest"] != state.project_config_digest
         ):
             raise ConversationRuntimeError(
-                "ATTENTION-STALE-001", "Attention Map is bound to a different current project/configuration"
+                "ATTENTION-STALE-001",
+                "Attention Map is bound to a different current project/configuration",
             )
         try:
             event = self._store.activate(
@@ -681,8 +742,12 @@ def _status_payload(payload: Mapping[str, Any]) -> None:
 
 def _rq_proposal_payload(payload: Mapping[str, Any]) -> None:
     allowed = {
-        "text", "rationale", "acceptance_criteria", "scope_limits",
-        "parent_question_id", "derived_from_seed_ids",
+        "text",
+        "rationale",
+        "acceptance_criteria",
+        "scope_limits",
+        "parent_question_id",
+        "derived_from_seed_ids",
     }
     unknown = set(payload) - allowed
     if unknown:
@@ -725,7 +790,9 @@ def _attention_status_payload(payload: Mapping[str, Any]) -> None:
 
 
 def _string_list(value, field: str) -> None:
-    if not isinstance(value, list) or any(not isinstance(item, str) or not item.strip() for item in value):
+    if not isinstance(value, list) or any(
+        not isinstance(item, str) or not item.strip() for item in value
+    ):
         raise ValueError(f"{field} must be an array of non-empty strings")
     if len(value) != len(set(value)):
         raise ValueError(f"{field} must not contain duplicates")
@@ -755,8 +822,12 @@ def _attention_proposal_payload(payload: Mapping[str, Any]) -> None:
         raise ValueError("rationale must be a non-empty string")
 
     addition_allowed = {
-        "statement", "rationale", "source_reference_ids", "related_question_ids",
-        "related_question_seed_ids", "projection_hints",
+        "statement",
+        "rationale",
+        "source_reference_ids",
+        "related_question_ids",
+        "related_question_seed_ids",
+        "projection_hints",
     }
     for item in additions:
         if not isinstance(item, Mapping) or set(item) - addition_allowed:
@@ -773,12 +844,20 @@ def _attention_proposal_payload(payload: Mapping[str, Any]) -> None:
 
     seen_dispositions: set[str] = set()
     for item in dispositions:
-        if not isinstance(item, Mapping) or set(item) - {"attention_id", "disposition", "disposition_reason"}:
+        if not isinstance(item, Mapping) or set(item) - {
+            "attention_id",
+            "disposition",
+            "disposition_reason",
+        }:
             raise ValueError("disposition update contains unknown fields")
         if set(item) < {"attention_id", "disposition"}:
             raise ValueError("disposition update requires attention_id and disposition")
         attention_id = item.get("attention_id")
-        if not isinstance(attention_id, str) or not attention_id.strip() or attention_id in seen_dispositions:
+        if (
+            not isinstance(attention_id, str)
+            or not attention_id.strip()
+            or attention_id in seen_dispositions
+        ):
             raise ValueError("disposition attention_id must be unique and non-empty")
         seen_dispositions.add(attention_id)
         disposition = item.get("disposition")
@@ -795,11 +874,17 @@ def _attention_proposal_payload(payload: Mapping[str, Any]) -> None:
     seen_links: set[str] = set()
     for item in links:
         if not isinstance(item, Mapping) or set(item) - {
-            "attention_id", "related_question_ids", "related_question_seed_ids"
+            "attention_id",
+            "related_question_ids",
+            "related_question_seed_ids",
         }:
             raise ValueError("link update contains unknown fields")
         attention_id = item.get("attention_id")
-        if not isinstance(attention_id, str) or not attention_id.strip() or attention_id in seen_links:
+        if (
+            not isinstance(attention_id, str)
+            or not attention_id.strip()
+            or attention_id in seen_links
+        ):
             raise ValueError("link attention_id must be unique and non-empty")
         seen_links.add(attention_id)
         if not ({"related_question_ids", "related_question_seed_ids"} & set(item)):
@@ -812,7 +897,10 @@ def _attention_proposal_payload(payload: Mapping[str, Any]) -> None:
 def _attention_activate_payload(payload: Mapping[str, Any]) -> None:
     if set(payload) != {"attention_map_id"}:
         raise ValueError("research_attention.activate_candidate accepts only attention_map_id")
-    if not isinstance(payload.get("attention_map_id"), str) or not payload["attention_map_id"].strip():
+    if (
+        not isinstance(payload.get("attention_map_id"), str)
+        or not payload["attention_map_id"].strip()
+    ):
         raise ValueError("attention_map_id must be a non-empty string")
 
 
@@ -825,9 +913,15 @@ def _desktop_payload(payload: Mapping[str, Any]) -> None:
         "desktop_policy",
         "parent_run_id",
     }
-    if set(payload) - allowed or not isinstance(payload.get("question_id"), str) or not payload["question_id"]:
+    if (
+        set(payload) - allowed
+        or not isinstance(payload.get("question_id"), str)
+        or not payload["question_id"]
+    ):
         raise ValueError("desktop_research.investigate payload is invalid")
-    if "resource_reference_ids" in payload and not isinstance(payload["resource_reference_ids"], list):
+    if "resource_reference_ids" in payload and not isinstance(
+        payload["resource_reference_ids"], list
+    ):
         raise ValueError("resource_reference_ids must be pre-registered IDs")
     if "parent_run_id" in payload and (
         not isinstance(payload["parent_run_id"], str) or not payload["parent_run_id"].strip()
@@ -841,7 +935,9 @@ def _abort_payload(payload: Mapping[str, Any]) -> None:
 
 
 def _apply_payload(payload: Mapping[str, Any]) -> None:
-    if set(payload) != {"state_delta_proposal_id"} or not isinstance(payload.get("state_delta_proposal_id"), str):
+    if set(payload) != {"state_delta_proposal_id"} or not isinstance(
+        payload.get("state_delta_proposal_id"), str
+    ):
         raise ValueError(
             "state.apply_candidate accepts only state_delta_proposal_id; "
             "Decision refs are derived by the Human Decision Gate"
@@ -905,7 +1001,9 @@ class LocalResearchApplication:
         for reference_id, value in (resource_catalog or {}).items():
             metadata = deepcopy(dict(value))
             existing_reference_id = metadata.get("reference_id")
-            if existing_reference_id is not None and str(existing_reference_id) != str(reference_id):
+            if existing_reference_id is not None and str(existing_reference_id) != str(
+                reference_id
+            ):
                 raise ValueError(f"resource catalog identity mismatch: {reference_id}")
             metadata["reference_id"] = str(reference_id)
             catalog[str(reference_id)] = metadata
@@ -915,8 +1013,12 @@ class LocalResearchApplication:
             registered = self.execution_store.register_input_bytes(reference_id, content)
             catalog[reference_id]["digest"] = registered.digest
             catalog[reference_id]["locator"] = registered.storage_locator
-        self.context_extension_store = LocalCapabilityContextExtensionStore(self.execution_store.root)
-        self.operational_store = LocalOperationalTraceStore(self.execution_store.root, self.execution_store)
+        self.context_extension_store = LocalCapabilityContextExtensionStore(
+            self.execution_store.root
+        )
+        self.operational_store = LocalOperationalTraceStore(
+            self.execution_store.root, self.execution_store
+        )
 
         descriptor = json.loads(DESCRIPTOR_PATH.read_text(encoding="utf-8"))
         capability_registry = CapabilityRegistry()
@@ -936,58 +1038,125 @@ class LocalResearchApplication:
             CapabilityNormalizationBoundary((normalizer,)),
             self.clock,
             artifact_store=self.execution_store,
-            context_extension_registry=CapabilityContextExtensionRegistry((DesktopResearchContextValidator(),)),
+            context_extension_registry=CapabilityContextExtensionRegistry(
+                (DesktopResearchContextValidator(),)
+            ),
             context_extension_store=self.context_extension_store,
         )
 
         actions = ActionRegistry()
-        actions.register(ActionDefinition(
-            "research.status", "research-status-query@0.1.0", "read_only", "harness_service", False,
-            service_id="research.status", payload_validator=_status_payload,
-        ))
-        actions.register(ActionDefinition(
-            "research_question.propose", "research-question-proposal@0.1.0", "read_only", "harness_service", False,
-            human_decision_required=False, service_id="research_question.propose",
-            payload_validator=_rq_proposal_payload,
-        ))
-        actions.register(ActionDefinition(
-            "research_question.propose_many", "research-question-batch-proposal@0.1.0",
-            "read_only", "harness_service", False,
-            human_decision_required=False, service_id="research_question.propose_many",
-            payload_validator=research_question_propose_many_payload,
-        ))
-        actions.register(ActionDefinition(
-            "research_attention.status", "research-attention-status@0.1.0", "read_only", "harness_service", False,
-            human_decision_required=False, service_id="research_attention.status",
-            payload_validator=_attention_status_payload,
-        ))
-        actions.register(ActionDefinition(
-            "research_attention.propose", "research-attention-proposal@0.1.0", "read_only", "harness_service", False,
-            human_decision_required=False, service_id="research_attention.propose",
-            payload_validator=_attention_proposal_payload,
-        ))
-        actions.register(ActionDefinition(
-            "research_attention.activate_candidate", "research-attention-activation@0.1.0",
-            "state_changing", "harness_service", True,
-            human_decision_required=False, service_id="research_attention.activate_candidate",
-            payload_validator=_attention_activate_payload,
-        ))
-        actions.register(ActionDefinition(
-            "desktop_research.investigate", "desktop-research-action@0.1.0", "read_only", "capability_invocation", False,
-            capability_id="desktop-research", capability_version="0.1.0", function_id="investigate",
-            execution_mode="real", materializer_id="desktop_research.investigate@0.1.0",
-            execution_style="external", payload_validator=_desktop_payload,
-        ))
-        actions.register(ActionDefinition(
-            "run.abort", "run-abort-action@0.1.0", "state_changing", "harness_service", True,
-            service_id="run.abort", payload_validator=_abort_payload,
-        ))
+        actions.register(
+            ActionDefinition(
+                "research.status",
+                "research-status-query@0.1.0",
+                "read_only",
+                "harness_service",
+                False,
+                service_id="research.status",
+                payload_validator=_status_payload,
+            )
+        )
+        actions.register(
+            ActionDefinition(
+                "research_question.propose",
+                "research-question-proposal@0.1.0",
+                "read_only",
+                "harness_service",
+                False,
+                human_decision_required=False,
+                service_id="research_question.propose",
+                payload_validator=_rq_proposal_payload,
+            )
+        )
+        actions.register(
+            ActionDefinition(
+                "research_question.propose_many",
+                "research-question-batch-proposal@0.1.0",
+                "read_only",
+                "harness_service",
+                False,
+                human_decision_required=False,
+                service_id="research_question.propose_many",
+                payload_validator=research_question_propose_many_payload,
+            )
+        )
+        actions.register(
+            ActionDefinition(
+                "research_attention.status",
+                "research-attention-status@0.1.0",
+                "read_only",
+                "harness_service",
+                False,
+                human_decision_required=False,
+                service_id="research_attention.status",
+                payload_validator=_attention_status_payload,
+            )
+        )
+        actions.register(
+            ActionDefinition(
+                "research_attention.propose",
+                "research-attention-proposal@0.1.0",
+                "read_only",
+                "harness_service",
+                False,
+                human_decision_required=False,
+                service_id="research_attention.propose",
+                payload_validator=_attention_proposal_payload,
+            )
+        )
+        actions.register(
+            ActionDefinition(
+                "research_attention.activate_candidate",
+                "research-attention-activation@0.1.0",
+                "state_changing",
+                "harness_service",
+                True,
+                human_decision_required=False,
+                service_id="research_attention.activate_candidate",
+                payload_validator=_attention_activate_payload,
+            )
+        )
+        actions.register(
+            ActionDefinition(
+                "desktop_research.investigate",
+                "desktop-research-action@0.1.0",
+                "read_only",
+                "capability_invocation",
+                False,
+                capability_id="desktop-research",
+                capability_version="0.1.0",
+                function_id="investigate",
+                execution_mode="real",
+                materializer_id="desktop_research.investigate@0.1.0",
+                execution_style="external",
+                payload_validator=_desktop_payload,
+            )
+        )
+        actions.register(
+            ActionDefinition(
+                "run.abort",
+                "run-abort-action@0.1.0",
+                "state_changing",
+                "harness_service",
+                True,
+                service_id="run.abort",
+                payload_validator=_abort_payload,
+            )
+        )
         # The exact candidate may or may not require a Decision. Static Conversation
         # metadata cannot truthfully decide that; PR20 authority validation does.
-        actions.register(ActionDefinition(
-            "state.apply_candidate", "state-delta-adoption-action@0.1.0", "state_changing", "harness_service", True,
-            human_decision_required=False, service_id="state.apply_candidate", payload_validator=_apply_payload,
-        ))
+        actions.register(
+            ActionDefinition(
+                "state.apply_candidate",
+                "state-delta-adoption-action@0.1.0",
+                "state_changing",
+                "harness_service",
+                True,
+                human_decision_required=False,
+                service_id="state.apply_candidate",
+                payload_validator=_apply_payload,
+            )
+        )
 
         services = HarnessServiceRegistry()
         services.register("research.status", ResearchStatusHandler(self.human_decisions))
@@ -999,7 +1168,9 @@ class LocalResearchApplication:
             "research_question.propose_many",
             ResearchQuestionProposeManyHandler(self.conversation_store, self.ids),
         )
-        services.register("research_attention.status", ResearchAttentionStatusHandler(self.effective_attention))
+        services.register(
+            "research_attention.status", ResearchAttentionStatusHandler(self.effective_attention)
+        )
         services.register(
             "research_attention.propose",
             ResearchAttentionProposeHandler(
@@ -1011,15 +1182,20 @@ class LocalResearchApplication:
             ResearchAttentionActivateHandler(self.attention_store, self.ids, self.clock),
         )
         services.register("run.abort", RunAbortHandler(self.capability_execution_service))
-        services.register("state.apply_candidate", StateDeltaApplyHandler(self.conversation_store, self.human_decisions))
+        services.register(
+            "state.apply_candidate",
+            StateDeltaApplyHandler(self.conversation_store, self.human_decisions),
+        )
 
         materializers = CapabilityActionMaterializerRegistry()
-        materializers.register(DesktopResearchConversationMaterializer(
-            effective_profile_set_provider=effective_profile_set_provider,
-            effective_attention_provider=self.effective_attention,
-            resource_catalog=catalog,
-            resource_roles=resource_roles,
-        ))
+        materializers.register(
+            DesktopResearchConversationMaterializer(
+                effective_profile_set_provider=effective_profile_set_provider,
+                effective_attention_provider=self.effective_attention,
+                resource_catalog=catalog,
+                resource_roles=resource_roles,
+            )
+        )
         descriptors = CapabilityDescriptorRegistry()
         descriptors.register(descriptor)
 

@@ -34,7 +34,9 @@ class NarrativeSemanticsContractTests(unittest.TestCase):
         cls.catalog = yaml.safe_load(NARRATIVE_CATALOG.read_text(encoding="utf-8"))
         cls.profile_validator = Draft202012Validator(cls.profile_schema)
         cls.narrative_validator = Draft202012Validator(cls.narrative_schema)
-        cls.generic = json.loads((FIXTURES / "valid/generic-narrative.profile.json").read_text(encoding="utf-8"))
+        cls.generic = json.loads(
+            (FIXTURES / "valid/generic-narrative.profile.json").read_text(encoding="utf-8")
+        )
 
     def test_catalog_schema_and_cross_references(self):
         Draft202012Validator.check_schema(self.narrative_schema)
@@ -52,7 +54,10 @@ class NarrativeSemanticsContractTests(unittest.TestCase):
         self.assertIsNone(narrative_constraint_error(self.generic, self.catalog))
         self.assertIsNone(narrative_composition_error([self.generic], self.catalog))
         for constraint in self.generic["constraints"]:
-            if constraint["path"] in {"narrative.stages.definitions", "narrative.section_purposes.definitions"}:
+            if constraint["path"] in {
+                "narrative.stages.definitions",
+                "narrative.section_purposes.definitions",
+            }:
                 self.assertNotIn("chapter_number", json.dumps(constraint["value"]))
                 self.assertNotIn("literal_heading", json.dumps(constraint["value"]))
         self.assertNotIn("MISCO", json.dumps(self.generic))
@@ -60,10 +65,54 @@ class NarrativeSemanticsContractTests(unittest.TestCase):
     def test_namespace_rejects_wrong_owner_path_merge_and_values(self):
         cases = [
             ("PROFILE-NARRATIVE-OWNER-001", {"profile_type": "organization"}),
-            ("PROFILE-NARRATIVE-PATH-001", {"constraint": {"path":"narrative.magic.order","merge_strategy":"union","value":[]}}),
-            ("PROFILE-NARRATIVE-MERGE-001", {"constraint": {"path":"narrative.preservation.required_content","merge_strategy":"intersection","value":["limitations"]}}),
-            ("PROFILE-NARRATIVE-VALUE-001", {"constraint": {"path":"narrative.preservation.required_content","merge_strategy":"union","value":["hide_adverse_results"]}}),
-            ("PROFILE-NARRATIVE-VALUE-001", {"constraint": {"path":"narrative.stages.definitions","merge_strategy":"union","value":[{"id":"x","semantic_role":"framing","consumes":[],"requires":[],"produces":["finding"]}]}}),
+            (
+                "PROFILE-NARRATIVE-PATH-001",
+                {
+                    "constraint": {
+                        "path": "narrative.magic.order",
+                        "merge_strategy": "union",
+                        "value": [],
+                    }
+                },
+            ),
+            (
+                "PROFILE-NARRATIVE-MERGE-001",
+                {
+                    "constraint": {
+                        "path": "narrative.preservation.required_content",
+                        "merge_strategy": "intersection",
+                        "value": ["limitations"],
+                    }
+                },
+            ),
+            (
+                "PROFILE-NARRATIVE-VALUE-001",
+                {
+                    "constraint": {
+                        "path": "narrative.preservation.required_content",
+                        "merge_strategy": "union",
+                        "value": ["hide_adverse_results"],
+                    }
+                },
+            ),
+            (
+                "PROFILE-NARRATIVE-VALUE-001",
+                {
+                    "constraint": {
+                        "path": "narrative.stages.definitions",
+                        "merge_strategy": "union",
+                        "value": [
+                            {
+                                "id": "x",
+                                "semantic_role": "framing",
+                                "consumes": [],
+                                "requires": [],
+                                "produces": ["finding"],
+                            }
+                        ],
+                    }
+                },
+            ),
         ]
         for index, (expected, mutation) in enumerate(cases):
             profile = deepcopy(self.generic)
@@ -72,29 +121,60 @@ class NarrativeSemanticsContractTests(unittest.TestCase):
                 profile["profile_type"] = mutation["profile_type"]
                 profile["constraints"] = [profile["constraints"][0]]
             else:
-                profile["constraints"] = [{"id":f"bad-{index}", **mutation["constraint"]}]
+                profile["constraints"] = [{"id": f"bad-{index}", **mutation["constraint"]}]
             self.assertFalse(list(self.profile_validator.iter_errors(profile)), str(index))
-            self.assertEqual(expected, narrative_constraint_error(profile, self.catalog), str(index))
+            self.assertEqual(
+                expected, narrative_constraint_error(profile, self.catalog), str(index)
+            )
 
     def test_structured_identity_conflicts_refs_and_cycles_fail_closed(self):
         conflict = deepcopy(self.generic)
-        stage_constraint = next(c for c in conflict["constraints"] if c["path"] == "narrative.stages.definitions")
-        stage_constraint["value"] = [{"id":"framing","semantic_role":"synthesis","consumes":["finding"],"requires":["finding"],"produces":["contribution_synthesis"]}]
-        self.assertEqual("PROFILE-NARRATIVE-IDENTITY-001", narrative_composition_error([self.generic, conflict], self.catalog))
+        stage_constraint = next(
+            c for c in conflict["constraints"] if c["path"] == "narrative.stages.definitions"
+        )
+        stage_constraint["value"] = [
+            {
+                "id": "framing",
+                "semantic_role": "synthesis",
+                "consumes": ["finding"],
+                "requires": ["finding"],
+                "produces": ["contribution_synthesis"],
+            }
+        ]
+        self.assertEqual(
+            "PROFILE-NARRATIVE-IDENTITY-001",
+            narrative_composition_error([self.generic, conflict], self.catalog),
+        )
 
         dangling = deepcopy(self.generic)
-        dep_constraint = next(c for c in dangling["constraints"] if c["path"] == "narrative.dependencies.required")
-        dep_constraint["value"].append({"from_stage":"missing","to_stage":"synthesis","relation":"semantic_precondition"})
-        self.assertEqual("PROFILE-NARRATIVE-REF-001", narrative_composition_error([dangling], self.catalog))
+        dep_constraint = next(
+            c for c in dangling["constraints"] if c["path"] == "narrative.dependencies.required"
+        )
+        dep_constraint["value"].append(
+            {"from_stage": "missing", "to_stage": "synthesis", "relation": "semantic_precondition"}
+        )
+        self.assertEqual(
+            "PROFILE-NARRATIVE-REF-001", narrative_composition_error([dangling], self.catalog)
+        )
 
         cyclic = deepcopy(self.generic)
-        dep_constraint = next(c for c in cyclic["constraints"] if c["path"] == "narrative.dependencies.required")
-        dep_constraint["value"].append({"from_stage":"synthesis","to_stage":"framing","relation":"semantic_precondition"})
-        self.assertEqual("NARRATIVE-DEPENDENCY-CYCLE-001", narrative_composition_error([cyclic], self.catalog))
+        dep_constraint = next(
+            c for c in cyclic["constraints"] if c["path"] == "narrative.dependencies.required"
+        )
+        dep_constraint["value"].append(
+            {"from_stage": "synthesis", "to_stage": "framing", "relation": "semantic_precondition"}
+        )
+        self.assertEqual(
+            "NARRATIVE-DEPENDENCY-CYCLE-001", narrative_composition_error([cyclic], self.catalog)
+        )
 
     def test_dependencies_are_minimum_partial_order_not_literal_total_order(self):
-        stage_constraint = next(c for c in self.generic["constraints"] if c["path"] == "narrative.stages.definitions")
-        dependency_constraint = next(c for c in self.generic["constraints"] if c["path"] == "narrative.dependencies.required")
+        stage_constraint = next(
+            c for c in self.generic["constraints"] if c["path"] == "narrative.stages.definitions"
+        )
+        dependency_constraint = next(
+            c for c in self.generic["constraints"] if c["path"] == "narrative.dependencies.required"
+        )
         stages = {stage["id"] for stage in stage_constraint["value"]}
         edges = {(edge["from_stage"], edge["to_stage"]) for edge in dependency_constraint["value"]}
         self.assertEqual({"framing", "formation", "validation", "synthesis", "implication"}, stages)
@@ -108,13 +188,17 @@ class NarrativeSemanticsContractTests(unittest.TestCase):
         composed = {item["path"]: item for item in canonical_compose_constraints([candidate])}
         self.assertEqual("union", composed["narrative.stages.definitions"]["merge_strategy"])
         self.assertEqual("union", composed["narrative.dependencies.required"]["merge_strategy"])
-        self.assertEqual("union", composed["narrative.preservation.required_content"]["merge_strategy"])
+        self.assertEqual(
+            "union", composed["narrative.preservation.required_content"]["merge_strategy"]
+        )
 
     def test_projection_regressions_preserve_authority_qualifiers_and_hints(self):
         cases = json.loads((FIXTURES / "semantic/cases.json").read_text(encoding="utf-8"))
         for case in cases["valid"] + cases["semantic_invalid"]:
             state = apply_mutations(cases["base_state"], case["mutations"])
-            self.assertEqual(case["expected_error"], narrative_projection_error(state, self.generic), case["id"])
+            self.assertEqual(
+                case["expected_error"], narrative_projection_error(state, self.generic), case["id"]
+            )
 
     def test_partial_narrative_profile_omits_unconfigured_projection_checks(self):
         cases = json.loads((FIXTURES / "semantic/cases.json").read_text(encoding="utf-8"))
@@ -130,11 +214,17 @@ class NarrativeSemanticsContractTests(unittest.TestCase):
         state["projection"]["hints"][0]["treatment"] = "normative_dependency"
         self.assertIsNone(narrative_projection_error(state, profile))
 
-        state["research_state_digest_after"] = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        state["research_state_digest_after"] = (
+            "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        )
         self.assertEqual("NARRATIVE-AUTHORITY-001", narrative_projection_error(state, profile))
 
     def test_stage_outputs_are_narrative_products_not_core_research_objects(self):
-        stages = next(c["value"] for c in self.generic["constraints"] if c["path"] == "narrative.stages.definitions")
+        stages = next(
+            c["value"]
+            for c in self.generic["constraints"]
+            if c["path"] == "narrative.stages.definitions"
+        )
         research_kinds = set(self.catalog["vocabularies"]["research_input_kind"])
         products = set(self.catalog["vocabularies"]["narrative_product"])
         for stage in stages:

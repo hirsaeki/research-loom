@@ -19,7 +19,10 @@ def descriptor_error(descriptor):
     if set(ids) != CANONICAL_FUNCTIONS or len(ids) != len(CANONICAL_FUNCTIONS):
         return "RM-DESCRIPTOR-001"
     for function in functions:
-        if function.get("input_contract") != "capability-context-pack@0.1.0" or function.get("output_contract") != "capability-handoff@0.1.0":
+        if (
+            function.get("input_contract") != "capability-context-pack@0.1.0"
+            or function.get("output_contract") != "capability-handoff@0.1.0"
+        ):
             return "RM-DESCRIPTOR-001"
     return None
 
@@ -28,7 +31,11 @@ def context_error(context, extension, execution_mode, evidence_gap_handoffs=()):
     if extension.get("extension_digest") != canonical_digest(extension, "extension_digest"):
         return "RM-CONTEXT-DIGEST-001"
     binding = extension.get("context_binding", {})
-    if binding.get("context_pack_id") != context.get("context_pack_id") or binding.get("context_pack_digest") != context.get("context_pack_digest") or binding.get("project_id") != context.get("project_id"):
+    if (
+        binding.get("context_pack_id") != context.get("context_pack_id")
+        or binding.get("context_pack_digest") != context.get("context_pack_digest")
+        or binding.get("project_id") != context.get("project_id")
+    ):
         return "RM-CONTEXT-BINDING-001"
 
     targets = extension.get("targets", {})
@@ -41,20 +48,26 @@ def context_error(context, extension, execution_mode, evidence_gap_handoffs=()):
         return "RM-CONTEXT-BINDING-001"
     resources = {item.get("reference_id"): item for item in context.get("resources", [])}
     source_handoffs = {
-        (item.get("handoff_id"), item.get("handoff_digest")): item
-        for item in evidence_gap_handoffs
+        (item.get("handoff_id"), item.get("handoff_digest")): item for item in evidence_gap_handoffs
     }
     seen_gap_refs = set()
     for gap_ref in gap_refs:
         source_digest = gap_ref.get("source_handoff_digest")
         resource = resources.get(gap_ref.get("source_resource_reference_id"))
-        if not resource or resource.get("reference_type") != "artifact" or resource.get("evidentiary_use") != "context_only" or resource.get("digest") != source_digest:
+        if (
+            not resource
+            or resource.get("reference_type") != "artifact"
+            or resource.get("evidentiary_use") != "context_only"
+            or resource.get("digest") != source_digest
+        ):
             return "RM-CONTEXT-BINDING-001"
         source_key = (gap_ref.get("source_handoff_id"), source_digest)
         source_handoff = source_handoffs.get(source_key)
         if not source_handoff or source_handoff.get("project_id") != context.get("project_id"):
             return "RM-CONTEXT-BINDING-001"
-        if source_handoff.get("handoff_digest") != canonical_digest(source_handoff, "handoff_digest"):
+        if source_handoff.get("handoff_digest") != canonical_digest(
+            source_handoff, "handoff_digest"
+        ):
             return "RM-CONTEXT-BINDING-001"
         gap_key = (source_handoff.get("handoff_id"), gap_ref.get("gap_id"))
         if gap_key in seen_gap_refs:
@@ -88,12 +101,20 @@ def context_error(context, extension, execution_mode, evidence_gap_handoffs=()):
         if method_basis is None or protocol is None or run_spec is None:
             return "RM-FUNCTION-001"
         if execution_mode == "real":
-            core_method = method_basis.get("core_method_ref") if isinstance(method_basis, dict) else None
-            if not core_method or core_method.get("adoption_state") != "approved" or protocol.get("approval_status") != "approved":
+            core_method = (
+                method_basis.get("core_method_ref") if isinstance(method_basis, dict) else None
+            )
+            if (
+                not core_method
+                or core_method.get("adoption_state") != "approved"
+                or protocol.get("approval_status") != "approved"
+            ):
                 return "RM-REAL-EXECUTION-001"
             if not decisions.get("method_adoption_decision_ids"):
                 return "RM-METHOD-DECISION-001"
-            if protocol.get("material_revision") and not decisions.get("material_protocol_revision_decision_ids"):
+            if protocol.get("material_revision") and not decisions.get(
+                "material_protocol_revision_decision_ids"
+            ):
                 return "RM-PROTOCOL-DECISION-001"
     elif fn == "analyze":
         if not prior:
@@ -129,18 +150,28 @@ def result_error(extension, handoff, context, context_extension):
     run_ids = set()
     run_spec = context_extension.get("run_spec")
     protocol = context_extension.get("protocol_basis")
-    if extension.get("run_results") and (not isinstance(run_spec, dict) or not isinstance(protocol, dict)):
+    if extension.get("run_results") and (
+        not isinstance(run_spec, dict) or not isinstance(protocol, dict)
+    ):
         return "RM-PROTOCOL-001"
-    expected_run_ref = None if not isinstance(run_spec, dict) else {
-        "id": run_spec.get("run_spec_id"),
-        "version": run_spec.get("version"),
-        "content_digest": run_spec.get("content_digest"),
-    }
-    expected_protocol_ref = None if not isinstance(protocol, dict) else {
-        "id": protocol.get("protocol_id"),
-        "version": protocol.get("version"),
-        "content_digest": protocol.get("content_digest"),
-    }
+    expected_run_ref = (
+        None
+        if not isinstance(run_spec, dict)
+        else {
+            "id": run_spec.get("run_spec_id"),
+            "version": run_spec.get("version"),
+            "content_digest": run_spec.get("content_digest"),
+        }
+    )
+    expected_protocol_ref = (
+        None
+        if not isinstance(protocol, dict)
+        else {
+            "id": protocol.get("protocol_id"),
+            "version": protocol.get("version"),
+            "content_digest": protocol.get("content_digest"),
+        }
+    )
 
     for run in extension.get("run_results", []):
         run_ids.add(run.get("run_result_id"))
@@ -165,13 +196,21 @@ def result_error(extension, handoff, context, context_extension):
             return "RM-COMPLETION-001"
 
     for analysis in extension.get("candidate_analyses", []):
-        if analysis.get("core_analysis_adoption_performed") is not False or not set(analysis.get("source_run_result_ids", [])).issubset(run_ids):
+        if analysis.get("core_analysis_adoption_performed") is not False or not set(
+            analysis.get("source_run_result_ids", [])
+        ).issubset(run_ids):
             return "RM-ANALYSIS-001"
 
     outputs = handoff.get("outputs", {})
-    expected_findings = {x.get("candidate_finding_id") for x in outputs.get("candidate_findings", [])}
+    expected_findings = {
+        x.get("candidate_finding_id") for x in outputs.get("candidate_findings", [])
+    }
     expected_actions = {x.get("proposal_id") for x in outputs.get("candidate_next_actions", [])}
     expected_methods = {x.get("proposal_id") for x in outputs.get("candidate_next_methods", [])}
-    if set(extension.get("candidate_finding_ids", [])) != expected_findings or set(extension.get("candidate_next_action_ids", [])) != expected_actions or set(extension.get("candidate_next_method_ids", [])) != expected_methods:
+    if (
+        set(extension.get("candidate_finding_ids", [])) != expected_findings
+        or set(extension.get("candidate_next_action_ids", [])) != expected_actions
+        or set(extension.get("candidate_next_method_ids", [])) != expected_methods
+    ):
         return "RM-HANDOFF-CANDIDATE-001"
     return None

@@ -51,7 +51,9 @@ class ResearchMethodContracts(unittest.TestCase):
     def test_schemas_and_semantics_catalog(self):
         Draft202012Validator.check_schema(self.context_schema)
         Draft202012Validator.check_schema(self.result_schema)
-        semantics = yaml.safe_load((RM / "research-method-semantics.yaml").read_text(encoding="utf-8"))
+        semantics = yaml.safe_load(
+            (RM / "research-method-semantics.yaml").read_text(encoding="utf-8")
+        )
         self.assertEqual(semantics["handoff"]["canonical_wire_format"], "capability-handoff@0.1.0")
         self.assertFalse(semantics["method_authority"]["capability_self_adopts_method"])
         self.assertFalse(semantics["conversation_boundary"]["confirmation_is_human_decision"])
@@ -61,12 +63,22 @@ class ResearchMethodContracts(unittest.TestCase):
         errors = list(Draft202012Validator(self.descriptor_schema).iter_errors(self.descriptor))
         self.assertEqual(errors, [])
         self.assertEqual(descriptor_error(self.descriptor), None)
-        self.assertEqual(self.descriptor["descriptor_digest"], canonical_digest(self.descriptor, "descriptor_digest"))
+        self.assertEqual(
+            self.descriptor["descriptor_digest"],
+            canonical_digest(self.descriptor, "descriptor_digest"),
+        )
 
     def test_valid_real_execute_context(self):
-        pack_errors = list(Draft202012Validator(self.context_pack_schema, format_checker=FormatChecker()).iter_errors(self.context))
+        pack_errors = list(
+            Draft202012Validator(
+                self.context_pack_schema, format_checker=FormatChecker()
+            ).iter_errors(self.context)
+        )
         self.assertEqual(pack_errors, [])
-        self.assertEqual(self.context["context_pack_digest"], canonical_digest(self.context, "context_pack_digest"))
+        self.assertEqual(
+            self.context["context_pack_digest"],
+            canonical_digest(self.context, "context_pack_digest"),
+        )
         errors = list(Draft202012Validator(self.context_schema).iter_errors(self.context_extension))
         self.assertEqual(errors, [])
         self.assertEqual(self._context_error(self.context_extension), None)
@@ -97,10 +109,15 @@ class ResearchMethodContracts(unittest.TestCase):
         self.assertEqual(self._context_error(case, context=context), "RM-CONTEXT-BINDING-001")
 
         source_handoff = deepcopy(self.gap_handoff)
-        source_handoff["outputs"]["evidence_gaps"][0]["statement"] = "Tampered after the Handoff digest was computed."
+        source_handoff["outputs"]["evidence_gaps"][0]["statement"] = (
+            "Tampered after the Handoff digest was computed."
+        )
         # Keep all Context Pack bindings valid and do not refresh handoff_digest:
         # only RFC 8785 Handoff digest recomputation should detect this mutation.
-        self.assertEqual(self._context_error(self.context_extension, handoff=source_handoff), "RM-CONTEXT-BINDING-001")
+        self.assertEqual(
+            self._context_error(self.context_extension, handoff=source_handoff),
+            "RM-CONTEXT-BINDING-001",
+        )
 
     def test_schema_enforces_function_specific_inputs(self):
         validator = Draft202012Validator(self.context_schema)
@@ -108,8 +125,14 @@ class ResearchMethodContracts(unittest.TestCase):
         def assert_rule(document, validator_name, path):
             errors = list(validator.iter_errors(document))
             self.assertTrue(
-                any(error.validator == validator_name and list(error.absolute_path) == path for error in errors),
-                [f"{error.validator}:{list(error.absolute_path)}:{error.message}" for error in errors],
+                any(
+                    error.validator == validator_name and list(error.absolute_path) == path
+                    for error in errors
+                ),
+                [
+                    f"{error.validator}:{list(error.absolute_path)}:{error.message}"
+                    for error in errors
+                ],
             )
 
         execute = deepcopy(self.context_extension)
@@ -125,7 +148,9 @@ class ResearchMethodContracts(unittest.TestCase):
         method_design = deepcopy(self.context_extension)
         method_design["function_id"] = "method_design"
         method_design["run_spec"] = None
-        method_design["prior_run_result_refs"] = [{"id":"RRES-OLD","version":"1.0.0","content_digest":"sha256:"+"c"*64}]
+        method_design["prior_run_result_refs"] = [
+            {"id": "RRES-OLD", "version": "1.0.0", "content_digest": "sha256:" + "c" * 64}
+        ]
         refresh(method_design)
         assert_rule(method_design, "maxItems", ["prior_run_result_refs"])
 
@@ -163,9 +188,19 @@ class ResearchMethodContracts(unittest.TestCase):
 
     def test_virtual_execute_may_test_candidate_design(self):
         case = deepcopy(self.context_extension)
-        case["method_basis"] = {"method_design_ref":{"method_design_id":"MD-1","version":"0.1.0","content_digest":"sha256:"+"b"*64,"authoritative_method":False}}
+        case["method_basis"] = {
+            "method_design_ref": {
+                "method_design_id": "MD-1",
+                "version": "0.1.0",
+                "content_digest": "sha256:" + "b" * 64,
+                "authoritative_method": False,
+            }
+        }
         case["protocol_basis"]["approval_status"] = "candidate"
-        case["human_decision_bindings"] = {"method_adoption_decision_ids":[],"material_protocol_revision_decision_ids":[]}
+        case["human_decision_bindings"] = {
+            "method_adoption_decision_ids": [],
+            "material_protocol_revision_decision_ids": [],
+        }
         refresh(case)
         self.assertEqual(self._context_error(case, "virtual"), None)
 
@@ -182,14 +217,26 @@ class ResearchMethodContracts(unittest.TestCase):
         missing_method["method_basis"] = None
         refresh(missing_method)
         method_errors = list(validator.iter_errors(missing_method))
-        self.assertTrue(any(error.validator == "not" and list(error.absolute_path) == ["method_basis"] for error in method_errors), method_errors)
+        self.assertTrue(
+            any(
+                error.validator == "not" and list(error.absolute_path) == ["method_basis"]
+                for error in method_errors
+            ),
+            method_errors,
+        )
         self.assertEqual(self._context_error(missing_method), "RM-FUNCTION-001")
 
         missing_protocol = deepcopy(instrument)
         missing_protocol["protocol_basis"] = None
         refresh(missing_protocol)
         protocol_errors = list(validator.iter_errors(missing_protocol))
-        self.assertTrue(any(error.validator == "not" and list(error.absolute_path) == ["protocol_basis"] for error in protocol_errors), protocol_errors)
+        self.assertTrue(
+            any(
+                error.validator == "not" and list(error.absolute_path) == ["protocol_basis"]
+                for error in protocol_errors
+            ),
+            protocol_errors,
+        )
         self.assertEqual(self._context_error(missing_protocol), "RM-FUNCTION-001")
 
     def test_function_specific_inputs(self):
@@ -197,21 +244,36 @@ class ResearchMethodContracts(unittest.TestCase):
         case["function_id"] = "analyze"
         refresh(case)
         self.assertEqual(self._context_error(case), "RM-FUNCTION-001")
-        case["prior_run_result_refs"] = [{"id":"RRES-OLD","version":"1.0.0","content_digest":"sha256:"+"c"*64}]
+        case["prior_run_result_refs"] = [
+            {"id": "RRES-OLD", "version": "1.0.0", "content_digest": "sha256:" + "c" * 64}
+        ]
         refresh(case)
         self.assertEqual(self._context_error(case), None)
 
     def _handoff(self, mode="real", function_id="execute"):
         return {
-            "handoff_id":"HND-RM-001","handoff_digest":"sha256:"+"8"*64,"invocation_id":"INV-RM-001","run_id":"RUN-RM-001",
-            "capability":{"capability_id":"fixture.research-method","function_id":function_id},"execution_mode":mode,
-            "outputs":{"candidate_findings":[{"candidate_finding_id":"CFND-RM-1"}],"candidate_next_actions":[{"proposal_id":"NA-RM-1"}],"candidate_next_methods":[{"proposal_id":"NM-RM-1"}]}
+            "handoff_id": "HND-RM-001",
+            "handoff_digest": "sha256:" + "8" * 64,
+            "invocation_id": "INV-RM-001",
+            "run_id": "RUN-RM-001",
+            "capability": {"capability_id": "fixture.research-method", "function_id": function_id},
+            "execution_mode": mode,
+            "outputs": {
+                "candidate_findings": [{"candidate_finding_id": "CFND-RM-1"}],
+                "candidate_next_actions": [{"proposal_id": "NA-RM-1"}],
+                "candidate_next_methods": [{"proposal_id": "NM-RM-1"}],
+            },
         }
 
     def test_result_schema_binding_raw_data_and_candidates(self):
         validator = Draft202012Validator(self.result_schema, format_checker=FormatChecker())
         self.assertEqual(list(validator.iter_errors(self.result_extension)), [])
-        self.assertEqual(result_error(self.result_extension, self._handoff(), self.context, self.context_extension), None)
+        self.assertEqual(
+            result_error(
+                self.result_extension, self._handoff(), self.context, self.context_extension
+            ),
+            None,
+        )
 
     def test_result_function_mismatch_is_stable_binding_error(self):
         case = deepcopy(self.context_extension)
@@ -219,25 +281,44 @@ class ResearchMethodContracts(unittest.TestCase):
         case["protocol_basis"] = None
         case["run_spec"] = None
         refresh(case)
-        self.assertEqual(result_error(self.result_extension, self._handoff(), self.context, case), "RM-RESULT-BINDING-001")
+        self.assertEqual(
+            result_error(self.result_extension, self._handoff(), self.context, case),
+            "RM-RESULT-BINDING-001",
+        )
 
     def test_result_requires_exact_runspec_and_protocol_identity(self):
         case = deepcopy(self.result_extension)
         case["run_results"][0]["run_spec_ref"]["id"] = "RSPEC-OTHER"
         refresh(case)
-        self.assertEqual(result_error(case, self._handoff(), self.context, self.context_extension), "RM-PROTOCOL-001")
+        self.assertEqual(
+            result_error(case, self._handoff(), self.context, self.context_extension),
+            "RM-PROTOCOL-001",
+        )
 
         case = deepcopy(self.result_extension)
         case["run_results"][0]["protocol_ref"]["version"] = "9.9.9"
         refresh(case)
-        self.assertEqual(result_error(case, self._handoff(), self.context, self.context_extension), "RM-PROTOCOL-001")
+        self.assertEqual(
+            result_error(case, self._handoff(), self.context, self.context_extension),
+            "RM-PROTOCOL-001",
+        )
 
     def test_virtual_or_synthetic_cannot_be_empirical(self):
-        self.assertEqual(result_error(self.result_extension, self._handoff("virtual"), self.context, self.context_extension), "RM-EPISTEMIC-MODE-001")
+        self.assertEqual(
+            result_error(
+                self.result_extension,
+                self._handoff("virtual"),
+                self.context,
+                self.context_extension,
+            ),
+            "RM-EPISTEMIC-MODE-001",
+        )
         case = deepcopy(self.result_extension)
         case["run_results"][0]["raw_data_refs"][0]["epistemic_mode"] = "synthetic"
         refresh(case)
-        self.assertEqual(result_error(case, self._handoff("virtual"), self.context, self.context_extension), None)
+        self.assertEqual(
+            result_error(case, self._handoff("virtual"), self.context, self.context_extension), None
+        )
 
     def test_partial_failed_runs_preserve_missingness_or_limitations(self):
         case = deepcopy(self.result_extension)
@@ -245,25 +326,40 @@ class ResearchMethodContracts(unittest.TestCase):
         case["run_results"][0]["validity_report"]["limitations"] = []
         case["run_results"][0]["validity_report"]["threats"] = []
         refresh(case)
-        self.assertEqual(result_error(case, self._handoff(), self.context, self.context_extension), "RM-COMPLETION-001")
+        self.assertEqual(
+            result_error(case, self._handoff(), self.context, self.context_extension),
+            "RM-COMPLETION-001",
+        )
 
     def test_raw_data_and_analysis_never_auto_adopt(self):
         case = deepcopy(self.result_extension)
         case["run_results"][0]["raw_data_refs"][0]["evidence_adoption_performed"] = True
-        self.assertEqual(result_error(case, self._handoff(), self.context, self.context_extension), "RM-RESULT-DIGEST-001")
+        self.assertEqual(
+            result_error(case, self._handoff(), self.context, self.context_extension),
+            "RM-RESULT-DIGEST-001",
+        )
         refresh(case)
-        self.assertEqual(result_error(case, self._handoff(), self.context, self.context_extension), "RM-RAW-EVIDENCE-001")
+        self.assertEqual(
+            result_error(case, self._handoff(), self.context, self.context_extension),
+            "RM-RAW-EVIDENCE-001",
+        )
 
         case = deepcopy(self.result_extension)
         case["candidate_analyses"][0]["core_analysis_adoption_performed"] = True
         refresh(case)
-        self.assertEqual(result_error(case, self._handoff(), self.context, self.context_extension), "RM-ANALYSIS-001")
+        self.assertEqual(
+            result_error(case, self._handoff(), self.context, self.context_extension),
+            "RM-ANALYSIS-001",
+        )
 
     def test_pr9_candidate_reference_sets_are_exact(self):
         case = deepcopy(self.result_extension)
         case["candidate_next_action_ids"] = []
         refresh(case)
-        self.assertEqual(result_error(case, self._handoff(), self.context, self.context_extension), "RM-HANDOFF-CANDIDATE-001")
+        self.assertEqual(
+            result_error(case, self._handoff(), self.context, self.context_extension),
+            "RM-HANDOFF-CANDIDATE-001",
+        )
 
     def test_pr10_routing_preserves_human_decision_boundary(self):
         proposal = self.routing["action_proposal"]
@@ -274,10 +370,21 @@ class ResearchMethodContracts(unittest.TestCase):
         self.assertEqual(proposal["route"]["execution_mode"], "real")
         self.assertTrue(proposal["human_decision_boundary"]["required"])
         self.assertFalse(proposal["human_decision_boundary"]["confirmation_is_human_decision"])
-        self.assertEqual(set(proposal["human_decision_boundary"]["decision_reference_ids"]), {"DEC-METHOD-1","DEC-PROTOCOL-1"})
-        self.assertEqual(proposal["route"]["context_pack"]["context_pack_id"], self.context["context_pack_id"])
-        self.assertEqual(proposal["route"]["context_pack"]["context_pack_digest"], self.context["context_pack_digest"])
-        self.assertEqual(proposal["action"]["payload"]["context_extension_digest"], self.context_extension["extension_digest"])
+        self.assertEqual(
+            set(proposal["human_decision_boundary"]["decision_reference_ids"]),
+            {"DEC-METHOD-1", "DEC-PROTOCOL-1"},
+        )
+        self.assertEqual(
+            proposal["route"]["context_pack"]["context_pack_id"], self.context["context_pack_id"]
+        )
+        self.assertEqual(
+            proposal["route"]["context_pack"]["context_pack_digest"],
+            self.context["context_pack_digest"],
+        )
+        self.assertEqual(
+            proposal["action"]["payload"]["context_extension_digest"],
+            self.context_extension["extension_digest"],
+        )
 
 
 if __name__ == "__main__":

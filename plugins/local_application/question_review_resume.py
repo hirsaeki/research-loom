@@ -83,7 +83,9 @@ def _question_projection(question: Mapping[str, Any]) -> dict[str, Any]:
     return result
 
 
-def _review_questions(candidate: Mapping[str, Any]) -> tuple[tuple[Mapping[str, Any], ...], Mapping[str, Any]]:
+def _review_questions(
+    candidate: Mapping[str, Any],
+) -> tuple[tuple[Mapping[str, Any], ...], Mapping[str, Any]]:
     provenance = candidate.get("provenance")
     if not isinstance(provenance, Mapping) or provenance.get("producer") != _REVIEW_PRODUCER:
         raise ConversationRuntimeError(
@@ -92,7 +94,8 @@ def _review_questions(candidate: Mapping[str, Any]) -> tuple[tuple[Mapping[str, 
     operation = provenance.get("question_delta")
     if operation not in _REVIEW_OPERATIONS:
         raise ConversationRuntimeError(
-            "RESUME-CANDIDATE-001", "Question Review candidate has an invalid material Question Delta"
+            "RESUME-CANDIDATE-001",
+            "Question Review candidate has an invalid material Question Delta",
         )
     sources = provenance.get("source_question_revisions")
     if not isinstance(sources, list) or not sources:
@@ -104,7 +107,8 @@ def _review_questions(candidate: Mapping[str, Any]) -> tuple[tuple[Mapping[str, 
     for source in sources:
         if not isinstance(source, Mapping):
             raise ConversationRuntimeError(
-                "RESUME-CANDIDATE-001", "Question Review candidate source revision binding is malformed"
+                "RESUME-CANDIDATE-001",
+                "Question Review candidate source revision binding is malformed",
             )
         source_id = source.get("id")
         revision = source.get("revision")
@@ -116,7 +120,8 @@ def _review_questions(candidate: Mapping[str, Any]) -> tuple[tuple[Mapping[str, 
             or source_id in source_revision_by_id
         ):
             raise ConversationRuntimeError(
-                "RESUME-CANDIDATE-001", "Question Review candidate source revision binding is malformed"
+                "RESUME-CANDIDATE-001",
+                "Question Review candidate source revision binding is malformed",
             )
         source_ids.append(source_id)
         source_revision_by_id[source_id] = revision
@@ -124,7 +129,8 @@ def _review_questions(candidate: Mapping[str, Any]) -> tuple[tuple[Mapping[str, 
         operation != "MERGE" and len(source_ids) != 1
     ):
         raise ConversationRuntimeError(
-            "RESUME-CANDIDATE-001", "Question Review candidate source revision cardinality is invalid"
+            "RESUME-CANDIDATE-001",
+            "Question Review candidate source revision cardinality is invalid",
         )
 
     actions = candidate.get("proposed_actions")
@@ -138,7 +144,8 @@ def _review_questions(candidate: Mapping[str, Any]) -> tuple[tuple[Mapping[str, 
     ordered: list[Mapping[str, Any]] = []
     for action in actions:
         if not isinstance(action, Mapping) or action.get("kind") not in {
-            "REVISE_OBJECT", "CREATE_OBJECT"
+            "REVISE_OBJECT",
+            "CREATE_OBJECT",
         }:
             raise ConversationRuntimeError(
                 "RESUME-CANDIDATE-001",
@@ -148,7 +155,8 @@ def _review_questions(candidate: Mapping[str, Any]) -> tuple[tuple[Mapping[str, 
         obj = payload.get("object") if isinstance(payload, Mapping) else None
         if not isinstance(obj, Mapping) or obj.get("kind") != "research_question":
             raise ConversationRuntimeError(
-                "RESUME-CANDIDATE-001", "Question Review candidate contains a non-Research-Question action"
+                "RESUME-CANDIDATE-001",
+                "Question Review candidate contains a non-Research-Question action",
             )
         ordered.append(obj)
         (revised if action.get("kind") == "REVISE_OBJECT" else created).append(obj)
@@ -160,17 +168,23 @@ def _review_questions(candidate: Mapping[str, Any]) -> tuple[tuple[Mapping[str, 
     )
     if not valid_shape or [str(item.get("id") or "") for item in revised] != source_ids:
         raise ConversationRuntimeError(
-            "RESUME-CANDIDATE-001", "Question Review candidate action composition does not match its Question Delta"
+            "RESUME-CANDIDATE-001",
+            "Question Review candidate action composition does not match its Question Delta",
         )
     for item in revised:
         source_id = str(item.get("id") or "")
-        if type(item.get("revision")) is not int or item["revision"] != source_revision_by_id[source_id] + 1:
+        if (
+            type(item.get("revision")) is not int
+            or item["revision"] != source_revision_by_id[source_id] + 1
+        ):
             raise ConversationRuntimeError(
-                "RESUME-CANDIDATE-001", "Question Review candidate revised Research Question revision is invalid"
+                "RESUME-CANDIDATE-001",
+                "Question Review candidate revised Research Question revision is invalid",
             )
     if any(type(item.get("revision")) is not int or item["revision"] != 0 for item in created):
         raise ConversationRuntimeError(
-            "RESUME-CANDIDATE-001", "Question Review candidate created Research Question must start at revision 0"
+            "RESUME-CANDIDATE-001",
+            "Question Review candidate created Research Question must start at revision 0",
         )
     question_ids = [str(item.get("id") or "") for item in ordered]
     affected_ids = [
@@ -185,12 +199,15 @@ def _review_questions(candidate: Mapping[str, Any]) -> tuple[tuple[Mapping[str, 
         or affected_ids != question_ids
     ):
         raise ConversationRuntimeError(
-            "RESUME-CANDIDATE-001", "Question Review candidate affected_refs do not bind its Research Questions"
+            "RESUME-CANDIDATE-001",
+            "Question Review candidate affected_refs do not bind its Research Questions",
         )
     return tuple(ordered), provenance
 
 
-def _confirmation_ids_by_candidate(application, project_id: str, *, limit: int) -> dict[str, list[str]]:
+def _confirmation_ids_by_candidate(
+    application, project_id: str, *, limit: int
+) -> dict[str, list[str]]:
     result: dict[str, list[str]] = {}
     for request in application.conversation_store.list_pending_confirmation_requests(
         project_id, limit=limit
@@ -261,11 +278,13 @@ def append_question_review_candidates(
                 "RESUME-BINDING-001", "Human Decision Request source candidate binding is malformed"
             )
         candidate_id = str(source.get("proposal_id") or "")
-        decisions_by_candidate.setdefault(candidate_id, []).append({
-            "request_id": str(request["request_id"]),
-            "source_candidate_id": candidate_id,
-            "status": str(request.get("operational_status", request.get("status", ""))),
-        })
+        decisions_by_candidate.setdefault(candidate_id, []).append(
+            {
+                "request_id": str(request["request_id"]),
+                "source_candidate_id": candidate_id,
+                "status": str(request.get("operational_status", request.get("status", ""))),
+            }
+        )
 
     authoritative_ids = {
         str(item.get("id"))
@@ -300,30 +319,32 @@ def append_question_review_candidates(
         snapshot_ref = str(candidate["current_snapshot_ref"])
         snapshot_digest = str(candidate["current_snapshot_digest"])
         projected = [_question_projection(question) for question in questions]
-        rows.append({
-            "state_delta_proposal_id": candidate_id,
-            "proposal_digest": str(candidate["proposal_digest"]),
-            "bound_snapshot": {
-                "snapshot_id": snapshot_ref,
-                "content_digest": snapshot_digest,
-            },
-            "bound_to_current_snapshot": (
-                snapshot_ref == str(state.current_snapshot["id"])
-                and snapshot_digest == str(state.current_snapshot["content_digest"])
-            ),
-            "source_action_proposal": {
-                "proposal_id": str(source_proposal["proposal_id"]),
-                "created_at": str(source_proposal["created_at"]),
-            },
-            "pending_confirmation_request_ids": sorted(confirmations.get(candidate_id, ())),
-            "human_decision_requests": deepcopy(decisions_by_candidate.get(candidate_id, ())),
-            "question_delta": str(provenance["question_delta"]),
-            "source_question_revisions": deepcopy(provenance["source_question_revisions"]),
-            "questions": projected,
-            "authoritative_same_ids": [
-                question["id"] for question in projected if question["id"] in authoritative_ids
-            ],
-        })
+        rows.append(
+            {
+                "state_delta_proposal_id": candidate_id,
+                "proposal_digest": str(candidate["proposal_digest"]),
+                "bound_snapshot": {
+                    "snapshot_id": snapshot_ref,
+                    "content_digest": snapshot_digest,
+                },
+                "bound_to_current_snapshot": (
+                    snapshot_ref == str(state.current_snapshot["id"])
+                    and snapshot_digest == str(state.current_snapshot["content_digest"])
+                ),
+                "source_action_proposal": {
+                    "proposal_id": str(source_proposal["proposal_id"]),
+                    "created_at": str(source_proposal["created_at"]),
+                },
+                "pending_confirmation_request_ids": sorted(confirmations.get(candidate_id, ())),
+                "human_decision_requests": deepcopy(decisions_by_candidate.get(candidate_id, ())),
+                "question_delta": str(provenance["question_delta"]),
+                "source_question_revisions": deepcopy(provenance["source_question_revisions"]),
+                "questions": projected,
+                "authoritative_same_ids": [
+                    question["id"] for question in projected if question["id"] in authoritative_ids
+                ],
+            }
+        )
 
     questions_section = result.get("research_questions")
     if not isinstance(questions_section, dict):

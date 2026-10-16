@@ -35,7 +35,9 @@ class MiscoWriterProfileApplicationTests(ResearchPackageAcceptanceSupport):
             "publication": [],
         }
         config.pop("configuration_digest", None)
-        config["configuration_digest"] = "sha256:" + hashlib.sha256(rfc8785.dumps(config)).hexdigest()
+        config["configuration_digest"] = (
+            "sha256:" + hashlib.sha256(rfc8785.dumps(config)).hexdigest()
+        )
         effective = resolve_effective_profile_set(config, [WRITER_MANIFEST])
         cfg = self.root / "project-config-input.json"
         eps = self.root / "profiles-input.json"
@@ -44,7 +46,9 @@ class MiscoWriterProfileApplicationTests(ResearchPackageAcceptanceSupport):
         return cfg, eps
 
     def _build_round_trip(self):
-        facade, case = writer_comp.Issue80WriterCompositionTests._build_complete_support_package(self)
+        facade, case = writer_comp.Issue80WriterCompositionTests._build_complete_support_package(
+            self
+        )
         proposal = writer_comp.Issue80WriterCompositionTests._proposal(self, case)
         # The support package deliberately lacks an adopted Argument; keep both
         # exported sections in the framing stage so the normal round trip can run
@@ -52,7 +56,9 @@ class MiscoWriterProfileApplicationTests(ResearchPackageAcceptanceSupport):
         proposal["sections"][1]["narrative_stage_refs"] = ["framing"]
         proposal["sections"][1]["semantic_purpose_refs"] = ["frame_problem"]
         composition = facade.capture_writer_composition(case["package_id"], proposal)["composition"]
-        facade.select_writer_composition(composition["composition_id"], 1, composition["composition_digest"])
+        facade.select_writer_composition(
+            composition["composition_id"], 1, composition["composition_digest"]
+        )
         output = self.root / "misco-writer-input"
         facade.export_writer_round_trip_input(
             composition["composition_id"], ["SEC-FRAME", "SEC-VALIDATE"], output
@@ -61,7 +67,9 @@ class MiscoWriterProfileApplicationTests(ResearchPackageAcceptanceSupport):
         return facade, case, composition, input_doc, output
 
     @staticmethod
-    def _review(section_input, *, violations: dict[str, set[str]] | None = None, outcome="unevaluated"):
+    def _review(
+        section_input, *, violations: dict[str, set[str]] | None = None, outcome="unevaluated"
+    ):
         violations = violations or {}
         rows = []
         for plan in section_input["writer_profile"]["review_plan"]:
@@ -82,7 +90,16 @@ class MiscoWriterProfileApplicationTests(ResearchPackageAcceptanceSupport):
         return rows
 
     @classmethod
-    def _response(cls, input_doc, *, response_id, base=None, first_violations=None, feedback=None, partial=False):
+    def _response(
+        cls,
+        input_doc,
+        *,
+        response_id,
+        base=None,
+        first_violations=None,
+        feedback=None,
+        partial=False,
+    ):
         sections = []
         source_sections = input_doc["sections"][:1] if partial else input_doc["sections"]
         for index, row in enumerate(source_sections):
@@ -107,7 +124,10 @@ class MiscoWriterProfileApplicationTests(ResearchPackageAcceptanceSupport):
             "schema_version": "0.1.0",
             "object_type": "writer_response",
             "response_id": response_id,
-            "input_ref": {"input_id": input_doc["input_id"], "input_digest": input_doc["input_digest"]},
+            "input_ref": {
+                "input_id": input_doc["input_id"],
+                "input_digest": input_doc["input_digest"],
+            },
             "base_revision_ref": base,
             "writer": {"writer_id": "acceptance-host", "writer_version": "1"},
             "sections": sections,
@@ -116,7 +136,9 @@ class MiscoWriterProfileApplicationTests(ResearchPackageAcceptanceSupport):
         }
 
     def test_d1_production_narrative_profile_controls_real_composition(self):
-        facade, case = writer_comp.Issue80WriterCompositionTests._build_complete_support_package(self)
+        facade, case = writer_comp.Issue80WriterCompositionTests._build_complete_support_package(
+            self
+        )
         try:
             package = facade.show_research_package(case["package_id"])["package"]
             pins = package["effective_profile_set"]["profile_pins"]
@@ -180,20 +202,39 @@ class MiscoWriterProfileApplicationTests(ResearchPackageAcceptanceSupport):
             )
             expected_writer_ids_by_source = {}
             for item in rules["items"]:
-                expected_writer_ids_by_source.setdefault(item["source"]["path"], set()).add(item["id"])
+                expected_writer_ids_by_source.setdefault(item["source"]["path"], set()).add(
+                    item["id"]
+                )
             self.assertEqual(
-                {rule_id for row in sources["source_documents"] for rule_id in row["writer_rule_ids"]},
+                {
+                    rule_id
+                    for row in sources["source_documents"]
+                    for rule_id in row["writer_rule_ids"]
+                },
                 rule_ids,
             )
             for row in sources["source_documents"]:
-                self.assertEqual(set(row["writer_rule_ids"]), expected_writer_ids_by_source[row["path"]])
+                self.assertEqual(
+                    set(row["writer_rule_ids"]), expected_writer_ids_by_source[row["path"]]
+                )
             self.assertNotIn("synthetic-example-spec", {item["class"] for item in rules["items"]})
-            self.assertTrue(all("09_SYNTHETIC_FEWSHOT_SPECIFICATION" not in row["path"] for row in sources["source_documents"]))
-            self.assertTrue(all("Layer_B" not in row["path"] and "Layer_C" not in row["path"] for row in sources["source_documents"]))
+            self.assertTrue(
+                all(
+                    "09_SYNTHETIC_FEWSHOT_SPECIFICATION" not in row["path"]
+                    for row in sources["source_documents"]
+                )
+            )
+            self.assertTrue(
+                all(
+                    "Layer_B" not in row["path"] and "Layer_C" not in row["path"]
+                    for row in sources["source_documents"]
+                )
+            )
 
             ablated = deepcopy(package)
             ablated["effective_profile_set"]["effective_resources"] = [
-                row for row in ablated["effective_profile_set"]["effective_resources"]
+                row
+                for row in ablated["effective_profile_set"]["effective_resources"]
                 if row["role"] != "WRITER_RULES"
             ]
             self.assertIsNone(_writer_profile_delivery(ablated))
@@ -234,7 +275,9 @@ class MiscoWriterProfileApplicationTests(ResearchPackageAcceptanceSupport):
                 composition["composition_id"], first["revision_id"]
             )
             first_bytes = first_path.read_bytes()
-            shown = facade.inspect_writer_round_trip(composition["composition_id"], first["revision_id"])
+            shown = facade.inspect_writer_round_trip(
+                composition["composition_id"], first["revision_id"]
+            )
             self.assertTrue(all(row["profile_review"] for row in shown["revision"]["sections"]))
             self.assertTrue(
                 all(
@@ -247,18 +290,28 @@ class MiscoWriterProfileApplicationTests(ResearchPackageAcceptanceSupport):
             second_response = self._response(
                 input_doc,
                 response_id="WR-MISCO-2",
-                base={"revision_id": first["revision_id"], "revision_digest": first["revision_digest"]},
+                base={
+                    "revision_id": first["revision_id"],
+                    "revision_digest": first["revision_digest"],
+                },
                 partial=True,
             )
-            second_response["sections"][0]["content"] = "Only the framing section is revised; the other section must remain byte-identical."
+            second_response["sections"][0]["content"] = (
+                "Only the framing section is revised; the other section must remain byte-identical."
+            )
             second = facade.import_writer_response(second_response)
             self.assertEqual(second["revision_number"], 2)
             self.assertEqual(second["reused_section_ids"], ["SEC-VALIDATE"])
             self.assertEqual(first_path.read_bytes(), first_bytes)
-            joined = facade.inspect_writer_round_trip(composition["composition_id"], second["revision_id"])
+            joined = facade.inspect_writer_round_trip(
+                composition["composition_id"], second["revision_id"]
+            )
             sections = {row["section_id"]: row for row in joined["revision"]["sections"]}
             old_sections = {row["section_id"]: row for row in shown["revision"]["sections"]}
-            self.assertEqual(sections["SEC-VALIDATE"]["content_digest"], old_sections["SEC-VALIDATE"]["content_digest"])
+            self.assertEqual(
+                sections["SEC-VALIDATE"]["content_digest"],
+                old_sections["SEC-VALIDATE"]["content_digest"],
+            )
             after = facade._application.state_repository.load_state_view(
                 facade.project_id,
                 facade._application.state_repository.load_active_lineage_ref(facade.project_id),
@@ -278,7 +331,9 @@ class MiscoWriterProfileApplicationTests(ResearchPackageAcceptanceSupport):
             )
             with self.assertRaises(LocalApplicationError) as raised:
                 facade.import_writer_response(bad)
-            self.assertEqual(raised.exception.code, "APPLICATION-WRITER-ROUND-TRIP-PROFILE-REVIEW-001")
+            self.assertEqual(
+                raised.exception.code, "APPLICATION-WRITER-ROUND-TRIP-PROFILE-REVIEW-001"
+            )
 
             bad["feedback"] = [
                 {
@@ -294,18 +349,31 @@ class MiscoWriterProfileApplicationTests(ResearchPackageAcceptanceSupport):
                 }
             ]
             imported = facade.import_writer_response(bad)
-            shown = facade.inspect_writer_round_trip(composition["composition_id"], imported["revision_id"])
-            self.assertEqual(shown["revision"]["writing_feedback"]["issues"][0]["profile_rule_ids"], ["NG-15", "NG-16"])
-            frame = next(row for row in shown["revision"]["sections"] if row["section_id"] == "SEC-FRAME")
-            guard = next(row for row in frame["profile_review"] if row["review_id"] == "narrative-guard")
+            shown = facade.inspect_writer_round_trip(
+                composition["composition_id"], imported["revision_id"]
+            )
+            self.assertEqual(
+                shown["revision"]["writing_feedback"]["issues"][0]["profile_rule_ids"],
+                ["NG-15", "NG-16"],
+            )
+            frame = next(
+                row for row in shown["revision"]["sections"] if row["section_id"] == "SEC-FRAME"
+            )
+            guard = next(
+                row for row in frame["profile_review"] if row["review_id"] == "narrative-guard"
+            )
             self.assertEqual(guard["outcome"], "violation")
             self.assertEqual(set(guard["violated_rule_ids"]), {"NG-15", "NG-16"})
             self.assertFalse(shown["revision"]["writing_feedback"]["is_research_evidence"])
-            self.assertFalse(shown["revision"]["authority_boundary"]["research_state_mutation_performed"])
+            self.assertFalse(
+                shown["revision"]["authority_boundary"]["research_state_mutation_performed"]
+            )
         finally:
             facade.close()
 
-    def test_d4_host_review_routes_omitted_counterevidence_boundaries_and_limitations_to_feedback(self):
+    def test_d4_host_review_routes_omitted_counterevidence_boundaries_and_limitations_to_feedback(
+        self,
+    ):
         facade, case = writer_comp.Issue80WriterCompositionTests._build_complete_support_package(
             self, include_adverse=True
         )
@@ -325,17 +393,23 @@ class MiscoWriterProfileApplicationTests(ResearchPackageAcceptanceSupport):
             proposal["sections"][0].pop("next_section_id", None)
             proposal["sections"][0]["finding_refs"] = [finding["id"]]
             proposal["sections"][0]["counter_review_refs"] = [case["counter_review_id"]]
-            composition = facade.capture_writer_composition(case["package_id"], proposal)["composition"]
+            composition = facade.capture_writer_composition(case["package_id"], proposal)[
+                "composition"
+            ]
             facade.select_writer_composition(
                 composition["composition_id"], 1, composition["composition_digest"]
             )
             output = self.root / "misco-adverse-writer-input"
-            facade.export_writer_round_trip_input(composition["composition_id"], ["SEC-FRAME"], output)
+            facade.export_writer_round_trip_input(
+                composition["composition_id"], ["SEC-FRAME"], output
+            )
             input_doc = json.loads((output / "writer-input.json").read_text(encoding="utf-8"))
             section_input = input_doc["sections"][0]["section_input"]
             delivered = {row["id"]: row for row in section_input["resolved_research_objects"]}
             self.assertEqual(delivered[finding["id"]]["limitations"], finding["limitations"])
-            self.assertEqual(delivered[finding["id"]]["boundary_conditions"], finding["boundary_conditions"])
+            self.assertEqual(
+                delivered[finding["id"]]["boundary_conditions"], finding["boundary_conditions"]
+            )
             self.assertIn(case["counter_review_id"], delivered)
 
             violations = {
@@ -380,13 +454,17 @@ class MiscoWriterProfileApplicationTests(ResearchPackageAcceptanceSupport):
                 },
             ]
             imported = facade.import_writer_response(response)
-            shown = facade.inspect_writer_round_trip(composition["composition_id"], imported["revision_id"])
+            shown = facade.inspect_writer_round_trip(
+                composition["composition_id"], imported["revision_id"]
+            )
             issues = shown["revision"]["writing_feedback"]["issues"]
             self.assertEqual(
                 {rule for issue in issues for rule in issue.get("profile_rule_ids", [])},
                 {"PUB-EV-06", "IO-APPROVED_LIMITATIONS"},
             )
-            self.assertFalse(shown["revision"]["authority_boundary"]["research_state_mutation_performed"])
+            self.assertFalse(
+                shown["revision"]["authority_boundary"]["research_state_mutation_performed"]
+            )
         finally:
             facade.close()
 
@@ -397,8 +475,12 @@ class MiscoWriterProfileApplicationTests(ResearchPackageAcceptanceSupport):
             sentence = "MISCOとAPIという必要な専門用語、およびSource Aという資料名はそのまま読者向け本文に残す。"
             response["sections"][0]["content"] = sentence
             imported = facade.import_writer_response(response)
-            shown = facade.inspect_writer_round_trip(composition["composition_id"], imported["revision_id"])
-            frame = next(row for row in shown["revision"]["sections"] if row["section_id"] == "SEC-FRAME")
+            shown = facade.inspect_writer_round_trip(
+                composition["composition_id"], imported["revision_id"]
+            )
+            frame = next(
+                row for row in shown["revision"]["sections"] if row["section_id"] == "SEC-FRAME"
+            )
             self.assertEqual(frame["content"], sentence)
             resources = input_doc["sections"][0]["section_input"]["writer_profile"]["resources"]
             by_role = {resource["role"]: json.loads(resource["content"]) for resource in resources}
@@ -406,8 +488,12 @@ class MiscoWriterProfileApplicationTests(ResearchPackageAcceptanceSupport):
                 "synthetic-example-spec",
                 {item["class"] for item in by_role["WRITER_RULES"]["items"]},
             )
-            source_paths = {item["path"] for item in by_role["WRITER_SOURCE_DOCUMENTS"]["source_documents"]}
-            self.assertFalse(any("09_SYNTHETIC_FEWSHOT_SPECIFICATION" in path for path in source_paths))
+            source_paths = {
+                item["path"] for item in by_role["WRITER_SOURCE_DOCUMENTS"]["source_documents"]
+            }
+            self.assertFalse(
+                any("09_SYNTHETIC_FEWSHOT_SPECIFICATION" in path for path in source_paths)
+            )
             self.assertFalse(any("Layer_B_AUDIT_PROVENANCE" in path for path in source_paths))
             self.assertFalse(any("Layer_C_HUMAN_REVIEW_SUPPORT" in path for path in source_paths))
         finally:
@@ -416,4 +502,5 @@ class MiscoWriterProfileApplicationTests(ResearchPackageAcceptanceSupport):
 
 if __name__ == "__main__":
     import unittest
+
     unittest.main()

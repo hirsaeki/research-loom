@@ -27,39 +27,43 @@ class SurveyReviewFixTests(unittest.TestCase):
                 design = facade.capture_survey_design(design_payload())
                 bound_snapshot = design["captured_against"]
 
-                proposed = facade.submit_action({
-                    "action_type": "research_question.propose",
-                    "payload": {"text": "Advance the current Research State HEAD."},
-                    "actor_id": "HUMAN-SURVEY-REVIEW",
-                })
-                apply = facade.submit_action({
-                    "action_type": "state.apply_candidate",
-                    "payload": {
-                        "state_delta_proposal_id": proposed["data"][
-                            "state_delta_proposal_id"
-                        ]
-                    },
-                    "actor_id": "HUMAN-SURVEY-REVIEW",
-                })
-                confirmed = facade.submit_confirmation({
-                    "confirmation_request_id": apply["confirmation_request"][
-                        "confirmation_request_id"
-                    ],
-                    "actor_id": "HUMAN-SURVEY-REVIEW",
-                })
+                proposed = facade.submit_action(
+                    {
+                        "action_type": "research_question.propose",
+                        "payload": {"text": "Advance the current Research State HEAD."},
+                        "actor_id": "HUMAN-SURVEY-REVIEW",
+                    }
+                )
+                apply = facade.submit_action(
+                    {
+                        "action_type": "state.apply_candidate",
+                        "payload": {
+                            "state_delta_proposal_id": proposed["data"]["state_delta_proposal_id"]
+                        },
+                        "actor_id": "HUMAN-SURVEY-REVIEW",
+                    }
+                )
+                confirmed = facade.submit_confirmation(
+                    {
+                        "confirmation_request_id": apply["confirmation_request"][
+                            "confirmation_request_id"
+                        ],
+                        "actor_id": "HUMAN-SURVEY-REVIEW",
+                    }
+                )
                 request = confirmed["decision_request"]
-                resolved = facade.resolve_human_decision({
-                    "request_id": request["request_id"],
-                    "request_digest": request["request_digest"],
-                    "disposition": "approve_exact",
-                    "actor_id": "HUMAN-SURVEY-REVIEW",
-                })
+                resolved = facade.resolve_human_decision(
+                    {
+                        "request_id": request["request_id"],
+                        "request_digest": request["request_digest"],
+                        "disposition": "approve_exact",
+                        "actor_id": "HUMAN-SURVEY-REVIEW",
+                    }
+                )
                 self.assertEqual(resolved["status"], "RESOLVED")
 
                 state = facade._state()
-                self.assertEqual(
-                    bound_snapshot["lineage_ref"], str(state.active_lineage_ref)
-                )
+                self.assertEqual(bound_snapshot["lineage_ref"], str(state.active_lineage_ref))
                 self.assertNotEqual(
                     bound_snapshot["snapshot_ref"], str(state.current_snapshot["id"])
                 )

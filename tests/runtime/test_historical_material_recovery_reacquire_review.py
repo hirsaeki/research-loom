@@ -59,12 +59,15 @@ class HistoricalMaterialReacquisitionReviewTests(ResearchPackageAcceptanceSuppor
                 self.returncode = -9
 
         process = FakeProcess()
-        with patch(
-            "plugins.local_application.material_reacquisition_facade.shutil.which",
-            return_value="pdftotext",
-        ), patch(
-            "plugins.local_application.material_reacquisition_facade.subprocess.Popen",
-            return_value=process,
+        with (
+            patch(
+                "plugins.local_application.material_reacquisition_facade.shutil.which",
+                return_value="pdftotext",
+            ),
+            patch(
+                "plugins.local_application.material_reacquisition_facade.subprocess.Popen",
+                return_value=process,
+            ),
         ):
             with self.assertRaisesRegex(
                 MaterialReacquisitionRetrievalError,
@@ -98,14 +101,17 @@ class HistoricalMaterialReacquisitionReviewTests(ResearchPackageAcceptanceSuppor
             service = HistoricalMaterialReacquisitionService(
                 store, facade.project_id, self.workspace
             )
-            with patch.object(
-                reacquisition_module,
-                "_artifact_pair_for_capture",
-                side_effect=oversized_pair,
-            ), patch.object(
-                store,
-                "load_artifact",
-                side_effect=AssertionError("large original must be rejected before load"),
+            with (
+                patch.object(
+                    reacquisition_module,
+                    "_artifact_pair_for_capture",
+                    side_effect=oversized_pair,
+                ),
+                patch.object(
+                    store,
+                    "load_artifact",
+                    side_effect=AssertionError("large original must be rejected before load"),
+                ),
             ):
                 result = service.reacquire(case["run_id"], "CAP-1", kind="rendition")
             self.assertEqual(result["status"], "REACQUISITION_FAILED")

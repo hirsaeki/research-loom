@@ -12,7 +12,9 @@ from .provenance import IMPLEMENTATION_ID, IMPLEMENTATION_VERSION
 
 
 def _json_bytes(value: Any) -> bytes:
-    return (json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
+    return (
+        json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n"
+    ).encode("utf-8")
 
 
 def _artifact(request, *, role: str, artifact_id: str, value: Any, provenance: Mapping[str, Any]):
@@ -125,18 +127,26 @@ def build_output(
         "input_pins": {
             "invocation_digest": str(request.run.invocation_digest),
             "context_pack_digest": str(request.run.context_pack_digest),
-            "project_config_digest": str(request.context_pack["pins"]["project_config"]["configuration_digest"]),
-            "effective_profile_set_digest": str(request.context_pack["pins"]["effective_profile_set"]["content_digest"]),
+            "project_config_digest": str(
+                request.context_pack["pins"]["project_config"]["configuration_digest"]
+            ),
+            "effective_profile_set_digest": str(
+                request.context_pack["pins"]["effective_profile_set"]["content_digest"]
+            ),
             "research_snapshot": deepcopy(dict(request.context_pack["pins"]["research_snapshot"])),
         },
         "preserved_context": {
-            "research_attention_ids": [str(item["attention_id"]) for item in request.context_pack["research_attention"]],
+            "research_attention_ids": [
+                str(item["attention_id"]) for item in request.context_pack["research_attention"]
+            ],
             "project_guard_ids": [
                 str(item["guard_id"])
                 for group in ("requirements", "prohibitions", "must_not_claim")
                 for item in request.context_pack["project_constraints"][group]
             ],
-            "effective_constraint_paths": [str(item["path"]) for item in request.context_pack["effective_constraints"]],
+            "effective_constraint_paths": [
+                str(item["path"]) for item in request.context_pack["effective_constraints"]
+            ],
         },
         "validation": {"status": "valid", "issues": []},
         "outputs": {
@@ -172,7 +182,9 @@ def build_output(
 
     completion_status = "complete"
     if extension.get("generator_backend") == "llm":
-        failed_generations = sum(1 for item in generation_attempts if item.get("status") == "failed")
+        failed_generations = sum(
+            1 for item in generation_attempts if item.get("status") == "failed"
+        )
         if failed_generations == len(respondent_profiles) and respondent_profiles:
             completion_status = "failed"
         elif failed_generations or validation.get("issues"):
@@ -194,25 +206,33 @@ def build_output(
         "scenario_class": str(extension["scenario_class"]),
         "evidence_status": "SYNTHETIC_TEST_ONLY",
         "completion_status": completion_status,
-        "synthetic_outputs": [{
-            "output_id": response_artifact.artifact_id,
-            "kind": "raw_data",
-            "identity_namespace": str(extension["synthetic_population"]["identity_namespace"]),
-            "content_digest": response_artifact.digest,
-            "evidence_status": "SYNTHETIC_TEST_ONLY",
-            "empirical_adoption_performed": False,
-        }],
+        "synthetic_outputs": [
+            {
+                "output_id": response_artifact.artifact_id,
+                "kind": "raw_data",
+                "identity_namespace": str(extension["synthetic_population"]["identity_namespace"]),
+                "content_digest": response_artifact.digest,
+                "evidence_status": "SYNTHETIC_TEST_ONLY",
+                "empirical_adoption_performed": False,
+            }
+        ],
         "candidate_analyses": [],
         "candidate_findings": [],
         "defects": list(defects),
         "warnings": list(warnings),
         "unresolved_ambiguities": [],
-        "human_gate_requirements": ["A separate Human-authorized REAL Survey invocation is required."],
+        "human_gate_requirements": [
+            "A separate Human-authorized REAL Survey invocation is required."
+        ],
         "candidate_change_requests": list(change_requests),
         "readiness_assessment": deepcopy(dict(readiness)),
         "execution_trace": [
             "exact Survey/Research Method pins validated",
-            (f"LLM synthetic respondent generation ({extension['scenario_class']})" if extension.get("generator_backend") == "llm" else f"structural synthetic generation ({extension['scenario_class']})"),
+            (
+                f"LLM synthetic respondent generation ({extension['scenario_class']})"
+                if extension.get("generator_backend") == "llm"
+                else f"structural synthetic generation ({extension['scenario_class']})"
+            ),
             "canonical Survey response validation",
             "defect and preservation classification",
             "candidate pre-REAL readiness assessment",
@@ -235,7 +255,14 @@ def build_output(
         "synthetic_population": deepcopy(dict(extension["synthetic_population"])),
         "generation_provenance": deepcopy(dict(provenance)),
         "generator_backend": str(extension.get("generator_backend", "structural")),
-        **({"respondent_plan": deepcopy(extension.get("respondent_plan")), "generation_attempts": deepcopy(list(generation_attempts))} if extension.get("generator_backend") == "llm" else {}),
+        **(
+            {
+                "respondent_plan": deepcopy(extension.get("respondent_plan")),
+                "generation_attempts": deepcopy(list(generation_attempts)),
+            }
+            if extension.get("generator_backend") == "llm"
+            else {}
+        ),
         "validation_failures": deepcopy(list(validation["issues"])),
         "preservation_events": deepcopy(list(validation["preservation_events"])),
         "defects": deepcopy(list(defects)),
@@ -255,7 +282,13 @@ def build_output(
         provenance=artifact_provenance,
     )
 
-    artifacts = [response_artifact, validation_artifact, defect_artifact, readiness_artifact, result_artifact]
+    artifacts = [
+        response_artifact,
+        validation_artifact,
+        defect_artifact,
+        readiness_artifact,
+        result_artifact,
+    ]
     if generation_artifact is not None:
         artifacts.append(generation_artifact)
     return CapabilityExecutionOutput(

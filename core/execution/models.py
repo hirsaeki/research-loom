@@ -163,6 +163,10 @@ class ExecutionResult:
 
 
 class CapabilityExecutionError(RuntimeError):
-    def __init__(self, code: str | ExecutionFailureCode, message: str, *, retryable: bool = False) -> None:
+    def __init__(
+        self, code: str | ExecutionFailureCode, message: str, *, retryable: bool = False
+    ) -> None:
         super().__init__(message)
-        self.issue = ExecutionIssue(str(code.value if isinstance(code, ExecutionFailureCode) else code), message, retryable)
+        self.issue = ExecutionIssue(
+            str(code.value if isinstance(code, ExecutionFailureCode) else code), message, retryable
+        )

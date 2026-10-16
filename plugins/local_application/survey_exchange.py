@@ -50,23 +50,34 @@ def question_projection(question: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
-def exchange_projection(record: Mapping[str, Any], design_record: Mapping[str, Any]) -> dict[str, Any]:
+def exchange_projection(
+    record: Mapping[str, Any], design_record: Mapping[str, Any]
+) -> dict[str, Any]:
     questionnaire = record["questionnaire"]
     design = design_record["design"]
     declared = questionnaire.get("sections") or []
     if declared:
         sections = [
-            {"id": str(s["section_id"]), "title": str(s["title"]), "description": str(s.get("description", "")), "questions": []}
+            {
+                "id": str(s["section_id"]),
+                "title": str(s["title"]),
+                "description": str(s.get("description", "")),
+                "questions": [],
+            }
             for s in declared
         ]
         by_id = {s["id"]: s for s in sections}
         for question in questionnaire["questions"]:
-            by_id[str(question["section_id"])] ["questions"].append(question_projection(question))
+            by_id[str(question["section_id"])]["questions"].append(question_projection(question))
     else:
-        sections = [{
-            "id": "SECTION-1", "title": "Questionnaire", "description": "",
-            "questions": [question_projection(q) for q in questionnaire["questions"]],
-        }]
+        sections = [
+            {
+                "id": "SECTION-1",
+                "title": "Questionnaire",
+                "description": "",
+                "questions": [question_projection(q) for q in questionnaire["questions"]],
+            }
+        ]
     return {
         "schema_version": "0.1.0",
         "exchange_type": "research_loom_survey_instrument",
@@ -90,7 +101,8 @@ def _inline(value: Any) -> str:
 
 def markdown_projection(exchange: Mapping[str, Any]) -> str:
     lines = [
-        f"# {exchange['title']}", "",
+        f"# {exchange['title']}",
+        "",
         f"- Survey ID: `{exchange['survey_id']}`",
         f"- Survey version: `{exchange['survey_version']}`",
         f"- Survey digest: `{exchange['survey_content_digest']}`",
@@ -109,8 +121,12 @@ def markdown_projection(exchange: Mapping[str, Any]) -> str:
             lines += ["", section["description"]]
         for q in section["questions"]:
             lines += [
-                "", f"### {q['id']}", f"- Variable: `{q['variable']}`", f"- Prompt: {q['prompt']}",
-                f"- Type: `{q['type']}`", f"- Required: `{str(q['required']).lower()}`",
+                "",
+                f"### {q['id']}",
+                f"- Variable: `{q['variable']}`",
+                f"- Prompt: {q['prompt']}",
+                f"- Type: `{q['type']}`",
+                f"- Required: `{str(q['required']).lower()}`",
             ]
             if q["choices"]:
                 lines.append("- Choices / stable values:")

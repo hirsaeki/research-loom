@@ -20,7 +20,9 @@ class Issue307ResearchConversationViewSelectionTests(unittest.TestCase):
         skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
         surfaces = (SKILL_ROOT / "references" / "public-surfaces.md").read_text(encoding="utf-8")
         bootstrap = (SKILL_ROOT / "references" / "host-bootstrap.md").read_text(encoding="utf-8")
-        semantics = (SKILL_ROOT / "references" / "interaction-semantics.md").read_text(encoding="utf-8")
+        semantics = (SKILL_ROOT / "references" / "interaction-semantics.md").read_text(
+            encoding="utf-8"
+        )
         scenarios = (SKILL_ROOT / "acceptance" / "scenarios.md").read_text(encoding="utf-8")
         rubric = (SKILL_ROOT / "acceptance" / "rubric.md").read_text(encoding="utf-8")
 
@@ -44,13 +46,81 @@ class Issue307ResearchConversationViewSelectionTests(unittest.TestCase):
             ["resume", "--workspace", "W", "--view", "conversation", "--json"],
             ["status", "--workspace", "W", "--view", "conversation", "--json"],
             ["synthesis-candidate", "list", "--workspace", "W", "--view", "conversation", "--json"],
-            ["synthesis-candidate", "show", "--workspace", "W", "--candidate-id", "SDP-1", "--view", "conversation", "--json"],
-            ["run", "show", "--workspace", "W", "--run-id", "RUN-1", "--view", "conversation", "--json"],
-            ["run", "replay", "--workspace", "W", "--run-id", "RUN-1", "--view", "conversation", "--json"],
-            ["action", "submit", "--workspace", "W", "--view", "conversation", "--json", "input.json"],
-            ["confirmation", "submit", "--workspace", "W", "--view", "conversation", "--json", "input.json"],
-            ["decision", "resolve", "--workspace", "W", "--view", "conversation", "--json", "input.json"],
-            ["external", "collect", "--workspace", "W", "--run-id", "RUN-1", "--view", "conversation", "--json", "input.json"],
+            [
+                "synthesis-candidate",
+                "show",
+                "--workspace",
+                "W",
+                "--candidate-id",
+                "SDP-1",
+                "--view",
+                "conversation",
+                "--json",
+            ],
+            [
+                "run",
+                "show",
+                "--workspace",
+                "W",
+                "--run-id",
+                "RUN-1",
+                "--view",
+                "conversation",
+                "--json",
+            ],
+            [
+                "run",
+                "replay",
+                "--workspace",
+                "W",
+                "--run-id",
+                "RUN-1",
+                "--view",
+                "conversation",
+                "--json",
+            ],
+            [
+                "action",
+                "submit",
+                "--workspace",
+                "W",
+                "--view",
+                "conversation",
+                "--json",
+                "input.json",
+            ],
+            [
+                "confirmation",
+                "submit",
+                "--workspace",
+                "W",
+                "--view",
+                "conversation",
+                "--json",
+                "input.json",
+            ],
+            [
+                "decision",
+                "resolve",
+                "--workspace",
+                "W",
+                "--view",
+                "conversation",
+                "--json",
+                "input.json",
+            ],
+            [
+                "external",
+                "collect",
+                "--workspace",
+                "W",
+                "--run-id",
+                "RUN-1",
+                "--view",
+                "conversation",
+                "--json",
+                "input.json",
+            ],
             ["candidate", "show", "--workspace", "W", "--candidate-id", "SDP-1", "--json"],
             ["decision", "show", "--workspace", "W", "--request-id", "HDR-1", "--json"],
         )
@@ -61,7 +131,16 @@ class Issue307ResearchConversationViewSelectionTests(unittest.TestCase):
         # Public contracts that did not add a view must stay view-free.
         for argv in (
             ["actions", "--workspace", "W", "--view", "conversation", "--json"],
-            ["external", "materials", "list", "--workspace", "W", "--view", "conversation", "--json"],
+            [
+                "external",
+                "materials",
+                "list",
+                "--workspace",
+                "W",
+                "--view",
+                "conversation",
+                "--json",
+            ],
         ):
             with self.subTest(rejected=argv), self.assertRaises(Exception):
                 parser.parse_args(argv)
@@ -80,11 +159,19 @@ class Issue307ResearchConversationViewSelectionTests(unittest.TestCase):
             "collect_external",
         ):
             with self.subTest(name=name):
-                self.assertIn("view", inspect.signature(getattr(LocalApplicationFacade, name)).parameters)
-        self.assertNotIn("view", inspect.signature(LocalApplicationFacade.show_candidate).parameters)
-        self.assertNotIn("view", inspect.signature(LocalApplicationFacade.show_human_decision_request).parameters)
+                self.assertIn(
+                    "view", inspect.signature(getattr(LocalApplicationFacade, name)).parameters
+                )
+        self.assertNotIn(
+            "view", inspect.signature(LocalApplicationFacade.show_candidate).parameters
+        )
+        self.assertNotIn(
+            "view", inspect.signature(LocalApplicationFacade.show_human_decision_request).parameters
+        )
 
-    def test_live_candidate_flow_uses_conversation_then_exact_detail_without_changing_canonical_payload(self):
+    def test_live_candidate_flow_uses_conversation_then_exact_detail_without_changing_canonical_payload(
+        self,
+    ):
         with tempfile.TemporaryDirectory() as temp:
             workspace = _init_workspace(Path(temp))
             with LocalApplicationFacade.open_workspace(workspace) as facade:
@@ -121,7 +208,9 @@ class Issue307ResearchConversationViewSelectionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             workspace = _init_workspace(Path(temp))
             with LocalApplicationFacade.open_workspace(workspace) as facade:
-                candidate = facade.submit_action(_proposal_input(), view="conversation")["candidate"]
+                candidate = facade.submit_action(_proposal_input(), view="conversation")[
+                    "candidate"
+                ]
                 apply = facade.submit_action(
                     {
                         "action_type": "state.apply_candidate",
@@ -133,7 +222,9 @@ class Issue307ResearchConversationViewSelectionTests(unittest.TestCase):
                 self.assertEqual(apply["status"], "CONFIRMATION_REQUIRED")
                 confirmed = facade.submit_confirmation(
                     {
-                        "confirmation_request_id": apply["confirmation_required"]["confirmation_request_id"],
+                        "confirmation_request_id": apply["confirmation_required"][
+                            "confirmation_request_id"
+                        ],
                         "actor_id": "HUMAN-RQ",
                     },
                     view="conversation",
@@ -152,7 +243,8 @@ class Issue307ResearchConversationViewSelectionTests(unittest.TestCase):
                 # The human-facing pending view remains semantic even after exact inspection.
                 status = facade.status(view="conversation")
                 pending = next(
-                    item for item in status["pending_human_decisions"]
+                    item
+                    for item in status["pending_human_decisions"]
                     if item["request_id"] == decision_ref["request_id"]
                 )
                 self.assertEqual(pending["operational_status"], "PENDING")

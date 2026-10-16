@@ -34,11 +34,13 @@ class SurveyAnalysisContractTests(unittest.TestCase):
                 "version": "1.0.0",
                 "content_digest": "sha256:" + "2" * 64,
             },
-            "analysis_items": [{
-                "item_id": "AN-001",
-                "analysis_type": "missingness",
-                "question_id": "Q1",
-            }],
+            "analysis_items": [
+                {
+                    "item_id": "AN-001",
+                    "analysis_type": "missingness",
+                    "question_id": "Q1",
+                }
+            ],
             "created_at": "2026-09-02T00:00:00Z",
         }
         digest = analysis_spec_content_digest(base)

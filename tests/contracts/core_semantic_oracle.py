@@ -127,7 +127,10 @@ def _human_decision_for(
             continue
         if expected_binding is not None:
             expected_kind, expected_choice = expected_binding
-            if decision.get("decision_kind") != expected_kind or decision.get("choice") != expected_choice:
+            if (
+                decision.get("decision_kind") != expected_kind
+                or decision.get("choice") != expected_choice
+            ):
                 continue
         return True
     return False
@@ -139,10 +142,7 @@ def _human_decisions_cover(
     expected_bindings: Iterable[tuple[str, str]],
 ) -> bool:
     """Require every distinct fixture action to have a resolving human Decision."""
-    return all(
-        _human_decision_for(obj, objects, binding)
-        for binding in set(expected_bindings)
-    )
+    return all(_human_decision_for(obj, objects, binding) for binding in set(expected_bindings))
 
 
 def _material_research_payload(obj: dict) -> dict:
@@ -251,7 +251,10 @@ def _graph_violations(objects: list[dict]) -> set[str]:
                 violations.add("CORE-TRACE-001")
                 dangling = True
             publication_artifact = index.get(("artifact", obj.get("source_id")))
-            if publication_artifact is not None and publication_artifact.get("lane") == "publication":
+            if (
+                publication_artifact is not None
+                and publication_artifact.get("lane") == "publication"
+            ):
                 violations.add("CORE-FW-001")
 
         elif kind == "finding":
@@ -345,8 +348,7 @@ def _history_violations(prior_objects: list[dict], objects: list[dict]) -> set[s
                 and after.get("adoption_state") in AUTHORITATIVE_STATES[kind]
             )
             initially_verified_evidence = (
-                kind == "evidence"
-                and after.get("verification_status") == "verified"
+                kind == "evidence" and after.get("verification_status") == "verified"
             )
             if initially_authoritative:
                 binding = FIXTURE_RESEARCH_STATE_DECISIONS[after["adoption_state"]]
@@ -375,10 +377,7 @@ def _history_violations(prior_objects: list[dict], objects: list[dict]) -> set[s
                 set(after.get("limitations", []))
             )
             epistemic_change = (
-                promoted_mode
-                or strengthened_kind
-                or removed_limitations
-                or became_verified
+                promoted_mode or strengthened_kind or removed_limitations or became_verified
             )
 
             if promoted_mode:
@@ -391,9 +390,8 @@ def _history_violations(prior_objects: list[dict], objects: list[dict]) -> set[s
                 if promoted_mode or strengthened_kind or removed_limitations:
                     required_bindings.add(FIXTURE_EVIDENCE_RECLASSIFICATION_DECISION)
                 revision_advanced = after.get("revision", -1) > before.get("revision", -1)
-                if (
-                    not revision_advanced
-                    or not _human_decisions_cover(after, objects, required_bindings)
+                if not revision_advanced or not _human_decisions_cover(
+                    after, objects, required_bindings
                 ):
                     violations.add("CORE-EPI-002")
 
@@ -408,12 +406,10 @@ def _history_violations(prior_objects: list[dict], objects: list[dict]) -> set[s
             before_state = before.get("adoption_state")
             after_state = after.get("adoption_state")
             authoritative_transition = (
-                before_state != after_state
-                and after_state in AUTHORITATIVE_STATES[kind]
+                before_state != after_state and after_state in AUTHORITATIVE_STATES[kind]
             )
-            materially_revised = (
-                _material_research_payload(before)
-                != _material_research_payload(after)
+            materially_revised = _material_research_payload(before) != _material_research_payload(
+                after
             )
 
             required_bindings: set[tuple[str, str]] = set()
@@ -431,7 +427,9 @@ def _history_violations(prior_objects: list[dict], objects: list[dict]) -> set[s
     return violations
 
 
-def evaluate_core_invariants(objects: list[dict], prior_objects: list[dict] | None = None) -> set[str]:
+def evaluate_core_invariants(
+    objects: list[dict], prior_objects: list[dict] | None = None
+) -> set[str]:
     """Evaluate only the invariant semantics exercised by canonical fixtures.
 
     This module is a test oracle. It deliberately does not expose a runtime

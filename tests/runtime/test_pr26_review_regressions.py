@@ -60,7 +60,9 @@ class PR26ReviewRegressionTests(unittest.TestCase):
         service = HumanDecisionService(
             store=store,
             state_provider=repo,
-            state_transition_service=StateTransitionService(repo, schema_validator=SCHEMA_VALIDATOR),
+            state_transition_service=StateTransitionService(
+                repo, schema_validator=SCHEMA_VALIDATOR
+            ),
             clock=CLOCK,
         )
         self.addCleanup(store.close)
@@ -73,24 +75,28 @@ class PR26ReviewRegressionTests(unittest.TestCase):
         gate = service.gate_candidate(
             _candidate(
                 state,
-                [TransitionAction(
-                    TransitionKind.ADOPT_OBJECT,
-                    {"object": rq(revision=1, state="approved")},
-                )],
+                [
+                    TransitionAction(
+                        TransitionKind.ADOPT_OBJECT,
+                        {"object": rq(revision=1, state="approved")},
+                    )
+                ],
                 "SDP-MALFORMED-ACTOR",
             ),
             state=state,
             actor=ACTOR,
         )
-        response = with_response_digest({
-            "schema_version": "0.1.0",
-            "response_id": "HDRESP-MALFORMED",
-            "request_id": gate.decision_request["request_id"],
-            "request_digest": gate.decision_request["request_digest"],
-            "disposition": "approve_exact",
-            "actor": "HUMAN-1",
-            "responded_at": CLOCK.now(),
-        })
+        response = with_response_digest(
+            {
+                "schema_version": "0.1.0",
+                "response_id": "HDRESP-MALFORMED",
+                "request_id": gate.decision_request["request_id"],
+                "request_digest": gate.decision_request["request_digest"],
+                "disposition": "approve_exact",
+                "actor": "HUMAN-1",
+                "responded_at": CLOCK.now(),
+            }
+        )
         with self.assertRaises(HumanDecisionError) as raised:
             service.resolve(response)
         self.assertEqual(raised.exception.code, "DECISION-RESPONSE-001")
@@ -104,23 +110,30 @@ class PR26ReviewRegressionTests(unittest.TestCase):
             state="approved",
         )
         derived["decision_ids"] = ["DEC-FORGED"]
-        action = TransitionAction(TransitionKind.APPLY_LINEAGE_PLAN, {
-            "plan_ref": "PLAN-FORGED",
-            "target_lineage_id": "LIN-FORGED",
-            "lineage_kind": "exploratory_fork",
-            "baseline_snapshot_ref": state.current_snapshot["id"],
-            "baseline_snapshot_digest": state.current_snapshot["content_digest"],
-            "treatments": [
-                {"object_kind": "project", "source_ref": "PRJ-1", "treatment": "PRESERVE"},
-                {"object_kind": "research_question", "source_ref": "RQ-1", "treatment": "PRESERVE"},
-                {
-                    "object_kind": "finding",
-                    "source_ref": "FND-1",
-                    "treatment": "RECONFIRM",
-                    "derived_object": derived,
-                },
-            ],
-        })
+        action = TransitionAction(
+            TransitionKind.APPLY_LINEAGE_PLAN,
+            {
+                "plan_ref": "PLAN-FORGED",
+                "target_lineage_id": "LIN-FORGED",
+                "lineage_kind": "exploratory_fork",
+                "baseline_snapshot_ref": state.current_snapshot["id"],
+                "baseline_snapshot_digest": state.current_snapshot["content_digest"],
+                "treatments": [
+                    {"object_kind": "project", "source_ref": "PRJ-1", "treatment": "PRESERVE"},
+                    {
+                        "object_kind": "research_question",
+                        "source_ref": "RQ-1",
+                        "treatment": "PRESERVE",
+                    },
+                    {
+                        "object_kind": "finding",
+                        "source_ref": "FND-1",
+                        "treatment": "RECONFIRM",
+                        "derived_object": derived,
+                    },
+                ],
+            },
+        )
         with self.assertRaises(HumanDecisionError) as raised:
             service.gate_candidate(
                 _candidate(state, [action], "SDP-FORGED-LINEAGE"),
@@ -146,23 +159,30 @@ class PR26ReviewRegressionTests(unittest.TestCase):
             state="approved",
         )
         derived["decision_ids"] = ["DEC-SIBLING"]
-        action = TransitionAction(TransitionKind.APPLY_LINEAGE_PLAN, {
-            "plan_ref": "PLAN-PINNED",
-            "target_lineage_id": "LIN-PINNED",
-            "lineage_kind": "exploratory_fork",
-            "baseline_snapshot_ref": state.current_snapshot["id"],
-            "baseline_snapshot_digest": state.current_snapshot["content_digest"],
-            "treatments": [
-                {"object_kind": "project", "source_ref": "PRJ-1", "treatment": "PRESERVE"},
-                {"object_kind": "research_question", "source_ref": "RQ-1", "treatment": "PRESERVE"},
-                {
-                    "object_kind": "finding",
-                    "source_ref": "FND-1",
-                    "treatment": "RECONFIRM",
-                    "derived_object": derived,
-                },
-            ],
-        })
+        action = TransitionAction(
+            TransitionKind.APPLY_LINEAGE_PLAN,
+            {
+                "plan_ref": "PLAN-PINNED",
+                "target_lineage_id": "LIN-PINNED",
+                "lineage_kind": "exploratory_fork",
+                "baseline_snapshot_ref": state.current_snapshot["id"],
+                "baseline_snapshot_digest": state.current_snapshot["content_digest"],
+                "treatments": [
+                    {"object_kind": "project", "source_ref": "PRJ-1", "treatment": "PRESERVE"},
+                    {
+                        "object_kind": "research_question",
+                        "source_ref": "RQ-1",
+                        "treatment": "PRESERVE",
+                    },
+                    {
+                        "object_kind": "finding",
+                        "source_ref": "FND-1",
+                        "treatment": "RECONFIRM",
+                        "derived_object": derived,
+                    },
+                ],
+            },
+        )
 
         self.assertEqual(state.latest_object("finding", "FND-1")["revision"], 1)
         self.assertEqual(state.exact_object("finding", "FND-1", 0).get("decision_ids", []), [])

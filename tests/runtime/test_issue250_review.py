@@ -39,26 +39,37 @@ class PayloadRepairReviewTests(ResearchPackageAcceptanceSupport):
     def test_staging_cleanup_does_not_mask_verified_repair(self):
         _, case, store, artifact, target, exact, source, service = self._ready()
         target.write_bytes(b"bad")
-        with self.assertLogs("plugins.local_execution_store.verified_artifact_read", level="WARNING") as logs:
+        with self.assertLogs(
+            "plugins.local_execution_store.verified_artifact_read", level="WARNING"
+        ) as logs:
             with self._failed_staging_cleanup(store) as staged:
-                result = service.recover(case["run_id"], "CAP-1", kind="rendition", source_file=source)
+                result = service.recover(
+                    case["run_id"], "CAP-1", kind="rendition", source_file=source
+                )
         self.assertTrue(staged)
         self.assertIn(staged[0].name, logs.output[0])
         self.assertIn("PermissionError", logs.output[0])
         self.assertEqual(result["status"], "REPAIRED")
         self.assertEqual(result["artifact_id"], artifact.artifact_id)
         self.assertEqual(target.read_bytes(), exact)
-        self.assertEqual(service.recover(case["run_id"], "CAP-1", kind="rendition",
-                                         source_file=source)["status"], "ALREADY_VERIFIED")
+        self.assertEqual(
+            service.recover(case["run_id"], "CAP-1", kind="rendition", source_file=source)[
+                "status"
+            ],
+            "ALREADY_VERIFIED",
+        )
 
     def test_staging_cleanup_does_not_mask_primary_identity_error(self):
         _, _, store, artifact, target, exact, source, _ = self._ready()
         target.write_bytes(b"bad")
         source.write_bytes(exact[:-1] + bytes([exact[-1] ^ 1]))
-        with self.assertLogs("plugins.local_execution_store.verified_artifact_read", level="WARNING") as logs:
+        with self.assertLogs(
+            "plugins.local_execution_store.verified_artifact_read", level="WARNING"
+        ) as logs:
             with self._failed_staging_cleanup(store) as staged:
-                with self.assertRaisesRegex(LocalExecutionStoreIntegrityError,
-                                            "do not match persisted artifact digest/size"):
+                with self.assertRaisesRegex(
+                    LocalExecutionStoreIntegrityError, "do not match persisted artifact digest/size"
+                ):
                     store.restore_missing_artifact_from_file(artifact.artifact_id, source)
         self.assertIn(staged[0].name, logs.output[0])
         self.assertEqual(target.read_bytes(), b"bad")
@@ -67,22 +78,35 @@ class PayloadRepairReviewTests(ResearchPackageAcceptanceSupport):
         facade, case, _, _, target, exact, _, _ = self._ready(kind="original")
         facade.close()
         target.write_bytes(b"bad original")
-        with patch("plugins.local_application.material_reacquisition_facade._retrieve_exact_locator",
-                   return_value=RetrievedMaterial(exact, "text/html",
-                                                   "https://example.test/source-a#section-1", "test")) as retrieve:
-            code, first = _submit_reacquire(self.workspace, run_id=case["run_id"], capture_id="CAP-1")
+        with patch(
+            "plugins.local_application.material_reacquisition_facade._retrieve_exact_locator",
+            return_value=RetrievedMaterial(
+                exact, "text/html", "https://example.test/source-a#section-1", "test"
+            ),
+        ) as retrieve:
+            code, first = _submit_reacquire(
+                self.workspace, run_id=case["run_id"], capture_id="CAP-1"
+            )
             self.assertEqual(code, 0)
             self.assertEqual(first["status"], "SUCCEEDED")
             self.assertEqual(first["data"]["historical_restore_status"], "REPAIRED")
             target.write_bytes(b"corrupted again")
-            code, second = _submit_reacquire(self.workspace, run_id=case["run_id"], capture_id="CAP-1")
+            code, second = _submit_reacquire(
+                self.workspace, run_id=case["run_id"], capture_id="CAP-1"
+            )
         self.assertEqual(code, 0)
         self.assertEqual(second["status"], "SUCCEEDED")
         self.assertEqual(second["data"]["status"], "IDENTICAL_REACQUISITION")
         self.assertEqual(second["data"]["historical_restore_status"], "REPAIRED")
-        self.assertNotEqual(first["data"]["reacquisition_run_id"], second["data"]["reacquisition_run_id"])
+        self.assertNotEqual(
+            first["data"]["reacquisition_run_id"], second["data"]["reacquisition_run_id"]
+        )
         self.assertEqual(retrieve.call_count, 2)
         self.assertEqual(target.read_bytes(), exact)
         with LocalApplicationFacade.open_workspace(self.workspace) as reopened:
-            self.assertEqual(reopened.show_external_material(case["run_id"], "CAP-1")["status"], "OK")
-            self.assertEqual(reopened.build_research_package(case["build_input"])["status"], "BUILT")
+            self.assertEqual(
+                reopened.show_external_material(case["run_id"], "CAP-1")["status"], "OK"
+            )
+            self.assertEqual(
+                reopened.build_research_package(case["build_input"])["status"], "BUILT"
+            )

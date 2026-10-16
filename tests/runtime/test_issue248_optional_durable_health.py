@@ -37,9 +37,12 @@ class OptionalDurableHealthTests(unittest.TestCase):
             source = self.workspace / "theme.md"
             source.write_text("retained input", encoding="utf-8")
             snap = facade.status()["snapshot"]
-            value = {"file": str(source), "role": "theme",
-                     "expected_snapshot_id": snap["snapshot_id"],
-                     "expected_snapshot_digest": snap["content_digest"]}
+            value = {
+                "file": str(source),
+                "role": "theme",
+                "expected_snapshot_id": snap["snapshot_id"],
+                "expected_snapshot_digest": snap["content_digest"],
+            }
             item = facade.register_project_input(value)["project_input"]
             # Registration must already exist while the facade is still open.
             self.assertIn("project_inputs", self._binding()["durable_children"])
@@ -55,8 +58,12 @@ class OptionalDurableHealthTests(unittest.TestCase):
             health = next(row for row in status["optional_children"] if row["name"] == child_name)
             self.assertEqual(health["status"], "UNAVAILABLE")
             before = status["snapshot"]
-            proposed = facade.submit_action({"action_type": "research_question.propose",
-                                             "payload": {"text": "An independent candidate"}})
+            proposed = facade.submit_action(
+                {
+                    "action_type": "research_question.propose",
+                    "payload": {"text": "An independent candidate"},
+                }
+            )
             self.assertIn("state_delta_proposal_id", proposed["data"])
             self.assertEqual(facade.status()["snapshot"], before)
             resumed = facade.resume_context()
@@ -79,7 +86,11 @@ class OptionalDurableHealthTests(unittest.TestCase):
             self.assertEqual(self.binding_path.read_bytes(), before)
         finally:
             facade.close()
-        row = next(x for x in LocalWorkspace.doctor(self.workspace)["checks"] if x.get("name") == "project_inputs")
+        row = next(
+            x
+            for x in LocalWorkspace.doctor(self.workspace)["checks"]
+            if x.get("name") == "project_inputs"
+        )
         self.assertEqual(row["status"], "UNINITIALIZED")
 
     def test_project_input_missing_corrupt_schema_are_local_and_restorable(self):
@@ -111,9 +122,11 @@ class OptionalDurableHealthTests(unittest.TestCase):
                 self._assert_unrelated_continuation("project_inputs")
                 facade = LocalApplicationFacade.open_workspace(self.workspace)
                 try:
-                    for operation in [facade.list_project_inputs,
-                                      lambda: facade.show_project_input(item["input_id"]),
-                                      lambda: facade.register_project_input(value)]:
+                    for operation in [
+                        facade.list_project_inputs,
+                        lambda: facade.show_project_input(item["input_id"]),
+                        lambda: facade.register_project_input(value),
+                    ]:
                         with self.assertRaises(LocalApplicationError) as error:
                             operation()
                         self.assertEqual(error.exception.code, code)
@@ -136,12 +149,54 @@ class OptionalDurableHealthTests(unittest.TestCase):
 
     def test_all_optional_sqlite_stores_refuse_lost_db_and_missing_schema(self):
         for name, module, klass, writer, reader, table in [
-            ("research_attention", "local_attention_store", "LocalAttentionStore", "_connect_write", "_connect_read", "attention_maps"),
-            ("research_exhibits", "local_research_exhibit_store", "LocalResearchExhibitStore", "_connect_write", "_connect_read", "research_exhibits"),
-            ("survey_registry", "local_survey_store", "LocalSurveyStore", "_write", "_read", "survey_instruments"),
-            ("survey_response_registry", "local_survey_response_store", "LocalSurveyResponseStore", "_write", "_read", "survey_responses"),
-            ("survey_analysis_registry", "local_survey_analysis_store", "LocalSurveyAnalysisStore", "_write", "_read", "survey_analysis_specs"),
-            ("delphi_registry", "local_delphi_store", "LocalDelphiStore", "_write", "_read", "delphi_documents"),
+            (
+                "research_attention",
+                "local_attention_store",
+                "LocalAttentionStore",
+                "_connect_write",
+                "_connect_read",
+                "attention_maps",
+            ),
+            (
+                "research_exhibits",
+                "local_research_exhibit_store",
+                "LocalResearchExhibitStore",
+                "_connect_write",
+                "_connect_read",
+                "research_exhibits",
+            ),
+            (
+                "survey_registry",
+                "local_survey_store",
+                "LocalSurveyStore",
+                "_write",
+                "_read",
+                "survey_instruments",
+            ),
+            (
+                "survey_response_registry",
+                "local_survey_response_store",
+                "LocalSurveyResponseStore",
+                "_write",
+                "_read",
+                "survey_responses",
+            ),
+            (
+                "survey_analysis_registry",
+                "local_survey_analysis_store",
+                "LocalSurveyAnalysisStore",
+                "_write",
+                "_read",
+                "survey_analysis_specs",
+            ),
+            (
+                "delphi_registry",
+                "local_delphi_store",
+                "LocalDelphiStore",
+                "_write",
+                "_read",
+                "delphi_documents",
+            ),
         ]:
             with self.subTest(child=name):
                 path = self.workspace / OPTIONAL_DURABLE_CHILDREN[name]["locator"]
@@ -167,7 +222,9 @@ class OptionalDurableHealthTests(unittest.TestCase):
                     self.assertEqual(error.exception.code, "WORKSPACE-OPTIONAL-SCHEMA-001")
                 self.assertEqual(path.read_bytes(), before)
                 path.write_bytes(saved)
-                con = getattr(store, reader)(); self.assertIsNotNone(con); con.close()
+                con = getattr(store, reader)()
+                self.assertIsNotNone(con)
+                con.close()
         self.assertEqual(LocalWorkspace.doctor(self.workspace)["status"], "OK")
 
     def test_directory_child_loss_blocks_only_its_consumer(self):
@@ -198,12 +255,15 @@ class OptionalDurableHealthTests(unittest.TestCase):
         child = self.internal / "project-inputs"
         blob = next((child / "blobs").glob("*/*"))
         blob.unlink()
+
         def persistent_bytes():
             # SQLite mode=ro may create WAL coordination sidecars. They are not
             # canonical records, and their presence is not a recovery write.
-            return {p.relative_to(self.internal): hashlib.sha256(p.read_bytes()).hexdigest()
-                    for p in self.internal.rglob("*")
-                    if p.is_file() and not p.name.endswith(("-shm", "-wal"))}
+            return {
+                p.relative_to(self.internal): hashlib.sha256(p.read_bytes()).hexdigest()
+                for p in self.internal.rglob("*")
+                if p.is_file() and not p.name.endswith(("-shm", "-wal"))
+            }
 
         before = persistent_bytes()
         report = LocalWorkspace.doctor(self.workspace)
@@ -222,7 +282,7 @@ class OptionalDurableHealthTests(unittest.TestCase):
             facade.close()
 
     def test_process_exit_after_capture_has_already_registered_child(self):
-        script = '''
+        script = """
 import json, os, sys
 from pathlib import Path
 from plugins.local_application import LocalApplicationFacade
@@ -232,8 +292,13 @@ s = f.status()['snapshot']
 f.register_project_input({'file': str(p), 'role': 'theme',
  'expected_snapshot_id': s['snapshot_id'], 'expected_snapshot_digest': s['content_digest']})
 os._exit(0)
-'''
-        result = subprocess.run([sys.executable, "-c", script, str(self.workspace)], capture_output=True, text=True, timeout=30)
+"""
+        result = subprocess.run(
+            [sys.executable, "-c", script, str(self.workspace)],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("project_inputs", self._binding()["durable_children"])
         db = self.internal / "project-inputs" / "project-inputs.sqlite3"
@@ -250,16 +315,26 @@ os._exit(0)
     def test_schema_ready_registration_failure_accepts_no_user_record(self):
         facade = LocalApplicationFacade.open_workspace(self.workspace)
         try:
-            source = self.workspace / "input.txt"; source.write_text("input", encoding="utf-8")
+            source = self.workspace / "input.txt"
+            source.write_text("input", encoding="utf-8")
             snap = facade.status()["snapshot"]
-            value = {"file": str(source), "role": "theme", "expected_snapshot_id": snap["snapshot_id"],
-                     "expected_snapshot_digest": snap["content_digest"]}
-            with patch("plugins.local_project_input_store.register_optional_path", side_effect=OSError("injected inventory failure")):
+            value = {
+                "file": str(source),
+                "role": "theme",
+                "expected_snapshot_id": snap["snapshot_id"],
+                "expected_snapshot_digest": snap["content_digest"],
+            }
+            with patch(
+                "plugins.local_project_input_store.register_optional_path",
+                side_effect=OSError("injected inventory failure"),
+            ):
                 with self.assertRaises(OSError):
                     facade.register_project_input(value)
             db = self.internal / "project-inputs" / "project-inputs.sqlite3"
             with closing(sqlite3.connect(db)) as con:
-                self.assertEqual(con.execute("SELECT COUNT(*) FROM project_inputs").fetchone()[0], 0)
+                self.assertEqual(
+                    con.execute("SELECT COUNT(*) FROM project_inputs").fetchone()[0], 0
+                )
             item = facade.register_project_input(value)["project_input"]
             self.assertIn("project_inputs", self._binding()["durable_children"])
             self.assertEqual(facade.list_project_inputs()["project_inputs"], [item])
@@ -274,18 +349,26 @@ os._exit(0)
         with patch("sys.stdout", output):
             code = main(["research-input", "list", "--workspace", str(self.workspace), "--json"])
         self.assertEqual(code, 2)
-        self.assertEqual(json.loads(output.getvalue())["issues"][0]["code"], "WORKSPACE-OPTIONAL-METADATA-MISSING-001")
+        self.assertEqual(
+            json.loads(output.getvalue())["issues"][0]["code"],
+            "WORKSPACE-OPTIONAL-METADATA-MISSING-001",
+        )
         self.assertFalse(db.exists())
 
     def test_publication_registration_and_missing_root_do_not_block_candidate_research(self):
         from test_issue220_publication_release import Issue220PublicationReleaseTests
+
         helper = Issue220PublicationReleaseTests()
         helper.setUp()
         try:
             facade, _case, composition, imported, _source = helper._prepared()
             try:
-                built = facade.build_publication_preview(composition["composition_id"], imported["revision_id"])
-                request = facade.request_publication_release(built["build"]["build_id"], "H")["decision_request"]
+                built = facade.build_publication_preview(
+                    composition["composition_id"], imported["revision_id"]
+                )
+                request = facade.request_publication_release(built["build"]["build_id"], "H")[
+                    "decision_request"
+                ]
                 response = helper._approval(request)
                 released = facade.release_publication(built["build"]["build_id"], response)
                 binding = helper.workspace / ".research-loom/workspace-binding.json"
@@ -298,13 +381,21 @@ os._exit(0)
             self.assertEqual(LocalWorkspace.doctor(helper.workspace)["status"], "DEGRADED")
             facade = LocalApplicationFacade.open_workspace(helper.workspace)
             try:
-                facade.submit_action({"action_type": "research_question.propose", "payload": {"text": "Still able to investigate"}})
+                facade.submit_action(
+                    {
+                        "action_type": "research_question.propose",
+                        "payload": {"text": "Still able to investigate"},
+                    }
+                )
                 with self.assertRaises(LocalApplicationError) as error:
                     facade.show_publication_preview(built["build"]["build_id"])
                 self.assertEqual(error.exception.code, "WORKSPACE-OPTIONAL-CHILD-MISSING-001")
                 self.assertFalse(child.exists())
                 backup.rename(child)
-                self.assertEqual(facade.release_publication(built["build"]["build_id"], response)["release"], released["release"])
+                self.assertEqual(
+                    facade.release_publication(built["build"]["build_id"], response)["release"],
+                    released["release"],
+                )
             finally:
                 facade.close()
         finally:
@@ -315,11 +406,14 @@ os._exit(0)
         child.mkdir()
         register_optional_path(child)
         from plugins.local_durable_store import inspect_optional_child
+
         # Public doctor/open normalize the workspace root before inspection.
         # Do the same here: Windows TemporaryDirectory may use an 8.3 alias,
         # which otherwise fails the containment check before reaching scandir.
         root = self.workspace.resolve()
-        with patch("plugins.local_durable_store.os.scandir", side_effect=PermissionError("denied")) as scan:
+        with patch(
+            "plugins.local_durable_store.os.scandir", side_effect=PermissionError("denied")
+        ) as scan:
             row = inspect_optional_child(root, "publication", self._binding())
         scan.assert_called_once_with(root / ".research-loom" / "publication")
         self.assertEqual(row["status"], "UNAVAILABLE")
@@ -327,8 +421,11 @@ os._exit(0)
 
     def test_unsafe_optional_path_does_not_poison_unrelated_open_or_follow_link(self):
         child = self.internal / "publication"
-        child.mkdir(); register_optional_path(child); child.rmdir()
-        outside = self.root / "outside"; outside.mkdir()
+        child.mkdir()
+        register_optional_path(child)
+        child.rmdir()
+        outside = self.root / "outside"
+        outside.mkdir()
         try:
             child.symlink_to(outside, target_is_directory=True)
         except OSError as exc:

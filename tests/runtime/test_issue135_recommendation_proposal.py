@@ -5,7 +5,11 @@ import unittest
 from unittest.mock import patch
 
 from core.conversation import ConversationRuntimeError
-from plugins.local_application import LocalApplicationError, LocalApplicationFacade, LocalResearchApplication
+from plugins.local_application import (
+    LocalApplicationError,
+    LocalApplicationFacade,
+    LocalResearchApplication,
+)
 from plugins.local_application.recommendation_facade import _current_authoritative_finding
 from runtime_fixtures import finding, project, rq, seed_state
 from test_survey_production import NullResolver
@@ -21,7 +25,9 @@ def profile_provider(_project_ref, expected_digest):
 
 
 class Issue135RecommendationProposalTests(unittest.TestCase):
-    def make_facade(self, root: str, *, finding_state: str = "approved", finding_project: str = "PRJ-1") -> LocalApplicationFacade:
+    def make_facade(
+        self, root: str, *, finding_state: str = "approved", finding_project: str = "PRJ-1"
+    ) -> LocalApplicationFacade:
         seed = seed_state(
             objects=[
                 project(),
@@ -57,7 +63,9 @@ class Issue135RecommendationProposalTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             facade = self.make_facade(temp)
             try:
-                definitions = {item["action_type"]: item for item in facade.list_actions()["actions"]}
+                definitions = {
+                    item["action_type"]: item for item in facade.list_actions()["actions"]
+                }
                 definition = definitions["research.recommendation.propose"]
                 self.assertEqual(definition["effect"], "read_only")
                 self.assertFalse(definition["confirmation_required"])
@@ -69,7 +77,9 @@ class Issue135RecommendationProposalTests(unittest.TestCase):
                 recommendation = result["data"]["recommendation_candidate"]
                 self.assertTrue(candidate["candidate_only"])
                 self.assertEqual(candidate["current_snapshot_ref"], before.current_snapshot["id"])
-                self.assertEqual(candidate["current_snapshot_digest"], before.current_snapshot["content_digest"])
+                self.assertEqual(
+                    candidate["current_snapshot_digest"], before.current_snapshot["content_digest"]
+                )
                 self.assertEqual(recommendation["kind"], "recommendation")
                 self.assertEqual(recommendation["finding_ids"], ["FND-1"])
                 self.assertEqual(recommendation["adoption_state"], "approved")
@@ -84,28 +94,38 @@ class Issue135RecommendationProposalTests(unittest.TestCase):
                 proposed = facade.submit_action(self.proposal_input())
                 proposal_id = proposed["data"]["state_delta_proposal_id"]
                 recommendation_id = proposed["data"]["recommendation_candidate"]["id"]
-                pending = facade.submit_action({
-                    "action_type": "state.apply_candidate",
-                    "payload": {"state_delta_proposal_id": proposal_id},
-                    "actor_id": "HUMAN-REC",
-                })
+                pending = facade.submit_action(
+                    {
+                        "action_type": "state.apply_candidate",
+                        "payload": {"state_delta_proposal_id": proposal_id},
+                        "actor_id": "HUMAN-REC",
+                    }
+                )
                 self.assertEqual(pending["status"], "CONFIRMATION_REQUIRED")
-                confirmed = facade.submit_confirmation({
-                    "confirmation_request_id": pending["confirmation_request"]["confirmation_request_id"],
-                    "actor_id": "HUMAN-REC",
-                })
+                confirmed = facade.submit_confirmation(
+                    {
+                        "confirmation_request_id": pending["confirmation_request"][
+                            "confirmation_request_id"
+                        ],
+                        "actor_id": "HUMAN-REC",
+                    }
+                )
                 self.assertEqual(confirmed["status"], "HUMAN_DECISION_REQUIRED")
                 request = confirmed["decision_request"]
                 unit = request["decision_units"][0]
                 self.assertEqual(unit["required_decision_kind"], "research_adoption")
                 self.assertEqual(unit["required_choice"], "approve")
-                self.assertEqual(unit["subject"], {"kind": "recommendation", "id": recommendation_id})
-                resolved = facade.resolve_human_decision({
-                    "request_id": request["request_id"],
-                    "request_digest": request["request_digest"],
-                    "disposition": "approve_exact",
-                    "actor_id": "HUMAN-REC",
-                })
+                self.assertEqual(
+                    unit["subject"], {"kind": "recommendation", "id": recommendation_id}
+                )
+                resolved = facade.resolve_human_decision(
+                    {
+                        "request_id": request["request_id"],
+                        "request_digest": request["request_digest"],
+                        "disposition": "approve_exact",
+                        "actor_id": "HUMAN-REC",
+                    }
+                )
                 self.assertEqual(resolved["status"], "RESOLVED")
                 state = facade._application.state_repository.load_state_view("PRJ-1", "LIN-1")
                 recommendation = state.latest_object("recommendation", recommendation_id)
@@ -125,11 +145,15 @@ class Issue135RecommendationProposalTests(unittest.TestCase):
             with self.subTest(label=label), tempfile.TemporaryDirectory() as temp:
                 facade = self.make_facade(temp, finding_state=state)
                 try:
-                    before = facade._application.state_repository.load_state_view("PRJ-1", "LIN-1").current_snapshot
+                    before = facade._application.state_repository.load_state_view(
+                        "PRJ-1", "LIN-1"
+                    ).current_snapshot
                     with self.assertRaises(ConversationRuntimeError) as raised:
                         facade.submit_action(self.proposal_input(finding_ids=finding_ids))
                     self.assertEqual(raised.exception.code, "RECOMMENDATION-SUPPORT-001")
-                    after = facade._application.state_repository.load_state_view("PRJ-1", "LIN-1").current_snapshot
+                    after = facade._application.state_repository.load_state_view(
+                        "PRJ-1", "LIN-1"
+                    ).current_snapshot
                     self.assertEqual(before, after)
                 finally:
                     facade.close()
@@ -180,35 +204,59 @@ class Issue135RecommendationProposalTests(unittest.TestCase):
             facade = self.make_facade(temp)
             try:
                 stale = facade.submit_action(self.proposal_input(statement="First recommendation."))
-                fresh = facade.submit_action(self.proposal_input(statement="Second recommendation."))
-                pending = facade.submit_action({
-                    "action_type": "state.apply_candidate",
-                    "payload": {"state_delta_proposal_id": fresh["data"]["state_delta_proposal_id"]},
-                    "actor_id": "HUMAN-REC",
-                })
-                confirmed = facade.submit_confirmation({
-                    "confirmation_request_id": pending["confirmation_request"]["confirmation_request_id"],
-                    "actor_id": "HUMAN-REC",
-                })
+                fresh = facade.submit_action(
+                    self.proposal_input(statement="Second recommendation.")
+                )
+                pending = facade.submit_action(
+                    {
+                        "action_type": "state.apply_candidate",
+                        "payload": {
+                            "state_delta_proposal_id": fresh["data"]["state_delta_proposal_id"]
+                        },
+                        "actor_id": "HUMAN-REC",
+                    }
+                )
+                confirmed = facade.submit_confirmation(
+                    {
+                        "confirmation_request_id": pending["confirmation_request"][
+                            "confirmation_request_id"
+                        ],
+                        "actor_id": "HUMAN-REC",
+                    }
+                )
                 request = confirmed["decision_request"]
-                facade.resolve_human_decision({
-                    "request_id": request["request_id"],
-                    "request_digest": request["request_digest"],
-                    "disposition": "approve_exact",
-                    "actor_id": "HUMAN-REC",
-                })
-                head = facade._application.state_repository.load_state_view("PRJ-1", "LIN-1").current_snapshot
-                stale_pending = facade.submit_action({
-                    "action_type": "state.apply_candidate",
-                    "payload": {"state_delta_proposal_id": stale["data"]["state_delta_proposal_id"]},
-                    "actor_id": "HUMAN-REC",
-                })
-                failed = facade.submit_confirmation({
-                    "confirmation_request_id": stale_pending["confirmation_request"]["confirmation_request_id"],
-                    "actor_id": "HUMAN-REC",
-                })
+                facade.resolve_human_decision(
+                    {
+                        "request_id": request["request_id"],
+                        "request_digest": request["request_digest"],
+                        "disposition": "approve_exact",
+                        "actor_id": "HUMAN-REC",
+                    }
+                )
+                head = facade._application.state_repository.load_state_view(
+                    "PRJ-1", "LIN-1"
+                ).current_snapshot
+                stale_pending = facade.submit_action(
+                    {
+                        "action_type": "state.apply_candidate",
+                        "payload": {
+                            "state_delta_proposal_id": stale["data"]["state_delta_proposal_id"]
+                        },
+                        "actor_id": "HUMAN-REC",
+                    }
+                )
+                failed = facade.submit_confirmation(
+                    {
+                        "confirmation_request_id": stale_pending["confirmation_request"][
+                            "confirmation_request_id"
+                        ],
+                        "actor_id": "HUMAN-REC",
+                    }
+                )
                 self.assertEqual(failed["status"], "FAILED")
-                after = facade._application.state_repository.load_state_view("PRJ-1", "LIN-1").current_snapshot
+                after = facade._application.state_repository.load_state_view(
+                    "PRJ-1", "LIN-1"
+                ).current_snapshot
                 self.assertEqual(after, head)
             finally:
                 facade.close()
@@ -220,7 +268,9 @@ class Issue135RecommendationProposalTests(unittest.TestCase):
                 with self.assertRaises(LocalApplicationError):
                     facade.submit_action(self.proposal_input(decision_ids=["DEC-X"]))
                 with self.assertRaises(LocalApplicationError) as raised:
-                    facade.submit_action(self.proposal_input(finding_ids=[f"FND-{i}" for i in range(257)]))
+                    facade.submit_action(
+                        self.proposal_input(finding_ids=[f"FND-{i}" for i in range(257)])
+                    )
                 self.assertEqual(raised.exception.code, "APPLICATION-PAYLOAD-001")
                 for overbound in (
                     {"statement": "x" * 8_193},
@@ -244,7 +294,9 @@ class Issue135RecommendationProposalTests(unittest.TestCase):
                 ):
                     result = facade.submit_action(self.proposal_input())
                 self.assertEqual(result["status"], "SUCCEEDED")
-                self.assertEqual(result["data"]["recommendation_candidate"]["finding_ids"], ["FND-1"])
+                self.assertEqual(
+                    result["data"]["recommendation_candidate"]["finding_ids"], ["FND-1"]
+                )
             finally:
                 facade.close()
 

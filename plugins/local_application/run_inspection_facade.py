@@ -118,7 +118,9 @@ def _artifact_projection(artifacts) -> list[Mapping[str, Any]]:
     ]
 
 
-def _desktop_research_projection(operational_store, run_id: str) -> tuple[Mapping[str, Any], bool, bool]:
+def _desktop_research_projection(
+    operational_store, run_id: str
+) -> tuple[Mapping[str, Any], bool, bool]:
     attempts_by_id = reconstruct_attempts(operational_store, run_id)
     attempts = [_jsonable(attempts_by_id[key]) for key in sorted(attempts_by_id)]
     attempt_items, attempts_truncated = _bounded(attempts)
@@ -171,26 +173,20 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
 
         probe_limit = _RUN_INSPECTION_ITEM_LIMIT + 1
         try:
-            lifecycle = _lifecycle_projection(
-                self._application.execution_store.events_for(run_id)
-            )
+            lifecycle = _lifecycle_projection(self._application.execution_store.events_for(run_id))
             diagnostic_probe = diagnostics_for(
                 self._application.execution_store,
                 run_id,
                 limit=probe_limit,
             )
-            diagnostic_items, diagnostics_truncated = _bounded(
-                _jsonable(diagnostic_probe)
-            )
+            diagnostic_items, diagnostics_truncated = _bounded(_jsonable(diagnostic_probe))
 
             artifact_probe = artifact_metadata_for(
                 self._application.execution_store,
                 run_id,
                 limit=probe_limit,
             )
-            artifact_items, artifacts_truncated = _bounded(
-                _artifact_projection(artifact_probe)
-            )
+            artifact_items, artifacts_truncated = _bounded(_artifact_projection(artifact_probe))
 
             desktop_research = None
             retrieval_attempts_truncated = False

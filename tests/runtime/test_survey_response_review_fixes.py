@@ -160,9 +160,7 @@ class SurveyResponseReviewFixTests(SurveyVirtualRunnerTestBase):
                     {"actor_id": "HUMAN-AUDIT", "actor_type": "human"},
                 )
                 input_id = proposal["source"]["input_id"]
-                stored = app.conversation_store._load_document(
-                    "conversation_input", input_id
-                )
+                stored = app.conversation_store._load_document("conversation_input", input_id)
                 self.assertIsNotNone(stored)
                 assert stored is not None
                 self.assertEqual(stored["conversation_id"], "CONV-SURVEY-AUDIT")

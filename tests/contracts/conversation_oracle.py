@@ -91,17 +91,9 @@ def _parse_time(value):
 
 
 def _candidate(handoff, kind, candidate_id):
-    key = (
-        "candidate_next_actions"
-        if kind == "next_action"
-        else "candidate_next_methods"
-    )
+    key = "candidate_next_actions" if kind == "next_action" else "candidate_next_methods"
     return next(
-        (
-            item
-            for item in handoff["outputs"][key]
-            if item["proposal_id"] == candidate_id
-        ),
+        (item for item in handoff["outputs"][key] if item["proposal_id"] == candidate_id),
         None,
     )
 
@@ -117,12 +109,10 @@ def _proposal_for_source(index, input_id):
 
 def _research_binding_from_invocation(invocation):
     return {
-        "project_config_digest": invocation["pins"]["project_config"][
-            "configuration_digest"
+        "project_config_digest": invocation["pins"]["project_config"]["configuration_digest"],
+        "effective_profile_set_digest": invocation["pins"]["effective_profile_set"][
+            "content_digest"
         ],
-        "effective_profile_set_digest": invocation["pins"][
-            "effective_profile_set"
-        ]["content_digest"],
         "research_snapshot": invocation["pins"]["research_snapshot"],
     }
 
@@ -142,10 +132,9 @@ def conversation_semantic_error(flow, invocation, handoff):
                 "action_receipt": "CONV-ACTION-RECEIPT-DIGEST-001",
                 "candidate_presentation": "CONV-PRESENTATION-DIGEST-001",
             }[document["message_type"]]
-        if (
-            document["message_type"] == "action_proposal"
-            and document["action"]["payload_digest"] != payload_digest(document)
-        ):
+        if document["message_type"] == "action_proposal" and document["action"][
+            "payload_digest"
+        ] != payload_digest(document):
             return "CONV-PROPOSAL-DIGEST-001"
 
     index = _index(flow)
@@ -221,9 +210,8 @@ def conversation_semantic_error(flow, invocation, handoff):
             return "CONV-ROUTE-001"
         if not _same(route["capability"], invocation["capability"]):
             return "CONV-PIN-001"
-        if (
-            route["execution_mode"] != invocation["execution_mode"]
-            or not _same(route["context_pack"], invocation["context_pack"])
+        if route["execution_mode"] != invocation["execution_mode"] or not _same(
+            route["context_pack"], invocation["context_pack"]
         ):
             return "CONV-PIN-001"
         research_binding = proposal["bindings"].get("research_context")
@@ -244,9 +232,8 @@ def conversation_semantic_error(flow, invocation, handoff):
             or request["actor_binding"] != proposal["initiating_actor"]
         ):
             return "CONV-CONFIRMATION-BINDING-001"
-        if (
-            not _same(request["action_binding"], action_binding(proposal))
-            or not _same(request["state_binding"], proposal["bindings"]["current_state"])
+        if not _same(request["action_binding"], action_binding(proposal)) or not _same(
+            request["state_binding"], proposal["bindings"]["current_state"]
         ):
             return "CONV-CONFIRMATION-BINDING-001"
         proposal_research = proposal["bindings"].get("research_context")
@@ -265,8 +252,7 @@ def conversation_semantic_error(flow, invocation, handoff):
         request = requests.get(request_id)
         if (
             request is None
-            or confirmation["request_binding"]["request_digest"]
-            != request["request_digest"]
+            or confirmation["request_binding"]["request_digest"] != request["request_digest"]
         ):
             return "CONV-CONFIRMATION-BINDING-001"
         proposal = proposals.get(confirmation["proposal_binding"]["proposal_id"])
@@ -281,9 +267,8 @@ def conversation_semantic_error(flow, invocation, handoff):
             or confirmation["actor"] != request["actor_binding"]
         ):
             return "CONV-CONFIRMATION-BINDING-001"
-        if (
-            not _same(confirmation["action_binding"], request["action_binding"])
-            or not _same(confirmation["observed_state"], request["state_binding"])
+        if not _same(confirmation["action_binding"], request["action_binding"]) or not _same(
+            confirmation["observed_state"], request["state_binding"]
         ):
             return "CONV-CONFIRMATION-BINDING-001"
         if request.get("research_context_binding") is None:
@@ -340,8 +325,7 @@ def conversation_semantic_error(flow, invocation, handoff):
                 request = requests.get(target["target_id"])
                 if (
                     request is None
-                    or request["proposal_binding"]["proposal_id"]
-                    != proposal["proposal_id"]
+                    or request["proposal_binding"]["proposal_id"] != proposal["proposal_id"]
                     or any(
                         confirmation["request_binding"]["confirmation_request_id"]
                         == target["target_id"]
@@ -364,18 +348,13 @@ def conversation_semantic_error(flow, invocation, handoff):
             confirmation_binding = receipt.get("confirmation_receipt_binding")
             if confirmation_binding is None:
                 return "CONV-AUDIT-001"
-            confirmation = confirmations.get(
-                confirmation_binding["confirmation_receipt_id"]
-            )
+            confirmation = confirmations.get(confirmation_binding["confirmation_receipt_id"])
             if (
                 confirmation is None
-                or confirmation["receipt_digest"]
-                != confirmation_binding["receipt_digest"]
+                or confirmation["receipt_digest"] != confirmation_binding["receipt_digest"]
             ):
                 return "CONV-AUDIT-001"
-            request = requests.get(
-                confirmation["request_binding"]["confirmation_request_id"]
-            )
+            request = requests.get(confirmation["request_binding"]["confirmation_request_id"])
             if (
                 request is None
                 or not _same(receipt["state_before"], request["state_binding"])
@@ -392,10 +371,7 @@ def conversation_semantic_error(flow, invocation, handoff):
                 or execution["service_id"] != route["service_id"]
             ):
                 return "CONV-AUDIT-001"
-        if (
-            receipt["status"] == "succeeded"
-            and route["route_type"] == "capability_invocation"
-        ):
+        if receipt["status"] == "succeeded" and route["route_type"] == "capability_invocation":
             if (
                 execution["execution_type"] != "capability_invocation"
                 or execution["invocation_contract"] != "capability-invocation@0.1.0"
@@ -408,8 +384,7 @@ def conversation_semantic_error(flow, invocation, handoff):
                 return "CONV-ROUTE-001"
             if "handoff" in execution and (
                 execution["handoff"]["handoff_id"] != handoff["handoff_id"]
-                or execution["handoff"]["handoff_digest"]
-                != handoff["handoff_digest"]
+                or execution["handoff"]["handoff_digest"] != handoff["handoff_digest"]
             ):
                 return "CONV-ROUTE-001"
             if receipt["research_state_mutation_performed"]:
@@ -434,9 +409,7 @@ def conversation_semantic_error(flow, invocation, handoff):
         ):
             return "CONV-HANDOFF-PRESENTATION-001"
         proposal = proposals.get(presentation["proposal_binding"]["proposal_id"])
-        if proposal is None or not _same(
-            presentation["proposal_binding"], binding(proposal)
-        ):
+        if proposal is None or not _same(presentation["proposal_binding"], binding(proposal)):
             return "CONV-HANDOFF-PRESENTATION-001"
         source = proposal["source"]
         if (
@@ -444,8 +417,7 @@ def conversation_semantic_error(flow, invocation, handoff):
             or source["handoff_id"] != handoff["handoff_id"]
             or source["handoff_digest"] != handoff["handoff_digest"]
             or source["candidate_kind"] != candidate["candidate_kind"]
-            or source["candidate_proposal_id"]
-            != candidate["candidate_proposal_id"]
+            or source["candidate_proposal_id"] != candidate["candidate_proposal_id"]
         ):
             return "CONV-HANDOFF-PRESENTATION-001"
         if (

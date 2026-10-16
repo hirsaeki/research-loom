@@ -8,8 +8,12 @@ from typing import Any, Mapping
 
 from plugins.local_survey_response_store import LocalSurveyResponseStoreError
 from plugins.survey_response import (
-    append_rejection_issue, dataset_content_digest, normalize_response,
-    registry_digest, validate_dataset, virtual_record_to_raw,
+    append_rejection_issue,
+    dataset_content_digest,
+    normalize_response,
+    registry_digest,
+    validate_dataset,
+    virtual_record_to_raw,
 )
 from .facade import LocalApplicationError
 from .survey_facade import _snapshot
@@ -128,10 +132,7 @@ class SurveyResponseCaptureMixin:
             )
 
         refs = list(dataset["accepted_response_refs"]) + list(dataset["rejected_response_refs"])
-        response_keys = [
-            (str(ref["identity_namespace"]), str(ref["response_id"]))
-            for ref in refs
-        ]
+        response_keys = [(str(ref["identity_namespace"]), str(ref["response_id"])) for ref in refs]
         try:
             loaded = self._survey_response_store().load_responses(
                 self._project_id,
@@ -239,7 +240,8 @@ class SurveyResponseCaptureMixin:
             # Structural validation can reject a raw record before producing a
             # canonical response. Its existing identity still needs checking.
             keys = [
-                key for outcome in outcomes
+                key
+                for outcome in outcomes
                 if (key := _raw_response_key(outcome["raw_input"])) is not None
             ]
             try:
@@ -261,8 +263,7 @@ class SurveyResponseCaptureMixin:
             raw = outcome["raw_input"]
             raw_response_key = _raw_response_key(raw)
             duplicate_response_id = (
-                raw_response_key is not None
-                and raw_response_key in seen_response_keys
+                raw_response_key is not None and raw_response_key in seen_response_keys
             )
             if raw_response_key is not None and not duplicate_response_id:
                 seen_response_keys.add(raw_response_key)
@@ -336,10 +337,9 @@ class SurveyResponseCaptureMixin:
                 key = (str(response["identity_namespace"]), response_id)
                 previous = stored.get(key)
                 if previous is not None:
-                    if (
-                        _real_response_identity(previous["response"]) != _real_response_identity(response)
-                        or _canonical_raw(previous["raw_input"]) != _canonical_raw(raw)
-                    ):
+                    if _real_response_identity(previous["response"]) != _real_response_identity(
+                        response
+                    ) or _canonical_raw(previous["raw_input"]) != _canonical_raw(raw):
                         raise LocalApplicationError(
                             "SURVEY_RESPONSE_DUPLICATE_RECORD",
                             f"immutable Survey response_id already exists with different content: {response_id}",
@@ -370,8 +370,20 @@ class SurveyResponseCaptureMixin:
                     }
                 )
 
-        accepted_refs.sort(key=lambda item: (item["identity_namespace"], item["response_id"], item["content_digest"]))
-        rejected_refs.sort(key=lambda item: (item["identity_namespace"], item["response_id"], item["content_digest"]))
+        accepted_refs.sort(
+            key=lambda item: (
+                item["identity_namespace"],
+                item["response_id"],
+                item["content_digest"],
+            )
+        )
+        rejected_refs.sort(
+            key=lambda item: (
+                item["identity_namespace"],
+                item["response_id"],
+                item["content_digest"],
+            )
+        )
         rejected_inputs.sort(key=lambda item: item["raw_input_digest"])
         source_run_ids = sorted({source_run_id} if source_run_id else set())
         created_at = self._application.clock.now()
@@ -381,7 +393,11 @@ class SurveyResponseCaptureMixin:
             "project_id": self._project_id,
             "dataset_id": (
                 dataset_id
-                or (f"SRD-{source_run_id}" if source_run_id and origin == "synthetic" else self._application.ids.new("SRD-"))
+                or (
+                    f"SRD-{source_run_id}"
+                    if source_run_id and origin == "synthetic"
+                    else self._application.ids.new("SRD-")
+                )
             ),
             "instrument_ref": instrument_ref,
             "response_origin": origin,
@@ -470,16 +486,21 @@ class SurveyResponseCaptureMixin:
                 "APPLICATION-SURVEY-RESPONSE-RUN-001",
                 "Virtual Runner source Run was not found",
             )
-        if _status_value(run.status) != "COMPLETED" or _status_value(run.execution_mode) != "virtual":
+        if (
+            _status_value(run.status) != "COMPLETED"
+            or _status_value(run.execution_mode) != "virtual"
+        ):
             raise LocalApplicationError(
                 "APPLICATION-SURVEY-RESPONSE-RUN-001",
                 "Survey response Dataset can only be captured from a completed virtual Run",
             )
-        _, resolved_instrument_ref = self._resolve_instrument({
-            "instrument_id": str(instrument_ref["id"]),
-            "instrument_version": str(instrument_ref["version"]),
-            "instrument_digest": str(instrument_ref["content_digest"]),
-        })
+        _, resolved_instrument_ref = self._resolve_instrument(
+            {
+                "instrument_id": str(instrument_ref["id"]),
+                "instrument_version": str(instrument_ref["version"]),
+                "instrument_digest": str(instrument_ref["content_digest"]),
+            }
+        )
         artifact_id = f"ART-VR-RESP-{run_id}"
         artifacts = {
             item.artifact_id: item

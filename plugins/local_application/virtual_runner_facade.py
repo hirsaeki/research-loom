@@ -5,8 +5,14 @@ import json
 from pathlib import Path
 from typing import Any, Mapping
 
-from plugins.local_application.facade import LocalApplicationError, _AUTHORITY_PAYLOAD_FIELDS, _INGRESS_FIELDS
-from plugins.local_application.survey_response_facade import LocalApplicationFacade as SurveyResponseApplicationFacade
+from plugins.local_application.facade import (
+    LocalApplicationError,
+    _AUTHORITY_PAYLOAD_FIELDS,
+    _INGRESS_FIELDS,
+)
+from plugins.local_application.survey_response_facade import (
+    LocalApplicationFacade as SurveyResponseApplicationFacade,
+)
 from .virtual_runner_binding import build_survey_virtual_extension
 from .workspace import workspace_document_path
 from .virtual_runner_input import _payload
@@ -20,22 +26,29 @@ DESCRIPTOR_PATH = ROOT / "core/packages/virtual-runner/virtual-runner-capability
 _MAX_PRIOR_VIRTUAL_RUN_IDS = 16
 
 
-class LocalApplicationFacade(VirtualRunnerInspectionMixin, VirtualRunnerExecuteMixin, SurveyResponseApplicationFacade):
+class LocalApplicationFacade(
+    VirtualRunnerInspectionMixin, VirtualRunnerExecuteMixin, SurveyResponseApplicationFacade
+):
     """Final local Application Facade including Survey response intake and the Virtual Runner."""
 
     def list_actions(self) -> Mapping[str, Any]:
         result = deepcopy(dict(super().list_actions()))
-        result["actions"].append({
-            "action_type": "virtual_runner.survey.execute",
-            "payload_contract": "survey-virtual-runner-execution@0.1.0",
-            "effect": "read_only",
-            "confirmation_required": False,
-            "route_category": "research_capability",
-        })
+        result["actions"].append(
+            {
+                "action_type": "virtual_runner.survey.execute",
+                "payload_contract": "survey-virtual-runner-execution@0.1.0",
+                "effect": "read_only",
+                "confirmation_required": False,
+                "route_category": "research_capability",
+            }
+        )
         return result
 
     def submit_action(self, draft_input: Mapping[str, Any]) -> Mapping[str, Any]:
-        if isinstance(draft_input, Mapping) and draft_input.get("action_type") == "virtual_runner.survey.execute":
+        if (
+            isinstance(draft_input, Mapping)
+            and draft_input.get("action_type") == "virtual_runner.survey.execute"
+        ):
             unknown = set(draft_input) - _INGRESS_FIELDS
             if unknown:
                 raise LocalApplicationError(

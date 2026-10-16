@@ -13,8 +13,7 @@ class ConversationActionResolver(Protocol):
         conversation_input: Mapping[str, Any],
         bounded_state_summary: Mapping[str, Any],
         registered_actions: Sequence[ActionDefinition],
-    ) -> ActionDraft | None:
-        ...
+    ) -> ActionDraft | None: ...
 
 
 class ConversationStore(Protocol):
@@ -55,8 +54,7 @@ class CapabilityActionMaterializer(Protocol):
         descriptor: Mapping[str, Any],
         *,
         context_pack_id: str,
-    ) -> CapabilityMaterialization:
-        ...
+    ) -> CapabilityMaterialization: ...
 
 
 class RuntimeAuthorizationEvidenceProvider(Protocol):
@@ -67,8 +65,7 @@ class RuntimeAuthorizationEvidenceProvider(Protocol):
         *,
         invocation_id: str,
         run_id: str,
-    ) -> Mapping[str, Any]:
-        ...
+    ) -> Mapping[str, Any]: ...
 
 
 class HarnessServiceHandler(Protocol):
@@ -79,5 +76,4 @@ class HarnessServiceHandler(Protocol):
         state: StateView,
         actor: Mapping[str, Any],
         proposal: Mapping[str, Any],
-    ) -> HarnessServiceResult:
-        ...
+    ) -> HarnessServiceResult: ...

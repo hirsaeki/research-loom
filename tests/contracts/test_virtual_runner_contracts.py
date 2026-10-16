@@ -204,11 +204,29 @@ def cutover():
         "freeze_package": {
             "method": {"id": "METHOD-SURVEY-1", "revision": 1},
             "protocol": {"id": "PROT-2", "version": "1.1.0", "content_digest": digest_fill("3")},
-            "instruments": [{"id": "INST-1", "version": "1.1.0", "content_digest": digest_fill("4")}],
-            "schemas": [{"id": "survey-schema", "version": "1.0.0", "content_digest": digest_fill("c")}],
-            "prompt_templates": [{"id": "synthetic-template", "version": "1.0.0", "content_digest": digest_fill("b")}],
-            "runner_code": [{"id": "fixture.virtual-runner", "version": "1.0.0", "content_digest": digest_fill("d")}],
-            "validation_gate_contracts": [{"id": "virtual-runner-contract", "version": "0.1.0", "content_digest": digest_fill("e")}],
+            "instruments": [
+                {"id": "INST-1", "version": "1.1.0", "content_digest": digest_fill("4")}
+            ],
+            "schemas": [
+                {"id": "survey-schema", "version": "1.0.0", "content_digest": digest_fill("c")}
+            ],
+            "prompt_templates": [
+                {"id": "synthetic-template", "version": "1.0.0", "content_digest": digest_fill("b")}
+            ],
+            "runner_code": [
+                {
+                    "id": "fixture.virtual-runner",
+                    "version": "1.0.0",
+                    "content_digest": digest_fill("d"),
+                }
+            ],
+            "validation_gate_contracts": [
+                {
+                    "id": "virtual-runner-contract",
+                    "version": "0.1.0",
+                    "content_digest": digest_fill("e"),
+                }
+            ],
             "effective_profile_set_digest": digest_fill("8"),
             "project_config_digest": digest_fill("7"),
         },
@@ -285,11 +303,17 @@ class VirtualRunnerContracts(unittest.TestCase):
 
     def test_schema_descriptor_and_semantic_error_catalog(self):
         Draft202012Validator.check_schema(self.schema)
-        self.assertEqual(list(Draft202012Validator(self.descriptor_schema).iter_errors(self.descriptor)), [])
+        self.assertEqual(
+            list(Draft202012Validator(self.descriptor_schema).iter_errors(self.descriptor)), []
+        )
         self.assertEqual(descriptor_error(self.descriptor), None)
-        semantics = yaml.safe_load((VR / "virtual-runner-semantics.yaml").read_text(encoding="utf-8"))
+        semantics = yaml.safe_load(
+            (VR / "virtual-runner-semantics.yaml").read_text(encoding="utf-8")
+        )
         self.assertEqual({x["id"] for x in semantics["errors"]}, ERROR_IDS)
-        declared_errors = {case["expected_error"] for case in self.catalog["cases"] if "expected_error" in case}
+        declared_errors = {
+            case["expected_error"] for case in self.catalog["cases"] if "expected_error" in case
+        }
         self.assertTrue(declared_errors.issubset(ERROR_IDS))
         self.assertFalse(semantics["capability"]["research_method_family"])
         self.assertFalse(semantics["scenario_semantics"]["scenario_class_is_execution_mode"])
@@ -439,7 +463,9 @@ class VirtualRunnerContracts(unittest.TestCase):
         old_result = result(old, "VR-RUN-1")
         new_result = result(revised, "VR-RUN-2")
         self.assertNotEqual(old["extension_digest"], revised["extension_digest"])
-        self.assertNotEqual(old_result["handoff_binding"]["run_id"], new_result["handoff_binding"]["run_id"])
+        self.assertNotEqual(
+            old_result["handoff_binding"]["run_id"], new_result["handoff_binding"]["run_id"]
+        )
 
         virtual_run_roots = {
             "VR-RUN-1": "VR-ROOT-1",
@@ -492,7 +518,11 @@ class VirtualRunnerContracts(unittest.TestCase):
     def test_pr10_conversational_routing_is_proposal_only(self):
         proposal = self.routing["action_proposal"]
         self.assertEqual(
-            list(Draft202012Validator(self.conversation_schema, format_checker=FormatChecker()).iter_errors(proposal)),
+            list(
+                Draft202012Validator(
+                    self.conversation_schema, format_checker=FormatChecker()
+                ).iter_errors(proposal)
+            ),
             [],
         )
         self.assertEqual(proposal["route"]["execution_mode"], "virtual")

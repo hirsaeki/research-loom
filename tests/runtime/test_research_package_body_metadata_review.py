@@ -63,7 +63,9 @@ class ResearchPackageBodyMetadataReviewTests(ResearchPackageAcceptanceSupport):
                 if row_kind == "material":
                     row = package["resolved_content"]["materials"][0]["text_rendition"]
                 else:
-                    row = package["resolved_content"]["working_material"]["project_inputs"][0]["content"]
+                    row = package["resolved_content"]["working_material"]["project_inputs"][0][
+                        "content"
+                    ]
                 if mode == "null":
                     row[field] = None
                 else:
@@ -103,7 +105,9 @@ class ResearchPackageBodyMetadataReviewTests(ResearchPackageAcceptanceSupport):
         package = json.loads(package_path.read_text(encoding="utf-8"))
         content = package["resolved_content"]["working_material"]["project_inputs"][0]["content"]
         attachment_path = content["attachment_path"]
-        attachment = next(item for item in package["attachments"] if item["path"] == attachment_path)
+        attachment = next(
+            item for item in package["attachments"] if item["path"] == attachment_path
+        )
         (output / attachment_path).write_bytes(b"")
         empty_digest = digest_bytes(b"")
         content["content_digest"] = empty_digest
@@ -120,4 +124,5 @@ class ResearchPackageBodyMetadataReviewTests(ResearchPackageAcceptanceSupport):
 
 if __name__ == "__main__":
     import unittest
+
     unittest.main()

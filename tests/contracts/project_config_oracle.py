@@ -132,7 +132,11 @@ def project_core_binding_error(config: dict, core_objects: list[dict]) -> str | 
 
     for ref in config["research_questions"]["references"]:
         question = by_id.get(ref["question_id"])
-        if question is None or question.get("kind") != "research_question" or question.get("project_id") != project_id:
+        if (
+            question is None
+            or question.get("kind") != "research_question"
+            or question.get("project_id") != project_id
+        ):
             return "PROJECT-CORE-BINDING-001"
 
     expected_kinds = {"source": "source", "artifact": "artifact"}

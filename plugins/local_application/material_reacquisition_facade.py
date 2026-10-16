@@ -63,7 +63,9 @@ class MaterialReacquisitionRetrievalError(RuntimeError):
     pass
 
 
-def material_recovery_action_guidance(verification_status: str | None = None) -> list[dict[str, Any]]:
+def material_recovery_action_guidance(
+    verification_status: str | None = None,
+) -> list[dict[str, Any]]:
     if verification_status is not None and verification_status not in REPAIRABLE | {"verified"}:
         return []  # Access and metadata faults require operator restoration, not byte replacement.
     return [
@@ -236,9 +238,7 @@ def _regenerate_text_rendition(
                 "regenerated rendition exceeds bounded material intake limit"
             )
         if returncode != 0:
-            raise MaterialReacquisitionRetrievalError(
-                "pdftotext rendition regeneration failed"
-            )
+            raise MaterialReacquisitionRetrievalError("pdftotext rendition regeneration failed")
         content = bytes(content)
         try:
             content.decode("utf-8")
@@ -269,9 +269,7 @@ def _resolve_public_https_locator(locator: str):
         or parsed.username is not None
         or parsed.password is not None
     ):
-        raise MaterialReacquisitionRetrievalError(
-            "historical locator must be a public HTTPS URL"
-        )
+        raise MaterialReacquisitionRetrievalError("historical locator must be a public HTTPS URL")
     try:
         resolved = socket.getaddrinfo(
             parsed.hostname,
@@ -436,6 +434,7 @@ def _retrieve_exact_locator(locator: str, *, max_bytes: int) -> RetrievedMateria
 
     raise MaterialReacquisitionRetrievalError("historical locator exceeded redirect limit")
 
+
 def _transition(store, run: CapabilityRunRecord, status: RunStatus, reason: str, *, failure=None):
     events = store.events_for(run.run_id)
     sequence = len(events) + 1
@@ -503,9 +502,9 @@ class HistoricalMaterialReacquisitionService:
                         if payload.get("historical_artifact_id") != historical_artifact_id:
                             continue
                         if (
-                            self._store.diagnose_artifact_content(
-                                historical_artifact_id
-                            ).get("status")
+                            self._store.diagnose_artifact_content(historical_artifact_id).get(
+                                "status"
+                            )
                             != "verified"
                         ):
                             continue
@@ -517,9 +516,7 @@ class HistoricalMaterialReacquisitionService:
                         ):
                             continue
                         if (
-                            self._store.diagnose_artifact_content(new_artifact_id).get(
-                                "status"
-                            )
+                            self._store.diagnose_artifact_content(new_artifact_id).get("status")
                             != "verified"
                         ):
                             continue
@@ -625,7 +622,14 @@ class HistoricalMaterialReacquisitionService:
         )
         self._store.create_run(run)
         self._store.append_run_event(
-            RunLifecycleEvent(run.run_id, 1, None, RunStatus.PREPARED, now, "bounded historical material reacquisition prepared")
+            RunLifecycleEvent(
+                run.run_id,
+                1,
+                None,
+                RunStatus.PREPARED,
+                now,
+                "bounded historical material reacquisition prepared",
+            )
         )
         return _transition(
             self._store,
@@ -755,9 +759,7 @@ class HistoricalMaterialReacquisitionService:
                     reacquisition_mode = "network_exact_locator"
                     derivation_source = None
                 else:
-                    original_diagnosis = self._store.diagnose_artifact_content(
-                        original.artifact_id
-                    )
+                    original_diagnosis = self._store.diagnose_artifact_content(original.artifact_id)
                     if original_diagnosis.get("status") != "verified":
                         raise MaterialReacquisitionRetrievalError(
                             "historical rendition regeneration requires the historical original to be verified first"
@@ -826,9 +828,7 @@ class HistoricalMaterialReacquisitionService:
                 if _historical_equivalent(
                     artifact.digest, artifact.size, actual_digest, actual_size
                 ):
-                    restored = self._restore_identical(
-                        artifact.artifact_id, retrieved.content
-                    )
+                    restored = self._restore_identical(artifact.artifact_id, retrieved.content)
                     payload = {
                         **common,
                         "status": "IDENTICAL_REACQUISITION",
@@ -854,9 +854,7 @@ class HistoricalMaterialReacquisitionService:
                         relation = "regenerated_version_of_historical_rendition"
                         rendition_role = "text"
                         parent_refs = (original.artifact_id, artifact.artifact_id)
-                        version_fields = {
-                            "new_rendition_version_id": new_rendition_version_id
-                        }
+                        version_fields = {"new_rendition_version_id": new_rendition_version_id}
                         provenance_capture_id = capture_id
                         media_type = "text/plain"
                     new_artifact = self._store.put_bytes(
@@ -941,14 +939,15 @@ class HistoricalMaterialReacquisitionService:
                 }
 
 
-
 class HistoricalMaterialReacquisitionHandler:
     def __init__(self, application, project_id: str, workspace_root: Path | None) -> None:
         self._service = HistoricalMaterialReacquisitionService(
             application.execution_store, project_id, workspace_root
         )
 
-    def execute(self, payload: Mapping[str, Any], *, state: Any, actor: Any, proposal: Mapping[str, Any]):
+    def execute(
+        self, payload: Mapping[str, Any], *, state: Any, actor: Any, proposal: Mapping[str, Any]
+    ):
         del state, actor, proposal
         result = self._service.reacquire(
             str(payload["historical_run_id"]),
@@ -962,12 +961,16 @@ class HistoricalMaterialReacquisitionHandler:
         )
 
 
-def ensure_material_reacquisition_action(application, project_id: str, workspace_root: Path | None) -> None:
+def ensure_material_reacquisition_action(
+    application, project_id: str, workspace_root: Path | None
+) -> None:
     coordinator = application.coordinator
     action_registry = coordinator._actions
     service_registry = coordinator._services
     with _ACTION_REGISTRATION_LOCK:
-        existing = {definition.action_type: definition for definition in coordinator.action_definitions()}
+        existing = {
+            definition.action_type: definition for definition in coordinator.action_definitions()
+        }
         definition = existing.get(_ACTION_TYPE)
         if definition is None:
             action_registry.register(

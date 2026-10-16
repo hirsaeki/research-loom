@@ -74,13 +74,17 @@ def _safe_kind(raw: Any) -> str | None:
     return _KIND_BY_PRODUCER.get(str(producer))
 
 
-def _semantic_object(candidate: Mapping[str, Any], *, expected_kind: str, project_id: str) -> Mapping[str, Any]:
+def _semantic_object(
+    candidate: Mapping[str, Any], *, expected_kind: str, project_id: str
+) -> Mapping[str, Any]:
     actions = candidate.get("proposed_actions")
     if not isinstance(actions, list) or len(actions) != 1:
         raise ConversationRuntimeError(_ERROR, "synthesis candidate action structure is invalid")
     action = actions[0]
     if not isinstance(action, Mapping) or action.get("kind") != "CREATE_OBJECT":
-        raise ConversationRuntimeError(_ERROR, "synthesis candidate action is not a supported object creation")
+        raise ConversationRuntimeError(
+            _ERROR, "synthesis candidate action is not a supported object creation"
+        )
     payload = action.get("payload")
     obj = payload.get("object") if isinstance(payload, Mapping) else None
     if not isinstance(obj, Mapping):
@@ -95,16 +99,18 @@ def _semantic_object(candidate: Mapping[str, Any], *, expected_kind: str, projec
         raise ConversationRuntimeError(_ERROR, "synthesis candidate object identity is invalid")
     affected = candidate.get("affected_refs")
     if not isinstance(affected, list) or not any(
-        isinstance(ref, Mapping)
-        and ref.get("kind") == expected_kind
-        and ref.get("id") == object_id
+        isinstance(ref, Mapping) and ref.get("kind") == expected_kind and ref.get("id") == object_id
         for ref in affected
     ):
-        raise ConversationRuntimeError(_ERROR, "synthesis candidate affected_refs do not bind its object")
+        raise ConversationRuntimeError(
+            _ERROR, "synthesis candidate affected_refs do not bind its object"
+        )
     return obj
 
 
-def _validate_semantics(kind: str, obj: Mapping[str, Any], source_payload: Mapping[str, Any]) -> None:
+def _validate_semantics(
+    kind: str, obj: Mapping[str, Any], source_payload: Mapping[str, Any]
+) -> None:
     try:
         normalized = (
             research_recommendation_proposal_payload(source_payload)
@@ -112,7 +118,9 @@ def _validate_semantics(kind: str, obj: Mapping[str, Any], source_payload: Mappi
             else research_argument_proposal_payload(source_payload)
         )
     except (TypeError, ValueError) as exc:
-        raise ConversationRuntimeError(_ERROR, "synthesis candidate source payload is invalid") from exc
+        raise ConversationRuntimeError(
+            _ERROR, "synthesis candidate source payload is invalid"
+        ) from exc
 
     if kind == "recommendation":
         if (
@@ -122,7 +130,9 @@ def _validate_semantics(kind: str, obj: Mapping[str, Any], source_payload: Mappi
             or obj.get("scope", []) != normalized["scope"]
             or obj.get("adoption_state") != "approved"
         ):
-            raise ConversationRuntimeError(_ERROR, "Recommendation candidate does not match its source proposal")
+            raise ConversationRuntimeError(
+                _ERROR, "Recommendation candidate does not match its source proposal"
+            )
         return
 
     required = ("conclusion", "warrant")
@@ -135,12 +145,18 @@ def _validate_semantics(kind: str, obj: Mapping[str, Any], source_payload: Mappi
         "implications",
     )
     if any(obj.get(field) != normalized[field] for field in required):
-        raise ConversationRuntimeError(_ERROR, "Argument candidate does not match its source proposal")
+        raise ConversationRuntimeError(
+            _ERROR, "Argument candidate does not match its source proposal"
+        )
     if any(obj.get(field) != normalized[field] for field in list_fields):
-        raise ConversationRuntimeError(_ERROR, "Argument candidate does not match its source proposal")
+        raise ConversationRuntimeError(
+            _ERROR, "Argument candidate does not match its source proposal"
+        )
     for field in ("conclusion_claim_id", "qualifier"):
         if obj.get(field) != normalized.get(field):
-            raise ConversationRuntimeError(_ERROR, "Argument candidate does not match its source proposal")
+            raise ConversationRuntimeError(
+                _ERROR, "Argument candidate does not match its source proposal"
+            )
 
 
 def _validated_candidate_row(
@@ -149,12 +165,16 @@ def _validated_candidate_row(
     project_id: str,
     expected_kind: str | None = None,
 ) -> tuple[Mapping[str, Any], Mapping[str, Any], Mapping[str, Any], str]:
-    candidate = _decode_json(row.get("payload_json"), message="stored synthesis candidate is unreadable")
+    candidate = _decode_json(
+        row.get("payload_json"), message="stored synthesis candidate is unreadable"
+    )
     candidate_id = str(row.get("proposal_id") or "")
     if not candidate_id or candidate.get("proposal_id") != candidate_id:
         raise ConversationRuntimeError(_ERROR, "synthesis candidate identity is invalid")
     if candidate.get("project_ref") != project_id or candidate.get("candidate_only") is not True:
-        raise ConversationRuntimeError(_ERROR, "synthesis candidate does not belong to the requested project")
+        raise ConversationRuntimeError(
+            _ERROR, "synthesis candidate does not belong to the requested project"
+        )
     basis = deepcopy(dict(candidate))
     supplied_digest = basis.pop("proposal_digest", None)
     if not isinstance(supplied_digest, str) or canonical_digest(basis) != supplied_digest:
@@ -170,18 +190,26 @@ def _validated_candidate_row(
 
     source_binding = provenance.get("source_action_proposal")
     if not isinstance(source_binding, Mapping):
-        raise ConversationRuntimeError(_ERROR, "synthesis candidate source proposal binding is malformed")
-    source = _decode_json(row.get("source_payload_json"), message="source Action Proposal does not resolve")
+        raise ConversationRuntimeError(
+            _ERROR, "synthesis candidate source proposal binding is malformed"
+        )
+    source = _decode_json(
+        row.get("source_payload_json"), message="source Action Proposal does not resolve"
+    )
     _VALIDATOR.validate(source)
     if source.get("project_id") != project_id:
         raise ConversationRuntimeError(_ERROR, "source Action Proposal belongs to another project")
-    if (
-        source.get("proposal_id") != source_binding.get("proposal_id")
-        or source.get("proposal_digest") != source_binding.get("proposal_digest")
-    ):
-        raise ConversationRuntimeError(_ERROR, "synthesis candidate source proposal binding is invalid")
+    if source.get("proposal_id") != source_binding.get("proposal_id") or source.get(
+        "proposal_digest"
+    ) != source_binding.get("proposal_digest"):
+        raise ConversationRuntimeError(
+            _ERROR, "synthesis candidate source proposal binding is invalid"
+        )
     source_action = source.get("action")
-    if not isinstance(source_action, Mapping) or source_action.get("action_type") != _ACTION_BY_KIND[kind]:
+    if (
+        not isinstance(source_action, Mapping)
+        or source_action.get("action_type") != _ACTION_BY_KIND[kind]
+    ):
         raise ConversationRuntimeError(_ERROR, "synthesis candidate source action type is invalid")
     source_payload = source_action.get("payload")
     if not isinstance(source_payload, Mapping):
@@ -200,7 +228,9 @@ def _label(value: str) -> str:
     return safe[: _LABEL_LIMIT - 1] + "…"
 
 
-def _semantic_content(kind: str, candidate: Mapping[str, Any], obj: Mapping[str, Any]) -> dict[str, Any]:
+def _semantic_content(
+    kind: str, candidate: Mapping[str, Any], obj: Mapping[str, Any]
+) -> dict[str, Any]:
     if kind == "recommendation":
         return {
             "statement": str(obj["statement"]),
@@ -285,29 +315,37 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                 projection = build_candidate_projection(candidate, state)
             except ConversationRuntimeError as exc:
                 degraded = True
-                items.append({
-                    "candidate_id": candidate_id,
-                    "kind": row_kind,
-                    "availability": "UNAVAILABLE",
-                    "issues": [{"code": exc.code, "message": exc.message}],
-                })
+                items.append(
+                    {
+                        "candidate_id": candidate_id,
+                        "kind": row_kind,
+                        "availability": "UNAVAILABLE",
+                        "issues": [{"code": exc.code, "message": exc.message}],
+                    }
+                )
                 continue
-            label_source = str(obj["statement"] if validated_kind == "recommendation" else obj["conclusion"])
-            items.append({
-                "candidate_id": candidate_id,
-                "kind": validated_kind,
-                "availability": "AVAILABLE",
-                "label": _label(label_source),
-                "created_at": str(source["created_at"]),
-                "candidate_projection": projection,
-            })
+            label_source = str(
+                obj["statement"] if validated_kind == "recommendation" else obj["conclusion"]
+            )
+            items.append(
+                {
+                    "candidate_id": candidate_id,
+                    "kind": validated_kind,
+                    "availability": "AVAILABLE",
+                    "label": _label(label_source),
+                    "created_at": str(source["created_at"]),
+                    "candidate_projection": projection,
+                }
+            )
 
         issues = []
         if page["collection_incomplete"]:
-            issues.append({
-                "code": "SYNTHESIS-CANDIDATE-COLLECTION-001",
-                "message": "candidate collection may be incomplete because an unattributable stored proposal is malformed",
-            })
+            issues.append(
+                {
+                    "code": "SYNTHESIS-CANDIDATE-COLLECTION-001",
+                    "message": "candidate collection may be incomplete because an unattributable stored proposal is malformed",
+                }
+            )
         detail = {
             "status": "DEGRADED" if degraded else "OK",
             "project_id": self._project_id,
@@ -316,8 +354,12 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
             "next_cursor": page["next_cursor"],
             "issues": issues,
         }
-        return detail if selected == "detail" else self._read_projection(
-            detail, project_synthesis_list, operation="synthesis-candidate.list"
+        return (
+            detail
+            if selected == "detail"
+            else self._read_projection(
+                detail, project_synthesis_list, operation="synthesis-candidate.list"
+            )
         )
 
     def show_synthesis_candidate(
@@ -342,10 +384,16 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                 "created_at": str(source["created_at"]),
             },
             "content": _semantic_content(kind, candidate, obj),
-            "candidate_projection": build_candidate_projection(candidate, self._current_state_view()),
+            "candidate_projection": build_candidate_projection(
+                candidate, self._current_state_view()
+            ),
         }
-        return detail if selected == "detail" else self._read_projection(
-            detail, project_synthesis_show, operation="synthesis-candidate.show"
+        return (
+            detail
+            if selected == "detail"
+            else self._read_projection(
+                detail, project_synthesis_show, operation="synthesis-candidate.show"
+            )
         )
 
     def show_candidate(self, candidate_id: str) -> Mapping[str, Any]:
@@ -425,7 +473,9 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
             raise LocalApplicationError("APPLICATION-VIEW-001", str(exc)) from exc
 
     @staticmethod
-    def _read_projection(detail: Mapping[str, Any], projector, *, operation: str) -> Mapping[str, Any]:
+    def _read_projection(
+        detail: Mapping[str, Any], projector, *, operation: str
+    ) -> Mapping[str, Any]:
         try:
             return projector(detail)
         except ConversationViewError as exc:
@@ -504,15 +554,19 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
     def status(self, *, view: str | None = None) -> Mapping[str, Any]:
         selected = self._public_view(view)
         detail = super().status()
-        return detail if selected == "detail" else self._read_projection(
-            detail, project_status, operation="status"
+        return (
+            detail
+            if selected == "detail"
+            else self._read_projection(detail, project_status, operation="status")
         )
 
     def show_run(self, run_id: str, *, view: str | None = None) -> Mapping[str, Any]:
         selected = self._public_view(view)
         detail = super().show_run(run_id)
-        return detail if selected == "detail" else self._read_projection(
-            detail, project_run, operation="run.show"
+        return (
+            detail
+            if selected == "detail"
+            else self._read_projection(detail, project_run, operation="run.show")
         )
 
     def replay_completed_desktop_research_run(
@@ -522,9 +576,7 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
         detail = super().replay_completed_desktop_research_run(run_id)
         if selected == "detail":
             return detail
-        return self._after_operation_projection(
-            detail, project_replay, operation="run.replay"
-        )
+        return self._after_operation_projection(detail, project_replay, operation="run.replay")
 
     def resume_context(
         self, *, limits: Mapping[str, int] | None = None, view: str | None = None
@@ -540,6 +592,8 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
         }
         if listing["status"] == "DEGRADED":
             result["status"] = "DEGRADED"
-        return result if selected == "detail" else self._read_projection(
-            result, project_resume, operation="resume"
+        return (
+            result
+            if selected == "detail"
+            else self._read_projection(result, project_resume, operation="resume")
         )

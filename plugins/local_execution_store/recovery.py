@@ -28,6 +28,5 @@ def result_extensions_for_run(
     return tuple(
         document
         for row in rows
-        if (document := store._load_document("extension", str(row["identity"])))
-        is not None
+        if (document := store._load_document("extension", str(row["identity"]))) is not None
     )

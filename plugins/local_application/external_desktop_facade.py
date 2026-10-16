@@ -146,7 +146,6 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                     "workspace could not be bound as the controlled intake root",
                 ) from exc
 
-
     def replay_completed_desktop_research_run(self, run_id: str) -> Mapping[str, Any]:
         if not isinstance(run_id, str) or not run_id:
             raise LocalApplicationError("APPLICATION-RUN-REPLAY-001", "run_id is required")
@@ -184,9 +183,7 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                 "replay parent Run has corrupt or unreadable retrieval history",
             ) from exc
         unresolved = [
-            deepcopy(item)
-            for item in attempts.values()
-            if item.get("completed_at") is None
+            deepcopy(item) for item in attempts.values() if item.get("completed_at") is None
         ]
         if not unresolved:
             raise LocalApplicationError(
@@ -196,9 +193,7 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
         try:
             correlation = self._application.conversation_store.load_run_correlation(run_id)
             proposal = (
-                self._application.conversation_store.load_proposal(
-                    str(correlation["proposal_id"])
-                )
+                self._application.conversation_store.load_proposal(str(correlation["proposal_id"]))
                 if correlation is not None
                 else None
             )
@@ -212,18 +207,23 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                 "APPLICATION-RUN-REPLAY-001",
                 "replay parent Run is not correlated to a public conversation action",
             )
-        if proposal is None or proposal.get("action", {}).get("action_type") != "desktop_research.investigate":
+        if (
+            proposal is None
+            or proposal.get("action", {}).get("action_type") != "desktop_research.investigate"
+        ):
             raise LocalApplicationError(
                 "APPLICATION-RUN-REPLAY-001",
                 "replay parent action is unavailable or unsupported",
             )
         payload = deepcopy(dict(proposal["action"]["payload"]))
         payload["parent_run_id"] = run_id
-        replay = self.submit_action({
-            "action_type": "desktop_research.investigate",
-            "payload": payload,
-            "rationale": f"Replay unresolved retrieval work from completed Run {run_id}.",
-        })
+        replay = self.submit_action(
+            {
+                "action_type": "desktop_research.investigate",
+                "payload": payload,
+                "rationale": f"Replay unresolved retrieval work from completed Run {run_id}.",
+            }
+        )
         child_run_id = replay.get("run_id")
         if not isinstance(child_run_id, str) or not child_run_id:
             raise LocalApplicationError(
@@ -236,15 +236,18 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                 provenance = deepcopy(dict(attempt.get("provenance") or {}))
                 provenance["replayed_from_run_id"] = run_id
                 provenance["replayed_from_attempt_id"] = str(attempt["attempt_id"])
-                started = self.start_external_retrieval_attempt(child_run_id, {
-                    "attempt_id": str(attempt["attempt_id"]),
-                    "strategy": str(attempt["strategy"]),
-                    "coverage_dimension_ids": list(attempt["coverage_dimension_ids"]),
-                    "query_or_target": attempt.get("query_or_target"),
-                    "provider_or_tool": attempt.get("provider_or_tool"),
-                    "target_locator": attempt.get("target_locator"),
-                    "provenance": provenance,
-                })
+                started = self.start_external_retrieval_attempt(
+                    child_run_id,
+                    {
+                        "attempt_id": str(attempt["attempt_id"]),
+                        "strategy": str(attempt["strategy"]),
+                        "coverage_dimension_ids": list(attempt["coverage_dimension_ids"]),
+                        "query_or_target": attempt.get("query_or_target"),
+                        "provider_or_tool": attempt.get("provider_or_tool"),
+                        "target_locator": attempt.get("target_locator"),
+                        "provenance": provenance,
+                    },
+                )
                 carried.append(started["attempt"])
         except Exception as exc:
             self._application.capability_execution_service.abort(
@@ -393,9 +396,7 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                 if original_declared is None
                 else int(original_declared)
             )
-            artifact_limit = int(
-                budget.get("max_capture_artifacts", 2 * capture_limit)
-            )
+            artifact_limit = int(budget.get("max_capture_artifacts", 2 * capture_limit))
         except (KeyError, TypeError, ValueError) as exc:
             raise LocalApplicationError(
                 "APPLICATION-EXTERNAL-BINDING-001",

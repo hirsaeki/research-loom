@@ -22,33 +22,52 @@ class CorrectableExternalSubmissionError(LocalApplicationError):
     """Operator-owned submission content can be corrected on the same RUNNING Run."""
 
 
-
 _RESULT_FIELDS = {
-    "validation", "outputs", "capture_ids", "citation_details", "search_trace",
-    "null_results", "evidence_gap_assessments", "coverage_assessment",
+    "validation",
+    "outputs",
+    "capture_ids",
+    "citation_details",
+    "search_trace",
+    "null_results",
+    "evidence_gap_assessments",
+    "coverage_assessment",
     "candidate_next_method_ids",
 }
 _OUTPUT_FIELDS = {
-    "observations", "evidence_candidates", "candidate_findings", "counterevidence",
-    "conflicts", "unknowns", "evidence_gaps", "candidate_next_actions",
+    "observations",
+    "evidence_candidates",
+    "candidate_findings",
+    "counterevidence",
+    "conflicts",
+    "unknowns",
+    "evidence_gaps",
+    "candidate_next_actions",
     "candidate_next_methods",
 }
 _CITATION_FIELDS = {
-    "citation_id", "handoff_output_kind", "handoff_output_id", "capture_id",
-    "excerpt", "excerpt_locator",
+    "citation_id",
+    "handoff_output_kind",
+    "handoff_output_id",
+    "capture_id",
+    "excerpt",
+    "excerpt_locator",
 }
 _SEARCH_LINK_FIELDS = {"attempt_id", "related_handoff_output_ids", "notes"}
 
 
 def _mapping(value: Any, field: str) -> dict[str, Any]:
     if not isinstance(value, Mapping):
-        raise CorrectableExternalSubmissionError("APPLICATION-EXTERNAL-SUBMISSION-CONTENT-001", f"{field} must be an object")
+        raise CorrectableExternalSubmissionError(
+            "APPLICATION-EXTERNAL-SUBMISSION-CONTENT-001", f"{field} must be an object"
+        )
     return deepcopy(dict(value))
 
 
 def _list(value: Any, field: str) -> list[Any]:
     if not isinstance(value, list):
-        raise CorrectableExternalSubmissionError("APPLICATION-EXTERNAL-SUBMISSION-CONTENT-001", f"{field} must be an array")
+        raise CorrectableExternalSubmissionError(
+            "APPLICATION-EXTERNAL-SUBMISSION-CONTENT-001", f"{field} must be an array"
+        )
     return deepcopy(value)
 
 
@@ -124,12 +143,16 @@ def assemble_external_submission(
         )
 
     capture_ids = _list(value.get("capture_ids", []), "capture_ids")
-    if any(not isinstance(item, str) or not item for item in capture_ids) or len(capture_ids) != len(set(capture_ids)):
+    if any(not isinstance(item, str) or not item for item in capture_ids) or len(
+        capture_ids
+    ) != len(set(capture_ids)):
         raise CorrectableExternalSubmissionError(
             "APPLICATION-EXTERNAL-SUBMISSION-CONTENT-001",
             "capture_ids must contain unique non-empty strings",
         )
-    source_captures, capture_details, texts = _resolve_captures(application, run.run_id, capture_ids)
+    source_captures, capture_details, texts = _resolve_captures(
+        application, run.run_id, capture_ids
+    )
     outputs["source_captures"] = source_captures
 
     handoff: dict[str, Any] = {
@@ -144,17 +167,23 @@ def assemble_external_submission(
             "invocation_digest": run.invocation_digest,
             "context_pack_digest": run.context_pack_digest,
             "project_config_digest": context["pins"]["project_config"]["configuration_digest"],
-            "effective_profile_set_digest": context["pins"]["effective_profile_set"]["content_digest"],
+            "effective_profile_set_digest": context["pins"]["effective_profile_set"][
+                "content_digest"
+            ],
             "research_snapshot": deepcopy(dict(context["pins"]["research_snapshot"])),
         },
         "preserved_context": {
-            "research_attention_ids": [str(item["attention_id"]) for item in context["research_attention"]],
+            "research_attention_ids": [
+                str(item["attention_id"]) for item in context["research_attention"]
+            ],
             "project_guard_ids": [
                 str(guard["guard_id"])
                 for key in ("requirements", "prohibitions", "must_not_claim")
                 for guard in context["project_constraints"][key]
             ],
-            "effective_constraint_paths": [str(item["path"]) for item in context["effective_constraints"]],
+            "effective_constraint_paths": [
+                str(item["path"]) for item in context["effective_constraints"]
+            ],
         },
         "validation": _mapping(value.get("validation"), "validation"),
         "outputs": outputs,
@@ -163,7 +192,11 @@ def assemble_external_submission(
             "produced_at": application.clock.now(),
             "implementation_id": run.implementation_id,
             "implementation_version": run.implementation_version,
-            "input_content_digests": [run.descriptor_digest, run.context_pack_digest, run.invocation_digest],
+            "input_content_digests": [
+                run.descriptor_digest,
+                run.context_pack_digest,
+                run.invocation_digest,
+            ],
         },
         "adoption_boundary": {
             "research_state_mutation_performed": False,
@@ -180,9 +213,13 @@ def assemble_external_submission(
         citation_details=_citations(value, capture_details, texts),
         search_trace=_search_trace(value, attempts),
         null_results=_mapping_list(value.get("null_results", []), "null_results"),
-        evidence_gap_assessments=_mapping_list(value.get("evidence_gap_assessments", []), "evidence_gap_assessments"),
+        evidence_gap_assessments=_mapping_list(
+            value.get("evidence_gap_assessments", []), "evidence_gap_assessments"
+        ),
         coverage_assessment=_mapping(value.get("coverage_assessment"), "coverage_assessment"),
-        candidate_next_method_ids=_list(value.get("candidate_next_method_ids", []), "candidate_next_method_ids"),
+        candidate_next_method_ids=_list(
+            value.get("candidate_next_method_ids", []), "candidate_next_method_ids"
+        ),
     )
     return handoff, extension
 
@@ -209,9 +246,7 @@ def validate_external_submission(
     try:
         validator.validate_documents(descriptor, invocation, context)
     except CapabilityExecutionError as exc:
-        raise LocalApplicationError(
-            "APPLICATION-EXTERNAL-BINDING-001", exc.issue.message
-        ) from exc
+        raise LocalApplicationError("APPLICATION-EXTERNAL-BINDING-001", exc.issue.message) from exc
     if (
         invocation.get("invocation_digest") != run.invocation_digest
         or context.get("context_pack_digest") != run.context_pack_digest
@@ -230,8 +265,7 @@ def validate_external_submission(
     if not decision.allowed:
         raise LocalApplicationError(
             "APPLICATION-EXTERNAL-BINDING-001",
-            "; ".join(item.message for item in decision.issues)
-            or "runtime authorization denied",
+            "; ".join(item.message for item in decision.issues) or "runtime authorization denied",
         )
     required = {str(item["reference_id"]) for item in context["resources"]}
     if not required.issubset(set(decision.resource_reference_ids)):
@@ -249,7 +283,12 @@ def validate_external_submission(
         provenance["implementation_id"] != run.implementation_id
         or provenance["implementation_version"] != run.implementation_version
     ):
-        return [_issue("CAP-HANDOFF-PROVENANCE-001", "Handoff implementation provenance does not match the pinned adapter")]
+        return [
+            _issue(
+                "CAP-HANDOFF-PROVENANCE-001",
+                "Handoff implementation provenance does not match the pinned adapter",
+            )
+        ]
 
     verified_resource_bases = set()
     for collection in ("evidence_candidates", "counterevidence"):
@@ -259,18 +298,23 @@ def validate_external_submission(
                 continue
             reference_id = str(basis.get("resource_reference_id"))
             resource = next(
-                (item for item in context["resources"] if str(item.get("reference_id")) == reference_id),
+                (
+                    item
+                    for item in context["resources"]
+                    if str(item.get("reference_id")) == reference_id
+                ),
                 None,
             )
-            key = (reference_id, str(resource.get("digest")) if isinstance(resource, Mapping) else "")
+            key = (
+                reference_id,
+                str(resource.get("digest")) if isinstance(resource, Mapping) else "",
+            )
             if key in verified_resource_bases:
                 continue
             try:
                 verified_resource_basis_provenance(store, context, basis)
             except NormalizationRejected as exc:
-                raise LocalApplicationError(
-                    "APPLICATION-EXTERNAL-INTEGRITY-001", str(exc)
-                ) from exc
+                raise LocalApplicationError("APPLICATION-EXTERNAL-INTEGRITY-001", str(exc)) from exc
             verified_resource_bases.add(key)
 
     codes = DesktopResearchResultValidator(store, application.operational_store).validate(
@@ -299,7 +343,9 @@ def _resolve_captures(application, run_id: str, capture_ids: list[str]):
     store = application.execution_store
     run_record = store.load_run(run_id)
     if run_record is None:
-        raise LocalApplicationError("APPLICATION-EXTERNAL-RUN-STATE-001", "external Run no longer resolves")
+        raise LocalApplicationError(
+            "APPLICATION-EXTERNAL-RUN-STATE-001", "external Run no longer resolves"
+        )
     artifacts = artifacts_for_capture_ids(store, run_id, capture_ids)
     by_capture: dict[str, list[Any]] = {}
     for artifact in artifacts:
@@ -362,34 +408,38 @@ def _resolve_captures(application, run_id: str, capture_ids: list[str]):
             ) from exc
         provenance = original.provenance
         locator = str(projection["source_locator"])
-        source_captures.append({
-            "capture_id": capture_id,
-            "origin": {
-                "origin_type": "acquired_source",
-                "acquisition_locator": str(provenance.get("acquisition_locator") or locator),
-            },
-            "locator": locator,
-            "content_digest": original.digest,
-        })
-        details.append({
-            "capture_id": capture_id,
-            "source_category": str(projection["source_category"]),
-            "exact_locator": locator,
-            "acquired_at": str(projection["acquired_at"]),
-            "original_capture": {
-                "content_reference": original.artifact_id,
+        source_captures.append(
+            {
+                "capture_id": capture_id,
+                "origin": {
+                    "origin_type": "acquired_source",
+                    "acquisition_locator": str(provenance.get("acquisition_locator") or locator),
+                },
+                "locator": locator,
                 "content_digest": original.digest,
-                "media_type": original.media_type,
-                "byte_length": original.size,
-            },
-            "text_rendition": {
-                "content_reference": text.artifact_id,
-                "content_digest": text.digest,
-                "media_type": text.media_type,
-                "byte_length": text.size,
-                "encoding": "UTF-8",
-            },
-        })
+            }
+        )
+        details.append(
+            {
+                "capture_id": capture_id,
+                "source_category": str(projection["source_category"]),
+                "exact_locator": locator,
+                "acquired_at": str(projection["acquired_at"]),
+                "original_capture": {
+                    "content_reference": original.artifact_id,
+                    "content_digest": original.digest,
+                    "media_type": original.media_type,
+                    "byte_length": original.size,
+                },
+                "text_rendition": {
+                    "content_reference": text.artifact_id,
+                    "content_digest": text.digest,
+                    "media_type": text.media_type,
+                    "byte_length": text.size,
+                    "encoding": "UTF-8",
+                },
+            }
+        )
         texts[capture_id] = decoded
     return source_captures, details, texts
 
@@ -421,14 +471,20 @@ def _citations(value, capture_details, texts):
             )
         excerpt = citation.get("excerpt")
         if not isinstance(excerpt, str) or not excerpt:
-            raise CorrectableExternalSubmissionError("APPLICATION-EXTERNAL-SUBMISSION-CONTENT-001", "citation excerpt must be a non-empty string")
-        assembled.append({
-            **citation,
-            "text_rendition_digest": detail["text_rendition"]["content_digest"],
-            "capture_integrity_verified": True,
-            "excerpt_containment_verified": excerpt in text or _matching_whitespace_slice(text, excerpt) is not None,
-            "evidence_adoption_performed": False,
-        })
+            raise CorrectableExternalSubmissionError(
+                "APPLICATION-EXTERNAL-SUBMISSION-CONTENT-001",
+                "citation excerpt must be a non-empty string",
+            )
+        assembled.append(
+            {
+                **citation,
+                "text_rendition_digest": detail["text_rendition"]["content_digest"],
+                "capture_integrity_verified": True,
+                "excerpt_containment_verified": excerpt in text
+                or _matching_whitespace_slice(text, excerpt) is not None,
+                "evidence_adoption_performed": False,
+            }
+        )
     return assembled
 
 
@@ -463,7 +519,10 @@ def _search_trace(value, attempts):
             )
         attempt_id = str(link["attempt_id"])
         if attempt_id in links:
-            raise CorrectableExternalSubmissionError("APPLICATION-EXTERNAL-SUBMISSION-CONTENT-001", f"duplicate search_trace attempt_id: {attempt_id}")
+            raise CorrectableExternalSubmissionError(
+                "APPLICATION-EXTERNAL-SUBMISSION-CONTENT-001",
+                f"duplicate search_trace attempt_id: {attempt_id}",
+            )
         links[attempt_id] = link
     if set(links) != set(attempts):
         raise CorrectableExternalSubmissionError(
@@ -478,8 +537,12 @@ def _search_trace(value, attempts):
             "strategy": attempt["strategy"],
             "coverage_dimension_ids": list(attempt["coverage_dimension_ids"]),
             "outcome": attempt["outcome"],
-            "related_handoff_output_ids": _list(link["related_handoff_output_ids"], "related_handoff_output_ids"),
-            "source_capture_ids": [str(attempt["resulting_capture_id"])] if attempt.get("outcome") == "source_captured" else [],
+            "related_handoff_output_ids": _list(
+                link["related_handoff_output_ids"], "related_handoff_output_ids"
+            ),
+            "source_capture_ids": [str(attempt["resulting_capture_id"])]
+            if attempt.get("outcome") == "source_captured"
+            else [],
         }
         if link.get("notes") is not None:
             entry["notes"] = str(link["notes"])
@@ -487,7 +550,8 @@ def _search_trace(value, attempts):
     return {
         "entries": entries,
         "unsuccessful_entry_ids": sorted(
-            attempt_id for attempt_id, attempt in attempts.items()
+            attempt_id
+            for attempt_id, attempt in attempts.items()
             if attempt.get("outcome") in UNSUCCESSFUL_OUTCOMES
         ),
     }

@@ -21,7 +21,15 @@ from plugins.sqlite_state_store.exhibit_guard import guard_research_state_head
 from .facade import LocalApplicationError
 from .external_attempt_lifecycle_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
 
-_ROLES = {"theme", "expectations", "project_brief", "scope", "methodology", "publication_brief", "other"}
+_ROLES = {
+    "theme",
+    "expectations",
+    "project_brief",
+    "scope",
+    "methodology",
+    "publication_brief",
+    "other",
+}
 _MAX_BYTES = 8 * 1024 * 1024
 _MAX_PROJECT_INPUT_IDS = 64
 _TEXTUAL_MEDIA_TYPES = {
@@ -50,11 +58,17 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
 
     def _registry(self) -> LocalProjectInputStore:
         if self._workspace_root is None:
-            raise LocalApplicationError("APPLICATION-PROJECT-INPUT-001", "project input registration requires an opened workspace")
+            raise LocalApplicationError(
+                "APPLICATION-PROJECT-INPUT-001",
+                "project input registration requires an opened workspace",
+            )
         try:
             if self._project_input_store is None:
-                self._project_input_store = LocalProjectInputStore(self._workspace_root, create=False)
+                self._project_input_store = LocalProjectInputStore(
+                    self._workspace_root, create=False
+                )
             from plugins.local_durable_store import require_optional_available
+
             require_optional_available(self._project_input_store.root, LocalProjectInputStoreError)
             return self._project_input_store
         except LocalProjectInputStoreError as exc:
@@ -66,24 +80,48 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
         repo = self._application.state_repository
         lineage = repo.load_active_lineage_ref(self._project_id)
         state = repo.load_state_view(self._project_id, lineage)
-        return str(lineage), str(state.current_snapshot["id"]), str(state.current_snapshot["content_digest"])
+        return (
+            str(lineage),
+            str(state.current_snapshot["id"]),
+            str(state.current_snapshot["content_digest"]),
+        )
 
     def register_project_input(self, value: Mapping[str, Any]) -> Mapping[str, Any]:
-        allowed = {"file", "role", "media_type", "provenance", "expected_snapshot_id", "expected_snapshot_digest"}
+        allowed = {
+            "file",
+            "role",
+            "media_type",
+            "provenance",
+            "expected_snapshot_id",
+            "expected_snapshot_digest",
+        }
         if not isinstance(value, Mapping) or set(value) - allowed:
-            raise LocalApplicationError("APPLICATION-PROJECT-INPUT-001", "project input registration contains unknown fields")
+            raise LocalApplicationError(
+                "APPLICATION-PROJECT-INPUT-001",
+                "project input registration contains unknown fields",
+            )
         path = value.get("file")
         role = value.get("role")
         if not isinstance(path, str) or not path.strip():
             raise LocalApplicationError("APPLICATION-PROJECT-INPUT-001", "file is required")
         if role not in _ROLES:
-            raise LocalApplicationError("APPLICATION-PROJECT-INPUT-001", "role is not an allowed project-input role")
+            raise LocalApplicationError(
+                "APPLICATION-PROJECT-INPUT-001", "role is not an allowed project-input role"
+            )
         provenance = value.get("provenance", {})
         if not isinstance(provenance, Mapping):
-            raise LocalApplicationError("APPLICATION-PROJECT-INPUT-001", "provenance must be an object")
+            raise LocalApplicationError(
+                "APPLICATION-PROJECT-INPUT-001", "provenance must be an object"
+            )
         lineage, snapshot_id, snapshot_digest = self._current_binding()
-        if value.get("expected_snapshot_id") != snapshot_id or value.get("expected_snapshot_digest") != snapshot_digest:
-            raise LocalApplicationError("APPLICATION-PROJECT-INPUT-STALE-001", "project input registration is not bound to the exact current Snapshot")
+        if (
+            value.get("expected_snapshot_id") != snapshot_id
+            or value.get("expected_snapshot_digest") != snapshot_digest
+        ):
+            raise LocalApplicationError(
+                "APPLICATION-PROJECT-INPUT-STALE-001",
+                "project input registration is not bound to the exact current Snapshot",
+            )
         source = Path(path)
         if not source.is_absolute():
             if self._workspace_root is None:
@@ -93,14 +131,21 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                 )
             source = self._workspace_root / source
         try:
-            content = read_controlled_file(self._application.execution_store, source, max_bytes=_MAX_BYTES)
+            content = read_controlled_file(
+                self._application.execution_store, source, max_bytes=_MAX_BYTES
+            )
         except (OSError, PermissionError, ValueError, LocalExecutionStoreError) as exc:
-            raise LocalApplicationError("APPLICATION-PROJECT-INPUT-FILE-001", "project input file is not an allowed regular workspace file") from exc
+            raise LocalApplicationError(
+                "APPLICATION-PROJECT-INPUT-FILE-001",
+                "project input file is not an allowed regular workspace file",
+            ) from exc
         media_type = value.get("media_type")
         if media_type is None:
             media_type = mimetypes.guess_type(path)[0] or "application/octet-stream"
         if not isinstance(media_type, str) or not media_type.strip():
-            raise LocalApplicationError("APPLICATION-PROJECT-INPUT-001", "media_type must be a non-empty string")
+            raise LocalApplicationError(
+                "APPLICATION-PROJECT-INPUT-001", "media_type must be a non-empty string"
+            )
         try:
             with guard_research_state_head(
                 self._application.state_repository,
@@ -127,7 +172,11 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
             ) from exc
         except LocalProjectInputStoreError as exc:
             raise LocalApplicationError(exc.code, exc.message) from exc
-        return {"status": "REGISTERED", "project_input": document, "research_state_mutation_performed": False}
+        return {
+            "status": "REGISTERED",
+            "project_input": document,
+            "research_state_mutation_performed": False,
+        }
 
     def list_project_inputs(
         self, *, limit: int = 100, cursor: str | None = None
@@ -156,10 +205,13 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
             managed = self._workspace_root / ".research-loom"
             if source.resolve(strict=False).is_relative_to(managed.resolve(strict=False)):
                 raise LocalApplicationError(
-                    "APPLICATION-PROJECT-INPUT-RECOVERY-001", "repair source must be an operator-controlled workspace file"
+                    "APPLICATION-PROJECT-INPUT-RECOVERY-001",
+                    "repair source must be an operator-controlled workspace file",
                 )
             if registry.get(str(input_id), self._project_id) is None:
-                raise LocalApplicationError("APPLICATION-PROJECT-INPUT-404", "project input does not exist in this project")
+                raise LocalApplicationError(
+                    "APPLICATION-PROJECT-INPUT-404", "project input does not exist in this project"
+                )
             staged, _, _ = self._application.execution_store._stage_controlled_original(
                 source, max_bytes=_MAX_BYTES
             )
@@ -169,7 +221,8 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
             raise LocalApplicationError(exc.code, exc.message) from exc
         except (OSError, ValueError, LocalExecutionStoreError) as exc:
             raise LocalApplicationError(
-                "APPLICATION-PROJECT-INPUT-RECOVERY-001", "project input could not be restored from the exact workspace file"
+                "APPLICATION-PROJECT-INPUT-RECOVERY-001",
+                "project input could not be restored from the exact workspace file",
             ) from exc
         finally:
             if staged is not None:
@@ -177,7 +230,9 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                     staged.unlink(missing_ok=True)
                 except OSError:
                     if result is not None:
-                        result["staging_cleanup_warning"] = "verified payload retained; remove abandoned staging after restoring access"
+                        result["staging_cleanup_warning"] = (
+                            "verified payload retained; remove abandoned staging after restoring access"
+                        )
 
     def show_project_input(self, input_id: str, *, format: str = "metadata") -> Mapping[str, Any]:
         if format not in {"metadata", "text", "base64"}:
@@ -257,13 +312,22 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
         return formats
 
     def submit_action(self, draft_input: Mapping[str, Any]) -> Mapping[str, Any]:
-        if isinstance(draft_input, Mapping) and draft_input.get("action_type") == "research_question.review":
+        if (
+            isinstance(draft_input, Mapping)
+            and draft_input.get("action_type") == "research_question.review"
+        ):
             payload = draft_input.get("payload")
             review_inputs = payload.get("review_inputs") if isinstance(payload, Mapping) else None
-            ids = review_inputs.get("project_input_ids", []) if isinstance(review_inputs, Mapping) else []
+            ids = (
+                review_inputs.get("project_input_ids", [])
+                if isinstance(review_inputs, Mapping)
+                else []
+            )
             if ids:
                 if not isinstance(ids, list) or any(not isinstance(item, str) for item in ids):
-                    raise LocalApplicationError("APPLICATION-PROJECT-INPUT-001", "project_input_ids must be an array of IDs")
+                    raise LocalApplicationError(
+                        "APPLICATION-PROJECT-INPUT-001", "project_input_ids must be an array of IDs"
+                    )
                 if len(ids) > _MAX_PROJECT_INPUT_IDS:
                     raise LocalApplicationError(
                         "APPLICATION-PROJECT-INPUT-001",
@@ -288,8 +352,7 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                     )
                 lineage, _snapshot_id, _snapshot_digest = self._current_binding()
                 foreign_lineage = [
-                    item for item, value in resolved.items()
-                    if value["lineage_ref"] != lineage
+                    item for item, value in resolved.items() if value["lineage_ref"] != lineage
                 ]
                 if foreign_lineage:
                     raise LocalApplicationError(
@@ -298,14 +361,18 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                         + ", ".join(foreign_lineage),
                     )
         return super().submit_action(draft_input)
+
     def _research_package_service(self):
         from .research_package_service import ResearchPackageService
+
         return ResearchPackageService(self)
 
     def build_research_package(self, value: Mapping[str, Any]) -> Mapping[str, Any]:
         return self._research_package_service().build(value)
 
-    def list_research_packages(self, *, limit: int = 100, cursor: str | None = None) -> Mapping[str, Any]:
+    def list_research_packages(
+        self, *, limit: int = 100, cursor: str | None = None
+    ) -> Mapping[str, Any]:
         return self._research_package_service().list(limit=limit, cursor=cursor)
 
     def show_research_package(self, package_id: str) -> Mapping[str, Any]:
@@ -316,31 +383,47 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
 
     def _writer_composition_service(self):
         from .writer_composition_history_service import WriterCompositionHistoryService
+
         return WriterCompositionHistoryService(self)
 
-    def capture_writer_composition(self, package_id: str, value: Mapping[str, Any]) -> Mapping[str, Any]:
+    def capture_writer_composition(
+        self, package_id: str, value: Mapping[str, Any]
+    ) -> Mapping[str, Any]:
         return self._writer_composition_service().capture(package_id, value)
 
-    def list_writer_compositions(self, *, limit: int = 64, cursor: str | None = None) -> Mapping[str, Any]:
+    def list_writer_compositions(
+        self, *, limit: int = 64, cursor: str | None = None
+    ) -> Mapping[str, Any]:
         return self._writer_composition_service().list(limit=limit, cursor=cursor)
 
     def show_writer_composition(self, composition_id: str, version: int) -> Mapping[str, Any]:
         return self._writer_composition_service().show(composition_id, version)
 
-    def diff_writer_composition(self, composition_id: str, from_version: int, to_version: int) -> Mapping[str, Any]:
+    def diff_writer_composition(
+        self, composition_id: str, from_version: int, to_version: int
+    ) -> Mapping[str, Any]:
         return self._writer_composition_service().diff(composition_id, from_version, to_version)
 
-    def export_writer_composition(self, composition_id: str, version: int, output: str | Path) -> Mapping[str, Any]:
+    def export_writer_composition(
+        self, composition_id: str, version: int, output: str | Path
+    ) -> Mapping[str, Any]:
         return self._writer_composition_service().export(composition_id, version, output)
 
-    def select_writer_composition(self, composition_id: str, version: int, digest: str) -> Mapping[str, Any]:
+    def select_writer_composition(
+        self, composition_id: str, version: int, digest: str
+    ) -> Mapping[str, Any]:
         return self._writer_composition_service().select(composition_id, version, digest)
 
-    def export_writer_section_input(self, composition_id: str, section_id: str, output: str | Path) -> Mapping[str, Any]:
-        return self._writer_composition_service().export_section_input(composition_id, section_id, output)
+    def export_writer_section_input(
+        self, composition_id: str, section_id: str, output: str | Path
+    ) -> Mapping[str, Any]:
+        return self._writer_composition_service().export_section_input(
+            composition_id, section_id, output
+        )
 
     def _writer_round_trip_service(self):
         from .writer_round_trip_service import WriterRoundTripService
+
         return WriterRoundTripService(self)
 
     def export_writer_round_trip_input(
