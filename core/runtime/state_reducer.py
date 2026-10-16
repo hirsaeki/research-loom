@@ -50,11 +50,11 @@ def reduce_state(current_state: StateView, request: StateTransitionRequest) -> R
                 "APPLY_LINEAGE_PLAN may only be mixed with RECORD_DECISION actions"
             )
         base = _reduce_lineage_plan(current_state, request, lineage_actions[0])
-        decisions = _validated_decision_objects(current_state, decision_actions)
+        plan_decisions = _validated_decision_objects(current_state, decision_actions)
         return replace(
             base,
-            object_revisions=stable_sorted_objects((*base.object_revisions, *decisions)),
-            decision_records=stable_sorted_objects(decisions),
+            object_revisions=stable_sorted_objects((*base.object_revisions, *plan_decisions)),
+            decision_records=stable_sorted_objects(plan_decisions),
             applied_actions=tuple(action.kind.value for action in request.actions),
         )
     if switch_actions:
@@ -65,10 +65,10 @@ def reduce_state(current_state: StateView, request: StateTransitionRequest) -> R
         target = str(switch_actions[0].payload.get("target_lineage_ref", ""))
         if not target:
             raise ReductionError("active lineage switch requires target_lineage_ref")
-        decisions = _validated_decision_objects(current_state, decision_actions)
+        switch_decisions = _validated_decision_objects(current_state, decision_actions)
         return ReductionResult(
-            object_revisions=stable_sorted_objects(decisions),
-            decision_records=stable_sorted_objects(decisions),
+            object_revisions=stable_sorted_objects(switch_decisions),
+            decision_records=stable_sorted_objects(switch_decisions),
             new_snapshot=None,
             lineage_updates=(),
             new_lineages=(),

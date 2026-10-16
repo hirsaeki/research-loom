@@ -5,12 +5,15 @@ import json
 from collections.abc import Mapping
 from copy import deepcopy
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import rfc8785
 from jsonschema import Draft202012Validator, FormatChecker
 
 from .models import ConversationRuntimeError
+
+if TYPE_CHECKING:
+    from core.runtime import StateView
 
 ROOT = Path(__file__).resolve().parents[2]
 CONTRACT = json.loads(
@@ -55,7 +58,7 @@ def with_document_digest(document: Mapping[str, Any]) -> dict[str, Any]:
     return result
 
 
-def state_binding(state) -> dict[str, Any]:
+def state_binding(state: StateView) -> dict[str, Any]:
     snapshot = state.current_snapshot
     return {
         "state_id": str(snapshot["id"]),
@@ -64,7 +67,7 @@ def state_binding(state) -> dict[str, Any]:
     }
 
 
-def research_context_binding(state) -> dict[str, Any]:
+def research_context_binding(state: StateView) -> dict[str, Any]:
     snapshot = state.current_snapshot
     return {
         "project_config_digest": state.project_config_digest,

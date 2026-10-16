@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import Any, cast
 
 from .ports import CapabilityResultNormalizer
 from .transition_models import StateDeltaProposal, StateView
@@ -91,6 +91,7 @@ def _validate_outer_handoff(handoff: Mapping[str, Any], state: StateView) -> Non
     snapshot = pins.get("research_snapshot") if isinstance(pins, Mapping) else None
     if not isinstance(snapshot, Mapping):
         raise NormalizationRejected("Capability Handoff is missing its pinned Research Snapshot")
+    pins = cast(Mapping[str, Any], pins)  # a pinned snapshot implies mapping pins
     if snapshot.get("snapshot_id") != state.current_snapshot.get("id") or snapshot.get(
         "content_digest"
     ) != state.current_snapshot.get("content_digest"):

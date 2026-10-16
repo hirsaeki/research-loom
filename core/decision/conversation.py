@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import replace
+from typing import Any
 
 from core.conversation import ConversationRuntimeError, CoordinatorResult
 from core.conversation.service import WorkConversationService
+from core.runtime import StateView
 
 
 class DecisionAwareResearchCoordinator(WorkConversationService):
@@ -16,11 +19,11 @@ class DecisionAwareResearchCoordinator(WorkConversationService):
     lifecycle work.
     """
 
-    def __init__(self, *args, human_decisions, **kwargs) -> None:
+    def __init__(self, *args: Any, human_decisions: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self._human_decisions = human_decisions
 
-    def _confirm(self, input_document):
+    def _confirm(self, input_document: Mapping[str, Any]) -> CoordinatorResult:
         # Preserve PR10 single-use semantics even if the Research State has moved
         # after the first Confirmation was consumed. A replay is a replay, not a
         # new state-binding attempt.
@@ -57,7 +60,13 @@ class DecisionAwareResearchCoordinator(WorkConversationService):
                 )
         return super()._confirm(input_document)
 
-    def _execute(self, source_input, proposal, state, confirmation_receipt):
+    def _execute(
+        self,
+        source_input: Mapping[str, Any],
+        proposal: Mapping[str, Any],
+        state: StateView,
+        confirmation_receipt: Mapping[str, Any] | None,
+    ) -> CoordinatorResult:
         action = proposal.get("action", {})
         pending = self._human_decisions.pending(str(proposal["project_id"]))
         candidate_id = None

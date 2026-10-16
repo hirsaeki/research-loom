@@ -5,7 +5,7 @@ import json
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass, field, is_dataclass, replace
 from enum import Enum
-from typing import Any
+from typing import Any, cast
 
 DIGEST_PREFIX = "sha256:"
 
@@ -343,7 +343,7 @@ def _jsonable(value: Any) -> Any:
     if isinstance(value, Enum):
         return value.value
     if is_dataclass(value):
-        return _jsonable(asdict(value))
+        return _jsonable(asdict(cast(Any, value)))
     if isinstance(value, Mapping):
         return {str(key): _jsonable(item) for key, item in value.items()}
     if isinstance(value, (tuple, list)):
