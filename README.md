@@ -2,20 +2,21 @@
 
 `research-loom` is a monorepo for a reusable research harness, composable research profiles, writing/publication skills, organization-specific plugins, and project configuration.
 
-## Repository status
+## What it does
 
-Production MISCO Profile migration now uses the same resolver and EPS contract; the legacy `research-profile/` tree remains migration/reference material and is not runtime authority.
+Research Loom keeps an LLM-assisted research project auditable: the conversation proposes, but only exact, Decision-bound commits change research state, and every material and claim stays traceable to pinned sources.
 
-The canonical production path has converged through PR26: Core research semantics and Profiles/Project Config, Capability ABI and Research Method contracts, Desktop Research external execution, lineage/recovery, production State transitions and SQLite persistence, execution/artifact/resource persistence, Work Conversation coordination, and the Human Decision Gate with atomic Decision-bound commits are connected end to end.
+Through the production CLI (below) and its application facade a host can:
 
-PR27 adds the production-local operator boundary: fresh local workspace bootstrap/reopen, exact Project Config + Effective Profile Set binding, a transport-neutral application facade, and a machine-oriented JSON CLI. ChatGPT Desktop App Work is the first intended human-facing consumer, but Work/ChatGPT semantics are not part of the Harness itself.
+- **Bind a workspace** to an exact Project Config and Effective Profile Set (`init`, `status`, `resume`, `doctor`, `profile`).
+- **Run research**: register inputs, propose and review research questions, run capabilities such as Desktop Research, Survey (real and virtual respondents) and Delphi, and inspect runs and captured external materials (`research-input`, `run`, `external`, `survey`, `delphi`, `candidate`, `synthesis-candidate`, `exhibit`).
+- **Gate changes through people**: proposals become Confirmations and Human Decisions before any atomic commit (`actions`, `action`, `confirmation`, `decision`).
+- **Package and write**: evaluate research quality, build pinned Research Packages, and round-trip detached Writer input and manuscript revisions, with writing feedback routed back to research (`research-quality`, `research-package`, `writer-composition`, `writer-round-trip`).
+- **Publish**: build DOCX/PDF previews, run machine and editorial checks, and release only on a bound human decision (`publication`).
 
-The legacy directories remain reference material only:
+Late needs found while writing or publishing (a missing figure, a missing warrant) return to research instead of being patched in prose.
 
-- `research-harness/` — legacy Research Harness implementation
-- `research-profile/` — legacy Research Profile implementation
-
-New work should converge toward the canonical areas below rather than adding new cross-cutting concepts to either legacy tree.
+The canonical code lives in `core/`, `profiles/`, `plugins/`, `skills/` and `projects/` (see [Target areas](#target-areas)). The legacy `research-harness/` and `research-profile/` trees are migration and reference material only, are not runtime authority, and are scheduled for removal (#500); do not add new concepts to them.
 
 For a human-facing research session driven by Codex or ChatGPT Work, explicitly load [`skills/research-conversation/SKILL.md`](skills/research-conversation/SKILL.md). The repository does not assume either host automatically discovers this skill, and repository development/review tasks should not be routed through it.
 
@@ -23,7 +24,7 @@ For Work deployment, see [runtime readiness, durable continuation and file deliv
 
 ## Production CLI
 
-Research Loom requires Python 3.12+ and `uv`. Root `pyproject.toml` and `uv.lock` are the single repository/application dependency contract.
+Research Loom requires Python 3.12+ and `uv`. Root `pyproject.toml` and `uv.lock` are the single repository/application dependency contract. (The legacy `research-harness/` keeps its own manifest for reference only; nothing installs it.)
 
 For normal harness/host runtime use, provision the root project environment first with `uv sync --frozen` outside the host sandbox, then invoke the repository launcher from the repository root. Runtime launchers execute the pre-synced root `.venv` directly; they do not invoke `uv`, mutate dependencies, or depend on the persistent uv cache.
 
@@ -89,10 +90,13 @@ Formatting-only commits are listed in `.git-blame-ignore-revs`; run `git config 
 
 ## Target areas
 
-- `core/` — generic research domain, provenance, workflow, validation, and package contracts
-- `profiles/` — declarative research, organization, narrative, and publication profiles
-- `plugins/` — imperative integration and organization-specific extension code
-- `skills/` — writer and publication workflows that consume versioned packages/contracts
-- `projects/` — project-specific configuration, inputs, and artifacts
+- `core/` — generic research semantics: state transitions and validation, capability execution, Work Conversation and Human Decision services, and the versioned package/schema contracts
+- `profiles/` — declarative research, organization, narrative, and publication profiles plus their contracts
+- `plugins/` — imperative adapters: the local application facade and CLI, SQLite stores, capability implementations, and organization-specific extensions
+- `skills/` — host-loaded workflows: `research-conversation`, `writer`, and `publication`
+- `projects/` — project-specific configuration (Project Config and pinned Effective Profile Set)
+- `docs/` — architecture records, operations guides, acceptance records, and migration ledgers
+- `tests/` — `tests/contracts` (schema and semantic contracts) and `tests/runtime` (behavior); see [Developer checks](#developer-checks)
+- `scripts/` — operational and CI helpers (offline runtime wheelhouse, CI test sharding, MISCO probes)
 
 See [`docs/architecture/monorepo-structure.md`](docs/architecture/monorepo-structure.md) for ownership boundaries and [`docs/architecture/production-local-workspace-application-cli.md`](docs/architecture/production-local-workspace-application-cli.md) for the production local application boundary.
