@@ -2,6 +2,22 @@
 
 The exported `writer-input.json` is the complete runtime handoff for the selected sections. Each entry embeds its verified `section_input` including source pins, resolved research bodies, Profile constraints, and (when selected) `writer_profile` resources.
 
+For a document-scoped review, use the public `writer-round-trip prepare-review`
+operation (or `prepare_writer_document_review`) to materialize the exact response
+plus its unchanged base sections. Read the returned target and necessary fixed
+input materials before declaring results. Return the optional `document_review`
+record with that exact `target_digest`, coverage, reviewed section IDs, reviewer
+identity/method/time and document-scoped Profile groups. Keep semantic and
+editorial judgments separate in their rule results and existing Writing Feedback.
+Do not compute a target hash by hand or put the record into provenance.
+
+Partial review cannot establish document conformance or document N/A. Omitted
+or unevaluated document review does not block draft storage. A partial edit does
+not inherit the old document review; review the newly assembled target only when
+claiming it has been reviewed. Full coverage means the exported scope, not an
+unread remainder of the paper. A target match proves identity, not text quality,
+independent review or Human approval.
+
 A host must not depend on the current repository checkout or legacy Profile tree for rule bodies. If required Profile content is missing from the detached input, report the gap; do not silently recover it from another source.
 
 `writer_profile.review_plan` is deterministic routing metadata. It maps every delivered runtime rule ID to exactly one review group. The Writer's natural-language/editorial judgment remains a Host/Human check; backend validation only proves that the declared review covers the exact delivered IDs and that declared violations are connected to Writing Feedback.

@@ -333,6 +333,9 @@ def build_parser() -> argparse.ArgumentParser:
     wrt_import = writer_round_trip_sub.add_parser("import-response")
     _add_workspace(wrt_import)
     _add_input_json(wrt_import)
+    wrt_review = writer_round_trip_sub.add_parser("prepare-review")
+    _add_workspace(wrt_review)
+    _add_input_json(wrt_review)
     wrt_inspect = writer_round_trip_sub.add_parser("inspect")
     _add_workspace(wrt_inspect)
     wrt_inspect.add_argument("--composition-id", required=True)
@@ -684,6 +687,8 @@ def _run(args: argparse.Namespace) -> Mapping[str, Any]:
                 )
             if args.writer_round_trip_command == "import-response":
                 return facade.import_writer_response(_read_input(args.json_input))
+            if args.writer_round_trip_command == "prepare-review":
+                return facade.prepare_writer_document_review(_read_input(args.json_input))
             if args.writer_round_trip_command == "inspect":
                 return facade.inspect_writer_round_trip(args.composition_id, args.revision_id)
         if args.command == "exhibit":

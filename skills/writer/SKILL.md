@@ -10,6 +10,13 @@ Use this Skill only after Research has produced a fixed Research Package and a W
 4. Return a `writer_response` that matches `core/packages/writer-publication/writer-round-trip.schema.json`.
 5. Import through `writer-round-trip import-response`. Treat an imported manuscript revision as an immutable writing artifact, not as research adoption or publication approval.
 
+When reporting document-scoped review, use the public prepare-review target,
+read the assembled manuscript and necessary fixed materials, then attach the
+optional exact-target `document_review` described in `references/detached-input.md`.
+Keep meaning and reader-experience findings separate and return concrete editing
+actions through existing Writing Feedback. Unreviewed drafts remain importable;
+never reuse a previous document review as proof for an edited manuscript.
+
 ## Research authority boundary
 
 - Do not create new Evidence, causal findings, support judgments, generalizations, Recommendations, or missing research links.

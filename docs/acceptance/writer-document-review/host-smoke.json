@@ -1,0 +1,153 @@
+{
+  "case_id": "synthetic-comparison-checklist-a8-6-b4-5-v1",
+  "base_commit": "c3398da759f73ee2ec7db8dde31a9de966ef129d",
+  "input_ref": {
+    "input_id": "WRI-e99db5ab6569489d13957d00",
+    "input_digest": "sha256:45d562feee575794f3dcf0ead348cffb08a82672ffbc32a9b5413819d1c71c15"
+  },
+  "reviewed_document_review": {
+    "target_digest": "sha256:51d40fa1671e7df74b76b2c5c76e5b38d963ebfe85b1487ccc5c9b3995c17447",
+    "coverage": "full",
+    "section_ids": [
+      "SEC-FRAMING",
+      "SEC-METHOD",
+      "SEC-RESULTS",
+      "SEC-IMPLICATION"
+    ],
+    "reviewer": {
+      "reviewer_id": "codex-primary-host",
+      "method": "host_self_review"
+    },
+    "reviewed_at": "2026-10-16T08:00:00Z",
+    "profile_review": [
+      {
+        "review_id": "writer-transform",
+        "rule_ids": [
+          "PUB-RC-04"
+        ],
+        "outcome": "conformant",
+        "violated_rule_ids": [],
+        "rationale": "導入・結果・提言を通してA8→6分、B4→5分の逆方向、原因未確認、一律導入の保留、B調査と案件構成を記録する追試後の適用範囲判断を保持する。方法節に未統制条件が明示され、試行・展開の決定済みへの昇格はない。",
+        "rule_results": [
+          {
+            "rule_id": "PUB-RC-04",
+            "outcome": "conformant",
+            "applicability": "applicable",
+            "method": "semantic",
+            "rationale": "導入・結果・提言を通してA8→6分、B4→5分の逆方向、原因未確認、一律導入の保留、B調査と案件構成を記録する追試後の適用範囲判断を保持する。方法節に未統制条件が明示され、試行・展開の決定済みへの昇格はない。"
+          }
+        ]
+      }
+    ]
+  },
+  "reviewed_sections": [
+    {
+      "section_id": "SEC-FRAMING",
+      "content": "同じチェックリストを使った後でも、処理時間の変化は二つのチームで逆方向になった。他チームへの展開を判断するには、短縮した側だけでなく、延長した側も見なければならない。問うべきことは、この食い違いを踏まえて、どこまで導入を判断できるかである。\n\n本稿は、一律導入をいったん保留し、Bの案件構成と同時期の変更を調べたうえで、案件構成を記録する追試へ進むことを提案する。以下では、比較の条件、二つの結果、その結果から導ける次の対応を順に示す。",
+      "citations": [],
+      "exhibit_refs": []
+    },
+    {
+      "section_id": "SEC-METHOD",
+      "content": "対象は、受付に同じチェックリストを使った架空のチームAとチームBである。各チームで導入前1週間と導入後1週間を比べ、各期間の完了案件20件について、案件あたりの平均処理時間を記録した。このチームと数値は合成試験用の材料であり、実際の業務実績ではない。\n\n比較は無作為割付のない前後観察である。案件構成と同時期の変更は測定・統制していないため、前後の平均値の変化は確認できても、その原因をチェックリストの使用に特定することはできない。この区別を保って、二つの結果を読む。",
+      "citations": [],
+      "exhibit_refs": []
+    },
+    {
+      "section_id": "SEC-RESULTS",
+      "content": "チームAの平均処理時間は、導入前の8分／件から導入後の6分／件へ低下した。一方、チームBでは4分／件から5分／件へ上昇した。同じチェックリストの使用後に、Aでは短縮、Bでは延長が観察されたのである。\n\nこの結果は、両チームで時間が短縮したというまとめ方には収まらない。Aの低下だけを展開の根拠にすると、Bの上昇が判断から抜け落ちる。二つを合算して方向の違いを隠すのではなく、それぞれの結果を保つ必要がある。\n\n次の論点は、なぜ方向が分かれたかである。Bで平均値が上がった理由、AとBの案件構成の違い、同時期の変更が及ぼした影響は、いずれも未解決である。観察された違いを説明できていない以上、この記録から他チームに当てはまる条件まで決めることはできない。",
+      "citations": [],
+      "exhibit_refs": []
+    },
+    {
+      "section_id": "SEC-IMPLICATION",
+      "content": "他チームへ広げるかという冒頭の問いに対し、本稿は一律導入の保留を提案する。短縮と延長が併存し、その違いを生んだ条件も分かっていないためである。これはチェックリストの因果効果を認定した判断ではなく、方向の異なる結果と未解決の条件を踏まえた提案である。\n\n次に行う対応として、まずBの案件構成と同時期の変更を調べ、案件構成を記録した追試の結果を見てから適用範囲を判断することを提案する。他チームへ当てはまる条件と導入範囲は、まだ決まっていない。本稿はこの確認の順序を提案するものであり、全社展開やBでの即時中止が決定したという報告ではない。",
+      "citations": [],
+      "exhibit_refs": []
+    }
+  ],
+  "edited_sections": [
+    {
+      "section_id": "SEC-IMPLICATION",
+      "content": "他チームへ広げるかという冒頭の問いに対し、本稿は一律導入の保留を提案する。短縮と延長が併存し、その違いを生んだ条件も分かっていないためである。これはチェックリストの因果効果を認定した判断ではなく、方向の異なる結果と未解決の条件を踏まえた提案である。\n\n次に行う対応として、まずBの案件構成と同時期の変更を調べ、案件構成を記録した追試の結果を見てから適用範囲を判断することを提案する。他チームへ当てはまる条件と導入範囲は、まだ決まっていない。この確認の順序に沿って、適用範囲を判断する材料を整える。",
+      "citations": [],
+      "exhibit_refs": []
+    }
+  ],
+  "receipt": {
+    "synthetic_test_only": true,
+    "reviewer_method": "host_self_review",
+    "independent_review": false,
+    "document_rule_reviewed": [
+      "PUB-RC-04"
+    ],
+    "full_profile_review": false,
+    "review_target": "sha256:51d40fa1671e7df74b76b2c5c76e5b38d963ebfe85b1487ccc5c9b3995c17447",
+    "edited_target": "sha256:859cd76a93bdd24671b7963f1106abe40ae5abc4e11c329440c3bb879be49e46",
+    "reviewed_import": {
+      "status": "IMPORTED",
+      "revision_id": "WMR-abdafac69280108c6e996ed4-31f44ade0ff7489aa3e40ab785069b3b",
+      "revision_digest": "sha256:2cb2ad8b909bbb36bed52ac2569e583114dc1c52a24d07478ec19c338a3f2177",
+      "revision_number": 6,
+      "reused_section_ids": [],
+      "research_state_mutation_performed": false
+    },
+    "same_response_replay": {
+      "status": "VERIFIED_REUSE",
+      "revision_id": "WMR-abdafac69280108c6e996ed4-31f44ade0ff7489aa3e40ab785069b3b",
+      "revision_digest": "sha256:2cb2ad8b909bbb36bed52ac2569e583114dc1c52a24d07478ec19c338a3f2177",
+      "revision_number": 6,
+      "research_state_mutation_performed": false
+    },
+    "old_review_rejected": "APPLICATION-WRITER-DOCUMENT-REVIEW-001",
+    "edited_import": {
+      "status": "IMPORTED",
+      "revision_id": "WMR-4dfa70a7fbea856636b8ad55-a8caeec4266c488d8b836c82e942de79",
+      "revision_digest": "sha256:f04dc0749d226f27152bbddc8870e7110028d979baa8c5eeb55e8f3caf8b7606",
+      "revision_number": 7,
+      "reused_section_ids": [
+        "SEC-FRAMING",
+        "SEC-METHOD",
+        "SEC-RESULTS"
+      ],
+      "research_state_mutation_performed": false
+    },
+    "edited_review_status": {
+      "status": "unevaluated",
+      "coverage": "unevaluated",
+      "scope_section_ids": [
+        "SEC-FRAMING",
+        "SEC-METHOD",
+        "SEC-RESULTS",
+        "SEC-IMPLICATION"
+      ],
+      "reviewed_section_ids": [],
+      "covers_composition": true,
+      "rule_outcomes": {},
+      "results_by_check_kind": {
+        "structural": [],
+        "semantic": [],
+        "editorial": []
+      },
+      "semantic_quality_guaranteed": false,
+      "reader_effect_validated": false
+    },
+    "old_revision_unchanged": true,
+    "research_state_mutation_performed": false,
+    "reader_feedback": [
+      {
+        "issue_id": "WFI-466-READER-REPETITION",
+        "target_type": "section",
+        "target_id": "SEC-IMPLICATION",
+        "issue_category": "NARRATIVE_CONSTRAINT_CONFLICT",
+        "severity": "minor",
+        "supporting_package_refs": [],
+        "description": "読者体験: 一律導入の保留と提案段階を既に示しており、結末でBの即時中止を否定する文は軽微な重複。段落役割のブロッカーではない。",
+        "proposed_next_action": "提案段階と因果未確認の境界を維持し、末尾の即時中止の否定を削って次に整える判断材料で締める。"
+      }
+    ],
+    "reader_effect_validated": false
+  },
+  "execution_date": "2026-10-16",
+  "timestamp_note": "Response generated_at and document reviewed_at use fixed synthetic fixture timestamps, not wall-clock measurement."
+}
