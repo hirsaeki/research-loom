@@ -16,6 +16,28 @@ env:
   LANG: C.UTF-8
 
 jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+      - name: Sync locked Python environment with developer tools
+        run: uv sync --frozen --group dev
+      - name: Ruff lint
+        run: uv run --frozen --group dev ruff check --output-format=github .
+      - name: Ruff format
+        run: uv run --frozen --group dev ruff format --check .
+      - name: Mypy (core, strict)
+        run: uv run --frozen --group dev mypy
+
   contract-checks:
     name: contract-checks
     runs-on: ubuntu-latest
