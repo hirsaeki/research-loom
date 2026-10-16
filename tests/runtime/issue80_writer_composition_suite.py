@@ -1,21 +1,22 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import json
 import os
-from pathlib import Path
 import subprocess
 import sys
+from copy import deepcopy
+from pathlib import Path
 from unittest.mock import patch
 
-from plugins.local_application import LocalApplicationError, verify_writer_section_input
-from plugins.local_application.writer_composition_service import WriterCompositionService
-from core.runtime import TransitionAction, TransitionKind
-from core.runtime.transition_models import CommitReceipt
-from runtime_fixtures import decision, make_request
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
 import survey_virtual_runner_test_support as vr
 import test_external_desktop_research_intake as intake
+from research_package_acceptance_support import ResearchPackageAcceptanceSupport
+from runtime_fixtures import decision, make_request
+
+from core.runtime import TransitionAction, TransitionKind
+from core.runtime.transition_models import CommitReceipt
+from plugins.local_application import LocalApplicationError, verify_writer_section_input
+from plugins.local_application.writer_composition_service import WriterCompositionService
 
 
 class Issue80WriterCompositionTests(ResearchPackageAcceptanceSupport):
@@ -389,9 +390,7 @@ class Issue80WriterCompositionTests(ResearchPackageAcceptanceSupport):
             v1 = facade.capture_writer_composition(case["package_id"], self._proposal(case))[
                 "composition"
             ]
-            selected1 = facade.select_writer_composition(
-                v1["composition_id"], 1, v1["composition_digest"]
-            )
+            facade.select_writer_composition(v1["composition_id"], 1, v1["composition_digest"])
             old_snapshot_id = v1["source"]["research_snapshot_id"]
             intake.adopt_rq(facade)
             current = facade._application.state_repository.load_state_view(
@@ -1155,8 +1154,9 @@ class Issue80WriterCompositionTests(ResearchPackageAcceptanceSupport):
         finally:
             facade.close()
         self.assertEqual(verify_writer_section_input(base)["status"], "VERIFIED")
-        from core.runtime import canonical_digest
         import hashlib
+
+        from core.runtime import canonical_digest
 
         def write_mutated(label, mutate):
             out = self.root / f"round5-bad-{label}"
@@ -1292,8 +1292,9 @@ class Issue80WriterCompositionTests(ResearchPackageAcceptanceSupport):
         finally:
             facade.close()
         self.assertEqual(verify_writer_section_input(base)["status"], "VERIFIED")
-        from core.runtime import canonical_digest
         import hashlib
+
+        from core.runtime import canonical_digest
 
         mutations = {
             "missing-content": lambda d: d["resolved_materials"][0]["text_rendition"].pop(
@@ -1351,7 +1352,6 @@ class Issue80WriterCompositionTests(ResearchPackageAcceptanceSupport):
             facade.export_writer_composition(comp["composition_id"], 1, normal)
             self.assertTrue(normal.is_file())
             sentinel = self.root / "whole-sentinel.json"
-            real_link = os.link
 
             def race_link(src, dst):
                 Path(dst).write_text("sentinel", encoding="utf-8")

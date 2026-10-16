@@ -1,16 +1,17 @@
-from copy import deepcopy
 import json
 import unittest
+from copy import deepcopy
 from unittest.mock import patch
 
-from plugins.desktop_research.normalization import source_id_for_capture
-from plugins.desktop_research.digest import canonical_extension_digest
-from plugins.local_application import LocalApplicationError
-from plugins.local_application.research_package_service import verify_export_root
-from plugins.local_application.research_package_format import validate_resolved_references
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-import test_external_desktop_research_intake as intake
 import issue80_writer_composition_suite as compositions
+import test_external_desktop_research_intake as intake
+from research_package_acceptance_support import ResearchPackageAcceptanceSupport
+
+from plugins.desktop_research.digest import canonical_extension_digest
+from plugins.desktop_research.normalization import source_id_for_capture
+from plugins.local_application import LocalApplicationError
+from plugins.local_application.research_package_format import validate_resolved_references
+from plugins.local_application.research_package_service import verify_export_root
 
 
 class ReusedSourceTests(ResearchPackageAcceptanceSupport):

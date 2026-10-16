@@ -1,21 +1,22 @@
 from __future__ import annotations
 
-from contextlib import redirect_stdout
-from copy import deepcopy
 import io
 import json
-from pathlib import Path
 import tempfile
 import unittest
+from contextlib import redirect_stdout
+from copy import deepcopy
+from pathlib import Path
+
+import test_external_desktop_research_intake as intake
 
 from core.execution import RunStatus
-from plugins.local_application.cli import main as cli_main
 from plugins.local_application import (
     LocalApplicationError,
     LocalApplicationFacade,
     LocalResearchApplication,
 )
-import test_external_desktop_research_intake as intake
+from plugins.local_application.cli import main as cli_main
 
 
 class Issue92ExternalSubmissionPreflightTests(intake.ExternalDesktopResearchIntakeTests):

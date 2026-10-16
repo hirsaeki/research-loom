@@ -33,10 +33,22 @@ extend-exclude = ["research-harness", "research-profile"]
 select = ["E", "W", "F", "I", "UP", "B"]
 ignore = [
     "E501",  # line length is owned by the formatter; long literals are left as written
+    "B023",  # closures here are invoked within the loop iteration that defines them
+    "UP031",  # %-format specifiers render publication text; rewriting them risks output drift
+    "UP042",  # StrEnum changes str()/format() of persisted enum values
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["F403", "F405"]  # shared runtime fixtures are star-imported
+"tests/**" = [
+    "F403", "F405",  # shared runtime fixtures are star-imported
+    "B017",  # some tests intentionally assert any failure from a fail-closed boundary
+]
+# Fixture hubs re-export helpers to star-importing test modules.
+"tests/runtime/runtime_fixtures.py" = ["F401"]
+"tests/runtime/survey_virtual_runner_test_support.py" = ["F401"]
+# Import-time install hooks are ordered on purpose until #487 removes them.
+"plugins/local_application/__init__.py" = ["E402", "I001"]
+"scripts/verify_misco_word_fixture.py" = ["E402"]  # imports after sys.path setup
 
 [tool.mypy]
 python_version = "3.12"

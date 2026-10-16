@@ -1,25 +1,25 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from copy import deepcopy
-from typing import Any, Mapping
+from typing import Any
+
+from plugins.local_research_exhibit_store import (
+    SUPPORTED_EXHIBIT_KINDS,
+    LocalResearchExhibitStore,
+    LocalResearchExhibitStoreError,
+    content_digest,
+    normalized_content,
+    validate_visual_locator,
+)
 from plugins.research_visual_semantics import (
     digest,
     research_object_digest,
     validate_visual_semantics,
 )
 
-from plugins.local_research_exhibit_store import (
-    LocalResearchExhibitStore,
-    LocalResearchExhibitStoreError,
-    SUPPORTED_EXHIBIT_KINDS,
-    content_digest,
-    normalized_content,
-    validate_visual_locator,
-)
-
-from .run_inspection_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
 from .facade import LocalApplicationError
-
+from .run_inspection_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
 
 _EXHIBIT_STORE_NAME = "research-exhibits.sqlite3"
 _EXHIBIT_LIST_LIMIT = 100

@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import ctypes
 import os
-from pathlib import Path
 import unittest
+from pathlib import Path
 
-from plugins.local_application.workspace import LocalWorkspaceError, _safe_locator
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
 import issue80_writer_composition_suite as composition_support
 import test_issue219_writer_round_trip as round_trip
+from research_package_acceptance_support import ResearchPackageAcceptanceSupport
+
+from plugins.local_application.workspace import LocalWorkspaceError, _safe_locator
 
 
 class WriterRecoveryReviewTests(ResearchPackageAcceptanceSupport):

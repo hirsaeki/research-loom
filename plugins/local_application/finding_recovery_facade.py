@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import hashlib
+from collections.abc import Mapping
+from copy import deepcopy
 from threading import RLock
-from typing import Any, Mapping
+from typing import Any
 
 from core.conversation import ActionDefinition, ConversationRuntimeError, HarnessServiceResult
 from core.execution import RunStatus
@@ -16,9 +17,8 @@ from plugins.local_conversation_store import (
 from plugins.local_execution_store import canonical_handoff_for
 from plugins.sqlite_state_store.exhibit_guard import guard_research_state_head
 
-from .facade import LocalApplicationError
 from .argument_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
-
+from .facade import LocalApplicationError
 
 _RECOVERY_VERSION = "legacy-desktop-finding-candidate-to-approved@0.1.0"
 _ACTION_TYPE = "desktop_research.finding.recover"

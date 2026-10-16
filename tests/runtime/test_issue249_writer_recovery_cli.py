@@ -4,11 +4,12 @@ import io
 import json
 from unittest.mock import patch
 
+import issue80_writer_composition_suite as composition_support
+import test_issue219_writer_round_trip as writer_support
+from research_package_acceptance_support import ResearchPackageAcceptanceSupport
+
 from plugins.local_application import LocalApplicationFacade
 from plugins.local_application.cli import main
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-import test_issue219_writer_round_trip as writer_support
-import issue80_writer_composition_suite as composition_support
 
 
 class WriterRecoveryCliTests(ResearchPackageAcceptanceSupport):

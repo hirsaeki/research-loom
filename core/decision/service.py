@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import hashlib
+from collections.abc import Mapping, Sequence
 from copy import deepcopy
 from dataclasses import asdict, replace
-import hashlib
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 from core.runtime import (
     Actor,
@@ -26,7 +27,6 @@ from .models import (
     with_request_digest,
     with_response_digest,
 )
-
 
 _TERMINAL = {"RESOLVED", "DECLINED", "REVISION_REQUESTED", "STALE", "CANCELLED"}
 _STALE_TRANSITION_CODES = {"RT-HEAD-001", "RT-HEAD-002", "RT-PIN-002", "RT-PIN-003", "RT-PIN-004"}

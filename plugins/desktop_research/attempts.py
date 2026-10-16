@@ -1,12 +1,12 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from copy import deepcopy
-from typing import Any, Mapping
+from typing import Any
 
 from core.execution.models import CapabilityRunRecord, RunStatus
 from core.execution.operational_trace import OperationalTraceStore
 from core.execution.ports import ExecutionTraceStore, RuntimeClock
-
 
 ATTEMPT_STARTED = "desktop_research.retrieval_attempt_started"
 ATTEMPT_COMPLETED = "desktop_research.retrieval_attempt_completed"

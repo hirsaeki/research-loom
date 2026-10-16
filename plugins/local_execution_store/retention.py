@@ -1,21 +1,21 @@
 from __future__ import annotations
 
-from collections import Counter
-from contextlib import contextmanager
 import errno
 import hashlib
 import os
-from pathlib import Path
 import stat
 import tempfile
 import time
-from typing import Any, Iterator, Mapping
+from collections import Counter
+from collections.abc import Iterator, Mapping
+from contextlib import contextmanager
+from pathlib import Path
+from typing import Any
 
 from core.execution.models import CapabilityRunRecord, ExecutionArtifactMetadata, RunStatus
 
 from .atomic import LocalExecutionStore as _AtomicExecutionStore
 from .store import LocalExecutionStoreError, LocalExecutionStoreIntegrityError, _now
-
 
 _LARGE_ORIGINAL_SCHEME = "external-original"
 

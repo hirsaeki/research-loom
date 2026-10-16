@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-from contextlib import redirect_stdout
 import io
 import json
+from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
-from plugins.local_application import LocalApplicationFacade
+from research_package_acceptance_support import ResearchPackageAcceptanceSupport
+
 from plugins.local_application.cli import main as cli_main
 from plugins.local_execution_store.verified_artifact_read import VerifiedArtifactReadMixin
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 
 def _run_cli(argv):

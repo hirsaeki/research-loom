@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from copy import deepcopy
 from threading import RLock
-from typing import Any, Mapping
+from typing import Any
 
 from core.conversation import (
     ActionDefinition,
@@ -14,12 +15,11 @@ from .facade import LocalApplicationError
 from .survey_facade import LocalApplicationFacade as SurveyApplicationFacade
 from .survey_response_capture import SurveyResponseCaptureMixin
 from .survey_response_core import (
-    SurveyResponseCoreMixin,
     _DATASET_FIELDS,
     _RESPONSE_FIELDS,
+    SurveyResponseCoreMixin,
 )
 from .survey_response_inspection import SurveyResponseInspectionMixin
-
 
 _SURVEY_RESPONSE_ACTIONS = (
     (

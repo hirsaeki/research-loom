@@ -1,24 +1,25 @@
-from copy import deepcopy
 import base64
 import hashlib
 import io
 import json
+import unittest
+import zipfile
+from copy import deepcopy
 from pathlib import Path
 from unittest.mock import patch
 from xml.etree import ElementTree as ET
-import zipfile
-import unittest
+
+import issue80_writer_composition_suite as compositions
+import test_issue219_writer_round_trip as writer
+import test_issue256_native_publication as native
+import test_issue405_research_charts as charts
+from research_package_acceptance_support import ResearchPackageAcceptanceSupport
+from test_issue256_native_publication import fixture_png
+from test_research_exhibits import state_signature
 
 from plugins.local_application import LocalApplicationError
+from plugins.local_application.publication_docx import A, W, docx_bytes, verify_native_docx
 from plugins.local_application.publication_exhibits import prepare_exhibits
-from plugins.local_application.publication_docx import W, A, docx_bytes, verify_native_docx
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-import test_issue256_native_publication as native
-from test_issue256_native_publication import fixture_png
-import test_issue405_research_charts as charts
-import test_issue219_writer_round_trip as writer
-import issue80_writer_composition_suite as compositions
-from test_research_exhibits import state_signature
 
 
 class GeneratedPublicationTests(ResearchPackageAcceptanceSupport):

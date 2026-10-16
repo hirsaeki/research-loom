@@ -1,29 +1,30 @@
-from copy import deepcopy
 import base64
 import hashlib
 import json
-from pathlib import Path
 import tempfile
 import unittest
+from copy import deepcopy
+from pathlib import Path
 from unittest.mock import patch
+
+from runtime_fixtures import evidence, project, rq, seed_state, source
+from test_research_exhibits import NullResolver, profile_provider, state_signature
 
 from core.runtime import canonical_digest
 from plugins.local_application import (
-    LocalApplicationFacade,
     LocalApplicationError,
+    LocalApplicationFacade,
     LocalResearchApplication,
 )
+from plugins.local_application.publication_exhibits import png_size
 from plugins.local_application.research_chart import (
     quantitative_input,
-    validate_chart_spec,
     validate_chart_exhibit,
+    validate_chart_spec,
 )
 from plugins.local_application.research_chart_png import render_chart
-from plugins.local_application.publication_exhibits import png_size
-from plugins.research_visual_semantics import digest, validate_visual_package_bindings
 from plugins.local_application.visual_origin import verify_visual_origin
-from runtime_fixtures import project, rq, source, evidence, seed_state
-from test_research_exhibits import NullResolver, profile_provider, state_signature
+from plugins.research_visual_semantics import digest, validate_visual_package_bindings
 
 
 def chart_evidence(numeric_x=False):

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from copy import deepcopy
-from typing import Any, Mapping
+from typing import Any
 
 from plugins.local_application.facade import LocalApplicationError
+
 from .virtual_runner_input import _PROFILE_PIN_FIELDS
 
 

@@ -1,22 +1,23 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import io
 import json
-from pathlib import Path
 import unittest
 import zipfile
+from copy import deepcopy
+from pathlib import Path
 from xml.etree import ElementTree as ET
 
+import test_external_desktop_research_intake as intake
+from pypdf import PdfWriter
+
 from plugins.local_application import LocalApplicationError
+from plugins.local_application.profile_advancement import _validate_target_project_delta
+from plugins.local_application.profile_resolution import target_project_config
 from plugins.local_application.publication_docx import W, docx_bytes
 from plugins.local_application.publication_formal_report import assemble, inspect_formal, outline
 from plugins.local_application.publication_pdf import coverage_review, inspect_pdf
-from pypdf import PdfWriter
-from plugins.local_application.profile_resolution import target_project_config
-from plugins.local_application.profile_advancement import _validate_target_project_delta
 from plugins.local_application.publication_release_service import _validate_publication_inputs
-import test_external_desktop_research_intake as intake
 
 ROOT = Path(__file__).resolve().parents[2]
 

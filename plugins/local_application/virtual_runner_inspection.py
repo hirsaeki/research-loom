@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import json
-from typing import Any, Mapping
+from collections.abc import Mapping
+from copy import deepcopy
+from typing import Any
 
 from plugins.local_application.facade import LocalApplicationError
 

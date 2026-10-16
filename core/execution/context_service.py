@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import Any
 
 from .context_extensions import (
     CapabilityContextExtensionRegistry,
@@ -22,8 +23,10 @@ from .models import (
 )
 from .resource_access import BoundedResourceAccess
 from .service import (
-    CapabilityExecutionService as _BaseCapabilityExecutionService,
     _TERMINAL_STATUSES,
+)
+from .service import (
+    CapabilityExecutionService as _BaseCapabilityExecutionService,
 )
 
 

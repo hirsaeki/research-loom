@@ -1,13 +1,11 @@
 from __future__ import annotations
 
 import hashlib
-from pathlib import Path
 import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
-from plugins.desktop_research import DesktopResearchResultValidator
-from plugins.local_execution_store import LocalExecutionStoreConfig, LocalExecutionStoreError
 from test_desktop_research import Flow
 from test_external_desktop_research_intake import (
     ExternalDesktopResearchIntakeTests,
@@ -17,6 +15,9 @@ from test_external_desktop_research_intake import (
 from test_external_desktop_research_intake_atomicity import (
     ExternalDesktopResearchAtomicityTests,
 )
+
+from plugins.desktop_research import DesktopResearchResultValidator
+from plugins.local_execution_store import LocalExecutionStoreConfig, LocalExecutionStoreError
 
 
 class DesktopResearchRetentionTests(unittest.TestCase):

@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import json
 import sqlite3
+from copy import deepcopy
 
 from core.conversation import ConversationRuntimeError
 from core.decision import request_digest
-
 
 _KNOWN_STATUSES = {
     "PENDING",

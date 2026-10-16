@@ -1,19 +1,18 @@
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor
 import math
-from pathlib import Path
 import tempfile
-import unittest
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from unittest.mock import patch
 
 from plugins.local_application import LocalApplicationFacade
 from plugins.local_survey_response_store import LocalSurveyResponseStore
-from tests.runtime.test_survey_response_dataset import intake, raw_response
 from tests.runtime.survey_virtual_runner_test_support import (
     SurveyVirtualRunnerTestBase,
     make_virtual_app,
 )
+from tests.runtime.test_survey_response_dataset import intake, raw_response
 
 
 class SurveyResponseReviewFixTests(SurveyVirtualRunnerTestBase):

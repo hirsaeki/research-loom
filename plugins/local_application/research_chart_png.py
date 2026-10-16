@@ -104,7 +104,7 @@ def render_chart(validated: dict) -> bytes:
     line(left, top, left, bottom, (40, 40, 40))
     line(left, py(0), right, py(0), (40, 40, 40))
     previous = None
-    for x, y in zip(xs, ys):
+    for x, y in zip(xs, ys, strict=False):
         xx, yy = px(x), py(y)
         if chart_type == "bar":
             half_width = max(1, int((right - left) / len(points) * 0.35))

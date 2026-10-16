@@ -2,16 +2,17 @@
 
 from __future__ import annotations
 
-from copy import deepcopy
 import hashlib
 import json
 import os
-from pathlib import Path, PureWindowsPath
 import re
 import stat
 import struct
-from typing import Any, Mapping
 import zlib
+from collections.abc import Mapping
+from copy import deepcopy
+from pathlib import Path, PureWindowsPath
+from typing import Any
 
 from .facade import LocalApplicationError
 from .item_listing import _require_unlinked
@@ -318,9 +319,9 @@ def prepare_exhibits(inspection: Mapping[str, Any], workspace: Path) -> dict[str
                 raise ValueError("new meaning requires Research")
             if generated is not None:
                 from .generated_explanation import (
+                    REVIEW_SCHEMA,
                     matching_review,
                     validate_explanation,
-                    REVIEW_SCHEMA,
                 )
                 from .research_chart import is_host_chart, validate_chart_exhibit
                 from .visual_origin import verify_visual_origin

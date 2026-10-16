@@ -6,16 +6,17 @@ not guessed or deep-hashed here; its owner verifies the selected object on use.
 
 from __future__ import annotations
 
-from contextlib import contextmanager
-from copy import deepcopy
-from functools import lru_cache
 import errno
 import importlib
 import os
-from pathlib import Path
 import sqlite3
 import time
-from typing import Any, Mapping
+from collections.abc import Mapping
+from contextlib import contextmanager
+from copy import deepcopy
+from functools import lru_cache
+from pathlib import Path
+from typing import Any
 
 OPTIONAL_DURABLE_CHILDREN = {
     "research_attention": {"locator": ".research-loom/attention.sqlite3", "kind": "file"},
@@ -139,7 +140,7 @@ def inspect_optional_child(
     *,
     quick: bool = False,
 ) -> dict[str, Any]:
-    from plugins.local_application.workspace import _safe_locator, LocalWorkspaceError
+    from plugins.local_application.workspace import LocalWorkspaceError, _safe_locator
 
     spec = OPTIONAL_DURABLE_CHILDREN[name]
     registered = name in binding.get("durable_children", {})
@@ -317,9 +318,9 @@ def register_optional_path(path: Path) -> None:
     from plugins.local_application.workspace import (
         BINDING_NAME,
         INTERNAL_DIR,
+        _atomic_json_write,
         _read_json,
         _validate_binding_shape,
-        _atomic_json_write,
     )
 
     binding_path = root / INTERNAL_DIR / BINDING_NAME

@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from collections import Counter
-from copy import deepcopy
 import json
 import re
-from typing import Any, Mapping
+from collections import Counter
+from collections.abc import Mapping
+from copy import deepcopy
+from typing import Any
 
 from plugins.local_survey_response_store import LocalSurveyResponseStoreError
 from plugins.survey_response import (
@@ -15,6 +16,7 @@ from plugins.survey_response import (
     validate_dataset,
     virtual_record_to_raw,
 )
+
 from .facade import LocalApplicationError
 from .survey_facade import _snapshot
 from .survey_response_core import _DATASET_FIELDS, _RESPONSE_FIELDS, _status_value

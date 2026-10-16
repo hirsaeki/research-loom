@@ -1,20 +1,20 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import hashlib
 import json
-from pathlib import Path
 import random
 import subprocess
 import sys
 import tempfile
 import unittest
+from copy import deepcopy
+from pathlib import Path
 from unittest.mock import patch
 
 import rfc8785
 
-from plugins.local_application import LocalWorkspace
 import plugins.local_application.profile_resolution as profile_resolution
+from plugins.local_application import LocalWorkspace
 from plugins.local_application.profile_resolution import resolve_effective_profile_set
 from plugins.local_application.research_package_format import profile_resources
 from plugins.local_application.workspace import LocalWorkspaceError

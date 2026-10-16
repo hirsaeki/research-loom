@@ -10,16 +10,16 @@ prose and explicitly marks all delivered semantic rules unevaluated.
 from __future__ import annotations
 
 import argparse
-from copy import deepcopy
-from dataclasses import replace
-from datetime import datetime, timezone
 import hashlib
 import json
-from pathlib import Path
 import subprocess
 import sys
-from typing import Any, Mapping
-
+from collections.abc import Mapping
+from copy import deepcopy
+from dataclasses import replace
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 RUNTIME_FIXTURES = ROOT / "tests" / "runtime"
@@ -33,11 +33,12 @@ if str(ROOT) not in sys.path:
 if str(RUNTIME_FIXTURES) not in sys.path:
     sys.path.insert(0, str(RUNTIME_FIXTURES))
 
+from runtime_fixtures import seed_state  # noqa: E402
+
 from core.runtime import canonical_digest  # noqa: E402
 from plugins.local_application import LocalApplicationFacade, LocalResearchApplication  # noqa: E402
 from plugins.local_application.profile_resolution import resolve_effective_profile_set  # noqa: E402
 from plugins.local_application.writer_round_trip_service import MAX_RESPONSE_BYTES  # noqa: E402
-from runtime_fixtures import seed_state  # noqa: E402
 
 
 class _NoCapabilityResolver:
@@ -61,7 +62,7 @@ def _read_json(path: Path) -> Any:
 
 
 def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+    return datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
 def _git_head() -> str:
@@ -700,7 +701,9 @@ def _write_immutable_bytes(path: Path, raw: bytes) -> None:
             handle.write(raw)
     except FileExistsError:
         if path.read_bytes() != raw:
-            raise SystemExit(f"immutable artifact path conflicts with existing bytes: {path}")
+            raise SystemExit(
+                f"immutable artifact path conflicts with existing bytes: {path}"
+            ) from None
 
 
 def _wrap_response(args: argparse.Namespace) -> int:
@@ -821,7 +824,7 @@ def _wrap_response(args: argparse.Namespace) -> int:
             }
         )
 
-    response_seed = f"{case_id}\n{prose_digest}\n{base_ref or ''}".encode("utf-8")
+    response_seed = f"{case_id}\n{prose_digest}\n{base_ref or ''}".encode()
     response_id = "WR-" + hashlib.sha256(response_seed).hexdigest()[:20]
     response = {
         "schema_version": "0.1.0",

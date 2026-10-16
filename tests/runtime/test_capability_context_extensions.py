@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import json
-from pathlib import Path
 import unittest
+from copy import deepcopy
+from pathlib import Path
 
 from core.execution import (
     CapabilityContextExtensionRegistry,
@@ -25,7 +25,6 @@ from core.runtime import (
     StateDeltaProposal,
     StateView,
 )
-
 
 ROOT = Path(__file__).resolve().parents[2]
 FIX = ROOT / "core/fixtures/capabilities/valid"

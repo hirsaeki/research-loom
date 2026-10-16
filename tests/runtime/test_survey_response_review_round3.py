@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from pathlib import Path
 import sqlite3
 import tempfile
 import unittest
+from pathlib import Path
 
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade
 from tests.runtime.survey_virtual_runner_test_support import (

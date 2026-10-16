@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from contextlib import contextmanager
 import errno
 import math
 import os
-from pathlib import Path
 import threading
 import time
+from contextlib import contextmanager
+from pathlib import Path
 
 from .workspace import INTERNAL_DIR, LocalWorkspaceError, _safe_locator
 
@@ -23,8 +23,8 @@ def _try_lock(handle, *, shared: bool) -> None:
         fcntl.flock(handle.fileno(), (fcntl.LOCK_SH if shared else fcntl.LOCK_EX) | fcntl.LOCK_NB)
         return
     import ctypes
-    from ctypes import wintypes
     import msvcrt
+    from ctypes import wintypes
 
     # LockFileEx supports actual shared byte-range locks; CRT locking does not
     # provide this distinction. FAIL_IMMEDIATELY keeps every attempt bounded.

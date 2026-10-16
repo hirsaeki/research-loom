@@ -8,10 +8,10 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import zipfile
 from typing import Any
 from xml.etree import ElementTree as ET
 from xml.sax.saxutils import escape, quoteattr
-import zipfile
 
 from .facade import LocalApplicationError
 

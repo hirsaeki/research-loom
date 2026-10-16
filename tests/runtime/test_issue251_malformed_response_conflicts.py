@@ -1,17 +1,17 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import json
-from pathlib import Path
 import tempfile
+from copy import deepcopy
+from pathlib import Path
 from unittest.mock import patch
 
-from plugins.local_survey_response_store import LocalSurveyResponseStore
 from plugins.local_application import (
     LocalApplicationError,
     LocalApplicationFacade,
     LocalResearchApplication,
 )
+from plugins.local_survey_response_store import LocalSurveyResponseStore
 from tests.runtime import test_issue251_real_survey_batches as batches
 from tests.runtime.survey_virtual_runner_test_support import SurveyVirtualRunnerTestBase
 from tests.runtime.test_survey_production import NullResolver, profile_provider, state_signature

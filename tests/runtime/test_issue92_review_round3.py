@@ -1,10 +1,14 @@
 from __future__ import annotations
 
-from copy import deepcopy
-from pathlib import Path
 import tempfile
 import unittest
+from copy import deepcopy
+from pathlib import Path
 from unittest.mock import patch
+
+import test_external_desktop_research_intake as intake
+import test_issue92_external_submission_preflight as issue92
+from runtime_fixtures import project, rq, seed_state
 
 from plugins.local_application import (
     LocalApplicationError,
@@ -12,9 +16,6 @@ from plugins.local_application import (
     LocalResearchApplication,
 )
 from plugins.local_application import external_submission as submission_module
-import test_external_desktop_research_intake as intake
-import test_issue92_external_submission_preflight as issue92
-from runtime_fixtures import project, rq, seed_state
 
 
 class Issue92ReviewRound3Tests(unittest.TestCase):

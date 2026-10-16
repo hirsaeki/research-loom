@@ -3,18 +3,13 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
-from typing import Mapping
+from collections.abc import Mapping
 
 from core.runtime import canonical_digest
+from plugins.research_visual_semantics import digest
+
+from .exhibit_facade import _string_list
 from .facade import LocalApplicationError
-from .research_quality_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
-from .research_chart import (
-    HOST_CHART_SCHEMA,
-    is_host_chart,
-    validate_chart_exhibit,
-    validate_chart_spec,
-)
-from .research_chart_png import RENDERER_ID, render_chart
 from .generated_explanation import (
     EXPLANATION_SCHEMA,
     REVIEW_SCHEMA,
@@ -22,8 +17,14 @@ from .generated_explanation import (
     validate_explanation,
     validate_request,
 )
-from plugins.research_visual_semantics import digest
-from .exhibit_facade import _string_list
+from .research_chart import (
+    HOST_CHART_SCHEMA,
+    is_host_chart,
+    validate_chart_exhibit,
+    validate_chart_spec,
+)
+from .research_chart_png import RENDERER_ID, render_chart
+from .research_quality_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
 from .visual_origin import verify_visual_origin
 
 

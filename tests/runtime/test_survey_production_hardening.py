@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import json
-from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+from copy import deepcopy
+from pathlib import Path
 
-from plugins.local_application import LocalApplicationError, LocalApplicationFacade
-from plugins.local_survey_store import canonical_document_digest
 from test_survey_production import (
     ROOT,
     adopt_rq,
@@ -19,6 +17,9 @@ from test_survey_production import (
     instrument_payload,
     make_app,
 )
+
+from plugins.local_application import LocalApplicationError, LocalApplicationFacade
+from plugins.local_survey_store import canonical_document_digest
 
 
 def run_launcher(argv: list[str]) -> tuple[int, dict]:

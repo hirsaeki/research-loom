@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from copy import deepcopy
 from threading import RLock
-from typing import Any, Mapping
+from typing import Any
 
 from core.conversation import ActionDefinition, ConversationRuntimeError, HarnessServiceResult
 from core.runtime import ObjectRef, StateDeltaProposal, TransitionAction, TransitionKind

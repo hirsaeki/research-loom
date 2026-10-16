@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor
-from copy import deepcopy
 import hashlib
 import json
-from pathlib import Path
 import sqlite3
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
+from copy import deepcopy
+from pathlib import Path
 from unittest.mock import patch
 
 from plugins.local_application import (
@@ -15,8 +15,8 @@ from plugins.local_application import (
     LocalResearchApplication,
 )
 from plugins.local_survey_response_store import LocalSurveyResponseStore
-from tests.runtime.survey_virtual_runner_test_support import SurveyVirtualRunnerTestBase
 from tests.runtime import test_issue221_real_survey_intake as issue221
+from tests.runtime.survey_virtual_runner_test_support import SurveyVirtualRunnerTestBase
 from tests.runtime.test_survey_production import NullResolver, profile_provider, state_signature
 
 
@@ -437,7 +437,6 @@ class Issue251RealSurveyBatchTests(SurveyVirtualRunnerTestBase):
 
     def test_failed_schema_publication_does_not_create_an_empty_registry(self):
         with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp)
             app, facade, _, payload = self._fixture(temp)
             try:
                 with patch(

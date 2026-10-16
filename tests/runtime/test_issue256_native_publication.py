@@ -1,31 +1,30 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import hashlib
 import io
 import json
 import os
-from pathlib import Path
 import struct
-from unittest.mock import patch
-from xml.etree import ElementTree as ET
 import zipfile
 import zlib
+from pathlib import Path
+from unittest.mock import patch
+from xml.etree import ElementTree as ET
 
-from plugins.local_application import LocalApplicationError
+import issue80_writer_composition_suite as composition_support
+import test_issue219_writer_round_trip as writer
+import test_research_exhibits as exhibits
+from research_package_acceptance_support import ResearchPackageAcceptanceSupport
+
+from plugins.local_application import LocalApplicationError, publication_exhibits
 from plugins.local_application import publication_release_service as publication
-from plugins.local_application import publication_exhibits
-from plugins.local_application.publication_docx import W, A, R, docx_bytes, verify_native_docx
+from plugins.local_application.publication_docx import A, W, docx_bytes, verify_native_docx
 from plugins.local_application.publication_exhibits import (
     _asset,
     png_size,
     prepare_exhibits,
     table_rows,
 )
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-import test_issue219_writer_round_trip as writer
-import issue80_writer_composition_suite as composition_support
-import test_research_exhibits as exhibits
 
 
 def fixture_png(width=320, height=120, *, source_width=None):

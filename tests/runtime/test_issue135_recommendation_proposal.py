@@ -4,6 +4,9 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+from runtime_fixtures import finding, project, rq, seed_state
+from test_survey_production import NullResolver
+
 from core.conversation import ConversationRuntimeError
 from plugins.local_application import (
     LocalApplicationError,
@@ -11,8 +14,6 @@ from plugins.local_application import (
     LocalResearchApplication,
 )
 from plugins.local_application.recommendation_facade import _current_authoritative_finding
-from runtime_fixtures import finding, project, rq, seed_state
-from test_survey_production import NullResolver
 
 
 def profile_provider(_project_ref, expected_digest):

@@ -1,23 +1,24 @@
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor
 import errno
 import hashlib
 import os
-from pathlib import Path
 import tempfile
 import unittest
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from unittest.mock import patch
 
-from plugins.local_application import LocalApplicationError, LocalApplicationFacade
-from plugins.local_application.material_recovery_facade import HistoricalMaterialRecoveryService
-from plugins.local_application.material_reacquisition_facade import RetrievedMaterial
-from plugins.local_execution_store import LocalExecutionStoreConfig, bind_controlled_import_root
-from plugins import local_payload_repair as repair
+import test_external_desktop_research_intake_atomicity as intake_support
 from research_package_acceptance_support import ResearchPackageAcceptanceSupport
 from test_historical_material_recovery import _run_cli, _submit_recovery
 from test_historical_material_recovery_reacquire import _submit_reacquire
-import test_external_desktop_research_intake_atomicity as intake_support
+
+from plugins import local_payload_repair as repair
+from plugins.local_application import LocalApplicationError, LocalApplicationFacade
+from plugins.local_application.material_reacquisition_facade import RetrievedMaterial
+from plugins.local_application.material_recovery_facade import HistoricalMaterialRecoveryService
+from plugins.local_execution_store import LocalExecutionStoreConfig, bind_controlled_import_root
 
 
 class ExactPayloadRepairTests(ResearchPackageAcceptanceSupport):

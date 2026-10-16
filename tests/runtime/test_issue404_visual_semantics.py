@@ -1,7 +1,10 @@
-from copy import deepcopy
-from pathlib import Path
 import tempfile
 import unittest
+from copy import deepcopy
+from pathlib import Path
+
+from research_package_acceptance_support import ResearchPackageAcceptanceSupport
+from test_research_exhibits import exhibit_payload, make_app, state_signature
 
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade
 from plugins.local_research_exhibit_store import (
@@ -9,8 +12,6 @@ from plugins.local_research_exhibit_store import (
     LocalResearchExhibitStoreError,
 )
 from plugins.research_visual_semantics import validate_visual_package_bindings
-from test_research_exhibits import make_app, exhibit_payload, state_signature
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 
 def visual_payload(**changes):
@@ -125,8 +126,9 @@ class VisualPackageRoundTripTests(ResearchPackageAcceptanceSupport):
             package_id = built["package"]["package_id"]
             output = self.root / "visual-package"
             facade.export_research_package(package_id, output)
-            from plugins.local_application.research_package_format import verify_export_root
             import json
+
+            from plugins.local_application.research_package_format import verify_export_root
 
             self.assertEqual(verify_export_root(output)["status"], "VERIFIED")
             package = json.loads((output / "research-package.json").read_text())

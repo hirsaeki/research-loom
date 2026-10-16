@@ -1,21 +1,20 @@
 from __future__ import annotations
 
-from plugins.local_durable_store import require_optional_available, register_optional_path
-
-from copy import deepcopy
 import json
 import os
-from pathlib import Path
 import sqlite3
 import tempfile
-from typing import Any, Mapping, Sequence
+from collections.abc import Mapping, Sequence
+from copy import deepcopy
+from pathlib import Path
+from typing import Any
 
+from plugins.local_durable_store import register_optional_path, require_optional_available
 from plugins.survey_response.contracts import (
     canonical_digest,
     validate_canonical_response,
     validate_dataset,
 )
-
 
 SURVEY_RESPONSE_STORE_SCHEMA_VERSION = "0.1.0"
 _REQUIRED_COLUMNS = {

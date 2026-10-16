@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import json
+from copy import deepcopy
 from unittest.mock import patch
 
-from plugins.local_application import LocalApplicationError
 import issue80_writer_composition_suite as _suite
+
+from plugins.local_application import LocalApplicationError
 
 
 class Issue80WriterCompositionTests(_suite.Issue80WriterCompositionTests):

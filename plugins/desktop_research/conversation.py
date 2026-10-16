@@ -1,13 +1,13 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from copy import deepcopy
-from typing import Any, Mapping
+from typing import Any
 
 from core.conversation.models import CapabilityMaterialization, ConversationRuntimeError
 from core.conversation.validation import canonical_digest
 
 from .submission import with_context_extension_digest
-
 
 _DEFAULT_CONTEXT_LIMITS = {
     "max_questions": 1,

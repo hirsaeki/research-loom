@@ -7,7 +7,6 @@ from pathlib import Path
 
 import yaml
 from jsonschema import Draft202012Validator
-
 from narrative_semantic_oracle import (
     apply_mutations,
     catalog_cross_reference_errors,

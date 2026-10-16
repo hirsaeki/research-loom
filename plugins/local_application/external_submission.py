@@ -1,16 +1,17 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from copy import deepcopy
-from typing import Any, Mapping
+from typing import Any
 
 from core.conversation.validation import canonical_digest
 from core.execution import CapabilityExecutionError
-from core.runtime.normalization import NormalizationRejected
 from core.execution.validation import CanonicalCapabilityExecutionValidator
+from core.runtime.normalization import NormalizationRejected
 from plugins.desktop_research import DesktopResearchResultValidator, build_result_extension
+from plugins.desktop_research.attempts import UNSUCCESSFUL_OUTCOMES
 from plugins.desktop_research.normalization import verified_resource_basis_provenance
 from plugins.desktop_research.retention import _matching_whitespace_slice
-from plugins.desktop_research.attempts import UNSUCCESSFUL_OUTCOMES
 from plugins.local_execution_store import LocalExecutionStoreError
 from plugins.local_execution_store.capture_query import artifacts_for_capture_ids
 

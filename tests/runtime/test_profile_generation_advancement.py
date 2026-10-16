@@ -1,20 +1,24 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import hashlib
 import io
 import json
-from pathlib import Path
-from contextlib import redirect_stdout
 import subprocess
 import sys
 import tempfile
 import threading
 import time
 import unittest
+from contextlib import redirect_stdout
+from copy import deepcopy
+from pathlib import Path
 from unittest.mock import patch
 
 import rfc8785
+import test_external_desktop_research_intake as intake
+from research_package_acceptance_support import ResearchPackageAcceptanceSupport
+from runtime_fixtures import make_request
+from test_profile_constraint_enforcement import _evidence, _source
 
 from core.runtime import CommitReceipt, TransitionAction, TransitionKind
 from plugins.local_application import LocalApplicationFacade, LocalWorkspace
@@ -25,11 +29,6 @@ from plugins.local_application.profile_resolution import (
     effective_profile_digest,
     resolve_effective_profile_set,
 )
-from runtime_fixtures import make_request
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-import test_external_desktop_research_intake as intake
-from test_profile_constraint_enforcement import _source, _evidence
-
 
 ROOT = Path(__file__).resolve().parents[2]
 OLD_EPS = ROOT / "profiles/fixtures/valid/effective-profile-set.json"
@@ -316,6 +315,7 @@ class ProfileGenerationAdvancementTests(ResearchPackageAcceptanceSupport):
 
     def test_kody_workspace_lock_closes_handle_when_initialization_fails(self):
         import errno
+
         from plugins.local_application import profile_advancement as advancement
         from plugins.local_application.workspace import LocalWorkspaceError
 

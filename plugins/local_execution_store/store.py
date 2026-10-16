@@ -1,20 +1,21 @@
 from __future__ import annotations
 
-from contextlib import contextmanager
-from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
 import errno
 import hashlib
 import json
 import os
-from pathlib import Path
 import re
 import sqlite3
 import stat
 import tempfile
-from threading import RLock
-from typing import Any, Iterator, Mapping
 import uuid
+from collections.abc import Iterator, Mapping
+from contextlib import contextmanager
+from dataclasses import asdict, dataclass
+from datetime import UTC, datetime
+from pathlib import Path
+from threading import RLock
+from typing import Any
 
 import rfc8785
 
@@ -27,7 +28,6 @@ from core.execution.models import (
     RunStatus,
 )
 from core.runtime.transition_models import canonical_digest
-
 
 _MIGRATION_RE = re.compile(r"^(?P<version>\d{4})_(?P<name>[a-z0-9_]+)\.sql$")
 _ALLOWED_JOURNAL_MODES = {"DELETE", "WAL"}
@@ -125,7 +125,7 @@ def _payload_sha256(value: Mapping[str, Any]) -> str:
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
 def _failure_json(issue: ExecutionIssue | None) -> str | None:
@@ -209,7 +209,7 @@ class LocalExecutionStore:
         with self._lock:
             self._connection.close()
 
-    def __enter__(self) -> "LocalExecutionStore":
+    def __enter__(self) -> LocalExecutionStore:
         return self
 
     def __exit__(self, *_exc: object) -> None:

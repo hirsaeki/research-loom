@@ -1,24 +1,19 @@
 from __future__ import annotations
 
 import re
-from typing import Mapping, Sequence
+from collections.abc import Mapping, Sequence
 
-from .transition_models import (
-    CommitBundle,
-    ReductionResult,
-    StateTransitionRequest,
-    StateView,
-    TransitionKind,
-    ValidationIssue,
-    ValidationStage,
-)
 from ._validation_common import _issue, _snapshot_digest
 from .authority_validation import (
     _validate_epistemic_preconditions,
     _validate_human_decisions,
     _validate_lineage_preconditions,
-    required_decisions_for_action,
-    resolving_decision_refs,
+)
+from .authority_validation import (
+    required_decisions_for_action as required_decisions_for_action,
+)
+from .authority_validation import (
+    resolving_decision_refs as resolving_decision_refs,
 )
 from .state_validation import (
     _validate_adoption_boundaries,
@@ -28,6 +23,15 @@ from .state_validation import (
     _validate_next_state,
     _validate_project_guards,
     _validate_reference_integrity,
+)
+from .transition_models import (
+    CommitBundle,
+    ReductionResult,
+    StateTransitionRequest,
+    StateView,
+    TransitionKind,
+    ValidationIssue,
+    ValidationStage,
 )
 
 _ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")

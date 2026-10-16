@@ -1,18 +1,18 @@
 from __future__ import annotations
 
-from plugins.local_durable_store import require_optional_available, register_optional_path
-
-from copy import deepcopy
 import hashlib
 import json
 import math
-from pathlib import Path
 import sqlite3
-from typing import Any, Mapping
+from collections.abc import Mapping
+from copy import deepcopy
+from pathlib import Path
+from typing import Any
 
 import rfc8785
-from plugins.research_visual_semantics import validate_visual_semantics
 
+from plugins.local_durable_store import register_optional_path, require_optional_available
+from plugins.research_visual_semantics import validate_visual_semantics
 
 EXHIBIT_STORE_SCHEMA_VERSION = "0.1.0"
 EXHIBIT_CONTENT_MAX_BYTES = 1_048_576

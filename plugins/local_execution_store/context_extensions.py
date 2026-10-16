@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import hashlib
 import json
-from pathlib import Path
 import sqlite3
+from collections.abc import Mapping
+from copy import deepcopy
+from pathlib import Path
 from threading import RLock
-from typing import Any, Mapping
+from typing import Any
 
 import rfc8785
 

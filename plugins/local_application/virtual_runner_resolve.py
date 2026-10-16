@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from copy import deepcopy
-from typing import Mapping
 
 from plugins.local_application.facade import LocalApplicationError
+
 from .virtual_runner_input import canonical_protocol_ref
 from .virtual_runner_profile import _approved_decision_for, _profile_set_pin
 

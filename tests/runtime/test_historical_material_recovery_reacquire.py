@@ -1,21 +1,23 @@
 from __future__ import annotations
 
-from contextlib import redirect_stdout
 import io
 import json
 import subprocess
+from contextlib import redirect_stdout
 from unittest.mock import patch
 
-from plugins.local_application import LocalApplicationError, LocalApplicationFacade
+from research_package_acceptance_support import ResearchPackageAcceptanceSupport
+
+from plugins.local_application import LocalApplicationError as LocalApplicationError
+from plugins.local_application import LocalApplicationFacade
+from plugins.local_application.cli import main as cli_main
 from plugins.local_application.material_reacquisition_facade import (
     MaterialReacquisitionRetrievalError,
     RetrievedMaterial,
     _regenerate_text_rendition,
     material_reacquisition_payload,
 )
-from plugins.local_application.cli import main as cli_main
 from plugins.local_execution_store import child_runs_for_parent
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 
 def _run_cli(argv):

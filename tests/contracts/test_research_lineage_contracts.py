@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import json
-from pathlib import Path
 import unittest
+from copy import deepcopy
+from pathlib import Path
 
-from jsonschema import Draft202012Validator, FormatChecker, ValidationError
 import yaml
-
+from jsonschema import Draft202012Validator, FormatChecker, ValidationError
 from research_lineage_oracle import (
     ERROR_IDS,
     canonical_digest,

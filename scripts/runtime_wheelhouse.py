@@ -7,11 +7,11 @@ import argparse
 import hashlib
 import json
 import os
-from pathlib import Path
 import platform
 import shutil
 import subprocess
 import sys
+from pathlib import Path
 
 SCHEMA = "research-loom-runtime-wheelhouse/v1"
 TARGET = {"os": "linux", "arch": "x86_64", "python": "3.12"}

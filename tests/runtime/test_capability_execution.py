@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from copy import deepcopy
-from dataclasses import replace
 import hashlib
 import json
-from pathlib import Path
 import unittest
+from copy import deepcopy
+from dataclasses import replace
+from pathlib import Path
 
 import rfc8785
 
@@ -30,7 +30,6 @@ from core.runtime import (
     StateDeltaProposal,
     StateView,
 )
-
 
 ROOT = Path(__file__).resolve().parents[2]
 FIX = ROOT / "core/fixtures/capabilities/valid"

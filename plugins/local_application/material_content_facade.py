@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import os
+from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from plugins.local_execution_store import LocalExecutionStoreIntegrityError
 
@@ -14,7 +15,6 @@ from .material_inventory_facade import (
     _artifact_projection,
     _capture_projection,
 )
-
 
 _MATERIAL_SHOW_DEFAULT_BYTES = 64 * 1024
 _MATERIAL_SHOW_MAX_BYTES = 1024 * 1024

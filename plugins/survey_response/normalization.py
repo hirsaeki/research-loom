@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from copy import deepcopy
-from typing import Any, Mapping
+from typing import Any
 
 from plugins.survey_virtual_runner.response_support import reachable_questions, stable_response_key
 from plugins.survey_virtual_runner.response_validation import SurveyResponseValidator

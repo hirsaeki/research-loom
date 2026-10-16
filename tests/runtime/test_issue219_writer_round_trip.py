@@ -1,13 +1,14 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import json
+from copy import deepcopy
 from unittest.mock import patch
+
+import issue80_writer_composition_suite as writer_comp_support
+from research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 from plugins.local_application import LocalApplicationError
 from plugins.local_application.writer_round_trip_service import WriterRoundTripService
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-import issue80_writer_composition_suite as writer_comp_support
 
 
 class Issue219WriterRoundTripTests(ResearchPackageAcceptanceSupport):

@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from copy import deepcopy
-from datetime import datetime, timezone
 import json
-from pathlib import Path
 import re
-from typing import Any, Mapping
 import uuid
+from collections.abc import Mapping
+from copy import deepcopy
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
 
 from core.conversation import (
     ActionDefinition,
@@ -61,7 +62,6 @@ from plugins.local_execution_store import (
 )
 from plugins.sqlite_state_store import SQLiteResearchStateRepository
 
-
 ROOT = Path(__file__).resolve().parents[2]
 DESCRIPTOR_PATH = (
     ROOT / "core/packages/desktop-research/desktop-research-capability-descriptor.json"
@@ -72,7 +72,7 @@ ATTENTION_STORE_NAME = "attention.sqlite3"
 
 class SystemClock:
     def now(self) -> str:
-        return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
 class UUIDIdProvider:

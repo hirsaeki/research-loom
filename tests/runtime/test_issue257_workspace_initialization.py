@@ -1,30 +1,31 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import hashlib
 import json
 import os
 import queue
-import threading
-from pathlib import Path
 import shutil
 import sqlite3
 import subprocess
 import sys
 import tempfile
+import threading
 import unittest
+from copy import deepcopy
+from pathlib import Path
 from unittest.mock import patch
+
+import test_local_workspace_application_cli as support
 
 from core.runtime import canonical_digest
 from plugins.local_application import LocalWorkspace
 from plugins.local_application.workspace import (
-    LocalWorkspaceError,
-    INTERNAL_DIR,
     BINDING_NAME,
     INITIALIZING_MARKER,
+    INTERNAL_DIR,
+    LocalWorkspaceError,
 )
 from plugins.local_application.workspace_initialization import finish_initialization, initial_intent
-import test_local_workspace_application_cli as support
 
 ROOT = Path(__file__).resolve().parents[2]
 CRASH = r"""
@@ -206,7 +207,6 @@ class Issue257InitializationTests(unittest.TestCase):
 
     def test_public_finalization_requires_full_integrity_and_exact_binding(self):
         self._crash("binding")
-        internal = self.workspace / INTERNAL_DIR
         diagnosis = LocalWorkspace.doctor(self.workspace)["initialization"]
         binding_digest = diagnosis["binding_digest"]
         before = self._bytes(self.workspace)

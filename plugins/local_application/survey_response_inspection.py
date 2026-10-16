@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 from plugins.local_survey_response_store import LocalSurveyResponseStoreError
+
 from .facade import LocalApplicationError
 
 _MAX_DATASET_SHOW = 100

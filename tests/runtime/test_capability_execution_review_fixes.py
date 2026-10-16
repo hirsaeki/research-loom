@@ -1,7 +1,20 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import unittest
+from copy import deepcopy
+
+from test_capability_execution import (
+    CONTEXT,
+    DESCRIPTOR,
+    HANDOFF,
+    INVOCATION,
+    Adapter,
+    ExternalAdapter,
+    GenericNormalizer,
+    MutableStateProvider,
+    refresh,
+    state_for_context,
+)
 
 from core.execution import (
     CapabilityExecutionError,
@@ -16,18 +29,6 @@ from core.execution.testing import (
     StaticClock,
 )
 from core.runtime import CapabilityNormalizationBoundary
-from test_capability_execution import (
-    Adapter,
-    CONTEXT,
-    DESCRIPTOR,
-    ExternalAdapter,
-    GenericNormalizer,
-    HANDOFF,
-    INVOCATION,
-    MutableStateProvider,
-    refresh,
-    state_for_context,
-)
 
 
 class DisappearingStateProvider:

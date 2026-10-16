@@ -1,26 +1,29 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from copy import deepcopy
 from threading import RLock
-from typing import Any, Mapping
+from typing import Any
 
 from core.conversation import ActionDefinition, ConversationRuntimeError, HarnessServiceResult
 from plugins.local_execution_store import artifact_metadata_for, diagnostics_for
 
+from . import new_material_continuation_admission as admission
 from .facade import LocalApplicationError
 from .material_reacquisition_facade import (
     _CAPABILITY_ID as _MRA_CAPABILITY_ID,
+)
+from .material_reacquisition_facade import (
     _RESULT_DIAGNOSTIC as _MRA_RESULT_DIAGNOSTIC,
 )
 from .material_reacquisition_public_facade import (
     LocalApplicationFacade as _BaseLocalApplicationFacade,
 )
-from . import new_material_continuation_admission as admission
 from .new_material_continuation_admission import _find_reacquisition_result
 from .new_material_continuation_service import NewMaterialContinuationService
 from .new_material_group_continuation_service import (
-    PairedNewMaterialContinuationService,
     _GROUP_RELATION,
+    PairedNewMaterialContinuationService,
 )
 
 _ACTION_TYPE = "desktop_research.material.continue_new_version"

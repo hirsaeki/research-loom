@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import json
 import os
-from pathlib import Path
 import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
-from plugins.local_application.facade import LocalApplicationError
-from plugins.local_application import material_content_facade as material_content
 from plugins.local_application import LocalApplicationFacade
+from plugins.local_application import material_content_facade as material_content
+from plugins.local_application.facade import LocalApplicationError
 from plugins.local_application.workspace import LocalWorkspace
 from tests.runtime.test_external_material_inventory import _capture, _create_running, _write_inputs
 

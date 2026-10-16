@@ -1,22 +1,30 @@
 from __future__ import annotations
 
-from plugins.local_durable_store import require_optional_available, register_optional_path
+import json
+import os
+import shutil
+import subprocess
+import tempfile
+from collections.abc import Mapping
 from copy import deepcopy
-import json, os, shutil, subprocess, tempfile
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
+
 from core.runtime import canonical_digest as core_canonical_digest
+from plugins.local_durable_store import register_optional_path, require_optional_available
 from plugins.local_execution_store import canonical_handoff_for
+
 from .facade import LocalApplicationError
 from .item_listing import ITEM_ERRORS, directory_page, read_mapping, unavailable
-from .research_package_format import digest_json, without_digest
 from .research_package_builder import build_package
 from .research_package_format import (
     MAX_OUTPUT_BYTES,
     MAX_PACKAGES,
+    digest_json,
     safe_component,
     validate_schema,
     verify_export_root,
+    without_digest,
 )
 
 

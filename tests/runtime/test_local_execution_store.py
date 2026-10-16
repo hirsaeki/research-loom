@@ -1,17 +1,18 @@
 from __future__ import annotations
 
-from copy import deepcopy
-from dataclasses import replace
 import hashlib
 import json
 import os
-from pathlib import Path
 import sqlite3
 import tempfile
 import unittest
+from copy import deepcopy
+from dataclasses import replace
+from pathlib import Path
 from unittest.mock import patch
 
 import rfc8785
+from runtime_fixtures import project, rq, snapshot
 
 from core.execution import (
     BoundedResourceAccess,
@@ -42,8 +43,6 @@ from plugins.local_execution_store import (
     LocalExecutionStoreIntegrityError,
 )
 from plugins.sqlite_state_store import SQLiteResearchStateRepository
-from runtime_fixtures import project, rq, snapshot
-
 
 ROOT = Path(__file__).resolve().parents[2]
 FIX = ROOT / "core/fixtures/capabilities/valid"
@@ -439,7 +438,7 @@ class LocalExecutionStoreTests(unittest.TestCase):
         self.store = None
 
     def test_artifact_round_trip_unicode_binary_dedup_and_identity(self):
-        text = "研究ログ 🐇".encode("utf-8")
+        text = "研究ログ 🐇".encode()
         first = self.store.put_bytes(
             self.runs[0],
             role="log",

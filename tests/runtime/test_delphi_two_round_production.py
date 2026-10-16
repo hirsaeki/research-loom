@@ -1,12 +1,15 @@
 from __future__ import annotations
 
-from copy import deepcopy
-from pathlib import Path
 import os
 import subprocess
 import sys
 import tempfile
 import unittest
+from copy import deepcopy
+from pathlib import Path
+
+from runtime_fixtures import decision, project, rq, seed_state
+from test_survey_production import NullResolver, profile_provider
 
 from plugins.local_application import (
     LocalApplicationError,
@@ -14,8 +17,6 @@ from plugins.local_application import (
     LocalResearchApplication,
 )
 from plugins.local_survey_store import canonical_document_digest
-from runtime_fixtures import decision, project, rq, seed_state
-from test_survey_production import NullResolver, profile_provider
 
 ROOT = Path(__file__).resolve().parents[2]
 

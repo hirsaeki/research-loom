@@ -1,22 +1,23 @@
 from __future__ import annotations
 
-from plugins.local_durable_store import require_optional_available, register_optional_path
-
-from copy import deepcopy
-from datetime import datetime, timezone
 import hashlib
 import json
 import os
 import re
-from uuid import uuid4
-from pathlib import Path
 import shutil
 import tempfile
-from typing import Any, Mapping
+from collections.abc import Mapping
+from copy import deepcopy
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
+from uuid import uuid4
 
 from jsonschema import Draft202012Validator, FormatChecker
 
 from core.runtime import canonical_digest
+from plugins.local_durable_store import register_optional_path, require_optional_available
+
 from .facade import LocalApplicationError
 from .research_package_format import safe_component
 from .writer_composition_service import _digest_document, _object_index, _package_ref_sets
@@ -34,7 +35,7 @@ SCHEMA = (
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
 def _validate_schema(value: Mapping[str, Any]) -> None:
@@ -163,7 +164,7 @@ class WriterRoundTripService:
                             raise LocalApplicationError(
                                 "APPLICATION-WRITER-ROUND-TRIP-IMMUTABLE-001",
                                 "immutable Writer identity contains different content; restore its exact backup",
-                            )
+                            ) from None
                         return True
                 return False
             finally:
@@ -1412,7 +1413,7 @@ class WriterRoundTripService:
         }
 
     def inspect(self, composition_id: str, revision_id: str | None = None) -> Mapping[str, Any]:
-        composer = self._composition_service()
+        self._composition_service()
         if revision_id is None:
             checkpoint = self._checkpoint_path(composition_id)
             if checkpoint.exists():

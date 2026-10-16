@@ -1,15 +1,16 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from copy import deepcopy
-from typing import Mapping
 from unittest.mock import patch
 
-from plugins.local_application.new_material_continuation_service import (
-    _render_reacquired_html_rendition,
-)
 from research_package_acceptance_support import ResearchPackageAcceptanceSupport
 from test_issue171_new_material_continuation import (
     Issue171NewMaterialContinuationTests as _Issue171Support,
+)
+
+from plugins.local_application.new_material_continuation_service import (
+    _render_reacquired_html_rendition,
 )
 
 

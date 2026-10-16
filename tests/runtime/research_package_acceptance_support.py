@@ -1,14 +1,19 @@
 from __future__ import annotations
 
-from copy import deepcopy
-from dataclasses import replace
 import hashlib
 import json
-from pathlib import Path
 import tempfile
 import unittest
+from copy import deepcopy
+from dataclasses import replace
+from pathlib import Path
 
 import rfc8785
+import survey_virtual_runner_test_support as vr
+import test_external_desktop_research_intake as intake
+import test_research_exhibits as exhibits
+from runtime_fixtures import decision, project, rq, seed_state
+from test_survey_production import NullResolver
 
 from core.runtime import canonical_digest
 from plugins.local_application import (
@@ -16,11 +21,6 @@ from plugins.local_application import (
     LocalResearchApplication,
     LocalWorkspace,
 )
-import test_external_desktop_research_intake as intake
-import test_research_exhibits as exhibits
-import survey_virtual_runner_test_support as vr
-from runtime_fixtures import decision, project, rq, seed_state
-from test_survey_production import NullResolver
 
 
 class ResearchPackageAcceptanceSupport(unittest.TestCase):

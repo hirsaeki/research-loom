@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import json
-from pathlib import Path
 import shutil
-from typing import Any, Mapping
+from collections.abc import Mapping
+from copy import deepcopy
+from pathlib import Path
+from typing import Any
 
 from core.execution import RunStatus
 from plugins.desktop_research import DesktopResearchCaptureService
@@ -17,7 +18,6 @@ from plugins.local_execution_store import (
 from .facade import LocalApplicationError
 from .material_content_facade import _artifact_pair_for_capture
 from .retention_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
-
 
 _INTAKE_RELATIVE = Path("intake") / "material-sources"
 _STAGE_MANIFEST = "stage.json"

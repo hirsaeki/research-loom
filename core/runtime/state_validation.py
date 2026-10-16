@@ -1,7 +1,14 @@
 from __future__ import annotations
 
-from typing import Any, Iterable, Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
+from typing import Any
 
+from ._validation_common import _dedupe_issues, _issue, _snapshot_digest
+from .authority_validation import (
+    _decision_pool,
+    _decision_refs_for_object,
+    _decision_subject_matches,
+)
 from .transition_models import (
     ReductionResult,
     StateTransitionRequest,
@@ -10,12 +17,6 @@ from .transition_models import (
     ValidationIssue,
     ValidationStage,
     canonical_digest,
-)
-from ._validation_common import _issue, _dedupe_issues, _snapshot_digest
-from .authority_validation import (
-    _decision_pool,
-    _decision_refs_for_object,
-    _decision_subject_matches,
 )
 
 _TEXT_FIELDS = (

@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from copy import deepcopy
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 import yaml
-
 
 ROOT = Path(__file__).resolve().parents[2]
 POLICY_PATH = ROOT / "profiles/contracts/research-quality-policy.yaml"

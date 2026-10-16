@@ -1,15 +1,16 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import hashlib
 import json
-from pathlib import Path
 import re
-from typing import Any, Iterable, Mapping
+from collections.abc import Iterable, Mapping
+from copy import deepcopy
+from pathlib import Path
+from typing import Any
 
-from jsonschema import Draft202012Validator, FormatChecker
 import rfc8785
 import yaml
+from jsonschema import Draft202012Validator, FormatChecker
 
 from core.runtime import canonical_digest
 from plugins.local_application.workspace import LocalWorkspaceError

@@ -1,16 +1,17 @@
 from __future__ import annotations
 
-from contextlib import redirect_stdout
-from copy import deepcopy
 import io
 import json
+from contextlib import redirect_stdout
+from copy import deepcopy
 from unittest.mock import patch
+
+import test_issue134_writer_composition as issue134_writer
+from research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 from core.runtime import canonical_digest
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade
 from plugins.local_application.cli import main as cli_main
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-import test_issue134_writer_composition as issue134_writer
 
 
 class FindingCandidateRecoveryTests(ResearchPackageAcceptanceSupport):

@@ -1,13 +1,13 @@
 from __future__ import annotations
 
+import json
+import tempfile
+import unittest
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
 from copy import deepcopy
-import json
 from pathlib import Path
 from threading import Barrier
-import tempfile
-import unittest
 from unittest.mock import patch
 
 from plugins.local_application import (
@@ -17,16 +17,22 @@ from plugins.local_application import (
 )
 from plugins.local_delphi_store import LocalDelphiStore, LocalDelphiStoreError
 from tests.runtime.test_delphi_two_round_production import (
-    make_app,
+    approve_instrument,
     design,
     instrument,
+    make_app,
     response,
     with_digest,
-    approve_instrument,
 )
-from tests.runtime.test_survey_production import NullResolver, profile_provider, state_signature
 from tests.runtime.test_local_workspace_application_cli import run_cli
 from tests.runtime.test_research_question_adoption import _init_workspace, _proposal_input
+from tests.runtime.test_survey_production import (
+    NullResolver,
+    profile_provider,
+)
+from tests.runtime.test_survey_production import (
+    state_signature as state_signature,
+)
 
 
 def proposal(inst, *, panel="PANEL-1", derived=None):
@@ -445,7 +451,7 @@ class Issue252DelphiLifecycleTests(unittest.TestCase):
                 self.assertNotEqual(feedbacks[0]["feedback_id"], feedbacks[1]["feedback_id"])
                 old_feedback = facade.show_delphi_feedback(feedbacks[0]["feedback_id"])
                 result2 = []
-                for index, (result, feedback) in enumerate(zip((r1, r2), feedbacks)):
+                for index, (result, feedback) in enumerate(zip((r1, r2), feedbacks, strict=False)):
                     revised = instrument(
                         2,
                         version=f"1.{index}.0",

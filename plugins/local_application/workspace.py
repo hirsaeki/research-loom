@@ -1,25 +1,20 @@
 from __future__ import annotations
 
-from collections import Counter
-from contextlib import suppress
-from copy import deepcopy
-from dataclasses import dataclass, field
 import hashlib
 import json
 import os
-from pathlib import Path
 import sqlite3
-from typing import Any, Mapping
 import uuid
+from collections import Counter
+from collections.abc import Mapping
+from contextlib import suppress
+from copy import deepcopy
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
 
-from jsonschema import Draft202012Validator, FormatChecker
 import rfc8785
-
-from plugins.local_durable_store import (
-    OPTIONAL_DURABLE_CHILDREN as _OPTIONAL_DURABLE_CHILDREN,
-    inspect_optional_children,
-    register_optional_path,
-)
+from jsonschema import Draft202012Validator, FormatChecker
 
 from core.runtime import LineageView, StateView, canonical_digest
 from core.runtime.transition_models import with_content_digest
@@ -32,7 +27,13 @@ from plugins.local_conversation_store import (
     LocalConversationStoreError,
     validate_conversation_store_schema,
 )
-
+from plugins.local_durable_store import (
+    OPTIONAL_DURABLE_CHILDREN as _OPTIONAL_DURABLE_CHILDREN,
+)
+from plugins.local_durable_store import (
+    inspect_optional_children,
+    register_optional_path,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 PROJECT_CONFIG_SCHEMA = ROOT / "projects/contracts/project-config.schema.json"
@@ -99,7 +100,7 @@ class OpenedLocalWorkspace:
             if lock is not None:
                 lock.__exit__(None, None, None)
 
-    def __enter__(self) -> "OpenedLocalWorkspace":
+    def __enter__(self) -> OpenedLocalWorkspace:
         return self
 
     def __exit__(self, *_exc: object) -> None:
@@ -898,7 +899,7 @@ class LocalWorkspace:
                 raise LocalWorkspaceError(
                     "WORKSPACE-MISSING-001", "workspace directory does not exist"
                 )
-            internal = _safe_locator(root, INTERNAL_DIR)
+            _safe_locator(root, INTERNAL_DIR)
             binding_path = _safe_locator(root, f"{INTERNAL_DIR}/{BINDING_NAME}")
             binding = _read_json(binding_path, code="WORKSPACE-BINDING-001")
             _validate_binding_shape(binding)

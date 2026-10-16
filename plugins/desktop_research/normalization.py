@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import re
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 from core.runtime.normalization import NormalizationRejected
 from core.runtime.transition_models import (
@@ -13,7 +14,6 @@ from core.runtime.transition_models import (
 )
 
 from .result_validation import DesktopResearchResultValidator
-
 
 _SAFE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 

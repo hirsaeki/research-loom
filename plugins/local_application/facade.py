@@ -1,17 +1,17 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from copy import deepcopy
 from dataclasses import asdict, is_dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from core.conversation import ActionDraft, ConversationRuntimeError, CoordinatorResult
 from core.conversation.validation import with_document_digest
 from core.decision import make_response, response_digest
 from plugins.local_application.workspace import LocalWorkspace, OpenedLocalWorkspace
 from plugins.local_execution_store import pending_runs_for_project
-
 
 _INGRESS_FIELDS = {"action_type", "payload", "rationale", "actor_id", "conversation_id"}
 _AUTHORITY_PAYLOAD_FIELDS = {
@@ -140,7 +140,7 @@ class LocalApplicationFacade:
         self._opened_workspace: OpenedLocalWorkspace | None = None
 
     @classmethod
-    def from_opened_workspace(cls, opened: OpenedLocalWorkspace) -> "LocalApplicationFacade":
+    def from_opened_workspace(cls, opened: OpenedLocalWorkspace) -> LocalApplicationFacade:
         facade = cls(
             opened.application,
             opened.project_id,
@@ -151,7 +151,7 @@ class LocalApplicationFacade:
         return facade
 
     @classmethod
-    def open_workspace(cls, workspace: str | Path) -> "LocalApplicationFacade":
+    def open_workspace(cls, workspace: str | Path) -> LocalApplicationFacade:
         return cls.from_opened_workspace(LocalWorkspace.open(workspace))
 
     @classmethod
@@ -264,7 +264,7 @@ class LocalApplicationFacade:
             self._application.close()
             self._owns_application = False
 
-    def __enter__(self) -> "LocalApplicationFacade":
+    def __enter__(self) -> LocalApplicationFacade:
         return self
 
     def __exit__(self, *_exc: object) -> None:
@@ -542,7 +542,8 @@ class LocalApplicationFacade:
         optional = []
         if self._workspace_root is not None:
             from plugins.local_durable_store import inspect_optional_children
-            from .workspace import _read_json, BINDING_NAME, INTERNAL_DIR
+
+            from .workspace import BINDING_NAME, INTERNAL_DIR, _read_json
 
             binding = _read_json(
                 self._workspace_root / INTERNAL_DIR / BINDING_NAME, code="WORKSPACE-BINDING-001"

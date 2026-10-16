@@ -1,8 +1,16 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import tempfile
 import unittest
+from copy import deepcopy
+
+from runtime_fixtures import (
+    SCHEMA_VALIDATOR,
+    finding,
+    project,
+    rq,
+    seed_state,
+)
 
 from core.conversation import ActionDraft, with_document_digest
 from core.conversation.testing import MappingResolver, SequenceIdProvider
@@ -17,14 +25,6 @@ from core.runtime import (
 from core.runtime.testing import InMemoryResearchStateRepository
 from plugins.local_application import LocalResearchApplication
 from plugins.local_decision_store import LocalHumanDecisionStore
-from runtime_fixtures import (
-    SCHEMA_VALIDATOR,
-    finding,
-    project,
-    rq,
-    seed_state,
-)
-
 
 CLOCK = StaticClock("2026-08-27T05:00:00Z")
 ACTOR = {"actor_id": "HUMAN-1", "actor_type": "human"}

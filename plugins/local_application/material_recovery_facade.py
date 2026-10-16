@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from collections.abc import Mapping
+from datetime import UTC, datetime
 from pathlib import Path
 from threading import RLock
-from typing import Any, Mapping
+from typing import Any
 
 from core.conversation import ActionDefinition, ConversationRuntimeError, HarnessServiceResult
-
 from plugins.local_execution_store import (
     LocalExecutionStoreIntegrityError,
     bind_controlled_import_root,
@@ -16,7 +16,6 @@ from plugins.local_execution_store import (
 from .external_desktop_facade import _ORIGINAL_ROLE, _TEXT_ROLE
 from .facade import LocalApplicationError
 from .material_content_facade import _artifact_pair_for_capture
-
 
 _ACTION_TYPE = "desktop_research.material.recover"
 _PAYLOAD_CONTRACT = "desktop-research-material-recovery@0.1.0"
@@ -246,7 +245,7 @@ class HistoricalMaterialRecoveryService:
                         "artifact_kind": kind,
                         "artifact_id": artifact.artifact_id,
                         "recovery_method": "operator_file_same_bytes",
-                        "recovered_at": datetime.now(timezone.utc).isoformat(),
+                        "recovered_at": datetime.now(UTC).isoformat(),
                         "verified_digest": artifact.digest,
                         "verified_size": artifact.size,
                         "previous_status": result.get("previous_status"),

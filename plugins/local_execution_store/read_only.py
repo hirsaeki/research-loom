@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+import sqlite3
+from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-import sqlite3
 from threading import RLock
-from typing import Iterator
 
 from .diagnosed_artifact_read import DiagnosedArtifactReadMixin
 from .retention import LocalExecutionStore as _RetentionLocalExecutionStore

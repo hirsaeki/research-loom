@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from collections import Counter
-from copy import deepcopy
 import json
 import re
-from typing import Any, Mapping, Sequence
+from collections import Counter
+from collections.abc import Mapping, Sequence
+from copy import deepcopy
+from typing import Any
 
 from .contracts import (
     aggregate_result_content_digest,
@@ -497,7 +498,7 @@ def _free_text_listing(
     max_rows = int(item["max_rows"])
     rows: list[dict[str, Any]] = []
     non_empty_count = 0
-    for response, answers in zip(responses, answer_maps):
+    for response, answers in zip(responses, answer_maps, strict=False):
         answer = answers[qid]
         if answer["state"] != "answered":
             continue

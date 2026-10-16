@@ -6,19 +6,18 @@ bad payload bytes and installs a verified replacement; it never repairs metadata
 
 from __future__ import annotations
 
-from contextlib import contextmanager
-from datetime import datetime, timezone
 import errno
 import hashlib
 import json
 import os
-from pathlib import Path
 import stat
 import tempfile
 import time
-from typing import Callable, Iterator
 import uuid
-
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
+from datetime import UTC, datetime
+from pathlib import Path
 
 REPAIRABLE = frozenset(
     {
@@ -220,7 +219,7 @@ def install_exact_payload(
             "content_created": True,
             "previous_status": before["status"],
             "quarantine_ref": quarantine_ref,
-            "recovered_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "recovered_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         }
         record = {
             "schema": "exact-payload-repair/v1",

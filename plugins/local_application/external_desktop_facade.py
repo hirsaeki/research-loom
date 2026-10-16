@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from copy import deepcopy
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from core.execution import RunStatus
 from plugins.desktop_research import (
@@ -21,7 +22,6 @@ from plugins.local_execution_store import (
 
 from .facade import LocalApplicationError
 from .resume_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
-
 
 _ATTEMPT_START_FIELDS = {
     "attempt_id",

@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import hashlib
 import json
-from pathlib import Path
 import sqlite3
-from threading import RLock
-from typing import Any, Mapping
 import uuid
+from collections.abc import Mapping
+from pathlib import Path
+from threading import RLock
+from typing import Any
 
 import rfc8785
 

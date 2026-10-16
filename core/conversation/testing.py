@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import deque
-from typing import Mapping, Sequence
+from collections.abc import Mapping, Sequence
 
 from .models import ActionDraft
 

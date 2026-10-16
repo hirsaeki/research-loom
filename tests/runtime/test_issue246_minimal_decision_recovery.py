@@ -1,16 +1,16 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import json
-from pathlib import Path
 import tempfile
 import unittest
+from copy import deepcopy
+from pathlib import Path
 from unittest.mock import patch
 
-from plugins.local_application import LocalApplicationError, LocalApplicationFacade
 from test_local_workspace_application_cli import run_cli
 from test_research_question_adoption import _init_workspace, _proposal_input
 
+from plugins.local_application import LocalApplicationError, LocalApplicationFacade
 
 T1 = "2026-09-20T01:00:00Z"
 T2 = "2026-09-20T02:00:00Z"

@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from contextlib import redirect_stdout
-from copy import deepcopy
 import hashlib
 import io
 import json
-from pathlib import Path
 import tempfile
 import unittest
+from contextlib import redirect_stdout
+from copy import deepcopy
+from pathlib import Path
 
 import rfc8785
 
@@ -16,7 +16,6 @@ from plugins.desktop_research import DesktopResearchCaptureService, DesktopResea
 from plugins.desktop_research.attempts import ATTEMPT_COMPLETED, ATTEMPT_STARTED
 from plugins.local_application import LocalApplicationFacade, LocalWorkspace
 from plugins.local_application.cli import main as cli_main
-
 
 ROOT = Path(__file__).resolve().parents[2]
 PROJECT_FIXTURE = ROOT / "projects/fixtures/valid/generic-project-config.json"

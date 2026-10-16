@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Iterable
 from copy import deepcopy
-from typing import Iterable
 
 import rfc8785
-
 
 AUTHORITATIVE_STATES = {
     "research_question": {"approved", "revised", "rejected", "closed", "out_of_scope"},

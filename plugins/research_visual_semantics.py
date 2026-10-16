@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Any, Mapping
 import hashlib
-import rfc8785
-from core.runtime import canonical_digest as research_object_digest
+from collections.abc import Mapping
+from typing import Any
 
+import rfc8785
+
+from core.runtime import canonical_digest as research_object_digest
 
 VISUAL_CLASSES = frozenset({"source_visual", "data_visualization", "explanatory_visual"})
 SEMANTIC_CHANGES = frozenset(
@@ -119,12 +121,12 @@ def validate_visual_package_bindings(exhibits: list, objects: list) -> None:
     object_index = {o["id"]: o for o in objects}
     exhibit_index = {e["exhibit_id"]: e for e in exhibits}
     for exhibit in exhibits:
-        from plugins.local_application.research_chart import is_host_chart, validate_chart_exhibit
         from plugins.local_application.generated_explanation import (
             REVIEW_SCHEMA,
             matching_review,
             validate_explanation,
         )
+        from plugins.local_application.research_chart import is_host_chart, validate_chart_exhibit
 
         validate_chart_exhibit(exhibit, objects)
         validate_explanation(exhibit)

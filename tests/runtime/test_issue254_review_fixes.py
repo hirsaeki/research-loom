@@ -1,16 +1,17 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
+
+import issue80_writer_composition_suite as issue80
+from research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 from plugins.local_application import LocalApplicationError
 from plugins.local_application.item_listing import directory_page
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-import issue80_writer_composition_suite as issue80
 
 
 class Issue254InventoryRootTests(unittest.TestCase):

@@ -1,18 +1,19 @@
 from __future__ import annotations
 
-from plugins.local_durable_store import require_optional_available, register_optional_path
-
-from copy import deepcopy
-from contextlib import contextmanager
 import hashlib
 import json
 import os
-from pathlib import Path
 import sqlite3
 import tempfile
-from typing import Any, Mapping
+from collections.abc import Mapping
+from contextlib import contextmanager
+from copy import deepcopy
+from pathlib import Path
+from typing import Any
 
 import rfc8785
+
+from plugins.local_durable_store import register_optional_path, require_optional_available
 
 SCHEMA_VERSION = "0.1.0"
 

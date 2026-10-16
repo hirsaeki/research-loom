@@ -7,8 +7,8 @@ from plugins.local_application import (
     new_material_group_continuation_pdf_provider as provider,
 )
 from plugins.local_application import new_material_group_continuation_service as group
-from plugins.local_application.material_reacquisition_facade import RetrievedMaterial
 from plugins.local_application.facade import LocalApplicationError
+from plugins.local_application.material_reacquisition_facade import RetrievedMaterial
 
 
 class Issue127PdfGroupProviderTests(unittest.TestCase):

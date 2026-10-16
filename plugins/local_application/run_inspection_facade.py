@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Iterable, Mapping
+from collections.abc import Iterable, Mapping
+from typing import Any
 
 from plugins.desktop_research.attempts import (
     OUTCOMES,
@@ -11,7 +12,6 @@ from plugins.local_execution_store import artifact_metadata_for, diagnostics_for
 
 from .external_desktop_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
 from .facade import LocalApplicationError, _jsonable
-
 
 _RUN_INSPECTION_ITEM_LIMIT = 100
 _INTERNAL_PROVENANCE_KEYS = {

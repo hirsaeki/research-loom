@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-from copy import deepcopy
-from pathlib import Path
 import tempfile
 import unittest
+from copy import deepcopy
+from pathlib import Path
+
+from runtime_fixtures import make_request, project, rq, seed_state
 
 from core.execution import (
     CapabilityContextExtensionRegistry,
@@ -32,7 +34,6 @@ from plugins.local_execution_store import (
     LocalOperationalTraceStore,
 )
 from plugins.sqlite_state_store import SQLiteResearchStateRepository
-from runtime_fixtures import make_request, project, rq, seed_state
 from tests.runtime.test_desktop_research import (
     DR_DESCRIPTOR,
     Flow,

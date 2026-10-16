@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-from plugins.local_durable_store import require_optional_available, register_optional_path
-
-from copy import deepcopy
-from datetime import datetime, timezone
 import json
 import os
-from pathlib import Path
 import shutil
-from typing import Any, Mapping
 import uuid
+from collections.abc import Mapping
+from copy import deepcopy
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
 
 from plugins.local_application.profile_resolution import (
     effective_profile_digest,
@@ -20,8 +19,10 @@ from plugins.local_application.profile_resolution import (
 from plugins.local_application.workspace import (
     BINDING_NAME,
     EFFECTIVE_PROFILE_SET_NAME,
+    EFFECTIVE_PROFILE_SET_SCHEMA,
     INTERNAL_DIR,
     PROJECT_CONFIG_NAME,
+    PROJECT_CONFIG_SCHEMA,
     LocalWorkspace,
     LocalWorkspaceError,
     _assert_safe_workspace_root,
@@ -30,16 +31,14 @@ from plugins.local_application.workspace import (
     _read_json,
     _safe_locator,
     _schema_validate,
+    _validate_binding_shape,
     _validate_profile_binding,
     _validate_project_semantics,
-    _validate_binding_shape,
-    PROJECT_CONFIG_SCHEMA,
-    EFFECTIVE_PROFILE_SET_SCHEMA,
 )
+from plugins.local_durable_store import register_optional_path, require_optional_available
 from plugins.sqlite_state_store import SQLiteResearchStateRepository
 
-
-from .workspace_lock import ADVANCEMENT_LOCK, workspace_lock as _workspace_advancement_lock
+from .workspace_lock import workspace_lock as _workspace_advancement_lock
 
 HISTORY_DIR = "profile-history"
 GENERATIONS_DIR = "generations"
@@ -50,7 +49,7 @@ _PUBLICATION_METADATA_NOTE = "Publication metadata advancement: explicit researc
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
 def _write_json(path: Path, value: Mapping[str, Any]) -> None:

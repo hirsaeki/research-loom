@@ -1,8 +1,12 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import json
+from copy import deepcopy
 from types import SimpleNamespace
+
+import survey_virtual_runner_test_support as vr
+import test_research_exhibits as exhibits
+from research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 from plugins.local_application import LocalApplicationError
 from plugins.local_application.research_package_builder import _collect_exhibit_modes
@@ -13,9 +17,6 @@ from plugins.local_application.research_package_format import (
     verify_export_root,
     without_digest,
 )
-import survey_virtual_runner_test_support as vr
-import test_research_exhibits as exhibits
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 
 class ResearchPackageCompletionReviewTests(ResearchPackageAcceptanceSupport):

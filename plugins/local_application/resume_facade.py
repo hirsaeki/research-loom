@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 from plugins.local_application.facade import LocalApplicationFacade as _BaseLocalApplicationFacade
 from plugins.local_application.resume import build_resume_context
@@ -19,7 +20,8 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
         )
         if self._workspace_root is not None:
             from plugins.local_durable_store import inspect_optional_children
-            from .workspace import _read_json, BINDING_NAME, INTERNAL_DIR
+
+            from .workspace import BINDING_NAME, INTERNAL_DIR, _read_json
 
             binding = _read_json(
                 self._workspace_root / INTERNAL_DIR / BINDING_NAME, code="WORKSPACE-BINDING-001"

@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field, is_dataclass, replace
-from enum import Enum
 import hashlib
 import json
-from typing import Any, Mapping, Sequence
-
+from collections.abc import Mapping, Sequence
+from dataclasses import asdict, dataclass, field, is_dataclass, replace
+from enum import Enum
+from typing import Any
 
 DIGEST_PREFIX = "sha256:"
 
@@ -58,7 +58,7 @@ class SnapshotRef:
     mode: str
 
     @classmethod
-    def from_snapshot(cls, snapshot: Mapping[str, Any]) -> "SnapshotRef":
+    def from_snapshot(cls, snapshot: Mapping[str, Any]) -> SnapshotRef:
         return cls(
             snapshot_id=str(snapshot["id"]),
             revision=int(snapshot.get("revision", 0)),
@@ -124,7 +124,7 @@ class StateTransitionRequest:
     def calculated_digest(self) -> str:
         return canonical_digest(self.digest_basis())
 
-    def with_calculated_digest(self) -> "StateTransitionRequest":
+    def with_calculated_digest(self) -> StateTransitionRequest:
         return replace(self, request_digest=self.calculated_digest())
 
 
@@ -149,7 +149,7 @@ class StateDeltaProposal:
         data.pop("proposal_digest", None)
         return canonical_digest(data)
 
-    def with_calculated_digest(self) -> "StateDeltaProposal":
+    def with_calculated_digest(self) -> StateDeltaProposal:
         return replace(self, proposal_digest=self.calculated_digest())
 
 
@@ -306,7 +306,7 @@ class CommitBundle:
         data.pop("receipt", None)
         return canonical_digest(data)
 
-    def with_digest_and_receipt(self, request: StateTransitionRequest) -> "CommitBundle":
+    def with_digest_and_receipt(self, request: StateTransitionRequest) -> CommitBundle:
         digest = self.calculated_digest()
         snapshot = self.new_snapshot
         receipt = CommitReceipt(

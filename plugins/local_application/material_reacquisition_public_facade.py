@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from copy import deepcopy
-from typing import Any, Mapping
+from typing import Any
 
 from plugins.local_execution_store import result_extensions_for_run
 from plugins.local_execution_store.capture_query import artifacts_for_capture_ids

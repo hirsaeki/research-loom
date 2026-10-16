@@ -1,16 +1,17 @@
 from __future__ import annotations
 
-from contextlib import redirect_stdout
-from copy import deepcopy
 import hashlib
 import io
 import json
-from pathlib import Path
 import tempfile
 import unittest
+from contextlib import redirect_stdout
+from copy import deepcopy
+from pathlib import Path
 from unittest.mock import patch
 
 import rfc8785
+from runtime_fixtures import project, rq, seed_state
 
 from plugins.desktop_research import DesktopResearchExternalAdapter, build_result_extension
 from plugins.local_application import (
@@ -19,8 +20,6 @@ from plugins.local_application import (
     LocalResearchApplication,
 )
 from plugins.local_application.cli import main as cli_main
-from runtime_fixtures import project, rq, seed_state
-
 
 ROOT = Path(__file__).resolve().parents[2]
 PROJECT_FIXTURE = ROOT / "projects/fixtures/valid/generic-project-config.json"

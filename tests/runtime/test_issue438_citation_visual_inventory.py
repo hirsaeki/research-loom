@@ -1,6 +1,6 @@
-from copy import deepcopy
 import json
 import unittest
+from copy import deepcopy
 
 from plugins.local_application.publication_exhibits import prepare_exhibits
 from plugins.local_application.publication_release_service import PublicationReleaseService

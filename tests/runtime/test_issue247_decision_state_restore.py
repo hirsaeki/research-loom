@@ -1,20 +1,21 @@
 from __future__ import annotations
 
-from contextlib import closing
-from copy import deepcopy
-from dataclasses import replace
 import json
-from pathlib import Path
 import shutil
 import sqlite3
 import tempfile
 import unittest
+from contextlib import closing
+from copy import deepcopy
+from dataclasses import replace
+from pathlib import Path
 from unittest.mock import patch
+
+from test_research_question_review import _adopt_question, _workspace
 
 from core.decision import HumanDecisionError, make_response
 from core.runtime import canonical_digest
 from plugins.local_application import LocalApplicationFacade, LocalWorkspace
-from test_research_question_review import _workspace, _adopt_question
 
 
 class DecisionStateRestoreTests(unittest.TestCase):
@@ -258,8 +259,9 @@ class DecisionStateRestoreTests(unittest.TestCase):
 
     def test_lineage_switch_without_new_snapshot_keeps_historical_receipt(self):
         import test_human_decision_gate as gate_support
-        from core.runtime import TransitionAction, TransitionKind
         from runtime_fixtures import project, rq, seed_state
+
+        from core.runtime import TransitionAction, TransitionKind
 
         state = seed_state(objects=[project(), rq(state="approved")])
         second = replace(state.lineages[0], lineage_id="LIN-2", lineage_kind="exploratory_fork")

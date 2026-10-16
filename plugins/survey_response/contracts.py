@@ -1,14 +1,15 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import hashlib
 import json
 import math
+from collections.abc import Mapping
+from copy import deepcopy
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
-from jsonschema import Draft202012Validator, FormatChecker
 import rfc8785
+from jsonschema import Draft202012Validator, FormatChecker
 
 ROOT = Path(__file__).resolve().parents[2]
 RAW_SCHEMA_PATH = ROOT / "core/packages/survey/survey-raw-response.schema.json"

@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import json
-from typing import Any, Mapping
+from collections.abc import Mapping
+from copy import deepcopy
+from typing import Any
 
 from core.conversation.validation import canonical_digest
 from plugins.local_survey_analysis_store import LocalSurveyAnalysisStoreError
 from plugins.local_survey_response_store import LocalSurveyResponseStoreError
 
 from .facade import LocalApplicationError
-
 
 _ERROR = "APPLICATION-SURVEY-VIRTUAL-PRETEST-001"
 

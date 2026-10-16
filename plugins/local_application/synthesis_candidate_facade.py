@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import json
-from typing import Any, Mapping
+from collections.abc import Mapping
+from copy import deepcopy
+from typing import Any
 
 from core.conversation import ConversationRuntimeError
 from core.conversation.validation import WorkConversationValidator
@@ -15,6 +16,7 @@ from plugins.local_conversation_store.synthesis import (
 from plugins.local_decision_store.resume import decision_request_for_project
 
 from .argument_facade import research_argument_proposal_payload
+from .candidate_projection import build_candidate_projection
 from .conversation_view import (
     ConversationViewError,
     normalize_view,
@@ -31,9 +33,10 @@ from .conversation_view import (
     projection_unavailable,
 )
 from .facade import LocalApplicationError
-from .candidate_projection import build_candidate_projection
 from .recommendation_facade import (
     LocalApplicationFacade as _BaseLocalApplicationFacade,
+)
+from .recommendation_facade import (
     research_recommendation_proposal_payload,
 )
 

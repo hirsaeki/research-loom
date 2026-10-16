@@ -2,17 +2,16 @@ from __future__ import annotations
 
 import json
 import os
-from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade
 from plugins.local_execution_store import LocalExecutionStoreConfig
 from tests.runtime.test_research_question_review import _adopt_question, _workspace
-
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -97,7 +96,7 @@ class Issue91ExternalMaterialContentTests(unittest.TestCase):
             root = Path(temp)
             workspace = _workspace(root)
             original = b"\x00exact original\r\nbytes\xff"
-            rendition = "exact UTF-8 rendition\nsecond line\n".encode("utf-8")
+            rendition = b"exact UTF-8 rendition\nsecond line\n"
             with LocalApplicationFacade.open_workspace(workspace) as facade:
                 question_id = _adopt_question(facade, "Issue 91 G1")
                 snapshot_before = facade.resume_context()["research_state"]["snapshot"]

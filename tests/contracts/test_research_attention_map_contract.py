@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import json
-from pathlib import Path
 import unittest
+from copy import deepcopy
+from pathlib import Path
 
 from jsonschema import Draft202012Validator, FormatChecker
 
 from core.conversation import canonical_digest
-
 
 ROOT = Path(__file__).resolve().parents[2]
 PROJECT_CONFIG_SCHEMA = ROOT / "projects/contracts/project-config.schema.json"

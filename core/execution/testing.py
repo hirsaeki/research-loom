@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from copy import deepcopy
 from dataclasses import asdict
 from threading import RLock
-from typing import Any, Mapping
+from typing import Any
 
 from core.runtime.transition_models import canonical_digest
 
@@ -16,7 +17,6 @@ from .models import (
     RunLifecycleEvent,
     RunStatus,
 )
-
 
 _RUN_IMMUTABLE_FIELDS = (
     "run_id",

@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-from dataclasses import replace
 import json
-from pathlib import Path
 import unittest
+from dataclasses import replace
+from pathlib import Path
 
 from core.runtime import (
     Actor,
-    CapabilityNormalizationBoundary,
     CanonicalResearchObjectSchemaValidator,
+    CapabilityNormalizationBoundary,
     LineageView,
     NormalizationRejected,
     ObjectRef,
@@ -24,7 +24,6 @@ from core.runtime import (
 )
 from core.runtime.testing import InMemoryResearchStateRepository
 from core.runtime.transition_models import CommitReceipt, with_content_digest
-
 
 ROOT = Path(__file__).resolve().parents[2]
 SCHEMA = json.loads((ROOT / "core/models/research-object.schema.json").read_text(encoding="utf-8"))

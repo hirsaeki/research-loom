@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import json
 import unittest
+from copy import deepcopy
 from pathlib import Path
 
 import yaml
 from jsonschema import Draft202012Validator, FormatChecker
-
 from research_method_oracle import canonical_digest, context_error, descriptor_error, result_error
 
 ROOT = Path(__file__).resolve().parents[2]

@@ -1,15 +1,16 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import io
 import json
+from copy import deepcopy
 from unittest.mock import patch
+
+import test_issue464_writer_rule_scope as scope_tests
+from research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 from plugins.local_application import LocalApplicationError
 from plugins.local_application.cli import main
 from plugins.local_application.writer_round_trip_service import WriterRoundTripService
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-import test_issue464_writer_rule_scope as scope_tests
 
 
 class Issue466WriterDocumentReviewTests(ResearchPackageAcceptanceSupport):

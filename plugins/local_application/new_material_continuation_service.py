@@ -1,25 +1,26 @@
 from __future__ import annotations
 
-from contextlib import contextmanager
-from copy import deepcopy
 import errno
-from html.parser import HTMLParser
 import hashlib
 import os
-from threading import RLock
 import time
-from typing import Any, Mapping
+from collections.abc import Mapping
+from contextlib import contextmanager
+from copy import deepcopy
+from html.parser import HTMLParser
+from threading import RLock
+from typing import Any
 
 from core.execution import RunStatus
 from plugins.desktop_research import DesktopResearchAttemptRecorder, DesktopResearchCaptureService
 from plugins.desktop_research.attempts import reconstruct_attempts
 
+from . import new_material_continuation_admission as admission
 from .facade import LocalApplicationError
 from .material_content_facade import _artifact_pair_for_capture
 from .material_reacquisition_public_facade import (
     LocalApplicationFacade as _BaseLocalApplicationFacade,
 )
-from . import new_material_continuation_admission as admission
 
 _CONTINUATION_LOCK = RLock()
 

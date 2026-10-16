@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from copy import deepcopy
 import hashlib
+from collections.abc import Mapping
+from copy import deepcopy
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from core.conversation.validation import canonical_digest
 

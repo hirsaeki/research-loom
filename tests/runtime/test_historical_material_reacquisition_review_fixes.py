@@ -4,6 +4,8 @@ from dataclasses import replace
 from threading import Event, Thread
 from unittest.mock import patch
 
+from research_package_acceptance_support import ResearchPackageAcceptanceSupport
+
 from plugins.local_application import LocalApplicationFacade
 from plugins.local_application.material_reacquisition_facade import (
     HistoricalMaterialReacquisitionService,
@@ -13,7 +15,6 @@ from plugins.local_application.material_reacquisition_facade import (
     _retrieve_exact_locator,
 )
 from plugins.local_execution_store import child_runs_for_parent
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 
 class HistoricalMaterialReacquisitionReviewFixTests(ResearchPackageAcceptanceSupport):

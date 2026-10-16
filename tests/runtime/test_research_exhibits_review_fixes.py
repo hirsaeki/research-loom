@@ -1,16 +1,17 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import sqlite3
-from types import SimpleNamespace
 import tempfile
 import unittest
+from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
+
+from test_research_exhibits import exhibit_payload, make_app
 
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade
 from plugins.local_research_exhibit_store import LocalResearchExhibitStore
-from test_research_exhibits import exhibit_payload, make_app
 
 
 class ResearchExhibitReviewFixTests(unittest.TestCase):

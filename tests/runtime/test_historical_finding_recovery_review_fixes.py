@@ -3,10 +3,11 @@ from __future__ import annotations
 from copy import deepcopy
 from unittest.mock import patch
 
-from core.runtime import canonical_digest
-from plugins.local_application import LocalApplicationError
 from research_package_acceptance_support import ResearchPackageAcceptanceSupport
 from test_historical_finding_lineage_recovery import HistoricalFindingLineageRecoveryTests
+
+from core.runtime import canonical_digest
+from plugins.local_application import LocalApplicationError
 
 
 class HistoricalFindingRecoveryReviewFixTests(ResearchPackageAcceptanceSupport):
