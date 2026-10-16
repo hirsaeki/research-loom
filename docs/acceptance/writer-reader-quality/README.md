@@ -1,5 +1,11 @@
 # Writer reader-quality trial and evaluation preparation
 
+For the current #467 acceptance scope, start with
+[the final limited assessment](acceptance-decision.md). The historical trial
+records below retain their original time-specific statements of unperformed
+work. The #466 public document-review round trip is now available in
+[its separate acceptance record](../writer-document-review/README.md).
+
 Start with [the actual manuscript comparison](comparison.md). It records six
 unaltered initial outputs, separate meaning/comprehension/reader-experience
 observations, a targeted edit, and the remaining limits. This work starts
