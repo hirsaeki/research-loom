@@ -1,0 +1,135 @@
+{
+  "schema_version": "1.0.0",
+  "status": "SYNTHETIC_TEST_ONLY",
+  "run_date": "2026-10-16",
+  "repository_base": "87142e10a91f15a86ba144c9fe300e994ef1031b",
+  "repository_bundle": {
+    "request_issue": 473,
+    "manifest_comment": "https://github.com/hirsaeki/research-loom/issues/473#issuecomment-6213187001",
+    "run_id": 38885476288,
+    "artifact_id": 12038938948,
+    "zip_sha256": "ab22d308ba8390f537ab898a28a93fabae7e43e7b0cd0538cdd7044bc6188e27",
+    "bundle_sha256": "3509d484fe2d3ddbfcbbbd1e3a4788a3cc73df0957fe0bd4690b65b3ef60c43f",
+    "bundle_bytes": 4515943,
+    "full_history_verified": true
+  },
+  "case_id": "synthetic-comparison-checklist-a8-6-b4-5-v1",
+  "fixed_input_digest": "sha256:45d562feee575794f3dcf0ead348cffb08a82672ffbc32a9b5413819d1c71c15",
+  "fixed_input_file_sha256": "c6ae932e098ed8bfc8de9189cb311936d11ce829ee8abeb324e346719c49650b",
+  "source": {
+    "authoritative_research_freeze": false,
+    "composition_digest": "sha256:aef6eaa103e01e6c81e1e523d488f89c6450d1767fbee43cfbc4bb8cf4ee3549",
+    "composition_id": "COMP-9a58ebbbc3e444b280a5de3d5b5f3428",
+    "composition_version": 1,
+    "effective_profile_set_digest": "sha256:8c30df04bf31dd12f222fe0b53b9e57ae47ca1df49d9c644daf599f4e47e638e",
+    "effective_profile_set_ref": "EPS-1",
+    "lineage_ref": "LIN-1",
+    "package_mode": "preview",
+    "preview_only": true,
+    "project_id": "PRJ-WRQ-COMPARE",
+    "release_eligible": false,
+    "research_package_digest": "sha256:4dc7dfe0e48577bac097b7a037ba10aa477464deb05e0f3d58b6a3cc612d96d2",
+    "research_package_id": "RP-0bbb8af981f2464196e47ba5dd382196",
+    "research_snapshot_digest": "sha256:5474423b8d623f85eff748d7e5d6dcb52c4589feb0d8cdd8f92a6790886e44cc",
+    "research_snapshot_id": "SNP-WRQ-COMPARE",
+    "source_epistemic_status": "SYNTHETIC_TEST_ONLY"
+  },
+  "original_skill_commit": "861367bebd07f10f38f1d743bac00cb0e2a91bf8",
+  "original_skill_sha256": "8666f6fd5787dd6b11ec17b9388cb4252d455b66ce0afaec83e3dbfc65cd08ee",
+  "model_visible": "inherited Codex default",
+  "exact_model": null,
+  "sampling": null,
+  "seed": null,
+  "first_generation_only": true,
+  "profile_review": "UNEVALUATED",
+  "imported": false,
+  "human_review_of_removal_drafts": false,
+  "reader_behaviour_measured": false,
+  "operational_dropout_measured": false,
+  "conditions": [
+    {
+      "condition": "no-entry",
+      "removed": "entry",
+      "retained_instructions": "no-entry-instructions.txt",
+      "prose": "no-entry.json",
+      "sha256": "b6e1fd269d600d3da995e68f5c9c63d7400996af1480be9d6b98b54883814c9c",
+      "bytes": 5589,
+      "characters": 1805,
+      "section_ids": [
+        "SEC-FRAMING",
+        "SEC-METHOD",
+        "SEC-RESULTS",
+        "SEC-IMPLICATION"
+      ],
+      "generations": 1,
+      "post_generation_edits": 0,
+      "below_length_guide": true,
+      "instruction_correction_before_generation": true
+    },
+    {
+      "condition": "no-progress",
+      "removed": "progress",
+      "retained_instructions": "no-progress-instructions.txt",
+      "prose": "no-progress.json",
+      "sha256": "ad455b13e072fd1e593c989120f13e12e132ee8ebdb5797bd0d3d3e9393c5cf9",
+      "bytes": 5502,
+      "characters": 1766,
+      "section_ids": [
+        "SEC-FRAMING",
+        "SEC-METHOD",
+        "SEC-RESULTS",
+        "SEC-IMPLICATION"
+      ],
+      "generations": 1,
+      "post_generation_edits": 0,
+      "below_length_guide": true,
+      "instruction_correction_before_generation": true
+    },
+    {
+      "condition": "no-return",
+      "removed": "return",
+      "retained_instructions": "no-return-instructions.txt",
+      "prose": "no-return.json",
+      "sha256": "0d7fe59fd1f0589c30f7dbe16437bd563be708c1a0483016aeefc98cb554b6ad",
+      "bytes": 5568,
+      "characters": 1794,
+      "section_ids": [
+        "SEC-FRAMING",
+        "SEC-METHOD",
+        "SEC-RESULTS",
+        "SEC-IMPLICATION"
+      ],
+      "generations": 1,
+      "post_generation_edits": 0,
+      "below_length_guide": true,
+      "instruction_correction_before_generation": null
+    }
+  ],
+  "comparison_outputs": {
+    "baseline": {
+      "path": "docs/acceptance/writer-reader-quality/outputs/baseline/synthetic-comparison-checklist-a8-6-b4-5-v1.json",
+      "sha256": "25f46c0b9582efb6791eddcaec57e16a9e563bf81eb0730fe919996b7ea97efe",
+      "characters": 1824
+    },
+    "revised": {
+      "path": "docs/acceptance/writer-reader-quality/outputs/revised/synthetic-comparison-checklist-a8-6-b4-5-v1.json",
+      "sha256": "8088ca6c86acd629ba9273e7cf4dafa331fc93edc68da18955893d25321d1f0c",
+      "characters": 1316
+    }
+  },
+  "profile_pins": [
+    {
+      "content_digest": "sha256:83503fd9bf27e228f43ac218e0b942ca852b021dbfea33a9cd8f097da8096752",
+      "profile_id": "misco.writer",
+      "profile_type": "narrative",
+      "profile_version": "1.2.0"
+    }
+  ],
+  "limitations": [
+    "Original Skill/Profile/Section Contracts retain overlapping rhetorical guidance; complete function removal did not occur.",
+    "Execution date and hidden service model/sampling are not matched to the earlier six drafts.",
+    "Initial no-entry and no-progress assignments paraphrased retained text; verbatim corrections arrived before drafting, but both messages remain in context.",
+    "No new human evaluation of these three removal drafts; no continuation or dropout measurement.",
+    "No regenerated outputs or length padding."
+  ]
+}
