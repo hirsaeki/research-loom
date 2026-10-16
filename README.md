@@ -71,6 +71,19 @@ uv run --frozen python research-loom status --workspace PATH --json
 
 No separate script dependency manifest or lockfile exists.
 
+## Developer checks
+
+Developer tools live in the opt-in `dev` dependency group, so runtime provisioning above stays runtime-only. CI runs the same checks:
+
+```bash
+uv sync --frozen --group dev
+uv run --frozen --group dev ruff check .
+uv run --frozen --group dev ruff format --check .
+uv run --frozen --group dev mypy          # strict, currently scoped to core/
+```
+
+Formatting-only commits are listed in `.git-blame-ignore-revs`; run `git config blame.ignoreRevsFile .git-blame-ignore-revs` to skip them in local `git blame`.
+
 ## Target areas
 
 - `core/` — generic research domain, provenance, workflow, validation, and package contracts
