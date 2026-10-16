@@ -68,10 +68,15 @@ def load_durations() -> dict[str, float]:
     return {str(k): float(v) for k, v in json.loads(DURATIONS.read_text(encoding="utf-8")).items()}
 
 
+def default_cost(modules: list[str], durations: dict[str, float]) -> float:
+    """Estimated cost of a module without a recorded duration: the known median."""
+    known = [durations[m] for m in modules if m in durations]
+    return statistics.median(known) if known else 1.0
+
+
 def shards(modules: list[str], count: int, durations: dict[str, float]) -> list[list[str]]:
     """Longest-processing-time-first packing; unknown modules cost the median."""
-    known = [durations[m] for m in modules if m in durations]
-    default = statistics.median(known) if known else 1.0
+    default = default_cost(modules, durations)
     bins: list[tuple[float, list[str]]] = [(0.0, []) for _ in range(count)]
     for module in sorted(modules, key=lambda m: (-durations.get(m, default), m)):
         index = min(range(count), key=lambda i: (bins[i][0], i))
@@ -123,10 +128,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.shards < 1:
         parser.error("--shards must be at least 1")
     durations = load_durations()
-    planned = shards(lane_modules(args.platform), args.shards, durations)
+    lane = lane_modules(args.platform)
+    planned = shards(lane, args.shards, durations)
     if args.command == "plan":
+        default = default_cost(lane, durations)
         for index, members in enumerate(planned):
-            estimate = sum(durations.get(m, 0.0) for m in members)
+            estimate = sum(durations.get(m, default) for m in members)
             print(f"shard {index}: {len(members)} modules, ~{estimate:.0f}s")
         return 0
     if not 0 <= args.index < args.shards:
