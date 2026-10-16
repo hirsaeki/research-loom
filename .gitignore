@@ -1,3 +1,17 @@
+# Runtime environment and bytecode (asserted by tests/contracts/test_repository_launchers.py)
 .venv/
 __pycache__/
 *.py[cod]
+
+# Developer tool caches
+.ruff_cache/
+.mypy_cache/
+
+# Build outputs (runtime wheelhouse bundle)
+dist/
+
+# Scratch output written by CI's launcher parity check
+/launcher.stdout
+/launcher.stderr
+/direct.stdout
+/direct.stderr
