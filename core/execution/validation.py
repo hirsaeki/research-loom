@@ -5,7 +5,7 @@ import json
 from collections.abc import Mapping
 from copy import deepcopy
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import rfc8785
 from jsonschema import Draft202012Validator, FormatChecker
@@ -18,7 +18,7 @@ _SCHEMA_ROOT = Path(__file__).resolve().parents[1] / "packages"
 
 
 def _load_schema(name: str) -> Mapping[str, Any]:
-    return json.loads((_SCHEMA_ROOT / name).read_text(encoding="utf-8"))
+    return cast(Mapping[str, Any], json.loads((_SCHEMA_ROOT / name).read_text(encoding="utf-8")))
 
 
 def _digest(document: Mapping[str, Any], field: str) -> str:

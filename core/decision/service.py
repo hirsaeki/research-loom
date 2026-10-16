@@ -4,13 +4,14 @@ import hashlib
 from collections.abc import Mapping, Sequence
 from copy import deepcopy
 from dataclasses import asdict, replace
-from typing import Any
+from typing import Any, cast
 
 from core.runtime import (
     Actor,
     CommitReceipt,
     StateTransitionRejected,
     StateTransitionRequest,
+    StateView,
     TransitionAction,
     TransitionKind,
     canonical_digest,
@@ -90,11 +91,11 @@ class HumanDecisionService:
     def __init__(
         self,
         *,
-        store,
-        state_provider,
-        state_transition_service,
-        clock,
-        source_binding_provider=None,
+        store: Any,
+        state_provider: Any,
+        state_transition_service: Any,
+        clock: Any,
+        source_binding_provider: Any = None,
     ) -> None:
         self._store = store
         self._states = state_provider
@@ -106,7 +107,7 @@ class HumanDecisionService:
         self,
         candidate: Mapping[str, Any],
         *,
-        state,
+        state: StateView,
         actor: Mapping[str, Any],
         source_action_proposal: Mapping[str, Any] | None = None,
         authorization_evidence: Sequence[str] = (),
@@ -224,13 +225,15 @@ class HumanDecisionService:
         return self._resolve_claimed(request, response)
 
     def pending(self, project_ref: str) -> tuple[Mapping[str, Any], ...]:
-        return self._store.list_pending(project_ref)
+        return cast(tuple[Mapping[str, Any], ...], self._store.list_pending(project_ref))
 
     def _resolution(self, request_id: str) -> Mapping[str, Any] | None:
         resolver = getattr(self._store, "resolution", None)
         return resolver(request_id) if resolver is not None else None
 
-    def _approval_transition(self, request, response):
+    def _approval_transition(
+        self, request: Mapping[str, Any], response: Mapping[str, Any]
+    ) -> tuple[tuple[TransitionAction, ...], StateTransitionRequest]:
         target_actions = self._request_actions(request)
         decision_actions, bound_actions = self._materialize_decisions_and_bind(
             request,
@@ -247,7 +250,9 @@ class HumanDecisionService:
         )
         return decision_actions, transition
 
-    def _verify_committed_resolution(self, request, response, stored_receipt) -> CommitReceipt:
+    def _verify_committed_resolution(
+        self, request: Mapping[str, Any], response: Mapping[str, Any], stored_receipt: Any
+    ) -> CommitReceipt:
         """Verify historical success without applying a transition or requiring today's HEAD."""
         message = (
             "resolved Human Decision does not match canonical State commit history; "
@@ -279,7 +284,8 @@ class HumanDecisionService:
                 ):
                     raise HumanDecisionError("DECISION-STATE-MISMATCH-001", message)
             for action in decisions:
-                expected = action.object_payload()
+                # materialized Decision actions always carry a complete object payload
+                expected = cast(Mapping[str, Any], action.object_payload())
                 actual = self._states.load_object_revision(
                     "decision",
                     str(expected["id"]),
@@ -291,7 +297,9 @@ class HumanDecisionService:
         except (KeyError, TypeError, ValueError, RepositoryError) as exc:
             raise HumanDecisionError("DECISION-STATE-MISMATCH-001", message) from exc
 
-    def _resolve_claimed(self, request, response) -> DecisionResolutionResult:
+    def _resolve_claimed(
+        self, request: Mapping[str, Any], response: Mapping[str, Any]
+    ) -> DecisionResolutionResult:
         request_id = str(request["request_id"])
         disposition = str(response["disposition"])
         if disposition == "decline":
@@ -337,7 +345,7 @@ class HumanDecisionService:
             "COMMIT_REJECTED", request, response, transition_rejection=result
         )
 
-    def _claim_or_raise(self, request, response) -> None:
+    def _claim_or_raise(self, request: Mapping[str, Any], response: Mapping[str, Any]) -> None:
         claimed = self._store.claim_response(
             str(request["request_id"]),
             str(request["request_digest"]),
@@ -348,7 +356,7 @@ class HumanDecisionService:
                 "DECISION-RACE-001", "a different response already owns this request"
             )
 
-    def _validate_candidate(self, candidate, state) -> None:
+    def _validate_candidate(self, candidate: Mapping[str, Any], state: StateView) -> None:
         required = (
             "proposal_id",
             "proposal_digest",
@@ -383,7 +391,9 @@ class HumanDecisionService:
                 "DECISION-STALE-001", "StateDeltaProposal is stale or bound to another state"
             )
 
-    def _candidate_actions(self, candidate, state) -> tuple[TransitionAction, ...]:
+    def _candidate_actions(
+        self, candidate: Mapping[str, Any], state: StateView
+    ) -> tuple[TransitionAction, ...]:
         actions: list[TransitionAction] = []
         for raw in candidate.get("proposed_actions", ()):
             if raw.get("decision_refs"):
@@ -450,14 +460,14 @@ class HumanDecisionService:
 
     def _build_request(
         self,
-        candidate,
+        candidate: Mapping[str, Any],
         *,
-        state,
-        actor,
-        actions,
-        requirements,
-        source_action_proposal,
-    ):
+        state: StateView,
+        actor: Mapping[str, Any],
+        actions: Sequence[TransitionAction],
+        requirements: Sequence[tuple[int, DecisionRequirement]],
+        source_action_proposal: Mapping[str, Any] | None,
+    ) -> dict[str, Any]:
         requirement_basis = [
             {
                 "action_index": index,
@@ -562,7 +572,7 @@ class HumanDecisionService:
             }
         )
 
-    def _validate_response_envelope(self, response) -> None:
+    def _validate_response_envelope(self, response: Mapping[str, Any]) -> None:
         required = {
             "request_id",
             "request_digest",
@@ -593,17 +603,20 @@ class HumanDecisionService:
                 "DECISION-RESPONSE-001", "Human Decision response digest is invalid"
             )
 
-    def _load_bound_state(self, request):
+    def _load_bound_state(self, request: Mapping[str, Any]) -> StateView:
         try:
-            return self._states.load_state_view(
-                str(request["project_ref"]), str(request["lineage_ref"])
+            return cast(
+                StateView,
+                self._states.load_state_view(
+                    str(request["project_ref"]), str(request["lineage_ref"])
+                ),
             )
         except Exception as exc:
             raise HumanDecisionError(
                 "DECISION-BINDING-001", "bound Research State no longer resolves"
             ) from exc
 
-    def _stale_reason(self, request, state) -> str | None:
+    def _stale_reason(self, request: Mapping[str, Any], state: StateView) -> str | None:
         if (
             request["snapshot_binding"]["snapshot_ref"] != state.current_snapshot["id"]
             or request["snapshot_binding"]["snapshot_digest"]
@@ -640,7 +653,7 @@ class HumanDecisionService:
             return "DecisionRequirement set changed after Decision Request issuance"
         return None
 
-    def _source_binding_reason(self, request) -> str | None:
+    def _source_binding_reason(self, request: Mapping[str, Any]) -> str | None:
         if self._sources is None:
             return None
         candidate_binding = request["source_state_delta_proposal"]
@@ -664,7 +677,7 @@ class HumanDecisionService:
                 return "source Action Proposal binding changed or disappeared"
         return None
 
-    def _request_actions(self, request) -> tuple[TransitionAction, ...]:
+    def _request_actions(self, request: Mapping[str, Any]) -> tuple[TransitionAction, ...]:
         actions = tuple(
             TransitionAction(
                 kind=TransitionKind(str(raw["kind"])),
@@ -686,7 +699,14 @@ class HumanDecisionService:
                 )
         return actions
 
-    def _materialize_decisions_and_bind(self, request, target_actions, *, actor_id, decided_at):
+    def _materialize_decisions_and_bind(
+        self,
+        request: Mapping[str, Any],
+        target_actions: Sequence[TransitionAction],
+        *,
+        actor_id: str,
+        decided_at: str,
+    ) -> tuple[tuple[TransitionAction, ...], tuple[TransitionAction, ...]]:
         grouped: dict[tuple[str, str], list[Mapping[str, str]]] = {}
         action_groups: dict[int, list[tuple[str, str]]] = {}
         for unit in request["decision_units"]:
@@ -735,7 +755,10 @@ class HumanDecisionService:
                     if item.get("treatment") == "RECONFIRM":
                         derived = item.get("derived_object")
                         if isinstance(derived, Mapping):
-                            subject = (str(derived.get("kind", "")), str(derived.get("id", "")))
+                            derived_subject = (
+                                str(derived.get("kind", "")),
+                                str(derived.get("id", "")),
+                            )
                             matching = [
                                 decision_ids[
                                     (
@@ -747,7 +770,7 @@ class HumanDecisionService:
                                 if int(unit["transition_action_index"]) == index
                                 and unit["required_decision_kind"] == "lineage_reconfirmation"
                                 and (str(unit["subject"]["kind"]), str(unit["subject"]["id"]))
-                                == subject
+                                == derived_subject
                             ]
                             if len(matching) != 1:
                                 raise HumanDecisionError(
@@ -771,14 +794,14 @@ class HumanDecisionService:
     def _transition_from_state(
         self,
         *,
-        state,
-        actor,
-        target_actions,
-        source_refs,
-        authorization_evidence,
-        basis_id,
-        submitted_at,
-        decision_actions,
+        state: StateView,
+        actor: Mapping[str, Any],
+        target_actions: Sequence[TransitionAction],
+        source_refs: Sequence[str],
+        authorization_evidence: Sequence[str],
+        basis_id: str,
+        submitted_at: str,
+        decision_actions: Sequence[TransitionAction],
     ) -> StateTransitionRequest:
         return self._make_transition(
             project_ref=state.project_ref,
@@ -800,12 +823,12 @@ class HumanDecisionService:
 
     def _transition_from_request(
         self,
-        request,
+        request: Mapping[str, Any],
         *,
-        actor,
-        target_actions,
-        decision_actions,
-        submitted_at,
+        actor: Mapping[str, Any],
+        target_actions: Sequence[TransitionAction],
+        decision_actions: Sequence[TransitionAction],
+        submitted_at: str,
     ) -> StateTransitionRequest:
         return self._make_transition(
             project_ref=str(request["project_ref"]),
@@ -828,21 +851,21 @@ class HumanDecisionService:
     def _make_transition(
         self,
         *,
-        project_ref,
-        lineage_ref,
-        snapshot_ref,
-        snapshot_digest,
-        project_config_ref,
-        project_config_digest,
-        profile_ref,
-        profile_digest,
-        actor,
-        target_actions,
-        source_refs,
-        authorization_evidence,
-        basis_id,
-        submitted_at,
-        decision_actions,
+        project_ref: str,
+        lineage_ref: str,
+        snapshot_ref: str,
+        snapshot_digest: str,
+        project_config_ref: str,
+        project_config_digest: str,
+        profile_ref: str,
+        profile_digest: str,
+        actor: Mapping[str, Any],
+        target_actions: Sequence[TransitionAction],
+        source_refs: Sequence[str],
+        authorization_evidence: Sequence[str],
+        basis_id: str,
+        submitted_at: str,
+        decision_actions: Sequence[TransitionAction],
     ) -> StateTransitionRequest:
         request = StateTransitionRequest(
             transition_id=_stable_id("TR-", basis_id),

@@ -16,6 +16,7 @@ from .transition_models import (
     CommitReceipt,
     StateTransitionRejected,
     StateTransitionRequest,
+    StateView,
     ValidationIssue,
     ValidationStage,
 )
@@ -170,8 +171,8 @@ def _reject(request: StateTransitionRequest, issue: ValidationIssue) -> StateTra
 
 def _rejected_with_head(
     request: StateTransitionRequest,
-    current_state,
-    issues,
+    current_state: StateView,
+    issues: Iterable[ValidationIssue],
 ) -> StateTransitionRejected:
     ordered = _ordered_issues(issues)
     return StateTransitionRejected(

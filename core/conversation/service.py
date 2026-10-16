@@ -5,10 +5,10 @@ from copy import deepcopy
 from dataclasses import asdict, is_dataclass
 from datetime import UTC, datetime, timedelta
 from enum import Enum
-from typing import Any
+from typing import Any, cast
 
 from core.execution import CapabilityExecutionError
-from core.runtime import CommitReceipt, StateTransitionRejected
+from core.runtime import CommitReceipt, StateTransitionRejected, StateView
 
 from .models import (
     ActionDefinition,
@@ -43,7 +43,7 @@ def _jsonable(value: Any) -> Any:
     if isinstance(value, Enum):
         return value.value
     if is_dataclass(value):
-        return _jsonable(asdict(value))
+        return _jsonable(asdict(cast(Any, value)))
     if isinstance(value, Mapping):
         return {str(k): _jsonable(v) for k, v in value.items()}
     if isinstance(value, (tuple, list)):
@@ -71,18 +71,18 @@ class WorkConversationService:
     def __init__(
         self,
         *,
-        resolver,
-        store,
-        state_provider,
-        state_transition_service,
-        capability_execution_service,
+        resolver: Any,
+        store: Any,
+        state_provider: Any,
+        state_transition_service: Any,
+        capability_execution_service: Any,
         action_registry: ActionRegistry,
         harness_services: HarnessServiceRegistry,
         capability_materializers: CapabilityActionMaterializerRegistry,
         descriptors: CapabilityDescriptorRegistry,
-        authorization_evidence_provider,
-        clock,
-        id_provider,
+        authorization_evidence_provider: Any,
+        clock: Any,
+        id_provider: Any,
         lineage_resolver: Callable[[str], str],
         confirmation_ttl_seconds: int = 900,
         validator: WorkConversationValidator | None = None,
@@ -167,7 +167,7 @@ class WorkConversationService:
         self,
         document: Mapping[str, Any],
         draft: ActionDraft,
-        state,
+        state: StateView,
         definition: ActionDefinition,
     ) -> CoordinatorResult:
         """Shared proposal-through-execution path for natural and typed ingress."""
@@ -206,7 +206,7 @@ class WorkConversationService:
         run_id: str,
         handoff: Mapping[str, Any],
         extension: Mapping[str, Any] | None = None,
-        artifacts=(),
+        artifacts: Any = (),
     ) -> CoordinatorResult:
         correlation = self._store.load_run_correlation(run_id)
         if correlation is None:
@@ -223,7 +223,7 @@ class WorkConversationService:
             candidate = _mapping(result.state_delta_proposal)
             self._store.store_state_delta_proposal(str(candidate["proposal_id"]), candidate)
 
-        presentations = ()
+        presentations: tuple[dict[str, Any], ...] = ()
         if not result.issues and result.handoff_ref is not None:
             presentations = self._candidate_presentations(proposal, handoff)
         return CoordinatorResult(
@@ -237,20 +237,23 @@ class WorkConversationService:
                 "state_delta_proposal": _mapping(result.state_delta_proposal)
                 if result.state_delta_proposal is not None
                 else None,
-                "issues": [asdict(item) if is_dataclass(item) else item for item in result.issues],
+                "issues": [
+                    asdict(cast(Any, item)) if is_dataclass(item) else item
+                    for item in result.issues
+                ],
             },
         )
 
-    def _state(self, project_id: str):
+    def _state(self, project_id: str) -> StateView:
         lineage = self._lineage(str(project_id))
         try:
-            return self._states.load_state_view(str(project_id), lineage)
+            return cast(StateView, self._states.load_state_view(str(project_id), lineage))
         except KeyError as exc:
             raise ConversationRuntimeError(
                 "CONV-PIN-001", "project/lineage does not resolve to current Research State"
             ) from exc
 
-    def _bounded_state_summary(self, state) -> Mapping[str, Any]:
+    def _bounded_state_summary(self, state: StateView) -> Mapping[str, Any]:
         objects = []
         for obj in state.effective_objects():
             if obj.get("kind") in {"project", "research_question", "evidence_gap"}:
@@ -278,7 +281,13 @@ class WorkConversationService:
             "objects": objects,
         }
 
-    def _build_proposal(self, input_document, definition: ActionDefinition, payload, state):
+    def _build_proposal(
+        self,
+        input_document: Mapping[str, Any],
+        definition: ActionDefinition,
+        payload: Mapping[str, Any],
+        state: StateView,
+    ) -> dict[str, Any]:
         classification = str(input_document["classification"])
         commitment = "proposal_only" if classification == "PROPOSAL" else "commit_requested"
         payload_copy = deepcopy(dict(payload))
@@ -304,10 +313,11 @@ class WorkConversationService:
                 raise ConversationRuntimeError(
                     "CONV-ROUTE-001", "incomplete capability action definition"
                 )
+            # all() above guarantees these optional definition fields are present
             descriptor = self._descriptors.resolve(
-                definition.capability_id, definition.capability_version
+                cast(str, definition.capability_id), cast(str, definition.capability_version)
             )
-            materializer = self._materializers.resolve(definition.materializer_id)
+            materializer = self._materializers.resolve(cast(str, definition.materializer_id))
             materialized = materializer.materialize(
                 payload_copy,
                 state,
@@ -347,7 +357,7 @@ class WorkConversationService:
             }
 
         decision_refs = list(payload_copy.get("decision_reference_ids", ()))
-        human_boundary = {
+        human_boundary: dict[str, Any] = {
             "required": definition.human_decision_required,
             "confirmation_is_human_decision": False,
         }
@@ -383,7 +393,9 @@ class WorkConversationService:
         }
         return with_document_digest(proposal)
 
-    def _build_confirmation_request(self, proposal, state):
+    def _build_confirmation_request(
+        self, proposal: Mapping[str, Any], state: StateView
+    ) -> dict[str, Any]:
         now = _parse_time(self._clock.now())
         expires = now + timedelta(seconds=self._confirmation_ttl)
         request = {
@@ -409,7 +421,7 @@ class WorkConversationService:
         }
         return with_document_digest(request)
 
-    def _confirm(self, input_document):
+    def _confirm(self, input_document: Mapping[str, Any]) -> CoordinatorResult:
         request_id = str(input_document["target"]["target_id"])
         request = self._store.load_confirmation_request(request_id)
         if request is None:
@@ -483,7 +495,7 @@ class WorkConversationService:
             issues=result.issues,
         )
 
-    def _cancel(self, input_document):
+    def _cancel(self, input_document: Mapping[str, Any]) -> CoordinatorResult:
         target = input_document["target"]
         target_type = str(target["target_type"])
         target_id = str(target["target_id"])
@@ -517,7 +529,13 @@ class WorkConversationService:
             "CANCELLED", input_document, proposal=proposal, action_receipt=receipt
         )
 
-    def _execute(self, source_input, proposal, state, confirmation_receipt):
+    def _execute(
+        self,
+        source_input: Mapping[str, Any],
+        proposal: Mapping[str, Any],
+        state: StateView,
+        confirmation_receipt: Mapping[str, Any] | None,
+    ) -> CoordinatorResult:
         self._assert_fresh(proposal, state)
         definition = self._actions.get(str(proposal["action"]["action_type"]))
         if proposal["commitment_mode"] != "commit_requested":
@@ -720,7 +738,7 @@ class WorkConversationService:
             execution_result=execution_result,
         )
 
-    def _build_invocation(self, proposal, materialized):
+    def _build_invocation(self, proposal: Mapping[str, Any], materialized: Any) -> dict[str, Any]:
         invocation_id = self._ids.new("INV-")
         run_id = self._ids.new("RUN-")
         authorization = self._authorization.evidence_for(
@@ -745,7 +763,7 @@ class WorkConversationService:
         invocation["invocation_digest"] = canonical_digest(invocation)
         return invocation
 
-    def _assert_fresh(self, proposal, state):
+    def _assert_fresh(self, proposal: Mapping[str, Any], state: StateView) -> None:
         if proposal["bindings"]["current_state"] != state_binding(state) or proposal[
             "bindings"
         ].get("research_context") != research_context_binding(state):
@@ -754,8 +772,14 @@ class WorkConversationService:
             )
 
     def _rejection_receipt(
-        self, source_input, proposal, state, code, confirmation_receipt, failed=False
-    ):
+        self,
+        source_input: Mapping[str, Any],
+        proposal: Mapping[str, Any],
+        state: StateView,
+        code: str,
+        confirmation_receipt: Mapping[str, Any] | None,
+        failed: bool = False,
+    ) -> dict[str, Any]:
         bound = state_binding(state)
         receipt = self._action_receipt(
             source_input,
@@ -773,17 +797,17 @@ class WorkConversationService:
 
     def _action_receipt(
         self,
-        source_input,
-        proposal,
+        source_input: Mapping[str, Any],
+        proposal: Mapping[str, Any],
         *,
-        status,
-        state_before,
-        state_after,
-        mutation,
-        execution,
-        confirmation_receipt=None,
-        rejection_code=None,
-    ):
+        status: str,
+        state_before: Mapping[str, Any],
+        state_after: Mapping[str, Any],
+        mutation: bool,
+        execution: Mapping[str, Any],
+        confirmation_receipt: Mapping[str, Any] | None = None,
+        rejection_code: str | None = None,
+    ) -> dict[str, Any]:
         doc = {
             "schema_version": "0.1.0",
             "message_type": "action_receipt",
@@ -822,7 +846,9 @@ class WorkConversationService:
         self._validator.validate(result)
         return result
 
-    def _candidate_presentations(self, source_proposal, handoff):
+    def _candidate_presentations(
+        self, source_proposal: Mapping[str, Any], handoff: Mapping[str, Any]
+    ) -> tuple[dict[str, Any], ...]:
         results = []
         outputs = handoff.get("outputs", {})
         for kind, key in (

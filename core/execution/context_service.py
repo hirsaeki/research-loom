@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from .context_extensions import (
     CapabilityContextExtensionRegistry,
@@ -47,7 +47,11 @@ class CapabilityExecutionService(_BaseCapabilityExecutionService):
     """
 
     def __init__(
-        self, *args, context_extension_registry=None, context_extension_store=None, **kwargs
+        self,
+        *args: Any,
+        context_extension_registry: CapabilityContextExtensionRegistry | None = None,
+        context_extension_store: CapabilityContextExtensionStore | None = None,
+        **kwargs: Any,
     ) -> None:
         super().__init__(*args, **kwargs)
         self._context_extension_registry = (
@@ -140,7 +144,13 @@ class CapabilityExecutionService(_BaseCapabilityExecutionService):
             run.context_pack_digest,
         )
 
-    def collect_external(self, run_id: str, handoff, extension=None, artifacts=()):
+    def collect_external(
+        self,
+        run_id: str,
+        handoff: Mapping[str, Any],
+        extension: Mapping[str, Any] | None = None,
+        artifacts: Any = (),
+    ) -> ExecutionResult:
         run = self._traces.load_run(run_id)
         if run is not None and run.status is RunStatus.RUNNING:
             adapter = self._registry.resolve(
@@ -177,7 +187,7 @@ class CapabilityExecutionService(_BaseCapabilityExecutionService):
         *,
         lineage_ref: str,
         expected_style: ExecutionStyle,
-    ):
+    ) -> tuple[CapabilityRunRecord, Any, BoundedResourceAccess]:
         self._validator.validate_documents(descriptor, invocation, context_pack)
         try:
             state = self._states.load_state_view(
@@ -223,7 +233,7 @@ class CapabilityExecutionService(_BaseCapabilityExecutionService):
 
         if context_extension is not None:
             try:
-                self._context_extension_store.store(
+                cast(CapabilityContextExtensionStore, self._context_extension_store).store(
                     str(capability["capability_id"]),
                     str(capability["capability_version"]),
                     str(capability["function_id"]),

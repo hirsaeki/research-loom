@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import deque
 from collections.abc import Mapping, Sequence
+from typing import Any
 
 from .models import ActionDraft
 
@@ -12,7 +13,12 @@ class MappingResolver:
     def __init__(self, by_text: Mapping[str, ActionDraft]) -> None:
         self._by_text = dict(by_text)
 
-    def resolve(self, conversation_input, bounded_state_summary, registered_actions):
+    def resolve(
+        self,
+        conversation_input: Mapping[str, Any],
+        bounded_state_summary: Any,
+        registered_actions: Any,
+    ) -> ActionDraft | None:
         return self._by_text.get(str(conversation_input["text"]))
 
 

@@ -164,7 +164,7 @@ class CapabilityExecutionService:
         run_id: str,
         handoff: Mapping[str, Any],
         extension: Mapping[str, Any] | None = None,
-        artifacts=(),
+        artifacts: Any = (),
     ) -> ExecutionResult:
         """Collect a Handoff against the exact immutable external Run inputs."""
         run = self._require_run(run_id)
@@ -281,7 +281,7 @@ class CapabilityExecutionService:
         *,
         lineage_ref: str,
         expected_style: ExecutionStyle,
-    ):
+    ) -> tuple[CapabilityRunRecord, Any, BoundedResourceAccess]:
         self._validator.validate_documents(
             descriptor,
             invocation,
@@ -400,7 +400,7 @@ class CapabilityExecutionService:
         self,
         invocation: Mapping[str, Any],
         context_pack: Mapping[str, Any],
-    ):
+    ) -> Any:
         decision = self._authorization.validate(
             invocation["runtime_authorization_evidence"],
             invocation=invocation,
@@ -429,7 +429,7 @@ class CapabilityExecutionService:
         run: CapabilityRunRecord,
         handoff: Mapping[str, Any],
         extension: Mapping[str, Any] | None,
-        artifacts,
+        artifacts: Any,
     ) -> ExecutionResult:
         invocation = self._required_doc(
             self._traces.load_invocation(run.invocation_id),
@@ -522,7 +522,7 @@ class CapabilityExecutionService:
             )
 
         try:
-            current = self._states.load_state_view(
+            state_view = self._states.load_state_view(
                 run.project_ref,
                 run.lineage_ref,
             )
@@ -545,7 +545,7 @@ class CapabilityExecutionService:
             proposal = self._normalization.normalize(
                 handoff,
                 extension=extension,
-                state=current,
+                state=state_view,
                 context={
                     "run_id": run.run_id,
                     "implementation_id": run.implementation_id,
@@ -560,7 +560,7 @@ class CapabilityExecutionService:
                 (),
             )
         except NormalizationRejected as exc:
-            snapshot = current.current_snapshot
+            snapshot = state_view.current_snapshot
             code = (
                 ExecutionFailureCode.STALE_STATE.value
                 if (
@@ -655,7 +655,7 @@ class CapabilityExecutionService:
         return run
 
     @staticmethod
-    def _required_doc(value, label):
+    def _required_doc(value: Any, label: str) -> Any:
         if value is None:
             raise CapabilityExecutionError(
                 ExecutionFailureCode.INVOCATION_INVALID,

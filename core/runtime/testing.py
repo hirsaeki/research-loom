@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from copy import deepcopy
 from dataclasses import asdict
-from typing import Any
+from typing import Any, cast
 
 from .ports import AtomicCommitError, IdempotencyConflictError, StaleHeadError
 from .transition_models import CommitBundle, CommitReceipt, LineageView, StateView, canonical_digest
@@ -96,7 +96,7 @@ class InMemoryResearchStateRepository:
         known = {(kind, object_id) for kind, object_id, _ in self._objects}
         known.update(("snapshot", snapshot_id) for snapshot_id in self._snapshots)
         known.update(("research_lineage", lineage_id) for lineage_id in self._lineages)
-        return {tuple(ref): tuple(ref) in known for ref in refs}
+        return {cast(tuple[str, str], tuple(ref)): tuple(ref) in known for ref in refs}
 
     def find_commit_by_idempotency_key(
         self, idempotency_key: str
