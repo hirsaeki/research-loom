@@ -1,3 +1,4 @@
+import plugins.local_application  # noqa: F401  # load first: survey_virtual_runner import cycle (#490)
 from plugins.survey_virtual_runner.generation import generate_records
 from tests.runtime.survey_virtual_runner_test_support import *  # noqa: F403
 
