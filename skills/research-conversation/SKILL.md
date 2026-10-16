@@ -272,8 +272,13 @@ consecutive middle sections and conclusion. Keep meaning fidelity,
 comprehension/decision support and reader experience as separate findings.
 Return concrete placement, explanation or repetition edits for weak passages
 and use the exact current base for partial revision. Distinguish supplied
-Recommendations from decisions already made in practice. Preserve first
-outputs and unchanged sections. Independent human reader evaluation remains
+Recommendations from decisions already made in practice.
+Check paragraphs for competing roles using `../writer/references/reader-flow.md`:
+request a concrete edit when unrelated or repeated caveats interrupt the
+argument, while allowing necessary qualifications and supplied contrasts that
+constitute the paragraph's point. Treat unresolved competition as an editorial
+blocker for that passage, not a runtime gate on draft storage or Research.
+Preserve first outputs and unchanged sections. Independent human reader evaluation remains
 separate; import success, source references and section checks do not establish
 reader effect or a full-document PASS.
 

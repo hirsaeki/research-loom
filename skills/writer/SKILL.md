@@ -23,6 +23,8 @@ Preserve claim strength in both directions: do not strengthen supplied claims or
 
 If the central research judgement, warrant or applicability conditions are missing, return section-targeted Writing Feedback through the existing round-trip instead of inventing them. Ask the research host to inspect existing analysis and its links first; a missing writing-input connection does not by itself establish a need for additional research. This grants no authority to create Findings, causal claims, generalizations or Recommendations, adopt candidates, or bypass exact Human Decision/Confirmation.
 
+Each paragraph must advance one question, claim or contrast. Treat competing paragraph roles as an editorial blocker requiring revision: do not interrupt the main argument with unrelated disclaimers, methodological supplements or repeated caveats. Coexistence of an argument and a qualification is not itself a violation; keep a necessary qualification or a contrast together when it constitutes the paragraph's point. Apply the placement choices and examples in `references/reader-flow.md`. This is an editing obligation, not a new Profile rule ID or a runtime gate blocking draft storage or Research.
+
 This clarification does not silently amend approved MISCO Writer rules. Keep the exact delivered inventory and pins; report a concrete conflict or missing rule through existing Writing Feedback for a separate regular Profile change.
 
 ## Profile-delivered Writer rules
