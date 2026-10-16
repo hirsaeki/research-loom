@@ -10,5 +10,36 @@ dependencies = [
     "pypdf>=6.20.1",
 ]
 
+[dependency-groups]
+dev = [
+    "ruff==0.17.1",
+    "mypy==2.4.0",
+    "types-PyYAML",
+    "types-jsonschema",
+]
+
 [tool.uv]
 package = false
+# Runtime provisioning (`uv sync --frozen`) stays runtime-only; developer tools need `--group dev`.
+default-groups = []
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+# Legacy reference trees are frozen pending removal (#500).
+extend-exclude = ["research-harness", "research-profile"]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "UP", "B"]
+ignore = [
+    "E501",  # line length is owned by the formatter; long literals are left as written
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["F403", "F405"]  # shared runtime fixtures are star-imported
+
+[tool.mypy]
+python_version = "3.12"
+explicit_package_bases = true
+files = ["core"]
+strict = true
