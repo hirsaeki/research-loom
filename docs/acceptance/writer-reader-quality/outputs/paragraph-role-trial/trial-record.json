@@ -1,0 +1,25 @@
+{
+  "record_type": "paragraph_role_generation_trial",
+  "contract_commit": "82363fd18a1958c754881088af3f6e73d3885519",
+  "input_digest": "sha256:45d562feee575794f3dcf0ead348cffb08a82672ffbc32a9b5413819d1c71c15",
+  "generation_count": 1,
+  "generator": "current conversation primary assistant",
+  "prior_drafts_and_evaluations_visible": true,
+  "independent_evaluation": false,
+  "ablation": false,
+  "model_version": "not available",
+  "sampling_parameters": "not available",
+  "prose_sha256": "03a6b955aa6bc77700b501675467196aec5f3a736fc73e11d32670a7a7190ba0",
+  "prose_characters": 1046,
+  "import_revision_id": "WMR-5ac2ecf805a33c9393e30812-5e33f8cc017e46c2ac7048cdf1ad2528",
+  "public_inspect_status": "OK",
+  "imported_content_exact_match": true,
+  "research_state_mutation_performed": false,
+  "profile_rule_outcomes": "UNEVALUATED; transport validation does not establish editorial quality",
+  "human_review": "pending",
+  "editor_observations": [
+    "Method first paragraph includes the synthetic-material notice; check whether its role interrupts method explanation.",
+    "Conclusion repeats causal and decision boundaries already stated elsewhere; possible consolidation target."
+  ],
+  "reader_file": "reader-manuscript.md"
+}

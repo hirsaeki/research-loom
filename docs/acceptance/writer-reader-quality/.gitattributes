@@ -1,0 +1,2 @@
+# Preserve first-generation and targeted-edit bytes used by the run manifest.
+outputs/**/*.json -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol

@@ -6,7 +6,7 @@ Use this Skill only after Research has produced a fixed Research Package and a W
 
 1. Export the selected sections with `writer-round-trip export-input` (or the equivalent public Facade operation).
 2. Read only the detached `writer-input.json` and its embedded section inputs. Do not inspect private SQLite state, hidden workspace stores, or the legacy `research-profile/` tree to recover missing rules.
-3. Draft each requested section from the supplied research objects/materials, citation scope, unresolved gaps, Narrative constraints, and communication brief.
+3. Draft each requested section from the supplied research objects/materials, citation scope, unresolved gaps, Narrative constraints, and communication brief. Apply `references/reader-flow.md` to give the reader a reason to begin, an advancing understanding through the middle, and a useful answer at the end.
 4. Return a `writer_response` that matches `core/packages/writer-publication/writer-round-trip.schema.json`.
 5. Import through `writer-round-trip import-response`. Treat an imported manuscript revision as an immutable writing artifact, not as research adoption or publication approval.
 
@@ -22,6 +22,8 @@ Use this Skill only after Research has produced a fixed Research Package and a W
 Preserve claim strength in both directions: do not strengthen supplied claims or weaken a supported central conclusion into mere possibility or “it depends”. Where supplied, organize the answer, principal evidence and warrant, and scope so readers understand the research judgement. Keep qualifications that change truth or strength near the conclusion; preserve counterevidence and substantive corrections. Do not replace the answer with caveats, a slogan without reasoning, or duplicate defensive/audit commentary.
 
 If the central research judgement, warrant or applicability conditions are missing, return section-targeted Writing Feedback through the existing round-trip instead of inventing them. Ask the research host to inspect existing analysis and its links first; a missing writing-input connection does not by itself establish a need for additional research. This grants no authority to create Findings, causal claims, generalizations or Recommendations, adopt candidates, or bypass exact Human Decision/Confirmation.
+
+Each paragraph must advance one question, claim or contrast. Treat competing paragraph roles as an editorial blocker requiring revision: do not interrupt the main argument with unrelated disclaimers, methodological supplements or repeated caveats. Coexistence of an argument and a qualification is not itself a violation; keep a necessary qualification or a contrast together when it constitutes the paragraph's point. Apply the placement choices and examples in `references/reader-flow.md`. This is an editing obligation, not a new Profile rule ID or a runtime gate blocking draft storage or Research.
 
 This clarification does not silently amend approved MISCO Writer rules. Keep the exact delivered inventory and pins; report a concrete conflict or missing rule through existing Writing Feedback for a separate regular Profile change.
 
@@ -69,3 +71,6 @@ If a figure/table would clarify supplied meaning, return to the Host's existing 
 When revising one section, base the response on the exact current manuscript revision and return only the changed section. The round-trip service reuses unchanged sections from that exact base; never recreate or silently rewrite them.
 
 See `references/detached-input.md` for the expected detached-input boundary.
+
+See `../../docs/acceptance/writer-reader-quality/comparison.md` for the bounded
+synthetic trial, preserved first outputs and remaining reader-evaluation limits.

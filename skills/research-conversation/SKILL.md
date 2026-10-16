@@ -255,6 +255,33 @@ Select the new source-bound Composition and Writer inputs, revise affected prose
 
 When the human asks to move from research into manuscript drafting or revision, first fix the Research Package and explicitly selected Writer Composition through the public Loom surfaces. Then load `../writer/SKILL.md` and hand off only the detached Writer input. Even when the host can write or edit workspace files directly, do not treat that convenience path as the manuscript path. Do not draft from private Research State, choose a different Profile version inside the Writer, or treat manuscript import as research adoption. If the selected section still has unresolved research needs, carry them into the Writer input/Feedback path rather than silently resolving them in prose.
 
+Before capturing the Composition, resolve the reader's situation and decision
+from the existing communication brief and inspect the supplied research for
+the question, findings, warrant, selection reason and important conditions.
+Use existing `reader_question`, `purpose` and `messages` to specify what each
+section helps the reader understand; use `opening_intent`, `closing_intent`,
+previous/next section IDs and research/citation/exhibit refs to connect that
+understanding to the next explanation and the final Recommendation. Do not add
+new hook/momentum/payoff fields or a fixed research sequence. A missing writing
+connection calls first for existing analysis and links, not broad new research
+or invented stakes. Prepare and select through the public Composition surface;
+the Writer realizes this plan using `../writer/references/reader-flow.md`.
+
+After import, inspect the same exact current manuscript across the opening,
+consecutive middle sections and conclusion. Keep meaning fidelity,
+comprehension/decision support and reader experience as separate findings.
+Return concrete placement, explanation or repetition edits for weak passages
+and use the exact current base for partial revision. Distinguish supplied
+Recommendations from decisions already made in practice.
+Check paragraphs for competing roles using `../writer/references/reader-flow.md`:
+request a concrete edit when unrelated or repeated caveats interrupt the
+argument, while allowing necessary qualifications and supplied contrasts that
+constitute the paragraph's point. Treat unresolved competition as an editorial
+blocker for that passage, not a runtime gate on draft storage or Research.
+Preserve first outputs and unchanged sections. Independent human reader evaluation remains
+separate; import success, source references and section checks do not establish
+reader effect or a full-document PASS.
+
 ## References
 
 - `references/public-surfaces.md` — which public Loom reads to use and what they prove.
