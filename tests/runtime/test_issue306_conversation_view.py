@@ -8,23 +8,22 @@ from copy import deepcopy
 from pathlib import Path
 from unittest.mock import patch
 
-import test_issue92_external_submission_preflight as external_tests
-import test_issue134_argument_proposal as argument_tests
-import test_issue135_recommendation_proposal as recommendation_tests
-import test_issue293_synthesis_candidate_discovery as synthesis_tests
-from test_research_question_adoption import _init_workspace, _proposal_input
-from test_research_question_batch_adoption import (
+import tests.runtime.test_issue92_external_submission_preflight as external_tests
+import tests.runtime.test_issue134_argument_proposal as argument_tests
+import tests.runtime.test_issue135_recommendation_proposal as recommendation_tests
+import tests.runtime.test_issue293_synthesis_candidate_discovery as synthesis_tests
+from plugins.local_application import LocalApplicationError, LocalApplicationFacade
+from plugins.local_application.cli import main as cli_main
+from plugins.local_application.conversation_view import ConversationViewError
+from tests.runtime.test_research_question_adoption import _init_workspace, _proposal_input
+from tests.runtime.test_research_question_batch_adoption import (
     _apply_to_decision,
     _batch_input,
     _five_questions,
     _question,
     _resolve,
 )
-from test_research_question_review import _adopt_question, _workspace
-
-from plugins.local_application import LocalApplicationError, LocalApplicationFacade
-from plugins.local_application.cli import main as cli_main
-from plugins.local_application.conversation_view import ConversationViewError
+from tests.runtime.test_research_question_review import _adopt_question, _workspace
 
 _RAW_TARGET_KEYS = {
     "proposal",

@@ -3,13 +3,12 @@ from __future__ import annotations
 from copy import deepcopy
 from unittest.mock import patch
 
-import issue80_writer_composition_suite as issue80
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-
+import tests.runtime.issue80_writer_composition_suite as issue80
 from plugins.local_application import LocalApplicationError
 from plugins.local_application.writer_composition_history_service import (
     WriterCompositionHistoryService,
 )
+from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 
 class Issue177WriterHistoryTests(ResearchPackageAcceptanceSupport):

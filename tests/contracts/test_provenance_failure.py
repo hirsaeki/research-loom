@@ -1,7 +1,8 @@
 import unittest
 
 from jsonschema import Draft202012Validator
-from semantic_oracle import ROOT, effective_provenance_error, key_of, load_json
+
+from tests.contracts.semantic_oracle import ROOT, effective_provenance_error, key_of, load_json
 
 
 def mutate_dependency_fixture(spec):

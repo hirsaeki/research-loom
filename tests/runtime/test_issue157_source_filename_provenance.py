@@ -5,9 +5,8 @@ import json
 from contextlib import redirect_stdout
 from pathlib import Path
 
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-
 from plugins.local_application.cli import main as cli_main
+from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 
 def _run_cli(argv):

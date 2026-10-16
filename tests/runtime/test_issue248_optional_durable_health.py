@@ -356,7 +356,7 @@ os._exit(0)
         self.assertFalse(db.exists())
 
     def test_publication_registration_and_missing_root_do_not_block_candidate_research(self):
-        from test_issue220_publication_release import Issue220PublicationReleaseTests
+        from tests.runtime.test_issue220_publication_release import Issue220PublicationReleaseTests
 
         helper = Issue220PublicationReleaseTests()
         helper.setUp()

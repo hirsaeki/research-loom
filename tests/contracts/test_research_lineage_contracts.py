@@ -7,7 +7,8 @@ from pathlib import Path
 
 import yaml
 from jsonschema import Draft202012Validator, FormatChecker, ValidationError
-from research_lineage_oracle import (
+
+from tests.contracts.research_lineage_oracle import (
     ERROR_IDS,
     canonical_digest,
     comparison_error,

@@ -9,17 +9,16 @@ from pathlib import Path
 from unittest.mock import patch
 from xml.etree import ElementTree as ET
 
-import issue80_writer_composition_suite as compositions
-import test_issue219_writer_round_trip as writer
-import test_issue256_native_publication as native
-import test_issue405_research_charts as charts
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-from test_issue256_native_publication import fixture_png
-from test_research_exhibits import state_signature
-
+import tests.runtime.issue80_writer_composition_suite as compositions
+import tests.runtime.test_issue219_writer_round_trip as writer
+import tests.runtime.test_issue256_native_publication as native
+import tests.runtime.test_issue405_research_charts as charts
 from plugins.local_application import LocalApplicationError
 from plugins.local_application.publication_docx import A, W, docx_bytes, verify_native_docx
 from plugins.local_application.publication_exhibits import prepare_exhibits
+from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
+from tests.runtime.test_issue256_native_publication import fixture_png
+from tests.runtime.test_research_exhibits import state_signature
 
 
 class GeneratedPublicationTests(ResearchPackageAcceptanceSupport):

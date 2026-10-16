@@ -4,15 +4,14 @@ import json
 from copy import deepcopy
 from unittest.mock import patch
 
-import issue80_writer_composition_suite as composition_support
-import test_issue219_writer_round_trip as round_trip
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-
+import tests.runtime.issue80_writer_composition_suite as composition_support
+import tests.runtime.test_issue219_writer_round_trip as round_trip
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade
 from plugins.local_application.writer_composition_history_service import (
     WriterCompositionHistoryService,
 )
 from plugins.local_application.writer_round_trip_service import WriterRoundTripService
+from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 
 class WriterRecoveryTests(ResearchPackageAcceptanceSupport):

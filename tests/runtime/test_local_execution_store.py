@@ -12,7 +12,6 @@ from pathlib import Path
 from unittest.mock import patch
 
 import rfc8785
-from runtime_fixtures import project, rq, snapshot
 
 from core.execution import (
     BoundedResourceAccess,
@@ -43,6 +42,7 @@ from plugins.local_execution_store import (
     LocalExecutionStoreIntegrityError,
 )
 from plugins.sqlite_state_store import SQLiteResearchStateRepository
+from tests.runtime.runtime_fixtures import project, rq, snapshot
 
 ROOT = Path(__file__).resolve().parents[2]
 FIX = ROOT / "core/fixtures/capabilities/valid"

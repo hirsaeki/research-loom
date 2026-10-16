@@ -9,17 +9,17 @@ from pathlib import Path
 from xml.etree import ElementTree as ET
 
 import rfc8785
-import test_external_desktop_research_intake as intake
-from test_misco_writer_profile_application import (
-    WRITER_MANIFEST,
-    MiscoWriterProfileApplicationTests,
-)
 
+import tests.runtime.test_external_desktop_research_intake as intake
 from plugins.local_application import LocalApplicationError
 from plugins.local_application.profile_resolution import resolve_effective_profile_set
 from plugins.local_application.publication_docx import WP, W, docx_bytes
 from plugins.local_application.publication_input import inspect_inputs
 from plugins.local_application.publication_release_service import _publication_policy
+from tests.runtime.test_misco_writer_profile_application import (
+    WRITER_MANIFEST,
+    MiscoWriterProfileApplicationTests,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 PUBLICATION_MANIFEST = ROOT / "profiles/publication/misco/profile.json"
@@ -324,7 +324,7 @@ class MiscoPublicationProfileApplicationTests(MiscoWriterProfileApplicationTests
             facade.close()
 
     def test_review_formal_content_width_bounds_table_and_image(self):
-        from test_issue256_native_publication import fixture_png
+        from tests.runtime.test_issue256_native_publication import fixture_png
 
         formal = json.loads(
             (ROOT / "profiles/publication/misco/resources/publication-formal-spec.json").read_text(
@@ -364,9 +364,8 @@ class MiscoPublicationProfileApplicationTests(MiscoWriterProfileApplicationTests
     def test_e3_table_caption_above_and_figure_caption_below_in_native_docx(self):
         import io
 
-        from test_issue256_native_publication import A, fixture_png
-
         from plugins.local_application.publication_docx import docx_bytes
+        from tests.runtime.test_issue256_native_publication import A, fixture_png
 
         table = {
             "ref": "EX-T",

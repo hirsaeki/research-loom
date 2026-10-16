@@ -4,8 +4,8 @@ import json
 import unittest
 from copy import deepcopy
 
-from desktop_research_oracle import context_semantic_error, result_semantic_error
-from test_desktop_research_contracts import (
+from tests.contracts.desktop_research_oracle import context_semantic_error, result_semantic_error
+from tests.contracts.test_desktop_research_contracts import (
     CONTEXT_PATH,
     DR,
     HANDOFF_PATH,

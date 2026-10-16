@@ -8,10 +8,10 @@ import sys
 from pathlib import Path
 
 import rfc8785
-import test_external_desktop_research_intake as intake
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
+import tests.runtime.test_external_desktop_research_intake as intake
 from plugins.local_application.profile_resolution import resolve_effective_profile_set
+from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 ROOT = Path(__file__).resolve().parents[2]
 WRITER_MANIFEST = ROOT / "profiles/narrative/misco/profile.json"

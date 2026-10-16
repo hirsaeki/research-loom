@@ -4,13 +4,12 @@ from collections.abc import Mapping
 from copy import deepcopy
 from unittest.mock import patch
 
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-from test_issue171_new_material_continuation import (
-    Issue171NewMaterialContinuationTests as _Issue171Support,
-)
-
 from plugins.local_application.new_material_continuation_service import (
     _render_reacquired_html_rendition,
+)
+from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
+from tests.runtime.test_issue171_new_material_continuation import (
+    Issue171NewMaterialContinuationTests as _Issue171Support,
 )
 
 

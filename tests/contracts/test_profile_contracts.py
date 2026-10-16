@@ -6,7 +6,8 @@ import unittest
 import rfc8785
 import yaml
 from jsonschema import Draft202012Validator
-from semantic_oracle import (
+
+from tests.contracts.semantic_oracle import (
     ROOT,
     canonical_compose_constraints,
     canonical_constraint_source_key,

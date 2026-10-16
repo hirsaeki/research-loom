@@ -8,14 +8,13 @@ from contextlib import redirect_stdout
 from copy import deepcopy
 from unittest.mock import patch
 
-from runtime_fixtures import finding, project, rq, seed_state
-from test_issue135_recommendation_proposal import profile_provider
-from test_survey_production import NullResolver
-
 from core.conversation import ConversationRuntimeError
 from core.runtime import canonical_digest
 from plugins.local_application import LocalApplicationFacade, LocalResearchApplication
 from plugins.local_application.cli import main as cli_main
+from tests.runtime.runtime_fixtures import finding, project, rq, seed_state
+from tests.runtime.test_issue135_recommendation_proposal import profile_provider
+from tests.runtime.test_survey_production import NullResolver
 
 
 def _make_facade(root: str) -> LocalApplicationFacade:

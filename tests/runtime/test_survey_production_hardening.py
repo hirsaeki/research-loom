@@ -7,7 +7,9 @@ import unittest
 from copy import deepcopy
 from pathlib import Path
 
-from test_survey_production import (
+from plugins.local_application import LocalApplicationError, LocalApplicationFacade
+from plugins.local_survey_store import canonical_document_digest
+from tests.runtime.test_survey_production import (
     ROOT,
     adopt_rq,
     design_payload,
@@ -17,9 +19,6 @@ from test_survey_production import (
     instrument_payload,
     make_app,
 )
-
-from plugins.local_application import LocalApplicationError, LocalApplicationFacade
-from plugins.local_survey_store import canonical_document_digest
 
 
 def run_launcher(argv: list[str]) -> tuple[int, dict]:

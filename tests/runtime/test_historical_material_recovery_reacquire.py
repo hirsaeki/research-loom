@@ -6,8 +6,6 @@ import subprocess
 from contextlib import redirect_stdout
 from unittest.mock import patch
 
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-
 from plugins.local_application import LocalApplicationError as LocalApplicationError
 from plugins.local_application import LocalApplicationFacade
 from plugins.local_application.cli import main as cli_main
@@ -18,6 +16,7 @@ from plugins.local_application.material_reacquisition_facade import (
     material_reacquisition_payload,
 )
 from plugins.local_execution_store import child_runs_for_parent
+from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 
 def _run_cli(argv):

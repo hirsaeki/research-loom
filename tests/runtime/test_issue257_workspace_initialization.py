@@ -15,8 +15,7 @@ from copy import deepcopy
 from pathlib import Path
 from unittest.mock import patch
 
-import test_local_workspace_application_cli as support
-
+import tests.runtime.test_local_workspace_application_cli as support
 from core.runtime import canonical_digest
 from plugins.local_application import LocalWorkspace
 from plugins.local_application.workspace import (

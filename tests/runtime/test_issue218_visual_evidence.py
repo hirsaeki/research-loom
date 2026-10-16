@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import json
 
-import test_research_exhibits as exhibits
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-
+import tests.runtime.test_research_exhibits as exhibits
 from plugins.local_application import LocalApplicationError
 from plugins.local_application.research_package_format import (
     MAX_ITEM_BYTES,
@@ -12,6 +10,7 @@ from plugins.local_application.research_package_format import (
     without_digest,
 )
 from plugins.local_application.research_package_service import verify_export_root
+from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 
 class Issue218VisualEvidenceTests(ResearchPackageAcceptanceSupport):

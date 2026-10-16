@@ -5,13 +5,12 @@ from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import patch
 
-import test_issue250_exact_payload_repair as support
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-from test_historical_material_recovery_reacquire import _submit_reacquire
-
+import tests.runtime.test_issue250_exact_payload_repair as support
 from plugins.local_application import LocalApplicationFacade
 from plugins.local_application.material_reacquisition_facade import RetrievedMaterial
 from plugins.local_execution_store import LocalExecutionStoreIntegrityError
+from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
+from tests.runtime.test_historical_material_recovery_reacquire import _submit_reacquire
 
 
 class PayloadRepairReviewTests(ResearchPackageAcceptanceSupport):

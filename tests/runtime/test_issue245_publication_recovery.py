@@ -6,15 +6,14 @@ import shutil
 from copy import deepcopy
 from unittest.mock import patch
 
-import test_issue220_publication_release as support
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-
+import tests.runtime.test_issue220_publication_release as support
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade
 from plugins.local_application.cli import main
 from plugins.local_application.publication_release_service import (
     PublicationReleaseService,
     _json_bytes,
 )
+from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 
 class PublicationRecoveryTests(ResearchPackageAcceptanceSupport):

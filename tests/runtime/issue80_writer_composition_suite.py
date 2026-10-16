@@ -8,15 +8,14 @@ from copy import deepcopy
 from pathlib import Path
 from unittest.mock import patch
 
-import survey_virtual_runner_test_support as vr
-import test_external_desktop_research_intake as intake
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-from runtime_fixtures import decision, make_request
-
+import tests.runtime.survey_virtual_runner_test_support as vr
+import tests.runtime.test_external_desktop_research_intake as intake
 from core.runtime import TransitionAction, TransitionKind
 from core.runtime.transition_models import CommitReceipt
 from plugins.local_application import LocalApplicationError, verify_writer_section_input
 from plugins.local_application.writer_composition_service import WriterCompositionService
+from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
+from tests.runtime.runtime_fixtures import decision, make_request
 
 
 class Issue80WriterCompositionTests(ResearchPackageAcceptanceSupport):

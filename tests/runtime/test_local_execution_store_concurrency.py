@@ -7,14 +7,13 @@ from pathlib import Path
 from threading import Barrier, Lock, Thread
 from unittest.mock import patch
 
-from test_local_execution_store import trace_run
-
 from core.execution import RunLifecycleEvent, RunStatus
 from plugins.local_execution_store import (
     LocalExecutionStore,
     LocalExecutionStoreConfig,
     LocalExecutionStoreError,
 )
+from tests.runtime.test_local_execution_store import trace_run
 
 
 class LocalExecutionStoreConcurrencySecurityTests(unittest.TestCase):

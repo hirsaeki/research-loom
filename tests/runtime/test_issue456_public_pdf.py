@@ -6,14 +6,14 @@ from pathlib import Path
 from unittest.mock import patch
 
 import rfc8785
-import test_external_desktop_research_intake as intake
-import test_misco_writer_profile_application as writer_tests
 from pypdf import PdfWriter
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-from test_issue456_formal_document import representative_report
 
+import tests.runtime.test_external_desktop_research_intake as intake
+import tests.runtime.test_misco_writer_profile_application as writer_tests
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade, LocalWorkspace
 from plugins.local_application.profile_resolution import resolve_effective_profile_set
+from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
+from tests.runtime.test_issue456_formal_document import representative_report
 
 ROOT = Path(__file__).resolve().parents[2]
 

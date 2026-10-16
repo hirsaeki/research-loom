@@ -6,16 +6,6 @@ import unittest
 from copy import deepcopy
 from dataclasses import replace
 
-from runtime_fixtures import (
-    SCHEMA_VALIDATOR,
-    evidence,
-    make_request,
-    project,
-    rq,
-    seed_state,
-    source,
-)
-
 from core.decision import (
     HumanDecisionError,
     HumanDecisionService,
@@ -26,6 +16,15 @@ from core.execution.testing import StaticClock
 from core.runtime import StateTransitionService, TransitionAction, TransitionKind, canonical_digest
 from core.runtime.testing import InMemoryResearchStateRepository
 from plugins.local_decision_store import LocalHumanDecisionStore
+from tests.runtime.runtime_fixtures import (
+    SCHEMA_VALIDATOR,
+    evidence,
+    make_request,
+    project,
+    rq,
+    seed_state,
+    source,
+)
 
 ACTOR = {"actor_id": "HUMAN-1", "actor_type": "human"}
 CLOCK = StaticClock("2026-08-27T04:00:00Z")

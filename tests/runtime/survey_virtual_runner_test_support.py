@@ -5,16 +5,6 @@ import unittest
 from copy import deepcopy
 from pathlib import Path
 
-from runtime_fixtures import decision, project, rq, seed_state
-from test_survey_production import (
-    NullResolver,
-    design_payload,
-    extended_questionnaire,
-    instrument_payload,
-    profile_provider,
-    state_signature,
-)
-
 from plugins.local_application import (
     LocalApplicationError,
     LocalApplicationFacade,
@@ -22,6 +12,15 @@ from plugins.local_application import (
 )
 from plugins.local_survey_store import canonical_document_digest
 from plugins.survey_virtual_runner.response_validation import SurveyResponseValidator
+from tests.runtime.runtime_fixtures import decision, project, rq, seed_state
+from tests.runtime.test_survey_production import (
+    NullResolver,
+    design_payload,
+    extended_questionnaire,
+    instrument_payload,
+    profile_provider,
+    state_signature,
+)
 
 METHOD_ID = "METHOD-SURVEY-1"
 PROTOCOL_ID = "PROTOCOL-SURVEY-1"

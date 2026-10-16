@@ -11,14 +11,11 @@ from copy import deepcopy
 from pathlib import Path
 from unittest.mock import patch
 
-import issue80_writer_composition_suite as compositions
 import rfc8785
-import test_issue219_writer_round_trip as writer
-import test_issue405_research_charts as charts
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-from test_issue256_native_publication import fixture_png
-from test_research_exhibits import state_signature
 
+import tests.runtime.issue80_writer_composition_suite as compositions
+import tests.runtime.test_issue219_writer_round_trip as writer
+import tests.runtime.test_issue405_research_charts as charts
 from core.runtime import canonical_digest
 from plugins.local_application import LocalApplicationError
 from plugins.local_application.generated_explanation import matching_review
@@ -26,6 +23,9 @@ from plugins.local_application.publication_docx import docx_bytes, verify_native
 from plugins.local_application.publication_exhibits import prepare_exhibits
 from plugins.local_application.research_chart import validate_chart_exhibit
 from plugins.research_visual_semantics import validate_visual_package_bindings
+from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
+from tests.runtime.test_issue256_native_publication import fixture_png
+from tests.runtime.test_research_exhibits import state_signature
 
 
 class HostChartTests(unittest.TestCase):

@@ -3,9 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 from unittest.mock import patch
 
-import test_issue220_publication_release as publication_support
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-
+import tests.runtime.test_issue220_publication_release as publication_support
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade
 from plugins.local_application.publication_release_service import (
     _digest,
@@ -13,6 +11,7 @@ from plugins.local_application.publication_release_service import (
     _sha,
     _verify_docx_bytes,
 )
+from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 
 class PublicationApprovalBindingTests(ResearchPackageAcceptanceSupport):

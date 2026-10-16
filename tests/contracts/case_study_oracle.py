@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from research_method_oracle import canonical_digest
+from tests.contracts.research_method_oracle import canonical_digest
 
 CANONICAL_FUNCTIONS = {"method_design", "instrument_design", "execute", "analyze"}
 CASE_ERROR_CODES = {

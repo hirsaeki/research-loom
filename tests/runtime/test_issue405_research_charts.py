@@ -7,9 +7,6 @@ from copy import deepcopy
 from pathlib import Path
 from unittest.mock import patch
 
-from runtime_fixtures import evidence, project, rq, seed_state, source
-from test_research_exhibits import NullResolver, profile_provider, state_signature
-
 from core.runtime import canonical_digest
 from plugins.local_application import (
     LocalApplicationError,
@@ -25,6 +22,8 @@ from plugins.local_application.research_chart import (
 from plugins.local_application.research_chart_png import render_chart
 from plugins.local_application.visual_origin import verify_visual_origin
 from plugins.research_visual_semantics import digest, validate_visual_package_bindings
+from tests.runtime.runtime_fixtures import evidence, project, rq, seed_state, source
+from tests.runtime.test_research_exhibits import NullResolver, profile_provider, state_signature
 
 
 def chart_evidence(numeric_x=False):

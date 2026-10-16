@@ -7,9 +7,7 @@ from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
-import issue80_writer_composition_suite as issue80
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-
+import tests.runtime.issue80_writer_composition_suite as issue80
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade
 from plugins.local_application.cli import main
 from plugins.local_application.item_listing import directory_page
@@ -19,6 +17,7 @@ from plugins.local_application.research_package_format import (
     without_digest,
 )
 from plugins.local_application.writer_composition_service import _digest_document
+from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 
 class Issue254ItemListingTests(ResearchPackageAcceptanceSupport):

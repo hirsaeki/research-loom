@@ -5,12 +5,11 @@ import json
 from copy import deepcopy
 from unittest.mock import patch
 
-import test_issue464_writer_rule_scope as scope_tests
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-
+import tests.runtime.test_issue464_writer_rule_scope as scope_tests
 from plugins.local_application import LocalApplicationError
 from plugins.local_application.cli import main
 from plugins.local_application.writer_round_trip_service import WriterRoundTripService
+from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 
 class Issue466WriterDocumentReviewTests(ResearchPackageAcceptanceSupport):

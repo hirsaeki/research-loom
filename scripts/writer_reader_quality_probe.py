@@ -22,7 +22,6 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
-RUNTIME_FIXTURES = ROOT / "tests" / "runtime"
 CASES_PATH = ROOT / "docs" / "acceptance" / "writer-reader-quality" / "cases.json"
 WRITER_MANIFEST = ROOT / "profiles" / "narrative" / "misco" / "1.2.0" / "profile.json"
 DRIVER_VERSION = "0.1.0"
@@ -30,15 +29,12 @@ PROJECT_PREFIX = "PRJ-WRQ"
 
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
-if str(RUNTIME_FIXTURES) not in sys.path:
-    sys.path.insert(0, str(RUNTIME_FIXTURES))
-
-from runtime_fixtures import seed_state  # noqa: E402
 
 from core.runtime import canonical_digest  # noqa: E402
 from plugins.local_application import LocalApplicationFacade, LocalResearchApplication  # noqa: E402
 from plugins.local_application.profile_resolution import resolve_effective_profile_set  # noqa: E402
 from plugins.local_application.writer_round_trip_service import MAX_RESPONSE_BYTES  # noqa: E402
+from tests.runtime.runtime_fixtures import seed_state  # noqa: E402
 
 
 class _NoCapabilityResolver:

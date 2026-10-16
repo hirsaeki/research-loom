@@ -68,7 +68,7 @@ jobs:
           cmp launcher.stdout direct.stdout
           cmp launcher.stderr direct.stderr
       - name: Run canonical contract tests
-        run: uv run --frozen python -m unittest discover -s tests/contracts -p 'test_*.py' -v
+        run: uv run --frozen python -m unittest discover -t . -s tests/contracts -p 'test_*.py' -v
 
   runtime-linux:
     name: runtime-linux-${{ matrix.shard }}
@@ -94,7 +94,6 @@ jobs:
         env:
           SHARD_INDEX: ${{ matrix.shard }}
           SHARD_TOTAL: 4
-          PYTHONPATH: tests/runtime
         run: |
           mapfile -t runtime_tests < <(find tests/runtime -type f -name 'test_*.py' | sort)
           selected=()
@@ -132,15 +131,15 @@ jobs:
       - name: Run Issue 91 real Windows file I/O regressions
         run: uv run --frozen python -m unittest -v tests.runtime.test_issue91_review_fixes.Issue91WindowsRealIoTests
       - name: Run Issue 127 historical material recovery acceptance
-        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_historical_material_recovery*.py' -v
+        run: uv run --frozen python -m unittest discover -t . -s tests/runtime -p 'test_historical_material_recovery*.py' -v
       - name: Run Issue 158 external material health acceptance
-        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_external_material_health.py' -v
+        run: uv run --frozen python -m unittest discover -t . -s tests/runtime -p 'test_external_material_health.py' -v
       - name: Run Issue 160 portable execution/material store acceptance
-        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue160_execution_store_portability.py' -v
+        run: uv run --frozen python -m unittest discover -t . -s tests/runtime -p 'test_issue160_execution_store_portability.py' -v
       - name: Run Issue 165 staged material import acceptance
-        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue165_staged_material_import.py' -v
+        run: uv run --frozen python -m unittest discover -t . -s tests/runtime -p 'test_issue165_staged_material_import.py' -v
       - name: Run Issue 171 new material continuation acceptance
-        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue171_new_material_continuation.py' -v
+        run: uv run --frozen python -m unittest discover -t . -s tests/runtime -p 'test_issue171_new_material_continuation.py' -v
 
   windows-package-lineage:
     name: windows-package-lineage
@@ -158,15 +157,15 @@ jobs:
       - name: Sync locked Python environment
         run: uv sync --frozen
       - name: Run Issue 77 Research Package Windows acceptance
-        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_research_package_*.py' -v
+        run: uv run --frozen python -m unittest discover -t . -s tests/runtime -p 'test_research_package_*.py' -v
       - name: Run Issue 133 Research Package ACL acceptance
-        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue133_windows_acl.py' -v
+        run: uv run --frozen python -m unittest discover -t . -s tests/runtime -p 'test_issue133_windows_acl.py' -v
       - name: Run Issue 134 Argument proposal and Writer recovery acceptance
-        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue134_*.py' -v
+        run: uv run --frozen python -m unittest discover -t . -s tests/runtime -p 'test_issue134_*.py' -v
       - name: Run Issue 145 historical Finding lineage recovery acceptance
-        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_*finding*recovery*.py' -v
+        run: uv run --frozen python -m unittest discover -t . -s tests/runtime -p 'test_*finding*recovery*.py' -v
       - name: Run Issue 148 historical G1 result recovery acceptance
-        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_historical_result_recovery.py' -v
+        run: uv run --frozen python -m unittest discover -t . -s tests/runtime -p 'test_historical_result_recovery.py' -v
 
   windows-writer-publication-a:
     name: windows-writer-publication-a
@@ -184,13 +183,13 @@ jobs:
       - name: Sync locked Python environment
         run: uv sync --frozen
       - name: Run Issue 80 Writer Composition Windows acceptance
-        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue80_writer_composition.py' -v
+        run: uv run --frozen python -m unittest discover -t . -s tests/runtime -p 'test_issue80_writer_composition.py' -v
       - name: Run Issue 245 Publication recovery acceptance
-        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue245*.py' -v
+        run: uv run --frozen python -m unittest discover -t . -s tests/runtime -p 'test_issue245*.py' -v
       - name: Run Issue 249 Writer continuity recovery acceptance
-        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue249*.py' -v
+        run: uv run --frozen python -m unittest discover -t . -s tests/runtime -p 'test_issue249*.py' -v
       - name: Run Issue 193 Parent Durable Store acceptance
-        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue193_parent_durable_store.py' -v
+        run: uv run --frozen python -m unittest discover -t . -s tests/runtime -p 'test_issue193_parent_durable_store.py' -v
 
   windows-writer-publication-b:
     name: windows-writer-publication-b
@@ -208,15 +207,15 @@ jobs:
       - name: Sync locked Python environment
         run: uv sync --frozen
       - name: Run Issue 250 exact payload repair acceptance
-        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue250*.py' -v
+        run: uv run --frozen python -m unittest discover -t . -s tests/runtime -p 'test_issue250*.py' -v
       - name: Run Issue 251 REAL Survey batch acceptance
-        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue251*.py' -v
+        run: uv run --frozen python -m unittest discover -t . -s tests/runtime -p 'test_issue251*.py' -v
       - name: Run Issue 256 native Publication Exhibit acceptance
-        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue256*.py' -v
+        run: uv run --frozen python -m unittest discover -t . -s tests/runtime -p 'test_issue256*.py' -v
       - name: Run Issue 254 bounded item inventory acceptance
-        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue254*.py' -v
+        run: uv run --frozen python -m unittest discover -t . -s tests/runtime -p 'test_issue254*.py' -v
       - name: Run Issue 248 optional child recovery acceptance
-        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue248*.py' -v
+        run: uv run --frozen python -m unittest discover -t . -s tests/runtime -p 'test_issue248*.py' -v
 
   issue128-windows:
     name: issue128-windows
@@ -265,11 +264,11 @@ jobs:
           .\projects\misco-ai-2026\New-MiscoMigrationProbe.ps1 -ExpectedHead $head -Workspace $workspace
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Run Issue 128 Profile generation advancement acceptance
-        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_profile_generation_advancement*.py' -v
+        run: uv run --frozen python -m unittest discover -t . -s tests/runtime -p 'test_profile_generation_advancement*.py' -v
       - name: Run Issue 257 interrupted initialization acceptance
-        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue257*.py' -v
+        run: uv run --frozen python -m unittest discover -t . -s tests/runtime -p 'test_issue257*.py' -v
       - name: Run Issue 255 shared Workspace and exclusive Profile lock acceptance
-        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue255*.py' -v
+        run: uv run --frozen python -m unittest discover -t . -s tests/runtime -p 'test_issue255*.py' -v
 
   delphi-windows:
     name: delphi-windows
@@ -287,6 +286,6 @@ jobs:
       - name: Sync locked Python environment
         run: uv sync --frozen
       - name: Run existing Delphi two-round acceptance
-        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_delphi_two_round_production.py' -v
+        run: uv run --frozen python -m unittest discover -t . -s tests/runtime -p 'test_delphi_two_round_production.py' -v
       - name: Run exact Delphi lifecycle and mode-scale acceptance
-        run: uv run --frozen python -m unittest discover -s tests/runtime -p 'test_issue25[23]*.py' -v
+        run: uv run --frozen python -m unittest discover -t . -s tests/runtime -p 'test_issue25[23]*.py' -v

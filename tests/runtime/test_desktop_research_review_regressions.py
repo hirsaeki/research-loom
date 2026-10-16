@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from test_desktop_research import Flow
+from tests.runtime.test_desktop_research import Flow
 
 
 class DesktopResearchReviewRegressionTests(unittest.TestCase):

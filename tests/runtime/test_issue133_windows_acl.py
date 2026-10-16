@@ -8,10 +8,9 @@ from pathlib import Path
 from unittest import skipUnless
 from unittest.mock import patch
 
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-
 from plugins.local_application import LocalApplicationError
 from plugins.local_application.research_package_service import verify_export_root
+from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 
 @skipUnless(os.name == "nt", "Windows ACL regression")

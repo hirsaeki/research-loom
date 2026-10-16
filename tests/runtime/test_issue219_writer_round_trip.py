@@ -4,11 +4,10 @@ import json
 from copy import deepcopy
 from unittest.mock import patch
 
-import issue80_writer_composition_suite as writer_comp_support
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-
+import tests.runtime.issue80_writer_composition_suite as writer_comp_support
 from plugins.local_application import LocalApplicationError
 from plugins.local_application.writer_round_trip_service import WriterRoundTripService
+from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 
 class Issue219WriterRoundTripTests(ResearchPackageAcceptanceSupport):

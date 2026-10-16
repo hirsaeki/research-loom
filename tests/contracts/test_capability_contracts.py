@@ -9,7 +9,9 @@ from pathlib import Path
 
 import rfc8785
 import yaml
-from capability_oracle import (
+from jsonschema import Draft202012Validator
+
+from tests.contracts.capability_oracle import (
     apply_fixture_mutation,
     context_semantic_error,
     descriptor_semantic_error,
@@ -22,7 +24,6 @@ from capability_oracle import (
     refresh_digest,
     semantic_case_error,
 )
-from jsonschema import Draft202012Validator
 
 ROOT = Path(__file__).resolve().parents[2]
 ORACLE_PATH = ROOT / "tests/contracts/capability_oracle.py"

@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import json
 
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-
 from plugins.local_application import LocalApplicationFacade
+from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 
 class Issue134WriterCompositionRecoveryTests(ResearchPackageAcceptanceSupport):

@@ -4,12 +4,11 @@ import json
 from copy import deepcopy
 from unittest.mock import patch
 
-import test_external_desktop_research_attempt_lifecycle as attempt_lifecycle
-import test_issue134_writer_composition as issue134_writer
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-
+import tests.runtime.test_external_desktop_research_attempt_lifecycle as attempt_lifecycle
+import tests.runtime.test_issue134_writer_composition as issue134_writer
 from plugins.local_application.finding_recovery_lineage import RecoveryFailure
 from plugins.local_execution_store import result_extensions_for_run
+from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 
 class HistoricalResultRecoveryTests(ResearchPackageAcceptanceSupport):

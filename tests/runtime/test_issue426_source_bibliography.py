@@ -7,10 +7,8 @@ from copy import deepcopy
 from pathlib import Path
 
 import rfc8785
-import test_issue405_research_charts as charts
-from runtime_fixtures import project, rq, seed_state, source
-from test_research_exhibits import NullResolver, profile_provider
 
+import tests.runtime.test_issue405_research_charts as charts
 from core.conversation import ConversationRuntimeError
 from core.runtime import canonical_digest
 from plugins.local_application import (
@@ -19,6 +17,8 @@ from plugins.local_application import (
     LocalResearchApplication,
 )
 from plugins.local_application.publication_exhibits import prepare_exhibits
+from tests.runtime.runtime_fixtures import project, rq, seed_state, source
+from tests.runtime.test_research_exhibits import NullResolver, profile_provider
 
 
 class SourceBibliographyIngressTests(unittest.TestCase):

@@ -6,9 +6,10 @@ from copy import deepcopy
 from pathlib import Path
 
 import yaml
-from delphi_oracle import design_error
 from jsonschema import Draft202012Validator, FormatChecker
-from research_method_oracle import canonical_digest
+
+from tests.contracts.delphi_oracle import design_error
+from tests.contracts.research_method_oracle import canonical_digest
 
 ROOT = Path(__file__).resolve().parents[2]
 PKG = ROOT / "core/packages"

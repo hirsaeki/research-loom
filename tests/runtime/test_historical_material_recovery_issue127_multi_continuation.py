@@ -3,12 +3,11 @@ from __future__ import annotations
 from copy import deepcopy
 from unittest.mock import patch
 
-import test_external_desktop_research_intake as intake
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-
+import tests.runtime.test_external_desktop_research_intake as intake
 from plugins.desktop_research.submission import with_context_extension_digest
 from plugins.local_application import LocalApplicationFacade
 from plugins.local_application.material_reacquisition_facade import RetrievedMaterial
+from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 
 class Issue127MultiMaterialContinuationTests(ResearchPackageAcceptanceSupport):

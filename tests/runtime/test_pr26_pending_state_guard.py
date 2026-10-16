@@ -5,8 +5,6 @@ import unittest
 from copy import deepcopy
 from unittest.mock import patch
 
-from runtime_fixtures import codes, make_request, project, rq, seed_state, service
-
 from core.conversation import ActionDraft, with_document_digest
 from core.conversation.testing import MappingResolver, SequenceIdProvider
 from core.execution.testing import StaticClock
@@ -18,6 +16,7 @@ from core.runtime import (
     canonical_digest,
 )
 from plugins.local_application import LocalResearchApplication
+from tests.runtime.runtime_fixtures import codes, make_request, project, rq, seed_state, service
 
 CLOCK = StaticClock("2026-08-27T06:30:00Z")
 ACTOR = {"actor_id": "HUMAN-1", "actor_type": "human"}

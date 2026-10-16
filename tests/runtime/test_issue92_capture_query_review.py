@@ -6,8 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-import test_issue92_external_submission_preflight as issue92
-
+import tests.runtime.test_issue92_external_submission_preflight as issue92
 from plugins.local_execution_store.capture_query import artifacts_for_capture_ids
 
 

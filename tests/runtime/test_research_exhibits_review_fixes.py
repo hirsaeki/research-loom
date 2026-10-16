@@ -8,10 +8,9 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from test_research_exhibits import exhibit_payload, make_app
-
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade
 from plugins.local_research_exhibit_store import LocalResearchExhibitStore
+from tests.runtime.test_research_exhibits import exhibit_payload, make_app
 
 
 class ResearchExhibitReviewFixTests(unittest.TestCase):

@@ -11,7 +11,6 @@ from pathlib import Path
 from unittest.mock import patch
 
 import rfc8785
-from runtime_fixtures import project, rq, seed_state
 
 from plugins.desktop_research import DesktopResearchExternalAdapter, build_result_extension
 from plugins.local_application import (
@@ -20,6 +19,7 @@ from plugins.local_application import (
     LocalResearchApplication,
 )
 from plugins.local_application.cli import main as cli_main
+from tests.runtime.runtime_fixtures import project, rq, seed_state
 
 ROOT = Path(__file__).resolve().parents[2]
 PROJECT_FIXTURE = ROOT / "projects/fixtures/valid/generic-project-config.json"

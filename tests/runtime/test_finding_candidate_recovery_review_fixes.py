@@ -4,8 +4,6 @@ from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from unittest.mock import patch
 
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-
 from core.runtime import canonical_digest
 from plugins.local_application import LocalApplicationError
 from plugins.local_conversation_store import (
@@ -13,6 +11,7 @@ from plugins.local_conversation_store import (
     find_state_delta_proposals_by_provenance_run_id,
     persist_state_delta_proposal_idempotently,
 )
+from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 
 class FindingCandidateRecoveryReviewFixTests(ResearchPackageAcceptanceSupport):

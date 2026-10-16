@@ -4,8 +4,6 @@ import io
 from dataclasses import replace
 from unittest.mock import patch
 
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-
 import plugins.local_application.material_reacquisition_facade as reacquisition_module
 from plugins.local_application.material_reacquisition_facade import (
     HistoricalMaterialReacquisitionService,
@@ -13,6 +11,7 @@ from plugins.local_application.material_reacquisition_facade import (
     _regenerate_text_rendition,
     material_reacquisition_payload,
 )
+from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 
 class HistoricalMaterialReacquisitionReviewTests(ResearchPackageAcceptanceSupport):

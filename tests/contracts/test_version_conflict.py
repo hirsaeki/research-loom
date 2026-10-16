@@ -1,6 +1,6 @@
 import unittest
 
-from semantic_oracle import ROOT, load_candidate, load_json, resolve_candidates
+from tests.contracts.semantic_oracle import ROOT, load_candidate, load_json, resolve_candidates
 
 
 class VersionConflictContractTest(unittest.TestCase):

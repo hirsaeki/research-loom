@@ -6,14 +6,13 @@ from copy import deepcopy
 from dataclasses import replace
 from unittest.mock import patch
 
-import survey_virtual_runner_test_support as vr
-import test_external_desktop_research_intake as intake
-import test_research_exhibits as exhibits
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-
+import tests.runtime.survey_virtual_runner_test_support as vr
+import tests.runtime.test_external_desktop_research_intake as intake
+import tests.runtime.test_research_exhibits as exhibits
 from core.execution import CapabilityRunRecord, RunStatus
 from plugins.local_application import LocalApplicationError
 from plugins.local_application.research_package_service import verify_export_root
+from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 
 class ResearchPackageAcceptanceTests(ResearchPackageAcceptanceSupport):

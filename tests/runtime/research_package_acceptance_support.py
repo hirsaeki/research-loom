@@ -9,18 +9,18 @@ from dataclasses import replace
 from pathlib import Path
 
 import rfc8785
-import survey_virtual_runner_test_support as vr
-import test_external_desktop_research_intake as intake
-import test_research_exhibits as exhibits
-from runtime_fixtures import decision, project, rq, seed_state
-from test_survey_production import NullResolver
 
+import tests.runtime.survey_virtual_runner_test_support as vr
+import tests.runtime.test_external_desktop_research_intake as intake
+import tests.runtime.test_research_exhibits as exhibits
 from core.runtime import canonical_digest
 from plugins.local_application import (
     LocalApplicationFacade,
     LocalResearchApplication,
     LocalWorkspace,
 )
+from tests.runtime.runtime_fixtures import decision, project, rq, seed_state
+from tests.runtime.test_survey_production import NullResolver
 
 
 class ResearchPackageAcceptanceSupport(unittest.TestCase):

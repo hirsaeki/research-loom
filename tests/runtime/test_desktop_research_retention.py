@@ -6,18 +6,17 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from test_desktop_research import Flow
-from test_external_desktop_research_intake import (
+from plugins.desktop_research import DesktopResearchResultValidator
+from plugins.local_execution_store import LocalExecutionStoreConfig, LocalExecutionStoreError
+from tests.runtime.test_desktop_research import Flow
+from tests.runtime.test_external_desktop_research_intake import (
     ExternalDesktopResearchIntakeTests,
     golden_submission,
     refresh,
 )
-from test_external_desktop_research_intake_atomicity import (
+from tests.runtime.test_external_desktop_research_intake_atomicity import (
     ExternalDesktopResearchAtomicityTests,
 )
-
-from plugins.desktop_research import DesktopResearchResultValidator
-from plugins.local_execution_store import LocalExecutionStoreConfig, LocalExecutionStoreError
 
 
 class DesktopResearchRetentionTests(unittest.TestCase):

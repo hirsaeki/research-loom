@@ -8,13 +8,6 @@ from pathlib import Path
 from threading import Event
 from unittest.mock import patch
 
-from test_external_desktop_research_intake import (
-    ExternalDesktopResearchIntakeTests,
-    NullResolver,
-    golden_submission,
-    profile_provider,
-)
-
 from plugins.desktop_research.attempts import reconstruct_attempts
 from plugins.local_application import (
     LocalApplicationError,
@@ -22,6 +15,12 @@ from plugins.local_application import (
     LocalResearchApplication,
 )
 from plugins.local_application.facade import LocalApplicationFacade as PreAttemptGuardFacade
+from tests.runtime.test_external_desktop_research_intake import (
+    ExternalDesktopResearchIntakeTests,
+    NullResolver,
+    golden_submission,
+    profile_provider,
+)
 
 
 class ExternalDesktopResearchAttemptLifecycleTests(unittest.TestCase):

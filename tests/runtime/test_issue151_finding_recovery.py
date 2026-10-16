@@ -4,14 +4,13 @@ import json
 from copy import deepcopy
 from unittest.mock import patch
 
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-from test_finding_candidate_recovery import FindingCandidateRecoveryTests
-
 from core.runtime import canonical_digest
 from plugins.local_application import LocalApplicationError
 from plugins.local_application import (
     historical_result_recovery_facade as historical_result_recovery,
 )
+from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
+from tests.runtime.test_finding_candidate_recovery import FindingCandidateRecoveryTests
 
 
 class Issue151AmbiguousCanonicalRecoveryTests(ResearchPackageAcceptanceSupport):

@@ -2,8 +2,6 @@
 
 import unittest
 
-from research_package_acceptance_support import ResearchPackageAcceptanceSupport
-
 from plugins.local_application import LocalApplicationError
 from plugins.local_application.research_package_format import (
     MAX_MATERIALS,
@@ -12,6 +10,7 @@ from plugins.local_application.research_package_format import (
     MAX_TEXT_BYTES,
     str_list,
 )
+from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 
 class ResearchPackageIntegrationBoundsTests(unittest.TestCase):
