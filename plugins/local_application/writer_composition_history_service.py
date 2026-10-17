@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
-import tempfile
 import uuid
 from collections.abc import Mapping
 from contextlib import contextmanager
@@ -12,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from core.runtime import canonical_digest
+from plugins._infra.atomic_write import write_durable
 from plugins.local_durable_store import register_optional_path, require_optional_available
 
 from .facade import LocalApplicationError
@@ -54,38 +53,20 @@ class WriterCompositionHistoryService(WriterCompositionService):
         path = _safe_locator(
             self.workspace, path.relative_to(self.workspace).as_posix(), require_exists=False
         )
-        fd, temporary = None, None
+        data = (json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2) + "\n").encode(
+            "utf-8"
+        )
         try:
-            try:
-                path.parent.mkdir(parents=True, exist_ok=True)
-                register_optional_path(self.root)
-                fd, name = tempfile.mkstemp(prefix=".writer-", suffix=".tmp", dir=path.parent)
-                temporary = Path(name)
-                with os.fdopen(fd, "wb") as handle:
-                    fd = None
-                    handle.write(
-                        (
-                            json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2) + "\n"
-                        ).encode("utf-8")
+            path.parent.mkdir(parents=True, exist_ok=True)
+            register_optional_path(self.root)
+            if not write_durable(
+                path, data, prefix=".writer-", suffix=".tmp", replace=not immutable
+            ):
+                if self._read_mapping_json(path, message, message) != value:
+                    raise LocalApplicationError(
+                        "APPLICATION-WRITER-COMPOSITION-INTEGRITY-001",
+                        "composition version already contains different facts",
                     )
-                    handle.flush()
-                    os.fsync(handle.fileno())
-                if immutable:
-                    try:
-                        os.link(temporary, path)
-                    except FileExistsError:
-                        if self._read_mapping_json(path, message, message) != value:
-                            raise LocalApplicationError(
-                                "APPLICATION-WRITER-COMPOSITION-INTEGRITY-001",
-                                "composition version already contains different facts",
-                            ) from None
-                else:
-                    os.replace(temporary, path)
-            finally:
-                if fd is not None:
-                    os.close(fd)
-                if temporary is not None:
-                    temporary.unlink(missing_ok=True)
         except OSError as exc:
             raise LocalApplicationError(
                 "APPLICATION-WRITER-COMPOSITION-WRITE-001",

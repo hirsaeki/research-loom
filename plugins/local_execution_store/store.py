@@ -7,7 +7,6 @@ import os
 import re
 import sqlite3
 import stat
-import tempfile
 import uuid
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
@@ -28,6 +27,7 @@ from core.execution.models import (
     RunStatus,
 )
 from core.runtime.transition_models import canonical_digest
+from plugins._infra.atomic_write import durable_staged_file, publish_staged
 
 _MIGRATION_RE = re.compile(r"^(?P<version>\d{4})_(?P<name>[a-z0-9_]+)\.sql$")
 _ALLOWED_JOURNAL_MODES = {"DELETE", "WAL"}
@@ -1296,30 +1296,14 @@ class LocalExecutionStore:
         target_dir = self.blob_root / digest_hex[:2]
         target_dir.mkdir(parents=True, exist_ok=True)
         target = target_dir / digest_hex
-        fd, temporary_name = tempfile.mkstemp(
-            prefix="blob-",
-            dir=self.staging_root,
-        )
-        temporary = Path(temporary_name)
-        try:
-            with os.fdopen(fd, "wb") as stream:
-                stream.write(content)
-                stream.flush()
-                os.fsync(stream.fileno())
+        with durable_staged_file(self.staging_root, content, prefix="blob-") as staged:
             if target.exists():
                 self._verify_blob_path(target, digest, len(content))
             else:
-                try:
-                    os.link(temporary, target)
-                except FileExistsError:
+                if not publish_staged(staged, target, replace=False):
                     self._verify_blob_path(target, digest, len(content))
                 self._fsync_directory(target_dir)
             return digest, f"{scheme}://sha256/{digest_hex}"
-        finally:
-            try:
-                temporary.unlink()
-            except FileNotFoundError:
-                pass
 
     def _load_verified_blob(
         self,

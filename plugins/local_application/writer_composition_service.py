@@ -17,6 +17,7 @@ import rfc8785
 from jsonschema import Draft202012Validator, FormatChecker
 
 from core.runtime import canonical_digest
+from plugins._infra.atomic_write import replace_text
 from plugins._infra.file_lock import lock_byte, unlock_byte, write_sentinel_if_empty
 from plugins.local_durable_store import register_optional_path, require_optional_available
 
@@ -1454,15 +1455,11 @@ class WriterCompositionService:
                     "APPLICATION-WRITER-COMPOSITION-IMMUTABLE-001",
                     "composition version already exists",
                 )
-            tmp = path.with_name(path.name + f".{uuid.uuid4().hex}.tmp")
             try:
-                tmp.write_text(
-                    json.dumps(document, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
-                    encoding="utf-8",
+                replace_text(
+                    path, json.dumps(document, ensure_ascii=False, sort_keys=True, indent=2) + "\n"
                 )
-                os.replace(tmp, path)
             except OSError as exc:
-                tmp.unlink(missing_ok=True)
                 raise LocalApplicationError(
                     "APPLICATION-WRITER-COMPOSITION-WRITE-001", "composition persistence failed"
                 ) from exc
@@ -1628,15 +1625,11 @@ class WriterCompositionService:
             event = {"version": version, "digest": digest, "selected_at": _now()}
             history.append(event)
             value = {"selected": event, "history": history}
-            tmp = path.with_name(path.name + f".{uuid.uuid4().hex}.tmp")
             try:
-                tmp.write_text(
-                    json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
-                    encoding="utf-8",
+                replace_text(
+                    path, json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2) + "\n"
                 )
-                os.replace(tmp, path)
             except OSError as exc:
-                tmp.unlink(missing_ok=True)
                 raise LocalApplicationError(
                     "APPLICATION-WRITER-COMPOSITION-WRITE-001",
                     "composition selection persistence failed",

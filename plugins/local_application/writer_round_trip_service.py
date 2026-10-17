@@ -16,6 +16,7 @@ from uuid import uuid4
 from jsonschema import Draft202012Validator, FormatChecker
 
 from core.runtime import canonical_digest
+from plugins._infra.atomic_write import write_durable
 from plugins.local_durable_store import register_optional_path, require_optional_available
 
 from .facade import LocalApplicationError
@@ -129,49 +130,32 @@ class WriterRoundTripService:
         path = _safe_locator(
             self.workspace, path.relative_to(self.workspace).as_posix(), require_exists=False
         )
-        fd, tmp = None, None
         try:
-            try:
-                if not replace and path.exists():
-                    existing = self._read_json(
-                        path, message="immutable Writer round-trip record is unreadable"
+            if not replace and path.exists():
+                existing = self._read_json(
+                    path, message="immutable Writer round-trip record is unreadable"
+                )
+                if dict(existing) != dict(value):
+                    raise LocalApplicationError(
+                        "APPLICATION-WRITER-ROUND-TRIP-IMMUTABLE-001",
+                        "immutable Writer identity contains different content; restore its exact backup",
                     )
-                    if dict(existing) != dict(value):
-                        raise LocalApplicationError(
-                            "APPLICATION-WRITER-ROUND-TRIP-IMMUTABLE-001",
-                            "immutable Writer identity contains different content; restore its exact backup",
-                        )
-                    return True
-                path.parent.mkdir(parents=True, exist_ok=True)
-                register_optional_path(self.root)
-                fd, name = tempfile.mkstemp(prefix=".writer-", suffix=".tmp", dir=path.parent)
-                tmp = Path(name)
-                with os.fdopen(fd, "wb") as handle:
-                    fd = None
-                    handle.write(_json_bytes(value))
-                    handle.flush()
-                    os.fsync(handle.fileno())
-                if replace:
-                    os.replace(tmp, path)
-                else:
-                    try:
-                        os.link(tmp, path)
-                    except FileExistsError:
-                        existing = self._read_json(
-                            path, message="immutable Writer round-trip record is unreadable"
-                        )
-                        if dict(existing) != dict(value):
-                            raise LocalApplicationError(
-                                "APPLICATION-WRITER-ROUND-TRIP-IMMUTABLE-001",
-                                "immutable Writer identity contains different content; restore its exact backup",
-                            ) from None
-                        return True
-                return False
-            finally:
-                if fd is not None:
-                    os.close(fd)
-                if tmp is not None:
-                    tmp.unlink(missing_ok=True)
+                return True
+            path.parent.mkdir(parents=True, exist_ok=True)
+            register_optional_path(self.root)
+            if not write_durable(
+                path, _json_bytes(value), prefix=".writer-", suffix=".tmp", replace=replace
+            ):
+                existing = self._read_json(
+                    path, message="immutable Writer round-trip record is unreadable"
+                )
+                if dict(existing) != dict(value):
+                    raise LocalApplicationError(
+                        "APPLICATION-WRITER-ROUND-TRIP-IMMUTABLE-001",
+                        "immutable Writer identity contains different content; restore its exact backup",
+                    )
+                return True
+            return False
         except OSError as exc:
             raise LocalApplicationError(
                 "APPLICATION-WRITER-ROUND-TRIP-WRITE-001",

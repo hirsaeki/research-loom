@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 import shutil
 import uuid
 from collections.abc import Mapping
@@ -10,6 +9,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from plugins._infra.atomic_write import replace_text
 from plugins.local_application.profile_resolution import (
     effective_profile_digest,
     exact_manifest_identity_map,
@@ -56,21 +56,16 @@ def _write_json(path: Path, value: Mapping[str, Any]) -> None:
     require_optional_available(path, LocalWorkspaceError)
     path.parent.mkdir(parents=True, exist_ok=True)
     register_optional_path(path)
-    temporary = path.with_name(path.name + ".tmp-" + uuid.uuid4().hex)
-    temporary.write_text(
-        json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n",
-        encoding="utf-8",
+    replace_text(
+        path, json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n"
     )
-    os.replace(temporary, path)
 
 
 def _write_text(path: Path, text: str) -> None:
     require_optional_available(path, LocalWorkspaceError)
     path.parent.mkdir(parents=True, exist_ok=True)
     register_optional_path(path)
-    temporary = path.with_name(path.name + ".tmp-" + uuid.uuid4().hex)
-    temporary.write_text(text, encoding="utf-8")
-    os.replace(temporary, path)
+    replace_text(path, text)
 
 
 def _generation_key(config_digest: str, profile_digest: str) -> str:

@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 import sqlite3
-import uuid
 from collections import Counter
 from collections.abc import Mapping
 from contextlib import suppress
@@ -18,6 +16,7 @@ from jsonschema import Draft202012Validator, FormatChecker
 
 from core.runtime import LineageView, StateView, canonical_digest
 from core.runtime.transition_models import with_content_digest
+from plugins._infra.atomic_write import replace_text
 from plugins.local_application.application import (
     LocalResearchApplication,
     SystemClock,
@@ -282,12 +281,9 @@ def _safe_locator(root: Path, locator: str, *, require_exists: bool = True) -> P
 
 
 def _atomic_json_write(path: Path, value: Mapping[str, Any]) -> None:
-    temporary = path.with_name(path.name + ".tmp-" + uuid.uuid4().hex)
-    temporary.write_text(
-        json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n",
-        encoding="utf-8",
+    replace_text(
+        path, json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n"
     )
-    os.replace(temporary, path)
 
 
 def _copy_json(path: Path, value: Mapping[str, Any]) -> None:
