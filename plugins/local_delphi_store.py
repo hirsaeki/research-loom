@@ -12,8 +12,8 @@ from typing import Any
 
 from core.runtime.digests import jcs_digest, jcs_digest_without
 from plugins.local_durable_store import register_optional_path, require_optional_available
-
-SCHEMA_VERSION = "0.1.0"
+from plugins.local_store_schemas import DELPHI_SCHEMA_SQL as _SCHEMA
+from plugins.local_store_schemas import DELPHI_SCHEMA_VERSION as SCHEMA_VERSION
 
 
 class LocalDelphiStoreError(RuntimeError):
@@ -31,27 +31,6 @@ def canonical_digest(value: Any, *, omit: tuple[str, ...] = ()) -> str:
 
 def registry_digest(document: Mapping[str, Any]) -> str:
     return canonical_digest(dict(document), omit=("registry_digest",))
-
-
-_SCHEMA = """
-CREATE TABLE IF NOT EXISTS delphi_store_meta (
-    schema_version TEXT PRIMARY KEY
-);
-CREATE TABLE IF NOT EXISTS delphi_documents (
-    project_id TEXT NOT NULL,
-    kind TEXT NOT NULL,
-    identity TEXT NOT NULL,
-    version TEXT NOT NULL,
-    panel_id TEXT,
-    round_sequence INTEGER,
-    content_digest TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    document_json TEXT NOT NULL,
-    PRIMARY KEY(project_id, kind, identity, version)
-);
-CREATE INDEX IF NOT EXISTS idx_delphi_panel_round
-ON delphi_documents(project_id, panel_id, round_sequence, kind);
-"""
 
 
 class LocalDelphiStore:

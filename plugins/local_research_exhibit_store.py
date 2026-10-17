@@ -13,9 +13,10 @@ import rfc8785
 
 from plugins._infra.sqlite import apply_pragmas
 from plugins.local_durable_store import register_optional_path, require_optional_available
+from plugins.local_store_schemas import EXHIBIT_SCHEMA_SQL as _SCHEMA_SQL
+from plugins.local_store_schemas import EXHIBIT_STORE_SCHEMA_VERSION
 from plugins.research_visual_semantics import validate_visual_semantics
 
-EXHIBIT_STORE_SCHEMA_VERSION = "0.1.0"
 EXHIBIT_CONTENT_MAX_BYTES = 1_048_576
 SUPPORTED_EXHIBIT_KINDS = frozenset({"table", "matrix", "graph", "note"})
 SUPPORTED_EXHIBIT_REPRESENTATIONS = frozenset({"markdown", "json", "text"})
@@ -465,38 +466,6 @@ def _validate_exhibit_metadata(value: Mapping[str, Any]) -> None:
 
 # Keep the original 0.1 research_exhibits shape stable. Metadata optimization is
 # an additive table so pre-optimization 0.1 stores remain readable.
-_SCHEMA_SQL = """
-CREATE TABLE IF NOT EXISTS exhibit_store_meta (
-    schema_version TEXT PRIMARY KEY
-);
-CREATE TABLE IF NOT EXISTS research_exhibits (
-    exhibit_id TEXT PRIMARY KEY,
-    project_id TEXT NOT NULL,
-    captured_at TEXT NOT NULL,
-    content_digest TEXT NOT NULL,
-    document_json TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS research_exhibits_project_idx
-    ON research_exhibits(project_id, captured_at, exhibit_id);
-CREATE TABLE IF NOT EXISTS research_exhibit_rqs (
-    exhibit_id TEXT NOT NULL,
-    rq_id TEXT NOT NULL,
-    PRIMARY KEY(exhibit_id, rq_id),
-    FOREIGN KEY(exhibit_id) REFERENCES research_exhibits(exhibit_id)
-);
-CREATE INDEX IF NOT EXISTS research_exhibit_rq_idx
-    ON research_exhibit_rqs(rq_id, exhibit_id);
-CREATE TABLE IF NOT EXISTS research_exhibit_metadata (
-    exhibit_id TEXT PRIMARY KEY,
-    project_id TEXT NOT NULL,
-    captured_at TEXT NOT NULL,
-    content_digest TEXT NOT NULL,
-    metadata_json TEXT NOT NULL,
-    FOREIGN KEY(exhibit_id) REFERENCES research_exhibits(exhibit_id)
-);
-CREATE INDEX IF NOT EXISTS research_exhibit_metadata_project_idx
-    ON research_exhibit_metadata(project_id, captured_at, exhibit_id);
-"""
 
 
 class LocalResearchExhibitStore:

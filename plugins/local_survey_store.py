@@ -9,8 +9,8 @@ from typing import Any
 
 from core.runtime.digests import jcs_digest_without
 from plugins.local_durable_store import register_optional_path, require_optional_available
-
-SURVEY_STORE_SCHEMA_VERSION = "0.1.0"
+from plugins.local_store_schemas import SURVEY_SCHEMA_SQL as _SCHEMA_SQL
+from plugins.local_store_schemas import SURVEY_STORE_SCHEMA_VERSION
 
 
 class LocalSurveyStoreError(RuntimeError):
@@ -156,31 +156,6 @@ def validate_instrument_record(document: Mapping[str, Any]) -> None:
         raise LocalSurveyStoreError(
             "SURVEY-STORE-INTEGRITY-001", "stored Questionnaire digest does not match content"
         )
-
-
-_SCHEMA_SQL = """
-CREATE TABLE IF NOT EXISTS survey_store_meta (
-    schema_version TEXT PRIMARY KEY
-);
-CREATE TABLE IF NOT EXISTS survey_designs (
-    project_id TEXT NOT NULL,
-    survey_design_id TEXT NOT NULL,
-    version TEXT NOT NULL,
-    content_digest TEXT NOT NULL,
-    captured_at TEXT NOT NULL,
-    document_json TEXT NOT NULL,
-    PRIMARY KEY(project_id, survey_design_id, version)
-);
-CREATE TABLE IF NOT EXISTS survey_instruments (
-    project_id TEXT NOT NULL,
-    questionnaire_id TEXT NOT NULL,
-    version TEXT NOT NULL,
-    content_digest TEXT NOT NULL,
-    captured_at TEXT NOT NULL,
-    document_json TEXT NOT NULL,
-    PRIMARY KEY(project_id, questionnaire_id, version)
-);
-"""
 
 
 class LocalSurveyStore:

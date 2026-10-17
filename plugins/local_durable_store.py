@@ -7,7 +7,6 @@ not guessed or deep-hashed here; its owner verifies the selected object on use.
 from __future__ import annotations
 
 import errno
-import importlib
 import os
 import sqlite3
 from collections.abc import Mapping
@@ -17,6 +16,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+from plugins import local_store_schemas as schemas
 from plugins._infra.file_lock import (
     LockTimeout,
     acquire_byte_lock,
@@ -38,41 +38,41 @@ from plugins.local_workspace_layout import (
 # Derived tables absent in supported older stores are not canonical data loss.
 _DB_SCHEMAS = {
     "research_attention": (
-        "local_attention_store",
-        "_SCHEMA_SQL",
+        schemas.ATTENTION_SCHEMA_SQL,
         "attention_store_meta",
-        "ATTENTION_STORE_SCHEMA_VERSION",
+        schemas.ATTENTION_STORE_SCHEMA_VERSION,
         (),
     ),
     "research_exhibits": (
-        "local_research_exhibit_store",
-        "_SCHEMA_SQL",
+        schemas.EXHIBIT_SCHEMA_SQL,
         "exhibit_store_meta",
-        "EXHIBIT_STORE_SCHEMA_VERSION",
+        schemas.EXHIBIT_STORE_SCHEMA_VERSION,
         ("research_exhibit_metadata",),
     ),
     "survey_registry": (
-        "local_survey_store",
-        "_SCHEMA_SQL",
+        schemas.SURVEY_SCHEMA_SQL,
         "survey_store_meta",
-        "SURVEY_STORE_SCHEMA_VERSION",
+        schemas.SURVEY_STORE_SCHEMA_VERSION,
         (),
     ),
     "survey_response_registry": (
-        "local_survey_response_store",
-        "_SCHEMA_SQL",
+        schemas.SURVEY_RESPONSE_SCHEMA_SQL,
         "survey_response_store_meta",
-        "SURVEY_RESPONSE_STORE_SCHEMA_VERSION",
+        schemas.SURVEY_RESPONSE_STORE_SCHEMA_VERSION,
         ("survey_response_dataset_entry_counts",),
     ),
     "survey_analysis_registry": (
-        "local_survey_analysis_store",
-        "_SCHEMA_SQL",
+        schemas.SURVEY_ANALYSIS_SCHEMA_SQL,
         "survey_analysis_store_meta",
-        "SURVEY_ANALYSIS_STORE_SCHEMA_VERSION",
+        schemas.SURVEY_ANALYSIS_STORE_SCHEMA_VERSION,
         (),
     ),
-    "delphi_registry": ("local_delphi_store", "_SCHEMA", "delphi_store_meta", "SCHEMA_VERSION", ()),
+    "delphi_registry": (
+        schemas.DELPHI_SCHEMA_SQL,
+        "delphi_store_meta",
+        schemas.DELPHI_SCHEMA_VERSION,
+        (),
+    ),
 }
 
 
@@ -99,12 +99,9 @@ def _expected_columns(script: str) -> dict[str, set[tuple[Any, ...]]]:
 
 def _database_schema(name: str) -> tuple[str, str | None, str | None, tuple[str, ...]]:
     if name == "project_inputs":
-        from plugins.local_project_input_store import LocalProjectInputStore
-
-        return LocalProjectInputStore._create_table_sql(), None, None, ()
-    module, ddl, meta, version, optional = _DB_SCHEMAS[name]
-    owner = importlib.import_module(f"plugins.{module}")
-    return getattr(owner, ddl), meta, str(getattr(owner, version)), optional
+        return schemas.project_inputs_table_sql(), None, None, ()
+    script, meta, version, optional = _DB_SCHEMAS[name]
+    return script, meta, version, optional
 
 
 def _validate_database(path: Path, name: str, *, quick: bool) -> None:
