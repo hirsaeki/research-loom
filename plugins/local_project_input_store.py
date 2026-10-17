@@ -4,14 +4,13 @@ import base64
 import binascii
 import hashlib
 import json
-import os
 import sqlite3
-import tempfile
 from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from plugins._infra.atomic_write import durable_staged_file, publish_staged
 from plugins.local_durable_store import register_optional_path, require_optional_available
 
 _SCHEMA_VERSION = 2
@@ -280,19 +279,9 @@ class LocalProjectInputStore:
         if target.exists():
             self._verify_blob(target, digest, len(content))
             return
-        fd, temporary_name = tempfile.mkstemp(prefix="project-input-", dir=self.root)
-        temporary = Path(temporary_name)
-        try:
-            with os.fdopen(fd, "wb") as stream:
-                stream.write(content)
-                stream.flush()
-                os.fsync(stream.fileno())
-            try:
-                os.link(temporary, target)
-            except FileExistsError:
+        with durable_staged_file(self.root, content, prefix="project-input-") as staged:
+            if not publish_staged(staged, target, replace=False):
                 self._verify_blob(target, digest, len(content))
-        finally:
-            temporary.unlink(missing_ok=True)
 
     @staticmethod
     def _verify_blob(path: Path, expected_digest: str, expected_size: int) -> None:

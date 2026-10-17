@@ -18,6 +18,7 @@ from xml.etree import ElementTree
 
 from jsonschema import Draft202012Validator, FormatChecker
 
+from plugins._infra.atomic_write import write_durable
 from plugins._infra.file_lock import lock_byte, unlock_byte, write_sentinel_if_empty
 from plugins.local_durable_store import register_optional_path, require_optional_available
 
@@ -1948,34 +1949,14 @@ class PublicationReleaseService:
 
     def _atomic_release_write(self, path: Path, data: bytes, *, replace: bool = False) -> None:
         path = self._checked_record_path(path)
-        staging = None
-        fd = None
         try:
-            try:
-                path.parent.mkdir(parents=True, exist_ok=True)
-                fd, name = tempfile.mkstemp(prefix=".publication-", dir=path.parent)
-                staging = Path(name)
-                with os.fdopen(fd, "wb") as stream:
-                    fd = None  # The stream now owns the descriptor.
-                    stream.write(data)
-                    stream.flush()
-                    os.fsync(stream.fileno())
-                if replace:
-                    os.replace(staging, path)
-                else:
-                    try:
-                        os.link(staging, path)
-                    except FileExistsError:
-                        if path.read_bytes() != data:
-                            raise LocalApplicationError(
-                                "APPLICATION-PUBLICATION-INTEGRITY-001",
-                                "Publication recovery refuses to replace different existing bytes",
-                            ) from None
-            finally:
-                if fd is not None:
-                    os.close(fd)
-                if staging is not None:
-                    staging.unlink(missing_ok=True)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            if not write_durable(path, data, prefix=".publication-", replace=replace):
+                if path.read_bytes() != data:
+                    raise LocalApplicationError(
+                        "APPLICATION-PUBLICATION-INTEGRITY-001",
+                        "Publication recovery refuses to replace different existing bytes",
+                    )
         except OSError as exc:
             raise LocalApplicationError(
                 "APPLICATION-PUBLICATION-WRITE-001",

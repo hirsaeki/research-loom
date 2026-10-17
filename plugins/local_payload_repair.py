@@ -10,13 +10,13 @@ import hashlib
 import json
 import os
 import stat
-import tempfile
 import uuid
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 
+from plugins._infra.atomic_write import write_durable
 from plugins._infra.file_lock import (
     LockTimeout,
     acquire_byte_lock,
@@ -213,34 +213,19 @@ def install_exact_payload(
             "before": before,
             **result,
         }
-        temporary = None
-        fd = None
         try:
             receipt = checked_path(root, root / "repairs" / (repair_id + ".json"))
             receipt.parent.mkdir(parents=True, exist_ok=True)
-            fd, name = tempfile.mkstemp(prefix=".repair-", dir=receipt.parent)
-            temporary = Path(name)
-            stream = os.fdopen(fd, "wb")
-            fd = None
-            with stream:
-                stream.write(
-                    (json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n").encode()
-                )
-                stream.flush()
-                os.fsync(stream.fileno())
-            os.replace(temporary, receipt)
+            write_durable(
+                receipt,
+                (json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n").encode(),
+                prefix=".repair-",
+                replace=True,
+            )
             _fsync_directory(receipt.parent)
             result["recovery_record"] = receipt.relative_to(root).as_posix()
         except (OSError, PayloadRepairError):
             result["recovery_record_warning"] = (
                 "payload verified; repair receipt could not be persisted"
             )
-        finally:
-            if fd is not None:
-                os.close(fd)
-            if temporary is not None:
-                try:
-                    temporary.unlink(missing_ok=True)
-                except OSError:
-                    pass
         return result
