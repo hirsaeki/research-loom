@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import sqlite3
@@ -11,8 +10,7 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
-import rfc8785
-
+from core.runtime.digests import jcs_digest, jcs_digest_without
 from plugins.local_durable_store import register_optional_path, require_optional_available
 
 SCHEMA_VERSION = "0.1.0"
@@ -26,11 +24,9 @@ class LocalDelphiStoreError(RuntimeError):
 
 
 def canonical_digest(value: Any, *, omit: tuple[str, ...] = ()) -> str:
-    payload = deepcopy(value)
-    if isinstance(payload, dict):
-        for field in omit:
-            payload.pop(field, None)
-    return "sha256:" + hashlib.sha256(rfc8785.dumps(payload)).hexdigest()
+    if isinstance(value, dict):
+        return jcs_digest_without(value, *omit)
+    return jcs_digest(value)
 
 
 def registry_digest(document: Mapping[str, Any]) -> str:

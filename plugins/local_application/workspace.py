@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import json
 import sqlite3
 from collections import Counter
@@ -11,10 +10,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-import rfc8785
 from jsonschema import Draft202012Validator, FormatChecker
 
 from core.runtime import LineageView, StateView, canonical_digest
+from core.runtime.digests import jcs_digest_without
 from core.runtime.transition_models import with_content_digest
 from plugins._infra.atomic_write import replace_text
 from plugins.local_application.application import (
@@ -140,9 +139,7 @@ def _schema_validate(value: Mapping[str, Any], schema_path: Path, code: str) -> 
 
 
 def _project_configuration_digest(config: Mapping[str, Any]) -> str:
-    payload = deepcopy(dict(config))
-    payload.pop("configuration_digest", None)
-    return "sha256:" + hashlib.sha256(rfc8785.dumps(payload)).hexdigest()
+    return jcs_digest_without(config, "configuration_digest")
 
 
 def _flatten_profile_requests(config: Mapping[str, Any]) -> list[dict[str, Any]]:

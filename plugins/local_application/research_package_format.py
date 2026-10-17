@@ -7,9 +7,9 @@ from copy import deepcopy
 from pathlib import Path, PureWindowsPath
 from typing import Any
 
-import rfc8785
 from jsonschema import Draft202012Validator, FormatChecker
 
+from core.runtime.digests import jcs_digest
 from plugins.desktop_research.normalization import source_id_for_capture
 from plugins.local_research_exhibit_store import (
     LocalResearchExhibitStoreError,
@@ -83,7 +83,7 @@ def digest_bytes(v: bytes) -> str:
 
 
 def digest_json(v: Mapping[str, Any]) -> str:
-    return "sha256:" + hashlib.sha256(rfc8785.dumps(dict(v))).hexdigest()
+    return jcs_digest(dict(v))
 
 
 def without_digest(p: Mapping[str, Any]) -> dict[str, Any]:

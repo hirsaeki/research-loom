@@ -11,7 +11,6 @@ import uuid
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime
 from pathlib import Path
 from threading import RLock
 from typing import Any
@@ -26,8 +25,10 @@ from core.execution.models import (
     RunLifecycleEvent,
     RunStatus,
 )
+from core.runtime.digests import jcs_digest
 from core.runtime.transition_models import canonical_digest
 from plugins._infra.atomic_write import durable_staged_file, publish_staged
+from plugins._infra.clock import utc_now as _now
 from plugins._infra.sqlite import (
     ALLOWED_JOURNAL_MODES,
     ALLOWED_SYNCHRONOUS,
@@ -125,11 +126,7 @@ def _canonical_json(value: Any) -> str:
 
 
 def _payload_sha256(value: Mapping[str, Any]) -> str:
-    return "sha256:" + hashlib.sha256(rfc8785.dumps(dict(value))).hexdigest()
-
-
-def _now() -> str:
-    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
+    return jcs_digest(dict(value))
 
 
 def _failure_json(issue: ExecutionIssue | None) -> str | None:

@@ -6,11 +6,11 @@ import hashlib
 import json
 import sqlite3
 from collections.abc import Mapping
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from plugins._infra.atomic_write import durable_staged_file, publish_staged
+from plugins._infra.clock import utc_now as _now
 from plugins.local_durable_store import register_optional_path, require_optional_available
 
 _SCHEMA_VERSION = 2
@@ -23,10 +23,6 @@ class LocalProjectInputStoreError(RuntimeError):
         super().__init__(message)
         self.code = code
         self.message = message
-
-
-def _now() -> str:
-    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
 def _encode_cursor(registered_at: str, input_id: str) -> str:

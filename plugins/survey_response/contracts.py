@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import json
 import math
 from collections.abc import Mapping
@@ -8,8 +7,9 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
-import rfc8785
 from jsonschema import Draft202012Validator, FormatChecker
+
+from core.runtime.digests import jcs_digest
 
 ROOT = Path(__file__).resolve().parents[2]
 RAW_SCHEMA_PATH = ROOT / "core/packages/survey/survey-raw-response.schema.json"
@@ -32,10 +32,9 @@ DATASET_VALIDATOR = _validator(DATASET_SCHEMA_PATH)
 
 def canonical_digest(value: Any) -> str:
     try:
-        encoded = rfc8785.dumps(value)
+        return jcs_digest(value)
     except (TypeError, ValueError) as exc:
         raise ValueError("Survey response value is not canonicalizable") from exc
-    return "sha256:" + hashlib.sha256(encoded).hexdigest()
 
 
 def raw_input_digest(value: Any) -> str:

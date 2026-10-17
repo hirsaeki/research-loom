@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-import hashlib
 import json
 from collections.abc import Mapping
 from copy import deepcopy
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-import rfc8785
 from jsonschema import Draft202012Validator, FormatChecker
+
+from core.runtime.digests import jcs_digest
 
 from .models import ConversationRuntimeError
 
@@ -40,7 +40,7 @@ DIGEST_ERRORS = {
 
 
 def canonical_digest(value: Any) -> str:
-    return "sha256:" + hashlib.sha256(rfc8785.dumps(value)).hexdigest()
+    return jcs_digest(value)
 
 
 def document_digest(document: Mapping[str, Any]) -> str:

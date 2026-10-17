@@ -13,6 +13,7 @@ import yaml
 from jsonschema import Draft202012Validator, FormatChecker
 
 from core.runtime import canonical_digest
+from core.runtime.digests import jcs_digest
 from plugins.local_application.workspace import LocalWorkspaceError
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -1016,9 +1017,7 @@ def target_project_config(
             if note not in notes:
                 notes.append(note)
         target.pop("configuration_digest", None)
-        target["configuration_digest"] = (
-            "sha256:" + hashlib.sha256(rfc8785.dumps(target)).hexdigest()
-        )
+        target["configuration_digest"] = jcs_digest(target)
     return target
 
 

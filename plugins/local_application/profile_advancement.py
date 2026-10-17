@@ -5,11 +5,11 @@ import shutil
 import uuid
 from collections.abc import Mapping
 from copy import deepcopy
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from plugins._infra.atomic_write import replace_text
+from plugins._infra.clock import utc_now as _now
 from plugins.local_application.profile_resolution import (
     effective_profile_digest,
     exact_manifest_identity_map,
@@ -46,10 +46,6 @@ EVENTS_DIR = "events"
 PENDING_MARKER = "profile-advancement.pending.json"
 _ADVANCEMENT_NOTE = "Profile generation advancement: direct Profile requests changed mechanically; other project semantics are unchanged."
 _PUBLICATION_METADATA_NOTE = "Publication metadata advancement: explicit research group answer saved; research content is unchanged."
-
-
-def _now() -> str:
-    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
 def _write_json(path: Path, value: Mapping[str, Any]) -> None:
