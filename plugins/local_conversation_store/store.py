@@ -7,6 +7,7 @@ from pathlib import Path
 from threading import RLock
 from typing import Any
 
+from plugins._infra.schema_record import migration_issue, record_baseline
 from plugins._infra.sqlite import apply_pragmas
 
 _REQUIRED_COLUMNS = {
@@ -26,6 +27,8 @@ _REQUIRED_COLUMNS = {
     "state_delta_proposals": {"proposal_id", "payload_json"},
 }
 _REQUIRED_TABLES = set(_REQUIRED_COLUMNS)
+# The current schema, recorded in schema_migrations (ADR 0001).
+SCHEMA_BASELINE = (1, "conversation_store_baseline")
 
 
 class LocalConversationStoreError(RuntimeError):
@@ -65,7 +68,7 @@ def validate_conversation_store_schema(path: str | Path) -> None:
         connection = sqlite3.connect(f"file:{database}?mode=ro", uri=True)
         connection.row_factory = sqlite3.Row
         try:
-            issue = _schema_issue(connection)
+            issue = migration_issue(connection, SCHEMA_BASELINE) or _schema_issue(connection)
         finally:
             connection.close()
     except sqlite3.Error as exc:
@@ -102,6 +105,9 @@ class LocalConversationStore:
                 journal_mode="WAL",
                 synchronous="FULL",
             )
+            issue = migration_issue(self._db, SCHEMA_BASELINE)
+            if issue is not None:
+                raise LocalConversationStoreError("CONVERSATION-STORE-SCHEMA-001", issue)
             # CREATE TABLE IF NOT EXISTS intentionally does not act as a migration.
             # Existing incompatible stores fail closed below before any index that
             # depends on the newer project_id projection is created.
@@ -148,6 +154,16 @@ class LocalConversationStore:
             issue = _schema_issue(self._db)
             if issue is not None:
                 raise LocalConversationStoreError("CONVERSATION-STORE-SCHEMA-001", issue)
+            self._db.execute("BEGIN IMMEDIATE")
+            try:
+                issue = record_baseline(self._db, SCHEMA_BASELINE)
+                if issue is not None:
+                    raise LocalConversationStoreError("CONVERSATION-STORE-SCHEMA-001", issue)
+                self._db.execute("COMMIT")
+            except BaseException:
+                if self._db.in_transaction:
+                    self._db.execute("ROLLBACK")
+                raise
             self._db.execute(
                 "CREATE INDEX IF NOT EXISTS confirmation_requests_project_pending "
                 "ON confirmation_requests(project_id,status,request_id)"
