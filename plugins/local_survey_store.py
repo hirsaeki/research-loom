@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from core.runtime.digests import jcs_digest_without
+from plugins._infra.sqlite import apply_pragmas
 from plugins.local_durable_store import register_optional_path, require_optional_available
 from plugins.local_store_schemas import SURVEY_SCHEMA_SQL as _SCHEMA_SQL
 from plugins.local_store_schemas import SURVEY_STORE_SCHEMA_VERSION
@@ -207,6 +208,7 @@ class LocalSurveyStore:
         try:
             connection = sqlite3.connect(self.path)
             connection.row_factory = sqlite3.Row
+            apply_pragmas(connection, journal_mode="DELETE", synchronous="FULL")
             connection.executescript(_SCHEMA_SQL)
             connection.execute(
                 "INSERT OR IGNORE INTO survey_store_meta(schema_version) VALUES (?)",

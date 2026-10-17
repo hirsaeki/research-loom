@@ -123,7 +123,9 @@ class LocalSurveyAnalysisStore:
         try:
             connection = sqlite3.connect(self.path, timeout=5.0)
             connection.row_factory = sqlite3.Row
-            apply_pragmas(connection, busy_timeout_ms=5000)
+            apply_pragmas(
+                connection, busy_timeout_ms=5000, journal_mode="DELETE", synchronous="FULL"
+            )
             connection.executescript(_SCHEMA_SQL)
             rows = connection.execute(
                 "SELECT schema_version FROM survey_analysis_store_meta"

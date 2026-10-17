@@ -11,6 +11,7 @@ from typing import Any
 
 from plugins._infra.atomic_write import durable_staged_file, publish_staged
 from plugins._infra.clock import utc_now as _now
+from plugins._infra.sqlite import apply_pragmas
 from plugins.local_durable_store import register_optional_path, require_optional_available
 from plugins.local_store_schemas import project_inputs_table_sql
 
@@ -94,6 +95,7 @@ class LocalProjectInputStore:
         try:
             self.db = sqlite3.connect(self.path)
             self.db.row_factory = sqlite3.Row
+            apply_pragmas(self.db, journal_mode="DELETE", synchronous="FULL")
             self._ensure_schema()
             register_optional_path(self.root)
             self._writable = True

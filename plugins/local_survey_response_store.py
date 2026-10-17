@@ -145,6 +145,7 @@ class LocalSurveyResponseStore:
             connection = sqlite3.connect(staging)
             try:
                 connection.row_factory = sqlite3.Row
+                apply_pragmas(connection, journal_mode="DELETE", synchronous="FULL")
                 connection.executescript(_SCHEMA_SQL)
                 connection.execute(
                     "INSERT INTO survey_response_store_meta(schema_version) VALUES (?)",
@@ -178,7 +179,9 @@ class LocalSurveyResponseStore:
                 self.path.resolve().as_uri() + "?mode=rw", uri=True, timeout=5.0
             )
             connection.row_factory = sqlite3.Row
-            apply_pragmas(connection, busy_timeout_ms=5000)
+            apply_pragmas(
+                connection, busy_timeout_ms=5000, journal_mode="DELETE", synchronous="FULL"
+            )
             self._schema_version(connection)
             register_optional_path(self.path)
             return connection
