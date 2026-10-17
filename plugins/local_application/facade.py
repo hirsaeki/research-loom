@@ -10,6 +10,7 @@ from typing import Any
 from core.conversation import ActionDraft, ConversationRuntimeError, CoordinatorResult
 from core.conversation.validation import with_document_digest
 from core.decision import make_response, response_digest
+from plugins.application_errors import LocalApplicationError as LocalApplicationError
 from plugins.local_application.workspace import LocalWorkspace, OpenedLocalWorkspace
 from plugins.local_execution_store import pending_runs_for_project
 
@@ -28,13 +29,6 @@ _AUTHORITY_PAYLOAD_FIELDS = {
 _MINIMAL_DECISION_FIELDS = {"request_id", "request_digest", "disposition", "actor_id"}
 _DECISION_DISPOSITIONS = {"approve_exact", "decline", "request_revision"}
 _STATUS_ITEM_LIMIT = 100
-
-
-class LocalApplicationError(RuntimeError):
-    def __init__(self, code: str, message: str) -> None:
-        super().__init__(message)
-        self.code = code
-        self.message = message
 
 
 def _jsonable(value: Any) -> Any:

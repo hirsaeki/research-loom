@@ -11,6 +11,7 @@ from plugins.local_delphi_store import (
     canonical_digest,
     registry_digest,
 )
+from plugins.survey_validation import schema_validate, validate_digest, validate_rqs
 
 from .delphi_analysis import (
     ANALYSIS_CONTRACT,
@@ -24,7 +25,6 @@ from .delphi_instrument_approval import DelphiInstrumentApproval, verify_approva
 from .facade import LocalApplicationError
 from .survey_analysis_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
 from .survey_facade import _snapshot
-from .survey_validation import schema_validate, validate_digest, validate_rqs
 
 _ROOT = Path(__file__).resolve().parents[2]
 _DESIGN_SCHEMA = _ROOT / "core/packages/delphi/delphi-design.schema.json"

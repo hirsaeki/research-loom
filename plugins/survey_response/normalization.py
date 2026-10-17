@@ -4,9 +4,6 @@ from collections.abc import Mapping
 from copy import deepcopy
 from typing import Any
 
-from plugins.survey_virtual_runner.response_support import reachable_questions, stable_response_key
-from plugins.survey_virtual_runner.response_validation import SurveyResponseValidator
-
 from .contracts import (
     RAW_RESPONSE_VALIDATOR,
     preserve_raw_input,
@@ -15,6 +12,8 @@ from .contracts import (
     schema_issues,
     validate_canonical_response,
 )
+from .response_support import reachable_questions, stable_response_key
+from .response_validation import SurveyResponseValidator
 
 _CANONICAL_STATES = {
     "answered",

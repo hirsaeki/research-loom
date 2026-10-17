@@ -12,7 +12,6 @@ from core.execution import RunStatus
 from core.runtime import canonical_digest as core_canonical_digest
 from plugins._infra.clock import utc_now
 from plugins.desktop_research.normalization import source_id_for_capture
-from plugins.research_visual_semantics import validate_visual_package_bindings
 
 from .facade import LocalApplicationError
 from .generated_explanation import validate_explanation
@@ -42,6 +41,7 @@ from .research_package_format import (
     validate_schema,
 )
 from .visual_origin import verify_visual_origin
+from .visual_package_bindings import validate_visual_package_bindings
 from .workspace import workspace_document_path
 
 

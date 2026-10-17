@@ -8,9 +8,8 @@ from typing import Any
 
 from jsonschema import Draft202012Validator, FormatChecker
 
+from plugins.application_errors import LocalApplicationError
 from plugins.local_survey_store import canonical_document_digest
-
-from .facade import LocalApplicationError
 
 HARNESS_OWNED_FIELDS = {
     "project_id",

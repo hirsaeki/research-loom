@@ -4,11 +4,11 @@ from collections.abc import Mapping
 
 from core.execution import ExecutionStyle
 from core.execution.models import CapabilityExecutionError
+from plugins.survey_response.response_validation import SurveyResponseValidator
 
 from .generation import generate_records
 from .output_builder import build_output
 from .provenance import build_virtual_context, generation_provenance, input_pins
-from .response_validation import SurveyResponseValidator
 from .runtime_state import (
     candidate_change_requests,
     defects_from_issues,

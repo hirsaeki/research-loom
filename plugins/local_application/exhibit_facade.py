@@ -4,6 +4,7 @@ from collections.abc import Mapping
 from copy import deepcopy
 from typing import Any
 
+from core.runtime import canonical_digest as research_object_digest
 from plugins.local_research_exhibit_store import (
     SUPPORTED_EXHIBIT_KINDS,
     LocalResearchExhibitStore,
@@ -12,11 +13,7 @@ from plugins.local_research_exhibit_store import (
     normalized_content,
     validate_visual_locator,
 )
-from plugins.research_visual_semantics import (
-    digest,
-    research_object_digest,
-    validate_visual_semantics,
-)
+from plugins.research_visual_semantics import digest, validate_visual_semantics
 
 from .facade import LocalApplicationError
 from .run_inspection_facade import LocalApplicationFacade as _BaseLocalApplicationFacade

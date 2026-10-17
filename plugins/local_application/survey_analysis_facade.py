@@ -31,11 +31,11 @@ from plugins.survey_analysis import (
     stable_identity,
     validate_analysis_spec,
 )
+from plugins.survey_validation import input_object, required_string
 
 from .facade import LocalApplicationError
 from .survey_facade import _snapshot
 from .survey_response_capture import _real_response_provenance
-from .survey_validation import input_object, required_string
 from .survey_virtual_pretest_inspection import SurveyVirtualPretestInspectionMixin
 from .virtual_runner_facade import LocalApplicationFacade as VirtualRunnerApplicationFacade
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from .response_validation import reachable_questions, stable_response_key
+from plugins.survey_response.response_validation import reachable_questions, stable_response_key
 
 DEFAULT_STRESS_FAULTS = (
     "required_missing",

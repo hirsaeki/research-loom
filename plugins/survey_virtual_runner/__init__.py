@@ -5,10 +5,11 @@ This plugin supplies only the first Survey execution adapter and shared Survey
 response validation; it is not a Research Method and never starts REAL execution.
 """
 
+from plugins.survey_response.response_validation import SurveyResponseValidator
+
 from .adapter import StructuralSurveyVirtualRunnerAdapter
 from .contracts import SurveyVirtualRunnerContextValidator
 from .normalization import SurveyVirtualRunnerNormalizer
-from .response_validation import SurveyResponseValidator
 
 __all__ = [
     "StructuralSurveyVirtualRunnerAdapter",

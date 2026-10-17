@@ -8,9 +8,9 @@ from typing import Any
 from plugins.local_survey_response_store import LocalSurveyResponseStore
 from plugins.local_survey_store import LocalSurveyStoreError
 from plugins.survey_response import normalize_response
+from plugins.survey_validation import input_object, required_string
 
 from .facade import LocalApplicationError
-from .survey_validation import input_object, required_string
 
 _STORE_NAME = "survey-response-registry.sqlite3"
 _RESPONSE_FIELDS = {

@@ -15,9 +15,9 @@ from plugins.local_research_exhibit_store import (
     LocalResearchExhibitStoreError,
     validate_visual_target,
 )
-from plugins.research_visual_semantics import validate_visual_package_bindings
 
 from .facade import LocalApplicationError
+from .visual_package_bindings import validate_visual_package_bindings
 
 SCHEMA_VERSION = "0.2.0"
 TOOL_VERSION = "0.2.0"

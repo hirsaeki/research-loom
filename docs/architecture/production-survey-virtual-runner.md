@@ -86,7 +86,7 @@ Expected STRESS failures are preserved as detected/resolved defects. They demons
 
 `core/packages/survey/survey-response.schema.json` is the provider-neutral detailed response shape used by the production Virtual Runner and intended for later REAL Survey intake. It preserves the canonical Survey response metadata and adds answer-level values plus explicit identity namespace needed for structural validation. For `execution_mode = virtual`, response `epistemic_mode` remains `virtual`; `synthetic = true` and the `synthetic:` namespace keep the synthetic firewall explicit.
 
-`plugins/survey_virtual_runner/response_validation.py` validates that shared Survey response contract. It distinguishes `missing`, `unknown`, `not_applicable`, and `prefer_not_to_answer`; it never collapses those states into `null` or an empty string. This is Survey response validation reused by the Virtual Runner, not a virtual-only response validator.
+`plugins/survey_response/response_validation.py` validates that shared Survey response contract. It distinguishes `missing`, `unknown`, `not_applicable`, and `prefer_not_to_answer`; it never collapses those states into `null` or an empty string. This is Survey response validation reused by the Virtual Runner, not a virtual-only response validator.
 
 ## Synthetic epistemic firewall
 
