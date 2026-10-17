@@ -17,12 +17,11 @@ research-loom/
 │  ├─ models/        # research object schema
 │  ├─ validators/    # non-overridable invariants (data)
 │  └─ fixtures/
-│     (workflow/, provenance/, services/ are empty placeholders; see #497)
 │
 ├─ profiles/
 │  ├─ contracts/
 │  ├─ research/
-│  ├─ organization/  # empty placeholder
+│  ├─ organization/  # reserved; no organization profile yet
 │  ├─ narrative/
 │  └─ publication/
 │
