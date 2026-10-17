@@ -1,3 +1,5 @@
+"""Deterministic in-memory doubles for tests. Production code must not import this module."""
+
 from __future__ import annotations
 
 from collections.abc import Mapping
