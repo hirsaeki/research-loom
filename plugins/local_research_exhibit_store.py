@@ -11,6 +11,7 @@ from typing import Any
 
 import rfc8785
 
+from plugins._infra.sqlite import apply_pragmas
 from plugins.local_durable_store import register_optional_path, require_optional_available
 from plugins.research_visual_semantics import validate_visual_semantics
 
@@ -555,7 +556,7 @@ class LocalResearchExhibitStore:
         try:
             connection = sqlite3.connect(self.path)
             connection.row_factory = sqlite3.Row
-            connection.execute("PRAGMA foreign_keys = ON")
+            apply_pragmas(connection, foreign_keys=True)
             connection.executescript(_SCHEMA_SQL)
             connection.execute(
                 "INSERT OR IGNORE INTO exhibit_store_meta(schema_version) VALUES (?)",

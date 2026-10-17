@@ -7,6 +7,8 @@ from pathlib import Path
 from threading import RLock
 from typing import Any
 
+from plugins._infra.sqlite import apply_pragmas
+
 _REQUIRED_COLUMNS = {
     "documents": {"message_type", "document_id", "digest", "payload_json"},
     "proposals": {"proposal_id", "conversation_id", "commitment_mode", "status"},
@@ -93,10 +95,13 @@ class LocalConversationStore:
                 str(self.path), isolation_level=None, check_same_thread=False, timeout=5.0
             )
             self._db.row_factory = sqlite3.Row
-            self._db.execute("PRAGMA journal_mode=WAL")
-            self._db.execute("PRAGMA synchronous=FULL")
-            self._db.execute("PRAGMA foreign_keys=ON")
-            self._db.execute("PRAGMA busy_timeout=5000")
+            apply_pragmas(
+                self._db,
+                foreign_keys=True,
+                busy_timeout_ms=5000,
+                journal_mode="WAL",
+                synchronous="FULL",
+            )
             # CREATE TABLE IF NOT EXISTS intentionally does not act as a migration.
             # Existing incompatible stores fail closed below before any index that
             # depends on the newer project_id projection is created.

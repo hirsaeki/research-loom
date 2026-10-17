@@ -6,6 +6,8 @@ from contextlib import contextmanager
 from pathlib import Path
 from threading import RLock
 
+from plugins._infra.sqlite import apply_pragmas
+
 from .diagnosed_artifact_read import DiagnosedArtifactReadMixin
 from .retention import LocalExecutionStore as _RetentionLocalExecutionStore
 from .store import (
@@ -55,9 +57,12 @@ class ReadOnlyLocalExecutionStore(
                 check_same_thread=False,
             )
             self._connection.row_factory = sqlite3.Row
-            self._connection.execute("PRAGMA foreign_keys = ON")
-            self._connection.execute("PRAGMA query_only = ON")
-            self._connection.execute(f"PRAGMA busy_timeout = {int(self.config.busy_timeout_ms)}")
+            apply_pragmas(
+                self._connection,
+                foreign_keys=True,
+                query_only=True,
+                busy_timeout_ms=self.config.busy_timeout_ms,
+            )
             self._validate_existing_schema()
         except Exception:
             connection = getattr(self, "_connection", None)

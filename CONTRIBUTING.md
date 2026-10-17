@@ -19,7 +19,7 @@ CI runs exactly these; run them before pushing.
 ```bash
 uv run --frozen --group dev ruff check .
 uv run --frozen --group dev ruff format --check .
-uv run --frozen --group dev mypy                                   # strict, scoped to core/
+uv run --frozen --group dev mypy                                   # strict, scoped to core/ and plugins/_infra/
 uv run --frozen python -m unittest discover -t . -s tests -p 'test_*.py'
 ```
 

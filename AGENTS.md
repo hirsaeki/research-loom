@@ -23,6 +23,7 @@ When iterating, it is fine to run only the affected test modules, but run the fu
 ## Conventions
 
 - `core/` stays generic. It must not import `plugins/` and must not contain organization-specific (MISCO) logic. It must pass `mypy --strict`.
+- `plugins/_infra/` holds low-level helpers (file locks, atomic writes, SQLite PRAGMAs). It must not import other plugins and must pass `mypy --strict`.
 - Import test helpers as `tests.runtime.*` / `tests.contracts.*`.
 - Test modules that branch on the platform must declare `CI_WINDOWS = True` or `CI_WINDOWS = False  # reason`.
 - Never edit or extend `research-harness/` or `research-profile/`. They are frozen legacy reference trees.

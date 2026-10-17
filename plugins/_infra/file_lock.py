@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import errno
 import os
+import sys
 import time
 
 # errno values that mean "another holder has the lock" rather than an I/O failure.
@@ -33,7 +34,7 @@ def lock_byte(fd: int, *, blocking: bool) -> None:
     On Windows a blocking attempt uses ``LK_LOCK``, which retries for about ten
     seconds before raising.
     """
-    if os.name == "nt":
+    if sys.platform == "win32":
         import msvcrt
 
         os.lseek(fd, 0, os.SEEK_SET)
@@ -45,7 +46,7 @@ def lock_byte(fd: int, *, blocking: bool) -> None:
 
 
 def unlock_byte(fd: int) -> None:
-    if os.name == "nt":
+    if sys.platform == "win32":
         import msvcrt
 
         os.lseek(fd, 0, os.SEEK_SET)
@@ -69,7 +70,7 @@ def acquire_byte_lock(
     raise ``LockTimeout`` once the deadline passes. An ``OSError`` whose errno is
     not in ``contention_errnos`` is an I/O failure and propagates unchanged.
     """
-    if timeout is None and os.name != "nt":
+    if timeout is None and sys.platform != "win32":
         lock_byte(fd, blocking=True)
         return
     deadline = None if timeout is None else time.monotonic() + timeout

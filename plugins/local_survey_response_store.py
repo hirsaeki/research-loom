@@ -9,6 +9,7 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
+from plugins._infra.sqlite import apply_pragmas
 from plugins.local_durable_store import register_optional_path, require_optional_available
 from plugins.survey_response.contracts import (
     canonical_digest,
@@ -268,7 +269,7 @@ class LocalSurveyResponseStore:
                 self.path.resolve().as_uri() + "?mode=rw", uri=True, timeout=5.0
             )
             connection.row_factory = sqlite3.Row
-            connection.execute("PRAGMA busy_timeout=5000")
+            apply_pragmas(connection, busy_timeout_ms=5000)
             self._schema_version(connection)
             register_optional_path(self.path)
             return connection

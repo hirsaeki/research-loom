@@ -10,6 +10,7 @@ from typing import Any
 from jsonschema import Draft202012Validator, FormatChecker
 
 from core.conversation import canonical_digest
+from plugins._infra.sqlite import apply_pragmas
 from plugins.local_durable_store import register_optional_path, require_optional_available
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -240,7 +241,7 @@ class LocalAttentionStore:
         try:
             connection = sqlite3.connect(self.path)
             connection.row_factory = sqlite3.Row
-            connection.execute("PRAGMA foreign_keys = ON")
+            apply_pragmas(connection, foreign_keys=True)
             connection.executescript(_SCHEMA_SQL)
             connection.execute(
                 "INSERT OR IGNORE INTO attention_store_meta(schema_version) VALUES (?)",

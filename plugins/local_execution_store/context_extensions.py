@@ -11,6 +11,8 @@ from typing import Any
 
 import rfc8785
 
+from plugins._infra.sqlite import apply_pragmas
+
 
 class LocalCapabilityContextExtensionStore:
     """Production local immutable store for capability Context extensions.
@@ -28,8 +30,7 @@ class LocalCapabilityContextExtensionStore:
             str(self.database), isolation_level=None, check_same_thread=False
         )
         self._connection.row_factory = sqlite3.Row
-        self._connection.execute("PRAGMA journal_mode = WAL")
-        self._connection.execute("PRAGMA synchronous = FULL")
+        apply_pragmas(self._connection, journal_mode="WAL", synchronous="FULL")
         self._connection.execute(
             """
             CREATE TABLE IF NOT EXISTS context_extensions(

@@ -6,15 +6,18 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from core.runtime.ports import RepositoryError
+from plugins._infra.sqlite import (
+    ALLOWED_JOURNAL_MODES,
+    ALLOWED_SYNCHRONOUS,
+    apply_pragmas,
+    foreign_keys_enabled,
+)
 
 from ._bootstrap import BootstrapMixin
 from ._diagnostics import DiagnosticsMixin
 from ._read import ReadMixin
 from ._support import MIGRATION_DIR, load_migrations, rollback_quietly, split_sql_statements
 from ._write import WriteMixin
-
-_ALLOWED_JOURNAL_MODES = {"DELETE", "WAL"}
-_ALLOWED_SYNCHRONOUS = {"FULL", "NORMAL", "EXTRA"}
 
 
 class SQLiteResearchStateRepository(
@@ -43,9 +46,9 @@ class SQLiteResearchStateRepository(
             raise ValueError("busy_timeout_ms must be non-negative")
         journal_mode = journal_mode.upper()
         synchronous = synchronous.upper()
-        if journal_mode not in _ALLOWED_JOURNAL_MODES:
+        if journal_mode not in ALLOWED_JOURNAL_MODES:
             raise ValueError(f"unsupported journal_mode {journal_mode!r}")
-        if synchronous not in _ALLOWED_SYNCHRONOUS:
+        if synchronous not in ALLOWED_SYNCHRONOUS:
             raise ValueError(f"unsupported synchronous setting {synchronous!r}")
 
         try:
@@ -55,18 +58,19 @@ class SQLiteResearchStateRepository(
                 timeout=max(busy_timeout_ms / 1000.0, 0.001),
             )
             self._connection.row_factory = sqlite3.Row
-            self._connection.execute("PRAGMA foreign_keys = ON")
-            self._connection.execute(f"PRAGMA busy_timeout = {int(busy_timeout_ms)}")
-            actual_journal = str(
-                self._connection.execute(f"PRAGMA journal_mode = {journal_mode}").fetchone()[0]
-            ).upper()
-            self._connection.execute(f"PRAGMA synchronous = {synchronous}")
+            actual_journal = apply_pragmas(
+                self._connection,
+                foreign_keys=True,
+                busy_timeout_ms=busy_timeout_ms,
+                journal_mode=journal_mode,
+                synchronous=synchronous,
+            )
             if self.database != ":memory:" and actual_journal != journal_mode:
                 raise RepositoryError(
                     "SQLite refused requested journal_mode "
                     f"{journal_mode!r}; got {actual_journal!r}"
                 )
-            if int(self._connection.execute("PRAGMA foreign_keys").fetchone()[0]) != 1:
+            if not foreign_keys_enabled(self._connection):
                 raise RepositoryError("SQLite foreign_keys pragma is not enabled")
             self._migrate()
         except RepositoryError:
