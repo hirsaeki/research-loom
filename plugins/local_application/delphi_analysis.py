@@ -8,7 +8,7 @@ from copy import deepcopy
 from math import isfinite
 from typing import Any
 
-from .facade import LocalApplicationError
+from plugins.application_errors import LocalApplicationError
 
 ANALYSIS_CONTRACT = "delphi-mode-scales@1"
 NUMERIC_MODES = ("rating", "probability", "confidence")

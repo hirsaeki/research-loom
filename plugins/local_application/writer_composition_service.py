@@ -20,9 +20,9 @@ from core.runtime import canonical_digest
 from plugins._infra.atomic_write import replace_text
 from plugins._infra.clock import utc_now as _now
 from plugins._infra.file_lock import lock_byte, unlock_byte, write_sentinel_if_empty
+from plugins.application_errors import LocalApplicationError
 from plugins.local_durable_store import register_optional_path, require_optional_available
 
-from .facade import LocalApplicationError
 from .item_listing import read_mapping
 from .research_package_format import _package_required_refs, safe_component
 

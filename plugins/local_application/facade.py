@@ -1,10 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 from copy import deepcopy
-from dataclasses import asdict, is_dataclass
-from enum import Enum
-from functools import cache
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -15,36 +12,15 @@ from plugins.application_errors import LocalApplicationError as LocalApplication
 from plugins.local_application.workspace import LocalWorkspace, OpenedLocalWorkspace
 from plugins.local_execution_store import pending_runs_for_project
 
+from .support.ingress import AUTHORITY_PAYLOAD_FIELDS, INGRESS_FIELDS
+from .support.stages import given_kwargs, jsonable, run_stages, stages_for
+
 if TYPE_CHECKING:
     from .facade_composition import LocalApplicationFacade
 
-_INGRESS_FIELDS = {"action_type", "payload", "rationale", "actor_id", "conversation_id"}
-_AUTHORITY_PAYLOAD_FIELDS = {
-    "decision_reference_ids",
-    "state_transition_request",
-    "commit_bundle",
-    "commit_id",
-    "new_snapshot_id",
-    "runtime_authorization_evidence",
-    "authorization_evidence",
-    "capability_implementation",
-    "implementation_id",
-}
 _MINIMAL_DECISION_FIELDS = {"request_id", "request_digest", "disposition", "actor_id"}
 _DECISION_DISPOSITIONS = {"approve_exact", "decline", "request_revision"}
 _STATUS_ITEM_LIMIT = 100
-
-
-def _jsonable(value: Any) -> Any:
-    if isinstance(value, Enum):
-        return value.value
-    if is_dataclass(value):
-        return _jsonable(asdict(value))
-    if isinstance(value, Mapping):
-        return {str(key): _jsonable(item) for key, item in value.items()}
-    if isinstance(value, (tuple, list)):
-        return [_jsonable(item) for item in value]
-    return value
 
 
 def _conversation_input(
@@ -89,97 +65,30 @@ def _result_projection(result: CoordinatorResult) -> dict[str, Any]:
 
     output: dict[str, Any] = {"status": status}
     if result.proposal is not None:
-        output["proposal"] = _jsonable(result.proposal)
+        output["proposal"] = jsonable(result.proposal)
     if result.confirmation_request is not None:
-        output["confirmation_request"] = _jsonable(result.confirmation_request)
+        output["confirmation_request"] = jsonable(result.confirmation_request)
     if result.confirmation_receipt is not None:
-        output["confirmation_receipt"] = _jsonable(result.confirmation_receipt)
+        output["confirmation_receipt"] = jsonable(result.confirmation_receipt)
     if decision_request is not None:
-        output["decision_request"] = _jsonable(decision_request)
+        output["decision_request"] = jsonable(decision_request)
     if result.action_receipt is not None:
-        output["action_receipt"] = _jsonable(result.action_receipt)
+        output["action_receipt"] = jsonable(result.action_receipt)
     if result.prepared_execution is not None:
-        prepared = _jsonable(result.prepared_execution)
+        prepared = jsonable(result.prepared_execution)
         output["prepared_execution"] = prepared
         run = prepared.get("run") if isinstance(prepared, Mapping) else None
         if isinstance(run, Mapping) and run.get("run_id"):
             output["run_id"] = str(run["run_id"])
     if result.execution_result is not None:
-        output["execution_result"] = _jsonable(result.execution_result)
+        output["execution_result"] = jsonable(result.execution_result)
     if result.presentations:
-        output["presentations"] = _jsonable(result.presentations)
+        output["presentations"] = jsonable(result.presentations)
     if result.data:
-        output["data"] = _jsonable(result.data)
+        output["data"] = jsonable(result.data)
     if result.issues:
-        output["issues"] = _jsonable(result.issues)
+        output["issues"] = jsonable(result.issues)
     return output
-
-
-@cache
-def stages_for(
-    cls: type, name: str, *, below: type | None = None
-) -> tuple[Callable[..., Any], ...]:
-    """Stages for public operation ``name`` contributed by ``cls`` and its bases.
-
-    Each facade layer lists its stages in a ``_STAGES`` mapping. They run in
-    method resolution order, outermost first, exactly as the former
-    ``super()`` overrides did; with ``below`` only classes after ``below`` in
-    the MRO contribute, matching a ``super()`` call made from that class.
-    Intermediate facade classes that are instantiated directly therefore keep
-    the same behavior as before.
-    """
-    mro = cls.__mro__
-    if below is not None:
-        mro = mro[mro.index(below) + 1 :]
-    return tuple(
-        vars(klass)["_STAGES"][name] for klass in mro if name in vars(klass).get("_STAGES", {})
-    )
-
-
-def _given(**kwargs: Any) -> dict[str, Any]:
-    """Keyword arguments the caller actually supplied (``None`` means omitted).
-
-    Dispatchers forward ``view`` only when given, as the former outermost
-    override did; deeper layers never accepted it.
-    """
-    return {key: value for key, value in kwargs.items() if value is not None}
-
-
-def run_stages(
-    stages: tuple[Callable[..., Any], ...],
-    facade: Any,
-    terminal: Callable[..., Any],
-    /,
-    *args: Any,
-    **kwargs: Any,
-) -> Any:
-    """Run a public facade operation through its ordered stages.
-
-    Feature layers contribute stages instead of overriding the public method.
-    Each stage is called as ``stage(facade, proceed, *args, **kwargs)`` and
-    calls ``proceed(...)`` with the arguments the next stage (and finally
-    ``terminal``) receives. The exported facade declares each stage tuple in
-    the order the former ``super()`` chain ran.
-    """
-    return run_stages_from(0, stages, facade, terminal, *args, **kwargs)
-
-
-def run_stages_from(
-    index: int,
-    stages: tuple[Callable[..., Any], ...],
-    facade: Any,
-    terminal: Callable[..., Any],
-    /,
-    *args: Any,
-    **kwargs: Any,
-) -> Any:
-    if index >= len(stages):
-        return terminal(*args, **kwargs)
-
-    def proceed(*next_args: Any, **next_kwargs: Any) -> Any:
-        return run_stages_from(index + 1, stages, facade, terminal, *next_args, **next_kwargs)
-
-    return stages[index](facade, proceed, *args, **kwargs)
 
 
 class LocalApplicationFacadeCore:
@@ -349,7 +258,7 @@ class LocalApplicationFacadeCore:
             self,
             self._submit_action_terminal,
             draft_input,
-            **_given(view=view),
+            **given_kwargs(view=view),
         )
 
     def _list_actions_terminal(self) -> Mapping[str, Any]:
@@ -376,7 +285,7 @@ class LocalApplicationFacadeCore:
             raise LocalApplicationError(
                 "APPLICATION-INGRESS-001", "typed action input must be an object"
             )
-        unknown = set(draft_input) - _INGRESS_FIELDS
+        unknown = set(draft_input) - INGRESS_FIELDS
         if unknown:
             raise LocalApplicationError(
                 "APPLICATION-INGRESS-001",
@@ -389,7 +298,7 @@ class LocalApplicationFacadeCore:
             raise LocalApplicationError("APPLICATION-INGRESS-001", "action_type is required")
         if not isinstance(payload, Mapping):
             raise LocalApplicationError("APPLICATION-INGRESS-001", "payload must be an object")
-        forbidden = set(payload) & _AUTHORITY_PAYLOAD_FIELDS
+        forbidden = set(payload) & AUTHORITY_PAYLOAD_FIELDS
         if forbidden:
             raise LocalApplicationError(
                 "APPLICATION-AUTHORITY-001",
@@ -432,7 +341,7 @@ class LocalApplicationFacadeCore:
             self,
             self._submit_confirmation_terminal,
             confirmation,
-            **_given(view=view),
+            **given_kwargs(view=view),
         )
 
     def _submit_confirmation_terminal(self, confirmation: Mapping[str, Any]) -> Mapping[str, Any]:
@@ -476,7 +385,7 @@ class LocalApplicationFacadeCore:
             self,
             self._resolve_human_decision_terminal,
             response,
-            **_given(view=view),
+            **given_kwargs(view=view),
         )
 
     def _resolve_human_decision_terminal(self, response: Mapping[str, Any]) -> Mapping[str, Any]:
@@ -574,13 +483,13 @@ class LocalApplicationFacadeCore:
         result = self._application.resolve_human_decision(response_value)
         return {
             "status": str(result.status),
-            "request": _jsonable(result.request),
-            "response": _jsonable(result.response),
-            "commit_receipt": _jsonable(result.commit_receipt)
+            "request": jsonable(result.request),
+            "response": jsonable(result.response),
+            "commit_receipt": jsonable(result.commit_receipt)
             if result.commit_receipt is not None
             else None,
             "transition_rejection": (
-                _jsonable(result.transition_rejection)
+                jsonable(result.transition_rejection)
                 if result.transition_rejection is not None
                 else None
             ),
@@ -595,7 +504,7 @@ class LocalApplicationFacadeCore:
             self._collect_external_terminal,
             run_id,
             submission,
-            **_given(view=view),
+            **given_kwargs(view=view),
         )
 
     def _collect_external_terminal(
@@ -623,7 +532,7 @@ class LocalApplicationFacadeCore:
 
     def status(self, *, view: str | None = None) -> Mapping[str, Any]:
         return run_stages(
-            stages_for(type(self), "status"), self, self._status_terminal, **_given(view=view)
+            stages_for(type(self), "status"), self, self._status_terminal, **given_kwargs(view=view)
         )
 
     def _status_terminal(self) -> Mapping[str, Any]:
@@ -695,9 +604,9 @@ class LocalApplicationFacadeCore:
                     "digest": state.effective_profile_set_digest,
                 },
             },
-            "pending_confirmations": _jsonable(pending_confirmations),
-            "pending_human_decisions": _jsonable(pending_decisions),
-            "pending_runs": _jsonable(pending_runs),
+            "pending_confirmations": jsonable(pending_confirmations),
+            "pending_human_decisions": jsonable(pending_decisions),
+            "pending_runs": jsonable(pending_runs),
             "truncated": {
                 "pending_confirmations": confirmations_truncated,
                 "pending_runs": runs_truncated,

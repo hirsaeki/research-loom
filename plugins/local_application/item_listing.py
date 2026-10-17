@@ -13,7 +13,8 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from .facade import LocalApplicationError
+from plugins.application_errors import LocalApplicationError
+
 from .research_package_format import safe_component
 
 ITEM_ERRORS = (

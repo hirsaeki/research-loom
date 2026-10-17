@@ -8,6 +8,7 @@ from typing import Any
 from core.conversation import ConversationRuntimeError
 from core.conversation.validation import WorkConversationValidator
 from core.runtime import canonical_digest
+from plugins.application_errors import LocalApplicationError
 from plugins.local_conversation_store.resume import state_delta_proposal_for_project
 from plugins.local_conversation_store.synthesis import (
     list_synthesis_candidate_rows,
@@ -32,7 +33,6 @@ from .conversation_view import (
     project_synthesis_show,
     projection_unavailable,
 )
-from .facade import LocalApplicationError
 from .recommendation_facade import (
     research_recommendation_proposal_payload,
 )

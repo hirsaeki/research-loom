@@ -8,12 +8,12 @@ from copy import deepcopy
 from typing import Any
 
 from core.execution import RunStatus
+from plugins.application_errors import LocalApplicationError
 from plugins.desktop_research import DesktopResearchAttemptRecorder
 from plugins.desktop_research import DesktopResearchCaptureService as _BASE_CAPTURE_SERVICE
 from plugins.desktop_research.attempts import reconstruct_attempts
 
 from . import new_material_continuation_admission as admission
-from .facade import LocalApplicationError
 from .material_content_facade import _artifact_pair_for_capture
 from .material_reacquisition_facade import MaterialReacquisitionRetrievalError
 from .material_reacquisition_pypdf_provider import (

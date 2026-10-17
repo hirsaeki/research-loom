@@ -6,9 +6,9 @@ from typing import Any
 
 from core.conversation import ActionDefinition, ConversationRuntimeError, HarnessServiceResult
 from core.execution import RunStatus
+from plugins.application_errors import LocalApplicationError
 
 from . import finding_recovery_facade as _base
-from .facade import LocalApplicationError
 from .finding_recovery_lineage import RecoveryFailure, proposal_matches, resolve_replay_child
 
 

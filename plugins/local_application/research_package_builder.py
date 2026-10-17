@@ -11,9 +11,9 @@ import rfc8785
 from core.execution import RunStatus
 from core.runtime import canonical_digest as core_canonical_digest
 from plugins._infra.clock import utc_now
+from plugins.application_errors import LocalApplicationError
 from plugins.desktop_research.normalization import source_id_for_capture
 
-from .facade import LocalApplicationError
 from .generated_explanation import validate_explanation
 from .research_chart import validate_chart_exhibit
 from .research_package_format import (

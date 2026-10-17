@@ -5,10 +5,9 @@ from copy import deepcopy
 from typing import Any
 
 from core.conversation import ConversationRuntimeError, WorkConversationValidator
+from plugins.application_errors import LocalApplicationError
 from plugins.local_conversation_store import find_state_delta_proposals_by_provenance_run_id
 from plugins.local_execution_store import child_runs_for_parent
-
-from .facade import LocalApplicationError
 
 _CONVERSATION_VALIDATOR = WorkConversationValidator()
 

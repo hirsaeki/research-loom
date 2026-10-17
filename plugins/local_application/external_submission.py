@@ -8,6 +8,7 @@ from core.conversation.validation import canonical_digest
 from core.execution import CapabilityExecutionError
 from core.execution.validation import CanonicalCapabilityExecutionValidator
 from core.runtime.normalization import NormalizationRejected
+from plugins.application_errors import LocalApplicationError
 from plugins.desktop_research import DesktopResearchResultValidator, build_result_extension
 from plugins.desktop_research.attempts import UNSUCCESSFUL_OUTCOMES
 from plugins.desktop_research.normalization import verified_resource_basis_provenance
@@ -15,7 +16,6 @@ from plugins.desktop_research.retention import matching_whitespace_slice
 from plugins.local_execution_store import LocalExecutionStoreError
 from plugins.local_execution_store.capture_query import artifacts_for_capture_ids
 
-from .facade import LocalApplicationError
 from .material_content_facade import _artifact_pair_for_capture
 
 

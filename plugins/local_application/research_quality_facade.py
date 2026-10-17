@@ -4,7 +4,8 @@ from collections.abc import Mapping
 from copy import deepcopy
 from typing import Any
 
-from .facade import LocalApplicationError
+from plugins.application_errors import LocalApplicationError
+
 from .research_quality_evaluation import (
     ResearchQualityEvaluationError,
     basis_refs,

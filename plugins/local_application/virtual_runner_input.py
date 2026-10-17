@@ -5,7 +5,7 @@ from collections.abc import Mapping
 from copy import deepcopy
 from typing import Any
 
-from plugins.local_application.facade import LocalApplicationError
+from plugins.application_errors import LocalApplicationError
 
 _DEFAULT_LIMITS = {
     "max_questions": 64,

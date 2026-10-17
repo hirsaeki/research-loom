@@ -11,10 +11,10 @@ from pathlib import Path
 from typing import Any
 
 from core.runtime import canonical_digest as core_canonical_digest
+from plugins.application_errors import LocalApplicationError
 from plugins.local_durable_store import register_optional_path, require_optional_available
 from plugins.local_execution_store import canonical_handoff_for
 
-from .facade import LocalApplicationError
 from .item_listing import ITEM_ERRORS, directory_page, read_mapping, unavailable
 from .research_package_builder import build_package
 from .research_package_format import (

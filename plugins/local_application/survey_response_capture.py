@@ -7,6 +7,7 @@ from collections.abc import Mapping
 from copy import deepcopy
 from typing import Any
 
+from plugins.application_errors import LocalApplicationError
 from plugins.local_survey_response_store import LocalSurveyResponseStoreError
 from plugins.survey_response import (
     append_rejection_issue,
@@ -18,7 +19,7 @@ from plugins.survey_response import (
 )
 from plugins.survey_validation import capture_origin, input_object
 
-from .facade import LocalApplicationError, run_stages, stages_for
+from .support.stages import run_stages, stages_for
 from .survey_facade import _snapshot
 from .survey_response_core import _DATASET_FIELDS, _RESPONSE_FIELDS, _status_value
 

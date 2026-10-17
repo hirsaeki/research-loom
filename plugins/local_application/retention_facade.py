@@ -5,6 +5,7 @@ from copy import deepcopy
 from typing import Any
 
 from core.execution import RunStatus
+from plugins.application_errors import LocalApplicationError
 from plugins.desktop_research import DesktopResearchCaptureService
 from plugins.desktop_research.capture import DesktopResearchCaptureError, validate_capture_identity
 from plugins.local_execution_store import LocalExecutionStoreError, read_controlled_file
@@ -17,7 +18,6 @@ from .external_desktop_facade import (
     _provenance,
     _required_string,
 )
-from .facade import LocalApplicationError
 from .material_content_facade import ExternalMaterialContentService
 from .material_reacquisition_facade import ensure_material_reacquisition_action
 from .material_recovery_facade import ensure_material_recovery_action

@@ -18,9 +18,9 @@ from core.resources import resource_path
 from core.runtime import canonical_digest
 from plugins._infra.atomic_write import write_durable
 from plugins._infra.clock import utc_now as _now
+from plugins.application_errors import LocalApplicationError
 from plugins.local_durable_store import register_optional_path, require_optional_available
 
-from .facade import LocalApplicationError
 from .research_package_format import safe_component
 from .writer_composition_service import _digest_document, _object_index, _package_ref_sets
 

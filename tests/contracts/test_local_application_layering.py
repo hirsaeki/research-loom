@@ -1,0 +1,78 @@
+"""Dependency direction between the local application subpackages (#493).
+
+``plugins/local_application`` is split into feature subpackages, listed in
+``LAYERS`` from the bottom up. A subpackage imports only itself and the
+subpackages below it, never a module left directly in ``local_application``
+(the composition root: CLI, facade and facade composition), and never another
+subpackage's private names.
+"""
+
+from __future__ import annotations
+
+import unittest
+
+from tests.contracts.test_plugin_layering import ROOT, _imports, _is_private, _module_name
+
+PACKAGE = "plugins.local_application"
+PACKAGE_DIR = ROOT / "plugins" / "local_application"
+LAYERS = (
+    "support",
+    "workspace",
+    "research_package",
+    "writer",
+    "publication",
+    "research",
+    "material",
+    "survey",
+    "virtual_runner",
+)
+
+
+def _subpackage(module: str) -> str | None:
+    """Subpackage of a module inside local_application, "" for a root module, None outside."""
+    if module != PACKAGE and not module.startswith(PACKAGE + "."):
+        return None
+    rest = module[len(PACKAGE) + 1 :].split(".") if module != PACKAGE else []
+    return rest[0] if rest and (PACKAGE_DIR / rest[0] / "__init__.py").is_file() else ""
+
+
+def layering_violations() -> list[str]:
+    found = []
+    for path in sorted(PACKAGE_DIR.rglob("*.py")):
+        source = _subpackage(_module_name(path))
+        if not source:
+            continue
+        where = path.relative_to(ROOT).as_posix()
+        for target, names, line in _imports(path):
+            dest = _subpackage(target)
+            if dest is None or dest == source:
+                continue
+            if dest == "" or LAYERS.index(dest) > LAYERS.index(source):
+                found.append(f"{where}:{line} {source} -> {target}")
+            found.extend(
+                f"{where}:{line} {source} -> {target}.{name} (private)"
+                for name in names
+                if _is_private(name)
+            )
+    return found
+
+
+class LocalApplicationLayeringTests(unittest.TestCase):
+    def test_every_subpackage_is_a_declared_layer(self):
+        subpackages = {path.parent.name for path in PACKAGE_DIR.glob("*/__init__.py")}
+        self.assertEqual(set(), subpackages - set(LAYERS))
+
+    def test_subpackages_import_only_lower_layers(self):
+        self.assertEqual([], layering_violations(), "move the shared helper down a layer")
+
+    def test_guard_classifies_modules(self):
+        self.assertEqual("support", _subpackage(f"{PACKAGE}.support.stages"))
+        self.assertEqual("support", _subpackage(f"{PACKAGE}.support"))
+        self.assertEqual("", _subpackage(f"{PACKAGE}.facade"))
+        self.assertEqual("", _subpackage(f"{PACKAGE}.cli"))
+        self.assertEqual("", _subpackage(PACKAGE))
+        self.assertIsNone(_subpackage("plugins.application_errors"))
+
+
+if __name__ == "__main__":
+    unittest.main()

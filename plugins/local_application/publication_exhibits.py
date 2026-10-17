@@ -14,7 +14,8 @@ from copy import deepcopy
 from pathlib import Path, PureWindowsPath
 from typing import Any
 
-from .facade import LocalApplicationError
+from plugins.application_errors import LocalApplicationError
+
 from .item_listing import _require_unlinked
 from .research_package_format import MAX_ITEM_BYTES, safe_component
 

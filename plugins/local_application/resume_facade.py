@@ -5,7 +5,7 @@ from typing import Any
 
 from plugins.local_application.resume import build_resume_context
 
-from .facade import _given, run_stages, stages_for
+from .support.stages import given_kwargs, run_stages, stages_for
 
 
 class ResumeMixin:
@@ -19,7 +19,7 @@ class ResumeMixin:
             self,
             self._resume_context_terminal,
             limits=limits,
-            **_given(view=view),
+            **given_kwargs(view=view),
         )
 
     def _resume_context_terminal(

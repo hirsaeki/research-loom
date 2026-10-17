@@ -13,7 +13,8 @@ from core.execution import (
 )
 from core.resources import resource_path
 from core.runtime import CapabilityNormalizationBoundary
-from plugins.local_application.facade import LocalApplicationError, _jsonable
+from plugins.application_errors import LocalApplicationError
+from plugins.local_application.support.stages import jsonable
 from plugins.local_survey_store import LocalSurveyStoreError
 from plugins.survey_virtual_runner.adapter import StructuralSurveyVirtualRunnerAdapter
 from plugins.survey_virtual_runner.contracts import SurveyVirtualRunnerContextValidator
@@ -208,7 +209,7 @@ class VirtualRunnerExecuteMixin:
                 "version": questionnaire["version"],
                 "content_digest": questionnaire["content_digest"],
             },
-            "execution_result": _jsonable(result),
+            "execution_result": jsonable(result),
             "response_dataset": response_dataset,
             "analysis_spec": analysis_spec,
             "aggregate_result": aggregate_result,

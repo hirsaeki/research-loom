@@ -30,12 +30,13 @@ Each layer in the diagram has one home in `plugins/local_application`:
 | Layer | Module | Owns |
 |---|---|---|
 | JSON CLI adapter | `cli.py` | Argument parsing, reading JSON input, emitting results and mapping errors to exit codes. Workspace operations go through the facade; the one exception is the read-only attention-store schema check that `doctor` adds after the facade's own diagnosis. |
-| Application Facade | `facade.py` (`LocalApplicationFacadeCore`) | Opening and initializing a workspace, the typed action ingress and the stage mechanism (`run_stages`, `stages_for`) that feature mixins plug into. |
+| Application Facade | `facade.py` (`LocalApplicationFacadeCore`) | Opening and initializing a workspace and the typed action ingress. |
+| | `support/` | Helpers below every feature subpackage: the stage mechanism (`stages.py`: `run_stages`, `stages_for`) that feature mixins plug into, and the typed ingress field sets (`ingress.py`). |
 | | `*_facade.py` (`<Feature>Mixin`) | One feature's public operations, plus its `_STAGES` contributions to shared operations such as `submit_action` or `show_run`. |
 | | `facade_composition.py` | The single definition of `LocalApplicationFacade`, whose base list fixes the mixin order, and the partial compositions that some services instantiate directly. |
 | Composition root | `application.py` (`LocalResearchApplication`) | Building the stores, registries and core services once per workspace. |
 
-A new feature adds a mixin module and inserts it into the base list in `facade_composition.py`. It never redefines `LocalApplicationFacade` or overrides another layer's public method; `tests/contracts/test_local_application_facade_api.py` pins the public API, the stage order and the single definition.
+A new feature adds a mixin module and inserts it into the base list in `facade_composition.py`. It never redefines `LocalApplicationFacade` or overrides another layer's public method; `tests/contracts/test_local_application_facade_api.py` pins the public API, the stage order and the single definition. Feature code is moving into subpackages listed bottom-up in `tests/contracts/test_local_application_layering.py`; a subpackage imports only itself and the layers below it, never a module left directly in `local_application`.
 
 Ordinary operator conversation must treat the public Application Facade / CLI as the source of truth. Direct reads of `execution.db`, `operational-trace.sqlite3`, table names, row IDs, or blob-store layout are implementation/debug concerns, not normal operator workflow.
 

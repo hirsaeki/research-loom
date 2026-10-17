@@ -7,10 +7,10 @@ from collections.abc import Callable, Mapping
 from typing import Any
 
 from core.runtime import canonical_digest
+from plugins.application_errors import LocalApplicationError
 from plugins.research_visual_semantics import digest
 
 from .exhibit_facade import _string_list
-from .facade import LocalApplicationError, run_stages, stages_for
 from .generated_explanation import (
     EXPLANATION_SCHEMA,
     REVIEW_SCHEMA,
@@ -25,6 +25,7 @@ from .research_chart import (
     validate_chart_spec,
 )
 from .research_chart_png import RENDERER_ID, render_chart
+from .support.stages import run_stages, stages_for
 from .visual_origin import verify_visual_origin
 
 

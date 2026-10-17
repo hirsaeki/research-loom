@@ -3,9 +3,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+from plugins.application_errors import LocalApplicationError
 from plugins.local_survey_response_store import LocalSurveyResponseStoreError
-
-from .facade import LocalApplicationError
 
 _MAX_DATASET_SHOW = 100
 

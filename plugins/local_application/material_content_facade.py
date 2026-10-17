@@ -6,9 +6,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from plugins.application_errors import LocalApplicationError
 from plugins.local_execution_store import LocalExecutionStoreIntegrityError
 
-from .facade import LocalApplicationError
 from .material_inventory_facade import (
     _ORIGINAL_ROLE,
     _TEXT_ROLE,

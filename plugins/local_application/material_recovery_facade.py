@@ -7,6 +7,7 @@ from threading import RLock
 from typing import Any
 
 from core.conversation import ActionDefinition, ConversationRuntimeError, HarnessServiceResult
+from plugins.application_errors import LocalApplicationError
 from plugins.local_execution_store import (
     LocalExecutionStoreIntegrityError,
     bind_controlled_import_root,
@@ -14,7 +15,6 @@ from plugins.local_execution_store import (
 )
 
 from .external_desktop_facade import _ORIGINAL_ROLE, _TEXT_ROLE
-from .facade import LocalApplicationError
 from .material_content_facade import _artifact_pair_for_capture
 
 _ACTION_TYPE = "desktop_research.material.recover"

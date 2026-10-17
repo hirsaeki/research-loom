@@ -11,9 +11,9 @@ from typing import Any
 
 from core.runtime import canonical_digest
 from plugins._infra.atomic_write import write_durable
+from plugins.application_errors import LocalApplicationError
 from plugins.local_durable_store import register_optional_path, require_optional_available
 
-from .facade import LocalApplicationError
 from .item_listing import ITEM_ERRORS, directory_page, read_mapping, unavailable
 from .writer_composition_service import (
     SCHEMA_VERSION,

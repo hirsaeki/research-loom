@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from typing import Any
 
+from plugins.application_errors import LocalApplicationError
 from plugins.desktop_research.attempts import (
     OUTCOMES,
     operational_terminations,
@@ -10,7 +11,7 @@ from plugins.desktop_research.attempts import (
 )
 from plugins.local_execution_store import artifact_metadata_for, diagnostics_for
 
-from .facade import LocalApplicationError, _given, _jsonable, run_stages, stages_for
+from .support.stages import given_kwargs, jsonable, run_stages, stages_for
 
 _RUN_INSPECTION_ITEM_LIMIT = 100
 _INTERNAL_PROVENANCE_KEYS = {
@@ -42,7 +43,7 @@ def _public_provenance(value: Any) -> Any:
         }
     if isinstance(value, (tuple, list)):
         return [_public_provenance(item) for item in value]
-    return _jsonable(value)
+    return jsonable(value)
 
 
 def _run_projection(run) -> Mapping[str, Any]:
@@ -121,7 +122,7 @@ def _desktop_research_projection(
     operational_store, run_id: str
 ) -> tuple[Mapping[str, Any], bool, bool]:
     attempts_by_id = reconstruct_attempts(operational_store, run_id)
-    attempts = [_jsonable(attempts_by_id[key]) for key in sorted(attempts_by_id)]
+    attempts = [jsonable(attempts_by_id[key]) for key in sorted(attempts_by_id)]
     attempt_items, attempts_truncated = _bounded(attempts)
 
     summary = {"total": len(attempts), "in_progress": 0}
@@ -135,7 +136,7 @@ def _desktop_research_projection(
             summary[str(outcome)] += 1
 
     terminations, terminations_truncated = _bounded(
-        _jsonable(operational_terminations(operational_store, run_id))
+        jsonable(operational_terminations(operational_store, run_id))
     )
     return (
         {
@@ -157,7 +158,7 @@ class RunInspectionMixin:
             self,
             self._show_run_terminal,
             run_id,
-            **_given(view=view),
+            **given_kwargs(view=view),
         )
 
     def _show_run_terminal(self, run_id: str) -> Mapping[str, Any]:
@@ -187,7 +188,7 @@ class RunInspectionMixin:
                 run_id,
                 limit=probe_limit,
             )
-            diagnostic_items, diagnostics_truncated = _bounded(_jsonable(diagnostic_probe))
+            diagnostic_items, diagnostics_truncated = _bounded(jsonable(diagnostic_probe))
 
             artifact_probe = artifact_metadata_for(
                 self._application.execution_store,

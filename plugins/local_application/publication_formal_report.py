@@ -9,7 +9,8 @@ import zipfile
 from copy import deepcopy
 from xml.etree import ElementTree as ET
 
-from .facade import LocalApplicationError
+from plugins.application_errors import LocalApplicationError
+
 from .publication_docx import PKG, R, W, _paragraph
 
 NS = {"w": W}
