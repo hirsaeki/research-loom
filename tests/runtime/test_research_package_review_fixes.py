@@ -7,8 +7,8 @@ from unittest.mock import patch
 import tests.runtime.test_research_package_acceptance as acceptance
 from core.execution import CapabilityRunRecord, RunStatus
 from plugins.local_application import LocalApplicationError
-from plugins.local_application.research_package_format import MAX_OUTPUT_BYTES
-from plugins.local_application.research_package_service import verify_export_root
+from plugins.local_application.research_package.research_package_format import MAX_OUTPUT_BYTES
+from plugins.local_application.research_package.research_package_service import verify_export_root
 
 CI_WINDOWS = True
 

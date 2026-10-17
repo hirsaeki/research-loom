@@ -3,8 +3,12 @@ from copy import deepcopy
 
 import tests.runtime.test_issue426_source_bibliography as bibliography_tests
 from plugins.local_application import LocalApplicationError
-from plugins.local_application.publication_release_service import PublicationReleaseService
-from plugins.local_application.research_package_builder import _bibliography_readiness
+from plugins.local_application.publication.publication_release_service import (
+    PublicationReleaseService,
+)
+from plugins.local_application.research_package.research_package_builder import (
+    bibliography_readiness,
+)
 
 
 class BibliographyTests(unittest.TestCase):
@@ -33,7 +37,7 @@ class BibliographyTests(unittest.TestCase):
         self.assertEqual(source["publisher"], "発行機関")
         for key in ["id", "canonical_locator", "content_digest", "media_type"]:
             self.assertEqual(source[key], before[key])
-        self.assertTrue(_bibliography_readiness(source)[0])
+        self.assertTrue(bibliography_readiness(source)[0])
         text = PublicationReleaseService._citation_label(
             {**source, "canonical_locator": "https://example.test/full-long-url"},
             "52頁",

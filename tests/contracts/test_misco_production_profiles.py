@@ -15,7 +15,7 @@ import rfc8785
 
 import plugins.local_application.workspace.profile_resolution as profile_resolution
 from plugins.local_application import LocalWorkspace
-from plugins.local_application.research_package_format import profile_resources
+from plugins.local_application.research_package.research_package_format import profile_resources
 from plugins.local_application.workspace.profile_resolution import resolve_effective_profile_set
 from plugins.local_application.workspace.workspace import LocalWorkspaceError
 

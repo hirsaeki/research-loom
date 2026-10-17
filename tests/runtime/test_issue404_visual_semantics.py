@@ -4,7 +4,9 @@ from copy import deepcopy
 from pathlib import Path
 
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade
-from plugins.local_application.visual_package_bindings import validate_visual_package_bindings
+from plugins.local_application.research_package.visual_package_bindings import (
+    validate_visual_package_bindings,
+)
 from plugins.local_research_exhibit_store import (
     LocalResearchExhibitStore,
     LocalResearchExhibitStoreError,
@@ -127,7 +129,9 @@ class VisualPackageRoundTripTests(ResearchPackageAcceptanceSupport):
             facade.export_research_package(package_id, output)
             import json
 
-            from plugins.local_application.research_package_format import verify_export_root
+            from plugins.local_application.research_package.research_package_format import (
+                verify_export_root,
+            )
 
             self.assertEqual(verify_export_root(output)["status"], "VERIFIED")
             package = json.loads((output / "research-package.json").read_text())

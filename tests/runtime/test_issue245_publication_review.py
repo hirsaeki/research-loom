@@ -97,7 +97,10 @@ class PublicationReviewTests(ResearchPackageAcceptanceSupport):
         self.assertNotEqual(new["request_id"], request["request_id"])
 
     def test_exact_legacy_nonce_request_path_recovers_without_scanning_history(self):
-        from plugins.local_application.publication_release_service import _digest, _json_bytes
+        from plugins.local_application.publication.publication_release_service import (
+            _digest,
+            _json_bytes,
+        )
 
         facade, build_id = self._ready()
         request = facade.request_publication_release(build_id, "H")["decision_request"]

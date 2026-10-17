@@ -243,7 +243,7 @@ def validate_chart_exhibit(exhibit: Mapping, objects: list) -> bytes | None:
             "generated chart digest or deterministic rendering differs from bound data/spec"
         )
     if host:
-        from .publication_exhibits import png_size
+        from .png_validation import png_size
 
         png_size(png)
     legend = {

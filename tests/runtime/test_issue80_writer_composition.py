@@ -170,7 +170,7 @@ class Issue80WriterCompositionTests(_suite.Issue80WriterCompositionTests):
 
             failed = self.root / "failed"
             with patch(
-                "plugins.local_application.writer_composition_service.os.replace",
+                "plugins.local_application.writer.writer_composition_service.os.replace",
                 side_effect=OSError("fixture"),
             ):
                 with self.assertRaises(LocalApplicationError):
@@ -189,7 +189,8 @@ class Issue80WriterCompositionTests(_suite.Issue80WriterCompositionTests):
             )
 
             with patch(
-                "plugins.local_application.writer_composition_service.MAX_SECTION_INPUT_BYTES", 1
+                "plugins.local_application.writer.writer_composition_service.MAX_SECTION_INPUT_BYTES",
+                1,
             ):
                 with self.assertRaises(LocalApplicationError) as output_bound:
                     facade.export_writer_section_input(

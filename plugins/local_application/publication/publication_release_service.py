@@ -1386,7 +1386,7 @@ class PublicationReleaseService:
         inspection = inspect_inputs(self.facade, composition_id, revision_id)
         package = inspection["source_package_document"]
         profile = self._profile_pin(package)
-        from .workspace.workspace import LocalWorkspace
+        from ..workspace.workspace import LocalWorkspace
 
         with LocalWorkspace.open(self.workspace) as opened:
             project_config = deepcopy(dict(opened.project_config))
@@ -1490,9 +1490,10 @@ class PublicationReleaseService:
 
     def finalize_pdf(self, build_id: str, input_: Mapping[str, Any]) -> Mapping[str, Any]:
         """Import a Host-rendered PDF into a new immutable, reviewed build."""
+        from plugins.local_workspace_layout import safe_locator as _safe_locator
+
         from .publication_formal_report import inspect_formal
         from .publication_pdf import coverage_review, inspect_pdf
-        from .workspace.workspace import _safe_locator
 
         allowed = {
             "pdf_path",
@@ -1725,7 +1726,7 @@ class PublicationReleaseService:
         pin = build.get("publication_policy", {}).get("project_config_pin")
         if not build.get("publication_policy", {}).get("coverage"):
             return
-        from .workspace.workspace import LocalWorkspace
+        from ..workspace.workspace import LocalWorkspace
 
         with LocalWorkspace.open(self.workspace) as opened:
             if (
@@ -1909,7 +1910,7 @@ class PublicationReleaseService:
         return self.root / "release-operations" / f"{self._request_operation_id(request_id)}.json"
 
     def _checked_record_path(self, path: Path) -> Path:
-        from .workspace.workspace import _safe_locator
+        from plugins.local_workspace_layout import safe_locator as _safe_locator
 
         return _safe_locator(
             self.workspace, path.relative_to(self.workspace).as_posix(), require_exists=False

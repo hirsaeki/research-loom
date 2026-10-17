@@ -152,7 +152,8 @@ class PublicPdfTests(ResearchPackageAcceptanceSupport):
             accepted = deepcopy(input_)
             accepted["review"]["reviewer_id"] = "synthetic-persistence-reviewer"
             with patch(
-                "plugins.local_application.publication_pdf.inspect_pdf", return_value=fake_machine
+                "plugins.local_application.publication.publication_pdf.inspect_pdf",
+                return_value=fake_machine,
             ):
                 finalized = facade.finalize_publication_pdf(build["build_id"], accepted)
                 self.assertEqual(
@@ -178,7 +179,8 @@ class PublicPdfTests(ResearchPackageAcceptanceSupport):
             broken = deepcopy(accepted)
             broken["review"]["checks"][0]["status"] = "not_applicable"
             with patch(
-                "plugins.local_application.publication_pdf.inspect_pdf", return_value=fake_machine
+                "plugins.local_application.publication.publication_pdf.inspect_pdf",
+                return_value=fake_machine,
             ):
                 rejected = facade.finalize_publication_pdf(build["build_id"], broken)
             with self.assertRaises(LocalApplicationError):

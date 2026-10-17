@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import tests.runtime.test_issue220_publication_release as publication_support
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade
-from plugins.local_application.publication_release_service import (
+from plugins.local_application.publication.publication_release_service import (
     _digest,
     _json_bytes,
     _sha,

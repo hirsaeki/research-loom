@@ -18,11 +18,13 @@ import tests.runtime.test_issue219_writer_round_trip as writer
 import tests.runtime.test_issue405_research_charts as charts
 from core.runtime import canonical_digest
 from plugins.local_application import LocalApplicationError
-from plugins.local_application.generated_explanation import matching_review
-from plugins.local_application.publication_docx import docx_bytes, verify_native_docx
-from plugins.local_application.publication_exhibits import prepare_exhibits
-from plugins.local_application.research_chart import validate_chart_exhibit
-from plugins.local_application.visual_package_bindings import validate_visual_package_bindings
+from plugins.local_application.publication.publication_docx import docx_bytes, verify_native_docx
+from plugins.local_application.publication.publication_exhibits import prepare_exhibits
+from plugins.local_application.research_package.generated_explanation import matching_review
+from plugins.local_application.research_package.research_chart import validate_chart_exhibit
+from plugins.local_application.research_package.visual_package_bindings import (
+    validate_visual_package_bindings,
+)
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 from tests.runtime.test_issue256_native_publication import fixture_png
 from tests.runtime.test_research_exhibits import state_signature
@@ -319,7 +321,9 @@ class HostChartRoundTripTests(ResearchPackageAcceptanceSupport):
             package = facade.build_research_package({**build_input, "exhibit_ids": selected})[
                 "package"
             ]
-            from plugins.local_application.research_package_format import verify_export_root
+            from plugins.local_application.research_package.research_package_format import (
+                verify_export_root,
+            )
 
             export = self.root / package["package_id"]
             facade.export_research_package(package["package_id"], export)

@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import tests.runtime.issue80_writer_composition_suite as issue80
 from plugins.local_application import LocalApplicationError
-from plugins.local_application.item_listing import directory_page
+from plugins.local_application.research_package.item_listing import directory_page
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 CI_WINDOWS = True
@@ -37,7 +37,7 @@ class Issue254InventoryRootTests(unittest.TestCase):
                         with (
                             self.subTest(path=path, kind=kind),
                             patch(
-                                "plugins.local_application.item_listing.os.scandir",
+                                "plugins.local_application.research_package.item_listing.os.scandir",
                                 side_effect=AssertionError("outside directory must not be scanned"),
                             ),
                         ):

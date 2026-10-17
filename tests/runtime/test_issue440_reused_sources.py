@@ -8,8 +8,10 @@ import tests.runtime.test_external_desktop_research_intake as intake
 from plugins.desktop_research.digest import canonical_extension_digest
 from plugins.desktop_research.normalization import source_id_for_capture
 from plugins.local_application import LocalApplicationError
-from plugins.local_application.research_package_format import validate_resolved_references
-from plugins.local_application.research_package_service import verify_export_root
+from plugins.local_application.research_package.research_package_format import (
+    validate_resolved_references,
+)
+from plugins.local_application.research_package.research_package_service import verify_export_root
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 

@@ -8,8 +8,10 @@ from copy import deepcopy
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
-from plugins.local_application.publication_docx import W
-from plugins.local_application.publication_release_service import PublicationReleaseService
+from plugins.local_application.publication.publication_docx import W
+from plugins.local_application.publication.publication_release_service import (
+    PublicationReleaseService,
+)
 from tests.runtime.test_issue256_native_publication import fixture_png
 
 

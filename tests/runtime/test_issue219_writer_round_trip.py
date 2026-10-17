@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import tests.runtime.issue80_writer_composition_suite as writer_comp_support
 from plugins.local_application import LocalApplicationError
-from plugins.local_application.writer_round_trip_service import WriterRoundTripService
+from plugins.local_application.writer.writer_round_trip_service import WriterRoundTripService
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 
@@ -263,7 +263,7 @@ class Issue219WriterRoundTripTests(ResearchPackageAcceptanceSupport):
             path = service._revision_path(composition["composition_id"], imported["revision_id"])
             tampered = json.loads(path.read_text(encoding="utf-8"))
             tampered["source"]["composition_id"] = "WCP-TAMPERED"
-            from plugins.local_application.writer_composition_service import _digest_document
+            from plugins.local_application.writer.writer_composition_service import _digest_document
 
             tampered["revision_digest"] = _digest_document(tampered, "revision_digest")
             path.write_text(
@@ -284,7 +284,7 @@ class Issue219WriterRoundTripTests(ResearchPackageAcceptanceSupport):
             receipt_path = service._input_path(input_doc["input_id"])
             tampered = json.loads(receipt_path.read_text(encoding="utf-8"))
             tampered["source"]["research_package_digest"] = "sha256:" + "0" * 64
-            from plugins.local_application.writer_composition_service import _digest_document
+            from plugins.local_application.writer.writer_composition_service import _digest_document
 
             tampered["input_digest"] = _digest_document(tampered, "input_digest")
             receipt_path.write_text(
@@ -321,7 +321,7 @@ class Issue219WriterRoundTripTests(ResearchPackageAcceptanceSupport):
             receipt_path = service._input_path(input_doc["input_id"])
             tampered = json.loads(receipt_path.read_text(encoding="utf-8"))
             tampered["sections"][0]["citation_scope"] = []
-            from plugins.local_application.writer_composition_service import _digest_document
+            from plugins.local_application.writer.writer_composition_service import _digest_document
 
             tampered["input_digest"] = _digest_document(tampered, "input_digest")
             receipt_path.write_text(
@@ -345,7 +345,7 @@ class Issue219WriterRoundTripTests(ResearchPackageAcceptanceSupport):
             embedded["resolved_research_objects"] = []
             embedded["resolved_material_refs"] = []
             embedded["resolved_materials"] = []
-            from plugins.local_application.writer_composition_service import _digest_document
+            from plugins.local_application.writer.writer_composition_service import _digest_document
 
             embedded["section_input_digest"] = _digest_document(embedded, "section_input_digest")
             tampered["sections"][0]["section_input_digest"] = embedded["section_input_digest"]
@@ -390,7 +390,7 @@ class Issue219WriterRoundTripTests(ResearchPackageAcceptanceSupport):
         try:
             output = self.root / "writer-round-trip-too-large"
             with patch(
-                "plugins.local_application.writer_round_trip_service.MAX_ROUND_TRIP_INPUT_BYTES",
+                "plugins.local_application.writer.writer_round_trip_service.MAX_ROUND_TRIP_INPUT_BYTES",
                 1,
             ):
                 with self.assertRaises(LocalApplicationError) as error:

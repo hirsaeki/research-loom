@@ -14,8 +14,13 @@ import tests.runtime.test_issue219_writer_round_trip as writer
 import tests.runtime.test_issue256_native_publication as native
 import tests.runtime.test_issue405_research_charts as charts
 from plugins.local_application import LocalApplicationError
-from plugins.local_application.publication_docx import A, W, docx_bytes, verify_native_docx
-from plugins.local_application.publication_exhibits import prepare_exhibits
+from plugins.local_application.publication.publication_docx import (
+    A,
+    W,
+    docx_bytes,
+    verify_native_docx,
+)
+from plugins.local_application.publication.publication_exhibits import prepare_exhibits
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 from tests.runtime.test_issue256_native_publication import fixture_png
 from tests.runtime.test_research_exhibits import state_signature
@@ -163,7 +168,7 @@ class GeneratedPublicationTests(ResearchPackageAcceptanceSupport):
         review = self.review(facade, eid)
         built, _, _, _ = self.preview(facade, case, [case["exhibit_id"], eid, review], [eid])
         cid = built["build"]["source_manuscript"]["composition_id"]
-        from plugins.local_application.publication_input import inspect_inputs
+        from plugins.local_application.publication.publication_input import inspect_inputs
 
         inspected = inspect_inputs(facade, cid, None)
         original = prepare_exhibits(inspected, self.workspace)
@@ -190,7 +195,7 @@ class GeneratedPublicationTests(ResearchPackageAcceptanceSupport):
             }
         }
         with patch(
-            "plugins.local_application.publication_release_service.prepare_exhibits",
+            "plugins.local_application.publication.publication_release_service.prepare_exhibits",
             return_value=removed,
         ):
             absent = facade.build_publication_preview(cid)
@@ -286,7 +291,9 @@ class ChartNativeLegendTests(unittest.TestCase):
 
 class VisualPermissionTests(unittest.TestCase):
     def test_misco_interview_permission_requires_disclosure_and_original_review(self):
-        from plugins.local_application.publication_release_service import _publication_policy
+        from plugins.local_application.publication.publication_release_service import (
+            _publication_policy,
+        )
 
         package = {
             "resolved_content": {
@@ -347,7 +354,7 @@ class VisualPermissionTests(unittest.TestCase):
         )
 
     def test_generated_meaning_keeps_transitive_finding_and_exhibit_sources(self):
-        from plugins.local_application.publication_exhibits import _visual_sources
+        from plugins.local_application.publication.publication_exhibits import _visual_sources
 
         source = {"id": "SRC", "kind": "source", "title": "Original study"}
         evidence = {"id": "EVD", "kind": "evidence", "source_id": "SRC"}

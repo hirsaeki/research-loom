@@ -196,7 +196,9 @@ class LocalApplicationFacadeCore:
         return self._project_id
 
     def _publication_release_service(self):
-        from plugins.local_application.publication_release_service import PublicationReleaseService
+        from plugins.local_application.publication.publication_release_service import (
+            PublicationReleaseService,
+        )
 
         return PublicationReleaseService(self)
 

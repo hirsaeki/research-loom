@@ -8,7 +8,7 @@ from collections.abc import Mapping
 
 from plugins.research_visual_semantics import SEMANTIC_CHANGES, digest
 
-from .publication_exhibits import png_size
+from .png_validation import png_size
 
 EXPLANATION_SCHEMA = "research-generated-explanation/v1"
 REVIEW_SCHEMA = "research-visual-review/v1"

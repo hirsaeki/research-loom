@@ -14,7 +14,7 @@ from plugins._infra.atomic_write import write_durable
 from plugins.application_errors import LocalApplicationError
 from plugins.local_durable_store import register_optional_path, require_optional_available
 
-from .item_listing import ITEM_ERRORS, directory_page, read_mapping, unavailable
+from ..research_package.item_listing import ITEM_ERRORS, directory_page, read_mapping, unavailable
 from .writer_composition_service import (
     SCHEMA_VERSION,
     WriterCompositionService,
@@ -47,7 +47,7 @@ class WriterCompositionHistoryService(WriterCompositionService):
     def _write_json_atomic(
         self, path: Path, value: Mapping[str, Any], message: str, *, immutable: bool = False
     ) -> None:
-        from .workspace.workspace import _safe_locator
+        from plugins.local_workspace_layout import safe_locator as _safe_locator
 
         require_optional_available(self.root, LocalApplicationError)
         path = _safe_locator(

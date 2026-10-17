@@ -9,7 +9,7 @@ from unittest.mock import patch
 import tests.runtime.research_package_acceptance_baseline as baseline
 import tests.runtime.test_external_desktop_research_intake as intake
 from plugins.local_application import LocalApplicationError
-from plugins.local_application.research_package_service import verify_export_root
+from plugins.local_application.research_package.research_package_service import verify_export_root
 
 CI_WINDOWS = True
 
@@ -105,7 +105,9 @@ class ResearchPackageAcceptanceTests(baseline.ResearchPackageAcceptanceTests):
         }
         legacy["schema_version"] = "0.1.0"
         legacy["package_digest"] = "sha256:" + "0" * 64
-        from plugins.local_application.research_package_format import validate_schema
+        from plugins.local_application.research_package.research_package_format import (
+            validate_schema,
+        )
 
         validate_schema(legacy)
         with self.assertRaises(KeyError):
@@ -128,7 +130,7 @@ class ResearchPackageAcceptanceTests(baseline.ResearchPackageAcceptanceTests):
         with self.assertRaises(LocalApplicationError):
             verify_export_root(output)
         with patch(
-            "plugins.local_application.research_package_format.digest_json",
+            "plugins.local_application.research_package.research_package_format.digest_json",
             return_value=package["package_digest"],
         ):
             self.assertEqual(verify_export_root(output)["status"], "VERIFIED")

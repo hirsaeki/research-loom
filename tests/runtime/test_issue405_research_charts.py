@@ -13,15 +13,17 @@ from plugins.local_application import (
     LocalApplicationFacade,
     LocalResearchApplication,
 )
-from plugins.local_application.publication_exhibits import png_size
-from plugins.local_application.research_chart import (
+from plugins.local_application.research_package.png_validation import png_size
+from plugins.local_application.research_package.research_chart import (
     quantitative_input,
     validate_chart_exhibit,
     validate_chart_spec,
 )
-from plugins.local_application.research_chart_png import render_chart
-from plugins.local_application.visual_origin import verify_visual_origin
-from plugins.local_application.visual_package_bindings import validate_visual_package_bindings
+from plugins.local_application.research_package.research_chart_png import render_chart
+from plugins.local_application.research_package.visual_origin import verify_visual_origin
+from plugins.local_application.research_package.visual_package_bindings import (
+    validate_visual_package_bindings,
+)
 from plugins.research_visual_semantics import digest
 from tests.runtime.runtime_fixtures import evidence, project, rq, seed_state, source
 from tests.runtime.test_research_exhibits import NullResolver, profile_provider, state_signature

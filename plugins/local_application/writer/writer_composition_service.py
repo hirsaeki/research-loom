@@ -23,8 +23,8 @@ from plugins._infra.file_lock import lock_byte, unlock_byte, write_sentinel_if_e
 from plugins.application_errors import LocalApplicationError
 from plugins.local_durable_store import register_optional_path, require_optional_available
 
-from .item_listing import read_mapping
-from .research_package_format import _package_required_refs, safe_component
+from ..research_package.item_listing import read_mapping
+from ..research_package.research_package_format import package_required_refs, safe_component
 
 SCHEMA_VERSION = "0.1.0"
 MAX_COMPOSITIONS = 64
@@ -450,7 +450,7 @@ def verify_section_input_root(root: str | Path) -> Mapping[str, Any]:
             "detached section references unresolved research objects",
         )
     for object_id, obj in objects.items():
-        for expected_kind, ref_id in _package_required_refs(obj):
+        for expected_kind, ref_id in package_required_refs(obj):
             target = objects.get(ref_id)
             if target is None or target.get("kind") != expected_kind:
                 raise LocalApplicationError(
@@ -1746,7 +1746,7 @@ class WriterCompositionService:
                     "APPLICATION-WRITER-COMPOSITION-REFERENCE-001",
                     f"section input object does not resolve in Research Package: {object_id}",
                 )
-            for _kind, ref_id in _package_required_refs(obj):
+            for _kind, ref_id in package_required_refs(obj):
                 if ref_id not in needed_ids:
                     needed_ids.add(ref_id)
                     pending.append(ref_id)

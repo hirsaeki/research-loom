@@ -10,13 +10,13 @@ from unittest.mock import patch
 import tests.runtime.issue80_writer_composition_suite as issue80
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade
 from plugins.local_application.cli import main
-from plugins.local_application.item_listing import directory_page
-from plugins.local_application.research_package_format import (
+from plugins.local_application.research_package.item_listing import directory_page
+from plugins.local_application.research_package.research_package_format import (
     MAX_OUTPUT_BYTES,
     digest_json,
     without_digest,
 )
-from plugins.local_application.writer_composition_service import _digest_document
+from plugins.local_application.writer.writer_composition_service import _digest_document
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 CI_WINDOWS = True
@@ -330,12 +330,15 @@ class Issue254ItemListingTests(ResearchPackageAcceptanceSupport):
         def fail_again(_field, _identity, error):
             raise error
 
-        with patch("plugins.local_application.research_package_service.unavailable", fail_again):
+        with patch(
+            "plugins.local_application.research_package.research_package_service.unavailable",
+            fail_again,
+        ):
             with self.assertRaises(LocalApplicationError):
                 facade.list_research_packages()
         # Removing only digest validation admits a metadata record whose digest is false.
         with patch(
-            "plugins.local_application.research_package_service.digest_json",
+            "plugins.local_application.research_package.research_package_service.digest_json",
             return_value=value["package_digest"],
         ):
             item = service._load_metadata("RP-BAD")

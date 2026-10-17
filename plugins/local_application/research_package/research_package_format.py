@@ -107,7 +107,7 @@ def validate_schema(v: Mapping[str, Any]) -> None:
         )
 
 
-def _package_required_refs(obj: Mapping[str, Any]) -> list[tuple[str, str]]:
+def package_required_refs(obj: Mapping[str, Any]) -> list[tuple[str, str]]:
     kind = str(obj.get("kind", ""))
     refs = []
 
@@ -173,7 +173,7 @@ def validate_resolved_references(package: Mapping[str, Any]) -> None:
         if not isinstance(obj, Mapping):
             missing.append("resolved_content.research_objects")
             continue
-        for expected, ref_id in _package_required_refs(obj):
+        for expected, ref_id in package_required_refs(obj):
             target = by_id.get(ref_id)
             if target is None or str(target.get("kind")) != expected:
                 missing.append(f"{obj.get('id')}->{expected}:{ref_id}")

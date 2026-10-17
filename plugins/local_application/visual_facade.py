@@ -11,22 +11,22 @@ from plugins.application_errors import LocalApplicationError
 from plugins.research_visual_semantics import digest
 
 from .exhibit_facade import _string_list
-from .generated_explanation import (
+from .research_package.generated_explanation import (
     EXPLANATION_SCHEMA,
     REVIEW_SCHEMA,
     matching_review,
     validate_explanation,
     validate_request,
 )
-from .research_chart import (
+from .research_package.research_chart import (
     HOST_CHART_SCHEMA,
     is_host_chart,
     validate_chart_exhibit,
     validate_chart_spec,
 )
-from .research_chart_png import RENDERER_ID, render_chart
+from .research_package.research_chart_png import RENDERER_ID, render_chart
+from .research_package.visual_origin import verify_visual_origin
 from .support.stages import run_stages, stages_for
-from .visual_origin import verify_visual_origin
 
 
 def capture_exhibit_stage(facade, proceed: Callable[..., Any], value):
@@ -284,7 +284,7 @@ class VisualMixin:
                     raise ValueError("renderer requires identity, version and retained instruction")
                 generator = dict(renderer)
                 renderer = {**generator, "instruction_digest": digest(generator["instruction"])}
-                from .generated_explanation import retained_png
+                from .research_package.generated_explanation import retained_png
 
                 if (
                     not isinstance(value["output_base64"], str)
