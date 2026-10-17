@@ -9,7 +9,7 @@ from core.conversation import ActionDraft, ConversationRuntimeError, Coordinator
 from core.conversation.validation import with_document_digest
 from core.decision import make_response, response_digest
 from plugins.application_errors import LocalApplicationError as LocalApplicationError
-from plugins.local_application.workspace import LocalWorkspace, OpenedLocalWorkspace
+from plugins.local_application.workspace.workspace import LocalWorkspace, OpenedLocalWorkspace
 from plugins.local_execution_store import pending_runs_for_project
 
 from .support.ingress import AUTHORITY_PAYLOAD_FIELDS, INGRESS_FIELDS
@@ -167,7 +167,9 @@ class LocalApplicationFacadeCore:
         request: Mapping[str, Any],
         output: str | Path,
     ) -> Mapping[str, Any]:
-        from plugins.local_application.profile_advancement import prepare_profile_generation
+        from plugins.local_application.workspace.profile_advancement import (
+            prepare_profile_generation,
+        )
 
         return prepare_profile_generation(workspace, request, output)
 
@@ -177,13 +179,15 @@ class LocalApplicationFacadeCore:
         workspace: str | Path,
         request: Mapping[str, Any],
     ) -> Mapping[str, Any]:
-        from plugins.local_application.profile_advancement import advance_profile_generation
+        from plugins.local_application.workspace.profile_advancement import (
+            advance_profile_generation,
+        )
 
         return advance_profile_generation(workspace, request)
 
     @classmethod
     def profile_generation_history(cls, workspace: str | Path) -> Mapping[str, Any]:
-        from plugins.local_application.profile_advancement import profile_history
+        from plugins.local_application.workspace.profile_advancement import profile_history
 
         return profile_history(workspace)
 
@@ -575,7 +579,7 @@ class LocalApplicationFacadeCore:
         if self._workspace_root is not None:
             from plugins.local_durable_store import inspect_optional_children
 
-            from .workspace import BINDING_NAME, INTERNAL_DIR, _read_json
+            from .workspace.workspace import BINDING_NAME, INTERNAL_DIR, _read_json
 
             binding = _read_json(
                 self._workspace_root / INTERNAL_DIR / BINDING_NAME, code="WORKSPACE-BINDING-001"

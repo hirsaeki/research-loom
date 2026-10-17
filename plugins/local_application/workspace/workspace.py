@@ -17,7 +17,7 @@ from core.runtime import LineageView, StateView, canonical_digest
 from core.runtime.digests import jcs_digest_without
 from core.runtime.ports import RepositoryError
 from core.runtime.transition_models import with_content_digest
-from plugins.local_application.application import (
+from plugins.local_application.workspace.application import (
     LocalResearchApplication,
     SystemClock,
     UUIDIdProvider,
@@ -688,7 +688,7 @@ class LocalWorkspace:
         root = _assert_safe_workspace_root(Path(workspace))
         if not root.is_dir():
             raise LocalWorkspaceError("WORKSPACE-MISSING-001", "workspace directory does not exist")
-        from plugins.local_application.profile_advancement import (
+        from plugins.local_application.workspace.profile_advancement import (
             _workspace_advancement_lock,
             recover_incomplete_profile_advancement,
         )
@@ -710,7 +710,7 @@ class LocalWorkspace:
     def _open_locked(cls, root: Path) -> OpenedLocalWorkspace:
         if not root.is_dir():
             raise LocalWorkspaceError("WORKSPACE-MISSING-001", "workspace directory does not exist")
-        from plugins.local_application.profile_advancement import (
+        from plugins.local_application.workspace.profile_advancement import (
             recover_incomplete_profile_advancement,
         )
 
@@ -934,7 +934,7 @@ class LocalWorkspace:
                 )
                 checks.append({"check": label, "status": "OK"})
 
-            from plugins.local_application.decision_state_health import (
+            from plugins.local_application.workspace.decision_state_health import (
                 check_decision_state_receipts,
             )
 

@@ -8,8 +8,10 @@ import unittest
 from contextlib import closing
 from pathlib import Path
 
-from plugins.local_application.workspace import LocalWorkspaceError
-from plugins.local_application.workspace_initialization import validate_required_store_schema
+from plugins.local_application.workspace.workspace import LocalWorkspaceError
+from plugins.local_application.workspace.workspace_initialization import (
+    validate_required_store_schema,
+)
 from plugins.local_conversation_store import (
     LocalConversationStore,
     LocalConversationStoreError,

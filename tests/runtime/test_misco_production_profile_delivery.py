@@ -10,7 +10,7 @@ from pathlib import Path
 import rfc8785
 
 import tests.runtime.test_external_desktop_research_intake as intake
-from plugins.local_application.profile_resolution import resolve_effective_profile_set
+from plugins.local_application.workspace.profile_resolution import resolve_effective_profile_set
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 ROOT = Path(__file__).resolve().parents[2]

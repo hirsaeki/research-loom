@@ -8,7 +8,7 @@ from pathlib import Path
 
 from core.conversation import ConversationRuntimeError
 from plugins.local_application import LocalApplicationFacade, LocalWorkspace, LocalWorkspaceError
-from plugins.local_application.profile_advancement import (
+from plugins.local_application.workspace.profile_advancement import (
     advance_profile_generation,
     prepare_profile_generation,
     profile_history,
@@ -269,7 +269,7 @@ class MiscoExistingWorkspaceMigrationTests(ResearchPackageAcceptanceSupport):
         output = self.root / "misco-target-one"
         prepare_profile_generation(self.workspace, request, output)
         # Re-resolving from an already-added target is handled after advance; duplicate additions are no-ops in target construction.
-        from plugins.local_application.profile_resolution import target_project_config
+        from plugins.local_application.workspace.profile_resolution import target_project_config
 
         with LocalWorkspace.open(self.workspace) as opened:
             current = deepcopy(opened.project_config)

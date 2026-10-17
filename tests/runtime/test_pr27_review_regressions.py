@@ -12,7 +12,7 @@ from unittest.mock import patch
 import rfc8785
 
 import plugins.local_application.facade as facade_module
-import plugins.local_application.workspace as workspace_module
+import plugins.local_application.workspace.workspace as workspace_module
 from core.conversation import ConversationRuntimeError
 from plugins.local_application import (
     LocalApplicationFacade,

@@ -18,13 +18,16 @@ from unittest.mock import patch
 import tests.runtime.test_local_workspace_application_cli as support
 from core.runtime import canonical_digest
 from plugins.local_application import LocalWorkspace
-from plugins.local_application.workspace import (
+from plugins.local_application.workspace.workspace import (
     BINDING_NAME,
     INITIALIZING_MARKER,
     INTERNAL_DIR,
     LocalWorkspaceError,
 )
-from plugins.local_application.workspace_initialization import finish_initialization, initial_intent
+from plugins.local_application.workspace.workspace_initialization import (
+    finish_initialization,
+    initial_intent,
+)
 
 CI_WINDOWS = True
 
@@ -33,7 +36,7 @@ CRASH = r"""
 import os,sys
 from pathlib import Path
 from unittest.mock import patch
-from plugins.local_application import workspace as w
+from plugins.local_application.workspace import workspace as w
 stage,workspace,config,eps=sys.argv[1:]
 write_json,copy_json,app,unlink,mkdir=w._atomic_json_write,w._copy_json,w.LocalResearchApplication,Path.unlink,Path.mkdir
 def after_json(path,value):
@@ -143,7 +146,7 @@ class Issue257InitializationTests(unittest.TestCase):
                 self.assertEqual(self._bytes(self.workspace), before)
 
     def test_precommit_intent_matches_native_text_output_bytes(self):
-        from plugins.local_application import workspace as workspace_module
+        from plugins.local_application.workspace import workspace as workspace_module
 
         config = json.loads(self.config.read_text(encoding="utf-8"))
         effective = json.loads(self.eps.read_text(encoding="utf-8"))

@@ -15,7 +15,7 @@ from jsonschema import Draft202012Validator, FormatChecker
 from core.resources import resource_path
 from core.runtime import canonical_digest
 from core.runtime.digests import jcs_digest
-from plugins.local_application.workspace import LocalWorkspaceError
+from plugins.local_application.workspace.workspace import LocalWorkspaceError
 
 PROFILE_MANIFEST_SCHEMA = resource_path("profiles/contracts/profile-manifest.schema.json")
 EPS_SCHEMA = resource_path("profiles/contracts/effective-profile-set.schema.json")

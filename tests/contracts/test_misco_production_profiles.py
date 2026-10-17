@@ -13,11 +13,11 @@ from unittest.mock import patch
 
 import rfc8785
 
-import plugins.local_application.profile_resolution as profile_resolution
+import plugins.local_application.workspace.profile_resolution as profile_resolution
 from plugins.local_application import LocalWorkspace
-from plugins.local_application.profile_resolution import resolve_effective_profile_set
 from plugins.local_application.research_package_format import profile_resources
-from plugins.local_application.workspace import LocalWorkspaceError
+from plugins.local_application.workspace.profile_resolution import resolve_effective_profile_set
+from plugins.local_application.workspace.workspace import LocalWorkspaceError
 
 ROOT = Path(__file__).resolve().parents[2]
 WRITER_MANIFEST = ROOT / "profiles/narrative/misco/profile.json"
