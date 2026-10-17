@@ -10,6 +10,14 @@ PACK = (
     ROOT
     / "research-profile/publication/authority/MISCO_Publication_Clean_Source_Pack_v1.0.2_HUMAN_APPROVED"
 )
+# The ledger is frozen at its #331 baseline commit, so its paths stay as they were then.
+# Historical rows whose file later moved are looked up at the file's current location.
+RELOCATED = {
+    # #493 moved the workspace modules into plugins/local_application/workspace/.
+    "plugins/local_application/profile_resolution.py": (
+        "plugins/local_application/workspace/profile_resolution.py"
+    ),
+}
 
 
 def load(name):
@@ -74,7 +82,9 @@ class MiscoProfileMigrationLedgerTests(unittest.TestCase):
         for row in source_rows(self.index):
             self.assertNotIn(row["path"], seen)
             seen.add(row["path"])
-            path = ROOT / row["path"]
+            if row["path"] in RELOCATED:
+                self.assertIn(row["role"], historical_roles, row["path"])
+            path = ROOT / RELOCATED.get(row["path"], row["path"])
             self.assertTrue(path.is_file(), row["path"])
             if row["role"] in historical_roles:
                 # #331 pinned the then-current implementation as migration evidence.
