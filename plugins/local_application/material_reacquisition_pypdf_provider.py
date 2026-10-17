@@ -4,7 +4,7 @@ import shutil
 import subprocess
 import tempfile
 from pathlib import Path
-from threading import RLock, Thread
+from threading import Thread
 from typing import Any
 
 from . import material_reacquisition_facade as _base
@@ -12,10 +12,7 @@ from .facade import LocalApplicationError
 
 _PYPDF_VERSION = "6.16.2"
 _PYPDF_BOUND_EXIT = 86
-_INSTALL_LOCK = RLock()
-_INSTALLED = False
-_BASE_GENERATOR = _base._regenerate_text_rendition
-_BASE_MATCHES_TARGET = _base.HistoricalMaterialReacquisitionService._matches_target
+_BASE_GENERATOR = _base._regenerate_basic_text_rendition
 
 
 _PYPDF_SCRIPT = rf"""
@@ -47,11 +44,7 @@ emit(b"\r\n")
 
 
 def _matches_current_target(child: Any, capture_id: str, kind: str) -> bool:
-    return (
-        child.capability_version == _base._CAPABILITY_VERSION
-        and child.implementation_version == _base._IMPLEMENTATION_VERSION
-        and _BASE_MATCHES_TARGET(child, capture_id, kind)
-    )
+    return _base.HistoricalMaterialReacquisitionService._matches_target(child, capture_id, kind)
 
 
 def _run_historical_pypdf(
@@ -229,24 +222,3 @@ def _regenerate_text_rendition(
             raise _base.MaterialReacquisitionRetrievalError(
                 f"historical pypdf provider failed: {pypdf_error}; fallback failed: {fallback_error}"
             ) from pypdf_error
-
-
-def _install_provider() -> None:
-    global _INSTALLED
-    with _INSTALL_LOCK:
-        if _INSTALLED:
-            return
-        _base._regenerate_text_rendition = _regenerate_text_rendition
-        _base._IMPLEMENTATION_VERSION = "0.2.1"
-        _base._CAPABILITY_VERSION = "0.2.1"
-        _base.HistoricalMaterialReacquisitionService._matches_target = staticmethod(
-            _matches_current_target
-        )
-        _INSTALLED = True
-
-
-def ensure_material_reacquisition_action(
-    application: Any, project_id: str, workspace_root: Path | None
-) -> None:
-    _install_provider()
-    _base.ensure_material_reacquisition_action(application, project_id, workspace_root)

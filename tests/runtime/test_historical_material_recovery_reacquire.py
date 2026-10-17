@@ -12,7 +12,7 @@ from plugins.local_application.cli import main as cli_main
 from plugins.local_application.material_reacquisition_facade import (
     MaterialReacquisitionRetrievalError,
     RetrievedMaterial,
-    _regenerate_text_rendition,
+    _regenerate_basic_text_rendition,
     material_reacquisition_payload,
 )
 from plugins.local_execution_store import child_runs_for_parent
@@ -655,7 +655,7 @@ class HistoricalMaterialReacquisitionTests(ResearchPackageAcceptanceSupport):
                 side_effect=fake_popen,
             ),
         ):
-            result = _regenerate_text_rendition(
+            result = _regenerate_basic_text_rendition(
                 b"%PDF-1.7 fixture",
                 "application/pdf",
                 "https://example.test/source.pdf",

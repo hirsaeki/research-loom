@@ -8,7 +8,7 @@ import plugins.local_application.material_reacquisition_facade as reacquisition_
 from plugins.local_application.material_reacquisition_facade import (
     HistoricalMaterialReacquisitionService,
     MaterialReacquisitionRetrievalError,
-    _regenerate_text_rendition,
+    _regenerate_basic_text_rendition,
     material_reacquisition_payload,
 )
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
@@ -75,7 +75,7 @@ class HistoricalMaterialReacquisitionReviewTests(ResearchPackageAcceptanceSuppor
                 MaterialReacquisitionRetrievalError,
                 "exceeds bounded material intake limit",
             ):
-                _regenerate_text_rendition(
+                _regenerate_basic_text_rendition(
                     b"%PDF-1.7 fixture",
                     "application/pdf",
                     "https://example.test/source.pdf",

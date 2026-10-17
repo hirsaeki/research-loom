@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import io
+import json
 import subprocess
 import sys
 import types
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -274,6 +276,49 @@ class HistoricalMaterialReacquisitionPypdfProviderTests(unittest.TestCase):
         ):
             self.assertFalse(provider._matches_current_target(old_child, "CAP-1", "rendition"))
             self.assertTrue(provider._matches_current_target(current_child, "CAP-1", "rendition"))
+
+    def test_base_module_alone_uses_the_current_providers_and_version(self):
+        # A fresh process imports only the reacquisition module: no other call
+        # may be needed first for the providers, version or target match (#514).
+        script = """
+import json
+from pathlib import Path
+from types import SimpleNamespace
+from plugins.local_application import material_reacquisition_facade as base
+
+html = base._regenerate_text_rendition(
+    b"<p>Visible evidence</p>", "text/html", "https://example.test/a", max_bytes=1024
+)
+def child(version):
+    return SimpleNamespace(
+        capability_id=base._CAPABILITY_ID,
+        capability_version=version,
+        implementation_version=version,
+        provenance={"historical_target": {"capture_id": "CAP-1", "kind": "rendition"}},
+    )
+match = base.HistoricalMaterialReacquisitionService._matches_target
+print(json.dumps({
+    "versions": [base._CAPABILITY_VERSION, base._IMPLEMENTATION_VERSION],
+    "html_provider": html.provider,
+    "matches": [match(child("0.2.0"), "CAP-1", "rendition"),
+                match(child("0.2.1"), "CAP-1", "rendition")],
+}))
+"""
+        completed = subprocess.run(
+            [sys.executable, "-c", script],
+            cwd=Path(__file__).resolve().parents[2],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        self.assertEqual(
+            json.loads(completed.stdout),
+            {
+                "versions": ["0.2.1", "0.2.1"],
+                "html_provider": "python-htmlparser/g1-normalized-text@0.1.0;newline=crlf",
+                "matches": [False, True],
+            },
+        )
 
 
 if __name__ == "__main__":
