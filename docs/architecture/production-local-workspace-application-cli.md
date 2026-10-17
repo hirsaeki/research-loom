@@ -29,7 +29,7 @@ Each layer in the diagram has one home in `plugins/local_application`:
 
 | Layer | Module | Owns |
 |---|---|---|
-| JSON CLI adapter | `cli.py` | Argument parsing, reading JSON input, emitting results and mapping errors to exit codes. It holds no research or storage logic. |
+| JSON CLI adapter | `cli.py` | Argument parsing, reading JSON input, emitting results and mapping errors to exit codes. Workspace operations go through the facade; the one exception is the read-only attention-store schema check that `doctor` adds after the facade's own diagnosis. |
 | Application Facade | `facade.py` (`LocalApplicationFacadeCore`) | Opening and initializing a workspace, the typed action ingress and the stage mechanism (`run_stages`, `stages_for`) that feature mixins plug into. |
 | | `*_facade.py` (`<Feature>Mixin`) | One feature's public operations, plus its `_STAGES` contributions to shared operations such as `submit_action` or `show_run`. |
 | | `facade_composition.py` | The single definition of `LocalApplicationFacade`, whose base list fixes the mixin order, and the partial compositions that some services instantiate directly. |
