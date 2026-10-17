@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import errno
 import hashlib
 import http.client
 import ipaddress
@@ -10,7 +9,6 @@ import socket
 import ssl
 import subprocess
 import tempfile
-import time
 import uuid
 from collections.abc import Callable, Mapping
 from contextlib import contextmanager
@@ -23,6 +21,7 @@ from urllib.parse import urljoin, urlparse
 
 from core.conversation import ActionDefinition, ConversationRuntimeError, HarnessServiceResult
 from core.execution import CapabilityRunRecord, ExecutionIssue, RunLifecycleEvent, RunStatus
+from plugins._infra.file_lock import acquire_byte_lock, unlock_byte, write_sentinel_if_empty
 from plugins.local_execution_store import (
     LocalExecutionStoreIntegrityError,
     bind_controlled_import_root,
@@ -544,38 +543,13 @@ class HistoricalMaterialReacquisitionService:
         locked = False
         try:
             if os.name == "nt":
-                import msvcrt
-
-                if os.fstat(fd).st_size == 0:
-                    os.write(fd, b"\0")
-                    os.fsync(fd)
-                os.lseek(fd, 0, os.SEEK_SET)
-                while True:
-                    try:
-                        msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
-                        locked = True
-                        break
-                    except OSError as exc:
-                        if exc.errno not in {errno.EACCES, errno.EAGAIN, errno.EDEADLK}:
-                            raise
-                        time.sleep(0.05)
-            else:
-                import fcntl
-
-                fcntl.flock(fd, fcntl.LOCK_EX)
-                locked = True
+                write_sentinel_if_empty(fd, fsync=True)
+            acquire_byte_lock(fd, timeout=None)
+            locked = True
             yield
         finally:
             if locked:
-                if os.name == "nt":
-                    import msvcrt
-
-                    os.lseek(fd, 0, os.SEEK_SET)
-                    msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
-                else:
-                    import fcntl
-
-                    fcntl.flock(fd, fcntl.LOCK_UN)
+                unlock_byte(fd)
             os.close(fd)
 
     def _new_run(self, historical, capture_id: str, kind: str, exact_locator: str):
