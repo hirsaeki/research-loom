@@ -16,7 +16,7 @@ from plugins.local_research_exhibit_store import (
 )
 from plugins.research_visual_semantics import digest, validate_visual_semantics
 
-from .support.stages import run_stages, stages_for
+from ..support.stages import run_stages, stages_for
 
 _EXHIBIT_STORE_NAME = "research-exhibits.sqlite3"
 _EXHIBIT_LIST_LIMIT = 100

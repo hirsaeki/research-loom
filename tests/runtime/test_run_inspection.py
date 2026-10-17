@@ -206,7 +206,7 @@ class RunInspectionTests(unittest.TestCase):
                 opened = None
                 with (
                     patch(
-                        "plugins.local_application.run_inspection_facade._RUN_INSPECTION_ITEM_LIMIT",
+                        "plugins.local_application.research.run_inspection_facade._RUN_INSPECTION_ITEM_LIMIT",
                         1,
                     ),
                     patch.object(

@@ -6,7 +6,7 @@ import unittest
 
 from core.conversation import ConversationRuntimeError
 from plugins.local_application import LocalApplicationFacade
-from plugins.local_application.resume import (
+from plugins.local_application.research.resume import (
     _project_projection,
     _question_projection,
     _rq_candidate,

@@ -9,11 +9,7 @@ directly; they run exactly the layers they used to.
 
 from __future__ import annotations
 
-from .argument_facade import ArgumentMixin
 from .delphi_facade import DelphiMixin
-from .evidence_qualification_facade import EvidenceQualificationMixin
-from .exhibit_facade import ExhibitMixin
-from .exhibit_guard_facade import ExhibitGuardMixin
 from .external_attempt_lifecycle_facade import ExternalAttemptLifecycleMixin
 from .external_desktop_facade import ExternalDesktopMixin
 from .facade import LocalApplicationFacadeCore
@@ -24,21 +20,25 @@ from .material_import_facade import MaterialImportMixin
 from .material_inventory_facade import MaterialInventoryMixin
 from .material_reacquisition_public_facade import MaterialReacquisitionPublicMixin
 from .new_material_continuation_public_facade import NewMaterialContinuationPublicMixin
-from .project_input_facade import ProjectInputMixin
-from .question_review_facade import QuestionReviewMixin
-from .recommendation_facade import RecommendationMixin
-from .research_quality_facade import ResearchQualityMixin
-from .resume_facade import ResumeMixin
+from .research.argument_facade import ArgumentMixin
+from .research.evidence_qualification_facade import EvidenceQualificationMixin
+from .research.exhibit_facade import ExhibitMixin
+from .research.exhibit_guard_facade import ExhibitGuardMixin
+from .research.project_input_facade import ProjectInputMixin
+from .research.question_review_facade import QuestionReviewMixin
+from .research.recommendation_facade import RecommendationMixin
+from .research.research_quality_facade import ResearchQualityMixin
+from .research.resume_facade import ResumeMixin
+from .research.run_inspection_facade import RunInspectionMixin
+from .research.source_bibliography_facade import SourceBibliographyMixin
+from .research.synthesis_candidate_facade import SynthesisCandidateMixin
+from .research.visual_facade import VisualMixin
+from .research.visual_need_facade import VisualNeedMixin
 from .retention_facade import RetentionMixin
-from .run_inspection_facade import RunInspectionMixin
-from .source_bibliography_facade import SourceBibliographyMixin
 from .survey_analysis_facade import SurveyAnalysisMixin
 from .survey_facade import SurveyMixin
 from .survey_response_facade import SurveyResponseMixin
-from .synthesis_candidate_facade import SynthesisCandidateMixin
 from .virtual_runner_facade import VirtualRunnerMixin
-from .visual_facade import VisualMixin
-from .visual_need_facade import VisualNeedMixin
 
 
 class LocalApplicationFacade(

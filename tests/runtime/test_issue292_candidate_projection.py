@@ -5,7 +5,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from plugins.local_application import LocalApplicationFacade
-from plugins.local_application.candidate_projection import build_candidate_projection
+from plugins.local_application.research.candidate_projection import build_candidate_projection
 from tests.runtime.test_issue134_argument_proposal import Issue134ArgumentProposalTests
 from tests.runtime.test_issue135_recommendation_proposal import Issue135RecommendationProposalTests
 from tests.runtime.test_research_question_adoption import _init_workspace, _proposal_input
