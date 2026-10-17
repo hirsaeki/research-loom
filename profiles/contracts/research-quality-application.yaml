@@ -4,7 +4,7 @@ purpose: >-
   Bind the closed research_quality.* Profile catalog to the production
   research-quality evaluator without creating a second quality-policy model.
 public_entrypoint: research-quality evaluate
-consumer: plugins.local_application.research_quality_evaluation.evaluate
+consumer: plugins.local_application.research.research_quality_evaluation.evaluate
 result_record:
   kind: research_exhibit
   capture_origin: research_quality_evaluator
