@@ -209,7 +209,7 @@ class LocalAttentionStore:
         try:
             connection = sqlite3.connect(self.path)
             connection.row_factory = sqlite3.Row
-            apply_pragmas(connection, foreign_keys=True)
+            apply_pragmas(connection, foreign_keys=True, journal_mode="DELETE", synchronous="FULL")
             connection.executescript(_SCHEMA_SQL)
             connection.execute(
                 "INSERT OR IGNORE INTO attention_store_meta(schema_version) VALUES (?)",

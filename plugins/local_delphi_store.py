@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from core.runtime.digests import jcs_digest, jcs_digest_without
+from plugins._infra.sqlite import apply_pragmas
 from plugins.local_durable_store import register_optional_path, require_optional_available
 from plugins.local_store_schemas import DELPHI_SCHEMA_SQL as _SCHEMA
 from plugins.local_store_schemas import DELPHI_SCHEMA_VERSION as SCHEMA_VERSION
@@ -71,6 +72,7 @@ class LocalDelphiStore:
             con = sqlite3.connect(staging)
             try:
                 con.row_factory = sqlite3.Row
+                apply_pragmas(con, journal_mode="DELETE", synchronous="FULL")
                 con.executescript(_SCHEMA)
                 con.execute(
                     "INSERT INTO delphi_store_meta(schema_version) VALUES (?)", (SCHEMA_VERSION,)
@@ -97,6 +99,7 @@ class LocalDelphiStore:
                 self._initialize()
             con = sqlite3.connect(self.path.resolve().as_uri() + "?mode=rw", uri=True, timeout=5.0)
             con.row_factory = sqlite3.Row
+            apply_pragmas(con, journal_mode="DELETE", synchronous="FULL")
             self._check_schema(con)
             register_optional_path(self.path)
             return con
