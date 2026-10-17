@@ -19,7 +19,7 @@ from .external_desktop_facade import (
 )
 from .facade import LocalApplicationError
 from .material_content_facade import ExternalMaterialContentService
-from .material_reacquisition_pypdf_provider import ensure_material_reacquisition_action
+from .material_reacquisition_facade import ensure_material_reacquisition_action
 from .material_recovery_facade import ensure_material_recovery_action
 
 _LARGE_ORIGINAL_PREFIX = "external-original://sha256/"

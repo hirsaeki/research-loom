@@ -38,9 +38,9 @@ _ACTION_TYPE = "desktop_research.material.reacquire"
 _PAYLOAD_CONTRACT = "desktop-research-material-reacquisition@0.2.0"
 _ACTION_REGISTRATION_LOCK = RLock()
 _IMPLEMENTATION_ID = "plugin.local-application.material-reacquisition"
-_IMPLEMENTATION_VERSION = "0.2.0"
+_IMPLEMENTATION_VERSION = "0.2.1"
 _CAPABILITY_ID = "desktop-research-material-reacquisition"
-_CAPABILITY_VERSION = "0.2.0"
+_CAPABILITY_VERSION = "0.2.1"
 _RESULT_DIAGNOSTIC = "historical_material_reacquisition"
 _NEW_MATERIAL_ROLES = {
     "original": "desktop_research.reacquired_original",
@@ -130,7 +130,29 @@ def _regenerate_text_rendition(
     *,
     max_bytes: int,
 ) -> RetrievedMaterial:
-    """Produce a bounded current rendition candidate; identity is decided only by digest/size."""
+    """Produce a bounded current rendition candidate; identity is decided only by digest/size.
+
+    PDF goes through the pinned pypdf provider and HTML through the G1 renderer;
+    other media fall back to ``_regenerate_basic_text_rendition``.
+    """
+    # Imported lazily: the provider builds on this module.
+    from .material_reacquisition_pypdf_provider import (
+        _regenerate_text_rendition as regenerate_with_providers,
+    )
+
+    return regenerate_with_providers(
+        original_content, original_media_type, exact_locator, max_bytes=max_bytes
+    )
+
+
+def _regenerate_basic_text_rendition(
+    original_content: bytes,
+    original_media_type: str,
+    exact_locator: str,
+    *,
+    max_bytes: int,
+) -> RetrievedMaterial:
+    """Verified UTF-8 text as is, or PDF through a local pdftotext."""
     media_type = str(original_media_type).split(";", 1)[0].strip().lower()
     if media_type == "text/plain":
         try:
@@ -463,7 +485,12 @@ class HistoricalMaterialReacquisitionService:
 
     @staticmethod
     def _matches_target(child, capture_id: str, kind: str) -> bool:
-        if child.capability_id != _CAPABILITY_ID:
+        # Results of an older implementation are not reused; they are reacquired.
+        if (
+            child.capability_id != _CAPABILITY_ID
+            or child.capability_version != _CAPABILITY_VERSION
+            or child.implementation_version != _IMPLEMENTATION_VERSION
+        ):
             return False
         target = child.provenance.get("historical_target")
         return (
