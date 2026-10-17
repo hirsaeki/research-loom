@@ -6,10 +6,10 @@ from threading import RLock
 from typing import Any
 
 from core.conversation import ActionDefinition, ConversationRuntimeError, HarnessServiceResult
+from plugins.application_errors import LocalApplicationError
 from plugins.local_execution_store import artifact_metadata_for, diagnostics_for
 
 from . import new_material_continuation_admission as admission
-from .facade import LocalApplicationError
 from .material_reacquisition_facade import (
     _CAPABILITY_ID as _MRA_CAPABILITY_ID,
 )

@@ -12,11 +12,11 @@ from typing import Any
 
 from core.execution import RunStatus
 from plugins._infra.file_lock import acquire_byte_lock, unlock_byte, write_sentinel_if_empty
+from plugins.application_errors import LocalApplicationError
 from plugins.desktop_research import DesktopResearchAttemptRecorder, DesktopResearchCaptureService
 from plugins.desktop_research.attempts import reconstruct_attempts
 
 from . import new_material_continuation_admission as admission
-from .facade import LocalApplicationError
 from .material_content_facade import _artifact_pair_for_capture
 
 

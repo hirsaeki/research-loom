@@ -6,6 +6,7 @@ from copy import deepcopy
 from typing import Any
 
 from core.execution import RunStatus
+from plugins.application_errors import LocalApplicationError
 from plugins.local_conversation_store import find_state_delta_proposals_by_provenance_run_id
 from plugins.local_execution_store import (
     canonical_handoff_for,
@@ -14,7 +15,6 @@ from plugins.local_execution_store import (
     result_extensions_for_run,
 )
 
-from .facade import LocalApplicationError
 from .material_content_facade import _artifact_pair_for_capture
 from .material_reacquisition_facade import (
     _CAPABILITY_ID as _MRA_CAPABILITY_ID,

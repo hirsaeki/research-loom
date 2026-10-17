@@ -5,7 +5,7 @@ from collections.abc import Callable, Mapping
 from copy import deepcopy
 from typing import Any
 
-from plugins.local_application.facade import LocalApplicationError
+from plugins.application_errors import LocalApplicationError
 
 
 def show_run_stage(facade, proceed: Callable[..., Any], run_id: str) -> Mapping[str, Any]:

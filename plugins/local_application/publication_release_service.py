@@ -21,9 +21,9 @@ from jsonschema import Draft202012Validator, FormatChecker
 from core.resources import resource_path
 from plugins._infra.atomic_write import write_durable
 from plugins._infra.file_lock import lock_byte, unlock_byte, write_sentinel_if_empty
+from plugins.application_errors import LocalApplicationError
 from plugins.local_durable_store import register_optional_path, require_optional_available
 
-from .facade import LocalApplicationError
 from .publication_docx import docx_bytes as _docx_bytes
 from .publication_docx import verify_native_docx
 from .publication_exhibits import prepare_exhibits, render_input_digest

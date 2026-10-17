@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from .facade import LocalApplicationError
+from plugins.application_errors import LocalApplicationError
+
 from .research_package_format import MAX_OUTPUT_BYTES, safe_component, verify_export_root
 from .writer_composition_history_service import WriterCompositionHistoryService
 from .writer_round_trip_service import WriterRoundTripService

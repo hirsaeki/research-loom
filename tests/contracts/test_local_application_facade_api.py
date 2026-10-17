@@ -155,7 +155,7 @@ class LocalApplicationFacadeApiTests(unittest.TestCase):
 
     def test_stage_order_is_pinned(self):
         from plugins.local_application import LocalApplicationFacade
-        from plugins.local_application.facade import stages_for
+        from plugins.local_application.support.stages import stages_for
 
         actual = {
             name: [
@@ -185,8 +185,8 @@ class LocalApplicationFacadeApiTests(unittest.TestCase):
         # Continuation services build this intermediate facade directly; it
         # must keep running the stages its former super() chain reached.
         from plugins.local_application import LocalApplicationFacade
-        from plugins.local_application.facade import stages_for
         from plugins.local_application.facade_composition import ContinuationFacade
+        from plugins.local_application.support.stages import stages_for
 
         for name in STAGE_ORDER:
             full = stages_for(LocalApplicationFacade, name)

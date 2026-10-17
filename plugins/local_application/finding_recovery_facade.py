@@ -10,14 +10,13 @@ from core.conversation import ActionDefinition, ConversationRuntimeError, Harnes
 from core.execution import RunStatus
 from core.runtime import canonical_digest
 from core.runtime.ports import StaleHeadError
+from plugins.application_errors import LocalApplicationError
 from plugins.local_conversation_store import (
     find_state_delta_proposals_by_provenance_run_id,
     persist_state_delta_proposal_idempotently,
 )
 from plugins.local_execution_store import canonical_handoff_for
 from plugins.sqlite_state_store.exhibit_guard import guard_research_state_head
-
-from .facade import LocalApplicationError
 
 _RECOVERY_VERSION = "legacy-desktop-finding-candidate-to-approved@0.1.0"
 _ACTION_TYPE = "desktop_research.finding.recover"

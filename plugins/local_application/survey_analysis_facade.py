@@ -13,6 +13,7 @@ from core.conversation import (
     ConversationRuntimeError,
     HarnessServiceResult,
 )
+from plugins.application_errors import LocalApplicationError
 from plugins.local_execution_store import (
     LocalExecutionStoreError,
     bind_controlled_import_root,
@@ -33,7 +34,6 @@ from plugins.survey_analysis import (
 )
 from plugins.survey_validation import input_object, required_string
 
-from .facade import LocalApplicationError
 from .survey_facade import _snapshot
 from .survey_response_capture import _real_response_provenance
 from .survey_virtual_pretest_inspection import SurveyVirtualPretestInspectionMixin

@@ -13,7 +13,7 @@ from typing import Any
 from xml.etree import ElementTree as ET
 from xml.sax.saxutils import escape, quoteattr
 
-from .facade import LocalApplicationError
+from plugins.application_errors import LocalApplicationError
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 R = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"

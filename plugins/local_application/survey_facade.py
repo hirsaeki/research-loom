@@ -10,6 +10,7 @@ import rfc8785
 
 from core.resources import resource_path
 from core.runtime.ports import StaleHeadError
+from plugins.application_errors import LocalApplicationError
 from plugins.local_survey_store import LocalSurveyStore, LocalSurveyStoreError, registry_digest
 from plugins.sqlite_state_store.exhibit_guard import guard_research_state_head
 from plugins.survey_validation import (
@@ -23,7 +24,6 @@ from plugins.survey_validation import (
     validate_rqs,
 )
 
-from .facade import LocalApplicationError
 from .survey_exchange import exchange_projection, markdown_projection
 
 _DESIGN_SCHEMA = resource_path("core/packages/survey/survey-design.schema.json")

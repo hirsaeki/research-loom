@@ -5,6 +5,7 @@ from copy import deepcopy
 from typing import Any
 
 from core.execution import RunStatus
+from plugins.application_errors import LocalApplicationError
 from plugins.desktop_research.attempts import reconstruct_attempts
 
 from .external_submission import (
@@ -12,7 +13,6 @@ from .external_submission import (
     assemble_external_submission,
     validate_external_submission,
 )
-from .facade import LocalApplicationError
 
 
 def collect_external_stage(

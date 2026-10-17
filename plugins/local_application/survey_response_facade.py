@@ -10,8 +10,8 @@ from core.conversation import (
     ConversationRuntimeError,
     HarnessServiceResult,
 )
+from plugins.application_errors import LocalApplicationError
 
-from .facade import LocalApplicationError
 from .survey_response_capture import SurveyResponseCaptureMixin
 from .survey_response_core import (
     _DATASET_FIELDS,

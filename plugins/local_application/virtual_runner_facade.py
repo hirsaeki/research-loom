@@ -6,11 +6,8 @@ from copy import deepcopy
 from typing import Any
 
 from core.resources import resource_path
-from plugins.local_application.facade import (
-    _AUTHORITY_PAYLOAD_FIELDS,
-    _INGRESS_FIELDS,
-    LocalApplicationError,
-)
+from plugins.application_errors import LocalApplicationError
+from plugins.local_application.support.ingress import AUTHORITY_PAYLOAD_FIELDS, INGRESS_FIELDS
 
 from .virtual_runner_binding import build_survey_virtual_extension
 from .virtual_runner_execute import VirtualRunnerExecuteMixin
@@ -51,7 +48,7 @@ def submit_action_stage(
         isinstance(draft_input, Mapping)
         and draft_input.get("action_type") == "virtual_runner.survey.execute"
     ):
-        unknown = set(draft_input) - _INGRESS_FIELDS
+        unknown = set(draft_input) - INGRESS_FIELDS
         if unknown:
             raise LocalApplicationError(
                 "APPLICATION-INGRESS-001",
@@ -61,7 +58,7 @@ def submit_action_stage(
         payload = draft_input.get("payload")
         if not isinstance(payload, Mapping):
             raise LocalApplicationError("APPLICATION-INGRESS-001", "payload must be an object")
-        forbidden = set(payload) & _AUTHORITY_PAYLOAD_FIELDS
+        forbidden = set(payload) & AUTHORITY_PAYLOAD_FIELDS
         if forbidden:
             raise LocalApplicationError(
                 "APPLICATION-AUTHORITY-001",

@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from core.execution import RunStatus
+from plugins.application_errors import LocalApplicationError
 from plugins.desktop_research import DesktopResearchCaptureService
 from plugins.local_execution_store import (
     LocalExecutionStoreError,
@@ -15,7 +16,6 @@ from plugins.local_execution_store import (
     open_read_only_execution_store,
 )
 
-from .facade import LocalApplicationError
 from .material_content_facade import _artifact_pair_for_capture
 
 _INTAKE_RELATIVE = Path("intake") / "material-sources"

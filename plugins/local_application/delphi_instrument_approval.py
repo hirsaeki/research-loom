@@ -11,9 +11,9 @@ from copy import deepcopy
 from typing import Any
 from uuid import uuid4
 
+from plugins.application_errors import LocalApplicationError
 from plugins.local_delphi_store import LocalDelphiStoreError, canonical_digest, registry_digest
 
-from .facade import LocalApplicationError
 from .survey_facade import _snapshot
 
 

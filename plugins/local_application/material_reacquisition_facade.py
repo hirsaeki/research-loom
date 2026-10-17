@@ -22,6 +22,7 @@ from core.conversation import ActionDefinition, ConversationRuntimeError, Harnes
 from core.execution import CapabilityRunRecord, ExecutionIssue, RunLifecycleEvent, RunStatus
 from plugins._infra.clock import utc_now as _utc_now
 from plugins._infra.file_lock import acquire_byte_lock, unlock_byte, write_sentinel_if_empty
+from plugins.application_errors import LocalApplicationError
 from plugins.local_execution_store import (
     LocalExecutionStoreIntegrityError,
     bind_controlled_import_root,
@@ -30,7 +31,6 @@ from plugins.local_execution_store import (
 )
 from plugins.local_payload_repair import REPAIRABLE
 
-from .facade import LocalApplicationError
 from .material_content_facade import _artifact_pair_for_capture
 from .material_recovery_facade import _canonical_artifact_binding_for_capture
 

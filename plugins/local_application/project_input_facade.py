@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from core.runtime.ports import StaleHeadError
+from plugins.application_errors import LocalApplicationError
 from plugins.local_execution_store import (
     LocalExecutionStoreError,
     bind_controlled_import_root,
@@ -18,8 +19,6 @@ from plugins.local_project_input_store import (
     LocalProjectInputStoreError,
 )
 from plugins.sqlite_state_store.exhibit_guard import guard_research_state_head
-
-from .facade import LocalApplicationError
 
 _ROLES = {
     "theme",

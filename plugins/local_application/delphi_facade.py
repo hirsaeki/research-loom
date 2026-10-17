@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from core.resources import resource_path
+from plugins.application_errors import LocalApplicationError
 from plugins.local_delphi_store import (
     LocalDelphiStore,
     LocalDelphiStoreError,
@@ -23,7 +24,6 @@ from .delphi_analysis import (
     validate_scales,
 )
 from .delphi_instrument_approval import DelphiInstrumentApproval, verify_approval
-from .facade import LocalApplicationError
 from .survey_facade import _snapshot
 
 _DESIGN_SCHEMA = resource_path("core/packages/delphi/delphi-design.schema.json")

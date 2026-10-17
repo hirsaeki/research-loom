@@ -11,13 +11,13 @@ from jsonschema import Draft202012Validator, FormatChecker
 
 from core.resources import resource_path
 from core.runtime.digests import jcs_digest
+from plugins.application_errors import LocalApplicationError
 from plugins.desktop_research.normalization import source_id_for_capture
 from plugins.local_research_exhibit_store import (
     LocalResearchExhibitStoreError,
     validate_visual_target,
 )
 
-from .facade import LocalApplicationError
 from .visual_package_bindings import validate_visual_package_bindings
 
 SCHEMA_VERSION = "0.2.0"

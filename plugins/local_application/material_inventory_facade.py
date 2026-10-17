@@ -7,9 +7,9 @@ from collections.abc import Mapping
 from copy import deepcopy
 from typing import Any
 
+from plugins.application_errors import LocalApplicationError
 from plugins.local_execution_store import external_capture_artifact_metadata_for_project
 
-from .facade import LocalApplicationError
 from .run_inspection_facade import _public_provenance
 
 _ORIGINAL_ROLE = "desktop_research.original_capture"

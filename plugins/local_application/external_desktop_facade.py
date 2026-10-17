@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from core.execution import RunStatus
+from plugins.application_errors import LocalApplicationError
 from plugins.desktop_research import (
     DesktopResearchAttemptRecorder,
     DesktopResearchCaptureService,
@@ -20,7 +21,7 @@ from plugins.local_execution_store import (
     read_controlled_file,
 )
 
-from .facade import LocalApplicationError, _given, run_stages, stages_for
+from .support.stages import given_kwargs, run_stages, stages_for
 
 _ATTEMPT_START_FIELDS = {
     "attempt_id",
@@ -153,7 +154,7 @@ class ExternalDesktopMixin:
             self,
             self._replay_completed_desktop_research_run_terminal,
             run_id,
-            **_given(view=view),
+            **given_kwargs(view=view),
         )
 
     def _replay_completed_desktop_research_run_terminal(self, run_id: str) -> Mapping[str, Any]:

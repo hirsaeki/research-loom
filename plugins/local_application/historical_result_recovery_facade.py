@@ -8,6 +8,7 @@ from typing import Any
 from core.conversation import ActionDefinition, ConversationRuntimeError, HarnessServiceResult
 from core.runtime import canonical_digest
 from core.runtime.ports import StaleHeadError
+from plugins.application_errors import LocalApplicationError
 from plugins.desktop_research import DesktopResearchNormalizer
 from plugins.desktop_research.attempts import reconstruct_attempts
 from plugins.local_conversation_store import persist_state_delta_proposal_idempotently
@@ -16,8 +17,8 @@ from plugins.sqlite_state_store.exhibit_guard import guard_research_state_head
 
 from . import finding_recovery_facade as _recovery_base
 from . import historical_finding_recovery_facade as _base
-from .facade import LocalApplicationError, _jsonable
 from .finding_recovery_lineage import RecoveryFailure
+from .support.stages import jsonable
 
 _REMATERIALIZATION_VERSION = "historical-desktop-result-rematerialization@0.1.0"
 _CANONICAL_FALLBACK_FAILURES = {
@@ -146,7 +147,7 @@ def _canonical_result(application, project_id: str, run_id: str):
             failure_class="canonical_result_incomplete",
         )
     try:
-        proposal = _jsonable(normalizer.normalize(handoff, extension, context))
+        proposal = jsonable(normalizer.normalize(handoff, extension, context))
     except Exception as exc:
         raise RecoveryFailure(
             "APPLICATION-HISTORICAL-RECOVERY-RESULT-001",
