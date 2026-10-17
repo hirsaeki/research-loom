@@ -3,13 +3,14 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
+from typing import Any
 
 from core.runtime import canonical_digest
 from plugins.research_visual_semantics import digest
 
 from .exhibit_facade import _string_list
-from .facade import LocalApplicationError
+from .facade import LocalApplicationError, run_stages, stages_for
 from .generated_explanation import (
     EXPLANATION_SCHEMA,
     REVIEW_SCHEMA,
@@ -28,8 +29,26 @@ from .research_quality_facade import LocalApplicationFacade as _BaseLocalApplica
 from .visual_origin import verify_visual_origin
 
 
+def capture_exhibit_stage(facade, proceed: Callable[..., Any], value):
+    content = (
+        value.get("content", {}).get("value")
+        if isinstance(value, Mapping) and isinstance(value.get("content"), Mapping)
+        else None
+    )
+    if isinstance(content, Mapping) and content.get("schema") == REVIEW_SCHEMA:
+        raise LocalApplicationError(
+            "APPLICATION-VISUAL-REVIEW-001",
+            "use the explicit visual review operation; generation/capture cannot facade-approve",
+        )
+    return proceed(value)
+
+
 class LocalApplicationFacade(_BaseLocalApplicationFacade):
     """Research-backed chart capture, using the existing Exhibit registry."""
+
+    _STAGES = {
+        "capture_exhibit": capture_exhibit_stage,
+    }
 
     def _visual_semantics(self, value, document, state, store):
         semantics = super()._visual_semantics(value, document, state, store)
@@ -48,19 +67,6 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
         except (TypeError, ValueError, OverflowError) as exc:
             raise LocalApplicationError("APPLICATION-VISUAL-VALIDATION-001", str(exc)) from exc
         return semantics
-
-    def capture_exhibit(self, value):
-        content = (
-            value.get("content", {}).get("value")
-            if isinstance(value, Mapping) and isinstance(value.get("content"), Mapping)
-            else None
-        )
-        if isinstance(content, Mapping) and content.get("schema") == REVIEW_SCHEMA:
-            raise LocalApplicationError(
-                "APPLICATION-VISUAL-REVIEW-001",
-                "use the explicit visual review operation; generation/capture cannot self-approve",
-            )
-        return super().capture_exhibit(value)
 
     def capture_explanation_exhibit(self, value):
         fields = {
@@ -204,7 +210,11 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                     }
                 ],
             )
-            return super().capture_exhibit(
+            # Former super().capture_exhibit: the stages below this layer.
+            return run_stages(
+                stages_for(type(self), "capture_exhibit", below=LocalApplicationFacade),
+                self,
+                self._capture_exhibit_terminal,
                 {
                     "kind": "note",
                     "title": "Visual semantic review",
@@ -213,7 +223,7 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                     "derived_from_exhibit_ids": [candidate["exhibit_id"]],
                     "content": {"representation": "json", "value": content},
                     "capture_origin": "explicit_host_human_visual_review",
-                }
+                },
             )
         except (TypeError, ValueError) as exc:
             raise LocalApplicationError("APPLICATION-VISUAL-REVIEW-001", str(exc)) from exc

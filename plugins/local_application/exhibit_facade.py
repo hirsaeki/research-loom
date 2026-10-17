@@ -15,7 +15,7 @@ from plugins.local_research_exhibit_store import (
 )
 from plugins.research_visual_semantics import digest, validate_visual_semantics
 
-from .facade import LocalApplicationError
+from .facade import LocalApplicationError, run_stages, stages_for
 from .run_inspection_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
 
 _EXHIBIT_STORE_NAME = "research-exhibits.sqlite3"
@@ -404,7 +404,12 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
             raise LocalApplicationError("APPLICATION-EXHIBIT-SEMANTICS-001", str(exc)) from exc
         return normalized
 
-    def capture_exhibit(self, input_value: Mapping[str, Any]) -> Mapping[str, Any]:
+    def capture_exhibit(self, value):
+        return run_stages(
+            stages_for(type(self), "capture_exhibit"), self, self._capture_exhibit_terminal, value
+        )
+
+    def _capture_exhibit_terminal(self, input_value: Mapping[str, Any]) -> Mapping[str, Any]:
         if not isinstance(input_value, Mapping):
             raise LocalApplicationError(
                 "APPLICATION-EXHIBIT-INPUT-001", "Research Exhibit input must be an object"

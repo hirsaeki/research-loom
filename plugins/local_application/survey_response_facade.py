@@ -145,6 +145,46 @@ class _SurveyResponseActionHandler:
         )
 
 
+def list_actions_stage(facade, proceed: Callable[..., Any]) -> Mapping[str, Any]:
+    facade._ensure_survey_response_actions()
+    return proceed()
+
+
+def submit_action_stage(
+    facade,
+    proceed: Callable[..., Any],
+    draft_input: Mapping[str, Any],
+    *,
+    view: str | None = None,
+) -> Mapping[str, Any]:
+    facade._ensure_survey_response_actions()
+    return proceed(draft_input)
+
+
+def capture_virtual_run_response_dataset_stage(
+    facade,
+    proceed: Callable[..., Any],
+    run_id: str,
+    *,
+    instrument_ref: Mapping[str, Any],
+) -> Mapping[str, Any]:
+    try:
+        return proceed(
+            run_id,
+            instrument_ref=instrument_ref,
+        )
+    except LocalApplicationError as exc:
+        if exc.code != "SURVEY-RESPONSE-DATASET-IMMUTABLE-001":
+            raise
+    # A concurrent caller may have won the immutable Dataset insert after this
+    # caller's initial existence check. Re-enter the verified read/reuse path;
+    # any identity/provenance mismatch still fails closed there.
+    return proceed(
+        run_id,
+        instrument_ref=instrument_ref,
+    )
+
+
 class LocalApplicationFacade(
     SurveyResponseInspectionMixin,
     SurveyResponseCaptureMixin,
@@ -153,27 +193,11 @@ class LocalApplicationFacade(
 ):
     """Canonical Survey response normalization, persistence, and inspection."""
 
-    def capture_virtual_run_response_dataset(
-        self,
-        run_id: str,
-        *,
-        instrument_ref: Mapping[str, Any],
-    ) -> Mapping[str, Any]:
-        try:
-            return super().capture_virtual_run_response_dataset(
-                run_id,
-                instrument_ref=instrument_ref,
-            )
-        except LocalApplicationError as exc:
-            if exc.code != "SURVEY-RESPONSE-DATASET-IMMUTABLE-001":
-                raise
-        # A concurrent caller may have won the immutable Dataset insert after this
-        # caller's initial existence check. Re-enter the verified read/reuse path;
-        # any identity/provenance mismatch still fails closed there.
-        return super().capture_virtual_run_response_dataset(
-            run_id,
-            instrument_ref=instrument_ref,
-        )
+    _STAGES = {
+        "list_actions": list_actions_stage,
+        "submit_action": submit_action_stage,
+        "capture_virtual_run_response_dataset": capture_virtual_run_response_dataset_stage,
+    }
 
     def _ensure_survey_response_actions(self) -> None:
         """Compose PR42 actions into the existing audited Coordinator registry."""
@@ -227,18 +251,3 @@ class LocalApplicationFacade(
                         action_type,
                         _SurveyResponseActionHandler(self._application, operation),
                     )
-
-
-def list_actions_stage(facade, proceed: Callable[[], Mapping[str, Any]]) -> Mapping[str, Any]:
-    facade._ensure_survey_response_actions()
-    return proceed()
-
-
-def submit_action_stage(
-    facade,
-    draft_input: Mapping[str, Any],
-    view: str | None,
-    proceed: Callable[[Mapping[str, Any], str | None], Mapping[str, Any]],
-) -> Mapping[str, Any]:
-    facade._ensure_survey_response_actions()
-    return proceed(draft_input, None)

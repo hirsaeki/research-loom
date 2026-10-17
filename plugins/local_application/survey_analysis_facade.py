@@ -271,8 +271,29 @@ class _SurveyAnalysisActionHandler:
         )
 
 
+def list_actions_stage(facade, proceed: Callable[..., Any]) -> Mapping[str, Any]:
+    facade._ensure_survey_analysis_actions()
+    return proceed()
+
+
+def submit_action_stage(
+    facade,
+    proceed: Callable[..., Any],
+    draft_input: Mapping[str, Any],
+    *,
+    view: str | None = None,
+) -> Mapping[str, Any]:
+    facade._ensure_survey_analysis_actions()
+    return proceed(draft_input)
+
+
 class LocalApplicationFacade(SurveyVirtualPretestInspectionMixin, VirtualRunnerApplicationFacade):
     """Final production facade including shared Survey aggregation and inspection."""
+
+    _STAGES = {
+        "list_actions": list_actions_stage,
+        "submit_action": submit_action_stage,
+    }
 
     def _survey_analysis_store(self) -> LocalSurveyAnalysisStore:
         if self._workspace_root is None:
@@ -1015,18 +1036,3 @@ class LocalApplicationFacade(SurveyVirtualPretestInspectionMixin, VirtualRunnerA
             },
             "research_state_mutation_performed": False,
         }
-
-
-def list_actions_stage(facade, proceed: Callable[[], Mapping[str, Any]]) -> Mapping[str, Any]:
-    facade._ensure_survey_analysis_actions()
-    return proceed()
-
-
-def submit_action_stage(
-    facade,
-    draft_input: Mapping[str, Any],
-    view: str | None,
-    proceed: Callable[[Mapping[str, Any], str | None], Mapping[str, Any]],
-) -> Mapping[str, Any]:
-    facade._ensure_survey_analysis_actions()
-    return proceed(draft_input, None)

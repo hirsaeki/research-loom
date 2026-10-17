@@ -26,8 +26,79 @@ from .material_recovery_facade import ensure_material_recovery_action
 _LARGE_ORIGINAL_PREFIX = "external-original://sha256/"
 
 
+def list_actions_stage(facade, proceed: Callable[..., Any]) -> Mapping[str, Any]:
+    ensure_material_recovery_action(facade._application, facade._project_id, facade._workspace_root)
+    ensure_material_reacquisition_action(
+        facade._application, facade._project_id, facade._workspace_root
+    )
+    return proceed()
+
+
+def submit_action_stage(
+    facade,
+    proceed: Callable[..., Any],
+    draft_input: Mapping[str, Any],
+    *,
+    view: str | None = None,
+) -> Mapping[str, Any]:
+    ensure_material_recovery_action(facade._application, facade._project_id, facade._workspace_root)
+    ensure_material_reacquisition_action(
+        facade._application, facade._project_id, facade._workspace_root
+    )
+    return proceed(draft_input)
+
+
+def capture_external_source_stage(
+    facade,
+    proceed: Callable[..., Any],
+    run_id: str,
+    submission: Mapping[str, Any],
+) -> Mapping[str, Any]:
+    value = _input_object(submission, _CAPTURE_FIELDS, "external capture")
+    provenance = _provenance(value, capture=True)
+    reserved = {"original_source_filename", "text_rendition_source_filename"}
+    if reserved & set(provenance):
+        raise LocalApplicationError(
+            "APPLICATION-EXTERNAL-INPUT-001",
+            "capture provenance may not supply source filename hints",
+        )
+    original_path = facade._workspace_capture_path(_required_string(value, "original_file"))
+    text_path = facade._workspace_capture_path(_required_string(value, "text_rendition_file"))
+    value["provenance"] = {
+        **provenance,
+        "original_source_filename": original_path.name,
+        "text_rendition_source_filename": text_path.name,
+    }
+
+    # Once a Run contains a managed large original, keep later capture-pair
+    # accounting on the same seam so that the large payload never consumes the
+    # generic Run-output budget used by bounded artifacts.
+    facade._desktop_external_run(run_id)
+    if any(
+        artifact.role == _ORIGINAL_ROLE
+        and artifact.storage_locator.startswith(_LARGE_ORIGINAL_PREFIX)
+        for artifact in facade._application.execution_store.artifacts_for(run_id)
+    ):
+        return facade._capture_external_source_with_large_original(run_id, value)
+    try:
+        return proceed(run_id, value)
+    except LocalApplicationError as exc:
+        if (
+            exc.code != "APPLICATION-EXTERNAL-FILE-002"
+            or "file exceeds configured intake size limit" not in exc.message
+        ):
+            raise
+    return facade._capture_external_source_with_large_original(run_id, value)
+
+
 class LocalApplicationFacade(_BaseLocalApplicationFacade):
     """PR39 facade: preserve the normal capture path and add oversized fallback."""
+
+    _STAGES = {
+        "list_actions": list_actions_stage,
+        "submit_action": submit_action_stage,
+        "capture_external_source": capture_external_source_stage,
+    }
 
     def show_external_material(
         self, run_id: str, capture_id: str, *, max_text_bytes: int = 64 * 1024
@@ -44,47 +115,6 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
             self._application.execution_store, self._project_id, self._workspace_root
         )
         return service.export(run_id, capture_id, kind=kind, output_file=output_file)
-
-    def capture_external_source(
-        self,
-        run_id: str,
-        submission: Mapping[str, Any],
-    ) -> Mapping[str, Any]:
-        value = _input_object(submission, _CAPTURE_FIELDS, "external capture")
-        provenance = _provenance(value, capture=True)
-        reserved = {"original_source_filename", "text_rendition_source_filename"}
-        if reserved & set(provenance):
-            raise LocalApplicationError(
-                "APPLICATION-EXTERNAL-INPUT-001",
-                "capture provenance may not supply source filename hints",
-            )
-        original_path = self._workspace_capture_path(_required_string(value, "original_file"))
-        text_path = self._workspace_capture_path(_required_string(value, "text_rendition_file"))
-        value["provenance"] = {
-            **provenance,
-            "original_source_filename": original_path.name,
-            "text_rendition_source_filename": text_path.name,
-        }
-
-        # Once a Run contains a managed large original, keep later capture-pair
-        # accounting on the same seam so that the large payload never consumes the
-        # generic Run-output budget used by bounded artifacts.
-        self._desktop_external_run(run_id)
-        if any(
-            artifact.role == _ORIGINAL_ROLE
-            and artifact.storage_locator.startswith(_LARGE_ORIGINAL_PREFIX)
-            for artifact in self._application.execution_store.artifacts_for(run_id)
-        ):
-            return self._capture_external_source_with_large_original(run_id, value)
-        try:
-            return super().capture_external_source(run_id, value)
-        except LocalApplicationError as exc:
-            if (
-                exc.code != "APPLICATION-EXTERNAL-FILE-002"
-                or "file exceeds configured intake size limit" not in exc.message
-            ):
-                raise
-        return self._capture_external_source_with_large_original(run_id, value)
 
     def _capture_external_source_with_large_original(
         self,
@@ -238,24 +268,3 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
             text,
         )
         return {"status": "EXTERNAL_SOURCE_CAPTURED", "capture": deepcopy(dict(detail))}
-
-
-def list_actions_stage(facade, proceed: Callable[[], Mapping[str, Any]]) -> Mapping[str, Any]:
-    ensure_material_recovery_action(facade._application, facade._project_id, facade._workspace_root)
-    ensure_material_reacquisition_action(
-        facade._application, facade._project_id, facade._workspace_root
-    )
-    return proceed()
-
-
-def submit_action_stage(
-    facade,
-    draft_input: Mapping[str, Any],
-    view: str | None,
-    proceed: Callable[[Mapping[str, Any], str | None], Mapping[str, Any]],
-) -> Mapping[str, Any]:
-    ensure_material_recovery_action(facade._application, facade._project_id, facade._workspace_root)
-    ensure_material_reacquisition_action(
-        facade._application, facade._project_id, facade._workspace_root
-    )
-    return proceed(draft_input, None)

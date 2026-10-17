@@ -6,11 +6,26 @@ from typing import Any
 from plugins.local_application.facade import LocalApplicationFacade as _BaseLocalApplicationFacade
 from plugins.local_application.resume import build_resume_context
 
+from .facade import _given, run_stages, stages_for
+
 
 class LocalApplicationFacade(_BaseLocalApplicationFacade):
     """Production facade extended with the read-only research resume projection."""
 
-    def resume_context(self, *, limits: Mapping[str, int] | None = None) -> Mapping[str, Any]:
+    def resume_context(
+        self, *, limits: Mapping[str, int] | None = None, view: str | None = None
+    ) -> Mapping[str, Any]:
+        return run_stages(
+            stages_for(type(self), "resume_context"),
+            self,
+            self._resume_context_terminal,
+            limits=limits,
+            **_given(view=view),
+        )
+
+    def _resume_context_terminal(
+        self, *, limits: Mapping[str, int] | None = None
+    ) -> Mapping[str, Any]:
         result = dict(
             build_resume_context(
                 self._application,

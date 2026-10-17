@@ -1,31 +1,37 @@
 """Late visual needs return through existing Package/Composition operations."""
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from copy import deepcopy
+from typing import Any
 
 from core.runtime import canonical_digest
 from plugins.research_visual_semantics import SEMANTIC_CHANGES
 
 from .exhibit_facade import _string_list
-from .facade import LocalApplicationError
+from .facade import LocalApplicationError, run_stages, stages_for
 from .generated_explanation import matching_review, validate_explanation
 from .visual_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
 
 NEED_SCHEMA = "research-visual-need/v1"
 
 
-class LocalApplicationFacade(_BaseLocalApplicationFacade):
-    def capture_exhibit(self, value):
-        content = (
-            value.get("content", {}).get("value")
-            if isinstance(value, Mapping) and isinstance(value.get("content"), Mapping)
-            else None
+def capture_exhibit_stage(facade, proceed: Callable[..., Any], value):
+    content = (
+        value.get("content", {}).get("value")
+        if isinstance(value, Mapping) and isinstance(value.get("content"), Mapping)
+        else None
+    )
+    if isinstance(content, Mapping) and content.get("schema") == NEED_SCHEMA:
+        raise LocalApplicationError(
+            "APPLICATION-VISUAL-NEED-001", "use the source-bound visual need operation"
         )
-        if isinstance(content, Mapping) and content.get("schema") == NEED_SCHEMA:
-            raise LocalApplicationError(
-                "APPLICATION-VISUAL-NEED-001", "use the source-bound visual need operation"
-            )
-        return super().capture_exhibit(value)
+    return proceed(value)
+
+
+class LocalApplicationFacade(_BaseLocalApplicationFacade):
+    _STAGES = {
+        "capture_exhibit": capture_exhibit_stage,
+    }
 
     def _visual_need_origin(self, origin):
         if not isinstance(origin, Mapping):
@@ -126,7 +132,11 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                 "APPLICATION-VISUAL-NEED-001", "visual need purpose must be bounded"
             )
         depth = "research" if changes else "exhibit_capture_and_package_rebuild"
-        result = super().capture_exhibit(
+        # Former super().capture_exhibit: the stages below this layer.
+        result = run_stages(
+            stages_for(type(self), "capture_exhibit", below=LocalApplicationFacade),
+            self,
+            self._capture_exhibit_terminal,
             {
                 "kind": "note",
                 "title": "Visual need: " + purpose[:128],
@@ -148,7 +158,7 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                     },
                 },
                 "capture_origin": "downstream_visual_need",
-            }
+            },
         )
         return {**result, "return_depth": depth, "research_state_mutation_performed": False}
 

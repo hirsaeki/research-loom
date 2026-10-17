@@ -284,8 +284,142 @@ def _resume_item(item: Mapping[str, Any]) -> dict[str, Any]:
     return result
 
 
+def submit_action_stage(
+    facade,
+    proceed: Callable[..., Any],
+    draft_input: Mapping[str, Any],
+    *,
+    view: str | None = None,
+) -> Mapping[str, Any]:
+    selected = facade._public_view(view)
+    detail = proceed(draft_input)
+    if selected == "detail":
+        return detail
+    action_type = draft_input.get("action_type") if isinstance(draft_input, Mapping) else None
+    return facade._after_operation_projection(
+        detail,
+        lambda value, **_: project_action_result(
+            value, action_type=str(action_type or ""), state=facade._current_state_view()
+        ),
+        operation="action.submit",
+    )
+
+
+def collect_external_stage(
+    facade,
+    proceed: Callable[..., Any],
+    run_id: str,
+    submission: Mapping[str, Any],
+    *,
+    view: str | None = None,
+) -> Mapping[str, Any]:
+    selected = facade._public_view(view)
+    detail = proceed(run_id, submission)
+    if selected == "detail":
+        return detail
+    return facade._after_operation_projection(
+        detail,
+        lambda value, **_: project_collect(value, state=facade._current_state_view()),
+        operation="external.collect",
+    )
+
+
+def replay_completed_desktop_research_run_stage(
+    facade, proceed: Callable[..., Any], run_id: str, *, view: str | None = None
+) -> Mapping[str, Any]:
+    selected = facade._public_view(view)
+    detail = proceed(run_id)
+    if selected == "detail":
+        return detail
+    return facade._after_operation_projection(detail, project_replay, operation="run.replay")
+
+
+def resolve_human_decision_stage(
+    facade, proceed: Callable[..., Any], response: Mapping[str, Any], *, view: str | None = None
+) -> Mapping[str, Any]:
+    selected = facade._public_view(view)
+    detail = proceed(response)
+    if selected == "detail":
+        return detail
+    return facade._after_operation_projection(
+        detail, project_decision_result, operation="decision.resolve"
+    )
+
+
+def resume_context_stage(
+    facade,
+    proceed: Callable[..., Any],
+    *,
+    limits: Mapping[str, int] | None = None,
+    view: str | None = None,
+) -> Mapping[str, Any]:
+    selected = facade._public_view(view)
+    result = deepcopy(dict(proceed(limits=limits)))
+    listing = facade.list_synthesis_candidates(limit=20, view="detail")
+    result["saved_synthesis_candidates"] = {
+        "items": [_resume_item(item) for item in listing["items"]],
+        "truncated": bool(listing["truncated"]),
+        "next_cursor": listing["next_cursor"],
+        "issues": deepcopy(listing["issues"]),
+    }
+    if listing["status"] == "DEGRADED":
+        result["status"] = "DEGRADED"
+    return (
+        result
+        if selected == "detail"
+        else facade._read_projection(result, project_resume, operation="resume")
+    )
+
+
+def show_run_stage(
+    facade, proceed: Callable[..., Any], run_id: str, *, view: str | None = None
+) -> Mapping[str, Any]:
+    selected = facade._public_view(view)
+    detail = proceed(run_id)
+    return (
+        detail
+        if selected == "detail"
+        else facade._read_projection(detail, project_run, operation="run.show")
+    )
+
+
+def status_stage(
+    facade, proceed: Callable[..., Any], *, view: str | None = None
+) -> Mapping[str, Any]:
+    selected = facade._public_view(view)
+    detail = proceed()
+    return (
+        detail
+        if selected == "detail"
+        else facade._read_projection(detail, project_status, operation="status")
+    )
+
+
+def submit_confirmation_stage(
+    facade, proceed: Callable[..., Any], confirmation: Mapping[str, Any], *, view: str | None = None
+) -> Mapping[str, Any]:
+    selected = facade._public_view(view)
+    detail = proceed(confirmation)
+    if selected == "detail":
+        return detail
+    return facade._after_operation_projection(
+        detail, project_confirmation_result, operation="confirmation.submit"
+    )
+
+
 class LocalApplicationFacade(_BaseLocalApplicationFacade):
     """Public bounded discovery for saved Recommendation and Argument candidates."""
+
+    _STAGES = {
+        "submit_action": submit_action_stage,
+        "collect_external": collect_external_stage,
+        "replay_completed_desktop_research_run": replay_completed_desktop_research_run_stage,
+        "resolve_human_decision": resolve_human_decision_stage,
+        "resume_context": resume_context_stage,
+        "show_run": show_run_stage,
+        "status": status_stage,
+        "submit_confirmation": submit_confirmation_stage,
+    }
 
     def list_synthesis_candidates(
         self,
@@ -502,105 +636,3 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                 message="Operation completed, but its conversation projection could not be verified.",
                 detail=detail,
             )
-
-    def submit_confirmation(
-        self, confirmation: Mapping[str, Any], *, view: str | None = None
-    ) -> Mapping[str, Any]:
-        selected = self._public_view(view)
-        detail = super().submit_confirmation(confirmation)
-        if selected == "detail":
-            return detail
-        return self._after_operation_projection(
-            detail, project_confirmation_result, operation="confirmation.submit"
-        )
-
-    def resolve_human_decision(
-        self, response: Mapping[str, Any], *, view: str | None = None
-    ) -> Mapping[str, Any]:
-        selected = self._public_view(view)
-        detail = super().resolve_human_decision(response)
-        if selected == "detail":
-            return detail
-        return self._after_operation_projection(
-            detail, project_decision_result, operation="decision.resolve"
-        )
-
-    def collect_external(
-        self, run_id: str, submission: Mapping[str, Any], *, view: str | None = None
-    ) -> Mapping[str, Any]:
-        selected = self._public_view(view)
-        detail = super().collect_external(run_id, submission)
-        if selected == "detail":
-            return detail
-        return self._after_operation_projection(
-            detail,
-            lambda value, **_: project_collect(value, state=self._current_state_view()),
-            operation="external.collect",
-        )
-
-    def status(self, *, view: str | None = None) -> Mapping[str, Any]:
-        selected = self._public_view(view)
-        detail = super().status()
-        return (
-            detail
-            if selected == "detail"
-            else self._read_projection(detail, project_status, operation="status")
-        )
-
-    def show_run(self, run_id: str, *, view: str | None = None) -> Mapping[str, Any]:
-        selected = self._public_view(view)
-        detail = super().show_run(run_id)
-        return (
-            detail
-            if selected == "detail"
-            else self._read_projection(detail, project_run, operation="run.show")
-        )
-
-    def replay_completed_desktop_research_run(
-        self, run_id: str, *, view: str | None = None
-    ) -> Mapping[str, Any]:
-        selected = self._public_view(view)
-        detail = super().replay_completed_desktop_research_run(run_id)
-        if selected == "detail":
-            return detail
-        return self._after_operation_projection(detail, project_replay, operation="run.replay")
-
-    def resume_context(
-        self, *, limits: Mapping[str, int] | None = None, view: str | None = None
-    ) -> Mapping[str, Any]:
-        selected = self._public_view(view)
-        result = deepcopy(dict(super().resume_context(limits=limits)))
-        listing = self.list_synthesis_candidates(limit=20, view="detail")
-        result["saved_synthesis_candidates"] = {
-            "items": [_resume_item(item) for item in listing["items"]],
-            "truncated": bool(listing["truncated"]),
-            "next_cursor": listing["next_cursor"],
-            "issues": deepcopy(listing["issues"]),
-        }
-        if listing["status"] == "DEGRADED":
-            result["status"] = "DEGRADED"
-        return (
-            result
-            if selected == "detail"
-            else self._read_projection(result, project_resume, operation="resume")
-        )
-
-
-def submit_action_stage(
-    facade,
-    draft_input: Mapping[str, Any],
-    view: str | None,
-    proceed: Callable[[Mapping[str, Any], str | None], Mapping[str, Any]],
-) -> Mapping[str, Any]:
-    selected = facade._public_view(view)
-    detail = proceed(draft_input, None)
-    if selected == "detail":
-        return detail
-    action_type = draft_input.get("action_type") if isinstance(draft_input, Mapping) else None
-    return facade._after_operation_projection(
-        detail,
-        lambda value, **_: project_action_result(
-            value, action_type=str(action_type or ""), state=facade._current_state_view()
-        ),
-        operation="action.submit",
-    )

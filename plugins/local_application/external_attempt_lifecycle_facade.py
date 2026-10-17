@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from copy import deepcopy
 from typing import Any
 
@@ -16,8 +16,50 @@ from .facade import LocalApplicationError
 from .question_review_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
 
 
+def collect_external_stage(
+    facade, proceed: Callable[..., Any], run_id: str, submission: Mapping[str, Any]
+) -> Mapping[str, Any]:
+    run, context_extension = facade._desktop_external_run(run_id)
+    research_result = None
+    if isinstance(submission, Mapping) and "research_result" in submission:
+        research_result = facade._research_result_input(submission, preflight=False)
+
+    guard = getattr(facade._application.execution_store, "require_run_status", None)
+    if not callable(guard):
+        raise LocalApplicationError(
+            "APPLICATION-EXTERNAL-ATTEMPT-001",
+            "external collect requires an atomic RUNNING-state guard",
+        )
+    try:
+        with guard(run.run_id, RunStatus.RUNNING):
+            attempts = facade._completed_attempts(run.run_id)
+            if research_result is not None:
+                try:
+                    facade._enforce_capture_budget(research_result, context_extension)
+                    handoff, extension = assemble_external_submission(
+                        facade._application, run, research_result, attempts
+                    )
+                except CorrectableExternalSubmissionError as exc:
+                    return facade._correctable_rejection(run, (facade._submission_issue(exc),))
+                issues = validate_external_submission(
+                    facade._application, run, context_extension, handoff, extension
+                )
+                if issues:
+                    return facade._correctable_rejection(run, issues)
+                submission = {"handoff": handoff, "extension": extension}
+            return proceed(run_id, submission)
+    except LocalApplicationError:
+        raise
+    except ValueError as exc:
+        raise LocalApplicationError("APPLICATION-EXTERNAL-RUN-STATE-001", str(exc)) from exc
+
+
 class LocalApplicationFacade(_BaseLocalApplicationFacade):
     """Final production facade guard for Desktop Research external intake."""
+
+    _STAGES = {
+        "collect_external": collect_external_stage,
+    }
 
     def preflight_external(self, run_id: str, submission: Mapping[str, Any]) -> Mapping[str, Any]:
         run, context_extension = self._desktop_external_run(run_id)
@@ -40,41 +82,6 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
             "issues": issues,
             "assembled_submission": {"handoff": handoff, "extension": extension},
         }
-
-    def collect_external(self, run_id: str, submission: Mapping[str, Any]) -> Mapping[str, Any]:
-        run, context_extension = self._desktop_external_run(run_id)
-        research_result = None
-        if isinstance(submission, Mapping) and "research_result" in submission:
-            research_result = self._research_result_input(submission, preflight=False)
-
-        guard = getattr(self._application.execution_store, "require_run_status", None)
-        if not callable(guard):
-            raise LocalApplicationError(
-                "APPLICATION-EXTERNAL-ATTEMPT-001",
-                "external collect requires an atomic RUNNING-state guard",
-            )
-        try:
-            with guard(run.run_id, RunStatus.RUNNING):
-                attempts = self._completed_attempts(run.run_id)
-                if research_result is not None:
-                    try:
-                        self._enforce_capture_budget(research_result, context_extension)
-                        handoff, extension = assemble_external_submission(
-                            self._application, run, research_result, attempts
-                        )
-                    except CorrectableExternalSubmissionError as exc:
-                        return self._correctable_rejection(run, (self._submission_issue(exc),))
-                    issues = validate_external_submission(
-                        self._application, run, context_extension, handoff, extension
-                    )
-                    if issues:
-                        return self._correctable_rejection(run, issues)
-                    submission = {"handoff": handoff, "extension": extension}
-                return super().collect_external(run_id, submission)
-        except LocalApplicationError:
-            raise
-        except ValueError as exc:
-            raise LocalApplicationError("APPLICATION-EXTERNAL-RUN-STATE-001", str(exc)) from exc
 
     def _completed_attempts(self, run_id: str):
         try:

@@ -28,10 +28,66 @@ DESCRIPTOR_PATH = ROOT / "core/packages/virtual-runner/virtual-runner-capability
 _MAX_PRIOR_VIRTUAL_RUN_IDS = 16
 
 
+def list_actions_stage(facade, proceed: Callable[..., Any]) -> Mapping[str, Any]:
+    result = deepcopy(dict(proceed()))
+    result["actions"].append(
+        {
+            "action_type": "virtual_runner.survey.execute",
+            "payload_contract": "survey-virtual-runner-execution@0.1.0",
+            "effect": "read_only",
+            "confirmation_required": False,
+            "route_category": "research_capability",
+        }
+    )
+    return result
+
+
+def submit_action_stage(
+    facade,
+    proceed: Callable[..., Any],
+    draft_input: Mapping[str, Any],
+    *,
+    view: str | None = None,
+) -> Mapping[str, Any]:
+    if (
+        isinstance(draft_input, Mapping)
+        and draft_input.get("action_type") == "virtual_runner.survey.execute"
+    ):
+        unknown = set(draft_input) - _INGRESS_FIELDS
+        if unknown:
+            raise LocalApplicationError(
+                "APPLICATION-INGRESS-001",
+                "typed action input contains caller-controlled authority or unknown fields: "
+                + ", ".join(sorted(map(str, unknown))),
+            )
+        payload = draft_input.get("payload")
+        if not isinstance(payload, Mapping):
+            raise LocalApplicationError("APPLICATION-INGRESS-001", "payload must be an object")
+        forbidden = set(payload) & _AUTHORITY_PAYLOAD_FIELDS
+        if forbidden:
+            raise LocalApplicationError(
+                "APPLICATION-AUTHORITY-001",
+                "caller may not supply Harness authority metadata: " + ", ".join(sorted(forbidden)),
+            )
+        normalized = _payload(payload)
+        if len(normalized["prior_virtual_run_ids"]) > _MAX_PRIOR_VIRTUAL_RUN_IDS:
+            raise LocalApplicationError(
+                "APPLICATION-VIRTUAL-PAYLOAD-001",
+                f"prior_virtual_run_ids may contain at most {_MAX_PRIOR_VIRTUAL_RUN_IDS} Run IDs",
+            )
+        return facade.run_survey_virtual(normalized)
+    return proceed(draft_input)
+
+
 class LocalApplicationFacade(
     VirtualRunnerInspectionMixin, VirtualRunnerExecuteMixin, SurveyResponseApplicationFacade
 ):
     """Final local Application Facade including Survey response intake and the Virtual Runner."""
+
+    _STAGES = {
+        "list_actions": list_actions_stage,
+        "submit_action": submit_action_stage,
+    }
 
     def _effective_profile_set(self, state) -> Mapping[str, Any]:
         if self._workspace_root is not None:
@@ -109,53 +165,3 @@ class LocalApplicationFacade(
             research_method=research_method,
         )
         return context, extension, method
-
-
-def list_actions_stage(facade, proceed: Callable[[], Mapping[str, Any]]) -> Mapping[str, Any]:
-    result = deepcopy(dict(proceed()))
-    result["actions"].append(
-        {
-            "action_type": "virtual_runner.survey.execute",
-            "payload_contract": "survey-virtual-runner-execution@0.1.0",
-            "effect": "read_only",
-            "confirmation_required": False,
-            "route_category": "research_capability",
-        }
-    )
-    return result
-
-
-def submit_action_stage(
-    facade,
-    draft_input: Mapping[str, Any],
-    view: str | None,
-    proceed: Callable[[Mapping[str, Any], str | None], Mapping[str, Any]],
-) -> Mapping[str, Any]:
-    if (
-        isinstance(draft_input, Mapping)
-        and draft_input.get("action_type") == "virtual_runner.survey.execute"
-    ):
-        unknown = set(draft_input) - _INGRESS_FIELDS
-        if unknown:
-            raise LocalApplicationError(
-                "APPLICATION-INGRESS-001",
-                "typed action input contains caller-controlled authority or unknown fields: "
-                + ", ".join(sorted(map(str, unknown))),
-            )
-        payload = draft_input.get("payload")
-        if not isinstance(payload, Mapping):
-            raise LocalApplicationError("APPLICATION-INGRESS-001", "payload must be an object")
-        forbidden = set(payload) & _AUTHORITY_PAYLOAD_FIELDS
-        if forbidden:
-            raise LocalApplicationError(
-                "APPLICATION-AUTHORITY-001",
-                "caller may not supply Harness authority metadata: " + ", ".join(sorted(forbidden)),
-            )
-        normalized = _payload(payload)
-        if len(normalized["prior_virtual_run_ids"]) > _MAX_PRIOR_VIRTUAL_RUN_IDS:
-            raise LocalApplicationError(
-                "APPLICATION-VIRTUAL-PAYLOAD-001",
-                f"prior_virtual_run_ids may contain at most {_MAX_PRIOR_VIRTUAL_RUN_IDS} Run IDs",
-            )
-        return facade.run_survey_virtual(normalized)
-    return proceed(draft_input, None)

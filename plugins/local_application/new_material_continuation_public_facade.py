@@ -131,230 +131,7 @@ def ensure_new_material_continuation_action(application, project_id: str, worksp
             )
 
 
-class LocalApplicationFacade(_BaseLocalApplicationFacade):
-    """Continue persisted divergent material through a new normal research result."""
-
-    def show_run(self, run_id: str) -> Mapping[str, Any]:
-        result = deepcopy(dict(super().show_run(run_id)))
-        try:
-            run = self._application.execution_store.load_run(run_id)
-        except Exception:
-            return result
-        if run is None:
-            return result
-
-        if run.capability_id == _MRA_CAPABILITY_ID:
-            nmv_records = [
-                item.get("payload")
-                for item in diagnostics_for(
-                    self._application.execution_store,
-                    run_id,
-                    kind=_MRA_RESULT_DIAGNOSTIC,
-                    limit=2,
-                )
-                if isinstance(item.get("payload"), Mapping)
-                and item["payload"].get("status") == "NEW_MATERIAL_VERSION"
-            ]
-            if len(nmv_records) != 1:
-                return result
-            try:
-                _run, mra, _artifact, historical, _original, _capture = _find_reacquisition_result(
-                    self._application, self._project_id, run_id
-                )
-            except LocalApplicationError as exc:
-                result["new_material_continuation"] = {
-                    "status": "blocked",
-                    "reacquisition_run_id": run_id,
-                    "failure_code": exc.code,
-                    "historical_recovery_satisfied": False,
-                }
-                return result
-            try:
-                binding = admission._continuation_binding(self._application.execution_store, run_id)
-                if binding is None:
-                    status, new_run_id = "available", None
-                else:
-                    bound = admission._validate_continuation_binding(
-                        self._application,
-                        self._project_id,
-                        binding,
-                        mra,
-                        historical,
-                        require_mirror=False,
-                        require_completed_capture=False,
-                    )
-                    mirror_complete = admission._continuation_mirror_complete(
-                        self._application.execution_store, binding
-                    )
-                    if bound.status.value == "COMPLETED" and mirror_complete:
-                        status = (
-                            "completed"
-                            if admission._completed_continuation_is_reusable(
-                                self._application,
-                                self._project_id,
-                                binding,
-                                mra,
-                                historical,
-                            )
-                            else "retryable"
-                        )
-                    elif not mirror_complete:
-                        status = "interrupted"
-                    else:
-                        status = bound.status.value.lower()
-                    new_run_id = bound.run_id
-            except LocalApplicationError as exc:
-                result["new_material_continuation"] = {
-                    "status": "conflict",
-                    "reacquisition_run_id": run_id,
-                    "failure_code": exc.code,
-                    "historical_recovery_satisfied": False,
-                }
-                return result
-            result["new_material_continuation"] = {
-                "status": status,
-                "reacquisition_run_id": run_id,
-                "historical_run_id": historical.run_id,
-                "historical_capture_id": mra["historical_capture_id"],
-                "new_material_artifact_id": mra["new_artifact_id"],
-                "new_material_kind": mra.get("new_material_kind") or mra.get("kind"),
-                "new_material_digest": mra["actual_digest"],
-                "new_material_size": mra["actual_size"],
-                "historical_acquired_at": mra["historical_acquired_at"],
-                "reacquired_at": mra["reacquired_at"],
-                "exact_locator": mra["requested_exact_locator"],
-                "new_run_id": new_run_id,
-                "historical_recovery_satisfied": False,
-            }
-        else:
-            own_bindings = [
-                item.get("payload")
-                for item in diagnostics_for(
-                    self._application.execution_store,
-                    run.run_id,
-                    kind=admission._CONTINUATION_BINDING_DIAGNOSTIC,
-                    limit=2,
-                )
-            ]
-            if len(own_bindings) == 1 and isinstance(own_bindings[0], Mapping):
-                binding = own_bindings[0]
-                reacquisition_run_id = str(binding.get("reacquisition_run_id") or "")
-                try:
-                    _parent, mra, artifact, historical, _original, _capture = (
-                        _find_reacquisition_result(
-                            self._application, self._project_id, reacquisition_run_id
-                        )
-                    )
-                    admission._validate_continuation_binding(
-                        self._application, self._project_id, binding, mra, historical
-                    )
-                except LocalApplicationError:
-                    return result
-                result["new_material_continuation"] = {
-                    "status": run.status.value.lower(),
-                    "reacquisition_run_id": reacquisition_run_id,
-                    "historical_run_id": historical.run_id,
-                    "historical_capture_id": mra["historical_capture_id"],
-                    "new_material_artifact_id": artifact.reference_id,
-                    "new_material_kind": mra.get("new_material_kind") or mra.get("kind"),
-                    "new_material_digest": mra["actual_digest"],
-                    "new_material_size": mra["actual_size"],
-                    "historical_acquired_at": mra["historical_acquired_at"],
-                    "reacquired_at": mra["reacquired_at"],
-                    "exact_locator": mra["requested_exact_locator"],
-                    "new_run_id": run.run_id,
-                    "new_handoff_id": run.handoff_ref,
-                    "new_handoff_digest": run.handoff_digest,
-                    "historical_recovery_satisfied": False,
-                }
-            elif not own_bindings:
-                artifacts = artifact_metadata_for(
-                    self._application.execution_store,
-                    run.run_id,
-                    limit=_GROUP_INSPECTION_ARTIFACT_LIMIT,
-                )
-                grouped = [
-                    item for item in artifacts if item.provenance.get("relation") == _GROUP_RELATION
-                ]
-                if grouped:
-                    group_ids = {
-                        str(item.provenance.get("continuation_group_id") or "") for item in grouped
-                    }
-                    historical_ids = {
-                        str(item.provenance.get("historical_run_id") or "") for item in grouped
-                    }
-                    run_id_lists = {
-                        tuple(item.provenance.get("reacquisition_run_ids") or ())
-                        for item in grouped
-                    }
-                    if (
-                        len(group_ids) == 1
-                        and "" not in group_ids
-                        and len(historical_ids) == 1
-                        and "" not in historical_ids
-                        and len(run_id_lists) == 1
-                    ):
-                        paired_ids = next(iter(run_id_lists))
-                        replacements = []
-                        valid = bool(paired_ids)
-                        for paired_id in paired_ids:
-                            try:
-                                _parent, mra, _artifact, historical, _original, _capture = (
-                                    _find_reacquisition_result(
-                                        self._application, self._project_id, str(paired_id)
-                                    )
-                                )
-                            except LocalApplicationError:
-                                valid = False
-                                break
-                            kind = str(mra.get("new_material_kind") or mra.get("kind") or "")
-                            role = (
-                                "desktop_research.original_capture"
-                                if kind == "original"
-                                else "desktop_research.text_rendition"
-                            )
-                            matches = [
-                                item
-                                for item in grouped
-                                if item.role == role
-                                and item.provenance.get("reacquisition_run_id") == paired_id
-                                and item.provenance.get("historical_capture_id")
-                                == mra.get("historical_capture_id")
-                                and item.provenance.get("reacquired_artifact_id")
-                                == mra.get("new_artifact_id")
-                                and item.digest == mra.get("actual_digest")
-                                and item.size == mra.get("actual_size")
-                            ]
-                            if len(matches) != 1 or historical.run_id not in historical_ids:
-                                valid = False
-                                break
-                            replacements.append(
-                                {
-                                    "reacquisition_run_id": str(paired_id),
-                                    "historical_capture_id": mra["historical_capture_id"],
-                                    "new_material_artifact_id": mra["new_artifact_id"],
-                                    "new_material_kind": kind,
-                                    "new_material_digest": mra["actual_digest"],
-                                    "new_material_size": mra["actual_size"],
-                                }
-                            )
-                        if valid:
-                            result["new_material_continuation"] = {
-                                "status": run.status.value.lower(),
-                                "mode": "paired",
-                                "continuation_group_id": next(iter(group_ids)),
-                                "reacquisition_run_ids": list(paired_ids),
-                                "historical_run_id": next(iter(historical_ids)),
-                                "replacements": replacements,
-                                "new_run_id": run.run_id,
-                                "new_handoff_id": run.handoff_ref,
-                                "new_handoff_digest": run.handoff_digest,
-                                "historical_recovery_satisfied": False,
-                            }
-        return result
-
-
-def list_actions_stage(facade, proceed: Callable[[], Mapping[str, Any]]) -> Mapping[str, Any]:
+def list_actions_stage(facade, proceed: Callable[..., Any]) -> Mapping[str, Any]:
     ensure_new_material_continuation_action(
         facade._application, facade._project_id, facade._workspace_root
     )
@@ -363,11 +140,241 @@ def list_actions_stage(facade, proceed: Callable[[], Mapping[str, Any]]) -> Mapp
 
 def submit_action_stage(
     facade,
+    proceed: Callable[..., Any],
     draft_input: Mapping[str, Any],
-    view: str | None,
-    proceed: Callable[[Mapping[str, Any], str | None], Mapping[str, Any]],
+    *,
+    view: str | None = None,
 ) -> Mapping[str, Any]:
     ensure_new_material_continuation_action(
         facade._application, facade._project_id, facade._workspace_root
     )
-    return proceed(draft_input, None)
+    return proceed(draft_input)
+
+
+def show_run_stage(facade, proceed: Callable[..., Any], run_id: str) -> Mapping[str, Any]:
+    result = deepcopy(dict(proceed(run_id)))
+    try:
+        run = facade._application.execution_store.load_run(run_id)
+    except Exception:
+        return result
+    if run is None:
+        return result
+
+    if run.capability_id == _MRA_CAPABILITY_ID:
+        nmv_records = [
+            item.get("payload")
+            for item in diagnostics_for(
+                facade._application.execution_store,
+                run_id,
+                kind=_MRA_RESULT_DIAGNOSTIC,
+                limit=2,
+            )
+            if isinstance(item.get("payload"), Mapping)
+            and item["payload"].get("status") == "NEW_MATERIAL_VERSION"
+        ]
+        if len(nmv_records) != 1:
+            return result
+        try:
+            _run, mra, _artifact, historical, _original, _capture = _find_reacquisition_result(
+                facade._application, facade._project_id, run_id
+            )
+        except LocalApplicationError as exc:
+            result["new_material_continuation"] = {
+                "status": "blocked",
+                "reacquisition_run_id": run_id,
+                "failure_code": exc.code,
+                "historical_recovery_satisfied": False,
+            }
+            return result
+        try:
+            binding = admission._continuation_binding(facade._application.execution_store, run_id)
+            if binding is None:
+                status, new_run_id = "available", None
+            else:
+                bound = admission._validate_continuation_binding(
+                    facade._application,
+                    facade._project_id,
+                    binding,
+                    mra,
+                    historical,
+                    require_mirror=False,
+                    require_completed_capture=False,
+                )
+                mirror_complete = admission._continuation_mirror_complete(
+                    facade._application.execution_store, binding
+                )
+                if bound.status.value == "COMPLETED" and mirror_complete:
+                    status = (
+                        "completed"
+                        if admission._completed_continuation_is_reusable(
+                            facade._application,
+                            facade._project_id,
+                            binding,
+                            mra,
+                            historical,
+                        )
+                        else "retryable"
+                    )
+                elif not mirror_complete:
+                    status = "interrupted"
+                else:
+                    status = bound.status.value.lower()
+                new_run_id = bound.run_id
+        except LocalApplicationError as exc:
+            result["new_material_continuation"] = {
+                "status": "conflict",
+                "reacquisition_run_id": run_id,
+                "failure_code": exc.code,
+                "historical_recovery_satisfied": False,
+            }
+            return result
+        result["new_material_continuation"] = {
+            "status": status,
+            "reacquisition_run_id": run_id,
+            "historical_run_id": historical.run_id,
+            "historical_capture_id": mra["historical_capture_id"],
+            "new_material_artifact_id": mra["new_artifact_id"],
+            "new_material_kind": mra.get("new_material_kind") or mra.get("kind"),
+            "new_material_digest": mra["actual_digest"],
+            "new_material_size": mra["actual_size"],
+            "historical_acquired_at": mra["historical_acquired_at"],
+            "reacquired_at": mra["reacquired_at"],
+            "exact_locator": mra["requested_exact_locator"],
+            "new_run_id": new_run_id,
+            "historical_recovery_satisfied": False,
+        }
+    else:
+        own_bindings = [
+            item.get("payload")
+            for item in diagnostics_for(
+                facade._application.execution_store,
+                run.run_id,
+                kind=admission._CONTINUATION_BINDING_DIAGNOSTIC,
+                limit=2,
+            )
+        ]
+        if len(own_bindings) == 1 and isinstance(own_bindings[0], Mapping):
+            binding = own_bindings[0]
+            reacquisition_run_id = str(binding.get("reacquisition_run_id") or "")
+            try:
+                _parent, mra, artifact, historical, _original, _capture = (
+                    _find_reacquisition_result(
+                        facade._application, facade._project_id, reacquisition_run_id
+                    )
+                )
+                admission._validate_continuation_binding(
+                    facade._application, facade._project_id, binding, mra, historical
+                )
+            except LocalApplicationError:
+                return result
+            result["new_material_continuation"] = {
+                "status": run.status.value.lower(),
+                "reacquisition_run_id": reacquisition_run_id,
+                "historical_run_id": historical.run_id,
+                "historical_capture_id": mra["historical_capture_id"],
+                "new_material_artifact_id": artifact.reference_id,
+                "new_material_kind": mra.get("new_material_kind") or mra.get("kind"),
+                "new_material_digest": mra["actual_digest"],
+                "new_material_size": mra["actual_size"],
+                "historical_acquired_at": mra["historical_acquired_at"],
+                "reacquired_at": mra["reacquired_at"],
+                "exact_locator": mra["requested_exact_locator"],
+                "new_run_id": run.run_id,
+                "new_handoff_id": run.handoff_ref,
+                "new_handoff_digest": run.handoff_digest,
+                "historical_recovery_satisfied": False,
+            }
+        elif not own_bindings:
+            artifacts = artifact_metadata_for(
+                facade._application.execution_store,
+                run.run_id,
+                limit=_GROUP_INSPECTION_ARTIFACT_LIMIT,
+            )
+            grouped = [
+                item for item in artifacts if item.provenance.get("relation") == _GROUP_RELATION
+            ]
+            if grouped:
+                group_ids = {
+                    str(item.provenance.get("continuation_group_id") or "") for item in grouped
+                }
+                historical_ids = {
+                    str(item.provenance.get("historical_run_id") or "") for item in grouped
+                }
+                run_id_lists = {
+                    tuple(item.provenance.get("reacquisition_run_ids") or ()) for item in grouped
+                }
+                if (
+                    len(group_ids) == 1
+                    and "" not in group_ids
+                    and len(historical_ids) == 1
+                    and "" not in historical_ids
+                    and len(run_id_lists) == 1
+                ):
+                    paired_ids = next(iter(run_id_lists))
+                    replacements = []
+                    valid = bool(paired_ids)
+                    for paired_id in paired_ids:
+                        try:
+                            _parent, mra, _artifact, historical, _original, _capture = (
+                                _find_reacquisition_result(
+                                    facade._application, facade._project_id, str(paired_id)
+                                )
+                            )
+                        except LocalApplicationError:
+                            valid = False
+                            break
+                        kind = str(mra.get("new_material_kind") or mra.get("kind") or "")
+                        role = (
+                            "desktop_research.original_capture"
+                            if kind == "original"
+                            else "desktop_research.text_rendition"
+                        )
+                        matches = [
+                            item
+                            for item in grouped
+                            if item.role == role
+                            and item.provenance.get("reacquisition_run_id") == paired_id
+                            and item.provenance.get("historical_capture_id")
+                            == mra.get("historical_capture_id")
+                            and item.provenance.get("reacquired_artifact_id")
+                            == mra.get("new_artifact_id")
+                            and item.digest == mra.get("actual_digest")
+                            and item.size == mra.get("actual_size")
+                        ]
+                        if len(matches) != 1 or historical.run_id not in historical_ids:
+                            valid = False
+                            break
+                        replacements.append(
+                            {
+                                "reacquisition_run_id": str(paired_id),
+                                "historical_capture_id": mra["historical_capture_id"],
+                                "new_material_artifact_id": mra["new_artifact_id"],
+                                "new_material_kind": kind,
+                                "new_material_digest": mra["actual_digest"],
+                                "new_material_size": mra["actual_size"],
+                            }
+                        )
+                    if valid:
+                        result["new_material_continuation"] = {
+                            "status": run.status.value.lower(),
+                            "mode": "paired",
+                            "continuation_group_id": next(iter(group_ids)),
+                            "reacquisition_run_ids": list(paired_ids),
+                            "historical_run_id": next(iter(historical_ids)),
+                            "replacements": replacements,
+                            "new_run_id": run.run_id,
+                            "new_handoff_id": run.handoff_ref,
+                            "new_handoff_digest": run.handoff_digest,
+                            "historical_recovery_satisfied": False,
+                        }
+    return result
+
+
+class LocalApplicationFacade(_BaseLocalApplicationFacade):
+    """Continue persisted divergent material through a new normal research result."""
+
+    _STAGES = {
+        "list_actions": list_actions_stage,
+        "submit_action": submit_action_stage,
+        "show_run": show_run_stage,
+    }

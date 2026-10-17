@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from copy import deepcopy
 from typing import Any
 
@@ -280,24 +280,26 @@ class HistoricalFindingRecoveryHandler:
         )
 
 
+def show_run_stage(facade, proceed: Callable[..., Any], run_id: str) -> Mapping[str, Any]:
+    result = deepcopy(dict(proceed(run_id)))
+    run = result.get("run")
+    if (
+        isinstance(run, Mapping)
+        and run.get("capability_id") == "desktop-research"
+        and run.get("function_id") == "investigate"
+        and run.get("execution_mode") == "real"
+        and run.get("status") == RunStatus.COMPLETED.value
+    ):
+        result["finding_recovery"] = _diagnose(facade._application, facade._project_id, run_id)
+    return result
+
+
 class LocalApplicationFacade(_base.LocalApplicationFacade):
     """#142 recovery plus bounded diagnosis and persisted direct-replay compatibility."""
 
-    def show_run(self, run_id: str) -> Mapping[str, Any]:
-        result = deepcopy(dict(super().show_run(run_id)))
-        run = result.get("run")
-        if (
-            isinstance(run, Mapping)
-            and run.get("capability_id") == "desktop-research"
-            and run.get("function_id") == "investigate"
-            and run.get("execution_mode") == "real"
-            and run.get("status") == RunStatus.COMPLETED.value
-        ):
-            result["finding_recovery"] = _diagnose(self._application, self._project_id, run_id)
-        return result
-
-    def recover_legacy_desktop_research_finding_candidate(self, run_id: str) -> Mapping[str, Any]:
-        return _recover(self._application, self._project_id, run_id)
+    _STAGES = {
+        "show_run": show_run_stage,
+    }
 
     def _ensure_finding_recovery_action(self) -> None:
         coordinator = self._application.coordinator

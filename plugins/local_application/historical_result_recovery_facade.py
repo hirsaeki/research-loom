@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from copy import deepcopy
 from typing import Any
 
@@ -417,38 +417,43 @@ class HistoricalResultRecoveryHandler:
         )
 
 
+def show_run_stage(facade, proceed: Callable[..., Any], run_id: str) -> Mapping[str, Any]:
+    result = deepcopy(dict(proceed(run_id)))
+    diagnosis = result.get("finding_recovery")
+    if not isinstance(diagnosis, Mapping):
+        return result
+    enriched = dict(diagnosis)
+    classification = _classification(facade._application, facade._project_id, run_id)
+    enriched["recovery_class"] = classification["recovery_class"]
+    if "route" in classification:
+        enriched["recovery_route"] = classification["route"]
+    for key in (
+        "source_handoff_id",
+        "source_handoff_digest",
+        "source_extension_digest",
+        "normalized_proposal_digest",
+        "historical_candidate_lineage_status",
+        "historical_candidate_count",
+    ):
+        if key in classification:
+            enriched[key] = classification[key]
+    if classification["recovery_class"] != "proposal_rematerializable":
+        enriched["recovery_stage"] = classification.get("stage")
+        enriched["recovery_failure_class"] = classification.get("failure_class")
+        enriched["recovery_code"] = classification.get("code")
+        enriched["recovery_message"] = classification.get("message")
+        if "failure_details" in classification:
+            enriched["recovery_failure_details"] = deepcopy(classification["failure_details"])
+    result["finding_recovery"] = enriched
+    return result
+
+
 class LocalApplicationFacade(_base.LocalApplicationFacade):
     """#148 canonical-result rematerialization over #142/#147 recovery."""
 
-    def show_run(self, run_id: str) -> Mapping[str, Any]:
-        result = deepcopy(dict(super().show_run(run_id)))
-        diagnosis = result.get("finding_recovery")
-        if not isinstance(diagnosis, Mapping):
-            return result
-        enriched = dict(diagnosis)
-        classification = _classification(self._application, self._project_id, run_id)
-        enriched["recovery_class"] = classification["recovery_class"]
-        if "route" in classification:
-            enriched["recovery_route"] = classification["route"]
-        for key in (
-            "source_handoff_id",
-            "source_handoff_digest",
-            "source_extension_digest",
-            "normalized_proposal_digest",
-            "historical_candidate_lineage_status",
-            "historical_candidate_count",
-        ):
-            if key in classification:
-                enriched[key] = classification[key]
-        if classification["recovery_class"] != "proposal_rematerializable":
-            enriched["recovery_stage"] = classification.get("stage")
-            enriched["recovery_failure_class"] = classification.get("failure_class")
-            enriched["recovery_code"] = classification.get("code")
-            enriched["recovery_message"] = classification.get("message")
-            if "failure_details" in classification:
-                enriched["recovery_failure_details"] = deepcopy(classification["failure_details"])
-        result["finding_recovery"] = enriched
-        return result
+    _STAGES = {
+        "show_run": show_run_stage,
+    }
 
     def recover_legacy_desktop_research_finding_candidate(self, run_id: str) -> Mapping[str, Any]:
         return _recover(self._application, self._project_id, run_id)

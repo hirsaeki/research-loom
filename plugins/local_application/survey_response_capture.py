@@ -18,7 +18,7 @@ from plugins.survey_response import (
 )
 from plugins.survey_validation import capture_origin, input_object
 
-from .facade import LocalApplicationError
+from .facade import LocalApplicationError, run_stages, stages_for
 from .survey_facade import _snapshot
 from .survey_response_core import _DATASET_FIELDS, _RESPONSE_FIELDS, _status_value
 
@@ -477,6 +477,20 @@ class SurveyResponseCaptureMixin:
         return result
 
     def capture_virtual_run_response_dataset(
+        self,
+        run_id: str,
+        *,
+        instrument_ref: Mapping[str, Any],
+    ) -> Mapping[str, Any]:
+        return run_stages(
+            stages_for(type(self), "capture_virtual_run_response_dataset"),
+            self,
+            self._capture_virtual_run_response_dataset_terminal,
+            run_id,
+            instrument_ref=instrument_ref,
+        )
+
+    def _capture_virtual_run_response_dataset_terminal(
         self,
         run_id: str,
         *,

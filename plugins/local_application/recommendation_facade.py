@@ -193,49 +193,86 @@ class ResearchRecommendationProposeHandler:
         )
 
 
+def list_actions_stage(facade, proceed: Callable[..., Any]) -> Mapping[str, Any]:
+    facade._ensure_recommendation_action()
+    return proceed()
+
+
+def submit_action_stage(
+    facade,
+    proceed: Callable[..., Any],
+    draft_input: Mapping[str, Any],
+    *,
+    view: str | None = None,
+) -> Mapping[str, Any]:
+    facade._ensure_recommendation_action()
+    result = dict(proceed(draft_input))
+    if draft_input.get("action_type") not in _CANDIDATE_PROJECTION_ACTIONS:
+        return result
+    data = result.get("data")
+    candidate = data.get("state_delta_proposal") if isinstance(data, Mapping) else None
+    if not isinstance(candidate, Mapping):
+        return result
+    projected_data = deepcopy(dict(data))
+    projected_data["candidate_projection"] = build_candidate_projection(
+        candidate, facade._current_state_view()
+    )
+    result["data"] = projected_data
+    return result
+
+
+def resume_context_stage(
+    facade, proceed: Callable[..., Any], *, limits: Mapping[str, int] | None = None
+) -> Mapping[str, Any]:
+    result = deepcopy(dict(proceed(limits=limits)))
+    questions = result.get("research_questions")
+    candidates = questions.get("candidates") if isinstance(questions, Mapping) else None
+    if not isinstance(candidates, list) or not candidates:
+        return result
+    state = facade._current_state_view()
+    candidate_ids = []
+    for row in candidates:
+        if not isinstance(row, dict):
+            continue
+        candidate_id = row.get("state_delta_proposal_id")
+        if not isinstance(candidate_id, str) or not candidate_id:
+            raise ConversationRuntimeError(
+                "APPLICATION-CANDIDATE-PROJECTION-001",
+                "resume candidate identity is invalid",
+            )
+        candidate_ids.append(candidate_id)
+    candidates_by_id = state_delta_proposals_by_ids_for_project(
+        facade._application.conversation_store,
+        facade._project_id,
+        candidate_ids,
+    )
+    for row in candidates:
+        if not isinstance(row, dict):
+            continue
+        candidate_id = row.get("state_delta_proposal_id")
+        if not isinstance(candidate_id, str) or not candidate_id:
+            raise ConversationRuntimeError(
+                "APPLICATION-CANDIDATE-PROJECTION-001",
+                "resume candidate identity is invalid",
+            )
+        candidate = candidates_by_id.get(candidate_id)
+        if not isinstance(candidate, Mapping):
+            raise ConversationRuntimeError(
+                "APPLICATION-CANDIDATE-PROJECTION-001",
+                "resume candidate does not resolve",
+            )
+        row["candidate_projection"] = build_candidate_projection(candidate, state)
+    return result
+
+
 class LocalApplicationFacade(_BaseLocalApplicationFacade):
     """Public production facade extension for bounded Recommendation proposal."""
 
-    def resume_context(self, *, limits: Mapping[str, int] | None = None) -> Mapping[str, Any]:
-        result = deepcopy(dict(super().resume_context(limits=limits)))
-        questions = result.get("research_questions")
-        candidates = questions.get("candidates") if isinstance(questions, Mapping) else None
-        if not isinstance(candidates, list) or not candidates:
-            return result
-        state = self._current_state_view()
-        candidate_ids = []
-        for row in candidates:
-            if not isinstance(row, dict):
-                continue
-            candidate_id = row.get("state_delta_proposal_id")
-            if not isinstance(candidate_id, str) or not candidate_id:
-                raise ConversationRuntimeError(
-                    "APPLICATION-CANDIDATE-PROJECTION-001",
-                    "resume candidate identity is invalid",
-                )
-            candidate_ids.append(candidate_id)
-        candidates_by_id = state_delta_proposals_by_ids_for_project(
-            self._application.conversation_store,
-            self._project_id,
-            candidate_ids,
-        )
-        for row in candidates:
-            if not isinstance(row, dict):
-                continue
-            candidate_id = row.get("state_delta_proposal_id")
-            if not isinstance(candidate_id, str) or not candidate_id:
-                raise ConversationRuntimeError(
-                    "APPLICATION-CANDIDATE-PROJECTION-001",
-                    "resume candidate identity is invalid",
-                )
-            candidate = candidates_by_id.get(candidate_id)
-            if not isinstance(candidate, Mapping):
-                raise ConversationRuntimeError(
-                    "APPLICATION-CANDIDATE-PROJECTION-001",
-                    "resume candidate does not resolve",
-                )
-            row["candidate_projection"] = build_candidate_projection(candidate, state)
-        return result
+    _STAGES = {
+        "list_actions": list_actions_stage,
+        "submit_action": submit_action_stage,
+        "resume_context": resume_context_stage,
+    }
 
     def _current_state_view(self):
         repository = self._application.state_repository
@@ -286,30 +323,3 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                         self._application.ids,
                     ),
                 )
-
-
-def list_actions_stage(facade, proceed: Callable[[], Mapping[str, Any]]) -> Mapping[str, Any]:
-    facade._ensure_recommendation_action()
-    return proceed()
-
-
-def submit_action_stage(
-    facade,
-    draft_input: Mapping[str, Any],
-    view: str | None,
-    proceed: Callable[[Mapping[str, Any], str | None], Mapping[str, Any]],
-) -> Mapping[str, Any]:
-    facade._ensure_recommendation_action()
-    result = dict(proceed(draft_input, None))
-    if draft_input.get("action_type") not in _CANDIDATE_PROJECTION_ACTIONS:
-        return result
-    data = result.get("data")
-    candidate = data.get("state_delta_proposal") if isinstance(data, Mapping) else None
-    if not isinstance(candidate, Mapping):
-        return result
-    projected_data = deepcopy(dict(data))
-    projected_data["candidate_projection"] = build_candidate_projection(
-        candidate, facade._current_state_view()
-    )
-    result["data"] = projected_data
-    return result

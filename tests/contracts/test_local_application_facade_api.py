@@ -18,6 +18,82 @@ from typing import Any
 
 SNAPSHOT = Path(__file__).with_name("local_application_facade_api.json")
 
+# Stage order of each public operation on the exported facade, outermost
+# first (module of each stage). It follows the MRO, as the former super()
+# chain did; a change here is a behavior change and must be deliberate.
+STAGE_ORDER = {
+    "capture_exhibit": [
+        "visual_need_facade",
+        "visual_facade",
+    ],
+    "capture_external_source": [
+        "retention_facade",
+    ],
+    "capture_virtual_run_response_dataset": [
+        "survey_response_facade",
+    ],
+    "close": [
+        "project_input_facade",
+    ],
+    "collect_external": [
+        "synthesis_candidate_facade",
+        "external_attempt_lifecycle_facade",
+    ],
+    "list_actions": [
+        "source_bibliography_facade",
+        "evidence_qualification_facade",
+        "recommendation_facade",
+        "new_material_continuation_public_facade",
+        "finding_recovery_facade",
+        "argument_facade",
+        "question_review_facade",
+        "survey_analysis_facade",
+        "virtual_runner_facade",
+        "survey_response_facade",
+        "retention_facade",
+    ],
+    "replay_completed_desktop_research_run": [
+        "synthesis_candidate_facade",
+    ],
+    "resolve_human_decision": [
+        "synthesis_candidate_facade",
+    ],
+    "resume_context": [
+        "synthesis_candidate_facade",
+        "recommendation_facade",
+        "question_review_facade",
+    ],
+    "show_run": [
+        "synthesis_candidate_facade",
+        "new_material_continuation_public_facade",
+        "material_reacquisition_public_facade",
+        "historical_result_recovery_facade",
+        "historical_finding_recovery_facade",
+        "virtual_runner_inspection",
+    ],
+    "status": [
+        "synthesis_candidate_facade",
+    ],
+    "submit_action": [
+        "source_bibliography_facade",
+        "evidence_qualification_facade",
+        "synthesis_candidate_facade",
+        "recommendation_facade",
+        "new_material_continuation_public_facade",
+        "finding_recovery_facade",
+        "argument_facade",
+        "project_input_facade",
+        "question_review_facade",
+        "survey_analysis_facade",
+        "virtual_runner_facade",
+        "survey_response_facade",
+        "retention_facade",
+    ],
+    "submit_confirmation": [
+        "synthesis_candidate_facade",
+    ],
+}
+
 
 def facade_api() -> list[dict[str, Any]]:
     from plugins.local_application import LocalApplicationFacade
@@ -63,15 +139,53 @@ class LocalApplicationFacadeApiTests(unittest.TestCase):
         ]
         self.assertEqual([], changed, "public kind or signature changed")
 
-    def test_action_dispatch_is_not_overridden_by_layers(self):
-        # Layers contribute ordered steps (_LIST_ACTIONS_STAGES /
-        # _SUBMIT_ACTION_STAGES) rather than super() overrides.
+    def test_public_methods_are_not_overridden_by_layers(self):
+        # Layers contribute ordered stages (_<NAME>_STAGES, see
+        # facade.run_stages) rather than overriding public methods via super().
         from plugins.local_application import LocalApplicationFacade
-        from plugins.local_application.facade import LocalApplicationFacade as RootFacade
 
-        for name in ("list_actions", "submit_action"):
-            owners = [cls for cls in LocalApplicationFacade.__mro__ if name in vars(cls)]
-            self.assertEqual([RootFacade], owners, name)
+        overridden = {
+            name: [cls.__module__ for cls in LocalApplicationFacade.__mro__ if name in vars(cls)]
+            for name in dir(LocalApplicationFacade)
+            if not name.startswith("_")
+        }
+        self.assertEqual(
+            {}, {name: owners for name, owners in overridden.items() if len(owners) > 1}
+        )
+
+    def test_stage_order_is_pinned(self):
+        from plugins.local_application import LocalApplicationFacade
+        from plugins.local_application.facade import stages_for
+
+        actual = {
+            name: [
+                stage.__module__.rsplit(".", 1)[-1]
+                for stage in stages_for(LocalApplicationFacade, name)
+            ]
+            for name in STAGE_ORDER
+        }
+        self.assertEqual(STAGE_ORDER, actual)
+
+    def test_intermediate_facades_run_the_stages_below_them(self):
+        # Continuation services build this intermediate facade directly; it
+        # must keep running the stages its former super() chain reached.
+        from plugins.local_application import LocalApplicationFacade
+        from plugins.local_application.facade import stages_for
+        from plugins.local_application.material_reacquisition_public_facade import (
+            LocalApplicationFacade as ContinuationFacade,
+        )
+
+        for name in STAGE_ORDER:
+            full = stages_for(LocalApplicationFacade, name)
+            below = stages_for(ContinuationFacade, name)
+            self.assertEqual(full[len(full) - len(below) :], below, name)
+        self.assertEqual(
+            [
+                stage.__module__.rsplit(".", 1)[-1]
+                for stage in stages_for(ContinuationFacade, "submit_action")
+            ],
+            STAGE_ORDER["submit_action"][5:],
+        )
 
 
 if __name__ == "__main__":
