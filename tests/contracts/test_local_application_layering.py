@@ -36,24 +36,32 @@ def _subpackage(module: str) -> str | None:
     return rest[0] if rest and (PACKAGE_DIR / rest[0] / "__init__.py").is_file() else ""
 
 
+def _violations(source: str, where: str, imports) -> list[str]:
+    found = []
+    for target, names, line in imports:
+        dest = _subpackage(target)
+        if dest is None or dest == source:
+            continue
+        if dest == "" or LAYERS.index(dest) > LAYERS.index(source):
+            found.append(f"{where}:{line} {source} -> {target}")
+        # A private submodule counts whether it is named in the module path
+        # (`import ...support._m`, `from ...support._m import y`) or imported as a name.
+        if any(map(_is_private, target.split(".")[3:])):
+            found.append(f"{where}:{line} {source} -> {target} (private)")
+        found.extend(
+            f"{where}:{line} {source} -> {target}.{name} (private)"
+            for name in names
+            if _is_private(name)
+        )
+    return found
+
+
 def layering_violations() -> list[str]:
     found = []
     for path in sorted(PACKAGE_DIR.rglob("*.py")):
         source = _subpackage(_module_name(path))
-        if not source:
-            continue
-        where = path.relative_to(ROOT).as_posix()
-        for target, names, line in _imports(path):
-            dest = _subpackage(target)
-            if dest is None or dest == source:
-                continue
-            if dest == "" or LAYERS.index(dest) > LAYERS.index(source):
-                found.append(f"{where}:{line} {source} -> {target}")
-            found.extend(
-                f"{where}:{line} {source} -> {target}.{name} (private)"
-                for name in names
-                if _is_private(name)
-            )
+        if source:
+            found += _violations(source, path.relative_to(ROOT).as_posix(), _imports(path))
     return found
 
 
@@ -72,6 +80,24 @@ class LocalApplicationLayeringTests(unittest.TestCase):
         self.assertEqual("", _subpackage(f"{PACKAGE}.cli"))
         self.assertEqual("", _subpackage(PACKAGE))
         self.assertIsNone(_subpackage("plugins.application_errors"))
+
+    def test_guard_detects_private_and_upward_imports(self):
+        imports = [
+            (f"{PACKAGE}.support._m", [], 1),
+            (f"{PACKAGE}.support._m", ["x"], 2),
+            (f"{PACKAGE}.support.stages", ["_hidden"], 3),
+            (f"{PACKAGE}.support.stages", ["run_stages"], 4),
+            (f"{PACKAGE}.facade", ["LocalApplicationFacadeCore"], 5),
+        ]
+        self.assertEqual(
+            [
+                f"w:1 workspace -> {PACKAGE}.support._m (private)",
+                f"w:2 workspace -> {PACKAGE}.support._m (private)",
+                f"w:3 workspace -> {PACKAGE}.support.stages._hidden (private)",
+                f"w:5 workspace -> {PACKAGE}.facade",
+            ],
+            _violations("workspace", "w", imports),
+        )
 
 
 if __name__ == "__main__":
