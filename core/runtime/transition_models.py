@@ -363,6 +363,10 @@ def canonical_json(value: Any) -> str:
 
 
 def canonical_digest(value: Any) -> str:
+    """Digest sorted-key ``json.dumps`` output (see ``canonical_json``).
+
+    This is not RFC 8785; RFC 8785 digests live in ``core.runtime.digests``.
+    """
     payload = canonical_json(value).encode("utf-8")
     return DIGEST_PREFIX + hashlib.sha256(payload).hexdigest()
 
