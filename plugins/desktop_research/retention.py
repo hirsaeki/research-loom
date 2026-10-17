@@ -58,7 +58,7 @@ def _normalized_whitespace(value: str) -> str:
     return _VALIDATION_WHITESPACE.sub(" ", value)
 
 
-def _matching_whitespace_slice(text: str, excerpt: str) -> str | None:
+def matching_whitespace_slice(text: str, excerpt: str) -> str | None:
     """Return the exact text slice when only allowed whitespace differs."""
     normalized_excerpt = _normalized_whitespace(excerpt)
     if not normalized_excerpt:
@@ -170,7 +170,7 @@ class DesktopResearchResultValidator(_BaseValidator):
             excerpt = str(citation.get("excerpt") or "")
             if excerpt in text:
                 continue
-            matched = _matching_whitespace_slice(text, excerpt)
+            matched = matching_whitespace_slice(text, excerpt)
             if matched is not None:
                 # Validation copy only; persisted/canonical citation text stays exact.
                 citation["excerpt"] = matched

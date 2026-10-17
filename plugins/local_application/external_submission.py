@@ -11,7 +11,7 @@ from core.runtime.normalization import NormalizationRejected
 from plugins.desktop_research import DesktopResearchResultValidator, build_result_extension
 from plugins.desktop_research.attempts import UNSUCCESSFUL_OUTCOMES
 from plugins.desktop_research.normalization import verified_resource_basis_provenance
-from plugins.desktop_research.retention import _matching_whitespace_slice
+from plugins.desktop_research.retention import matching_whitespace_slice
 from plugins.local_execution_store import LocalExecutionStoreError
 from plugins.local_execution_store.capture_query import artifacts_for_capture_ids
 
@@ -482,7 +482,7 @@ def _citations(value, capture_details, texts):
                 "text_rendition_digest": detail["text_rendition"]["content_digest"],
                 "capture_integrity_verified": True,
                 "excerpt_containment_verified": excerpt in text
-                or _matching_whitespace_slice(text, excerpt) is not None,
+                or matching_whitespace_slice(text, excerpt) is not None,
                 "evidence_adoption_performed": False,
             }
         )
