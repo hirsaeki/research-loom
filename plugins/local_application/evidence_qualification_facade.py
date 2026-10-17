@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from copy import deepcopy
 from threading import RLock
 from typing import Any
@@ -220,16 +220,6 @@ class ResearchEvidenceQualificationHandler:
 class LocalApplicationFacade(_BaseLocalApplicationFacade):
     """Public Evidence qualification ingress over the existing Human Decision gate."""
 
-    def list_actions(self) -> Mapping[str, Any]:
-        self._ensure_evidence_qualification_action()
-        return super().list_actions()
-
-    def submit_action(
-        self, draft_input: Mapping[str, Any], *, view: str | None = None
-    ) -> Mapping[str, Any]:
-        self._ensure_evidence_qualification_action()
-        return super().submit_action(draft_input, view=view)
-
     def _ensure_evidence_qualification_action(self) -> None:
         coordinator = self._application.coordinator
         action_registry = coordinator._actions
@@ -274,3 +264,18 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                         self._application.ids,
                     ),
                 )
+
+
+def list_actions_stage(facade, proceed: Callable[[], Mapping[str, Any]]) -> Mapping[str, Any]:
+    facade._ensure_evidence_qualification_action()
+    return proceed()
+
+
+def submit_action_stage(
+    facade,
+    draft_input: Mapping[str, Any],
+    view: str | None,
+    proceed: Callable[[Mapping[str, Any], str | None], Mapping[str, Any]],
+) -> Mapping[str, Any]:
+    facade._ensure_evidence_qualification_action()
+    return proceed(draft_input, view)

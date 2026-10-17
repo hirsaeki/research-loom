@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import base64
 import mimetypes
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
@@ -312,57 +312,6 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
             formats.insert(1, "text")
         return formats
 
-    def submit_action(self, draft_input: Mapping[str, Any]) -> Mapping[str, Any]:
-        if (
-            isinstance(draft_input, Mapping)
-            and draft_input.get("action_type") == "research_question.review"
-        ):
-            payload = draft_input.get("payload")
-            review_inputs = payload.get("review_inputs") if isinstance(payload, Mapping) else None
-            ids = (
-                review_inputs.get("project_input_ids", [])
-                if isinstance(review_inputs, Mapping)
-                else []
-            )
-            if ids:
-                if not isinstance(ids, list) or any(not isinstance(item, str) for item in ids):
-                    raise LocalApplicationError(
-                        "APPLICATION-PROJECT-INPUT-001", "project_input_ids must be an array of IDs"
-                    )
-                if len(ids) > _MAX_PROJECT_INPUT_IDS:
-                    raise LocalApplicationError(
-                        "APPLICATION-PROJECT-INPUT-001",
-                        f"project_input_ids must contain at most {_MAX_PROJECT_INPUT_IDS} IDs",
-                    )
-                registry = self._registry()
-                resolved: dict[str, Mapping[str, Any]] = {}
-                missing: list[str] = []
-                try:
-                    for item in ids:
-                        document = registry.verify_content(item, self._project_id)
-                        if document is None:
-                            missing.append(item)
-                            continue
-                        resolved[item] = document
-                except LocalProjectInputStoreError as exc:
-                    raise LocalApplicationError(exc.code, exc.message) from exc
-                if missing:
-                    raise LocalApplicationError(
-                        "APPLICATION-PROJECT-INPUT-404",
-                        "Question Review references unknown project inputs: " + ", ".join(missing),
-                    )
-                lineage, _snapshot_id, _snapshot_digest = self._current_binding()
-                foreign_lineage = [
-                    item for item, value in resolved.items() if value["lineage_ref"] != lineage
-                ]
-                if foreign_lineage:
-                    raise LocalApplicationError(
-                        "APPLICATION-PROJECT-INPUT-STALE-001",
-                        "Question Review references project inputs from a different Research Lineage: "
-                        + ", ".join(foreign_lineage),
-                    )
-        return super().submit_action(draft_input)
-
     def _research_package_service(self):
         from .research_package_service import ResearchPackageService
 
@@ -442,3 +391,58 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
         self, composition_id: str, revision_id: str | None = None
     ) -> Mapping[str, Any]:
         return self._writer_round_trip_service().inspect(composition_id, revision_id)
+
+
+def submit_action_stage(
+    facade,
+    draft_input: Mapping[str, Any],
+    view: str | None,
+    proceed: Callable[[Mapping[str, Any], str | None], Mapping[str, Any]],
+) -> Mapping[str, Any]:
+    if (
+        isinstance(draft_input, Mapping)
+        and draft_input.get("action_type") == "research_question.review"
+    ):
+        payload = draft_input.get("payload")
+        review_inputs = payload.get("review_inputs") if isinstance(payload, Mapping) else None
+        ids = (
+            review_inputs.get("project_input_ids", []) if isinstance(review_inputs, Mapping) else []
+        )
+        if ids:
+            if not isinstance(ids, list) or any(not isinstance(item, str) for item in ids):
+                raise LocalApplicationError(
+                    "APPLICATION-PROJECT-INPUT-001", "project_input_ids must be an array of IDs"
+                )
+            if len(ids) > _MAX_PROJECT_INPUT_IDS:
+                raise LocalApplicationError(
+                    "APPLICATION-PROJECT-INPUT-001",
+                    f"project_input_ids must contain at most {_MAX_PROJECT_INPUT_IDS} IDs",
+                )
+            registry = facade._registry()
+            resolved: dict[str, Mapping[str, Any]] = {}
+            missing: list[str] = []
+            try:
+                for item in ids:
+                    document = registry.verify_content(item, facade._project_id)
+                    if document is None:
+                        missing.append(item)
+                        continue
+                    resolved[item] = document
+            except LocalProjectInputStoreError as exc:
+                raise LocalApplicationError(exc.code, exc.message) from exc
+            if missing:
+                raise LocalApplicationError(
+                    "APPLICATION-PROJECT-INPUT-404",
+                    "Question Review references unknown project inputs: " + ", ".join(missing),
+                )
+            lineage, _snapshot_id, _snapshot_digest = facade._current_binding()
+            foreign_lineage = [
+                item for item, value in resolved.items() if value["lineage_ref"] != lineage
+            ]
+            if foreign_lineage:
+                raise LocalApplicationError(
+                    "APPLICATION-PROJECT-INPUT-STALE-001",
+                    "Question Review references project inputs from a different Research Lineage: "
+                    + ", ".join(foreign_lineage),
+                )
+    return proceed(draft_input, None)

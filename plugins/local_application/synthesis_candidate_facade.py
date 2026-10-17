@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from copy import deepcopy
 from typing import Any
 
@@ -503,22 +503,6 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                 detail=detail,
             )
 
-    def submit_action(
-        self, draft_input: Mapping[str, Any], *, view: str | None = None
-    ) -> Mapping[str, Any]:
-        selected = self._public_view(view)
-        detail = super().submit_action(draft_input)
-        if selected == "detail":
-            return detail
-        action_type = draft_input.get("action_type") if isinstance(draft_input, Mapping) else None
-        return self._after_operation_projection(
-            detail,
-            lambda value, **_: project_action_result(
-                value, action_type=str(action_type or ""), state=self._current_state_view()
-            ),
-            operation="action.submit",
-        )
-
     def submit_confirmation(
         self, confirmation: Mapping[str, Any], *, view: str | None = None
     ) -> Mapping[str, Any]:
@@ -600,3 +584,23 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
             if selected == "detail"
             else self._read_projection(result, project_resume, operation="resume")
         )
+
+
+def submit_action_stage(
+    facade,
+    draft_input: Mapping[str, Any],
+    view: str | None,
+    proceed: Callable[[Mapping[str, Any], str | None], Mapping[str, Any]],
+) -> Mapping[str, Any]:
+    selected = facade._public_view(view)
+    detail = proceed(draft_input, None)
+    if selected == "detail":
+        return detail
+    action_type = draft_input.get("action_type") if isinstance(draft_input, Mapping) else None
+    return facade._after_operation_projection(
+        detail,
+        lambda value, **_: project_action_result(
+            value, action_type=str(action_type or ""), state=facade._current_state_view()
+        ),
+        operation="action.submit",
+    )

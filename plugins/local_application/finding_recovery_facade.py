@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from copy import deepcopy
 from threading import RLock
 from typing import Any
@@ -387,14 +387,6 @@ class LegacyFindingRecoveryHandler:
 class LocalApplicationFacade(_BaseLocalApplicationFacade):
     """Public bounded recovery for immutable pre-#139 Desktop Research candidates."""
 
-    def list_actions(self) -> Mapping[str, Any]:
-        self._ensure_finding_recovery_action()
-        return super().list_actions()
-
-    def submit_action(self, draft_input: Mapping[str, Any]) -> Mapping[str, Any]:
-        self._ensure_finding_recovery_action()
-        return super().submit_action(draft_input)
-
     def recover_legacy_desktop_research_finding_candidate(self, run_id: str) -> Mapping[str, Any]:
         return _recover_legacy_candidate(self._application, self._project_id, run_id)
 
@@ -438,3 +430,18 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                     _ACTION_TYPE,
                     LegacyFindingRecoveryHandler(self._application, self._project_id),
                 )
+
+
+def list_actions_stage(facade, proceed: Callable[[], Mapping[str, Any]]) -> Mapping[str, Any]:
+    facade._ensure_finding_recovery_action()
+    return proceed()
+
+
+def submit_action_stage(
+    facade,
+    draft_input: Mapping[str, Any],
+    view: str | None,
+    proceed: Callable[[Mapping[str, Any], str | None], Mapping[str, Any]],
+) -> Mapping[str, Any]:
+    facade._ensure_finding_recovery_action()
+    return proceed(draft_input, None)

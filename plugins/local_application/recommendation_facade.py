@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from copy import deepcopy
 from threading import RLock
 from typing import Any
@@ -196,26 +196,6 @@ class ResearchRecommendationProposeHandler:
 class LocalApplicationFacade(_BaseLocalApplicationFacade):
     """Public production facade extension for bounded Recommendation proposal."""
 
-    def list_actions(self) -> Mapping[str, Any]:
-        self._ensure_recommendation_action()
-        return super().list_actions()
-
-    def submit_action(self, draft_input: Mapping[str, Any]) -> Mapping[str, Any]:
-        self._ensure_recommendation_action()
-        result = dict(super().submit_action(draft_input))
-        if draft_input.get("action_type") not in _CANDIDATE_PROJECTION_ACTIONS:
-            return result
-        data = result.get("data")
-        candidate = data.get("state_delta_proposal") if isinstance(data, Mapping) else None
-        if not isinstance(candidate, Mapping):
-            return result
-        projected_data = deepcopy(dict(data))
-        projected_data["candidate_projection"] = build_candidate_projection(
-            candidate, self._current_state_view()
-        )
-        result["data"] = projected_data
-        return result
-
     def resume_context(self, *, limits: Mapping[str, int] | None = None) -> Mapping[str, Any]:
         result = deepcopy(dict(super().resume_context(limits=limits)))
         questions = result.get("research_questions")
@@ -306,3 +286,30 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                         self._application.ids,
                     ),
                 )
+
+
+def list_actions_stage(facade, proceed: Callable[[], Mapping[str, Any]]) -> Mapping[str, Any]:
+    facade._ensure_recommendation_action()
+    return proceed()
+
+
+def submit_action_stage(
+    facade,
+    draft_input: Mapping[str, Any],
+    view: str | None,
+    proceed: Callable[[Mapping[str, Any], str | None], Mapping[str, Any]],
+) -> Mapping[str, Any]:
+    facade._ensure_recommendation_action()
+    result = dict(proceed(draft_input, None))
+    if draft_input.get("action_type") not in _CANDIDATE_PROJECTION_ACTIONS:
+        return result
+    data = result.get("data")
+    candidate = data.get("state_delta_proposal") if isinstance(data, Mapping) else None
+    if not isinstance(candidate, Mapping):
+        return result
+    projected_data = deepcopy(dict(data))
+    projected_data["candidate_projection"] = build_candidate_projection(
+        candidate, facade._current_state_view()
+    )
+    result["data"] = projected_data
+    return result

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from copy import deepcopy
 from threading import RLock
 from typing import Any
@@ -223,14 +223,6 @@ class ResearchArgumentProposeHandler:
 class LocalApplicationFacade(_BaseLocalApplicationFacade):
     """Public production facade extension for bounded Research Argument synthesis."""
 
-    def list_actions(self) -> Mapping[str, Any]:
-        self._ensure_argument_action()
-        return super().list_actions()
-
-    def submit_action(self, draft_input: Mapping[str, Any]) -> Mapping[str, Any]:
-        self._ensure_argument_action()
-        return super().submit_action(draft_input)
-
     def _ensure_argument_action(self) -> None:
         coordinator = self._application.coordinator
         action_registry = coordinator._actions
@@ -274,3 +266,18 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                         self._application.ids,
                     ),
                 )
+
+
+def list_actions_stage(facade, proceed: Callable[[], Mapping[str, Any]]) -> Mapping[str, Any]:
+    facade._ensure_argument_action()
+    return proceed()
+
+
+def submit_action_stage(
+    facade,
+    draft_input: Mapping[str, Any],
+    view: str | None,
+    proceed: Callable[[Mapping[str, Any], str | None], Mapping[str, Any]],
+) -> Mapping[str, Any]:
+    facade._ensure_argument_action()
+    return proceed(draft_input, None)

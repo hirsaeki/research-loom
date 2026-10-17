@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from copy import deepcopy
 from dataclasses import asdict, is_dataclass
 from enum import Enum
@@ -264,7 +264,42 @@ class LocalApplicationFacade:
     def __exit__(self, *_exc: object) -> None:
         self.close()
 
+    # Feature layers contribute ordered steps instead of overriding these two
+    # methods. Each step receives the facade and a ``proceed`` callable for
+    # the rest of the pipeline; the exported facade declares the order.
+    _LIST_ACTIONS_STAGES: tuple[Callable[..., Mapping[str, Any]], ...] = ()
+    _SUBMIT_ACTION_STAGES: tuple[Callable[..., Mapping[str, Any]], ...] = ()
+
     def list_actions(self) -> Mapping[str, Any]:
+        stages = type(self)._LIST_ACTIONS_STAGES
+
+        def proceed_from(index: int) -> Mapping[str, Any]:
+            if index == len(stages):
+                return self._list_registered_actions()
+            return stages[index](self, lambda: proceed_from(index + 1))
+
+        return proceed_from(0)
+
+    def submit_action(
+        self, draft_input: Mapping[str, Any], *, view: str | None = None
+    ) -> Mapping[str, Any]:
+        stages = type(self)._SUBMIT_ACTION_STAGES
+
+        def proceed_from(
+            index: int, draft: Mapping[str, Any], selected_view: str | None
+        ) -> Mapping[str, Any]:
+            if index == len(stages):
+                return self._submit_registered_action(draft)
+            return stages[index](
+                self,
+                draft,
+                selected_view,
+                lambda next_draft, next_view: proceed_from(index + 1, next_draft, next_view),
+            )
+
+        return proceed_from(0, draft_input, view)
+
+    def _list_registered_actions(self) -> Mapping[str, Any]:
         definitions = self._application.coordinator.action_definitions()
         actions = []
         for definition in definitions:
@@ -283,7 +318,7 @@ class LocalApplicationFacade:
             )
         return {"status": "OK", "project_id": self._project_id, "actions": actions}
 
-    def submit_action(self, draft_input: Mapping[str, Any]) -> Mapping[str, Any]:
+    def _submit_registered_action(self, draft_input: Mapping[str, Any]) -> Mapping[str, Any]:
         if not isinstance(draft_input, Mapping):
             raise LocalApplicationError(
                 "APPLICATION-INGRESS-001", "typed action input must be an object"
