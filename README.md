@@ -28,6 +28,8 @@ Research Loom requires Python 3.12+ and `uv`. Root `pyproject.toml` and `uv.lock
 
 For normal harness/host runtime use, provision the root project environment first with `uv sync --frozen` outside the host sandbox, then invoke the repository launcher from the repository root. Runtime launchers execute the pre-synced root `.venv` directly; they do not invoke `uv`, mutate dependencies, or depend on the persistent uv cache.
 
+`uv sync` installs the project itself in editable mode (build backend `uv_build`, which uv runs without network access), so the synced environment also provides a `research-loom` console script at `.venv/bin/research-loom` (`.venv\Scripts\research-loom.exe` on Windows) that behaves like the launchers. Profiles, Project Configs and Core contracts are always read from the repository checkout through `core/resources.py`; a standalone wheel without the repository is not a supported install.
+
 Windows / PowerShell:
 
 ```powershell

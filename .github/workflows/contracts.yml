@@ -55,7 +55,7 @@ jobs:
         run: uv sync --frozen
       - name: Smoke production repository launcher
         run: ./research-loom --help
-      - name: Compare launcher and direct developer invocation errors
+      - name: Compare launcher, direct and console-script invocation errors
         shell: bash
         run: |
           set +e
@@ -63,10 +63,15 @@ jobs:
           launcher_exit=$?
           uv run --frozen python research-loom invalid-command > direct.stdout 2> direct.stderr
           direct_exit=$?
+          (cd "$RUNNER_TEMP" && "$GITHUB_WORKSPACE/.venv/bin/research-loom" invalid-command) > script.stdout 2> script.stderr
+          script_exit=$?
           set -e
           test "$launcher_exit" -eq "$direct_exit"
+          test "$launcher_exit" -eq "$script_exit"
           cmp launcher.stdout direct.stdout
           cmp launcher.stderr direct.stderr
+          cmp launcher.stdout script.stdout
+          cmp launcher.stderr script.stderr
       - name: Run canonical contract tests
         run: uv run --frozen python -m unittest discover -t . -s tests/contracts -p 'test_*.py' -v
 
