@@ -141,6 +141,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     doctor = sub.add_parser("doctor")
     _add_workspace(doctor)
+    doctor.add_argument(
+        "--deep",
+        action="store_true",
+        help="also run full integrity checks over every SQLite store (read-only)",
+    )
     _add_output_json(doctor)
 
     profile = sub.add_parser("profile")
@@ -594,8 +599,10 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _doctor_with_optional_attention(workspace: str | Path) -> Mapping[str, Any]:
-    result = deepcopy(dict(LocalApplicationFacade.doctor_workspace(workspace)))
+def _doctor_with_optional_attention(
+    workspace: str | Path, *, deep: bool = False
+) -> Mapping[str, Any]:
+    result = deepcopy(dict(LocalApplicationFacade.doctor_workspace(workspace, deep=deep)))
     if result.get("status") != "OK":
         return result
     attention_path = (
@@ -634,7 +641,7 @@ def _run(args: argparse.Namespace) -> Mapping[str, Any]:
         return finish_initialization(args.workspace, args.expected_binding_digest)
 
     if args.command == "doctor":
-        return _doctor_with_optional_attention(args.workspace)
+        return _doctor_with_optional_attention(args.workspace, deep=args.deep)
 
     if args.command == "research-package" and args.research_package_command == "verify":
         from plugins.local_application.research_package_service import verify_export_root

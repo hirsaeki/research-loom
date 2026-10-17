@@ -19,6 +19,9 @@ A portable child copied for read-only intake is not a whole-workspace restore.
    failures before calling a backup healthy. A snapshot can still be retained
    for forensic recovery, but label its known failures rather than calling it
    verified. This is not a deep hash of every material blob or optional store.
+   Add `--deep` to also run each SQLite store's full integrity check (State's
+   `integrity_issues()` and `PRAGMA integrity_check` elsewhere); it stays
+   read-only and slower, and still does not hash material blobs.
 4. After that command exits, copy the entire Parent into a new, uniquely named
    backup-set directory outside the source workspace. Include all initialized
    children, bindings, Profile history, payloads, and any SQLite `-wal`, `-shm`,

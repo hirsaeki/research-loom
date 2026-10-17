@@ -248,8 +248,8 @@ class LocalApplicationFacadeCore:
             opened.close()
 
     @classmethod
-    def doctor_workspace(cls, workspace: str | Path) -> Mapping[str, Any]:
-        return LocalWorkspace.doctor(workspace)
+    def doctor_workspace(cls, workspace: str | Path, *, deep: bool = False) -> Mapping[str, Any]:
+        return LocalWorkspace.doctor(workspace, deep=deep)
 
     @classmethod
     def resolve_profile_generation(
