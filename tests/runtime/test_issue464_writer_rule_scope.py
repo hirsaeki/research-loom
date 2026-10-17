@@ -12,7 +12,7 @@ import tests.runtime.issue80_writer_composition_suite as composition_tests
 import tests.runtime.test_external_desktop_research_intake as intake
 import tests.runtime.test_misco_writer_profile_application as legacy
 from plugins.local_application import LocalApplicationError
-from plugins.local_application.profile_resolution import resolve_effective_profile_set
+from plugins.local_application.workspace.profile_resolution import resolve_effective_profile_set
 from plugins.local_application.writer_round_trip_service import WriterRoundTripService
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 

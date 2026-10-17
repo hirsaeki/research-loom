@@ -10,13 +10,13 @@ from typing import Any
 
 from plugins._infra.atomic_write import replace_text
 from plugins._infra.clock import utc_now as _now
-from plugins.local_application.profile_resolution import (
+from plugins.local_application.workspace.profile_resolution import (
     effective_profile_digest,
     exact_manifest_identity_map,
     resolve_effective_profile_set,
     target_project_config,
 )
-from plugins.local_application.workspace import (
+from plugins.local_application.workspace.workspace import (
     BINDING_NAME,
     EFFECTIVE_PROFILE_SET_NAME,
     EFFECTIVE_PROFILE_SET_SCHEMA,

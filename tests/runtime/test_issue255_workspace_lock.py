@@ -15,9 +15,9 @@ from unittest.mock import patch
 
 import tests.runtime.test_profile_generation_advancement as profile
 from plugins.local_application import LocalApplicationFacade, LocalWorkspace
-from plugins.local_application import profile_advancement as advancement
-from plugins.local_application import workspace_lock as locking
-from plugins.local_application.workspace import LocalWorkspaceError
+from plugins.local_application.workspace import profile_advancement as advancement
+from plugins.local_application.workspace import workspace_lock as locking
+from plugins.local_application.workspace.workspace import LocalWorkspaceError
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 CI_WINDOWS = True
@@ -46,7 +46,7 @@ class Issue255WorkspaceLockTests(ResearchPackageAcceptanceSupport):
         body = """
 import sys
 from pathlib import Path
-from plugins.local_application.workspace_lock import workspace_lock
+from plugins.local_application.workspace.workspace_lock import workspace_lock
 with workspace_lock(Path(sys.argv[1]), shared=sys.argv[2] == "shared"):
     print("READY", flush=True)
     sys.stdin.read()
@@ -112,8 +112,8 @@ with LocalApplicationFacade.open_workspace(sys.argv[1]) as facade:
             result = self._child("""
 import json, sys, time
 from pathlib import Path
-from plugins.local_application.workspace_lock import workspace_lock
-from plugins.local_application.workspace import LocalWorkspaceError
+from plugins.local_application.workspace.workspace_lock import workspace_lock
+from plugins.local_application.workspace.workspace import LocalWorkspaceError
 start = time.monotonic()
 try:
     with workspace_lock(Path(sys.argv[1]), timeout=0.15):

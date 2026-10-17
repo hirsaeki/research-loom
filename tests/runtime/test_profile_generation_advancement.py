@@ -20,8 +20,8 @@ import tests.runtime.test_external_desktop_research_intake as intake
 from core.runtime import CommitReceipt, TransitionAction, TransitionKind
 from plugins.local_application import LocalApplicationFacade, LocalWorkspace
 from plugins.local_application.cli import main as cli_main
-from plugins.local_application.profile_advancement import _ADVANCEMENT_NOTE
-from plugins.local_application.profile_resolution import (
+from plugins.local_application.workspace.profile_advancement import _ADVANCEMENT_NOTE
+from plugins.local_application.workspace.profile_resolution import (
     _sha256,
     effective_profile_digest,
     resolve_effective_profile_set,
@@ -179,7 +179,7 @@ class ProfileGenerationAdvancementTests(ResearchPackageAcceptanceSupport):
             "profile_manifest_files": request["profile_manifest_files"],
             "origin": "kody-concurrency-regression",
         }
-        from plugins.local_application import profile_advancement as advancement
+        from plugins.local_application.workspace import profile_advancement as advancement
 
         real_rebind = advancement._state_rebind
         first_entered = threading.Event()
@@ -239,7 +239,7 @@ class ProfileGenerationAdvancementTests(ResearchPackageAcceptanceSupport):
             "profile_manifest_files": request["profile_manifest_files"],
             "origin": "kody-open-lifetime-regression",
         }
-        from plugins.local_application import profile_advancement as advancement
+        from plugins.local_application.workspace import profile_advancement as advancement
 
         opened = LocalApplicationFacade.open_workspace(self.workspace)
         started = threading.Event()
@@ -277,7 +277,7 @@ class ProfileGenerationAdvancementTests(ResearchPackageAcceptanceSupport):
             "profile_manifest_files": request["profile_manifest_files"],
             "origin": "kody-reentrant-lock-regression",
         }
-        from plugins.local_application import profile_advancement as advancement
+        from plugins.local_application.workspace import profile_advancement as advancement
 
         outer = LocalWorkspace.open(self.workspace)
         inner = LocalWorkspace.open(self.workspace)
@@ -318,14 +318,14 @@ class ProfileGenerationAdvancementTests(ResearchPackageAcceptanceSupport):
     def test_kody_workspace_lock_closes_handle_when_initialization_fails(self):
         import errno
 
-        from plugins.local_application import profile_advancement as advancement
-        from plugins.local_application.workspace import LocalWorkspaceError
+        from plugins.local_application.workspace import profile_advancement as advancement
+        from plugins.local_application.workspace.workspace import LocalWorkspaceError
 
         handle = io.BytesIO()
         with (
             patch.object(Path, "open", return_value=handle),
             patch(
-                "plugins.local_application.workspace_lock._try_lock",
+                "plugins.local_application.workspace.workspace_lock._try_lock",
                 side_effect=OSError(errno.EIO, "injected lock initialization failure"),
             ),
         ):
@@ -402,7 +402,7 @@ class ProfileGenerationAdvancementTests(ResearchPackageAcceptanceSupport):
         marker_path.unlink()
 
     def test_kody_profile_resolver_bounds_inputs_and_prunes_incompatible_branches(self):
-        from plugins.local_application import profile_resolution as resolution
+        from plugins.local_application.workspace import profile_resolution as resolution
 
         over_limit = self._resolve_request(
             manifests=[str(PUBLICATION)] * (resolution.MAX_PROFILE_MANIFESTS + 1)
@@ -1201,7 +1201,7 @@ class ProfileGenerationAdvancementTests(ResearchPackageAcceptanceSupport):
         self.assertEqual(code, 0)
         before_history = self._history()
 
-        from plugins.local_application import profile_advancement as advancement
+        from plugins.local_application.workspace import profile_advancement as advancement
 
         real_rebind = advancement._state_rebind
         with patch.object(
@@ -1236,7 +1236,7 @@ class ProfileGenerationAdvancementTests(ResearchPackageAcceptanceSupport):
         code, before_resume = _run_cli(["resume", "--workspace", self.workspace, "--json"])
         self.assertEqual(code, 0)
 
-        from plugins.local_application import profile_advancement as advancement
+        from plugins.local_application.workspace import profile_advancement as advancement
 
         real_write_json = advancement._write_json
 
@@ -1263,7 +1263,7 @@ class ProfileGenerationAdvancementTests(ResearchPackageAcceptanceSupport):
 
     def test_ablation_old_new_history_guard_is_detected_then_baseline_restored(self):
         request, output, _ = self._resolve()
-        from plugins.local_application import profile_advancement as advancement
+        from plugins.local_application.workspace import profile_advancement as advancement
 
         real_archive = advancement._archive_generation
 

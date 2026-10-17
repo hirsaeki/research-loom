@@ -11,12 +11,12 @@ import rfc8785
 import yaml
 
 from plugins.local_application import LocalApplicationFacade
-from plugins.local_application.profile_resolution import resolve_effective_profile_set
 from plugins.local_application.research_quality_evaluation import (
     ResearchQualityEvaluationError,
     evaluate,
     normalize_input,
 )
+from plugins.local_application.workspace.profile_resolution import resolve_effective_profile_set
 from tests.runtime.runtime_fixtures import seed_state
 from tests.runtime.test_external_desktop_research_intake import adopt_rq, bootstrap_config, run_cli
 

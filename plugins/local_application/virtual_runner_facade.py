@@ -15,7 +15,7 @@ from .virtual_runner_input import _payload
 from .virtual_runner_inspection import VirtualRunnerInspectionMixin
 from .virtual_runner_method_context import build_method_context
 from .virtual_runner_resolve import resolve_virtual_inputs
-from .workspace import workspace_document_path
+from .workspace.workspace import workspace_document_path
 
 DESCRIPTOR_PATH = resource_path(
     "core/packages/virtual-runner/virtual-runner-capability-descriptor.json"

@@ -118,7 +118,7 @@ class WriterRoundTripService:
         self._write_record(path, value, replace=True)
 
     def _write_record(self, path: Path, value: Mapping[str, Any], *, replace: bool) -> bool:
-        from .workspace import _safe_locator
+        from .workspace.workspace import _safe_locator
 
         require_optional_available(self.root, LocalApplicationError)
         path = _safe_locator(

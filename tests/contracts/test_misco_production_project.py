@@ -7,7 +7,7 @@ from pathlib import Path
 
 import rfc8785
 
-from plugins.local_application.profile_resolution import resolve_effective_profile_set
+from plugins.local_application.workspace.profile_resolution import resolve_effective_profile_set
 
 ROOT = Path(__file__).resolve().parents[2]
 PROJECT_CONFIG = ROOT / "projects/misco-ai-2026/project-config.json"

@@ -45,7 +45,7 @@ from plugins.desktop_research import (
     DesktopResearchExternalAdapter,
     DesktopResearchNormalizer,
 )
-from plugins.local_application.research_question_batch import (
+from plugins.local_application.workspace.research_question_batch import (
     ResearchQuestionProposeManyHandler,
     research_question_propose_many_payload,
 )

@@ -11,7 +11,7 @@ from pypdf import PdfWriter
 import tests.runtime.test_external_desktop_research_intake as intake
 import tests.runtime.test_misco_writer_profile_application as writer_tests
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade, LocalWorkspace
-from plugins.local_application.profile_resolution import resolve_effective_profile_set
+from plugins.local_application.workspace.profile_resolution import resolve_effective_profile_set
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 from tests.runtime.test_issue456_formal_document import representative_report
 

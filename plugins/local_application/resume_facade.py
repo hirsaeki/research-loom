@@ -35,7 +35,7 @@ class ResumeMixin:
         if self._workspace_root is not None:
             from plugins.local_durable_store import inspect_optional_children
 
-            from .workspace import BINDING_NAME, INTERNAL_DIR, _read_json
+            from .workspace.workspace import BINDING_NAME, INTERNAL_DIR, _read_json
 
             binding = _read_json(
                 self._workspace_root / INTERNAL_DIR / BINDING_NAME, code="WORKSPACE-BINDING-001"

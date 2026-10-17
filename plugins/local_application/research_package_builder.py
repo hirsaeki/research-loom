@@ -42,7 +42,7 @@ from .research_package_format import (
 )
 from .visual_origin import verify_visual_origin
 from .visual_package_bindings import validate_visual_package_bindings
-from .workspace import workspace_document_path
+from .workspace.workspace import workspace_document_path
 
 
 def _required_object_refs(obj: Mapping[str, Any]) -> list[tuple[str, str]]:

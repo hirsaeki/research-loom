@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 from core.runtime import CommitReceipt, StateTransitionRejected, TransitionAction, TransitionKind
-from plugins.local_application.workspace import LocalWorkspace, LocalWorkspaceError
+from plugins.local_application.workspace.workspace import LocalWorkspace, LocalWorkspaceError
 from tests.runtime.runtime_fixtures import make_request
 from tests.runtime.test_research_question_adoption import _bootstrap_config
 

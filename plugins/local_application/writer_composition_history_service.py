@@ -47,7 +47,7 @@ class WriterCompositionHistoryService(WriterCompositionService):
     def _write_json_atomic(
         self, path: Path, value: Mapping[str, Any], message: str, *, immutable: bool = False
     ) -> None:
-        from .workspace import _safe_locator
+        from .workspace.workspace import _safe_locator
 
         require_optional_available(self.root, LocalApplicationError)
         path = _safe_locator(

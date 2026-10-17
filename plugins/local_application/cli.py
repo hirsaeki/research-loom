@@ -11,8 +11,8 @@ from typing import Any
 from core.conversation import ConversationRuntimeError
 from core.decision import HumanDecisionError
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade
-from plugins.local_application.application import ATTENTION_STORE_NAME
-from plugins.local_application.workspace import LocalWorkspaceError
+from plugins.local_application.workspace.application import ATTENTION_STORE_NAME
+from plugins.local_application.workspace.workspace import LocalWorkspaceError
 from plugins.local_attention_store import LocalAttentionStoreError, validate_attention_store_schema
 from plugins.local_delphi_store import LocalDelphiStoreError
 from plugins.local_durable_store import OptionalDurableStoreError
@@ -636,7 +636,7 @@ def _run(args: argparse.Namespace) -> Mapping[str, Any]:
         )
 
     if args.command == "init-finish":
-        from .workspace_initialization import finish_initialization
+        from .workspace.workspace_initialization import finish_initialization
 
         return finish_initialization(args.workspace, args.expected_binding_digest)
 
