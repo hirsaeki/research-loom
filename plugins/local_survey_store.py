@@ -286,6 +286,7 @@ class LocalSurveyStore:
         validator(document)
         connection = self._write()
         try:
+            connection.execute("BEGIN IMMEDIATE")
             existing = connection.execute(
                 f"SELECT project_id,{id_column},version,content_digest,captured_at,document_json "
                 f"FROM {table} WHERE project_id=? AND {id_column}=? AND version=?",

@@ -279,6 +279,7 @@ class LocalAttentionStore:
         connection = self._connect_write()
         try:
             with connection:
+                connection.execute("BEGIN IMMEDIATE")
                 existing = connection.execute(
                     "SELECT map_digest, document_json FROM attention_maps WHERE map_id=?",
                     (str(document["map_id"]),),
