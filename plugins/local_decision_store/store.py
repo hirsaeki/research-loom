@@ -8,6 +8,8 @@ from pathlib import Path
 from threading import RLock
 from typing import Any
 
+from plugins._infra.sqlite import apply_pragmas
+
 
 class LocalHumanDecisionStore:
     """Separate production-local operational store for Human Decision lifecycle.
@@ -25,10 +27,13 @@ class LocalHumanDecisionStore:
             str(self.path), isolation_level=None, check_same_thread=False, timeout=5.0
         )
         self._db.row_factory = sqlite3.Row
-        self._db.execute("PRAGMA journal_mode=WAL")
-        self._db.execute("PRAGMA synchronous=FULL")
-        self._db.execute("PRAGMA foreign_keys=ON")
-        self._db.execute("PRAGMA busy_timeout=5000")
+        apply_pragmas(
+            self._db,
+            foreign_keys=True,
+            busy_timeout_ms=5000,
+            journal_mode="WAL",
+            synchronous="FULL",
+        )
         self._db.executescript(
             """
             CREATE TABLE IF NOT EXISTS decision_requests(

@@ -80,7 +80,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full development guide; coding ag
 uv sync --frozen --group dev
 uv run --frozen --group dev ruff check .
 uv run --frozen --group dev ruff format --check .
-uv run --frozen --group dev mypy          # strict, currently scoped to core/
+uv run --frozen --group dev mypy          # strict, currently scoped to core/ and plugins/_infra/
 uv run --frozen python -m unittest discover -t . -s tests -p 'test_*.py'   # all tests
 ```
 

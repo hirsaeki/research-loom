@@ -7,6 +7,7 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
+from plugins._infra.sqlite import apply_pragmas
 from plugins.local_durable_store import register_optional_path, require_optional_available
 from plugins.survey_analysis import validate_aggregate_result, validate_analysis_spec
 
@@ -160,7 +161,7 @@ class LocalSurveyAnalysisStore:
         try:
             connection = sqlite3.connect(self.path, timeout=5.0)
             connection.row_factory = sqlite3.Row
-            connection.execute("PRAGMA busy_timeout=5000")
+            apply_pragmas(connection, busy_timeout_ms=5000)
             connection.executescript(_SCHEMA_SQL)
             rows = connection.execute(
                 "SELECT schema_version FROM survey_analysis_store_meta"

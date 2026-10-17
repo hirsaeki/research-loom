@@ -28,10 +28,14 @@ from core.execution.models import (
 )
 from core.runtime.transition_models import canonical_digest
 from plugins._infra.atomic_write import durable_staged_file, publish_staged
+from plugins._infra.sqlite import (
+    ALLOWED_JOURNAL_MODES,
+    ALLOWED_SYNCHRONOUS,
+    apply_pragmas,
+    foreign_keys_enabled,
+)
 
 _MIGRATION_RE = re.compile(r"^(?P<version>\d{4})_(?P<name>[a-z0-9_]+)\.sql$")
-_ALLOWED_JOURNAL_MODES = {"DELETE", "WAL"}
-_ALLOWED_SYNCHRONOUS = {"FULL", "NORMAL", "EXTRA"}
 _ALLOWED_TRANSITIONS = {
     RunStatus.PREPARED: {
         RunStatus.RUNNING,
@@ -162,9 +166,9 @@ class LocalExecutionStore:
             raise ValueError("busy_timeout_ms must be non-negative")
         journal_mode = self.config.journal_mode.upper()
         synchronous = self.config.synchronous.upper()
-        if journal_mode not in _ALLOWED_JOURNAL_MODES:
+        if journal_mode not in ALLOWED_JOURNAL_MODES:
             raise ValueError(f"unsupported journal_mode {journal_mode!r}")
-        if synchronous not in _ALLOWED_SYNCHRONOUS:
+        if synchronous not in ALLOWED_SYNCHRONOUS:
             raise ValueError(f"unsupported synchronous setting {synchronous!r}")
 
         self.root.mkdir(parents=True, exist_ok=True)
@@ -185,18 +189,19 @@ class LocalExecutionStore:
                 check_same_thread=False,
             )
             self._connection.row_factory = sqlite3.Row
-            self._connection.execute("PRAGMA foreign_keys = ON")
-            self._connection.execute(f"PRAGMA busy_timeout = {int(self.config.busy_timeout_ms)}")
-            actual_journal = str(
-                self._connection.execute(f"PRAGMA journal_mode = {journal_mode}").fetchone()[0]
-            ).upper()
-            self._connection.execute(f"PRAGMA synchronous = {synchronous}")
+            actual_journal = apply_pragmas(
+                self._connection,
+                foreign_keys=True,
+                busy_timeout_ms=self.config.busy_timeout_ms,
+                journal_mode=journal_mode,
+                synchronous=synchronous,
+            )
             if actual_journal != journal_mode:
                 raise LocalExecutionStoreError(
                     "SQLite refused requested journal_mode "
                     f"{journal_mode!r}; got {actual_journal!r}"
                 )
-            if int(self._connection.execute("PRAGMA foreign_keys").fetchone()[0]) != 1:
+            if not foreign_keys_enabled(self._connection):
                 raise LocalExecutionStoreError("SQLite foreign_keys pragma is not enabled")
             self._migrate()
         except Exception:
