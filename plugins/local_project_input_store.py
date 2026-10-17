@@ -150,6 +150,18 @@ class LocalProjectInputStore:
         """
         try:
             self.db.execute("BEGIN IMMEDIATE")
+            recorded = self.db.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='project_input_store_meta'"
+            ).fetchone()
+            # Without a meta row the legacy marker decides; anything else is a
+            # schema this code does not know and must not stamp as current.
+            if recorded is None and int(
+                self.db.execute("PRAGMA user_version").fetchone()[0]
+            ) not in (0, 1, _SCHEMA_VERSION):
+                raise LocalProjectInputStoreError(
+                    "APPLICATION-PROJECT-INPUT-SCHEMA-001",
+                    "project input registry schema version is incompatible",
+                )
             table = self.db.execute(
                 "SELECT 1 FROM sqlite_master WHERE type='table' AND name='project_inputs'"
             ).fetchone()

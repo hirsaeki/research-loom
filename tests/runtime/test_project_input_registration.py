@@ -277,6 +277,27 @@ class ProjectInputRegistrationTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "schema version is incompatible"):
                 _validate_database(database, "project_inputs", quick=False)
 
+    def test_registry_with_an_unknown_legacy_version_is_not_stamped_current(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            LocalProjectInputStore(root).close()
+            database = root / ".research-loom" / "project-inputs" / "project-inputs.sqlite3"
+            with closing(sqlite3.connect(database)) as db:
+                db.execute("DROP TABLE project_input_store_meta")
+                db.execute("PRAGMA user_version=3")
+                db.commit()
+
+            with self.assertRaises(LocalProjectInputStoreError) as raised:
+                LocalProjectInputStore(root)
+            self.assertEqual(raised.exception.code, "APPLICATION-PROJECT-INPUT-SCHEMA-001")
+            with closing(sqlite3.connect(database)) as db:
+                self.assertIsNone(
+                    db.execute(
+                        "SELECT 1 FROM sqlite_master WHERE name='project_input_store_meta'"
+                    ).fetchone()
+                )
+                self.assertEqual(db.execute("PRAGMA user_version").fetchone()[0], 3)
+
     def test_existing_content_addressed_blob_is_verified(self):
         with tempfile.TemporaryDirectory() as tmp:
             workspace = make_workspace(Path(tmp))
