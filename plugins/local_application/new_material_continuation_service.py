@@ -6,6 +6,7 @@ import os
 import time
 from collections.abc import Mapping
 from contextlib import contextmanager
+from contextvars import ContextVar
 from copy import deepcopy
 from html.parser import HTMLParser
 from threading import RLock
@@ -47,27 +48,37 @@ _HTML_SKIP_TAGS = frozenset({"script", "style", "noscript"})
 _HTML_RENDITION_PROVIDER = "python-htmlparser/g1-normalized-text@0.1.0;newline=crlf"
 
 
+# Capture-scoped text rendition limit pinned from the new Run's capture budget.
+_TEXT_RENDITION_LIMIT: ContextVar[int | None] = ContextVar(
+    "new_material_continuation_text_rendition_limit", default=None
+)
+
+
 class _G1HtmlTextParser(HTMLParser):
+    """Conservatively preserve skip scope across malformed HTML end tags."""
+
     def __init__(self) -> None:
         super().__init__()
         self.parts: list[str] = []
-        self.skip = 0
+        self.skip_tags: list[str] = []
 
     def handle_starttag(self, tag: str, attrs) -> None:
         del attrs
         if tag in _HTML_SKIP_TAGS:
-            self.skip += 1
-        elif tag in _HTML_BREAK_TAGS:
+            self.skip_tags.append(tag)
+        elif not self.skip_tags and tag in _HTML_BREAK_TAGS:
             self.parts.append("\n")
 
     def handle_endtag(self, tag: str) -> None:
-        if tag in _HTML_SKIP_TAGS:
-            self.skip = max(0, self.skip - 1)
-        elif tag in _HTML_CONTAINER_BREAK_TAGS:
+        if self.skip_tags:
+            if tag == self.skip_tags[-1]:
+                self.skip_tags.pop()
+            return
+        if tag in _HTML_CONTAINER_BREAK_TAGS:
             self.parts.append("\n")
 
     def handle_data(self, data: str) -> None:
-        if not self.skip:
+        if not self.skip_tags:
             self.parts.append(data)
 
 
@@ -77,7 +88,14 @@ def _render_reacquired_html_rendition(
     *,
     max_bytes: int,
 ) -> bytes:
-    """Replay the bounded G1 HTML-to-text rule for a new HTML material version."""
+    """Replay the bounded G1 HTML-to-text rule for a new HTML material version.
+
+    Within a budgeted capture the effective limit is also capped by the pinned
+    text rendition budget of the new Run.
+    """
+    pinned_limit = _TEXT_RENDITION_LIMIT.get()
+    if pinned_limit is not None:
+        max_bytes = min(max_bytes, pinned_limit)
     normalized_media_type = str(media_type or "").split(";", 1)[0].strip().lower()
     if normalized_media_type != "text/html":
         raise LocalApplicationError(
@@ -623,7 +641,80 @@ class NewMaterialContinuationService:
                         pass
                 raise
 
+    def _capture_budget_for_run(self, new_run) -> Mapping[str, Any]:
+        extension = self._application.context_extension_store.load(
+            new_run.capability_id,
+            new_run.capability_version,
+            new_run.function_id,
+            new_run.context_pack_id,
+        )
+        budget = extension.get("budget") if isinstance(extension, Mapping) else None
+        if not isinstance(budget, Mapping):
+            raise LocalApplicationError(
+                "APPLICATION-NEW-MATERIAL-CONTINUATION-MATERIAL-001",
+                "new Desktop Research Run has no valid capture budget binding",
+            )
+        return budget
+
     def _capture_new_material_version(
+        self,
+        new_run,
+        historical,
+        historical_extension: Mapping[str, Any],
+        result: Mapping[str, Any],
+        new_artifact,
+        reacquisition_run_id: str,
+    ) -> dict[str, str]:
+        """Capture within the new Run's pinned original and text rendition budget."""
+        kind = str(result.get("new_material_kind") or result.get("kind") or "")
+        if kind != "original":
+            return self._capture_new_material_version_unbudgeted(
+                new_run,
+                historical,
+                historical_extension,
+                result,
+                new_artifact,
+                reacquisition_run_id,
+            )
+        budget = self._capture_budget_for_run(new_run)
+        try:
+            store_limit = int(self._application.execution_store.config.max_artifact_bytes)
+            original_declared = budget.get("max_original_capture_bytes")
+            original_limit = (
+                store_limit
+                if original_declared is None
+                else min(store_limit, int(original_declared))
+            )
+            text_limit = min(store_limit, int(budget["max_text_rendition_bytes"]))
+        except (KeyError, TypeError, ValueError) as exc:
+            raise LocalApplicationError(
+                "APPLICATION-NEW-MATERIAL-CONTINUATION-MATERIAL-001",
+                "new Desktop Research Run capture budget is malformed",
+            ) from exc
+        if min(original_limit, text_limit) < 0:
+            raise LocalApplicationError(
+                "APPLICATION-NEW-MATERIAL-CONTINUATION-MATERIAL-001",
+                "new Desktop Research Run capture budget is malformed",
+            )
+        if len(new_artifact.content) > original_limit:
+            raise LocalApplicationError(
+                "APPLICATION-NEW-MATERIAL-CONTINUATION-MATERIAL-001",
+                "reacquired original exceeds the pinned capture budget",
+            )
+        token = _TEXT_RENDITION_LIMIT.set(text_limit)
+        try:
+            return self._capture_new_material_version_unbudgeted(
+                new_run,
+                historical,
+                historical_extension,
+                result,
+                new_artifact,
+                reacquisition_run_id,
+            )
+        finally:
+            _TEXT_RENDITION_LIMIT.reset(token)
+
+    def _capture_new_material_version_unbudgeted(
         self,
         new_run,
         historical,

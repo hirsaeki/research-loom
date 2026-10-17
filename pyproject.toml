@@ -46,8 +46,6 @@ ignore = [
 # Fixture hubs re-export helpers to star-importing test modules.
 "tests/runtime/runtime_fixtures.py" = ["F401"]
 "tests/runtime/survey_virtual_runner_test_support.py" = ["F401"]
-# Import-time install hooks are ordered on purpose until #487 removes them.
-"plugins/local_application/__init__.py" = ["E402", "I001"]
 "scripts/verify_misco_word_fixture.py" = ["E402"]  # imports after sys.path setup
 
 [tool.mypy]
