@@ -150,9 +150,13 @@ class LocalProjectInputStore:
         """
         try:
             self.db.execute("BEGIN IMMEDIATE")
-            recorded = self.db.execute(
+            meta_table = self.db.execute(
                 "SELECT 1 FROM sqlite_master WHERE type='table' AND name='project_input_store_meta'"
             ).fetchone()
+            recorded = (
+                meta_table
+                and self.db.execute("SELECT 1 FROM project_input_store_meta LIMIT 1").fetchone()
+            )
             # Without a meta row the legacy marker decides; anything else is a
             # schema this code does not know and must not stamp as current.
             if recorded is None and int(
