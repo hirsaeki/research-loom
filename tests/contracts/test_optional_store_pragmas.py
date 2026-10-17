@@ -29,19 +29,23 @@ def _is_sqlite_connect(node: ast.AST) -> bool:
     )
 
 
-def _sets_required_pragmas(node: ast.AST) -> bool:
+def _pinned_connection(node: ast.AST) -> str | None:
+    """The connection expression an apply_pragmas call pins with REQUIRED, if any."""
     if not (
         isinstance(node, ast.Call)
         and isinstance(node.func, ast.Name)
         and node.func.id == "apply_pragmas"
+        and node.args
     ):
-        return False
+        return None
     given = {
         keyword.arg: keyword.value.value
         for keyword in node.keywords
         if isinstance(keyword.value, ast.Constant)
     }
-    return all(given.get(name) == value for name, value in REQUIRED.items())
+    if all(given.get(name) == value for name, value in REQUIRED.items()):
+        return ast.unparse(node.args[0])
+    return None
 
 
 def unpinned_write_connections() -> list[str]:
@@ -53,13 +57,19 @@ def unpinned_write_connections() -> list[str]:
             if not isinstance(function, ast.FunctionDef | ast.AsyncFunctionDef):
                 continue
             nodes = list(ast.walk(function))
-            pinned = any(_sets_required_pragmas(node) for node in nodes)
+            pinned = {target for node in nodes if (target := _pinned_connection(node))}
+            # Each write connection must be bound to a name that is itself pinned.
+            bound = {
+                id(node.value): ast.unparse(node.targets[0])
+                for node in nodes
+                if isinstance(node, ast.Assign) and len(node.targets) == 1
+            }
             for node in nodes:
                 if not _is_sqlite_connect(node):
                     continue
                 if "mode=ro" in (ast.get_source_segment(source, node) or ""):
                     continue
-                if not pinned:
+                if bound.get(id(node)) not in pinned:
                     offenders.append(f"plugins/{name}:{node.lineno} in {function.name}")
     return sorted(set(offenders))
 
