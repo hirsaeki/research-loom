@@ -22,7 +22,7 @@ from plugins.local_application.generated_explanation import matching_review
 from plugins.local_application.publication_docx import docx_bytes, verify_native_docx
 from plugins.local_application.publication_exhibits import prepare_exhibits
 from plugins.local_application.research_chart import validate_chart_exhibit
-from plugins.research_visual_semantics import validate_visual_package_bindings
+from plugins.local_application.visual_package_bindings import validate_visual_package_bindings
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 from tests.runtime.test_issue256_native_publication import fixture_png
 from tests.runtime.test_research_exhibits import state_signature

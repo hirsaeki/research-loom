@@ -7,11 +7,11 @@ from typing import Any
 from core.conversation.validation import canonical_digest
 from core.execution import ExecutionStyle
 from core.execution.models import CapabilityExecutionError
+from plugins.survey_response.response_validation import SurveyResponseValidator, stable_response_key
 
 from .llm_backend import VirtualRespondentBackend, VirtualRespondentBackendError
 from .output_builder import build_output
 from .provenance import build_virtual_context, generation_provenance, input_pins
-from .response_validation import SurveyResponseValidator, stable_response_key
 from .runtime_state import candidate_change_requests, defects_from_issues, readiness_assessment
 
 

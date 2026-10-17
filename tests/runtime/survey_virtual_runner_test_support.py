@@ -11,7 +11,7 @@ from plugins.local_application import (
     LocalResearchApplication,
 )
 from plugins.local_survey_store import canonical_document_digest
-from plugins.survey_virtual_runner.response_validation import SurveyResponseValidator
+from plugins.survey_response.response_validation import SurveyResponseValidator
 from tests.runtime.runtime_fixtures import decision, project, rq, seed_state
 from tests.runtime.test_survey_production import (
     NullResolver,

@@ -9,8 +9,7 @@ from typing import Any, Protocol
 from urllib import error, request
 
 from core.conversation.validation import canonical_digest
-
-from .response_validation import stable_response_key
+from plugins.survey_response.response_validation import stable_response_key
 
 PROMPT_TEMPLATE_ID = "survey-virtual-respondent"
 PROMPT_TEMPLATE_VERSION = "1.0.0"

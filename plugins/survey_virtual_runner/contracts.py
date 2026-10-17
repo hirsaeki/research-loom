@@ -10,7 +10,7 @@ from jsonschema import Draft202012Validator, FormatChecker
 
 from core.conversation.validation import canonical_digest
 from core.execution.models import ExecutionIssue
-from plugins.local_application.survey_validation import validate_questionnaire
+from plugins.survey_validation import validate_questionnaire
 
 ROOT = Path(__file__).resolve().parents[2]
 VR_SCHEMA = json.loads(
