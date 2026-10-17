@@ -9,15 +9,34 @@ from threading import RLock
 from types import SimpleNamespace
 
 from plugins.local_application.cli import _emit_external_materials_human
-from plugins.local_application.facade import LocalApplicationError
+from plugins.local_application.exhibit_facade import ExhibitMixin
+from plugins.local_application.exhibit_guard_facade import ExhibitGuardMixin
+from plugins.local_application.external_desktop_facade import ExternalDesktopMixin
+from plugins.local_application.facade import LocalApplicationError, LocalApplicationFacadeCore
 from plugins.local_application.material_inventory_facade import (
-    LocalApplicationFacade,
+    MaterialInventoryMixin,
     _decode_material_cursor,
     _encode_material_cursor,
 )
+from plugins.local_application.resume_facade import ResumeMixin
+from plugins.local_application.run_inspection_facade import RunInspectionMixin
 from plugins.local_execution_store.material_inventory import (
     external_capture_artifact_metadata_for_project,
 )
+
+
+# The material inventory layer and the layers below it, without a workspace.
+class _InventoryFacade(
+    MaterialInventoryMixin,
+    ExhibitGuardMixin,
+    ExhibitMixin,
+    RunInspectionMixin,
+    ExternalDesktopMixin,
+    ResumeMixin,
+    LocalApplicationFacadeCore,
+):
+    pass
+
 
 _ORIGINAL_ROLE = "desktop_research.original_capture"
 _TEXT_ROLE = "desktop_research.text_rendition"
@@ -246,7 +265,7 @@ class ExternalMaterialInventoryGuardTests(unittest.TestCase):
         with self.assertRaises(LocalApplicationError):
             _decode_material_cursor("not-a-valid-cursor")
 
-        facade = LocalApplicationFacade(SimpleNamespace(), "PROJECT-1")
+        facade = _InventoryFacade(SimpleNamespace(), "PROJECT-1")
         with self.assertRaises(LocalApplicationError):
             facade.list_external_materials(limit=101)
 

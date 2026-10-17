@@ -7,7 +7,6 @@ from typing import Any
 from plugins.local_execution_store import result_extensions_for_run
 from plugins.local_execution_store.capture_query import artifacts_for_capture_ids
 
-from .historical_result_recovery_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
 from .material_reacquisition_facade import material_recovery_action_guidance
 
 
@@ -72,7 +71,7 @@ def show_run_stage(facade, proceed: Callable[..., Any], run_id: str) -> Mapping[
     return result
 
 
-class LocalApplicationFacade(_BaseLocalApplicationFacade):
+class MaterialReacquisitionPublicMixin:
     """Final public facade for bounded historical material reacquisition guidance."""
 
     _STAGES = {

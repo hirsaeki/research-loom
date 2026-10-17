@@ -10,7 +10,6 @@ from plugins.desktop_research.attempts import (
 )
 from plugins.local_execution_store import artifact_metadata_for, diagnostics_for
 
-from .external_desktop_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
 from .facade import LocalApplicationError, _given, _jsonable, run_stages, stages_for
 
 _RUN_INSPECTION_ITEM_LIMIT = 100
@@ -149,7 +148,7 @@ def _desktop_research_projection(
     )
 
 
-class LocalApplicationFacade(_BaseLocalApplicationFacade):
+class RunInspectionMixin:
     """Production facade extended with bounded read-only Run inspection."""
 
     def show_run(self, run_id: str, *, view: str | None = None) -> Mapping[str, Any]:

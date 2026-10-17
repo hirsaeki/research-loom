@@ -8,8 +8,6 @@ from typing import Any
 from core.conversation import ActionDefinition, ConversationRuntimeError, HarnessServiceResult
 from core.runtime import ObjectRef, StateDeltaProposal, TransitionAction, TransitionKind
 
-from .project_input_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
-
 _ACTION_REGISTRATION_LOCK = RLock()
 _ACTION_TYPE = "research.argument.propose"
 _PAYLOAD_CONTRACT = "research-argument-proposal@0.1.0"
@@ -236,7 +234,7 @@ def submit_action_stage(
     return proceed(draft_input)
 
 
-class LocalApplicationFacade(_BaseLocalApplicationFacade):
+class ArgumentMixin:
     """Public production facade extension for bounded Research Argument synthesis."""
 
     _STAGES = {

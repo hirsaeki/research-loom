@@ -10,7 +10,6 @@ from plugins.research_visual_semantics import SEMANTIC_CHANGES
 from .exhibit_facade import _string_list
 from .facade import LocalApplicationError, run_stages, stages_for
 from .generated_explanation import matching_review, validate_explanation
-from .visual_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
 
 NEED_SCHEMA = "research-visual-need/v1"
 
@@ -28,7 +27,7 @@ def capture_exhibit_stage(facade, proceed: Callable[..., Any], value):
     return proceed(value)
 
 
-class LocalApplicationFacade(_BaseLocalApplicationFacade):
+class VisualNeedMixin:
     _STAGES = {
         "capture_exhibit": capture_exhibit_stage,
     }
@@ -134,7 +133,7 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
         depth = "research" if changes else "exhibit_capture_and_package_rebuild"
         # Former super().capture_exhibit: the stages below this layer.
         result = run_stages(
-            stages_for(type(self), "capture_exhibit", below=LocalApplicationFacade),
+            stages_for(type(self), "capture_exhibit", below=VisualNeedMixin),
             self,
             self._capture_exhibit_terminal,
             {

@@ -166,14 +166,27 @@ class LocalApplicationFacadeApiTests(unittest.TestCase):
         }
         self.assertEqual(STAGE_ORDER, actual)
 
+    def test_facade_is_defined_once_from_mixins(self):
+        # The facade is composed in facade_composition.py; feature modules
+        # contribute mixins and never define LocalApplicationFacade themselves.
+        import ast
+        from pathlib import Path
+
+        package = Path(__file__).resolve().parents[2] / "plugins" / "local_application"
+        definers = sorted(
+            path.name
+            for path in package.glob("*.py")
+            for node in ast.walk(ast.parse(path.read_text(encoding="utf-8")))
+            if isinstance(node, ast.ClassDef) and node.name == "LocalApplicationFacade"
+        )
+        self.assertEqual(["facade_composition.py"], definers)
+
     def test_intermediate_facades_run_the_stages_below_them(self):
         # Continuation services build this intermediate facade directly; it
         # must keep running the stages its former super() chain reached.
         from plugins.local_application import LocalApplicationFacade
         from plugins.local_application.facade import stages_for
-        from plugins.local_application.material_reacquisition_public_facade import (
-            LocalApplicationFacade as ContinuationFacade,
-        )
+        from plugins.local_application.facade_composition import ContinuationFacade
 
         for name in STAGE_ORDER:
             full = stages_for(LocalApplicationFacade, name)

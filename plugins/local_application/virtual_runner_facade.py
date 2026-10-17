@@ -11,9 +11,6 @@ from plugins.local_application.facade import (
     _INGRESS_FIELDS,
     LocalApplicationError,
 )
-from plugins.local_application.survey_response_facade import (
-    LocalApplicationFacade as SurveyResponseApplicationFacade,
-)
 
 from .virtual_runner_binding import build_survey_virtual_extension
 from .virtual_runner_execute import VirtualRunnerExecuteMixin
@@ -79,9 +76,7 @@ def submit_action_stage(
     return proceed(draft_input)
 
 
-class LocalApplicationFacade(
-    VirtualRunnerInspectionMixin, VirtualRunnerExecuteMixin, SurveyResponseApplicationFacade
-):
+class VirtualRunnerMixin(VirtualRunnerInspectionMixin, VirtualRunnerExecuteMixin):
     """Final local Application Facade including Survey response intake and the Virtual Runner."""
 
     _STAGES = {

@@ -37,7 +37,6 @@ from .facade import LocalApplicationError
 from .survey_facade import _snapshot
 from .survey_response_capture import _real_response_provenance
 from .survey_virtual_pretest_inspection import SurveyVirtualPretestInspectionMixin
-from .virtual_runner_facade import LocalApplicationFacade as VirtualRunnerApplicationFacade
 
 _STORE_NAME = "survey-analysis-registry.sqlite3"
 _ANALYSIS_SPEC_CAPTURE_FIELDS = {"dataset_id", "dataset_digest", "analysis_items"}
@@ -214,7 +213,9 @@ class _SurveyAnalysisActionHandler:
         self._workspace_root = workspace_root
 
     def execute(self, payload, *, state, actor, proposal):
-        facade = LocalApplicationFacade(
+        from .facade_composition import SurveyAnalysisFacade
+
+        facade = SurveyAnalysisFacade(
             self._application,
             state.project_ref,
             workspace_root=self._workspace_root,
@@ -287,7 +288,7 @@ def submit_action_stage(
     return proceed(draft_input)
 
 
-class LocalApplicationFacade(SurveyVirtualPretestInspectionMixin, VirtualRunnerApplicationFacade):
+class SurveyAnalysisMixin(SurveyVirtualPretestInspectionMixin):
     """Final production facade including shared Survey aggregation and inspection."""
 
     _STAGES = {

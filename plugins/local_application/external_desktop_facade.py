@@ -21,7 +21,6 @@ from plugins.local_execution_store import (
 )
 
 from .facade import LocalApplicationError, _given, run_stages, stages_for
-from .resume_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
 
 _ATTEMPT_START_FIELDS = {
     "attempt_id",
@@ -132,7 +131,7 @@ def _provenance(value: Mapping[str, Any], *, capture: bool = False) -> dict[str,
     return deepcopy(dict(item))
 
 
-class LocalApplicationFacade(_BaseLocalApplicationFacade):
+class ExternalDesktopMixin:
     """Production facade extended with Run-bound external Desktop Research intake."""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:

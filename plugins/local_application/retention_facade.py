@@ -19,7 +19,6 @@ from .external_desktop_facade import (
 )
 from .facade import LocalApplicationError
 from .material_content_facade import ExternalMaterialContentService
-from .material_inventory_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
 from .material_reacquisition_pypdf_provider import ensure_material_reacquisition_action
 from .material_recovery_facade import ensure_material_recovery_action
 
@@ -91,7 +90,7 @@ def capture_external_source_stage(
     return facade._capture_external_source_with_large_original(run_id, value)
 
 
-class LocalApplicationFacade(_BaseLocalApplicationFacade):
+class RetentionMixin:
     """PR39 facade: preserve the normal capture path and add oversized fallback."""
 
     _STAGES = {

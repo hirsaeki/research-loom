@@ -23,7 +23,6 @@ from .delphi_analysis import (
 )
 from .delphi_instrument_approval import DelphiInstrumentApproval, verify_approval
 from .facade import LocalApplicationError
-from .survey_analysis_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
 from .survey_facade import _snapshot
 
 _ROOT = Path(__file__).resolve().parents[2]
@@ -99,7 +98,7 @@ def _item_map(instrument: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
     return result
 
 
-class LocalApplicationFacade(_BaseLocalApplicationFacade):
+class DelphiMixin:
     """Minimal production two-round Delphi registry and inspection surface."""
 
     def _delphi_store(self) -> LocalDelphiStore:

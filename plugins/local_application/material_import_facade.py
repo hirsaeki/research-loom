@@ -17,7 +17,6 @@ from plugins.local_execution_store import (
 
 from .facade import LocalApplicationError
 from .material_content_facade import _artifact_pair_for_capture
-from .retention_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
 
 _INTAKE_RELATIVE = Path("intake") / "material-sources"
 _STAGE_MANIFEST = "stage.json"
@@ -99,7 +98,7 @@ def _source_filename(provenance: Mapping[str, Any], key: str) -> str | None:
     return Path(value).name
 
 
-class LocalApplicationFacade(_BaseLocalApplicationFacade):
+class MaterialImportMixin:
     """Stage a portable source root, then copy verified material into current durability."""
 
     def _material_intake_root(self) -> Path:

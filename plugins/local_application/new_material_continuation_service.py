@@ -18,9 +18,14 @@ from plugins.desktop_research.attempts import reconstruct_attempts
 from . import new_material_continuation_admission as admission
 from .facade import LocalApplicationError
 from .material_content_facade import _artifact_pair_for_capture
-from .material_reacquisition_public_facade import (
-    LocalApplicationFacade as _BaseLocalApplicationFacade,
-)
+
+
+def _continuation_facade_class():
+    # Imported lazily: the facade composition imports the layer that owns this service.
+    from .facade_composition import ContinuationFacade
+
+    return ContinuationFacade
+
 
 _CONTINUATION_LOCK = RLock()
 
@@ -477,7 +482,7 @@ class NewMaterialContinuationService:
                     )
                 historical_payload["parent_run_id"] = prior_run.run_id
 
-            facade = _BaseLocalApplicationFacade(
+            facade = _continuation_facade_class()(
                 self._application,
                 self._project_id,
                 workspace_root=self._workspace_root,

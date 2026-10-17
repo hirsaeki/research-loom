@@ -294,7 +294,7 @@ def show_run_stage(facade, proceed: Callable[..., Any], run_id: str) -> Mapping[
     return result
 
 
-class LocalApplicationFacade(_base.LocalApplicationFacade):
+class HistoricalFindingRecoveryMixin:
     """#142 recovery plus bounded diagnosis and persisted direct-replay compatibility."""
 
     _STAGES = {

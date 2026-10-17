@@ -23,7 +23,6 @@ from plugins.survey_validation import (
 )
 
 from .facade import LocalApplicationError
-from .material_import_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
 from .survey_exchange import exchange_projection, markdown_projection
 
 _ROOT = Path(__file__).resolve().parents[2]
@@ -50,7 +49,7 @@ def _snapshot(state) -> dict[str, str]:
     }
 
 
-class LocalApplicationFacade(_BaseLocalApplicationFacade):
+class SurveyMixin:
     """Production Survey Design/Instrument registry and provider-neutral exchange."""
 
     def _survey_store(self) -> LocalSurveyStore:

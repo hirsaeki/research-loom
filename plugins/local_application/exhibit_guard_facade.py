@@ -4,8 +4,6 @@ from core.runtime.ports import StaleHeadError
 from plugins.local_research_exhibit_store import LocalResearchExhibitStoreError
 from plugins.sqlite_state_store.exhibit_guard import guard_research_state_head
 
-from .exhibit_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
-
 
 class _StateGuardedResearchExhibitStore:
     def __init__(self, delegate, state_repository) -> None:
@@ -33,7 +31,7 @@ class _StateGuardedResearchExhibitStore:
             ) from exc
 
 
-class LocalApplicationFacade(_BaseLocalApplicationFacade):
+class ExhibitGuardMixin:
     """Exhibit facade whose final persistence is guarded by the bound State HEAD."""
 
     def _exhibit_store(self):

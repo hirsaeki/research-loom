@@ -9,7 +9,6 @@ from typing import Any
 
 from plugins.local_execution_store import external_capture_artifact_metadata_for_project
 
-from .exhibit_guard_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
 from .facade import LocalApplicationError
 from .run_inspection_facade import _public_provenance
 
@@ -227,7 +226,7 @@ def _material_projection(captures: list[Mapping[str, Any]]) -> Mapping[str, Any]
     }
 
 
-class LocalApplicationFacade(_BaseLocalApplicationFacade):
+class MaterialInventoryMixin:
     """Production facade extended with captured external material inventory."""
 
     def list_external_materials(

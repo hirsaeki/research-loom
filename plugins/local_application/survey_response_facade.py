@@ -12,7 +12,6 @@ from core.conversation import (
 )
 
 from .facade import LocalApplicationError
-from .survey_facade import LocalApplicationFacade as SurveyApplicationFacade
 from .survey_response_capture import SurveyResponseCaptureMixin
 from .survey_response_core import (
     _DATASET_FIELDS,
@@ -108,7 +107,9 @@ class _SurveyResponseActionHandler:
         self._operation = operation
 
     def execute(self, payload, *, state, actor, proposal):
-        facade = LocalApplicationFacade(self._application, state.project_ref)
+        from .facade_composition import SurveyResponseFacade
+
+        facade = SurveyResponseFacade(self._application, state.project_ref)
         if self._operation == "normalize":
             result = facade.normalize_survey_response(payload)
         elif self._operation == "capture":
@@ -185,11 +186,8 @@ def capture_virtual_run_response_dataset_stage(
     )
 
 
-class LocalApplicationFacade(
-    SurveyResponseInspectionMixin,
-    SurveyResponseCaptureMixin,
-    SurveyResponseCoreMixin,
-    SurveyApplicationFacade,
+class SurveyResponseMixin(
+    SurveyResponseInspectionMixin, SurveyResponseCaptureMixin, SurveyResponseCoreMixin
 ):
     """Canonical Survey response normalization, persistence, and inspection."""
 

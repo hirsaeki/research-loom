@@ -22,7 +22,7 @@ from .material_reacquisition_pypdf_provider import (
 from .new_material_continuation_service import (
     _CONTINUATION_LOCK,
     NewMaterialContinuationService,
-    _BaseLocalApplicationFacade,
+    _continuation_facade_class,
     _research_result_for_new_run,
     _target_lock,
 )
@@ -311,7 +311,7 @@ class PairedNewMaterialContinuationService(NewMaterialContinuationService):
         else:
             historical_payload["parent_run_id"] = prior_run.run_id
 
-        facade = _BaseLocalApplicationFacade(
+        facade = _continuation_facade_class()(
             self._application,
             self._project_id,
             workspace_root=self._workspace_root,

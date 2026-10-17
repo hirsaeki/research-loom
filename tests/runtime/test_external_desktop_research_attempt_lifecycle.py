@@ -14,7 +14,7 @@ from plugins.local_application import (
     LocalApplicationFacade,
     LocalResearchApplication,
 )
-from plugins.local_application.facade import LocalApplicationFacade as PreAttemptGuardFacade
+from plugins.local_application.facade import LocalApplicationFacadeCore as PreAttemptGuardFacade
 from tests.runtime.test_external_desktop_research_intake import (
     ExternalDesktopResearchIntakeTests,
     NullResolver,

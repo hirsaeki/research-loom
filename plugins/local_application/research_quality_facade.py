@@ -11,10 +11,9 @@ from .research_quality_evaluation import (
     evaluate,
     normalize_input,
 )
-from .synthesis_candidate_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
 
 
-class LocalApplicationFacade(_BaseLocalApplicationFacade):
+class ResearchQualityMixin:
     """Public non-authoritative Research/Organization quality evaluation."""
 
     def evaluate_research_quality(self, input_value: Mapping[str, Any]) -> dict[str, Any]:
