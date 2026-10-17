@@ -28,6 +28,10 @@ def _unit(module: str) -> str | None:
     return parts[1] if len(parts) > 1 and parts[0] == "plugins" else None
 
 
+def _is_private(name: str) -> bool:
+    return name.startswith("_") and not name.startswith("__")
+
+
 def _imports(path: Path) -> list[tuple[str, list[str], int]]:
     """Return (absolute target module, imported names, line) for each import."""
     module = _module_name(path)
@@ -122,11 +126,14 @@ class PluginLayeringTests(unittest.TestCase):
                 dest = _unit(target)
                 if not dest or dest == source:
                     continue
-                for name in names:
-                    if name.startswith("_") and not name.startswith("__"):
-                        offenders.append(
-                            f"{path.relative_to(ROOT).as_posix()}:{line} {target}.{name}"
-                        )
+                # Private submodules count too, whether named in the module path
+                # (`import plugins.x._m`, `from plugins.x._m import y`) or as an
+                # imported name. The unit name itself (e.g. `_infra`) is public.
+                private = [target] if any(map(_is_private, target.split(".")[2:])) else []
+                private += [f"{target}.{name}" for name in names if _is_private(name)]
+                offenders.extend(
+                    f"{path.relative_to(ROOT).as_posix()}:{line} {item}" for item in private
+                )
         self.assertEqual([], offenders, "import a public name or move the helper to a shared layer")
 
     def test_infra_imports_no_other_plugin(self):
