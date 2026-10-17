@@ -3,9 +3,9 @@ from __future__ import annotations
 import json
 from collections.abc import Callable, Mapping
 from copy import deepcopy
-from pathlib import Path
 from typing import Any
 
+from core.resources import resource_path
 from plugins.local_application.facade import (
     _AUTHORITY_PAYLOAD_FIELDS,
     _INGRESS_FIELDS,
@@ -20,8 +20,9 @@ from .virtual_runner_method_context import build_method_context
 from .virtual_runner_resolve import resolve_virtual_inputs
 from .workspace import workspace_document_path
 
-ROOT = Path(__file__).resolve().parents[2]
-DESCRIPTOR_PATH = ROOT / "core/packages/virtual-runner/virtual-runner-capability-descriptor.json"
+DESCRIPTOR_PATH = resource_path(
+    "core/packages/virtual-runner/virtual-runner-capability-descriptor.json"
+)
 _MAX_PRIOR_VIRTUAL_RUN_IDS = 16
 
 

@@ -28,6 +28,7 @@ from core.execution import (
     CapabilityRegistry,
     ExecutionIssue,
 )
+from core.resources import resource_path
 from core.runtime import (
     CanonicalResearchObjectSchemaValidator,
     CapabilityNormalizationBoundary,
@@ -62,11 +63,10 @@ from plugins.local_execution_store import (
 )
 from plugins.sqlite_state_store import SQLiteResearchStateRepository
 
-ROOT = Path(__file__).resolve().parents[2]
-DESCRIPTOR_PATH = (
-    ROOT / "core/packages/desktop-research/desktop-research-capability-descriptor.json"
+DESCRIPTOR_PATH = resource_path(
+    "core/packages/desktop-research/desktop-research-capability-descriptor.json"
 )
-RESEARCH_SCHEMA_PATH = ROOT / "core/models/research-object.schema.json"
+RESEARCH_SCHEMA_PATH = resource_path("core/models/research-object.schema.json")
 ATTENTION_STORE_NAME = "attention.sqlite3"
 
 

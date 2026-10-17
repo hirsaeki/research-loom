@@ -2,18 +2,18 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
-from pathlib import Path
 from typing import Any, cast
 
 import rfc8785
 from jsonschema import Draft202012Validator, FormatChecker
 
+from core.resources import resource_path
 from core.runtime.digests import jcs_digest_without
 from core.runtime.transition_models import StateView
 
 from .models import CapabilityExecutionError, ExecutionFailureCode
 
-_SCHEMA_ROOT = Path(__file__).resolve().parents[1] / "packages"
+_SCHEMA_ROOT = resource_path("core/packages")
 
 
 def _load_schema(name: str) -> Mapping[str, Any]:

@@ -3,11 +3,11 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping
 from copy import deepcopy
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from jsonschema import Draft202012Validator, FormatChecker
 
+from core.resources import resource_path
 from core.runtime.digests import jcs_digest
 
 from .models import ConversationRuntimeError
@@ -15,9 +15,8 @@ from .models import ConversationRuntimeError
 if TYPE_CHECKING:
     from core.runtime import StateView
 
-ROOT = Path(__file__).resolve().parents[2]
 CONTRACT = json.loads(
-    (ROOT / "core" / "packages" / "work-conversation.schema.json").read_text(encoding="utf-8")
+    (resource_path("core/packages/work-conversation.schema.json")).read_text(encoding="utf-8")
 )
 _VALIDATOR = Draft202012Validator(CONTRACT, format_checker=FormatChecker())
 

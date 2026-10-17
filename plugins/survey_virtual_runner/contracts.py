@@ -3,28 +3,27 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping
 from copy import deepcopy
-from pathlib import Path
 from typing import Any
 
 from jsonschema import Draft202012Validator, FormatChecker
 
 from core.conversation.validation import canonical_digest
 from core.execution.models import ExecutionIssue
+from core.resources import resource_path
 from plugins.survey_validation import validate_questionnaire
 
-ROOT = Path(__file__).resolve().parents[2]
 VR_SCHEMA = json.loads(
-    (ROOT / "core/packages/virtual-runner/virtual-runner-contract.schema.json").read_text(
+    (resource_path("core/packages/virtual-runner/virtual-runner-contract.schema.json")).read_text(
         encoding="utf-8"
     )
 )
 RM_SCHEMA = json.loads(
     (
-        ROOT / "core/packages/research-method/research-method-context-extension.schema.json"
+        resource_path("core/packages/research-method/research-method-context-extension.schema.json")
     ).read_text(encoding="utf-8")
 )
 SURVEY_SCHEMA = json.loads(
-    (ROOT / "core/packages/survey/survey-contract.schema.json").read_text(encoding="utf-8")
+    (resource_path("core/packages/survey/survey-contract.schema.json")).read_text(encoding="utf-8")
 )
 _VR_VALIDATOR = Draft202012Validator(VR_SCHEMA, format_checker=FormatChecker())
 _RM_VALIDATOR = Draft202012Validator(RM_SCHEMA, format_checker=FormatChecker())

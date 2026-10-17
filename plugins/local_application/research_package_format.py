@@ -9,6 +9,7 @@ from typing import Any
 
 from jsonschema import Draft202012Validator, FormatChecker
 
+from core.resources import resource_path
 from core.runtime.digests import jcs_digest
 from plugins.desktop_research.normalization import source_id_for_capture
 from plugins.local_research_exhibit_store import (
@@ -44,9 +45,8 @@ ALLOWED = {
     "materials",
     "gap_ids",
 }
-ROOT = Path(__file__).resolve().parents[2]
-SCHEMA = ROOT / "core/packages/writer-publication/research-package.schema.json"
-NARRATIVE = ROOT / "profiles/contracts/narrative-semantics.yaml"
+SCHEMA = resource_path("core/packages/writer-publication/research-package.schema.json")
+NARRATIVE = resource_path("profiles/contracts/narrative-semantics.yaml")
 
 REQUIRED_NARRATIVE_PATHS = {
     "narrative.stages.definitions",

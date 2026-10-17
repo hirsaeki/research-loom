@@ -8,6 +8,7 @@ from typing import Any
 
 import rfc8785
 
+from core.resources import resource_path
 from core.runtime.ports import StaleHeadError
 from plugins.local_survey_store import LocalSurveyStore, LocalSurveyStoreError, registry_digest
 from plugins.sqlite_state_store.exhibit_guard import guard_research_state_head
@@ -25,10 +26,9 @@ from plugins.survey_validation import (
 from .facade import LocalApplicationError
 from .survey_exchange import exchange_projection, markdown_projection
 
-_ROOT = Path(__file__).resolve().parents[2]
-_DESIGN_SCHEMA = _ROOT / "core/packages/survey/survey-design.schema.json"
-_CONTRACT_SCHEMA = _ROOT / "core/packages/survey/survey-contract.schema.json"
-_EXCHANGE_SCHEMA = _ROOT / "core/packages/survey/survey-instrument-exchange.schema.json"
+_DESIGN_SCHEMA = resource_path("core/packages/survey/survey-design.schema.json")
+_CONTRACT_SCHEMA = resource_path("core/packages/survey/survey-contract.schema.json")
+_EXCHANGE_SCHEMA = resource_path("core/packages/survey/survey-instrument-exchange.schema.json")
 _STORE_NAME = "survey-registry.sqlite3"
 _DESIGN_FIELDS = {"rq_ids", "design", "capture_origin"}
 _INSTRUMENT_FIELDS = {

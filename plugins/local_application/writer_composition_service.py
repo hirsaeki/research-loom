@@ -15,6 +15,7 @@ from typing import Any
 import rfc8785
 from jsonschema import Draft202012Validator, FormatChecker
 
+from core.resources import resource_path
 from core.runtime import canonical_digest
 from plugins._infra.atomic_write import replace_text
 from plugins._infra.clock import utc_now as _now
@@ -32,10 +33,7 @@ MAX_SECTIONS = 64
 MAX_SECTION_REFS = 128
 MAX_SECTION_INPUT_BYTES = 4 * 1024 * 1024
 MAX_SELECTION_EVENTS = 256
-SCHEMA = (
-    Path(__file__).resolve().parents[2]
-    / "core/packages/writer-publication/writer-composition.schema.json"
-)
+SCHEMA = resource_path("core/packages/writer-publication/writer-composition.schema.json")
 
 
 def _validate_schema(value: Mapping[str, Any]) -> None:

@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping
 from copy import deepcopy
-from pathlib import Path
 from typing import Any
 
 from core.conversation import CapabilityMaterialization, canonical_digest
@@ -12,6 +11,7 @@ from core.execution import (
     CapabilityExecutionService,
     CapabilityRegistry,
 )
+from core.resources import resource_path
 from core.runtime import CapabilityNormalizationBoundary
 from plugins.local_application.facade import LocalApplicationError, _jsonable
 from plugins.local_survey_store import LocalSurveyStoreError
@@ -23,8 +23,9 @@ from plugins.survey_virtual_runner.normalization import SurveyVirtualRunnerNorma
 
 from .virtual_runner_input import _payload
 
-ROOT = Path(__file__).resolve().parents[2]
-DESCRIPTOR_PATH = ROOT / "core/packages/virtual-runner/virtual-runner-capability-descriptor.json"
+DESCRIPTOR_PATH = resource_path(
+    "core/packages/virtual-runner/virtual-runner-capability-descriptor.json"
+)
 
 
 class VirtualRunnerExecuteMixin:

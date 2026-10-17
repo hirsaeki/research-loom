@@ -5,6 +5,7 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
+from core.resources import resource_path
 from plugins.local_delphi_store import (
     LocalDelphiStore,
     LocalDelphiStoreError,
@@ -25,9 +26,8 @@ from .delphi_instrument_approval import DelphiInstrumentApproval, verify_approva
 from .facade import LocalApplicationError
 from .survey_facade import _snapshot
 
-_ROOT = Path(__file__).resolve().parents[2]
-_DESIGN_SCHEMA = _ROOT / "core/packages/delphi/delphi-design.schema.json"
-_CONTRACT_SCHEMA = _ROOT / "core/packages/delphi/delphi-contract.schema.json"
+_DESIGN_SCHEMA = resource_path("core/packages/delphi/delphi-design.schema.json")
+_CONTRACT_SCHEMA = resource_path("core/packages/delphi/delphi-contract.schema.json")
 _STORE_NAME = "delphi-registry.sqlite3"
 _ALLOWED_STATES = {"answered", "missing", "not_applicable", "prefer_not_to_answer"}
 

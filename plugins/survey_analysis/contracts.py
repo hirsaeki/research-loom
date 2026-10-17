@@ -8,11 +8,13 @@ from typing import Any
 
 from jsonschema import Draft202012Validator, FormatChecker
 
+from core.resources import resource_path
 from core.runtime.digests import jcs_digest
 
-ROOT = Path(__file__).resolve().parents[2]
-ANALYSIS_SPEC_SCHEMA_PATH = ROOT / "core/packages/survey/survey-analysis-spec.schema.json"
-AGGREGATE_RESULT_SCHEMA_PATH = ROOT / "core/packages/survey/survey-aggregate-result.schema.json"
+ANALYSIS_SPEC_SCHEMA_PATH = resource_path("core/packages/survey/survey-analysis-spec.schema.json")
+AGGREGATE_RESULT_SCHEMA_PATH = resource_path(
+    "core/packages/survey/survey-aggregate-result.schema.json"
+)
 
 
 def _validator(path: Path) -> Draft202012Validator:

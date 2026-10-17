@@ -18,6 +18,7 @@ from xml.etree import ElementTree
 
 from jsonschema import Draft202012Validator, FormatChecker
 
+from core.resources import resource_path
 from plugins._infra.atomic_write import write_durable
 from plugins._infra.file_lock import lock_byte, unlock_byte, write_sentinel_if_empty
 from plugins.local_durable_store import register_optional_path, require_optional_available
@@ -33,20 +34,10 @@ SERVICE_VERSION = "0.2.0"
 MAX_SECTIONS = 128
 MAX_OUTPUT_BYTES = 16 * 1024 * 1024
 _XREF = re.compile(r"\[\[(section|exhibit|citation):([^\]]+)\]\]")
-_APPLICATION_SCHEMA = (
-    Path(__file__).resolve().parents[2]
-    / "core"
-    / "packages"
-    / "writer-publication"
-    / "publication-application.schema.json"
+_APPLICATION_SCHEMA = resource_path(
+    "core/packages/writer-publication/publication-application.schema.json"
 )
-_PREVIEW_SCHEMA = (
-    Path(__file__).resolve().parents[2]
-    / "core"
-    / "packages"
-    / "writer-publication"
-    / "publication-preview.schema.json"
-)
+_PREVIEW_SCHEMA = resource_path("core/packages/writer-publication/publication-preview.schema.json")
 
 
 def _json_bytes(value: Mapping[str, Any]) -> bytes:
