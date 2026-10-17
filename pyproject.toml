@@ -10,6 +10,13 @@ dependencies = [
     "pypdf>=6.20.1",
 ]
 
+[project.scripts]
+research-loom = "plugins.local_application.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.11,<0.12"]
+build-backend = "uv_build"
+
 [dependency-groups]
 dev = [
     "ruff==0.17.1",
@@ -19,9 +26,16 @@ dev = [
 ]
 
 [tool.uv]
-package = false
 # Runtime provisioning (`uv sync --frozen`) stays runtime-only; developer tools need `--group dev`.
 default-groups = []
+
+# `core` and `plugins` are namespace packages installed in editable mode from the repository root.
+# They read Profiles, Project Configs and Core contracts from the checkout (core/resources.py),
+# so a standalone wheel without the repository is not a supported install.
+[tool.uv.build-backend]
+module-root = ""
+module-name = ["core", "plugins"]
+namespace = true
 
 [tool.ruff]
 target-version = "py312"

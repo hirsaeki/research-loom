@@ -3,6 +3,10 @@
 Profile, Project and Core contracts, schemas and catalogs live next to the code
 in the repository tree. Every module that reads one resolves its path here, so a
 change in how the code is installed or packaged moves one place, not twenty.
+
+The project is installed in editable mode (`uv sync`), so `core` is imported
+from the checkout and the root below is the repository. A standalone wheel that
+does not ship with the repository is not a supported install.
 """
 
 from __future__ import annotations
