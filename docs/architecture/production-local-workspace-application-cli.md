@@ -23,6 +23,20 @@ A local workspace is a filesystem/composition concern under `plugins/local_appli
 
 `LocalResearchApplication` remains the production composition root. `LocalApplicationFacade` is the small operator-facing API. The CLI calls only that facade; it does not mutate or query SQLite repositories or operational stores directly. Workspace initialization, bounded Run inspection, Research Exhibit capture/retrieval, and read-only diagnosis are exposed through public application/store seams rather than CLI-owned storage logic.
 
+### Where each layer lives
+
+Each layer in the diagram has one home in `plugins/local_application`:
+
+| Layer | Module | Owns |
+|---|---|---|
+| JSON CLI adapter | `cli.py` | Argument parsing, reading JSON input, emitting results and mapping errors to exit codes. It holds no research or storage logic. |
+| Application Facade | `facade.py` (`LocalApplicationFacadeCore`) | Opening and initializing a workspace, the typed action ingress and the stage mechanism (`run_stages`, `stages_for`) that feature mixins plug into. |
+| | `*_facade.py` (`<Feature>Mixin`) | One feature's public operations, plus its `_STAGES` contributions to shared operations such as `submit_action` or `show_run`. |
+| | `facade_composition.py` | The single definition of `LocalApplicationFacade`, whose base list fixes the mixin order, and the partial compositions that some services instantiate directly. |
+| Composition root | `application.py` (`LocalResearchApplication`) | Building the stores, registries and core services once per workspace. |
+
+A new feature adds a mixin module and inserts it into the base list in `facade_composition.py`. It never redefines `LocalApplicationFacade` or overrides another layer's public method; `tests/contracts/test_local_application_facade_api.py` pins the public API, the stage order and the single definition.
+
 Ordinary operator conversation must treat the public Application Facade / CLI as the source of truth. Direct reads of `execution.db`, `operational-trace.sqlite3`, table names, row IDs, or blob-store layout are implementation/debug concerns, not normal operator workflow.
 
 ## Three different bindings
