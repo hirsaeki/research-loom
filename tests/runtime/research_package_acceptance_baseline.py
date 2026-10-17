@@ -11,7 +11,7 @@ import tests.runtime.test_external_desktop_research_intake as intake
 import tests.runtime.test_research_exhibits as exhibits
 from core.execution import CapabilityRunRecord, RunStatus
 from plugins.local_application import LocalApplicationError
-from plugins.local_application.research_package_service import verify_export_root
+from plugins.local_application.research_package.research_package_service import verify_export_root
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 
@@ -335,7 +335,7 @@ class ResearchPackageAcceptanceTests(ResearchPackageAcceptanceSupport):
             self.assertEqual((existing / "keep.txt").read_text(), "keep")
             failed = self.root / "failed"
             with patch(
-                "plugins.local_application.research_package_service.os.replace",
+                "plugins.local_application.research_package.research_package_service.os.replace",
                 side_effect=OSError("fixture write failure"),
             ):
                 with self.assertRaises(LocalApplicationError) as error:
@@ -359,7 +359,9 @@ class ResearchPackageAcceptanceTests(ResearchPackageAcceptanceSupport):
         legacy["schema_version"] = "0.1.0"
         legacy["package_digest"] = "sha256:" + "0" * 64
         # Reference-only shape can still satisfy the legacy contract, but cannot provide exact detached bodies.
-        from plugins.local_application.research_package_format import validate_schema
+        from plugins.local_application.research_package.research_package_format import (
+            validate_schema,
+        )
 
         validate_schema(legacy)
         self.assertNotIn("resolved_content", legacy)

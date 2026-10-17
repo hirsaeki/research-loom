@@ -14,6 +14,7 @@ from plugins._infra.clock import utc_now
 from plugins.application_errors import LocalApplicationError
 from plugins.desktop_research.normalization import source_id_for_capture
 
+from ..workspace.workspace import workspace_document_path
 from .generated_explanation import validate_explanation
 from .research_chart import validate_chart_exhibit
 from .research_package_format import (
@@ -42,10 +43,9 @@ from .research_package_format import (
 )
 from .visual_origin import verify_visual_origin
 from .visual_package_bindings import validate_visual_package_bindings
-from .workspace.workspace import workspace_document_path
 
 
-def _required_object_refs(obj: Mapping[str, Any]) -> list[tuple[str, str]]:
+def required_object_refs(obj: Mapping[str, Any]) -> list[tuple[str, str]]:
     kind = str(obj.get("kind", ""))
     refs: list[tuple[str, str]] = []
 
@@ -92,7 +92,7 @@ def _validate_selected_reference_closure(selected: list[Mapping[str, Any]]) -> N
     by_id = {str(obj.get("id")): obj for obj in selected if isinstance(obj.get("id"), str)}
     missing = []
     for obj in selected:
-        for expected_kind, ref_id in _required_object_refs(obj):
+        for expected_kind, ref_id in required_object_refs(obj):
             target = by_id.get(ref_id)
             if target is None or str(target.get("kind")) != expected_kind:
                 missing.append(f"{obj.get('id')}->{expected_kind}:{ref_id}")
@@ -104,7 +104,7 @@ def _validate_selected_reference_closure(selected: list[Mapping[str, Any]]) -> N
         )
 
 
-def _bibliography_readiness(source: Mapping[str, Any]) -> tuple[bool, list[str]]:
+def bibliography_readiness(source: Mapping[str, Any]) -> tuple[bool, list[str]]:
     def supplied(field):
         return isinstance(source.get(field), str) and bool(source[field].strip())
 
@@ -151,7 +151,7 @@ def _research_inventories(
         if source is None or source.get("kind") != "source":
             unresolved.append("source_unresolved")
         else:
-            bibliography_ready, missing = _bibliography_readiness(source)
+            bibliography_ready, missing = bibliography_readiness(source)
             unresolved.extend(missing)
         verification_status = str(evidence.get("verification_status") or "unspecified")
         if verification_status != "verified":

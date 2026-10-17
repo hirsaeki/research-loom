@@ -373,7 +373,7 @@ class ProjectInputMixin:
         return formats
 
     def _research_package_service(self):
-        from .research_package_service import ResearchPackageService
+        from .research_package.research_package_service import ResearchPackageService
 
         return ResearchPackageService(self)
 
@@ -392,7 +392,7 @@ class ProjectInputMixin:
         return self._research_package_service().export(package_id, output_dir)
 
     def _writer_composition_service(self):
-        from .writer_composition_history_service import WriterCompositionHistoryService
+        from .writer.writer_composition_history_service import WriterCompositionHistoryService
 
         return WriterCompositionHistoryService(self)
 
@@ -432,7 +432,7 @@ class ProjectInputMixin:
         )
 
     def _writer_round_trip_service(self):
-        from .writer_round_trip_service import WriterRoundTripService
+        from .writer.writer_round_trip_service import WriterRoundTripService
 
         return WriterRoundTripService(self)
 

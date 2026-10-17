@@ -2,9 +2,13 @@ import json
 import unittest
 from copy import deepcopy
 
-from plugins.local_application.publication_exhibits import prepare_exhibits
-from plugins.local_application.publication_release_service import PublicationReleaseService
-from plugins.local_application.research_package_builder import _research_inventories
+from plugins.local_application.publication.publication_exhibits import prepare_exhibits
+from plugins.local_application.publication.publication_release_service import (
+    PublicationReleaseService,
+)
+from plugins.local_application.research_package.research_package_builder import (
+    _research_inventories,
+)
 
 
 def _case_type(module_name, class_name):

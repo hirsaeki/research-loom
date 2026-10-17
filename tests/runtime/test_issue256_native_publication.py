@@ -14,15 +14,21 @@ from xml.etree import ElementTree as ET
 import tests.runtime.issue80_writer_composition_suite as composition_support
 import tests.runtime.test_issue219_writer_round_trip as writer
 import tests.runtime.test_research_exhibits as exhibits
-from plugins.local_application import LocalApplicationError, publication_exhibits
-from plugins.local_application import publication_release_service as publication
-from plugins.local_application.publication_docx import A, W, docx_bytes, verify_native_docx
-from plugins.local_application.publication_exhibits import (
+from plugins.local_application import LocalApplicationError
+from plugins.local_application.publication import publication_exhibits
+from plugins.local_application.publication import publication_release_service as publication
+from plugins.local_application.publication.publication_docx import (
+    A,
+    W,
+    docx_bytes,
+    verify_native_docx,
+)
+from plugins.local_application.publication.publication_exhibits import (
     _asset,
-    png_size,
     prepare_exhibits,
     table_rows,
 )
+from plugins.local_application.research_package.png_validation import png_size
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 CI_WINDOWS = True

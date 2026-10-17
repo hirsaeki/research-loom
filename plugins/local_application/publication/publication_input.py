@@ -4,9 +4,13 @@ from __future__ import annotations
 
 from plugins.application_errors import LocalApplicationError
 
-from .research_package_format import MAX_OUTPUT_BYTES, safe_component, verify_export_root
-from .writer_composition_history_service import WriterCompositionHistoryService
-from .writer_round_trip_service import WriterRoundTripService
+from ..research_package.research_package_format import (
+    MAX_OUTPUT_BYTES,
+    safe_component,
+    verify_export_root,
+)
+from ..writer.writer_composition_history_service import WriterCompositionHistoryService
+from ..writer.writer_round_trip_service import WriterRoundTripService
 
 
 class _PublicationCompositionReader(WriterCompositionHistoryService):

@@ -12,10 +12,16 @@ from pypdf import PdfWriter
 
 import tests.runtime.test_external_desktop_research_intake as intake
 from plugins.local_application import LocalApplicationError
-from plugins.local_application.publication_docx import W, docx_bytes
-from plugins.local_application.publication_formal_report import assemble, inspect_formal, outline
-from plugins.local_application.publication_pdf import coverage_review, inspect_pdf
-from plugins.local_application.publication_release_service import _validate_publication_inputs
+from plugins.local_application.publication.publication_docx import W, docx_bytes
+from plugins.local_application.publication.publication_formal_report import (
+    assemble,
+    inspect_formal,
+    outline,
+)
+from plugins.local_application.publication.publication_pdf import coverage_review, inspect_pdf
+from plugins.local_application.publication.publication_release_service import (
+    _validate_publication_inputs,
+)
 from plugins.local_application.workspace.profile_advancement import _validate_target_project_delta
 from plugins.local_application.workspace.profile_resolution import target_project_config
 

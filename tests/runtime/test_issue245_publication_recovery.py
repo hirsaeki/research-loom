@@ -9,7 +9,7 @@ from unittest.mock import patch
 import tests.runtime.test_issue220_publication_release as support
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade
 from plugins.local_application.cli import main
-from plugins.local_application.publication_release_service import (
+from plugins.local_application.publication.publication_release_service import (
     PublicationReleaseService,
     _json_bytes,
 )
@@ -138,7 +138,7 @@ class PublicationRecoveryTests(ResearchPackageAcceptanceSupport):
         response = support.Issue220PublicationReleaseTests._approval(request)
         root = facade._publication_release_service().root
         with patch(
-            "plugins.local_application.publication_release_service.os.replace",
+            "plugins.local_application.publication.publication_release_service.os.replace",
             side_effect=PermissionError("denied"),
         ):
             with self.assertRaises(LocalApplicationError) as error:

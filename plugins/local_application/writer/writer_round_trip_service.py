@@ -21,7 +21,7 @@ from plugins._infra.clock import utc_now as _now
 from plugins.application_errors import LocalApplicationError
 from plugins.local_durable_store import register_optional_path, require_optional_available
 
-from .research_package_format import safe_component
+from ..research_package.research_package_format import safe_component
 from .writer_composition_service import _digest_document, _object_index, _package_ref_sets
 
 SCHEMA_VERSION = "0.1.0"
@@ -118,7 +118,7 @@ class WriterRoundTripService:
         self._write_record(path, value, replace=True)
 
     def _write_record(self, path: Path, value: Mapping[str, Any], *, replace: bool) -> bool:
-        from .workspace.workspace import _safe_locator
+        from plugins.local_workspace_layout import safe_locator as _safe_locator
 
         require_optional_available(self.root, LocalApplicationError)
         path = _safe_locator(

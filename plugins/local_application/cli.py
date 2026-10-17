@@ -644,7 +644,9 @@ def _run(args: argparse.Namespace) -> Mapping[str, Any]:
         return _doctor_with_optional_attention(args.workspace, deep=args.deep)
 
     if args.command == "research-package" and args.research_package_command == "verify":
-        from plugins.local_application.research_package_service import verify_export_root
+        from plugins.local_application.research_package.research_package_service import (
+            verify_export_root,
+        )
 
         return verify_export_root(args.input)
 

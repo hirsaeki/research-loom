@@ -93,7 +93,7 @@ def directory_page(
                 yield entry.name
 
     try:
-        _require_unlinked(root)
+        require_unlinked(root)
         with os.scandir(root) as entries:
             selected = heapq.nsmallest(limit + 1, names(entries))
     except FileNotFoundError:
@@ -117,7 +117,7 @@ def directory_page(
     return [root / name for name in selected], next_cursor
 
 
-def _require_unlinked(path: Path) -> None:
+def require_unlinked(path: Path) -> None:
     for part in (path, *path.parents):
         if part.is_symlink() or (hasattr(part, "is_junction") and part.is_junction()):
             raise LocalApplicationError(
@@ -127,7 +127,7 @@ def _require_unlinked(path: Path) -> None:
 
 def read_mapping(path: Path, maximum: int) -> Mapping[str, Any]:
     """Bound before allocation. Never follow static linked metadata paths."""
-    _require_unlinked(path)
+    require_unlinked(path)
     info = path.stat()
     if not stat.S_ISREG(info.st_mode):
         raise LocalApplicationError(

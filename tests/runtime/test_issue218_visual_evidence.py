@@ -4,12 +4,12 @@ import json
 
 import tests.runtime.test_research_exhibits as exhibits
 from plugins.local_application import LocalApplicationError
-from plugins.local_application.research_package_format import (
+from plugins.local_application.research_package.research_package_format import (
     MAX_ITEM_BYTES,
     digest_json,
     without_digest,
 )
-from plugins.local_application.research_package_service import verify_export_root
+from plugins.local_application.research_package.research_package_service import verify_export_root
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 

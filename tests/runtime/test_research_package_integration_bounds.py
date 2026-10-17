@@ -3,7 +3,7 @@
 import unittest
 
 from plugins.local_application import LocalApplicationError
-from plugins.local_application.research_package_format import (
+from plugins.local_application.research_package.research_package_format import (
     MAX_MATERIALS,
     MAX_OBJECTS,
     MAX_OUTPUT_BYTES,
@@ -55,13 +55,15 @@ class ResearchPackageBulkAttachmentVerificationTests(ResearchPackageAcceptanceSu
         import json
         from copy import deepcopy
 
-        from plugins.local_application.research_package_format import (
+        from plugins.local_application.research_package.research_package_format import (
             digest_bytes,
             digest_json,
             verify_export_root,
             without_digest,
         )
-        from plugins.local_application.research_package_service import ResearchPackageService
+        from plugins.local_application.research_package.research_package_service import (
+            ResearchPackageService,
+        )
 
         facade, case = self._build()
         try:

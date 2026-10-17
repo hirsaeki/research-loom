@@ -11,7 +11,9 @@ from jsonschema import Draft202012Validator, FormatChecker
 
 import tests.runtime.issue80_writer_composition_suite as writer_comp_support
 from plugins.local_application import LocalApplicationError
-from plugins.local_application.publication_release_service import PublicationReleaseService
+from plugins.local_application.publication.publication_release_service import (
+    PublicationReleaseService,
+)
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 from tests.runtime.test_issue219_writer_round_trip import Issue219WriterRoundTripTests
 

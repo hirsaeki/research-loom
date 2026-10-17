@@ -7,10 +7,10 @@ from unittest.mock import patch
 import tests.runtime.issue80_writer_composition_suite as composition_support
 import tests.runtime.test_issue219_writer_round_trip as round_trip
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade
-from plugins.local_application.writer_composition_history_service import (
+from plugins.local_application.writer.writer_composition_history_service import (
     WriterCompositionHistoryService,
 )
-from plugins.local_application.writer_round_trip_service import WriterRoundTripService
+from plugins.local_application.writer.writer_round_trip_service import WriterRoundTripService
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 CI_WINDOWS = True
@@ -70,7 +70,7 @@ class WriterRecoveryTests(ResearchPackageAcceptanceSupport):
         facade.close()
         with LocalApplicationFacade.open_workspace(self.workspace) as reopened:
             with patch(
-                "plugins.local_application.writer_round_trip_service._now",
+                "plugins.local_application.writer.writer_round_trip_service._now",
                 return_value="2099-01-01T00:00:00Z",
             ):
                 retry = reopened.import_writer_response(response)
@@ -95,7 +95,7 @@ class WriterRecoveryTests(ResearchPackageAcceptanceSupport):
         facade.close()
         with LocalApplicationFacade.open_workspace(self.workspace) as reopened:
             with patch(
-                "plugins.local_application.writer_composition_history_service._now",
+                "plugins.local_application.writer.writer_composition_history_service._now",
                 return_value="2099-01-01T00:00:00Z",
             ):
                 retry = reopened.capture_writer_composition(case["package_id"], proposal)[
@@ -137,10 +137,10 @@ class WriterRecoveryTests(ResearchPackageAcceptanceSupport):
         self.assertFalse(replay["research_state_mutation_performed"])
 
     def test_bad_head_or_checkpoint_is_preserved_and_exact_backup_allows_retry(self):
-        from plugins.local_application.writer_round_trip_service import (
+        from plugins.local_application.writer.writer_round_trip_service import (
             _digest_document as _digest,
         )
-        from plugins.local_application.writer_round_trip_service import (
+        from plugins.local_application.writer.writer_round_trip_service import (
             _json_bytes,
         )
 
@@ -181,10 +181,10 @@ class WriterRecoveryTests(ResearchPackageAcceptanceSupport):
         self.assertEqual(retry["revision_digest"], first["revision_digest"])
 
     def test_legacy_writer_history_recovers_unique_head_and_rejects_ambiguous_successors(self):
-        from plugins.local_application.writer_round_trip_service import (
+        from plugins.local_application.writer.writer_round_trip_service import (
             _digest_document as _digest,
         )
-        from plugins.local_application.writer_round_trip_service import (
+        from plugins.local_application.writer.writer_round_trip_service import (
             _json_bytes,
         )
 
@@ -252,7 +252,7 @@ class WriterRecoveryTests(ResearchPackageAcceptanceSupport):
                 self.assertEqual(error.exception.code, "APPLICATION-WRITER-ROUND-TRIP-WRITE-001")
             pending = json.loads(service._checkpoint_path(cid).read_bytes())
             with patch(
-                "plugins.local_application.writer_round_trip_service._now",
+                "plugins.local_application.writer.writer_round_trip_service._now",
                 return_value="2099-01-01T00:00:00Z",
             ):
                 retry = facade.import_writer_response(response)
@@ -297,7 +297,7 @@ class WriterRecoveryTests(ResearchPackageAcceptanceSupport):
         service._capture_operation_path("COMP-PENDING").unlink()
         service._series_index_path("COMP-PENDING").unlink()
         with patch(
-            "plugins.local_application.writer_composition_history_service._now",
+            "plugins.local_application.writer.writer_composition_history_service._now",
             return_value="2099-01-01T00:00:00Z",
         ):
             replay = facade.capture_writer_composition(case["package_id"], revised)
@@ -305,7 +305,7 @@ class WriterRecoveryTests(ResearchPackageAcceptanceSupport):
         self.assertEqual(replay["composition"], second)
 
     def test_composition_bad_pointer_and_continuity_binding_are_not_overwritten(self):
-        from plugins.local_application.writer_composition_service import _digest_document
+        from plugins.local_application.writer.writer_composition_service import _digest_document
 
         facade, case = (
             composition_support.Issue80WriterCompositionTests._build_complete_support_package(self)
@@ -381,7 +381,7 @@ class WriterRecoveryTests(ResearchPackageAcceptanceSupport):
             "composition"
         ]
         with patch(
-            "plugins.local_application.writer_composition_history_service._now",
+            "plugins.local_application.writer.writer_composition_history_service._now",
             return_value="2099-01-01T00:00:00Z",
         ):
             retry = facade.capture_writer_composition(case["package_id"], revised)

@@ -9,7 +9,7 @@ from plugins.application_errors import LocalApplicationError
 from plugins.research_visual_semantics import SEMANTIC_CHANGES
 
 from .exhibit_facade import _string_list
-from .generated_explanation import matching_review, validate_explanation
+from .research_package.generated_explanation import matching_review, validate_explanation
 from .support.stages import run_stages, stages_for
 
 NEED_SCHEMA = "research-visual-need/v1"

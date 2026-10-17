@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 
 from plugins.local_application import LocalApplicationError
-from plugins.local_application.research_package_format import (
+from plugins.local_application.research_package.research_package_format import (
     digest_bytes,
     digest_json,
     verify_export_root,

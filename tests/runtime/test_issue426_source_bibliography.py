@@ -16,7 +16,7 @@ from plugins.local_application import (
     LocalApplicationFacade,
     LocalResearchApplication,
 )
-from plugins.local_application.publication_exhibits import prepare_exhibits
+from plugins.local_application.publication.publication_exhibits import prepare_exhibits
 from tests.runtime.runtime_fixtures import project, rq, seed_state, source
 from tests.runtime.test_research_exhibits import NullResolver, profile_provider
 

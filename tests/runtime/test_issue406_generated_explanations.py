@@ -4,8 +4,13 @@ import unittest
 from unittest.mock import patch
 
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade
-from plugins.local_application.generated_explanation import matching_review, validate_explanation
-from plugins.local_application.visual_package_bindings import validate_visual_package_bindings
+from plugins.local_application.research_package.generated_explanation import (
+    matching_review,
+    validate_explanation,
+)
+from plugins.local_application.research_package.visual_package_bindings import (
+    validate_visual_package_bindings,
+)
 from plugins.research_visual_semantics import digest
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 from tests.runtime.test_issue256_native_publication import fixture_png
@@ -193,7 +198,9 @@ class GeneratedExplanationPackageTests(ResearchPackageAcceptanceSupport):
             self.assertNotEqual(newer["package"]["package_id"], original["package_id"])
             export = self.root / "generated-explanation-package"
             facade.export_research_package(newer["package"]["package_id"], export)
-            from plugins.local_application.research_package_format import verify_export_root
+            from plugins.local_application.research_package.research_package_format import (
+                verify_export_root,
+            )
 
             self.assertEqual(verify_export_root(export)["status"], "VERIFIED")
             self.assertEqual(

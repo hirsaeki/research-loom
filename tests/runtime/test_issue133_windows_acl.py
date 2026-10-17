@@ -9,7 +9,7 @@ from unittest import skipUnless
 from unittest.mock import patch
 
 from plugins.local_application import LocalApplicationError
-from plugins.local_application.research_package_service import verify_export_root
+from plugins.local_application.research_package.research_package_service import verify_export_root
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 CI_WINDOWS = True
@@ -130,7 +130,7 @@ class Issue133WindowsAclTests(ResearchPackageAcceptanceSupport):
         real_mkdtemp = __import__("tempfile").mkdtemp
         try:
             with patch(
-                "plugins.local_application.research_package_service.tempfile.mkdtemp",
+                "plugins.local_application.research_package.research_package_service.tempfile.mkdtemp",
                 side_effect=self._restrict_export_temp(real_mkdtemp),
             ):
                 exported = facade.export_research_package(case["package_id"], output)
@@ -160,7 +160,7 @@ class Issue133WindowsAclTests(ResearchPackageAcceptanceSupport):
     def test_issue379_managed_package_resets_staging_acl_and_is_fresh_process_readable(self):
         real_mkdtemp = __import__("tempfile").mkdtemp
         with patch(
-            "plugins.local_application.research_package_service.tempfile.mkdtemp",
+            "plugins.local_application.research_package.research_package_service.tempfile.mkdtemp",
             side_effect=self._restrict_export_temp(real_mkdtemp),
         ):
             facade, case = self._build()
@@ -183,7 +183,7 @@ class Issue133WindowsAclTests(ResearchPackageAcceptanceSupport):
         facade, case = self._prepare_case()
         try:
             with patch(
-                "plugins.local_application.research_package_service._normalize_windows_export_acl",
+                "plugins.local_application.research_package.research_package_service._normalize_windows_export_acl",
                 side_effect=OSError("fixture managed ACL reset failure"),
             ):
                 with self.assertRaises(LocalApplicationError) as error:
@@ -221,7 +221,7 @@ class Issue133WindowsAclTests(ResearchPackageAcceptanceSupport):
 
         try:
             with patch(
-                "plugins.local_application.research_package_service.os.replace",
+                "plugins.local_application.research_package.research_package_service.os.replace",
                 side_effect=competing_package_replace,
             ):
                 with self.assertRaises(LocalApplicationError) as error:
@@ -238,11 +238,11 @@ class Issue133WindowsAclTests(ResearchPackageAcceptanceSupport):
         real_mkdtemp = __import__("tempfile").mkdtemp
         with (
             patch(
-                "plugins.local_application.research_package_service.tempfile.mkdtemp",
+                "plugins.local_application.research_package.research_package_service.tempfile.mkdtemp",
                 side_effect=self._restrict_export_temp(real_mkdtemp),
             ),
             patch(
-                "plugins.local_application.research_package_service._normalize_windows_export_acl",
+                "plugins.local_application.research_package.research_package_service._normalize_windows_export_acl",
                 return_value=None,
             ),
         ):
@@ -261,7 +261,7 @@ class Issue133WindowsAclTests(ResearchPackageAcceptanceSupport):
         output = self.root / "issue133-acl-failure"
         try:
             with patch(
-                "plugins.local_application.research_package_service._normalize_windows_export_acl",
+                "plugins.local_application.research_package.research_package_service._normalize_windows_export_acl",
                 side_effect=OSError("fixture ACL reset failure"),
             ):
                 with self.assertRaises(LocalApplicationError) as error:
@@ -283,7 +283,7 @@ class Issue133WindowsAclTests(ResearchPackageAcceptanceSupport):
 
         try:
             with patch(
-                "plugins.local_application.research_package_service.os.replace",
+                "plugins.local_application.research_package.research_package_service.os.replace",
                 side_effect=competing_replace,
             ):
                 with self.assertRaises(LocalApplicationError) as error:
@@ -300,11 +300,11 @@ class Issue133WindowsAclTests(ResearchPackageAcceptanceSupport):
         try:
             with (
                 patch(
-                    "plugins.local_application.research_package_service.tempfile.mkdtemp",
+                    "plugins.local_application.research_package.research_package_service.tempfile.mkdtemp",
                     side_effect=self._restrict_export_temp(real_mkdtemp),
                 ),
                 patch(
-                    "plugins.local_application.research_package_service._normalize_windows_export_acl",
+                    "plugins.local_application.research_package.research_package_service._normalize_windows_export_acl",
                     return_value=None,
                 ),
             ):

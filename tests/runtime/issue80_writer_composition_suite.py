@@ -13,7 +13,7 @@ import tests.runtime.test_external_desktop_research_intake as intake
 from core.runtime import TransitionAction, TransitionKind
 from core.runtime.transition_models import CommitReceipt
 from plugins.local_application import LocalApplicationError, verify_writer_section_input
-from plugins.local_application.writer_composition_service import WriterCompositionService
+from plugins.local_application.writer.writer_composition_service import WriterCompositionService
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 from tests.runtime.runtime_fixtures import decision, make_request
 
@@ -1267,7 +1267,7 @@ class Issue80WriterCompositionTests(ResearchPackageAcceptanceSupport):
         with self.__class__._reopen(self.workspace) as reopened:
             before = set(self.root.glob(".section-input-*"))
             with patch(
-                "plugins.local_application.writer_composition_service.verify_section_input_root",
+                "plugins.local_application.writer.writer_composition_service.verify_section_input_root",
                 side_effect=LocalApplicationError(
                     "APPLICATION-WRITER-COMPOSITION-INTEGRITY-001", "fixture"
                 ),
@@ -1357,7 +1357,7 @@ class Issue80WriterCompositionTests(ResearchPackageAcceptanceSupport):
                 raise FileExistsError(dst)
 
             with patch(
-                "plugins.local_application.writer_composition_service.os.link",
+                "plugins.local_application.writer.writer_composition_service.os.link",
                 side_effect=race_link,
             ):
                 with self.assertRaises(LocalApplicationError):
@@ -1365,7 +1365,7 @@ class Issue80WriterCompositionTests(ResearchPackageAcceptanceSupport):
             self.assertEqual(sentinel.read_text(encoding="utf-8"), "sentinel")
             failed = self.root / "whole-failed.json"
             with patch(
-                "plugins.local_application.writer_composition_service.os.fsync",
+                "plugins.local_application.writer.writer_composition_service.os.fsync",
                 side_effect=OSError("fixture"),
             ):
                 with self.assertRaises(LocalApplicationError):
@@ -1412,14 +1412,15 @@ class Issue80WriterCompositionTests(ResearchPackageAcceptanceSupport):
             self.assertEqual((existing / "keep").read_text(), "keep")
             failed = self.root / "failed"
             with patch(
-                "plugins.local_application.writer_composition_service.os.replace",
+                "plugins.local_application.writer.writer_composition_service.os.replace",
                 side_effect=OSError("fixture"),
             ):
                 with self.assertRaises(LocalApplicationError):
                     facade.export_writer_section_input(v1["composition_id"], "SEC-FRAME", failed)
             self.assertFalse(failed.exists())
             with patch(
-                "plugins.local_application.writer_composition_service.MAX_SELECTION_EVENTS", 2
+                "plugins.local_application.writer.writer_composition_service.MAX_SELECTION_EVENTS",
+                2,
             ):
                 facade.select_writer_composition(v1["composition_id"], 1, v1["composition_digest"])
                 with self.assertRaises(LocalApplicationError) as selection_bound:
@@ -1430,7 +1431,8 @@ class Issue80WriterCompositionTests(ResearchPackageAcceptanceSupport):
                     selection_bound.exception.code, "APPLICATION-WRITER-COMPOSITION-BOUND-001"
                 )
             with patch(
-                "plugins.local_application.writer_composition_service.MAX_SECTION_INPUT_BYTES", 1
+                "plugins.local_application.writer.writer_composition_service.MAX_SECTION_INPUT_BYTES",
+                1,
             ):
                 with self.assertRaises(LocalApplicationError) as output_bound:
                     facade.export_writer_section_input(

@@ -12,9 +12,9 @@ import rfc8785
 
 import tests.runtime.test_external_desktop_research_intake as intake
 from plugins.local_application import LocalApplicationError
-from plugins.local_application.publication_docx import WP, W, docx_bytes
-from plugins.local_application.publication_input import inspect_inputs
-from plugins.local_application.publication_release_service import _publication_policy
+from plugins.local_application.publication.publication_docx import WP, W, docx_bytes
+from plugins.local_application.publication.publication_input import inspect_inputs
+from plugins.local_application.publication.publication_release_service import _publication_policy
 from plugins.local_application.workspace.profile_resolution import resolve_effective_profile_set
 from tests.runtime.test_misco_writer_profile_application import (
     WRITER_MANIFEST,
@@ -364,7 +364,7 @@ class MiscoPublicationProfileApplicationTests(MiscoWriterProfileApplicationTests
     def test_e3_table_caption_above_and_figure_caption_below_in_native_docx(self):
         import io
 
-        from plugins.local_application.publication_docx import docx_bytes
+        from plugins.local_application.publication.publication_docx import docx_bytes
         from tests.runtime.test_issue256_native_publication import A, fixture_png
 
         table = {
