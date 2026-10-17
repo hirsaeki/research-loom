@@ -3,12 +3,13 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
 import yaml
 from jsonschema import Draft202012Validator, FormatChecker
+
+from core.resources import resource_path
 
 from .attempts import (
     UNSUCCESSFUL_OUTCOMES,
@@ -17,8 +18,7 @@ from .attempts import (
 )
 from .digest import canonical_extension_digest
 
-ROOT = Path(__file__).resolve().parents[2]
-DR = ROOT / "core" / "packages" / "desktop-research"
+DR = resource_path("core/packages/desktop-research")
 _SCHEMA = json.loads(
     (DR / "desktop-research-result-extension.schema.json").read_text(encoding="utf-8")
 )

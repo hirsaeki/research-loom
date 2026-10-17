@@ -12,6 +12,7 @@ from typing import Any
 
 from jsonschema import Draft202012Validator, FormatChecker
 
+from core.resources import resource_path
 from core.runtime import LineageView, StateView, canonical_digest
 from core.runtime.digests import jcs_digest_without
 from core.runtime.ports import RepositoryError
@@ -56,10 +57,9 @@ from plugins.local_workspace_layout import safe_locator as _safe_locator
 from plugins.local_workspace_layout import validate_binding_shape as _validate_binding_shape
 from plugins.sqlite_state_store import integrity_issues_for
 
-ROOT = Path(__file__).resolve().parents[2]
-PROJECT_CONFIG_SCHEMA = ROOT / "projects/contracts/project-config.schema.json"
-EFFECTIVE_PROFILE_SET_SCHEMA = ROOT / "profiles/contracts/effective-profile-set.schema.json"
-RESEARCH_OBJECT_SCHEMA = ROOT / "core/models/research-object.schema.json"
+PROJECT_CONFIG_SCHEMA = resource_path("projects/contracts/project-config.schema.json")
+EFFECTIVE_PROFILE_SET_SCHEMA = resource_path("profiles/contracts/effective-profile-set.schema.json")
+RESEARCH_OBJECT_SCHEMA = resource_path("core/models/research-object.schema.json")
 
 INITIALIZING_MARKER = ".initializing"
 

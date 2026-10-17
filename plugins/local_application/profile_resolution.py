@@ -12,17 +12,17 @@ import rfc8785
 import yaml
 from jsonschema import Draft202012Validator, FormatChecker
 
+from core.resources import resource_path
 from core.runtime import canonical_digest
 from core.runtime.digests import jcs_digest
 from plugins.local_application.workspace import LocalWorkspaceError
 
-ROOT = Path(__file__).resolve().parents[2]
-PROFILE_MANIFEST_SCHEMA = ROOT / "profiles/contracts/profile-manifest.schema.json"
-EPS_SCHEMA = ROOT / "profiles/contracts/effective-profile-set.schema.json"
-CORE_INVARIANTS = ROOT / "core/validators/non-overridable-invariants.yaml"
-STRENGTHENING_REGISTRY = ROOT / "profiles/contracts/invariant-strengthening-validators.yaml"
-NARRATIVE_SEMANTICS = ROOT / "profiles/contracts/narrative-semantics.yaml"
-RESEARCH_QUALITY_POLICY = ROOT / "profiles/contracts/research-quality-policy.yaml"
+PROFILE_MANIFEST_SCHEMA = resource_path("profiles/contracts/profile-manifest.schema.json")
+EPS_SCHEMA = resource_path("profiles/contracts/effective-profile-set.schema.json")
+CORE_INVARIANTS = resource_path("core/validators/non-overridable-invariants.yaml")
+STRENGTHENING_REGISTRY = resource_path("profiles/contracts/invariant-strengthening-validators.yaml")
+NARRATIVE_SEMANTICS = resource_path("profiles/contracts/narrative-semantics.yaml")
+RESEARCH_QUALITY_POLICY = resource_path("profiles/contracts/research-quality-policy.yaml")
 CORE_CONTRACTS = {"research_contract": "0.1.0", "invariant_contract": "0.1.0"}
 TYPE_RANK = {
     name: i for i, name in enumerate(("research", "organization", "narrative", "publication"))
@@ -363,7 +363,7 @@ def _validate_manifest_semantics(manifest: Mapping[str, Any]) -> None:
 def _load_candidates(paths: Iterable[str | Path]) -> list[dict[str, Any]]:
     candidates: list[dict[str, Any]] = []
     identities: dict[tuple[str, str, str], str] = {}
-    profile_root = (ROOT / "profiles").resolve()
+    profile_root = resource_path("profiles").resolve()
     for index, raw_path in enumerate(paths):
         if index >= MAX_PROFILE_MANIFESTS:
             raise LocalWorkspaceError(
@@ -687,7 +687,7 @@ def _normalized_resource_bytes(path: Path) -> bytes:
 
 
 def _effective_resources(selected) -> list[dict[str, Any]]:
-    profile_root = (ROOT / "profiles").resolve()
+    profile_root = resource_path("profiles").resolve()
     grouped: dict[tuple[str, str, str], dict[str, Any]] = {}
     resource_count = 0
     resource_bytes = 0

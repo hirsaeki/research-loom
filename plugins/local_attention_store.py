@@ -10,13 +10,13 @@ from typing import Any
 from jsonschema import Draft202012Validator, FormatChecker
 
 from core.conversation import canonical_digest
+from core.resources import resource_path
 from plugins._infra.sqlite import apply_pragmas
 from plugins.local_durable_store import register_optional_path, require_optional_available
 from plugins.local_store_schemas import ATTENTION_SCHEMA_SQL as _SCHEMA_SQL
 from plugins.local_store_schemas import ATTENTION_STORE_SCHEMA_VERSION
 
-ROOT = Path(__file__).resolve().parents[1]
-ATTENTION_MAP_SCHEMA_PATH = ROOT / "projects/contracts/research-attention-map.schema.json"
+ATTENTION_MAP_SCHEMA_PATH = resource_path("projects/contracts/research-attention-map.schema.json")
 
 
 class LocalAttentionStoreError(RuntimeError):

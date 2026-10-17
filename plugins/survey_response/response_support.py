@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
-from pathlib import Path
 from typing import Any
 
 from jsonschema import Draft202012Validator, FormatChecker
 
-ROOT = Path(__file__).resolve().parents[2]
+from core.resources import resource_path
+
 _RESPONSE_SCHEMA = json.loads(
-    (ROOT / "core/packages/survey/survey-response.schema.json").read_text(encoding="utf-8")
+    (resource_path("core/packages/survey/survey-response.schema.json")).read_text(encoding="utf-8")
 )
 _RESPONSE_VALIDATOR = Draft202012Validator(
     _RESPONSE_SCHEMA,

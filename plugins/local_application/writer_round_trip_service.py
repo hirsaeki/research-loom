@@ -14,6 +14,7 @@ from uuid import uuid4
 
 from jsonschema import Draft202012Validator, FormatChecker
 
+from core.resources import resource_path
 from core.runtime import canonical_digest
 from plugins._infra.atomic_write import write_durable
 from plugins._infra.clock import utc_now as _now
@@ -29,10 +30,7 @@ MAX_FEEDBACK_ISSUES = 128
 MAX_INSPECT_ANCESTRY = 64
 MAX_RESPONSE_BYTES = 8 * 1024 * 1024
 MAX_ROUND_TRIP_INPUT_BYTES = 16 * 1024 * 1024
-SCHEMA = (
-    Path(__file__).resolve().parents[2]
-    / "core/packages/writer-publication/writer-round-trip.schema.json"
-)
+SCHEMA = resource_path("core/packages/writer-publication/writer-round-trip.schema.json")
 
 
 def _validate_schema(value: Mapping[str, Any]) -> None:

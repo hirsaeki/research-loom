@@ -2,16 +2,15 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from copy import deepcopy
-from pathlib import Path
 from typing import Any
 
 from core.conversation.validation import canonical_digest
 from core.execution.models import CapabilityExecutionError
+from core.resources import resource_path
 
 from .contracts import document_digest, validate_virtual_document
 from .digest import file_digest, text_digest
 
-ROOT = Path(__file__).resolve().parents[2]
 IMPLEMENTATION_ID = "plugin.survey-virtual-runner.structural"
 IMPLEMENTATION_VERSION = "0.1.0"
 RUNNER_VERSION = "0.1.0"
@@ -20,7 +19,7 @@ STRUCTURAL_TEMPLATE = (
     "Structural Survey generator v1: use only pinned Questionnaire structure and stable values; "
     "preserve explicit missing states; inject only configured structural STRESS faults."
 )
-RESPONSE_SCHEMA_PATH = ROOT / "core/packages/survey/survey-response.schema.json"
+RESPONSE_SCHEMA_PATH = resource_path("core/packages/survey/survey-response.schema.json")
 
 
 def runner_digest(

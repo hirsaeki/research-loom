@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from copy import deepcopy
-from pathlib import Path
 from typing import Any
 
 import yaml
 
-ROOT = Path(__file__).resolve().parents[2]
-POLICY_PATH = ROOT / "profiles/contracts/research-quality-policy.yaml"
+from core.resources import resource_path
+
+POLICY_PATH = resource_path("profiles/contracts/research-quality-policy.yaml")
 _STATUS = {"conformant", "violation", "unevaluated", "not_applicable"}
 _ORGANIZATION_STATUS = {"conformant", "violation", "not_applicable"}
 _MAX_ASSESSMENT_SUBJECTS = 256

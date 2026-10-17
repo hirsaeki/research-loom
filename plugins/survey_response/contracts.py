@@ -9,12 +9,14 @@ from typing import Any
 
 from jsonschema import Draft202012Validator, FormatChecker
 
+from core.resources import resource_path
 from core.runtime.digests import jcs_digest
 
-ROOT = Path(__file__).resolve().parents[2]
-RAW_SCHEMA_PATH = ROOT / "core/packages/survey/survey-raw-response.schema.json"
-CANONICAL_RESPONSE_SCHEMA_PATH = ROOT / "core/packages/survey/survey-response-canonical.schema.json"
-DATASET_SCHEMA_PATH = ROOT / "core/packages/survey/survey-response-dataset.schema.json"
+RAW_SCHEMA_PATH = resource_path("core/packages/survey/survey-raw-response.schema.json")
+CANONICAL_RESPONSE_SCHEMA_PATH = resource_path(
+    "core/packages/survey/survey-response-canonical.schema.json"
+)
+DATASET_SCHEMA_PATH = resource_path("core/packages/survey/survey-response-dataset.schema.json")
 _MAX_SAFE_INTEGER = 9_007_199_254_740_991
 
 
