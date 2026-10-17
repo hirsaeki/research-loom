@@ -1,0 +1,506 @@
+[
+  {
+    "name": "advance_profile_generation",
+    "kind": "classmethod",
+    "signature": "(workspace: 'str | Path', request: 'Mapping[str, Any]') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "build_delphi_feedback",
+    "kind": "method",
+    "signature": "(self, round_result_id: 'str', version: 'str' = '1') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "build_delphi_stopping_candidate",
+    "kind": "method",
+    "signature": "(self, panel_id: 'str', *, round_result_id: 'str | None' = None, version: 'str | None' = None) -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "build_publication_preview",
+    "kind": "method",
+    "signature": "(self, composition_id: 'str', revision_id: 'str | None' = None, publication_inputs: 'Mapping[str, Any] | None' = None) -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "build_research_package",
+    "kind": "method",
+    "signature": "(self, value: 'Mapping[str, Any]') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "capture_chart_exhibit",
+    "kind": "method",
+    "signature": "(self, value: 'Mapping') -> 'Mapping'"
+  },
+  {
+    "name": "capture_delphi_design",
+    "kind": "method",
+    "signature": "(self, input_value: 'Mapping[str, Any]') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "capture_delphi_instrument",
+    "kind": "method",
+    "signature": "(self, input_value: 'Mapping[str, Any]') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "capture_delphi_round",
+    "kind": "method",
+    "signature": "(self, input_value: 'Mapping[str, Any]') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "capture_exhibit",
+    "kind": "method",
+    "signature": "(self, value)"
+  },
+  {
+    "name": "capture_explanation_exhibit",
+    "kind": "method",
+    "signature": "(self, value)"
+  },
+  {
+    "name": "capture_external_source",
+    "kind": "method",
+    "signature": "(self, run_id: 'str', submission: 'Mapping[str, Any]') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "capture_real_survey_intake",
+    "kind": "method",
+    "signature": "(self, input_value: 'Mapping[str, Any]') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "capture_survey_analysis_spec",
+    "kind": "method",
+    "signature": "(self, input_value: 'Mapping[str, Any]') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "capture_survey_design",
+    "kind": "method",
+    "signature": "(self, input_value: 'Mapping[str, Any]') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "capture_survey_instrument",
+    "kind": "method",
+    "signature": "(self, input_value: 'Mapping[str, Any]') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "capture_survey_response",
+    "kind": "method",
+    "signature": "(self, input_value: 'Mapping[str, Any]') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "capture_survey_response_dataset",
+    "kind": "method",
+    "signature": "(self, input_value: 'Mapping[str, Any]') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "capture_virtual_run_response_dataset",
+    "kind": "method",
+    "signature": "(self, run_id: 'str', *, instrument_ref: 'Mapping[str, Any]') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "capture_visual_need",
+    "kind": "method",
+    "signature": "(self, value)"
+  },
+  {
+    "name": "capture_visual_review",
+    "kind": "method",
+    "signature": "(self, value)"
+  },
+  {
+    "name": "capture_writer_composition",
+    "kind": "method",
+    "signature": "(self, package_id: 'str', value: 'Mapping[str, Any]') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "close",
+    "kind": "method",
+    "signature": "(self) -> 'None'"
+  },
+  {
+    "name": "collect_external",
+    "kind": "method",
+    "signature": "(self, run_id: 'str', submission: 'Mapping[str, Any]', *, view: 'str | None' = None) -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "compare_survey_virtual_pretests",
+    "kind": "method",
+    "signature": "(self, run_a_id: 'str', run_b_id: 'str', *, aggregate_a_result_id: 'str | None' = None, aggregate_b_result_id: 'str | None' = None) -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "complete_external_retrieval_attempt",
+    "kind": "method",
+    "signature": "(self, run_id: 'str', submission: 'Mapping[str, Any]') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "diff_writer_composition",
+    "kind": "method",
+    "signature": "(self, composition_id: 'str', from_version: 'int', to_version: 'int') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "doctor",
+    "kind": "method",
+    "signature": "(self) -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "doctor_workspace",
+    "kind": "classmethod",
+    "signature": "(workspace: 'str | Path') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "evaluate_research_quality",
+    "kind": "method",
+    "signature": "(self, input_value: 'Mapping[str, Any]') -> 'dict[str, Any]'"
+  },
+  {
+    "name": "export_external_material",
+    "kind": "method",
+    "signature": "(self, run_id: 'str', capture_id: 'str', *, kind: 'str', output_file) -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "export_research_package",
+    "kind": "method",
+    "signature": "(self, package_id: 'str', output_dir: 'str | Path') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "export_survey_instrument",
+    "kind": "method",
+    "signature": "(self, instrument_id: 'str', version: 'str', *, format: 'str') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "export_writer_composition",
+    "kind": "method",
+    "signature": "(self, composition_id: 'str', version: 'int', output: 'str | Path') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "export_writer_round_trip_input",
+    "kind": "method",
+    "signature": "(self, composition_id: 'str', section_ids: 'list[str]', output: 'str | Path') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "export_writer_section_input",
+    "kind": "method",
+    "signature": "(self, composition_id: 'str', section_id: 'str', output: 'str | Path') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "finalize_publication_pdf",
+    "kind": "method",
+    "signature": "(self, build_id: 'str', input_: 'Mapping[str, Any]') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "from_opened_workspace",
+    "kind": "classmethod",
+    "signature": "(opened: 'OpenedLocalWorkspace') -> 'LocalApplicationFacade'"
+  },
+  {
+    "name": "import_staged_external_material",
+    "kind": "method",
+    "signature": "(self, stage_id: 'str', *, source_run_id: 'str', source_capture_id: 'str', destination_run_id: 'str') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "import_writer_response",
+    "kind": "method",
+    "signature": "(self, value: 'Mapping[str, Any]') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "initialize_workspace",
+    "kind": "classmethod",
+    "signature": "(workspace: 'str | Path', project_config_file: 'str | Path', effective_profile_set_file: 'str | Path') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "inspect_delphi_panel",
+    "kind": "method",
+    "signature": "(self, panel_id: 'str', *, limit: 'int' = 25, offset: 'int' = 0) -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "inspect_writer_round_trip",
+    "kind": "method",
+    "signature": "(self, composition_id: 'str', revision_id: 'str | None' = None) -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "list_actions",
+    "kind": "method",
+    "signature": "(self) -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "list_exhibits",
+    "kind": "method",
+    "signature": "(self, *, rq_id: 'str | None' = None) -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "list_external_materials",
+    "kind": "method",
+    "signature": "(self, *, limit: 'int' = 100, cursor: 'str | None' = None) -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "list_project_inputs",
+    "kind": "method",
+    "signature": "(self, *, limit: 'int' = 100, cursor: 'str | None' = None) -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "list_research_packages",
+    "kind": "method",
+    "signature": "(self, *, limit: 'int' = 100, cursor: 'str | None' = None) -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "list_synthesis_candidates",
+    "kind": "method",
+    "signature": "(self, *, kind: 'str | None' = None, limit: 'int' = 20, cursor: 'str | None' = None, view: 'str | None' = None) -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "list_writer_compositions",
+    "kind": "method",
+    "signature": "(self, *, limit: 'int' = 64, cursor: 'str | None' = None) -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "normalize_survey_response",
+    "kind": "method",
+    "signature": "(self, input_value: 'Mapping[str, Any]') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "open_workspace",
+    "kind": "classmethod",
+    "signature": "(workspace: 'str | Path') -> 'LocalApplicationFacade'"
+  },
+  {
+    "name": "preflight_external",
+    "kind": "method",
+    "signature": "(self, run_id: 'str', submission: 'Mapping[str, Any]') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "prepare_writer_document_review",
+    "kind": "method",
+    "signature": "(self, value: 'Mapping[str, Any]') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "profile_generation_history",
+    "kind": "classmethod",
+    "signature": "(workspace: 'str | Path') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "project_id",
+    "kind": "property"
+  },
+  {
+    "name": "recalculate_delphi_round",
+    "kind": "method",
+    "signature": "(self, round_result_id: 'str', version: 'str' = '1') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "recover_legacy_desktop_research_finding_candidate",
+    "kind": "method",
+    "signature": "(self, run_id: 'str') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "recover_project_input",
+    "kind": "method",
+    "signature": "(self, input_id: 'str', source_file: 'str | Path') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "register_project_input",
+    "kind": "method",
+    "signature": "(self, value: 'Mapping[str, Any]') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "release_publication",
+    "kind": "method",
+    "signature": "(self, build_id: 'str', decision: 'Mapping[str, Any]') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "replay_completed_desktop_research_run",
+    "kind": "method",
+    "signature": "(self, run_id: 'str', *, view: 'str | None' = None) -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "request_delphi_instrument_approval",
+    "kind": "method",
+    "signature": "(self, input_value: 'Mapping[str, Any]') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "request_publication_release",
+    "kind": "method",
+    "signature": "(self, build_id: 'str', actor_id: 'str', *, renewal_of: 'str | None' = None) -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "resolve_delphi_instrument_approval",
+    "kind": "method",
+    "signature": "(self, input_value: 'Mapping[str, Any]') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "resolve_human_decision",
+    "kind": "method",
+    "signature": "(self, response: 'Mapping[str, Any]', *, view: 'str | None' = None) -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "resolve_profile_generation",
+    "kind": "classmethod",
+    "signature": "(workspace: 'str | Path', request: 'Mapping[str, Any]', output: 'str | Path') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "resume_context",
+    "kind": "method",
+    "signature": "(self, *, limits: 'Mapping[str, int] | None' = None, view: 'str | None' = None) -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "resume_visual_need",
+    "kind": "method",
+    "signature": "(self, value)"
+  },
+  {
+    "name": "run_survey_aggregation",
+    "kind": "method",
+    "signature": "(self, input_value: 'Mapping[str, Any]') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "run_survey_virtual",
+    "kind": "method",
+    "signature": "(self, payload: 'Mapping[str, Any]') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "select_writer_composition",
+    "kind": "method",
+    "signature": "(self, composition_id: 'str', version: 'int', digest: 'str') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "show_candidate",
+    "kind": "method",
+    "signature": "(self, candidate_id: 'str') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "show_delphi_design",
+    "kind": "method",
+    "signature": "(self, design_id: 'str', version: 'str') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "show_delphi_feedback",
+    "kind": "method",
+    "signature": "(self, feedback_id: 'str') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "show_delphi_instrument",
+    "kind": "method",
+    "signature": "(self, instrument_id: 'str', version: 'str') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "show_delphi_instrument_approval",
+    "kind": "method",
+    "signature": "(self, request_id: 'str') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "show_delphi_round",
+    "kind": "method",
+    "signature": "(self, round_result_id: 'str', version: 'str' = '1') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "show_delphi_stopping_candidate",
+    "kind": "method",
+    "signature": "(self, candidate_id: 'str') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "show_exhibit",
+    "kind": "method",
+    "signature": "(self, exhibit_id: 'str') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "show_external_material",
+    "kind": "method",
+    "signature": "(self, run_id: 'str', capture_id: 'str', *, max_text_bytes: 'int' = 65536) -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "show_human_decision_request",
+    "kind": "method",
+    "signature": "(self, request_id: 'str') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "show_project_input",
+    "kind": "method",
+    "signature": "(self, input_id: 'str', *, format: 'str' = 'metadata') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "show_publication_preview",
+    "kind": "method",
+    "signature": "(self, build_id: 'str') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "show_real_survey_intake",
+    "kind": "method",
+    "signature": "(self, dataset_id: 'str', *, aggregate_result_id: 'str | None' = None, limit: 'int' = 25, offset: 'int' = 0) -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "show_research_package",
+    "kind": "method",
+    "signature": "(self, package_id: 'str') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "show_run",
+    "kind": "method",
+    "signature": "(self, run_id: 'str', *, view: 'str | None' = None) -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "show_survey_aggregate_result",
+    "kind": "method",
+    "signature": "(self, aggregate_result_id: 'str', *, limit: 'int' = 25, offset: 'int' = 0) -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "show_survey_analysis_spec",
+    "kind": "method",
+    "signature": "(self, analysis_spec_id: 'str') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "show_survey_design",
+    "kind": "method",
+    "signature": "(self, survey_design_id: 'str', version: 'str') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "show_survey_instrument",
+    "kind": "method",
+    "signature": "(self, instrument_id: 'str', version: 'str') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "show_survey_response",
+    "kind": "method",
+    "signature": "(self, response_id: 'str', *, identity_namespace: 'str | None' = None) -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "show_survey_response_dataset",
+    "kind": "method",
+    "signature": "(self, dataset_id: 'str', *, limit: 'int' = 25, offset: 'int' = 0) -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "show_survey_virtual_pretest",
+    "kind": "method",
+    "signature": "(self, run_id: 'str', *, aggregate_result_id: 'str | None' = None) -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "show_synthesis_candidate",
+    "kind": "method",
+    "signature": "(self, candidate_id: 'str', *, view: 'str | None' = None) -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "show_writer_composition",
+    "kind": "method",
+    "signature": "(self, composition_id: 'str', version: 'int') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "stage_external_material_source",
+    "kind": "method",
+    "signature": "(self, source: 'str | Path') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "start_external_retrieval_attempt",
+    "kind": "method",
+    "signature": "(self, run_id: 'str', submission: 'Mapping[str, Any]') -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "status",
+    "kind": "method",
+    "signature": "(self, *, view: 'str | None' = None) -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "submit_action",
+    "kind": "method",
+    "signature": "(self, draft_input: 'Mapping[str, Any]', *, view: 'str | None' = None) -> 'Mapping[str, Any]'"
+  },
+  {
+    "name": "submit_confirmation",
+    "kind": "method",
+    "signature": "(self, confirmation: 'Mapping[str, Any]', *, view: 'str | None' = None) -> 'Mapping[str, Any]'"
+  }
+]
