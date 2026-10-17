@@ -217,7 +217,7 @@ class ExternalDesktopResearchAttemptLifecycleTests(unittest.TestCase):
             },
         )
         handoff, extension = golden_submission(app, run_id, capture)
-        historical = PreAttemptGuardFacade.collect_external(
+        historical = PreAttemptGuardFacade._collect_external_terminal(
             facade,
             run_id,
             {"handoff": handoff, "extension": extension},
@@ -322,7 +322,7 @@ class ExternalDesktopResearchAttemptLifecycleTests(unittest.TestCase):
                 handoff, extension = golden_submission(app, run_id, capture)
 
                 # Simulate a historical pre-guard Run without rewriting its provenance.
-                historical = PreAttemptGuardFacade.collect_external(
+                historical = PreAttemptGuardFacade._collect_external_terminal(
                     facade,
                     run_id,
                     {"handoff": handoff, "extension": extension},

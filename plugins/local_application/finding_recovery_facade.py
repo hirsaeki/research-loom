@@ -384,11 +384,29 @@ class LegacyFindingRecoveryHandler:
         )
 
 
+def list_actions_stage(facade, proceed: Callable[..., Any]) -> Mapping[str, Any]:
+    facade._ensure_finding_recovery_action()
+    return proceed()
+
+
+def submit_action_stage(
+    facade,
+    proceed: Callable[..., Any],
+    draft_input: Mapping[str, Any],
+    *,
+    view: str | None = None,
+) -> Mapping[str, Any]:
+    facade._ensure_finding_recovery_action()
+    return proceed(draft_input)
+
+
 class LocalApplicationFacade(_BaseLocalApplicationFacade):
     """Public bounded recovery for immutable pre-#139 Desktop Research candidates."""
 
-    def recover_legacy_desktop_research_finding_candidate(self, run_id: str) -> Mapping[str, Any]:
-        return _recover_legacy_candidate(self._application, self._project_id, run_id)
+    _STAGES = {
+        "list_actions": list_actions_stage,
+        "submit_action": submit_action_stage,
+    }
 
     def _ensure_finding_recovery_action(self) -> None:
         coordinator = self._application.coordinator
@@ -430,18 +448,3 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                     _ACTION_TYPE,
                     LegacyFindingRecoveryHandler(self._application, self._project_id),
                 )
-
-
-def list_actions_stage(facade, proceed: Callable[[], Mapping[str, Any]]) -> Mapping[str, Any]:
-    facade._ensure_finding_recovery_action()
-    return proceed()
-
-
-def submit_action_stage(
-    facade,
-    draft_input: Mapping[str, Any],
-    view: str | None,
-    proceed: Callable[[Mapping[str, Any], str | None], Mapping[str, Any]],
-) -> Mapping[str, Any]:
-    facade._ensure_finding_recovery_action()
-    return proceed(draft_input, None)

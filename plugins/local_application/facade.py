@@ -4,6 +4,7 @@ from collections.abc import Callable, Mapping
 from copy import deepcopy
 from dataclasses import asdict, is_dataclass
 from enum import Enum
+from functools import cache
 from pathlib import Path
 from typing import Any
 
@@ -109,6 +110,73 @@ def _result_projection(result: CoordinatorResult) -> dict[str, Any]:
     if result.issues:
         output["issues"] = _jsonable(result.issues)
     return output
+
+
+@cache
+def stages_for(
+    cls: type, name: str, *, below: type | None = None
+) -> tuple[Callable[..., Any], ...]:
+    """Stages for public operation ``name`` contributed by ``cls`` and its bases.
+
+    Each facade layer lists its stages in a ``_STAGES`` mapping. They run in
+    method resolution order, outermost first, exactly as the former
+    ``super()`` overrides did; with ``below`` only classes after ``below`` in
+    the MRO contribute, matching a ``super()`` call made from that class.
+    Intermediate facade classes that are instantiated directly therefore keep
+    the same behavior as before.
+    """
+    mro = cls.__mro__
+    if below is not None:
+        mro = mro[mro.index(below) + 1 :]
+    return tuple(
+        vars(klass)["_STAGES"][name] for klass in mro if name in vars(klass).get("_STAGES", {})
+    )
+
+
+def _given(**kwargs: Any) -> dict[str, Any]:
+    """Keyword arguments the caller actually supplied (``None`` means omitted).
+
+    Dispatchers forward ``view`` only when given, as the former outermost
+    override did; deeper layers never accepted it.
+    """
+    return {key: value for key, value in kwargs.items() if value is not None}
+
+
+def run_stages(
+    stages: tuple[Callable[..., Any], ...],
+    facade: Any,
+    terminal: Callable[..., Any],
+    /,
+    *args: Any,
+    **kwargs: Any,
+) -> Any:
+    """Run a public facade operation through its ordered stages.
+
+    Feature layers contribute stages instead of overriding the public method.
+    Each stage is called as ``stage(facade, proceed, *args, **kwargs)`` and
+    calls ``proceed(...)`` with the arguments the next stage (and finally
+    ``terminal``) receives. The exported facade declares each stage tuple in
+    the order the former ``super()`` chain ran.
+    """
+    return run_stages_from(0, stages, facade, terminal, *args, **kwargs)
+
+
+def run_stages_from(
+    index: int,
+    stages: tuple[Callable[..., Any], ...],
+    facade: Any,
+    terminal: Callable[..., Any],
+    /,
+    *args: Any,
+    **kwargs: Any,
+) -> Any:
+    if index >= len(stages):
+        return terminal(*args, **kwargs)
+
+    def proceed(*next_args: Any, **next_kwargs: Any) -> Any:
+        return run_stages_from(index + 1, stages, facade, terminal, *next_args, **next_kwargs)
+
+    return stages[index](facade, proceed, *args, **kwargs)
 
 
 class LocalApplicationFacade:
@@ -249,6 +317,9 @@ class LocalApplicationFacade:
         return self._publication_release_service().release(build_id, decision)
 
     def close(self) -> None:
+        return run_stages(stages_for(type(self), "close"), self, self._close_terminal)
+
+    def _close_terminal(self) -> None:
         if self._opened_workspace is not None:
             opened = self._opened_workspace
             self._opened_workspace = None
@@ -264,42 +335,21 @@ class LocalApplicationFacade:
     def __exit__(self, *_exc: object) -> None:
         self.close()
 
-    # Feature layers contribute ordered steps instead of overriding these two
-    # methods. Each step receives the facade and a ``proceed`` callable for
-    # the rest of the pipeline; the exported facade declares the order.
-    _LIST_ACTIONS_STAGES: tuple[Callable[..., Mapping[str, Any]], ...] = ()
-    _SUBMIT_ACTION_STAGES: tuple[Callable[..., Mapping[str, Any]], ...] = ()
-
     def list_actions(self) -> Mapping[str, Any]:
-        stages = type(self)._LIST_ACTIONS_STAGES
-
-        def proceed_from(index: int) -> Mapping[str, Any]:
-            if index == len(stages):
-                return self._list_registered_actions()
-            return stages[index](self, lambda: proceed_from(index + 1))
-
-        return proceed_from(0)
+        return run_stages(stages_for(type(self), "list_actions"), self, self._list_actions_terminal)
 
     def submit_action(
         self, draft_input: Mapping[str, Any], *, view: str | None = None
     ) -> Mapping[str, Any]:
-        stages = type(self)._SUBMIT_ACTION_STAGES
+        return run_stages(
+            stages_for(type(self), "submit_action"),
+            self,
+            self._submit_action_terminal,
+            draft_input,
+            **_given(view=view),
+        )
 
-        def proceed_from(
-            index: int, draft: Mapping[str, Any], selected_view: str | None
-        ) -> Mapping[str, Any]:
-            if index == len(stages):
-                return self._submit_registered_action(draft)
-            return stages[index](
-                self,
-                draft,
-                selected_view,
-                lambda next_draft, next_view: proceed_from(index + 1, next_draft, next_view),
-            )
-
-        return proceed_from(0, draft_input, view)
-
-    def _list_registered_actions(self) -> Mapping[str, Any]:
+    def _list_actions_terminal(self) -> Mapping[str, Any]:
         definitions = self._application.coordinator.action_definitions()
         actions = []
         for definition in definitions:
@@ -318,7 +368,7 @@ class LocalApplicationFacade:
             )
         return {"status": "OK", "project_id": self._project_id, "actions": actions}
 
-    def _submit_registered_action(self, draft_input: Mapping[str, Any]) -> Mapping[str, Any]:
+    def _submit_action_terminal(self, draft_input: Mapping[str, Any]) -> Mapping[str, Any]:
         if not isinstance(draft_input, Mapping):
             raise LocalApplicationError(
                 "APPLICATION-INGRESS-001", "typed action input must be an object"
@@ -371,7 +421,18 @@ class LocalApplicationFacade:
             raise LocalApplicationError("APPLICATION-PAYLOAD-001", str(exc)) from exc
         return _result_projection(result)
 
-    def submit_confirmation(self, confirmation: Mapping[str, Any]) -> Mapping[str, Any]:
+    def submit_confirmation(
+        self, confirmation: Mapping[str, Any], *, view: str | None = None
+    ) -> Mapping[str, Any]:
+        return run_stages(
+            stages_for(type(self), "submit_confirmation"),
+            self,
+            self._submit_confirmation_terminal,
+            confirmation,
+            **_given(view=view),
+        )
+
+    def _submit_confirmation_terminal(self, confirmation: Mapping[str, Any]) -> Mapping[str, Any]:
         allowed = {"confirmation_request_id", "actor_id"}
         if not isinstance(confirmation, Mapping) or set(confirmation) - allowed:
             raise LocalApplicationError(
@@ -404,7 +465,18 @@ class LocalApplicationFacade:
         )
         return _result_projection(self._application.coordinator.process_input(document))
 
-    def resolve_human_decision(self, response: Mapping[str, Any]) -> Mapping[str, Any]:
+    def resolve_human_decision(
+        self, response: Mapping[str, Any], *, view: str | None = None
+    ) -> Mapping[str, Any]:
+        return run_stages(
+            stages_for(type(self), "resolve_human_decision"),
+            self,
+            self._resolve_human_decision_terminal,
+            response,
+            **_given(view=view),
+        )
+
+    def _resolve_human_decision_terminal(self, response: Mapping[str, Any]) -> Mapping[str, Any]:
         if not isinstance(response, Mapping):
             raise LocalApplicationError(
                 "APPLICATION-DECISION-001", "Human Decision input must be an object"
@@ -511,7 +583,21 @@ class LocalApplicationFacade:
             ),
         }
 
-    def collect_external(self, run_id: str, submission: Mapping[str, Any]) -> Mapping[str, Any]:
+    def collect_external(
+        self, run_id: str, submission: Mapping[str, Any], *, view: str | None = None
+    ) -> Mapping[str, Any]:
+        return run_stages(
+            stages_for(type(self), "collect_external"),
+            self,
+            self._collect_external_terminal,
+            run_id,
+            submission,
+            **_given(view=view),
+        )
+
+    def _collect_external_terminal(
+        self, run_id: str, submission: Mapping[str, Any]
+    ) -> Mapping[str, Any]:
         if not isinstance(run_id, str) or not run_id:
             raise LocalApplicationError("APPLICATION-EXTERNAL-001", "run_id is required")
         if not isinstance(submission, Mapping) or set(submission) - {"handoff", "extension"}:
@@ -532,7 +618,12 @@ class LocalApplicationFacade:
         )
         return _result_projection(result)
 
-    def status(self) -> Mapping[str, Any]:
+    def status(self, *, view: str | None = None) -> Mapping[str, Any]:
+        return run_stages(
+            stages_for(type(self), "status"), self, self._status_terminal, **_given(view=view)
+        )
+
+    def _status_terminal(self) -> Mapping[str, Any]:
         repo = self._application.state_repository
         lineage_id = repo.load_active_lineage_ref(self._project_id)
         state = repo.load_state_view(self._project_id, lineage_id)

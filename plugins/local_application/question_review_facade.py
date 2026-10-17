@@ -19,53 +19,78 @@ _ACTION_TYPE = "research_question.review"
 _PAYLOAD_CONTRACT = "research-question-review@0.1.0"
 
 
+def list_actions_stage(facade, proceed: Callable[..., Any]) -> Mapping[str, Any]:
+    facade._ensure_question_review_action()
+    return proceed()
+
+
+def submit_action_stage(
+    facade,
+    proceed: Callable[..., Any],
+    draft_input: Mapping[str, Any],
+    *,
+    view: str | None = None,
+) -> Mapping[str, Any]:
+    facade._ensure_question_review_action()
+    return proceed(draft_input)
+
+
+def resume_context_stage(
+    facade, proceed: Callable[..., Any], *, limits: Mapping[str, int] | None = None
+) -> Mapping[str, Any]:
+    result = deepcopy(dict(proceed(limits=limits)))
+    repository = facade._application.state_repository
+    state = repository.load_state_view(
+        facade._project_id,
+        repository.load_active_lineage_ref(facade._project_id),
+    )
+    current = {
+        str(item["id"]): item
+        for item in state.effective_objects()
+        if item.get("kind") == "research_question" and item.get("id")
+    }
+    questions = result.get("research_questions")
+    if isinstance(questions, Mapping):
+        for collection_name in ("authoritative", "candidates"):
+            collection = questions.get(collection_name)
+            if not isinstance(collection, list):
+                continue
+            for item in collection:
+                if not isinstance(item, dict):
+                    continue
+                source = current.get(str(item.get("id", "")))
+                if source is None:
+                    continue
+                item["revision"] = int(source.get("revision", item.get("revision", 0)))
+                item["question_lineage_id"] = str(
+                    source.get("question_lineage_id") or source.get("id")
+                )
+                for key in (
+                    "derived_from_question_revisions",
+                    "question_delta",
+                    "review_inputs",
+                    "downstream_review_required_refs",
+                ):
+                    if key in source:
+                        item[key] = deepcopy(source[key])
+    append_question_review_candidates(
+        result,
+        application=facade._application,
+        project_id=facade._project_id,
+        state=state,
+        limits=limits,
+    )
+    return result
+
+
 class LocalApplicationFacade(_BaseLocalApplicationFacade):
     """Production facade extension for iterative Research Question review."""
 
-    def resume_context(self, *, limits: Mapping[str, int] | None = None) -> Mapping[str, Any]:
-        result = deepcopy(dict(super().resume_context(limits=limits)))
-        repository = self._application.state_repository
-        state = repository.load_state_view(
-            self._project_id,
-            repository.load_active_lineage_ref(self._project_id),
-        )
-        current = {
-            str(item["id"]): item
-            for item in state.effective_objects()
-            if item.get("kind") == "research_question" and item.get("id")
-        }
-        questions = result.get("research_questions")
-        if isinstance(questions, Mapping):
-            for collection_name in ("authoritative", "candidates"):
-                collection = questions.get(collection_name)
-                if not isinstance(collection, list):
-                    continue
-                for item in collection:
-                    if not isinstance(item, dict):
-                        continue
-                    source = current.get(str(item.get("id", "")))
-                    if source is None:
-                        continue
-                    item["revision"] = int(source.get("revision", item.get("revision", 0)))
-                    item["question_lineage_id"] = str(
-                        source.get("question_lineage_id") or source.get("id")
-                    )
-                    for key in (
-                        "derived_from_question_revisions",
-                        "question_delta",
-                        "review_inputs",
-                        "downstream_review_required_refs",
-                    ):
-                        if key in source:
-                            item[key] = deepcopy(source[key])
-        append_question_review_candidates(
-            result,
-            application=self._application,
-            project_id=self._project_id,
-            state=state,
-            limits=limits,
-        )
-        return result
+    _STAGES = {
+        "list_actions": list_actions_stage,
+        "submit_action": submit_action_stage,
+        "resume_context": resume_context_stage,
+    }
 
     def _ensure_question_review_action(self) -> None:
         coordinator = self._application.coordinator
@@ -111,18 +136,3 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                         self._application.ids,
                     ),
                 )
-
-
-def list_actions_stage(facade, proceed: Callable[[], Mapping[str, Any]]) -> Mapping[str, Any]:
-    facade._ensure_question_review_action()
-    return proceed()
-
-
-def submit_action_stage(
-    facade,
-    draft_input: Mapping[str, Any],
-    view: str | None,
-    proceed: Callable[[Mapping[str, Any], str | None], Mapping[str, Any]],
-) -> Mapping[str, Any]:
-    facade._ensure_question_review_action()
-    return proceed(draft_input, None)

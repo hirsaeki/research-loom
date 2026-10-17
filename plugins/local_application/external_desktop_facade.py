@@ -20,7 +20,7 @@ from plugins.local_execution_store import (
     read_controlled_file,
 )
 
-from .facade import LocalApplicationError
+from .facade import LocalApplicationError, _given, run_stages, stages_for
 from .resume_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
 
 _ATTEMPT_START_FIELDS = {
@@ -146,7 +146,18 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                     "workspace could not be bound as the controlled intake root",
                 ) from exc
 
-    def replay_completed_desktop_research_run(self, run_id: str) -> Mapping[str, Any]:
+    def replay_completed_desktop_research_run(
+        self, run_id: str, *, view: str | None = None
+    ) -> Mapping[str, Any]:
+        return run_stages(
+            stages_for(type(self), "replay_completed_desktop_research_run"),
+            self,
+            self._replay_completed_desktop_research_run_terminal,
+            run_id,
+            **_given(view=view),
+        )
+
+    def _replay_completed_desktop_research_run_terminal(self, run_id: str) -> Mapping[str, Any]:
         if not isinstance(run_id, str) or not run_id:
             raise LocalApplicationError("APPLICATION-RUN-REPLAY-001", "run_id is required")
         try:
@@ -357,6 +368,19 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
         return {"status": "EXTERNAL_ATTEMPT_COMPLETED", "attempt": deepcopy(dict(detail))}
 
     def capture_external_source(
+        self,
+        run_id: str,
+        submission: Mapping[str, Any],
+    ) -> Mapping[str, Any]:
+        return run_stages(
+            stages_for(type(self), "capture_external_source"),
+            self,
+            self._capture_external_source_terminal,
+            run_id,
+            submission,
+        )
+
+    def _capture_external_source_terminal(
         self,
         run_id: str,
         submission: Mapping[str, Any],

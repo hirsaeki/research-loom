@@ -9,7 +9,7 @@ from core.conversation.validation import canonical_digest
 from plugins.local_survey_analysis_store import LocalSurveyAnalysisStoreError
 from plugins.local_survey_response_store import LocalSurveyResponseStoreError
 
-from .facade import LocalApplicationError
+from .facade import LocalApplicationError, run_stages, stages_for
 
 _ERROR = "APPLICATION-SURVEY-VIRTUAL-PRETEST-001"
 
@@ -188,7 +188,13 @@ class SurveyVirtualPretestInspectionMixin:
         aggregate_result_id: str | None = None,
     ) -> Mapping[str, Any]:
         before = deepcopy(self._state().current_snapshot)
-        base = super().show_run(run_id)
+        # Former super().show_run from this mixin's MRO position.
+        base = run_stages(
+            stages_for(type(self), "show_run", below=SurveyVirtualPretestInspectionMixin),
+            self,
+            self._show_run_terminal,
+            run_id,
+        )
         run = base.get("run")
         virtual = base.get("virtual_runner")
         if (
