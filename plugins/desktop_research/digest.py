@@ -1,14 +1,11 @@
 from __future__ import annotations
 
-import hashlib
 from collections.abc import Mapping
 from typing import Any
 
-import rfc8785
+from core.runtime.digests import jcs_digest_without
 
 
 def canonical_extension_digest(document: Mapping[str, Any]) -> str:
     """Return the RFC 8785 SHA-256 digest excluding extension_digest."""
-    payload = dict(document)
-    payload.pop("extension_digest", None)
-    return "sha256:" + hashlib.sha256(rfc8785.dumps(payload)).hexdigest()
+    return jcs_digest_without(document, "extension_digest")

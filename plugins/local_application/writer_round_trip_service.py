@@ -8,7 +8,6 @@ import shutil
 import tempfile
 from collections.abc import Mapping
 from copy import deepcopy
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -17,6 +16,7 @@ from jsonschema import Draft202012Validator, FormatChecker
 
 from core.runtime import canonical_digest
 from plugins._infra.atomic_write import write_durable
+from plugins._infra.clock import utc_now as _now
 from plugins.local_durable_store import register_optional_path, require_optional_available
 
 from .facade import LocalApplicationError
@@ -33,10 +33,6 @@ SCHEMA = (
     Path(__file__).resolve().parents[2]
     / "core/packages/writer-publication/writer-round-trip.schema.json"
 )
-
-
-def _now() -> str:
-    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
 def _validate_schema(value: Mapping[str, Any]) -> None:

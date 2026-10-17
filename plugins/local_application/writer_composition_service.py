@@ -9,7 +9,6 @@ import uuid
 from collections.abc import Mapping
 from contextlib import contextmanager
 from copy import deepcopy
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +17,7 @@ from jsonschema import Draft202012Validator, FormatChecker
 
 from core.runtime import canonical_digest
 from plugins._infra.atomic_write import replace_text
+from plugins._infra.clock import utc_now as _now
 from plugins._infra.file_lock import lock_byte, unlock_byte, write_sentinel_if_empty
 from plugins.local_durable_store import register_optional_path, require_optional_available
 
@@ -57,10 +57,6 @@ def _validate_schema(value: Mapping[str, Any]) -> None:
             "APPLICATION-WRITER-COMPOSITION-SCHEMA-001",
             f"Writer Composition contract violation at {path}: {first.message}",
         )
-
-
-def _now() -> str:
-    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
 def _require_string(value: Any, field: str) -> str:

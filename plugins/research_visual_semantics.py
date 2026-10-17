@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-import hashlib
 from collections.abc import Mapping
 from typing import Any
 
-import rfc8785
-
 from core.runtime import canonical_digest as research_object_digest
+from core.runtime.digests import jcs_digest
 
 VISUAL_CLASSES = frozenset({"source_visual", "data_visualization", "explanatory_visual"})
 SEMANTIC_CHANGES = frozenset(
@@ -25,7 +23,7 @@ SEMANTIC_CHANGES = frozenset(
 
 
 def digest(value: Any) -> str:
-    return "sha256:" + hashlib.sha256(rfc8785.dumps(value)).hexdigest()
+    return jcs_digest(value)
 
 
 def _digest(value: Any) -> bool:

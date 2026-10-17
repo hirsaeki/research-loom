@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import json
 import sqlite3
 from collections.abc import Mapping
@@ -8,8 +7,7 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
-import rfc8785
-
+from core.runtime.digests import jcs_digest_without
 from plugins.local_durable_store import register_optional_path, require_optional_available
 
 SURVEY_STORE_SCHEMA_VERSION = "0.1.0"
@@ -23,14 +21,12 @@ class LocalSurveyStoreError(RuntimeError):
 
 
 def canonical_document_digest(document: Mapping[str, Any], field: str) -> str:
-    payload = {key: deepcopy(value) for key, value in document.items() if key != field}
     try:
-        encoded = rfc8785.dumps(payload)
+        return jcs_digest_without(document, field)
     except (TypeError, ValueError) as exc:
         raise LocalSurveyStoreError(
             "SURVEY-DIGEST-001", "Survey document is not canonicalizable"
         ) from exc
-    return "sha256:" + hashlib.sha256(encoded).hexdigest()
 
 
 def registry_digest(document: Mapping[str, Any]) -> str:

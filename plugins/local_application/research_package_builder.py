@@ -4,13 +4,13 @@ import json
 import uuid
 from collections.abc import Mapping
 from copy import deepcopy
-from datetime import UTC, datetime
 from typing import Any
 
 import rfc8785
 
 from core.execution import RunStatus
 from core.runtime import canonical_digest as core_canonical_digest
+from plugins._infra.clock import utc_now
 from plugins.desktop_research.normalization import source_id_for_capture
 from plugins.research_visual_semantics import validate_visual_package_bindings
 
@@ -928,7 +928,7 @@ def build_package(service, value: Mapping[str, Any]) -> Mapping[str, Any]:
         "project_constraints": {"must_not_claim": project_must_not_claim(config)},
         "publication_requirements": {"requirement_refs": []},
         "provenance": {
-            "generated_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+            "generated_at": utc_now(),
             "generator_id": "research-loom.research-package",
             "tool_version": TOOL_VERSION,
             "input_digests": list(

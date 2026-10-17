@@ -13,7 +13,6 @@ import uuid
 from collections.abc import Callable, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import UTC, datetime
 from pathlib import Path
 from threading import RLock, Thread
 from typing import Any
@@ -21,6 +20,7 @@ from urllib.parse import urljoin, urlparse
 
 from core.conversation import ActionDefinition, ConversationRuntimeError, HarnessServiceResult
 from core.execution import CapabilityRunRecord, ExecutionIssue, RunLifecycleEvent, RunStatus
+from plugins._infra.clock import utc_now as _utc_now
 from plugins._infra.file_lock import acquire_byte_lock, unlock_byte, write_sentinel_if_empty
 from plugins.local_execution_store import (
     LocalExecutionStoreIntegrityError,
@@ -103,10 +103,6 @@ def material_reacquisition_payload(payload: Mapping[str, Any]) -> dict[str, str]
         "capture_id": capture_id,
         "kind": kind,
     }
-
-
-def _utc_now() -> str:
-    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
 def _sha256(content: bytes) -> str:

@@ -13,10 +13,10 @@ import stat
 import uuid
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
-from datetime import UTC, datetime
 from pathlib import Path
 
 from plugins._infra.atomic_write import write_durable
+from plugins._infra.clock import utc_now
 from plugins._infra.file_lock import (
     LockTimeout,
     acquire_byte_lock,
@@ -203,7 +203,7 @@ def install_exact_payload(
             "content_created": True,
             "previous_status": before["status"],
             "quarantine_ref": quarantine_ref,
-            "recovered_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+            "recovered_at": utc_now(),
         }
         record = {
             "schema": "exact-payload-repair/v1",

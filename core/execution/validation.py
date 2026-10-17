@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-import hashlib
 import json
 from collections.abc import Mapping
-from copy import deepcopy
 from pathlib import Path
 from typing import Any, cast
 
 import rfc8785
 from jsonschema import Draft202012Validator, FormatChecker
 
+from core.runtime.digests import jcs_digest_without
 from core.runtime.transition_models import StateView
 
 from .models import CapabilityExecutionError, ExecutionFailureCode
@@ -22,9 +21,7 @@ def _load_schema(name: str) -> Mapping[str, Any]:
 
 
 def _digest(document: Mapping[str, Any], field: str) -> str:
-    payload = deepcopy(dict(document))
-    payload.pop(field, None)
-    return "sha256:" + hashlib.sha256(rfc8785.dumps(payload)).hexdigest()
+    return jcs_digest_without(document, field)
 
 
 def _canonical(value: Any) -> bytes:
