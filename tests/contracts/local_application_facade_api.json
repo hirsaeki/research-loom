@@ -142,7 +142,7 @@
   {
     "name": "doctor_workspace",
     "kind": "classmethod",
-    "signature": "(workspace: 'str | Path') -> 'Mapping[str, Any]'"
+    "signature": "(workspace: 'str | Path', *, deep: 'bool' = False) -> 'Mapping[str, Any]'"
   },
   {
     "name": "evaluate_research_quality",

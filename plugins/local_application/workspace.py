@@ -14,6 +14,7 @@ from jsonschema import Draft202012Validator, FormatChecker
 
 from core.runtime import LineageView, StateView, canonical_digest
 from core.runtime.digests import jcs_digest_without
+from core.runtime.ports import RepositoryError
 from core.runtime.transition_models import with_content_digest
 from plugins.local_application.application import (
     LocalResearchApplication,
@@ -53,6 +54,7 @@ from plugins.local_workspace_layout import atomic_json_write as _atomic_json_wri
 from plugins.local_workspace_layout import read_json as _read_json
 from plugins.local_workspace_layout import safe_locator as _safe_locator
 from plugins.local_workspace_layout import validate_binding_shape as _validate_binding_shape
+from plugins.sqlite_state_store import integrity_issues_for
 
 ROOT = Path(__file__).resolve().parents[2]
 PROJECT_CONFIG_SCHEMA = ROOT / "projects/contracts/project-config.schema.json"
@@ -420,6 +422,68 @@ def _sqlite_quick_check(path: Path, *, code: str) -> None:
         raise LocalWorkspaceError(code, f"SQLite database is not readable: {path}") from exc
 
 
+_DEEP_CORE_STORES = (
+    "research_state",
+    "conversation",
+    "decision",
+    "execution",
+    "context_extensions",
+    "operational_trace",
+)
+
+
+def _deep_integrity(
+    root: Path, binding: Mapping[str, Any], checks: list[Mapping[str, Any]]
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Full integrity checks over every SQLite store doctor already accepted (ADR 0001).
+
+    Read-only like the rest of doctor: State runs its own integrity_issues, every
+    other store PRAGMA integrity_check. Optional children are checked only when
+    doctor validated them as SQLite.
+    """
+    targets = [
+        (key, _safe_locator(root, str(binding["storage"][key]))) for key in _DEEP_CORE_STORES
+    ]
+    for row in checks:
+        if (
+            row.get("check") == "optional_child"
+            and row.get("status") == "OK"
+            and str(row.get("validation_scope", "")).startswith("sqlite")
+        ):
+            locator = str(row["locator"])
+            if row["name"] == "project_inputs":
+                locator += "/project-inputs.sqlite3"
+            targets.append((str(row["name"]), _safe_locator(root, locator)))
+
+    deep_checks: list[dict[str, Any]] = []
+    issues: list[dict[str, Any]] = []
+    for store, path in targets:
+        try:
+            connection = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+            connection.row_factory = sqlite3.Row
+            try:
+                if store == "research_state":
+                    problems = list(integrity_issues_for(connection))
+                else:
+                    problems = [
+                        str(row[0])
+                        for row in connection.execute("PRAGMA integrity_check")
+                        if str(row[0]).lower() != "ok"
+                    ]
+            finally:
+                connection.close()
+        except (sqlite3.Error, RepositoryError) as exc:
+            problems = [f"integrity check could not run: {exc}"]
+        deep_checks.append(
+            {"check": "deep_integrity", "store": store, "status": "ERROR" if problems else "OK"}
+        )
+        issues.extend(
+            {"code": "WORKSPACE-DEEP-INTEGRITY-001", "store": store, "message": problem}
+            for problem in problems
+        )
+    return deep_checks, issues
+
+
 def _validate_conversation_database(path: Path) -> None:
     try:
         validate_conversation_store_schema(path)
@@ -709,8 +773,10 @@ class LocalWorkspace:
         return OpenedLocalWorkspace(root, binding, config, effective, application)
 
     @classmethod
-    def doctor(cls, workspace: str | Path) -> Mapping[str, Any]:
+    def doctor(cls, workspace: str | Path, *, deep: bool = False) -> Mapping[str, Any]:
         integrity = cls._doctor_integrity(workspace)
+        if deep and integrity.get("status") != "ERROR":
+            integrity = cls._doctor_deep(workspace, integrity)
         try:
             root = _assert_safe_workspace_root(Path(workspace))
             marker = _safe_locator(
@@ -749,6 +815,23 @@ class LocalWorkspace:
                 ],
             }
         return integrity
+
+    @classmethod
+    def _doctor_deep(cls, workspace: str | Path, integrity: Mapping[str, Any]) -> Mapping[str, Any]:
+        try:
+            root = _assert_safe_workspace_root(Path(workspace))
+            binding = _read_json(
+                _safe_locator(root, f"{INTERNAL_DIR}/{BINDING_NAME}"), code="WORKSPACE-BINDING-001"
+            )
+            deep_checks, deep_issues = _deep_integrity(root, binding, list(integrity["checks"]))
+        except LocalWorkspaceError as exc:
+            deep_checks, deep_issues = [], [{"code": exc.code, "message": exc.message}]
+        return {
+            **integrity,
+            "status": "ERROR" if deep_issues else integrity["status"],
+            "checks": [*integrity["checks"], *deep_checks],
+            "issues": [*integrity.get("issues", []), *deep_issues],
+        }
 
     @classmethod
     def _doctor_integrity(cls, workspace: str | Path) -> Mapping[str, Any]:
