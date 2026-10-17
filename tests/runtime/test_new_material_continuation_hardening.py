@@ -11,9 +11,9 @@ import sys
 import unittest
 from pathlib import Path
 
-from plugins.local_application import new_material_continuation_service as base
-from plugins.local_application import new_material_group_continuation_service as group
 from plugins.local_application.facade import LocalApplicationError
+from plugins.local_application.material import new_material_continuation_service as base
+from plugins.local_application.material import new_material_group_continuation_service as group
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -48,8 +48,8 @@ class NewMaterialContinuationHardeningTests(unittest.TestCase):
 
     def test_hardening_holds_when_services_are_imported_first(self):
         script = (
-            "from plugins.local_application import new_material_group_continuation_service as g\n"
-            "from plugins.local_application import new_material_continuation_service as b\n"
+            "from plugins.local_application.material import new_material_group_continuation_service as g\n"
+            "from plugins.local_application.material import new_material_continuation_service as b\n"
             "out = b._render_reacquired_html_rendition("
             "b'<script>x</style>y</script>z', 'text/html', max_bytes=64)\n"
             "assert out == b'z\\r\\n', out\n"

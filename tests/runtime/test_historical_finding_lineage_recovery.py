@@ -310,7 +310,7 @@ class HistoricalFindingLineageRecoveryTests(ResearchPackageAcceptanceSupport):
             self.assertEqual(caught.exception.code, "APPLICATION-FINDING-RECOVERY-PROVENANCE-001")
 
             with patch(
-                "plugins.local_application.finding_recovery_lineage._validate_replay_relation"
+                "plugins.local_application.material.finding_recovery_lineage._validate_replay_relation"
             ):
                 ablated = facade.recover_legacy_desktop_research_finding_candidate(
                     case["parent_run_id"]

@@ -34,15 +34,15 @@ def _internal_provenance_key(key: Any) -> bool:
     return normalized in _INTERNAL_PROVENANCE_KEYS or normalized.endswith("_path")
 
 
-def _public_provenance(value: Any) -> Any:
+def public_provenance(value: Any) -> Any:
     if isinstance(value, Mapping):
         return {
-            str(key): _public_provenance(item)
+            str(key): public_provenance(item)
             for key, item in value.items()
             if not _internal_provenance_key(key)
         }
     if isinstance(value, (tuple, list)):
-        return [_public_provenance(item) for item in value]
+        return [public_provenance(item) for item in value]
     return jsonable(value)
 
 
@@ -70,7 +70,7 @@ def _run_projection(run) -> Mapping[str, Any]:
             if run.failure is not None
             else None
         ),
-        "execution_provenance": _public_provenance(run.provenance),
+        "execution_provenance": public_provenance(run.provenance),
         "bindings": {
             "invocation_id": run.invocation_id,
             "invocation_digest": run.invocation_digest,
@@ -112,7 +112,7 @@ def _artifact_projection(artifacts) -> list[Mapping[str, Any]]:
             "byte_length": artifact.size,
             "digest": artifact.digest,
             "execution_mode": artifact.execution_mode,
-            "provenance": _public_provenance(artifact.provenance),
+            "provenance": public_provenance(artifact.provenance),
         }
         for artifact in artifacts
     ]

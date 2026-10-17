@@ -13,7 +13,7 @@ from plugins.local_application import (
     LocalApplicationFacade,
     LocalResearchApplication,
 )
-from plugins.local_application import external_submission as submission_module
+from plugins.local_application.material import external_submission as submission_module
 from tests.runtime.runtime_fixtures import project, rq, seed_state
 
 

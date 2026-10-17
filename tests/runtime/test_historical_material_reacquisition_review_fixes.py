@@ -5,7 +5,7 @@ from threading import Event, Thread
 from unittest.mock import patch
 
 from plugins.local_application import LocalApplicationFacade
-from plugins.local_application.material_reacquisition_facade import (
+from plugins.local_application.material.material_reacquisition_facade import (
     HistoricalMaterialReacquisitionService,
     MaterialReacquisitionRetrievalError,
     RetrievedMaterial,
@@ -156,7 +156,7 @@ class HistoricalMaterialReacquisitionReviewFixTests(ResearchPackageAcceptanceSup
 
         with (
             patch(
-                "plugins.local_application.material_reacquisition_facade.socket.getaddrinfo",
+                "plugins.local_application.material.material_reacquisition_facade.socket.getaddrinfo",
                 return_value=[(2, 1, 6, "", ("127.0.0.1", 443))],
             ),
             patch.object(_PinnedHTTPSConnection, "connect") as connect,
@@ -205,14 +205,14 @@ class HistoricalMaterialReacquisitionReviewFixTests(ResearchPackageAcceptanceSup
 
         with (
             patch(
-                "plugins.local_application.material_reacquisition_facade.socket.getaddrinfo",
+                "plugins.local_application.material.material_reacquisition_facade.socket.getaddrinfo",
                 side_effect=[
                     [(2, 1, 6, "", ("8.8.8.8", 443))],
                     [(2, 1, 6, "", ("127.0.0.1", 443))],
                 ],
             ) as resolver,
             patch(
-                "plugins.local_application.material_reacquisition_facade._PinnedHTTPSConnection",
+                "plugins.local_application.material.material_reacquisition_facade._PinnedHTTPSConnection",
                 FakePinnedConnection,
             ),
         ):
@@ -240,14 +240,14 @@ class HistoricalMaterialReacquisitionReviewFixTests(ResearchPackageAcceptanceSup
 
         with (
             patch(
-                "plugins.local_application.material_reacquisition_facade.socket.getaddrinfo",
+                "plugins.local_application.material.material_reacquisition_facade.socket.getaddrinfo",
                 side_effect=[
                     [(2, 1, 6, "", ("8.8.8.8", 443))],
                     [(2, 1, 6, "", ("127.0.0.1", 443))],
                 ],
             ) as resolver,
             patch(
-                "plugins.local_application.material_reacquisition_facade._PinnedHTTPSConnection",
+                "plugins.local_application.material.material_reacquisition_facade._PinnedHTTPSConnection",
                 RedirectConnection,
             ),
         ):
@@ -268,11 +268,11 @@ class HistoricalMaterialReacquisitionReviewFixTests(ResearchPackageAcceptanceSup
         context = FakeContext()
         with (
             patch(
-                "plugins.local_application.material_reacquisition_facade.ssl.create_default_context",
+                "plugins.local_application.material.material_reacquisition_facade.ssl.create_default_context",
                 return_value=context,
             ),
             patch(
-                "plugins.local_application.material_reacquisition_facade.socket.create_connection",
+                "plugins.local_application.material.material_reacquisition_facade.socket.create_connection",
                 return_value=raw_socket,
             ) as create_connection,
         ):

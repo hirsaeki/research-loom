@@ -10,8 +10,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from plugins.local_application import material_reacquisition_facade as base
-from plugins.local_application import material_reacquisition_pypdf_provider as provider
+from plugins.local_application.material import material_reacquisition_facade as base
+from plugins.local_application.material import material_reacquisition_pypdf_provider as provider
 
 CI_WINDOWS = True
 
@@ -284,7 +284,7 @@ class HistoricalMaterialReacquisitionPypdfProviderTests(unittest.TestCase):
 import json
 from pathlib import Path
 from types import SimpleNamespace
-from plugins.local_application import material_reacquisition_facade as base
+from plugins.local_application.material import material_reacquisition_facade as base
 
 html = base._regenerate_text_rendition(
     b"<p>Visible evidence</p>", "text/html", "https://example.test/a", max_bytes=1024

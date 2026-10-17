@@ -22,7 +22,7 @@ from .material_content_facade import _artifact_pair_for_capture
 
 def _continuation_facade_class():
     # Imported lazily: the facade composition imports the layer that owns this service.
-    from .facade_composition import ContinuationFacade
+    from ..facade_composition import ContinuationFacade
 
     return ContinuationFacade
 
