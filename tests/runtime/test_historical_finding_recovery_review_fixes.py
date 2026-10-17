@@ -44,7 +44,7 @@ class HistoricalFindingRecoveryReviewFixTests(ResearchPackageAcceptanceSupport):
         facade, case = self._prepare_case()
         try:
             with patch(
-                "plugins.local_application.finding_recovery_lineage.find_state_delta_proposals_by_provenance_run_id",
+                "plugins.local_application.material.finding_recovery_lineage.find_state_delta_proposals_by_provenance_run_id",
                 side_effect=RuntimeError("simulated candidate-store read failure"),
             ):
                 with self.assertRaises(LocalApplicationError) as caught:

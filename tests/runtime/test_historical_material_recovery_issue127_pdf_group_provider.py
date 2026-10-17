@@ -3,9 +3,9 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
-from plugins.local_application import new_material_group_continuation_service as group
 from plugins.local_application.facade import LocalApplicationError
-from plugins.local_application.material_reacquisition_facade import RetrievedMaterial
+from plugins.local_application.material import new_material_group_continuation_service as group
+from plugins.local_application.material.material_reacquisition_facade import RetrievedMaterial
 
 CI_WINDOWS = True
 

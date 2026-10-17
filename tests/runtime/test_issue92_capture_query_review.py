@@ -36,7 +36,7 @@ class Issue92CaptureQueryReviewTests(unittest.TestCase):
                 )
                 self.assertGreater(len(app.execution_store.artifacts_for(run_id)), len(selected))
                 with patch(
-                    "plugins.local_application.external_submission.artifacts_for_capture_ids",
+                    "plugins.local_application.material.external_submission.artifacts_for_capture_ids",
                     wraps=artifacts_for_capture_ids,
                 ) as selected_query:
                     self.assertEqual(
@@ -85,7 +85,7 @@ class Issue92CaptureQueryReviewTests(unittest.TestCase):
                     *[f"CAP-MISSING-{index}" for index in range(20)],
                 ]
                 with patch(
-                    "plugins.local_application.external_submission.artifacts_for_capture_ids",
+                    "plugins.local_application.material.external_submission.artifacts_for_capture_ids",
                     wraps=artifacts_for_capture_ids,
                 ) as selected_query:
                     rejected = facade.preflight_external(run_id, {"research_result": oversized})

@@ -158,7 +158,7 @@ class ExternalDesktopResearchAttemptLifecycleTests(unittest.TestCase):
                 return result
 
             with patch(
-                "plugins.local_application.external_attempt_lifecycle_facade.reconstruct_attempts",
+                "plugins.local_application.material.external_attempt_lifecycle_facade.reconstruct_attempts",
                 side_effect=delayed_reconstruct,
             ):
                 with ThreadPoolExecutor(max_workers=2) as pool:
@@ -231,7 +231,7 @@ class ExternalDesktopResearchAttemptLifecycleTests(unittest.TestCase):
             app, facade, run_id = self._completed_historical_run_with_open_attempt(Path(temp))
             try:
                 with patch(
-                    "plugins.local_application.external_desktop_facade.reconstruct_attempts",
+                    "plugins.local_application.material.external_desktop_facade.reconstruct_attempts",
                     side_effect=ValueError("corrupt attempt history"),
                 ):
                     with self.assertRaises(LocalApplicationError) as blocked:

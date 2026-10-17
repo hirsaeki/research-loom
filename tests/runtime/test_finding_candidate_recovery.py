@@ -221,7 +221,7 @@ class FindingCandidateRecoveryTests(ResearchPackageAcceptanceSupport):
             # lets the same stale historical proposal enter recovery. Restoring the
             # guard above is therefore necessary, not decorative.
             with patch(
-                "plugins.local_application.finding_recovery_facade._require_exact_current_snapshot"
+                "plugins.local_application.material.finding_recovery_facade._require_exact_current_snapshot"
             ):
                 ablated = facade.recover_legacy_desktop_research_finding_candidate(case["run_id"])
             self.assertEqual(ablated["status"], "RECOVERED")

@@ -4,7 +4,7 @@ from collections.abc import Mapping
 from copy import deepcopy
 from unittest.mock import patch
 
-from plugins.local_application.new_material_continuation_service import (
+from plugins.local_application.material.new_material_continuation_service import (
     _render_reacquired_html_rendition,
 )
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport

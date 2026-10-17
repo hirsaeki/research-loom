@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 from core.runtime import canonical_digest
 from plugins.local_application import LocalApplicationError
-from plugins.local_application import (
+from plugins.local_application.material import (
     historical_result_recovery_facade as historical_result_recovery,
 )
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
@@ -112,7 +112,7 @@ class Issue151AmbiguousCanonicalRecoveryTests(ResearchPackageAcceptanceSupport):
             # Ablation: with independent canonical verification disabled, the
             # same invalid result can enter rematerialization through ambiguity.
             with patch(
-                "plugins.local_application.historical_result_recovery_facade._canonical_result",
+                "plugins.local_application.material.historical_result_recovery_facade._canonical_result",
                 return_value=verified_canonical,
             ):
                 ablated = facade.recover_legacy_desktop_research_finding_candidate(case["run_id"])

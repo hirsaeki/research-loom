@@ -15,10 +15,10 @@ from plugins.local_conversation_store import persist_state_delta_proposal_idempo
 from plugins.local_execution_store import canonical_handoff_for, result_extensions_for_run
 from plugins.sqlite_state_store.exhibit_guard import guard_research_state_head
 
+from ..support.stages import jsonable
 from . import finding_recovery_facade as _recovery_base
 from . import historical_finding_recovery_facade as _base
 from .finding_recovery_lineage import RecoveryFailure
-from .support.stages import jsonable
 
 _REMATERIALIZATION_VERSION = "historical-desktop-result-rematerialization@0.1.0"
 _CANONICAL_FALLBACK_FAILURES = {

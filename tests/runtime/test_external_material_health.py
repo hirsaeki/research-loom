@@ -7,7 +7,9 @@ from unittest.mock import patch
 
 from plugins.desktop_research import DesktopResearchCaptureService
 from plugins.local_application import LocalApplicationFacade, LocalWorkspace
-from plugins.local_application.material_recovery_facade import HistoricalMaterialRecoveryService
+from plugins.local_application.material.material_recovery_facade import (
+    HistoricalMaterialRecoveryService,
+)
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 from tests.runtime.test_external_material_inventory import _capture, _create_running, _write_inputs
 

@@ -10,16 +10,17 @@ directly; they run exactly the layers they used to.
 from __future__ import annotations
 
 from .delphi_facade import DelphiMixin
-from .external_attempt_lifecycle_facade import ExternalAttemptLifecycleMixin
-from .external_desktop_facade import ExternalDesktopMixin
 from .facade import LocalApplicationFacadeCore
-from .finding_recovery_facade import FindingRecoveryMixin
-from .historical_finding_recovery_facade import HistoricalFindingRecoveryMixin
-from .historical_result_recovery_facade import HistoricalResultRecoveryMixin
-from .material_import_facade import MaterialImportMixin
-from .material_inventory_facade import MaterialInventoryMixin
-from .material_reacquisition_public_facade import MaterialReacquisitionPublicMixin
-from .new_material_continuation_public_facade import NewMaterialContinuationPublicMixin
+from .material.external_attempt_lifecycle_facade import ExternalAttemptLifecycleMixin
+from .material.external_desktop_facade import ExternalDesktopMixin
+from .material.finding_recovery_facade import FindingRecoveryMixin
+from .material.historical_finding_recovery_facade import HistoricalFindingRecoveryMixin
+from .material.historical_result_recovery_facade import HistoricalResultRecoveryMixin
+from .material.material_import_facade import MaterialImportMixin
+from .material.material_inventory_facade import MaterialInventoryMixin
+from .material.material_reacquisition_public_facade import MaterialReacquisitionPublicMixin
+from .material.new_material_continuation_public_facade import NewMaterialContinuationPublicMixin
+from .material.retention_facade import RetentionMixin
 from .research.argument_facade import ArgumentMixin
 from .research.evidence_qualification_facade import EvidenceQualificationMixin
 from .research.exhibit_facade import ExhibitMixin
@@ -34,7 +35,6 @@ from .research.source_bibliography_facade import SourceBibliographyMixin
 from .research.synthesis_candidate_facade import SynthesisCandidateMixin
 from .research.visual_facade import VisualMixin
 from .research.visual_need_facade import VisualNeedMixin
-from .retention_facade import RetentionMixin
 from .survey_analysis_facade import SurveyAnalysisMixin
 from .survey_facade import SurveyMixin
 from .survey_response_facade import SurveyResponseMixin

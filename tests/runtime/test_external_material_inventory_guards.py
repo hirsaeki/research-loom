@@ -9,9 +9,9 @@ from threading import RLock
 from types import SimpleNamespace
 
 from plugins.local_application.cli import _emit_external_materials_human
-from plugins.local_application.external_desktop_facade import ExternalDesktopMixin
 from plugins.local_application.facade import LocalApplicationError, LocalApplicationFacadeCore
-from plugins.local_application.material_inventory_facade import (
+from plugins.local_application.material.external_desktop_facade import ExternalDesktopMixin
+from plugins.local_application.material.material_inventory_facade import (
     MaterialInventoryMixin,
     _decode_material_cursor,
     _encode_material_cursor,

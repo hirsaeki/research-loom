@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import tests.runtime.test_external_desktop_research_attempt_lifecycle as attempt_lifecycle
 import tests.runtime.test_issue134_writer_composition as issue134_writer
-from plugins.local_application.finding_recovery_lineage import RecoveryFailure
+from plugins.local_application.material.finding_recovery_lineage import RecoveryFailure
 from plugins.local_execution_store import result_extensions_for_run
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
@@ -126,13 +126,13 @@ class HistoricalResultRecoveryTests(ResearchPackageAcceptanceSupport):
             extension = deepcopy(result_extensions_for_run(store, case["run_id"])[0])
             extension["handoff_binding"]["run_id"] = "RUN-WRONG"
             with patch(
-                "plugins.local_application.historical_result_recovery_facade.result_extensions_for_run",
+                "plugins.local_application.material.historical_result_recovery_facade.result_extensions_for_run",
                 return_value=(extension,),
             ):
                 guarded = facade.show_run(case["run_id"])["finding_recovery"]
                 self.assertEqual(guarded["recovery_class"], "not_recoverable")
                 with patch(
-                    "plugins.local_application.historical_result_recovery_facade.DesktopResearchNormalizer.validate_extension",
+                    "plugins.local_application.material.historical_result_recovery_facade.DesktopResearchNormalizer.validate_extension",
                     return_value=(),
                 ):
                     ablated = facade.show_run(case["run_id"])["finding_recovery"]
@@ -256,7 +256,7 @@ class HistoricalResultRecoveryTests(ResearchPackageAcceptanceSupport):
         try:
             self._remove_producer_candidate(facade, case)
             with patch(
-                "plugins.local_application.historical_result_recovery_facade.result_extensions_for_run",
+                "plugins.local_application.material.historical_result_recovery_facade.result_extensions_for_run",
                 return_value=("corrupt-extension",),
             ):
                 diagnosis = facade.show_run(case["run_id"])["finding_recovery"]
@@ -292,7 +292,7 @@ class HistoricalResultRecoveryTests(ResearchPackageAcceptanceSupport):
             )
             extension["source_capture_details"] = None
             with patch(
-                "plugins.local_application.historical_result_recovery_facade.result_extensions_for_run",
+                "plugins.local_application.material.historical_result_recovery_facade.result_extensions_for_run",
                 return_value=(extension,),
             ):
                 diagnosis = facade.show_run(case["run_id"])["finding_recovery"]
@@ -340,11 +340,11 @@ class HistoricalResultRecoveryTests(ResearchPackageAcceptanceSupport):
             }
             with (
                 patch(
-                    "plugins.local_application.historical_result_recovery_facade._base._recover",
+                    "plugins.local_application.material.historical_result_recovery_facade._base._recover",
                     side_effect=[missing, recovered],
                 ) as base_recover,
                 patch(
-                    "plugins.local_application.historical_result_recovery_facade._classification",
+                    "plugins.local_application.material.historical_result_recovery_facade._classification",
                     return_value={
                         "recovery_class": "proposal_rematerializable",
                         "route": "persisted_candidate_recovery",

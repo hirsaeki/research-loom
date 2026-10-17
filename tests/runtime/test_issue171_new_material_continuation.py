@@ -4,7 +4,7 @@ from copy import deepcopy
 from unittest.mock import patch
 
 from plugins.local_application import LocalApplicationError
-from plugins.local_application.material_reacquisition_facade import RetrievedMaterial
+from plugins.local_application.material.material_reacquisition_facade import RetrievedMaterial
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 CI_WINDOWS = True
@@ -47,7 +47,7 @@ class Issue171NewMaterialContinuationTests(ResearchPackageAcceptanceSupport):
         facade.list_actions()
         changed = changed_bytes if changed_bytes is not None else exact + b"\r\n"
         with patch(
-            "plugins.local_application.material_reacquisition_facade._regenerate_text_rendition",
+            "plugins.local_application.material.material_reacquisition_facade._regenerate_text_rendition",
             return_value=RetrievedMaterial(
                 changed,
                 "text/plain",
@@ -92,7 +92,7 @@ class Issue171NewMaterialContinuationTests(ResearchPackageAcceptanceSupport):
             b"<p>Current material version.</p></body></html>"
         )
         with patch(
-            "plugins.local_application.material_reacquisition_facade._retrieve_exact_locator",
+            "plugins.local_application.material.material_reacquisition_facade._retrieve_exact_locator",
             return_value=RetrievedMaterial(
                 changed,
                 "text/html",
@@ -289,7 +289,7 @@ class Issue171NewMaterialContinuationTests(ResearchPackageAcceptanceSupport):
             )
 
             with patch(
-                "plugins.local_application.new_material_continuation_admission._require_new_material_artifact_class",
+                "plugins.local_application.material.new_material_continuation_admission._require_new_material_artifact_class",
                 return_value=None,
             ):
                 admitted = facade.submit_action(
@@ -329,7 +329,7 @@ class Issue171NewMaterialContinuationTests(ResearchPackageAcceptanceSupport):
             # admits the otherwise wrong-class persisted bytes far enough to create
             # the new canonical candidate result. Restoring the guard above rejects it.
             with patch(
-                "plugins.local_application.new_material_continuation_admission._require_new_material_artifact_class",
+                "plugins.local_application.material.new_material_continuation_admission._require_new_material_artifact_class",
                 return_value=None,
             ):
                 admitted = facade.submit_action(
@@ -436,7 +436,9 @@ class Issue171NewMaterialContinuationTests(ResearchPackageAcceptanceSupport):
                 "new_run_id": case["run_id"],
             }
             store = facade._application.execution_store
-            from plugins.local_application import new_material_continuation_admission as admission
+            from plugins.local_application.material import (
+                new_material_continuation_admission as admission,
+            )
 
             store.store_diagnostic(run_id, admission._CONTINUATION_BINDING_DIAGNOSTIC, binding)
             store.store_diagnostic(
