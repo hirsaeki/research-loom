@@ -448,7 +448,7 @@ def show_run_stage(facade, proceed: Callable[..., Any], run_id: str) -> Mapping[
     return result
 
 
-class LocalApplicationFacade(_base.LocalApplicationFacade):
+class HistoricalResultRecoveryMixin:
     """#148 canonical-result rematerialization over #142/#147 recovery."""
 
     _STAGES = {

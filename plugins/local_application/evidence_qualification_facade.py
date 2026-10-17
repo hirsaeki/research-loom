@@ -15,8 +15,6 @@ from core.runtime import (
     canonical_digest,
 )
 
-from .visual_need_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
-
 _ACTION_REGISTRATION_LOCK = RLock()
 _ACTION_TYPE = "research.evidence.qualify"
 _PAYLOAD_CONTRACT = "research-evidence-qualification@0.1.0"
@@ -233,7 +231,7 @@ def submit_action_stage(
     return proceed(draft_input, view=view)
 
 
-class LocalApplicationFacade(_BaseLocalApplicationFacade):
+class EvidenceQualificationMixin:
     """Public Evidence qualification ingress over the existing Human Decision gate."""
 
     _STAGES = {

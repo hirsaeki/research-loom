@@ -17,7 +17,6 @@ from plugins.local_conversation_store import (
 from plugins.local_execution_store import canonical_handoff_for
 from plugins.sqlite_state_store.exhibit_guard import guard_research_state_head
 
-from .argument_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
 from .facade import LocalApplicationError
 
 _RECOVERY_VERSION = "legacy-desktop-finding-candidate-to-approved@0.1.0"
@@ -400,7 +399,7 @@ def submit_action_stage(
     return proceed(draft_input)
 
 
-class LocalApplicationFacade(_BaseLocalApplicationFacade):
+class FindingRecoveryMixin:
     """Public bounded recovery for immutable pre-#139 Desktop Research candidates."""
 
     _STAGES = {

@@ -3,13 +3,12 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from plugins.local_application.facade import LocalApplicationFacade as _BaseLocalApplicationFacade
 from plugins.local_application.resume import build_resume_context
 
 from .facade import _given, run_stages, stages_for
 
 
-class LocalApplicationFacade(_BaseLocalApplicationFacade):
+class ResumeMixin:
     """Production facade extended with the read-only research resume projection."""
 
     def resume_context(

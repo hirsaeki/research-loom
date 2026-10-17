@@ -15,8 +15,6 @@ from core.runtime import (
     canonical_digest,
 )
 
-from .evidence_qualification_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
-
 _ACTION_REGISTRATION_LOCK = RLock()
 _ACTION_TYPE = "research.source.bibliography"
 _PAYLOAD_CONTRACT = "research-source-bibliography@0.1.0"
@@ -252,7 +250,7 @@ def submit_action_stage(
     return proceed(draft_input, view=view)
 
 
-class LocalApplicationFacade(_BaseLocalApplicationFacade):
+class SourceBibliographyMixin:
     """Public Source bibliography ingress over the existing candidate/apply path."""
 
     _STAGES = {

@@ -6,7 +6,7 @@ from dataclasses import asdict, is_dataclass
 from enum import Enum
 from functools import cache
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from core.conversation import ActionDraft, ConversationRuntimeError, CoordinatorResult
 from core.conversation.validation import with_document_digest
@@ -14,6 +14,9 @@ from core.decision import make_response, response_digest
 from plugins.application_errors import LocalApplicationError as LocalApplicationError
 from plugins.local_application.workspace import LocalWorkspace, OpenedLocalWorkspace
 from plugins.local_execution_store import pending_runs_for_project
+
+if TYPE_CHECKING:
+    from .facade_composition import LocalApplicationFacade
 
 _INGRESS_FIELDS = {"action_type", "payload", "rationale", "actor_id", "conversation_id"}
 _AUTHORITY_PAYLOAD_FIELDS = {
@@ -179,7 +182,7 @@ def run_stages_from(
     return stages[index](facade, proceed, *args, **kwargs)
 
 
-class LocalApplicationFacade:
+class LocalApplicationFacadeCore:
     """Small transport-neutral application surface over LocalResearchApplication.
 
     Callers submit candidate action data only. Registry-owned routing, effects,

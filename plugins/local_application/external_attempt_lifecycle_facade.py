@@ -13,7 +13,6 @@ from .external_submission import (
     validate_external_submission,
 )
 from .facade import LocalApplicationError
-from .question_review_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
 
 
 def collect_external_stage(
@@ -54,7 +53,7 @@ def collect_external_stage(
         raise LocalApplicationError("APPLICATION-EXTERNAL-RUN-STATE-001", str(exc)) from exc
 
 
-class LocalApplicationFacade(_BaseLocalApplicationFacade):
+class ExternalAttemptLifecycleMixin:
     """Final production facade guard for Desktop Research external intake."""
 
     _STAGES = {

@@ -16,7 +16,6 @@ from plugins.local_research_exhibit_store import (
 from plugins.research_visual_semantics import digest, validate_visual_semantics
 
 from .facade import LocalApplicationError, run_stages, stages_for
-from .run_inspection_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
 
 _EXHIBIT_STORE_NAME = "research-exhibits.sqlite3"
 _EXHIBIT_LIST_LIMIT = 100
@@ -129,7 +128,7 @@ def _state_binding(state) -> tuple[str, str, str]:
     )
 
 
-class LocalApplicationFacade(_BaseLocalApplicationFacade):
+class ExhibitMixin:
     """Production facade extended with immutable Research Exhibit persistence."""
 
     def _exhibit_store(self) -> LocalResearchExhibitStore:

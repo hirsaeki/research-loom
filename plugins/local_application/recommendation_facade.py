@@ -10,9 +10,6 @@ from core.runtime import ObjectRef, StateDeltaProposal, TransitionAction, Transi
 from plugins.local_conversation_store.resume import state_delta_proposals_by_ids_for_project
 
 from .candidate_projection import build_candidate_projection
-from .new_material_continuation_public_facade import (
-    LocalApplicationFacade as _BaseLocalApplicationFacade,
-)
 
 _ACTION_REGISTRATION_LOCK = RLock()
 _ACTION_TYPE = "research.recommendation.propose"
@@ -265,7 +262,7 @@ def resume_context_stage(
     return result
 
 
-class LocalApplicationFacade(_BaseLocalApplicationFacade):
+class RecommendationMixin:
     """Public production facade extension for bounded Recommendation proposal."""
 
     _STAGES = {

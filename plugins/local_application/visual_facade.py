@@ -25,7 +25,6 @@ from .research_chart import (
     validate_chart_spec,
 )
 from .research_chart_png import RENDERER_ID, render_chart
-from .research_quality_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
 from .visual_origin import verify_visual_origin
 
 
@@ -43,7 +42,7 @@ def capture_exhibit_stage(facade, proceed: Callable[..., Any], value):
     return proceed(value)
 
 
-class LocalApplicationFacade(_BaseLocalApplicationFacade):
+class VisualMixin:
     """Research-backed chart capture, using the existing Exhibit registry."""
 
     _STAGES = {
@@ -212,7 +211,7 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
             )
             # Former super().capture_exhibit: the stages below this layer.
             return run_stages(
-                stages_for(type(self), "capture_exhibit", below=LocalApplicationFacade),
+                stages_for(type(self), "capture_exhibit", below=VisualMixin),
                 self,
                 self._capture_exhibit_terminal,
                 {

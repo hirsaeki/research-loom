@@ -19,7 +19,6 @@ from plugins.local_project_input_store import (
 )
 from plugins.sqlite_state_store.exhibit_guard import guard_research_state_head
 
-from .external_attempt_lifecycle_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
 from .facade import LocalApplicationError
 
 _ROLES = {
@@ -105,7 +104,7 @@ def close_stage(facade, proceed: Callable[..., Any]) -> None:
     proceed()
 
 
-class LocalApplicationFacade(_BaseLocalApplicationFacade):
+class ProjectInputMixin:
     """Same-workspace immutable project-input registration and Question Review linkage."""
 
     _STAGES = {

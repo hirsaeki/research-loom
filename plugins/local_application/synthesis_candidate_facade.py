@@ -34,9 +34,6 @@ from .conversation_view import (
 )
 from .facade import LocalApplicationError
 from .recommendation_facade import (
-    LocalApplicationFacade as _BaseLocalApplicationFacade,
-)
-from .recommendation_facade import (
     research_recommendation_proposal_payload,
 )
 
@@ -407,7 +404,7 @@ def submit_confirmation_stage(
     )
 
 
-class LocalApplicationFacade(_BaseLocalApplicationFacade):
+class SynthesisCandidateMixin:
     """Public bounded discovery for saved Recommendation and Argument candidates."""
 
     _STAGES = {

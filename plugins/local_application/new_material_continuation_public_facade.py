@@ -16,9 +16,6 @@ from .material_reacquisition_facade import (
 from .material_reacquisition_facade import (
     _RESULT_DIAGNOSTIC as _MRA_RESULT_DIAGNOSTIC,
 )
-from .material_reacquisition_public_facade import (
-    LocalApplicationFacade as _BaseLocalApplicationFacade,
-)
 from .new_material_continuation_admission import _find_reacquisition_result
 from .new_material_continuation_service import NewMaterialContinuationService
 from .new_material_group_continuation_service import (
@@ -370,7 +367,7 @@ def show_run_stage(facade, proceed: Callable[..., Any], run_id: str) -> Mapping[
     return result
 
 
-class LocalApplicationFacade(_BaseLocalApplicationFacade):
+class NewMaterialContinuationPublicMixin:
     """Continue persisted divergent material through a new normal research result."""
 
     _STAGES = {

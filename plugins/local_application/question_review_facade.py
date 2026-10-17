@@ -7,7 +7,6 @@ from typing import Any
 
 from core.conversation import ActionDefinition, ConversationRuntimeError
 
-from .delphi_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
 from .question_review_resume import append_question_review_candidates
 from .research_question_review import (
     ResearchQuestionReviewHandler,
@@ -83,7 +82,7 @@ def resume_context_stage(
     return result
 
 
-class LocalApplicationFacade(_BaseLocalApplicationFacade):
+class QuestionReviewMixin:
     """Production facade extension for iterative Research Question review."""
 
     _STAGES = {
