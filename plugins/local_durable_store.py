@@ -23,27 +23,17 @@ from plugins._infra.file_lock import (
     unlock_byte,
     write_sentinel_if_empty,
 )
-
-OPTIONAL_DURABLE_CHILDREN = {
-    "research_attention": {"locator": ".research-loom/attention.sqlite3", "kind": "file"},
-    "profile_history": {"locator": ".research-loom/profile-history", "kind": "directory"},
-    "research_exhibits": {"locator": ".research-loom/research-exhibits.sqlite3", "kind": "file"},
-    "survey_registry": {"locator": ".research-loom/survey-registry.sqlite3", "kind": "file"},
-    "survey_response_registry": {
-        "locator": ".research-loom/survey-response-registry.sqlite3",
-        "kind": "file",
-    },
-    "survey_analysis_registry": {
-        "locator": ".research-loom/survey-analysis-registry.sqlite3",
-        "kind": "file",
-    },
-    "delphi_registry": {"locator": ".research-loom/delphi-registry.sqlite3", "kind": "file"},
-    "project_inputs": {"locator": ".research-loom/project-inputs", "kind": "directory"},
-    "writer_compositions": {"locator": ".research-loom/writer-compositions", "kind": "directory"},
-    "writer_round_trips": {"locator": ".research-loom/writer-round-trips", "kind": "directory"},
-    "research_packages": {"locator": ".research-loom/research-packages", "kind": "directory"},
-    "publication": {"locator": ".research-loom/publication", "kind": "directory"},
-}
+from plugins.local_workspace_layout import (
+    BINDING_NAME,
+    INTERNAL_DIR,
+    OPTIONAL_DURABLE_CHILDREN,
+    LocalWorkspaceError,
+    assert_safe_workspace_root,
+    atomic_json_write,
+    read_json,
+    safe_locator,
+    validate_binding_shape,
+)
 
 # Derived tables absent in supported older stores are not canonical data loss.
 _DB_SCHEMAS = {
@@ -146,8 +136,6 @@ def inspect_optional_child(
     *,
     quick: bool = False,
 ) -> dict[str, Any]:
-    from plugins.local_application.workspace import LocalWorkspaceError, _safe_locator
-
     spec = OPTIONAL_DURABLE_CHILDREN[name]
     registered = name in binding.get("durable_children", {})
     row: dict[str, Any] = {
@@ -159,7 +147,7 @@ def inspect_optional_child(
         "validation_scope": "presence",
     }
     try:
-        path = _safe_locator(root, spec["locator"], require_exists=False)
+        path = safe_locator(root, spec["locator"], require_exists=False)
         if not path.exists():
             if registered:
                 raise OptionalDurableStoreError(
@@ -174,7 +162,7 @@ def inspect_optional_child(
         if name in _DB_SCHEMAS or name == "project_inputs":
             database = path
             if name == "project_inputs":
-                database = _safe_locator(
+                database = safe_locator(
                     root, spec["locator"] + "/project-inputs.sqlite3", require_exists=False
                 )
                 if not database.is_file():
@@ -242,9 +230,7 @@ def _workspace_child(path: Path) -> tuple[Path, str] | None:
                 # Match the lexical child first so its symlink remains visible,
                 # then normalize only the workspace root (Windows 8.3 aliases
                 # and parent aliases are also normalized by LocalWorkspace.open).
-                from plugins.local_application.workspace import _assert_safe_workspace_root
-
-                return _assert_safe_workspace_root(root), name
+                return assert_safe_workspace_root(root), name
         break
     return None
 
@@ -254,18 +240,12 @@ def require_optional_available(path: Path, error_type=OptionalDurableStoreError)
     if child is None:
         return  # Standalone store; no Parent initialization claim exists.
     root, name = child
-    from plugins.local_application.workspace import (
-        BINDING_NAME,
-        INTERNAL_DIR,
-        _read_json,
-        _validate_binding_shape,
-    )
 
     binding_path = root / INTERNAL_DIR / BINDING_NAME
     if not binding_path.exists():
         return  # LocalResearchApplication bootstrap / standalone fixture.
-    binding = _read_json(binding_path, code="WORKSPACE-BINDING-001")
-    _validate_binding_shape(binding)
+    binding = read_json(binding_path, code="WORKSPACE-BINDING-001")
+    validate_binding_shape(binding)
     result = inspect_optional_child(root, name, binding)
     if result["status"] == "UNAVAILABLE":
         raise error_type(result["code"], result["message"] + "; " + result["next_action"])
@@ -273,9 +253,7 @@ def require_optional_available(path: Path, error_type=OptionalDurableStoreError)
 
 @contextmanager
 def _inventory_lock(root: Path):
-    from plugins.local_application.workspace import _safe_locator
-
-    path = _safe_locator(root, ".research-loom/durable-children.lock", require_exists=False)
+    path = safe_locator(root, ".research-loom/durable-children.lock", require_exists=False)
     with path.open("a+b") as handle:
         write_sentinel_if_empty(handle.fileno(), fsync=False)
         try:
@@ -305,22 +283,15 @@ def register_optional_path(path: Path) -> None:
     if child is None:
         return
     root, name = child
-    from plugins.local_application.workspace import (
-        BINDING_NAME,
-        INTERNAL_DIR,
-        _atomic_json_write,
-        _read_json,
-        _validate_binding_shape,
-    )
 
     binding_path = root / INTERNAL_DIR / BINDING_NAME
     if not binding_path.is_file():
         return
     with _inventory_lock(root):
-        binding = _read_json(binding_path, code="WORKSPACE-BINDING-001")
-        _validate_binding_shape(binding)
+        binding = read_json(binding_path, code="WORKSPACE-BINDING-001")
+        validate_binding_shape(binding)
         children = binding.get("durable_children")
         if children is None or name in children:
             return
         binding["durable_children"][name] = deepcopy(OPTIONAL_DURABLE_CHILDREN[name])
-        _atomic_json_write(binding_path, binding)
+        atomic_json_write(binding_path, binding)
