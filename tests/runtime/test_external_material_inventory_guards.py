@@ -9,8 +9,6 @@ from threading import RLock
 from types import SimpleNamespace
 
 from plugins.local_application.cli import _emit_external_materials_human
-from plugins.local_application.exhibit_facade import ExhibitMixin
-from plugins.local_application.exhibit_guard_facade import ExhibitGuardMixin
 from plugins.local_application.external_desktop_facade import ExternalDesktopMixin
 from plugins.local_application.facade import LocalApplicationError, LocalApplicationFacadeCore
 from plugins.local_application.material_inventory_facade import (
@@ -18,8 +16,10 @@ from plugins.local_application.material_inventory_facade import (
     _decode_material_cursor,
     _encode_material_cursor,
 )
-from plugins.local_application.resume_facade import ResumeMixin
-from plugins.local_application.run_inspection_facade import RunInspectionMixin
+from plugins.local_application.research.exhibit_facade import ExhibitMixin
+from plugins.local_application.research.exhibit_guard_facade import ExhibitGuardMixin
+from plugins.local_application.research.resume_facade import ResumeMixin
+from plugins.local_application.research.run_inspection_facade import RunInspectionMixin
 from plugins.local_execution_store.material_inventory import (
     external_capture_artifact_metadata_for_project,
 )

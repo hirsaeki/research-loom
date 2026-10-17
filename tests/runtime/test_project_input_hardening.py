@@ -48,7 +48,7 @@ class ProjectInputHardeningTests(unittest.TestCase):
                     return content
 
                 with patch(
-                    "plugins.local_application.project_input_facade.read_controlled_file",
+                    "plugins.local_application.research.project_input_facade.read_controlled_file",
                     side_effect=read_then_advance,
                 ):
                     with self.assertRaises(LocalApplicationError) as stale:
@@ -147,11 +147,11 @@ class ProjectInputHardeningTests(unittest.TestCase):
 
                 with (
                     patch(
-                        "plugins.local_application.project_input_facade.read_controlled_file",
+                        "plugins.local_application.research.project_input_facade.read_controlled_file",
                         side_effect=read_then_advance,
                     ),
                     patch(
-                        "plugins.local_application.project_input_facade.guard_research_state_head",
+                        "plugins.local_application.research.project_input_facade.guard_research_state_head",
                         side_effect=lambda *_args, **_kwargs: nullcontext(),
                     ),
                 ):

@@ -3,9 +3,9 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from plugins.local_application.resume import build_resume_context
+from plugins.local_application.research.resume import build_resume_context
 
-from .support.stages import given_kwargs, run_stages, stages_for
+from ..support.stages import given_kwargs, run_stages, stages_for
 
 
 class ResumeMixin:
@@ -34,8 +34,9 @@ class ResumeMixin:
         )
         if self._workspace_root is not None:
             from plugins.local_durable_store import inspect_optional_children
+            from plugins.local_workspace_layout import read_json as _read_json
 
-            from .workspace.workspace import BINDING_NAME, INTERNAL_DIR, _read_json
+            from ..workspace.workspace import BINDING_NAME, INTERNAL_DIR
 
             binding = _read_json(
                 self._workspace_root / INTERNAL_DIR / BINDING_NAME, code="WORKSPACE-BINDING-001"

@@ -14,7 +14,7 @@ import tests.runtime.test_issue135_recommendation_proposal as recommendation_tes
 import tests.runtime.test_issue293_synthesis_candidate_discovery as synthesis_tests
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade
 from plugins.local_application.cli import main as cli_main
-from plugins.local_application.conversation_view import ConversationViewError
+from plugins.local_application.research.conversation_view import ConversationViewError
 from tests.runtime.test_research_question_adoption import _init_workspace, _proposal_input
 from tests.runtime.test_research_question_batch_adoption import (
     _apply_to_decision,
@@ -482,7 +482,7 @@ class Issue306ConversationViewTests(unittest.TestCase):
                     "SELECT COUNT(*) FROM state_delta_proposals"
                 ).fetchone()[0]
                 with patch(
-                    "plugins.local_application.synthesis_candidate_facade.project_action_result",
+                    "plugins.local_application.research.synthesis_candidate_facade.project_action_result",
                     side_effect=ConversationViewError("fixture projection failure"),
                 ):
                     result = facade.submit_action(_proposal_input(), view="conversation")

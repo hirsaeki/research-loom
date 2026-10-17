@@ -169,7 +169,7 @@ class Issue134ArgumentProposalTests(unittest.TestCase):
             try:
                 invalid = self.proposal_input(finding_ids=["CF-RUN-ONLY"], evidence_ids=[])
                 with patch(
-                    "plugins.local_application.argument_facade._current_authoritative_argument_support",
+                    "plugins.local_application.research.argument_facade._current_authoritative_argument_support",
                     return_value=True,
                 ):
                     result = facade.submit_action(invalid)

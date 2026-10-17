@@ -37,7 +37,7 @@ class ResearchQualityApplicationMappingTests(unittest.TestCase):
         )
         self.assertEqual(
             mapping["consumer"],
-            "plugins.local_application.research_quality_evaluation.evaluate",
+            "plugins.local_application.research.research_quality_evaluation.evaluate",
         )
         self.assertEqual(mapping["result_record"]["kind"], "research_exhibit")
         self.assertEqual(mapping["result_record"]["authority_effect"], "none")

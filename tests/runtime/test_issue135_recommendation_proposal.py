@@ -10,7 +10,7 @@ from plugins.local_application import (
     LocalApplicationFacade,
     LocalResearchApplication,
 )
-from plugins.local_application.recommendation_facade import _current_authoritative_finding
+from plugins.local_application.research.recommendation_facade import _current_authoritative_finding
 from tests.runtime.runtime_fixtures import finding, project, rq, seed_state
 from tests.runtime.test_survey_production import NullResolver
 
@@ -289,7 +289,7 @@ class Issue135RecommendationProposalTests(unittest.TestCase):
             facade = self.make_facade(temp, finding_state="candidate")
             try:
                 with patch(
-                    "plugins.local_application.recommendation_facade._current_authoritative_finding",
+                    "plugins.local_application.research.recommendation_facade._current_authoritative_finding",
                     return_value=True,
                 ):
                     result = facade.submit_action(self.proposal_input())

@@ -10,7 +10,7 @@ from typing import Any
 from plugins.application_errors import LocalApplicationError
 from plugins.local_execution_store import external_capture_artifact_metadata_for_project
 
-from .run_inspection_facade import _public_provenance
+from .research.run_inspection_facade import _public_provenance
 
 _ORIGINAL_ROLE = "desktop_research.original_capture"
 _TEXT_ROLE = "desktop_research.text_rendition"

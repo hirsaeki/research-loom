@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from core.execution import CapabilityRunRecord, RunStatus
-from plugins.local_application.run_inspection_facade import _run_projection
+from plugins.local_application.research.run_inspection_facade import _run_projection
 
 
 def test_run_projection_exposes_harness_owned_execution_trace() -> None:

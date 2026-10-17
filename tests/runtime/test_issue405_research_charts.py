@@ -227,7 +227,7 @@ class ChartCaptureTests(unittest.TestCase):
     def test_without_renderer_source_and_spec_provenance_remain(self):
         with (
             patch(
-                "plugins.local_application.visual_facade.render_chart",
+                "plugins.local_application.research.visual_facade.render_chart",
                 side_effect=ValueError("renderer unavailable"),
             ),
             patch.object(
