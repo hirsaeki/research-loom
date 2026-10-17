@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from copy import deepcopy
 from threading import RLock
 from typing import Any
@@ -175,14 +175,6 @@ class LocalApplicationFacade(
             instrument_ref=instrument_ref,
         )
 
-    def list_actions(self) -> Mapping[str, Any]:
-        self._ensure_survey_response_actions()
-        return super().list_actions()
-
-    def submit_action(self, draft_input: Mapping[str, Any]) -> Mapping[str, Any]:
-        self._ensure_survey_response_actions()
-        return super().submit_action(draft_input)
-
     def _ensure_survey_response_actions(self) -> None:
         """Compose PR42 actions into the existing audited Coordinator registry."""
         coordinator = self._application.coordinator
@@ -235,3 +227,18 @@ class LocalApplicationFacade(
                         action_type,
                         _SurveyResponseActionHandler(self._application, operation),
                     )
+
+
+def list_actions_stage(facade, proceed: Callable[[], Mapping[str, Any]]) -> Mapping[str, Any]:
+    facade._ensure_survey_response_actions()
+    return proceed()
+
+
+def submit_action_stage(
+    facade,
+    draft_input: Mapping[str, Any],
+    view: str | None,
+    proceed: Callable[[Mapping[str, Any], str | None], Mapping[str, Any]],
+) -> Mapping[str, Any]:
+    facade._ensure_survey_response_actions()
+    return proceed(draft_input, None)

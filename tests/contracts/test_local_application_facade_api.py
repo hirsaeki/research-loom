@@ -63,6 +63,16 @@ class LocalApplicationFacadeApiTests(unittest.TestCase):
         ]
         self.assertEqual([], changed, "public kind or signature changed")
 
+    def test_action_dispatch_is_not_overridden_by_layers(self):
+        # Layers contribute ordered steps (_LIST_ACTIONS_STAGES /
+        # _SUBMIT_ACTION_STAGES) rather than super() overrides.
+        from plugins.local_application import LocalApplicationFacade
+        from plugins.local_application.facade import LocalApplicationFacade as RootFacade
+
+        for name in ("list_actions", "submit_action"):
+            owners = [cls for cls in LocalApplicationFacade.__mro__ if name in vars(cls)]
+            self.assertEqual([RootFacade], owners, name)
+
 
 if __name__ == "__main__":
     if sys.argv[1:] == ["--update"]:

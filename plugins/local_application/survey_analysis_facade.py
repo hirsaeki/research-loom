@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from copy import deepcopy
 from pathlib import Path
 from threading import RLock
@@ -284,14 +284,6 @@ class LocalApplicationFacade(SurveyVirtualPretestInspectionMixin, VirtualRunnerA
                 )
             return LocalSurveyAnalysisStore(Path(root) / _STORE_NAME)
         return LocalSurveyAnalysisStore(self._workspace_root / ".research-loom" / _STORE_NAME)
-
-    def list_actions(self) -> Mapping[str, Any]:
-        self._ensure_survey_analysis_actions()
-        return super().list_actions()
-
-    def submit_action(self, draft_input: Mapping[str, Any]) -> Mapping[str, Any]:
-        self._ensure_survey_analysis_actions()
-        return super().submit_action(draft_input)
 
     def _ensure_survey_analysis_actions(self) -> None:
         coordinator = self._application.coordinator
@@ -1023,3 +1015,18 @@ class LocalApplicationFacade(SurveyVirtualPretestInspectionMixin, VirtualRunnerA
             },
             "research_state_mutation_performed": False,
         }
+
+
+def list_actions_stage(facade, proceed: Callable[[], Mapping[str, Any]]) -> Mapping[str, Any]:
+    facade._ensure_survey_analysis_actions()
+    return proceed()
+
+
+def submit_action_stage(
+    facade,
+    draft_input: Mapping[str, Any],
+    view: str | None,
+    proceed: Callable[[Mapping[str, Any], str | None], Mapping[str, Any]],
+) -> Mapping[str, Any]:
+    facade._ensure_survey_analysis_actions()
+    return proceed(draft_input, None)

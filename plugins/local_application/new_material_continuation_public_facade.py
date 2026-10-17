@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from copy import deepcopy
 from threading import RLock
 from typing import Any
@@ -133,18 +133,6 @@ def ensure_new_material_continuation_action(application, project_id: str, worksp
 
 class LocalApplicationFacade(_BaseLocalApplicationFacade):
     """Continue persisted divergent material through a new normal research result."""
-
-    def list_actions(self) -> Mapping[str, Any]:
-        ensure_new_material_continuation_action(
-            self._application, self._project_id, self._workspace_root
-        )
-        return super().list_actions()
-
-    def submit_action(self, draft_input: Mapping[str, Any]) -> Mapping[str, Any]:
-        ensure_new_material_continuation_action(
-            self._application, self._project_id, self._workspace_root
-        )
-        return super().submit_action(draft_input)
 
     def show_run(self, run_id: str) -> Mapping[str, Any]:
         result = deepcopy(dict(super().show_run(run_id)))
@@ -364,3 +352,22 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                                 "historical_recovery_satisfied": False,
                             }
         return result
+
+
+def list_actions_stage(facade, proceed: Callable[[], Mapping[str, Any]]) -> Mapping[str, Any]:
+    ensure_new_material_continuation_action(
+        facade._application, facade._project_id, facade._workspace_root
+    )
+    return proceed()
+
+
+def submit_action_stage(
+    facade,
+    draft_input: Mapping[str, Any],
+    view: str | None,
+    proceed: Callable[[Mapping[str, Any], str | None], Mapping[str, Any]],
+) -> Mapping[str, Any]:
+    ensure_new_material_continuation_action(
+        facade._application, facade._project_id, facade._workspace_root
+    )
+    return proceed(draft_input, None)

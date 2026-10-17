@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from copy import deepcopy
 from threading import RLock
 from typing import Any
@@ -21,14 +21,6 @@ _PAYLOAD_CONTRACT = "research-question-review@0.1.0"
 
 class LocalApplicationFacade(_BaseLocalApplicationFacade):
     """Production facade extension for iterative Research Question review."""
-
-    def list_actions(self) -> Mapping[str, Any]:
-        self._ensure_question_review_action()
-        return super().list_actions()
-
-    def submit_action(self, draft_input: Mapping[str, Any]) -> Mapping[str, Any]:
-        self._ensure_question_review_action()
-        return super().submit_action(draft_input)
 
     def resume_context(self, *, limits: Mapping[str, int] | None = None) -> Mapping[str, Any]:
         result = deepcopy(dict(super().resume_context(limits=limits)))
@@ -119,3 +111,18 @@ class LocalApplicationFacade(_BaseLocalApplicationFacade):
                         self._application.ids,
                     ),
                 )
+
+
+def list_actions_stage(facade, proceed: Callable[[], Mapping[str, Any]]) -> Mapping[str, Any]:
+    facade._ensure_question_review_action()
+    return proceed()
+
+
+def submit_action_stage(
+    facade,
+    draft_input: Mapping[str, Any],
+    view: str | None,
+    proceed: Callable[[Mapping[str, Any], str | None], Mapping[str, Any]],
+) -> Mapping[str, Any]:
+    facade._ensure_question_review_action()
+    return proceed(draft_input, None)

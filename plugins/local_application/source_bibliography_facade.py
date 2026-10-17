@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from copy import deepcopy
 from threading import RLock
 from typing import Any
@@ -15,6 +15,18 @@ from core.runtime import (
     canonical_digest,
 )
 
+from . import argument_facade as _argument_facade
+from . import evidence_qualification_facade as _evidence_qualification_facade
+from . import finding_recovery_facade as _finding_recovery_facade
+from . import new_material_continuation_public_facade as _new_material_continuation_public_facade
+from . import project_input_facade as _project_input_facade
+from . import question_review_facade as _question_review_facade
+from . import recommendation_facade as _recommendation_facade
+from . import retention_facade as _retention_facade
+from . import survey_analysis_facade as _survey_analysis_facade
+from . import survey_response_facade as _survey_response_facade
+from . import synthesis_candidate_facade as _synthesis_candidate_facade
+from . import virtual_runner_facade as _virtual_runner_facade
 from .evidence_qualification_facade import LocalApplicationFacade as _BaseLocalApplicationFacade
 
 _ACTION_REGISTRATION_LOCK = RLock()
@@ -236,18 +248,53 @@ class ResearchSourceBibliographyHandler:
         )
 
 
+def list_actions_stage(facade, proceed: Callable[[], Mapping[str, Any]]) -> Mapping[str, Any]:
+    facade._ensure_source_bibliography_action()
+    return proceed()
+
+
+def submit_action_stage(
+    facade,
+    draft_input: Mapping[str, Any],
+    view: str | None,
+    proceed: Callable[[Mapping[str, Any], str | None], Mapping[str, Any]],
+) -> Mapping[str, Any]:
+    facade._ensure_source_bibliography_action()
+    return proceed(draft_input, view)
+
+
 class LocalApplicationFacade(_BaseLocalApplicationFacade):
     """Public Source bibliography ingress over the existing candidate/apply path."""
 
-    def list_actions(self) -> Mapping[str, Any]:
-        self._ensure_source_bibliography_action()
-        return super().list_actions()
-
-    def submit_action(
-        self, draft_input: Mapping[str, Any], *, view: str | None = None
-    ) -> Mapping[str, Any]:
-        self._ensure_source_bibliography_action()
-        return super().submit_action(draft_input, view=view)
+    # Former super() order of the layered facade, outermost first.
+    _LIST_ACTIONS_STAGES = (
+        list_actions_stage,
+        _evidence_qualification_facade.list_actions_stage,
+        _recommendation_facade.list_actions_stage,
+        _new_material_continuation_public_facade.list_actions_stage,
+        _finding_recovery_facade.list_actions_stage,
+        _argument_facade.list_actions_stage,
+        _question_review_facade.list_actions_stage,
+        _survey_analysis_facade.list_actions_stage,
+        _virtual_runner_facade.list_actions_stage,
+        _survey_response_facade.list_actions_stage,
+        _retention_facade.list_actions_stage,
+    )
+    _SUBMIT_ACTION_STAGES = (
+        submit_action_stage,
+        _evidence_qualification_facade.submit_action_stage,
+        _synthesis_candidate_facade.submit_action_stage,
+        _recommendation_facade.submit_action_stage,
+        _new_material_continuation_public_facade.submit_action_stage,
+        _finding_recovery_facade.submit_action_stage,
+        _argument_facade.submit_action_stage,
+        _project_input_facade.submit_action_stage,
+        _question_review_facade.submit_action_stage,
+        _survey_analysis_facade.submit_action_stage,
+        _virtual_runner_facade.submit_action_stage,
+        _survey_response_facade.submit_action_stage,
+        _retention_facade.submit_action_stage,
+    )
 
     def _ensure_source_bibliography_action(self) -> None:
         coordinator = self._application.coordinator
