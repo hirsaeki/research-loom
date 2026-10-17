@@ -24,6 +24,7 @@ When iterating, it is fine to run only the affected test modules, but run the fu
 
 - `core/` stays generic. It must not import `plugins/` and must not contain organization-specific (MISCO) logic. It must pass `mypy --strict`.
 - `plugins/_infra/` holds low-level helpers (file locks, atomic writes, SQLite PRAGMAs). It must not import other plugins and must pass `mypy --strict`.
+- Plugin packages must not import each other in a cycle (lazy imports count) or import another package's `_private` names; see the plugin layering in [`docs/architecture/monorepo-structure.md`](docs/architecture/monorepo-structure.md). `tests/contracts/test_plugin_layering.py` enforces this.
 - Import test helpers as `tests.runtime.*` / `tests.contracts.*`.
 - Test modules that branch on the platform must declare `CI_WINDOWS = True` or `CI_WINDOWS = False  # reason`.
 - Never edit or extend `research-harness/` or `research-profile/`. They are frozen legacy reference trees.

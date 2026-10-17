@@ -108,6 +108,18 @@ Rules:
 4. Writer/publication skills consume versioned packages/contracts rather than the internal database schema.
 5. Projects compose the pieces but project-specific logic must not leak back into reusable layers.
 
+### Inside `plugins/`
+
+Plugin packages (each top-level package or module under `plugins/`) also depend in one direction only. From the bottom up:
+
+1. `_infra/`: file locks, atomic writes, SQLite PRAGMAs, clock. It imports no other plugin.
+2. Shared layout and contracts: `local_workspace_layout`, `local_store_schemas`, `application_errors`.
+3. Durable and domain stores and their validation: `local_durable_store`, the `local_*_store` modules, `survey_validation`, `survey_response`, `survey_analysis`, `research_visual_semantics`, and similar.
+4. Capabilities: `desktop_research`, `survey_virtual_runner`, and similar.
+5. `local_application/`: the application facade, services and CLI, which compose everything below.
+
+A lower layer never imports a higher one, not even inside a function. No package imports another package's private (`_`-prefixed) names. Shared helpers move down a layer instead. `tests/contracts/test_plugin_layering.py` enforces both rules: no import cycle between plugin packages, and no cross-package private import.
+
 ## Research → writing → publication boundary
 
 The target flow is:
