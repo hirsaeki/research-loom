@@ -13,7 +13,11 @@ from plugins._infra.atomic_write import durable_staged_file, publish_staged
 from plugins._infra.clock import utc_now as _now
 from plugins._infra.sqlite import apply_pragmas
 from plugins.local_durable_store import register_optional_path, require_optional_available
-from plugins.local_store_schemas import project_inputs_table_sql
+from plugins.local_store_schemas import (
+    PROJECT_INPUT_META_SQL,
+    PROJECT_INPUT_STORE_SCHEMA_VERSION,
+    project_inputs_table_sql,
+)
 
 _SCHEMA_VERSION = 2
 _BLOB_HASH_CHUNK_BYTES = 1024 * 1024
@@ -138,39 +142,50 @@ class LocalProjectInputStore:
         )
 
     def _ensure_schema(self) -> None:
-        table = self.db.execute(
-            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='project_inputs'"
-        ).fetchone()
-        if table is None:
-            self.db.execute(self._create_table_sql())
-            self._ensure_page_index()
-            self.db.execute(f"PRAGMA user_version={_SCHEMA_VERSION}")
-            self.db.commit()
-            return
-        if self._has_current_unique_binding():
-            self._ensure_page_index()
-            if int(self.db.execute("PRAGMA user_version").fetchone()[0]) < _SCHEMA_VERSION:
-                self.db.execute(f"PRAGMA user_version={_SCHEMA_VERSION}")
-                self.db.commit()
-            return
+        """Bring the registry to the current schema in one write transaction.
+
+        Older files are told apart by shape, not by user_version: a table whose
+        UNIQUE binding lacks the lineage and snapshot columns is migrated. The
+        version is then recorded in project_input_store_meta.
+        """
         try:
             self.db.execute("BEGIN IMMEDIATE")
-            self.db.execute("ALTER TABLE project_inputs RENAME TO project_inputs_legacy")
-            self.db.execute(self._create_table_sql())
-            self.db.execute(
-                """INSERT INTO project_inputs(
-                       input_id,project_id,role,media_type,byte_length,content_digest,
-                       source_path,provenance_json,registered_at,lineage_ref,snapshot_id,snapshot_digest
-                   )
-                   SELECT input_id,project_id,role,media_type,byte_length,content_digest,
-                          source_path,provenance_json,registered_at,lineage_ref,snapshot_id,snapshot_digest
-                   FROM project_inputs_legacy"""
-            )
-            self.db.execute("DROP TABLE project_inputs_legacy")
+            table = self.db.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='project_inputs'"
+            ).fetchone()
+            if table is None:
+                self.db.execute(self._create_table_sql())
+            elif not self._has_current_unique_binding():
+                self.db.execute("ALTER TABLE project_inputs RENAME TO project_inputs_legacy")
+                self.db.execute(self._create_table_sql())
+                self.db.execute(
+                    """INSERT INTO project_inputs(
+                           input_id,project_id,role,media_type,byte_length,content_digest,
+                           source_path,provenance_json,registered_at,lineage_ref,snapshot_id,snapshot_digest
+                       )
+                       SELECT input_id,project_id,role,media_type,byte_length,content_digest,
+                              source_path,provenance_json,registered_at,lineage_ref,snapshot_id,snapshot_digest
+                       FROM project_inputs_legacy"""
+                )
+                self.db.execute("DROP TABLE project_inputs_legacy")
             self._ensure_page_index()
-            self.db.execute(f"PRAGMA user_version={_SCHEMA_VERSION}")
+            self.db.execute(PROJECT_INPUT_META_SQL)
+            self.db.execute(
+                "INSERT OR IGNORE INTO project_input_store_meta(schema_version) VALUES (?)",
+                (PROJECT_INPUT_STORE_SCHEMA_VERSION,),
+            )
+            versions = self.db.execute(
+                "SELECT schema_version FROM project_input_store_meta"
+            ).fetchall()
+            if [tuple(row) for row in versions] != [(PROJECT_INPUT_STORE_SCHEMA_VERSION,)]:
+                raise LocalProjectInputStoreError(
+                    "APPLICATION-PROJECT-INPUT-SCHEMA-001",
+                    "project input registry schema version is incompatible",
+                )
+            if int(self.db.execute("PRAGMA user_version").fetchone()[0]) < _SCHEMA_VERSION:
+                self.db.execute(f"PRAGMA user_version={_SCHEMA_VERSION}")
             self.db.commit()
-        except Exception:
+        except BaseException:
             if self.db.in_transaction:
                 self.db.rollback()
             raise

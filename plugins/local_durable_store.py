@@ -120,6 +120,13 @@ def _validate_database(path: Path, name: str, *, quick: bool) -> None:
             versions = con.execute(f'SELECT schema_version FROM "{meta}"').fetchall()
             if versions != [(version,)]:
                 raise ValueError("SQLite schema version is incompatible")
+        elif con.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='project_input_store_meta'"
+        ).fetchone():
+            versions = con.execute("SELECT schema_version FROM project_input_store_meta").fetchall()
+            if versions != [(schemas.PROJECT_INPUT_STORE_SCHEMA_VERSION,)]:
+                raise ValueError("Project Input schema version is incompatible")
+        # A registry no write has migrated yet has no meta row; reads still accept it.
         elif con.execute("PRAGMA user_version").fetchone()[0] not in (0, 1, 2):
             raise ValueError("Project Input schema version is incompatible")
     finally:

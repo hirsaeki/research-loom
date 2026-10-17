@@ -9,6 +9,9 @@ from pathlib import Path
 from unittest.mock import patch
 
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade
+from plugins.local_durable_store import _validate_database
+from plugins.local_project_input_store import LocalProjectInputStore, LocalProjectInputStoreError
+from plugins.local_store_schemas import PROJECT_INPUT_STORE_SCHEMA_VERSION
 from tests.runtime.test_research_question_review import (
     _adopt_question,
 )
@@ -203,6 +206,11 @@ class ProjectInputRegistrationTests(unittest.TestCase):
                 # Listing an older schema is read-only; migration is a write concern.
                 with closing(sqlite3.connect(database)) as legacy:
                     self.assertEqual(legacy.execute("PRAGMA user_version").fetchone()[0], 0)
+                    self.assertIsNone(
+                        legacy.execute(
+                            "SELECT 1 FROM sqlite_master WHERE name='project_input_store_meta'"
+                        ).fetchone()
+                    )
                 registered = facade.register_project_input(
                     {
                         "file": str(source),
@@ -214,6 +222,12 @@ class ProjectInputRegistrationTests(unittest.TestCase):
                 migrated = sqlite3.connect(database)
                 try:
                     self.assertEqual(migrated.execute("PRAGMA user_version").fetchone()[0], 2)
+                    self.assertEqual(
+                        migrated.execute(
+                            "SELECT schema_version FROM project_input_store_meta"
+                        ).fetchall(),
+                        [(PROJECT_INPUT_STORE_SCHEMA_VERSION,)],
+                    )
                     unique_columns = []
                     for index in migrated.execute("PRAGMA index_list(project_inputs)").fetchall():
                         if index[2]:
@@ -243,6 +257,25 @@ class ProjectInputRegistrationTests(unittest.TestCase):
                 self.assertEqual(len(facade.list_project_inputs()["project_inputs"]), 2)
             finally:
                 facade.close()
+
+    def test_registry_with_an_unknown_recorded_version_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            LocalProjectInputStore(root).close()
+            database = root / ".research-loom" / "project-inputs" / "project-inputs.sqlite3"
+            with closing(sqlite3.connect(database)) as db:
+                self.assertEqual(
+                    db.execute("SELECT schema_version FROM project_input_store_meta").fetchall(),
+                    [(PROJECT_INPUT_STORE_SCHEMA_VERSION,)],
+                )
+                db.execute("UPDATE project_input_store_meta SET schema_version='9.9.9'")
+                db.commit()
+
+            with self.assertRaises(LocalProjectInputStoreError) as raised:
+                LocalProjectInputStore(root)
+            self.assertEqual(raised.exception.code, "APPLICATION-PROJECT-INPUT-SCHEMA-001")
+            with self.assertRaisesRegex(ValueError, "schema version is incompatible"):
+                _validate_database(database, "project_inputs", quick=False)
 
     def test_existing_content_addressed_blob_is_verified(self):
         with tempfile.TemporaryDirectory() as tmp:

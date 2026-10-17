@@ -252,6 +252,16 @@ ON delphi_documents(project_id, panel_id, round_sequence, kind);
 """
 
 
+# Project Input records its version in this meta row (ADR 0001). It also keeps
+# PRAGMA user_version at 2, the value older releases check.
+PROJECT_INPUT_STORE_SCHEMA_VERSION = "0.2.0"
+PROJECT_INPUT_META_SQL = """
+CREATE TABLE IF NOT EXISTS project_input_store_meta (
+    schema_version TEXT PRIMARY KEY
+)
+"""
+
+
 def project_inputs_table_sql(table: str = "project_inputs") -> str:
     return f"""
             CREATE TABLE {table}(
