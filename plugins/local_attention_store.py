@@ -12,10 +12,11 @@ from jsonschema import Draft202012Validator, FormatChecker
 from core.conversation import canonical_digest
 from plugins._infra.sqlite import apply_pragmas
 from plugins.local_durable_store import register_optional_path, require_optional_available
+from plugins.local_store_schemas import ATTENTION_SCHEMA_SQL as _SCHEMA_SQL
+from plugins.local_store_schemas import ATTENTION_STORE_SCHEMA_VERSION
 
 ROOT = Path(__file__).resolve().parents[1]
 ATTENTION_MAP_SCHEMA_PATH = ROOT / "projects/contracts/research-attention-map.schema.json"
-ATTENTION_STORE_SCHEMA_VERSION = "0.1.0"
 
 
 class LocalAttentionStoreError(RuntimeError):
@@ -58,39 +59,6 @@ def validate_attention_map(value: Mapping[str, Any]) -> None:
         raise LocalAttentionStoreError(
             "ATTENTION-MAP-DIGEST-001", "Attention Map digest does not match immutable content"
         )
-
-
-_SCHEMA_SQL = """
-CREATE TABLE IF NOT EXISTS attention_store_meta (
-    schema_version TEXT PRIMARY KEY
-);
-CREATE TABLE IF NOT EXISTS attention_maps (
-    map_id TEXT PRIMARY KEY,
-    project_id TEXT NOT NULL,
-    map_digest TEXT NOT NULL,
-    document_json TEXT NOT NULL
-);
-CREATE UNIQUE INDEX IF NOT EXISTS attention_maps_digest_idx
-    ON attention_maps(map_digest);
-CREATE TABLE IF NOT EXISTS attention_activation_events (
-    activation_id TEXT PRIMARY KEY,
-    project_id TEXT NOT NULL,
-    map_id TEXT NOT NULL,
-    map_digest TEXT NOT NULL,
-    activated_at TEXT NOT NULL,
-    event_digest TEXT NOT NULL,
-    document_json TEXT NOT NULL,
-    FOREIGN KEY(map_id) REFERENCES attention_maps(map_id)
-);
-CREATE TABLE IF NOT EXISTS active_attention_map (
-    project_id TEXT PRIMARY KEY,
-    map_id TEXT NOT NULL,
-    map_digest TEXT NOT NULL,
-    activation_id TEXT NOT NULL,
-    FOREIGN KEY(map_id) REFERENCES attention_maps(map_id),
-    FOREIGN KEY(activation_id) REFERENCES attention_activation_events(activation_id)
-);
-"""
 
 
 _REQUIRED_COLUMNS = {

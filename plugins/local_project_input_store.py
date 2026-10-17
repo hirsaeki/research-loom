@@ -12,6 +12,7 @@ from typing import Any
 from plugins._infra.atomic_write import durable_staged_file, publish_staged
 from plugins._infra.clock import utc_now as _now
 from plugins.local_durable_store import register_optional_path, require_optional_available
+from plugins.local_store_schemas import project_inputs_table_sql
 
 _SCHEMA_VERSION = 2
 _BLOB_HASH_CHUNK_BYTES = 1024 * 1024
@@ -104,23 +105,7 @@ class LocalProjectInputStore:
 
     @staticmethod
     def _create_table_sql(table: str = "project_inputs") -> str:
-        return f"""
-            CREATE TABLE {table}(
-                input_id TEXT PRIMARY KEY,
-                project_id TEXT NOT NULL,
-                role TEXT NOT NULL,
-                media_type TEXT NOT NULL,
-                byte_length INTEGER NOT NULL,
-                content_digest TEXT NOT NULL,
-                source_path TEXT NOT NULL,
-                provenance_json TEXT NOT NULL,
-                registered_at TEXT NOT NULL,
-                lineage_ref TEXT NOT NULL,
-                snapshot_id TEXT NOT NULL,
-                snapshot_digest TEXT NOT NULL,
-                UNIQUE(project_id, role, content_digest, lineage_ref, snapshot_id, snapshot_digest)
-            )
-        """
+        return project_inputs_table_sql(table)
 
     def _has_current_unique_binding(self) -> bool:
         expected = [

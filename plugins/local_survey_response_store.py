@@ -11,13 +11,14 @@ from typing import Any
 
 from plugins._infra.sqlite import apply_pragmas
 from plugins.local_durable_store import register_optional_path, require_optional_available
+from plugins.local_store_schemas import SURVEY_RESPONSE_SCHEMA_SQL as _SCHEMA_SQL
+from plugins.local_store_schemas import SURVEY_RESPONSE_STORE_SCHEMA_VERSION
 from plugins.survey_response.contracts import (
     canonical_digest,
     validate_canonical_response,
     validate_dataset,
 )
 
-SURVEY_RESPONSE_STORE_SCHEMA_VERSION = "0.1.0"
 _REQUIRED_COLUMNS = {
     "survey_response_store_meta": {"schema_version"},
     "survey_responses": {
@@ -66,98 +67,6 @@ class LocalSurveyResponseStoreError(RuntimeError):
         super().__init__(message)
         self.code = code
         self.message = message
-
-
-_SCHEMA_SQL = """
-CREATE TABLE IF NOT EXISTS survey_response_store_meta (
-    schema_version TEXT PRIMARY KEY
-);
-CREATE TABLE IF NOT EXISTS survey_responses (
-    project_id TEXT NOT NULL,
-    response_id TEXT NOT NULL,
-    identity_namespace TEXT NOT NULL,
-    instrument_id TEXT NOT NULL,
-    instrument_version TEXT NOT NULL,
-    content_digest TEXT NOT NULL,
-    response_origin TEXT NOT NULL,
-    validation_status TEXT NOT NULL,
-    ingested_at TEXT NOT NULL,
-    document_json TEXT NOT NULL,
-    raw_input_json TEXT NOT NULL,
-    PRIMARY KEY(project_id, identity_namespace, response_id)
-);
-CREATE TABLE IF NOT EXISTS survey_response_datasets (
-    project_id TEXT NOT NULL,
-    dataset_id TEXT NOT NULL,
-    instrument_id TEXT NOT NULL,
-    instrument_version TEXT NOT NULL,
-    content_digest TEXT NOT NULL,
-    response_origin TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    summary_digest TEXT NOT NULL,
-    summary_json TEXT NOT NULL,
-    document_json TEXT NOT NULL,
-    PRIMARY KEY(project_id, dataset_id)
-);
-CREATE TABLE IF NOT EXISTS survey_response_dataset_entries (
-    project_id TEXT NOT NULL,
-    dataset_id TEXT NOT NULL,
-    entry_index INTEGER NOT NULL,
-    kind TEXT NOT NULL,
-    payload_json TEXT NOT NULL,
-    PRIMARY KEY(project_id, dataset_id, entry_index)
-);
-CREATE TABLE IF NOT EXISTS survey_response_dataset_entry_counts (
-    project_id TEXT NOT NULL,
-    dataset_id TEXT NOT NULL,
-    entry_count INTEGER NOT NULL DEFAULT 0,
-    accepted_count INTEGER NOT NULL DEFAULT 0,
-    PRIMARY KEY(project_id, dataset_id)
-);
-CREATE TRIGGER IF NOT EXISTS survey_response_dataset_count_init
-AFTER INSERT ON survey_response_datasets
-BEGIN
-    INSERT OR IGNORE INTO survey_response_dataset_entry_counts(
-        project_id,dataset_id,entry_count,accepted_count
-    ) VALUES (NEW.project_id,NEW.dataset_id,0,0);
-END;
-CREATE TRIGGER IF NOT EXISTS survey_response_dataset_count_insert
-AFTER INSERT ON survey_response_dataset_entries
-BEGIN
-    INSERT INTO survey_response_dataset_entry_counts(
-        project_id,dataset_id,entry_count,accepted_count
-    ) VALUES (
-        NEW.project_id,
-        NEW.dataset_id,
-        1,
-        CASE WHEN NEW.kind='accepted_response' THEN 1 ELSE 0 END
-    )
-    ON CONFLICT(project_id,dataset_id) DO UPDATE SET
-        entry_count=entry_count+1,
-        accepted_count=accepted_count+
-            CASE WHEN NEW.kind='accepted_response' THEN 1 ELSE 0 END;
-END;
-CREATE TRIGGER IF NOT EXISTS survey_response_dataset_count_delete
-AFTER DELETE ON survey_response_dataset_entries
-BEGIN
-    UPDATE survey_response_dataset_entry_counts
-    SET entry_count=entry_count-1,
-        accepted_count=accepted_count-
-            CASE WHEN OLD.kind='accepted_response' THEN 1 ELSE 0 END
-    WHERE project_id=OLD.project_id AND dataset_id=OLD.dataset_id;
-END;
-CREATE TRIGGER IF NOT EXISTS survey_response_dataset_count_kind_update
-AFTER UPDATE OF kind ON survey_response_dataset_entries
-BEGIN
-    UPDATE survey_response_dataset_entry_counts
-    SET accepted_count=accepted_count
-        - CASE WHEN OLD.kind='accepted_response' THEN 1 ELSE 0 END
-        + CASE WHEN NEW.kind='accepted_response' THEN 1 ELSE 0 END
-    WHERE project_id=NEW.project_id AND dataset_id=NEW.dataset_id;
-END;
-CREATE INDEX IF NOT EXISTS survey_response_dataset_entries_page
-ON survey_response_dataset_entries(project_id, dataset_id, entry_index);
-"""
 
 
 class LocalSurveyResponseStore:

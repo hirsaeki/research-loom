@@ -9,9 +9,10 @@ from typing import Any
 
 from plugins._infra.sqlite import apply_pragmas
 from plugins.local_durable_store import register_optional_path, require_optional_available
+from plugins.local_store_schemas import SURVEY_ANALYSIS_SCHEMA_SQL as _SCHEMA_SQL
+from plugins.local_store_schemas import SURVEY_ANALYSIS_STORE_SCHEMA_VERSION
 from plugins.survey_analysis import validate_aggregate_result, validate_analysis_spec
 
-SURVEY_ANALYSIS_STORE_SCHEMA_VERSION = "0.1.0"
 _REQUIRED_COLUMNS = {
     "survey_analysis_store_meta": {"schema_version"},
     "survey_analysis_specs": {
@@ -50,45 +51,6 @@ class LocalSurveyAnalysisStoreError(RuntimeError):
         super().__init__(message)
         self.code = code
         self.message = message
-
-
-_SCHEMA_SQL = """
-CREATE TABLE IF NOT EXISTS survey_analysis_store_meta (
-    schema_version TEXT PRIMARY KEY
-);
-CREATE TABLE IF NOT EXISTS survey_analysis_specs (
-    project_id TEXT NOT NULL,
-    analysis_spec_id TEXT NOT NULL,
-    content_digest TEXT NOT NULL,
-    dataset_id TEXT NOT NULL,
-    dataset_digest TEXT NOT NULL,
-    instrument_id TEXT NOT NULL,
-    instrument_version TEXT NOT NULL,
-    instrument_digest TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    document_json TEXT NOT NULL,
-    PRIMARY KEY(project_id, analysis_spec_id)
-);
-CREATE TABLE IF NOT EXISTS survey_aggregate_results (
-    project_id TEXT NOT NULL,
-    aggregate_result_id TEXT NOT NULL,
-    content_digest TEXT NOT NULL,
-    analysis_spec_id TEXT NOT NULL,
-    analysis_spec_digest TEXT NOT NULL,
-    dataset_id TEXT NOT NULL,
-    dataset_digest TEXT NOT NULL,
-    instrument_id TEXT NOT NULL,
-    instrument_version TEXT NOT NULL,
-    instrument_digest TEXT NOT NULL,
-    response_origin TEXT NOT NULL,
-    epistemic_status TEXT NOT NULL,
-    generated_at TEXT NOT NULL,
-    document_json TEXT NOT NULL,
-    PRIMARY KEY(project_id, aggregate_result_id)
-);
-CREATE INDEX IF NOT EXISTS survey_aggregate_results_by_spec
-ON survey_aggregate_results(project_id, analysis_spec_id, dataset_id);
-"""
 
 
 class LocalSurveyAnalysisStore:
