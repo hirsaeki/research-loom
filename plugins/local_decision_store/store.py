@@ -8,7 +8,56 @@ from pathlib import Path
 from threading import RLock
 from typing import Any
 
+from plugins._infra.schema_record import migration_issue, record_baseline
 from plugins._infra.sqlite import apply_pragmas
+
+_REQUIRED_COLUMNS = {
+    "decision_requests": {
+        "request_id",
+        "request_digest",
+        "project_ref",
+        "lineage_ref",
+        "source_candidate_id",
+        "source_candidate_digest",
+        "snapshot_ref",
+        "snapshot_digest",
+        "payload_json",
+        "status",
+        "claimed_response_digest",
+        "commit_id",
+        "commit_receipt_json",
+        "detail",
+    },
+    "decision_responses": {
+        "response_digest",
+        "request_id",
+        "response_id",
+        "disposition",
+        "actor_id",
+        "actor_type",
+        "payload_json",
+        "outcome",
+        "detail",
+    },
+}
+# The current schema, recorded in schema_migrations (ADR 0001).
+SCHEMA_BASELINE = (1, "decision_store_baseline")
+
+
+class LocalHumanDecisionStoreError(RuntimeError):
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+        self.message = message
+
+
+def _schema_issue(connection: sqlite3.Connection) -> str | None:
+    for table, required in _REQUIRED_COLUMNS.items():
+        columns = {str(row[1]) for row in connection.execute(f"PRAGMA table_info({table})")}
+        missing = sorted(required - columns)
+        if missing:
+            return f"incompatible {table} schema; missing columns: " + ", ".join(missing)
+    return None
 
 
 class LocalHumanDecisionStore:
@@ -26,6 +75,13 @@ class LocalHumanDecisionStore:
         self._db = sqlite3.connect(
             str(self.path), isolation_level=None, check_same_thread=False, timeout=5.0
         )
+        try:
+            self._prepare_schema()
+        except BaseException:
+            self._db.close()
+            raise
+
+    def _prepare_schema(self) -> None:
         self._db.row_factory = sqlite3.Row
         apply_pragmas(
             self._db,
@@ -34,6 +90,11 @@ class LocalHumanDecisionStore:
             journal_mode="WAL",
             synchronous="FULL",
         )
+        issue = migration_issue(self._db, SCHEMA_BASELINE)
+        if issue is not None:
+            raise LocalHumanDecisionStoreError("DECISION-STORE-SCHEMA-001", issue)
+        # CREATE TABLE IF NOT EXISTS does not migrate; an older or damaged store
+        # fails closed below before its index is created.
         self._db.executescript(
             """
             CREATE TABLE IF NOT EXISTS decision_requests(
@@ -52,8 +113,6 @@ class LocalHumanDecisionStore:
               commit_receipt_json TEXT,
               detail TEXT
             );
-            CREATE INDEX IF NOT EXISTS decision_requests_pending
-              ON decision_requests(project_ref,status,request_id);
             CREATE TABLE IF NOT EXISTS decision_responses(
               response_digest TEXT PRIMARY KEY,
               request_id TEXT NOT NULL,
@@ -68,6 +127,23 @@ class LocalHumanDecisionStore:
             );
             """
         )
+        issue = _schema_issue(self._db)
+        if issue is not None:
+            raise LocalHumanDecisionStoreError("DECISION-STORE-SCHEMA-001", issue)
+        self._db.execute(
+            "CREATE INDEX IF NOT EXISTS decision_requests_pending "
+            "ON decision_requests(project_ref,status,request_id)"
+        )
+        self._db.execute("BEGIN IMMEDIATE")
+        try:
+            issue = record_baseline(self._db, SCHEMA_BASELINE)
+            if issue is not None:
+                raise LocalHumanDecisionStoreError("DECISION-STORE-SCHEMA-001", issue)
+            self._db.execute("COMMIT")
+        except BaseException:
+            if self._db.in_transaction:
+                self._db.execute("ROLLBACK")
+            raise
 
     @staticmethod
     def _json(value: Mapping[str, Any]) -> str:

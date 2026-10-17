@@ -17,6 +17,8 @@ from pathlib import Path
 from typing import Any
 
 from core.runtime import canonical_digest
+from plugins._infra.schema_record import migration_issue
+from plugins.local_decision_store import SCHEMA_BASELINE as DECISION_SCHEMA_BASELINE
 
 from .workspace import (
     BINDING_NAME,
@@ -57,7 +59,18 @@ _REQUIRED_STORE_COLUMNS = {
 }
 
 
+# Stores that record a schema_migrations baseline (ADR 0001). A store from
+# before the record has no table yet and is accepted; another history is not.
+_SCHEMA_BASELINES = {"WORKSPACE-DECISION-DB-001": DECISION_SCHEMA_BASELINE}
+
+
 def validate_required_store_schema(connection: sqlite3.Connection, code: str) -> None:
+    baseline = _SCHEMA_BASELINES.get(code)
+    if baseline is not None and migration_issue(connection, baseline) is not None:
+        raise LocalWorkspaceError(
+            code,
+            "store schema migration history is unknown; preserve the Workspace and restore an exact complete backup",
+        )
     for table, columns in _REQUIRED_STORE_COLUMNS.get(code, {}).items():
         row = connection.execute("SELECT type FROM sqlite_master WHERE name=?", (table,)).fetchone()
         present = {str(row[1]) for row in connection.execute(f'PRAGMA table_info("{table}")')}
