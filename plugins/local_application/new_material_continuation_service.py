@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import errno
 import hashlib
 import os
-import time
 from collections.abc import Mapping
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -13,6 +11,7 @@ from threading import RLock
 from typing import Any
 
 from core.execution import RunStatus
+from plugins._infra.file_lock import acquire_byte_lock, unlock_byte, write_sentinel_if_empty
 from plugins.desktop_research import DesktopResearchAttemptRecorder, DesktopResearchCaptureService
 from plugins.desktop_research.attempts import reconstruct_attempts
 
@@ -140,38 +139,13 @@ def _target_lock(workspace_root, reacquisition_run_id: str):
     locked = False
     try:
         if os.name == "nt":
-            import msvcrt
-
-            if os.fstat(fd).st_size == 0:
-                os.write(fd, b"\0")
-                os.fsync(fd)
-            os.lseek(fd, 0, os.SEEK_SET)
-            while True:
-                try:
-                    msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
-                    locked = True
-                    break
-                except OSError as exc:
-                    if exc.errno not in {errno.EACCES, errno.EAGAIN, errno.EDEADLK}:
-                        raise
-                    time.sleep(0.05)
-        else:
-            import fcntl
-
-            fcntl.flock(fd, fcntl.LOCK_EX)
-            locked = True
+            write_sentinel_if_empty(fd, fsync=True)
+        acquire_byte_lock(fd, timeout=None)
+        locked = True
         yield
     finally:
         if locked:
-            if os.name == "nt":
-                import msvcrt
-
-                os.lseek(fd, 0, os.SEEK_SET)
-                msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
-            else:
-                import fcntl
-
-                fcntl.flock(fd, fcntl.LOCK_UN)
+            unlock_byte(fd)
         os.close(fd)
 
 

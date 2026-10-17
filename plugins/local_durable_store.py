@@ -10,13 +10,19 @@ import errno
 import importlib
 import os
 import sqlite3
-import time
 from collections.abc import Mapping
 from contextlib import contextmanager
 from copy import deepcopy
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
+
+from plugins._infra.file_lock import (
+    LockTimeout,
+    acquire_byte_lock,
+    unlock_byte,
+    write_sentinel_if_empty,
+)
 
 OPTIONAL_DURABLE_CHILDREN = {
     "research_attention": {"locator": ".research-loom/attention.sqlite3", "kind": "file"},
@@ -271,42 +277,26 @@ def _inventory_lock(root: Path):
 
     path = _safe_locator(root, ".research-loom/durable-children.lock", require_exists=False)
     with path.open("a+b") as handle:
-        handle.seek(0, os.SEEK_END)
-        if not handle.tell():
-            handle.write(b"\0")
-            handle.flush()
-        deadline = time.monotonic() + 5
-        while True:
-            try:
-                if os.name == "nt":
-                    import msvcrt
-
-                    handle.seek(0)
-                    msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
-                else:
-                    import fcntl
-
-                    fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-                break
-            except OSError as exc:
-                if exc.errno not in (errno.EACCES, errno.EAGAIN):
-                    raise OptionalDurableStoreError(
-                        "WORKSPACE-OPTIONAL-INVENTORY-IO-001", "Parent inventory lock I/O failed"
-                    ) from exc
-                if time.monotonic() >= deadline:
-                    raise OptionalDurableStoreError(
-                        "WORKSPACE-OPTIONAL-INVENTORY-BUSY-001",
-                        "Parent inventory lock could not be acquired",
-                    ) from exc
-                time.sleep(0.05)
+        write_sentinel_if_empty(handle.fileno(), fsync=False)
+        try:
+            acquire_byte_lock(
+                handle.fileno(),
+                timeout=5,
+                contention_errnos=frozenset({errno.EACCES, errno.EAGAIN}),
+            )
+        except LockTimeout as exc:
+            raise OptionalDurableStoreError(
+                "WORKSPACE-OPTIONAL-INVENTORY-BUSY-001",
+                "Parent inventory lock could not be acquired",
+            ) from exc.__cause__
+        except OSError as exc:
+            raise OptionalDurableStoreError(
+                "WORKSPACE-OPTIONAL-INVENTORY-IO-001", "Parent inventory lock I/O failed"
+            ) from exc
         try:
             yield
         finally:
-            if os.name == "nt":
-                handle.seek(0)
-                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
-            else:
-                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            unlock_byte(handle.fileno())
 
 
 def register_optional_path(path: Path) -> None:

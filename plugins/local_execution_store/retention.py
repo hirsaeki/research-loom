@@ -5,7 +5,6 @@ import hashlib
 import os
 import stat
 import tempfile
-import time
 from collections import Counter
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
@@ -13,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from core.execution.models import CapabilityRunRecord, ExecutionArtifactMetadata, RunStatus
+from plugins._infra.file_lock import acquire_byte_lock, unlock_byte, write_sentinel_if_empty
 
 from .atomic import LocalExecutionStore as _AtomicExecutionStore
 from .store import LocalExecutionStoreError, LocalExecutionStoreIntegrityError, _now
@@ -42,42 +42,13 @@ class LocalExecutionStore(_AtomicExecutionStore):
         locked = False
         try:
             if os.name == "nt":
-                import msvcrt
-
-                if os.fstat(fd).st_size == 0:
-                    os.write(fd, b"\0")
-                    os.fsync(fd)
-                os.lseek(fd, 0, os.SEEK_SET)
-                while True:
-                    try:
-                        msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
-                        locked = True
-                        break
-                    except OSError as exc:
-                        if exc.errno not in {
-                            errno.EACCES,
-                            errno.EAGAIN,
-                            errno.EDEADLK,
-                        }:
-                            raise
-                        time.sleep(0.05)
-            else:
-                import fcntl
-
-                fcntl.flock(fd, fcntl.LOCK_EX)
-                locked = True
+                write_sentinel_if_empty(fd, fsync=True)
+            acquire_byte_lock(fd, timeout=None)
+            locked = True
             yield
         finally:
             if locked:
-                if os.name == "nt":
-                    import msvcrt
-
-                    os.lseek(fd, 0, os.SEEK_SET)
-                    msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
-                else:
-                    import fcntl
-
-                    fcntl.flock(fd, fcntl.LOCK_UN)
+                unlock_byte(fd)
             os.close(fd)
 
     def _locator_path(self, locator: str, expected_digest: str) -> Path:

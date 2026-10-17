@@ -17,6 +17,7 @@ import rfc8785
 from jsonschema import Draft202012Validator, FormatChecker
 
 from core.runtime import canonical_digest
+from plugins._infra.file_lock import lock_byte, unlock_byte, write_sentinel_if_empty
 from plugins.local_durable_store import register_optional_path, require_optional_available
 
 from .facade import LocalApplicationError
@@ -763,20 +764,9 @@ class WriterCompositionService:
         register_optional_path(self.root)
         handle = lock_path.open("a+b")
         try:
-            handle.seek(0, os.SEEK_END)
-            if handle.tell() == 0:
-                handle.write(b"\0")
-                handle.flush()
-            handle.seek(0)
+            write_sentinel_if_empty(handle.fileno(), fsync=False)
             try:
-                if os.name == "nt":
-                    import msvcrt
-
-                    msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
-                else:
-                    import fcntl
-
-                    fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                lock_byte(handle.fileno(), blocking=False)
             except (OSError, BlockingIOError) as exc:
                 raise LocalApplicationError(
                     "APPLICATION-WRITER-COMPOSITION-BUSY-001", message
@@ -784,15 +774,7 @@ class WriterCompositionService:
             try:
                 yield
             finally:
-                handle.seek(0)
-                if os.name == "nt":
-                    import msvcrt
-
-                    msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
-                else:
-                    import fcntl
-
-                    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+                unlock_byte(handle.fileno())
         finally:
             handle.close()
 

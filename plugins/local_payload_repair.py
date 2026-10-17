@@ -6,18 +6,23 @@ bad payload bytes and installs a verified replacement; it never repairs metadata
 
 from __future__ import annotations
 
-import errno
 import hashlib
 import json
 import os
 import stat
 import tempfile
-import time
 import uuid
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
+
+from plugins._infra.file_lock import (
+    LockTimeout,
+    acquire_byte_lock,
+    unlock_byte,
+    write_sentinel_if_empty,
+)
 
 REPAIRABLE = frozenset(
     {
@@ -121,38 +126,17 @@ def payload_lock(root: Path, target: Path, *, timeout: float = 5.0) -> Iterator[
     lock_path = checked_path(root, root / "repair-locks" / (token + ".lock"))
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     with lock_path.open("a+b") as handle:
-        if os.fstat(handle.fileno()).st_size == 0:
-            handle.write(b"\0")
-            handle.flush()
-        deadline = time.monotonic() + timeout
-        while True:
-            try:
-                if os.name == "nt":
-                    import msvcrt
-
-                    handle.seek(0)
-                    msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
-                else:
-                    import fcntl
-
-                    fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-                break
-            except OSError as exc:
-                if exc.errno not in (errno.EACCES, errno.EAGAIN, errno.EDEADLK):
-                    raise
-                if time.monotonic() >= deadline:
-                    raise PayloadRepairError(
-                        "content-addressed payload repair is busy; retry later"
-                    ) from exc
-                time.sleep(0.05)
+        write_sentinel_if_empty(handle.fileno(), fsync=False)
+        try:
+            acquire_byte_lock(handle.fileno(), timeout=timeout)
+        except LockTimeout as exc:
+            raise PayloadRepairError(
+                "content-addressed payload repair is busy; retry later"
+            ) from exc.__cause__
         try:
             yield
         finally:
-            if os.name == "nt":
-                handle.seek(0)
-                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
-            else:
-                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            unlock_byte(handle.fileno())
 
 
 def install_exact_payload(
