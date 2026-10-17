@@ -3,24 +3,83 @@ from __future__ import annotations
 import hashlib
 from collections.abc import Mapping
 from contextlib import ExitStack
+from contextvars import ContextVar
 from copy import deepcopy
 from typing import Any
 
 from core.execution import RunStatus
-from plugins.desktop_research import DesktopResearchAttemptRecorder, DesktopResearchCaptureService
+from plugins.desktop_research import DesktopResearchAttemptRecorder
+from plugins.desktop_research import DesktopResearchCaptureService as _BASE_CAPTURE_SERVICE
 from plugins.desktop_research.attempts import reconstruct_attempts
 
 from . import new_material_continuation_admission as admission
 from .facade import LocalApplicationError
 from .material_content_facade import _artifact_pair_for_capture
+from .material_reacquisition_facade import MaterialReacquisitionRetrievalError
+from .material_reacquisition_pypdf_provider import (
+    _regenerate_text_rendition as _regenerate_pinned_text_rendition,
+)
 from .new_material_continuation_service import (
     _CONTINUATION_LOCK,
     NewMaterialContinuationService,
     _BaseLocalApplicationFacade,
-    _render_reacquired_html_rendition,
     _research_result_for_new_run,
     _target_lock,
 )
+from .new_material_continuation_service import (
+    _render_reacquired_html_rendition as _BASE_RENDER,
+)
+
+# Provider of the PDF text rendition produced for the capture in progress.
+_PDF_RENDITION_PROVIDER: ContextVar[str | None] = ContextVar(
+    "paired_new_material_pdf_rendition_provider", default=None
+)
+
+
+def _render_reacquired_html_rendition(
+    original_content: bytes,
+    media_type: str | None,
+    *,
+    max_bytes: int,
+) -> bytes:
+    """Render a divergent original's text: HTML via the G1 rule, PDF via the pinned provider."""
+    normalized = str(media_type or "").split(";", 1)[0].strip().lower()
+    if normalized != "application/pdf":
+        return _BASE_RENDER(original_content, media_type, max_bytes=max_bytes)
+
+    try:
+        # The provider's locator is not persisted here. The group capture keeps the
+        # historical exact locator independently; only the bounded bytes/provider
+        # are consumed from this existing pinned renderer.
+        rendered = _regenerate_pinned_text_rendition(
+            original_content,
+            normalized,
+            "",
+            max_bytes=max_bytes,
+        )
+    except MaterialReacquisitionRetrievalError as exc:
+        raise LocalApplicationError(
+            "APPLICATION-NEW-MATERIAL-CONTINUATION-MATERIAL-001",
+            "divergent PDF original rendition regeneration failed",
+        ) from exc
+    _PDF_RENDITION_PROVIDER.set(rendered.provider)
+    return rendered.content
+
+
+class DesktopResearchCaptureService(_BASE_CAPTURE_SERVICE):
+    """Record the PDF rendition provider in capture provenance when one was used."""
+
+    def capture(self, run, **kwargs):
+        provider = _PDF_RENDITION_PROVIDER.get()
+        if provider is not None:
+            provenance = deepcopy(dict(kwargs.get("provenance") or {}))
+            provenance["text_rendition_provider"] = provider
+            kwargs["provenance"] = provenance
+        try:
+            return super().capture(run, **kwargs)
+        finally:
+            _PDF_RENDITION_PROVIDER.set(None)
+
 
 _GROUP_LIMIT = 16
 _GROUP_RELATION = "new_material_version_group_continuation"
@@ -373,7 +432,14 @@ class PairedNewMaterialContinuationService(NewMaterialContinuationService):
             )
         return original_limit, text_limit
 
-    def _capture_group(
+    def _capture_group(self, *args, **kwargs) -> dict[str, str]:
+        token = _PDF_RENDITION_PROVIDER.set(None)
+        try:
+            return self._capture_group_once(*args, **kwargs)
+        finally:
+            _PDF_RENDITION_PROVIDER.reset(token)
+
+    def _capture_group_once(
         self,
         new_run,
         historical,

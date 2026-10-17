@@ -3,9 +3,6 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
-from plugins.local_application import (
-    new_material_group_continuation_pdf_provider as provider,
-)
 from plugins.local_application import new_material_group_continuation_service as group
 from plugins.local_application.facade import LocalApplicationError
 from plugins.local_application.material_reacquisition_facade import RetrievedMaterial
@@ -16,7 +13,7 @@ CI_WINDOWS = True
 class Issue127PdfGroupProviderTests(unittest.TestCase):
     def test_pdf_group_provider_ablation_and_provenance(self):
         with self.assertRaisesRegex(LocalApplicationError, "only text/html"):
-            provider._BASE_RENDER(
+            group._BASE_RENDER(
                 b"%PDF-1.4 fixture",
                 "application/pdf",
                 max_bytes=1024,
@@ -30,7 +27,7 @@ class Issue127PdfGroupProviderTests(unittest.TestCase):
             None,
         )
         with patch.object(
-            provider,
+            group,
             "_regenerate_pinned_text_rendition",
             return_value=rendered,
         ) as regenerate:
@@ -48,7 +45,7 @@ class Issue127PdfGroupProviderTests(unittest.TestCase):
             )
 
             with patch.object(
-                provider._BASE_CAPTURE_SERVICE,
+                group._BASE_CAPTURE_SERVICE,
                 "capture",
                 return_value={"status": "ok"},
             ) as capture:
@@ -74,7 +71,7 @@ class Issue127PdfGroupProviderTests(unittest.TestCase):
                 "uv-pypdf/6.16.2;newline=crlf",
             )
 
-        self.assertIsNone(provider._PDF_RENDITION_PROVIDER.get())
+        self.assertIsNone(group._PDF_RENDITION_PROVIDER.get())
 
 
 if __name__ == "__main__":
