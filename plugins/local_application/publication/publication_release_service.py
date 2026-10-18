@@ -466,7 +466,6 @@ class PublicationReleaseService(PublicationReleaseRequestMixin, PublicationRende
         """Import a Host-rendered PDF into a new immutable, reviewed build."""
         from plugins.local_workspace_layout import safe_locator as _safe_locator
 
-        from .publication_formal_report import inspect_formal
         from .publication_pdf import coverage_review, inspect_pdf
 
         allowed = {
@@ -484,8 +483,10 @@ class PublicationReleaseService(PublicationReleaseRequestMixin, PublicationRende
             )
         source, source_manifest, root = self._load_build(build_id)
         policy = source.get("publication_policy", {})
+        dialect = self._dialect(source.get("publication_profile", {}))
         if (
-            policy.get("document_mode") != "formal_report"
+            not dialect.formal_report_requested(policy)
+            or policy.get("document_mode") != "formal_report"
             or not policy.get("coverage")
             or policy.get("missing_inputs")
             or policy.get("final_pdf")
@@ -544,7 +545,7 @@ class PublicationReleaseService(PublicationReleaseRequestMixin, PublicationRende
                 "Host receipt must bind the Word rendering with updated fields to these DOCX/PDF bytes",
             )
         native = (root / docx["relative_path"]).read_bytes()
-        failures = inspect_formal(
+        failures = dialect.inspect_formal_report(
             native,
             policy["formal_report"],
             policy["research_group_type"],
@@ -595,7 +596,7 @@ class PublicationReleaseService(PublicationReleaseRequestMixin, PublicationRende
             _sha(payload),
             machine["page_count"],
             page_ranges=host["page_ranges"],
-            dialect=self._dialect(source.get("publication_profile", {})),
+            dialect=dialect,
         )
         key = _sha(
             _canonical_bytes(

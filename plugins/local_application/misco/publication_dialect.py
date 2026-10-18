@@ -10,6 +10,7 @@ from plugins.application_errors import LocalApplicationError
 
 from ..publication.publication_dialect import PublicationDialect
 from ..publication.publication_release_support import source_tags
+from . import formal_report
 
 MISCO_PUBLICATION_PROFILE_ID = "misco.publication"
 MISCO_EDITORIAL_QA = "misco-editorial-qa"
@@ -161,6 +162,24 @@ class MiscoPublicationDialect(PublicationDialect):
         note = "図に示す内容：" + "、".join(value["request"]["allowed_labels"]) + "。"
         note += "\n既存の研究内容を整理した図であり、新たな研究上の結論を示すものではない。"
         return note
+
+    def formal_report_requested(self, policy: Mapping[str, Any]) -> bool:
+        return (
+            policy.get("document_mode") == "formal_report"
+            and isinstance(policy.get("formal_report"), Mapping)
+            and policy.get("research_group_type") in {"G", "M"}
+        )
+
+    def formal_outline(self, structure: Any, section_ids: list[str]) -> dict[str, Any]:
+        return formal_report.outline(structure, section_ids)
+
+    def assemble_formal_report(self, docx: bytes, report: dict, group: str, layout: dict) -> bytes:
+        return formal_report.assemble(docx, report, group, layout)
+
+    def inspect_formal_report(
+        self, docx: bytes, report: dict, group: str, layout: dict
+    ) -> list[str]:
+        return formal_report.inspect_formal(docx, report, group, layout)
 
 
 MISCO_PUBLICATION_DIALECT = MiscoPublicationDialect()

@@ -66,6 +66,24 @@ class PublicationDialect:
         """Note under a generated diagram."""
         return note
 
+    def formal_report_requested(self, policy: Mapping[str, Any]) -> bool:
+        """Whether the policy asks for the dialect's formal report; generic Publication has none."""
+        return False
+
+    def formal_outline(self, structure: Any, section_ids: list[str]) -> dict[str, Any]:
+        """Formal heading scope for each manuscript section."""
+        raise NotImplementedError("this Publication dialect has no formal report")
+
+    def assemble_formal_report(self, docx: bytes, report: dict, group: str, layout: dict) -> bytes:
+        """Formal report assembled over the native Publication DOCX."""
+        raise NotImplementedError("this Publication dialect has no formal report")
+
+    def inspect_formal_report(
+        self, docx: bytes, report: dict, group: str, layout: dict
+    ) -> list[str]:
+        """Failures of an assembled formal report against its specification."""
+        raise NotImplementedError("this Publication dialect has no formal report")
+
 
 GENERIC_PUBLICATION_DIALECT = PublicationDialect()
 

@@ -44,12 +44,12 @@ A new feature adds a mixin module and inserts it into the base list in `facade_c
 | `workspace/` | `LocalResearchApplication`, workspace binding, locking, initialization, reopen, diagnosis and Profile resolution. |
 | `research_package/` | Research Package format, build and listing, and the charts, explanations and visual bindings it pins. |
 | `writer/` | Writer composition, composition history and round trip. |
-| `publication/` | Publication preview, exhibits, formal report, PDF and release. |
+| `publication/` | Publication preview, exhibits, PDF and release, and the `PublicationDialect` extension point. |
 | `research/` | Synthesis candidates, recommendations, arguments, evidence, question review, research quality, exhibits, visuals, project inputs, resume and Run inspection. |
 | `material/` | Material intake, content, inventory, retention, reacquisition, new-material continuation, historical recovery and the external Desktop Research interval. |
 | `survey/` | Survey and Delphi questionnaires, responses, analysis and virtual pretests. |
 | `virtual_runner/` | Virtual Runner binding, input, resolution, execution and inspection. |
-| `misco/` | MISCO organization behavior: the MISCO Publication dialect. `facade.py` maps the `misco.publication` Profile to it. |
+| `misco/` | MISCO organization behavior: the MISCO Publication dialect and the formal report it assembles. `facade.py` maps the `misco.publication` Profile to it. |
 
 A subpackage imports only itself and the layers above it in this table, never a root module and never another layer's private names; `tests/contracts/test_local_application_layering.py` enforces the order. Publication code never branches on a Profile id: it reads a `PublicationDialect` (`publication/publication_dialect.py`), and the composition root passes the organization dialects to `PublicationReleaseService`. Its `ROOT_CALLBACKS` lists the three function-level imports of `facade_composition` that remain: services that submit actions through a partial facade (`ContinuationFacade`, `SurveyAnalysisFacade`, `SurveyResponseFacade`).
 

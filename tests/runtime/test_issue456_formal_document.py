@@ -12,13 +12,13 @@ from pypdf import PdfWriter
 
 import tests.runtime.test_external_desktop_research_intake as intake
 from plugins.local_application import LocalApplicationError
-from plugins.local_application.misco.publication_dialect import MISCO_PUBLICATION_DIALECT
-from plugins.local_application.publication.publication_docx import W, docx_bytes
-from plugins.local_application.publication.publication_formal_report import (
+from plugins.local_application.misco.formal_report import (
     assemble,
     inspect_formal,
     outline,
 )
+from plugins.local_application.misco.publication_dialect import MISCO_PUBLICATION_DIALECT
+from plugins.local_application.publication.publication_docx import W, docx_bytes
 from plugins.local_application.publication.publication_pdf import coverage_review, inspect_pdf
 from plugins.local_application.publication.publication_release_support import (
     _validate_publication_inputs,
