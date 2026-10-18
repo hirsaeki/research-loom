@@ -14,7 +14,7 @@ from .operational_trace import LocalOperationalTraceStore as _BaseOperationalTra
 from .store import (
     LocalExecutionStore as _BaseExecutionStore,
 )
-from .store import (
+from .store_model import (
     LocalExecutionStoreError,
     LocalExecutionStoreIntegrityError,
     _canonical_json,

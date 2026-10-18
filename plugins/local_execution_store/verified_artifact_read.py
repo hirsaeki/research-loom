@@ -8,7 +8,7 @@ from typing import Any
 
 from core.execution.models import ResourcePayload
 
-from .store import LocalExecutionStoreIntegrityError
+from .store_model import LocalExecutionStoreIntegrityError
 
 
 class VerifiedArtifactReadMixin:

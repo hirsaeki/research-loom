@@ -5,7 +5,7 @@ from collections.abc import Mapping
 
 from core.execution.models import ExecutionArtifactMetadata
 
-from .store import LocalExecutionStoreIntegrityError
+from .store_model import LocalExecutionStoreIntegrityError
 
 _ORIGINAL_ROLE = "desktop_research.original_capture"
 _TEXT_ROLE = "desktop_research.text_rendition"

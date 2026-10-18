@@ -10,7 +10,7 @@ from .read_only import ReadOnlyLocalExecutionStore, open_read_only_execution_sto
 from .recovery import result_extensions_for_run
 from .retention import LocalExecutionStore as _RetentionLocalExecutionStore
 from .status import child_runs_for_parent, pending_runs_for_project, recent_runs_for_project
-from .store import (
+from .store_model import (
     LocalExecutionStoreConfig,
     LocalExecutionStoreError,
     LocalExecutionStoreIntegrityError,

@@ -12,10 +12,11 @@ from pathlib import Path
 from typing import Any
 
 from core.execution.models import CapabilityRunRecord, ExecutionArtifactMetadata, RunStatus
+from plugins._infra.clock import utc_now as _now
 from plugins._infra.file_lock import acquire_byte_lock, unlock_byte, write_sentinel_if_empty
 
 from .atomic import LocalExecutionStore as _AtomicExecutionStore
-from .store import LocalExecutionStoreError, LocalExecutionStoreIntegrityError, _now
+from .store_model import LocalExecutionStoreError, LocalExecutionStoreIntegrityError
 
 _LARGE_ORIGINAL_SCHEME = "external-original"
 
