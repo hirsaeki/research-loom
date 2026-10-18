@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 from core.execution import ExecutionFailureCode, ExecutionIssue, RunStatus
 from plugins.local_application.material import new_material_continuation_admission as admission
-from plugins.local_application.material.material_reacquisition_facade import RetrievedMaterial
+from plugins.local_application.material.material_reacquisition_service import RetrievedMaterial
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 
@@ -35,7 +35,7 @@ class Issue174NewMaterialContinuationRetryTests(ResearchPackageAcceptanceSupport
         facade.list_actions()
         changed = changed_bytes if changed_bytes is not None else exact + b"\r\n"
         with patch(
-            "plugins.local_application.material.material_reacquisition_facade._regenerate_text_rendition",
+            "plugins.local_application.material.material_reacquisition_service._regenerate_text_rendition",
             return_value=RetrievedMaterial(
                 changed,
                 "text/plain",

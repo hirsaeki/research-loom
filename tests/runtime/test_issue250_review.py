@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import tests.runtime.test_issue250_exact_payload_repair as support
 from plugins.local_application import LocalApplicationFacade
-from plugins.local_application.material.material_reacquisition_facade import RetrievedMaterial
+from plugins.local_application.material.material_reacquisition_service import RetrievedMaterial
 from plugins.local_execution_store import LocalExecutionStoreIntegrityError
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 from tests.runtime.test_historical_material_recovery_reacquire import _submit_reacquire
@@ -81,7 +81,7 @@ class PayloadRepairReviewTests(ResearchPackageAcceptanceSupport):
         facade.close()
         target.write_bytes(b"bad original")
         with patch(
-            "plugins.local_application.material.material_reacquisition_facade._retrieve_exact_locator",
+            "plugins.local_application.material.material_reacquisition_service._retrieve_exact_locator",
             return_value=RetrievedMaterial(
                 exact, "text/html", "https://example.test/source-a#section-1", "test"
             ),

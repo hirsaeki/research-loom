@@ -12,7 +12,7 @@ from unittest.mock import patch
 import tests.runtime.test_external_desktop_research_intake_atomicity as intake_support
 from plugins import local_payload_repair as repair
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade
-from plugins.local_application.material.material_reacquisition_facade import RetrievedMaterial
+from plugins.local_application.material.material_reacquisition_service import RetrievedMaterial
 from plugins.local_application.material.material_recovery_facade import (
     HistoricalMaterialRecoveryService,
 )
@@ -334,7 +334,7 @@ class ExactPayloadRepairTests(ResearchPackageAcceptanceSupport):
         target.write_bytes(b"bad original")
         facade.close()
         with patch(
-            "plugins.local_application.material.material_reacquisition_facade._retrieve_exact_locator",
+            "plugins.local_application.material.material_reacquisition_service._retrieve_exact_locator",
             return_value=RetrievedMaterial(
                 exact, "text/html", "https://example.test/source-a#section-1", "test"
             ),
@@ -353,7 +353,7 @@ class ExactPayloadRepairTests(ResearchPackageAcceptanceSupport):
         target.write_bytes(b"bad historical bytes")
         facade.close()
         with patch(
-            "plugins.local_application.material.material_reacquisition_facade._retrieve_exact_locator",
+            "plugins.local_application.material.material_reacquisition_service._retrieve_exact_locator",
             return_value=RetrievedMaterial(
                 b"<html>changed source</html>",
                 "text/html",

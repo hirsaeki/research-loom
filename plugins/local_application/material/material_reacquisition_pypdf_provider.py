@@ -9,7 +9,7 @@ from typing import Any
 
 from plugins.application_errors import LocalApplicationError
 
-from . import material_reacquisition_facade as _base
+from . import material_reacquisition_service as _base
 
 _PYPDF_VERSION = "6.16.2"
 _PYPDF_BOUND_EXIT = 86

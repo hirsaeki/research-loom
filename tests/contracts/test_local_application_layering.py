@@ -4,7 +4,8 @@
 ``LAYERS`` from the bottom up. A subpackage imports only itself and the
 subpackages below it, never a module left directly in ``local_application``
 (the composition root: CLI, facade and facade composition), and never another
-subpackage's private names.
+subpackage's private names. Only the composition root (``ROOT_MODULES``) stays
+directly in ``local_application``.
 
 ``ROOT_CALLBACKS`` lists the few places where a service builds one of the partial
 facades defined in the composition root. Each is allowed only as an import made
@@ -38,7 +39,15 @@ ROOT_CALLBACKS = {
     (f"{PACKAGE}.material.new_material_continuation_service", COMPOSITION): (
         "continuation services submit actions through ContinuationFacade"
     ),
+    (f"{PACKAGE}.survey.survey_analysis_facade", COMPOSITION): (
+        "Survey analysis action handlers run through SurveyAnalysisFacade"
+    ),
+    (f"{PACKAGE}.survey.survey_response_facade", COMPOSITION): (
+        "Survey response action handlers run through SurveyResponseFacade"
+    ),
 }
+# Modules left directly in local_application: the composition root and nothing else.
+ROOT_MODULES = {"__init__", "__main__", "cli", "facade", "facade_composition"}
 
 
 def _lazy_import_lines(path) -> set[int]:
@@ -111,6 +120,10 @@ class LocalApplicationLayeringTests(unittest.TestCase):
 
     def test_subpackages_import_only_lower_layers(self):
         self.assertEqual([], layering_violations(), "move the shared helper down a layer")
+
+    def test_root_holds_only_the_composition_root(self):
+        flat = {path.stem for path in PACKAGE_DIR.glob("*.py")}
+        self.assertEqual(ROOT_MODULES, flat, "move feature modules into a subpackage")
 
     def test_root_callbacks_are_lazy_and_still_needed(self):
         for module, target in ROOT_CALLBACKS:

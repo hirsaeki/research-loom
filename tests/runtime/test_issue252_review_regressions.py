@@ -5,7 +5,7 @@ import unittest
 from copy import deepcopy
 
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade
-from plugins.local_application.delphi_analysis import analyze_round
+from plugins.local_application.survey.delphi_analysis import analyze_round
 from tests.runtime.test_delphi_two_round_production import (
     approve_instrument,
     design,

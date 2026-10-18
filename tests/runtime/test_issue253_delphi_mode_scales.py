@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade
-from plugins.local_application.delphi_analysis import ANALYSIS_CONTRACT
+from plugins.local_application.survey.delphi_analysis import ANALYSIS_CONTRACT
 from tests.runtime.test_delphi_two_round_production import (
     approve_instrument,
     design,

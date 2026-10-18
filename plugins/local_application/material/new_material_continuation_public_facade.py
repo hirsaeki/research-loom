@@ -10,10 +10,10 @@ from plugins.application_errors import LocalApplicationError
 from plugins.local_execution_store import artifact_metadata_for, diagnostics_for
 
 from . import new_material_continuation_admission as admission
-from .material_reacquisition_facade import (
+from .material_reacquisition_service import (
     _CAPABILITY_ID as _MRA_CAPABILITY_ID,
 )
-from .material_reacquisition_facade import (
+from .material_reacquisition_service import (
     _RESULT_DIAGNOSTIC as _MRA_RESULT_DIAGNOSTIC,
 )
 from .new_material_continuation_admission import _find_reacquisition_result

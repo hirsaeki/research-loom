@@ -4,8 +4,8 @@ import io
 from dataclasses import replace
 from unittest.mock import patch
 
-import plugins.local_application.material.material_reacquisition_facade as reacquisition_module
-from plugins.local_application.material.material_reacquisition_facade import (
+import plugins.local_application.material.material_reacquisition_service as reacquisition_module
+from plugins.local_application.material.material_reacquisition_service import (
     HistoricalMaterialReacquisitionService,
     MaterialReacquisitionRetrievalError,
     _regenerate_basic_text_rendition,
@@ -63,11 +63,11 @@ class HistoricalMaterialReacquisitionReviewTests(ResearchPackageAcceptanceSuppor
         process = FakeProcess()
         with (
             patch(
-                "plugins.local_application.material.material_reacquisition_facade.shutil.which",
+                "plugins.local_application.material.material_reacquisition_service.shutil.which",
                 return_value="pdftotext",
             ),
             patch(
-                "plugins.local_application.material.material_reacquisition_facade.subprocess.Popen",
+                "plugins.local_application.material.material_reacquisition_service.subprocess.Popen",
                 return_value=process,
             ),
         ):

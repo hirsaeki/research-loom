@@ -9,7 +9,7 @@ from unittest.mock import patch
 from plugins.local_application import LocalApplicationError as LocalApplicationError
 from plugins.local_application import LocalApplicationFacade
 from plugins.local_application.cli import main as cli_main
-from plugins.local_application.material.material_reacquisition_facade import (
+from plugins.local_application.material.material_reacquisition_service import (
     MaterialReacquisitionRetrievalError,
     RetrievedMaterial,
     _regenerate_basic_text_rendition,
@@ -155,7 +155,7 @@ class HistoricalMaterialReacquisitionTests(ResearchPackageAcceptanceSupport):
             facade.close()
             facade = None
             with patch(
-                "plugins.local_application.material.material_reacquisition_facade._retrieve_exact_locator",
+                "plugins.local_application.material.material_reacquisition_service._retrieve_exact_locator",
                 side_effect=retrieve,
             ):
                 code, result = _submit_reacquire(
@@ -190,7 +190,7 @@ class HistoricalMaterialReacquisitionTests(ResearchPackageAcceptanceSupport):
                 self.assertEqual(child.parent_run_id, case["run_id"])
 
             with patch(
-                "plugins.local_application.material.material_reacquisition_facade._retrieve_exact_locator",
+                "plugins.local_application.material.material_reacquisition_service._retrieve_exact_locator",
                 side_effect=AssertionError("idempotent repeat must not fetch"),
             ):
                 code, repeated = _submit_reacquire(
@@ -221,7 +221,7 @@ class HistoricalMaterialReacquisitionTests(ResearchPackageAcceptanceSupport):
 
             changed = b"<html>changed source body</html>"
             with patch(
-                "plugins.local_application.material.material_reacquisition_facade._retrieve_exact_locator",
+                "plugins.local_application.material.material_reacquisition_service._retrieve_exact_locator",
                 return_value=RetrievedMaterial(
                     changed,
                     "text/html",
@@ -288,7 +288,7 @@ class HistoricalMaterialReacquisitionTests(ResearchPackageAcceptanceSupport):
             facade.close()
             facade = None
             with patch(
-                "plugins.local_application.material.material_reacquisition_facade._retrieve_exact_locator",
+                "plugins.local_application.material.material_reacquisition_service._retrieve_exact_locator",
                 side_effect=MaterialReacquisitionRetrievalError("HTTP 403 blocked"),
             ):
                 code, result = _submit_reacquire(
@@ -339,7 +339,7 @@ class HistoricalMaterialReacquisitionTests(ResearchPackageAcceptanceSupport):
             facade = None
 
             with patch(
-                "plugins.local_application.material.material_reacquisition_facade._retrieve_exact_locator",
+                "plugins.local_application.material.material_reacquisition_service._retrieve_exact_locator",
                 return_value=RetrievedMaterial(
                     b"<html>fixed source body</html>",
                     "text/html",
@@ -368,7 +368,7 @@ class HistoricalMaterialReacquisitionTests(ResearchPackageAcceptanceSupport):
             )
 
             with patch(
-                "plugins.local_application.material.material_reacquisition_facade._regenerate_text_rendition",
+                "plugins.local_application.material.material_reacquisition_service._regenerate_text_rendition",
                 return_value=RetrievedMaterial(
                     exact_rendition,
                     "text/plain",
@@ -418,13 +418,13 @@ class HistoricalMaterialReacquisitionTests(ResearchPackageAcceptanceSupport):
 
             with (
                 patch(
-                    "plugins.local_application.material.material_reacquisition_facade._retrieve_exact_locator",
+                    "plugins.local_application.material.material_reacquisition_service._retrieve_exact_locator",
                     side_effect=AssertionError(
                         "rendition regeneration must reuse the verified historical original"
                     ),
                 ),
                 patch(
-                    "plugins.local_application.material.material_reacquisition_facade._regenerate_text_rendition",
+                    "plugins.local_application.material.material_reacquisition_service._regenerate_text_rendition",
                     return_value=RetrievedMaterial(
                         exact_rendition,
                         "text/plain",
@@ -488,7 +488,7 @@ class HistoricalMaterialReacquisitionTests(ResearchPackageAcceptanceSupport):
             facade = None
 
             with patch(
-                "plugins.local_application.material.material_reacquisition_facade._regenerate_text_rendition",
+                "plugins.local_application.material.material_reacquisition_service._regenerate_text_rendition",
                 return_value=RetrievedMaterial(
                     changed,
                     "text/plain",
@@ -554,7 +554,7 @@ class HistoricalMaterialReacquisitionTests(ResearchPackageAcceptanceSupport):
             facade = None
 
             with patch(
-                "plugins.local_application.material.material_reacquisition_facade._regenerate_text_rendition",
+                "plugins.local_application.material.material_reacquisition_service._regenerate_text_rendition",
                 side_effect=MaterialReacquisitionRetrievalError("no exact-safe rendition provider"),
             ):
                 code, result = _submit_reacquire(
@@ -590,7 +590,7 @@ class HistoricalMaterialReacquisitionTests(ResearchPackageAcceptanceSupport):
             facade.close()
             facade = None
             with patch(
-                "plugins.local_application.material.material_reacquisition_facade._regenerate_text_rendition",
+                "plugins.local_application.material.material_reacquisition_service._regenerate_text_rendition",
                 side_effect=AssertionError("must fail before generation"),
             ):
                 code, result = _submit_reacquire(
@@ -647,11 +647,11 @@ class HistoricalMaterialReacquisitionTests(ResearchPackageAcceptanceSupport):
 
         with (
             patch(
-                "plugins.local_application.material.material_reacquisition_facade.shutil.which",
+                "plugins.local_application.material.material_reacquisition_service.shutil.which",
                 return_value="pdftotext",
             ),
             patch(
-                "plugins.local_application.material.material_reacquisition_facade.subprocess.Popen",
+                "plugins.local_application.material.material_reacquisition_service.subprocess.Popen",
                 side_effect=fake_popen,
             ),
         ):
@@ -674,7 +674,7 @@ class HistoricalMaterialReacquisitionTests(ResearchPackageAcceptanceSupport):
             facade.close()
             facade = None
             with patch(
-                "plugins.local_application.material.material_reacquisition_facade._retrieve_exact_locator",
+                "plugins.local_application.material.material_reacquisition_service._retrieve_exact_locator",
                 side_effect=AssertionError("run show must never retrieve"),
             ):
                 code, shown = _run_cli(
@@ -707,7 +707,7 @@ class HistoricalMaterialReacquisitionTests(ResearchPackageAcceptanceSupport):
             facade = None
             with (
                 patch(
-                    "plugins.local_application.material.material_reacquisition_facade._retrieve_exact_locator",
+                    "plugins.local_application.material.material_reacquisition_service._retrieve_exact_locator",
                     return_value=RetrievedMaterial(
                         b"changed bytes",
                         "text/html",
@@ -717,7 +717,7 @@ class HistoricalMaterialReacquisitionTests(ResearchPackageAcceptanceSupport):
                     ),
                 ),
                 patch(
-                    "plugins.local_application.material.material_reacquisition_facade._historical_equivalent",
+                    "plugins.local_application.material.material_reacquisition_service._historical_equivalent",
                     return_value=True,
                 ),
             ):

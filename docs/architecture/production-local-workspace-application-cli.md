@@ -32,11 +32,25 @@ Each layer in the diagram has one home in `plugins/local_application`:
 | JSON CLI adapter | `cli.py` | Argument parsing, reading JSON input, emitting results and mapping errors to exit codes. Workspace operations go through the facade; the one exception is the read-only attention-store schema check that `doctor` adds after the facade's own diagnosis. |
 | Application Facade | `facade.py` (`LocalApplicationFacadeCore`) | Opening and initializing a workspace and the typed action ingress. |
 | | `support/` | Helpers below every feature subpackage: the stage mechanism (`stages.py`: `run_stages`, `stages_for`) that feature mixins plug into, and the typed ingress field sets (`ingress.py`). |
-| | `*_facade.py` (`<Feature>Mixin`) | One feature's public operations, plus its `_STAGES` contributions to shared operations such as `submit_action` or `show_run`. |
+| | `<subpackage>/*_facade.py` (`<Feature>Mixin`) | One feature's public operations, plus its `_STAGES` contributions to shared operations such as `submit_action` or `show_run`. |
 | | `facade_composition.py` | The single definition of `LocalApplicationFacade`, whose base list fixes the mixin order, and the partial compositions that some services instantiate directly. |
 | Composition root | `workspace/application.py` (`LocalResearchApplication`) | Building the stores, registries and core services once per workspace. The rest of `workspace/` binds, locks, initializes, reopens and diagnoses the workspace and resolves its Profiles. |
 
-A new feature adds a mixin module and inserts it into the base list in `facade_composition.py`. It never redefines `LocalApplicationFacade` or overrides another layer's public method; `tests/contracts/test_local_application_facade_api.py` pins the public API, the stage order and the single definition. Feature code is moving into subpackages listed bottom-up in `tests/contracts/test_local_application_layering.py`; a subpackage imports only itself and the layers below it, never a module left directly in `local_application`.
+A new feature adds a mixin module and inserts it into the base list in `facade_composition.py`. It never redefines `LocalApplicationFacade` or overrides another layer's public method; `tests/contracts/test_local_application_facade_api.py` pins the public API, the stage order and the single definition. Only the composition root (`cli.py`, `facade.py`, `facade_composition.py`, `__init__.py`, `__main__.py`) stays directly in `local_application`. Feature code lives in subpackages, listed here from the bottom up:
+
+| Subpackage | Owns |
+|---|---|
+| `support/` | Stage mechanism and typed ingress fields shared by every layer. |
+| `workspace/` | `LocalResearchApplication`, workspace binding, locking, initialization, reopen, diagnosis and Profile resolution. |
+| `research_package/` | Research Package format, build and listing, and the charts, explanations and visual bindings it pins. |
+| `writer/` | Writer composition, composition history and round trip. |
+| `publication/` | Publication preview, exhibits, formal report, PDF and release. |
+| `research/` | Synthesis candidates, recommendations, arguments, evidence, question review, research quality, exhibits, visuals, project inputs, resume and Run inspection. |
+| `material/` | Material intake, content, inventory, retention, reacquisition, new-material continuation, historical recovery and the external Desktop Research interval. |
+| `survey/` | Survey and Delphi questionnaires, responses, analysis and virtual pretests. |
+| `virtual_runner/` | Virtual Runner binding, input, resolution, execution and inspection. |
+
+A subpackage imports only itself and the layers above it in this table, never a root module and never another layer's private names; `tests/contracts/test_local_application_layering.py` enforces the order. Its `ROOT_CALLBACKS` lists the three function-level imports of `facade_composition` that remain: services that submit actions through a partial facade (`ContinuationFacade`, `SurveyAnalysisFacade`, `SurveyResponseFacade`).
 
 Ordinary operator conversation must treat the public Application Facade / CLI as the source of truth. Direct reads of `execution.db`, `operational-trace.sqlite3`, table names, row IDs, or blob-store layout are implementation/debug concerns, not normal operator workflow.
 

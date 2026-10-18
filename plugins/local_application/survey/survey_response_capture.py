@@ -19,7 +19,7 @@ from plugins.survey_response import (
 )
 from plugins.survey_validation import capture_origin, input_object
 
-from .support.stages import run_stages, stages_for
+from ..support.stages import run_stages, stages_for
 from .survey_facade import _snapshot
 from .survey_response_core import _DATASET_FIELDS, _RESPONSE_FIELDS, _status_value
 

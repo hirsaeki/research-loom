@@ -9,13 +9,13 @@ from core.resources import resource_path
 from plugins.application_errors import LocalApplicationError
 from plugins.local_application.support.ingress import AUTHORITY_PAYLOAD_FIELDS, INGRESS_FIELDS
 
+from ..workspace.workspace import workspace_document_path
 from .virtual_runner_binding import build_survey_virtual_extension
 from .virtual_runner_execute import VirtualRunnerExecuteMixin
 from .virtual_runner_input import _payload
 from .virtual_runner_inspection import VirtualRunnerInspectionMixin
 from .virtual_runner_method_context import build_method_context
 from .virtual_runner_resolve import resolve_virtual_inputs
-from .workspace.workspace import workspace_document_path
 
 DESCRIPTOR_PATH = resource_path(
     "core/packages/virtual-runner/virtual-runner-capability-descriptor.json"

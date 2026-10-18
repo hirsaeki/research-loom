@@ -107,7 +107,7 @@ class _SurveyResponseActionHandler:
         self._operation = operation
 
     def execute(self, payload, *, state, actor, proposal):
-        from .facade_composition import SurveyResponseFacade
+        from ..facade_composition import SurveyResponseFacade
 
         facade = SurveyResponseFacade(self._application, state.project_ref)
         if self._operation == "normalize":
