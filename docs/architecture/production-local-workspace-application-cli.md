@@ -49,8 +49,9 @@ A new feature adds a mixin module and inserts it into the base list in `facade_c
 | `material/` | Material intake, content, inventory, retention, reacquisition, new-material continuation, historical recovery and the external Desktop Research interval. |
 | `survey/` | Survey and Delphi questionnaires, responses, analysis and virtual pretests. |
 | `virtual_runner/` | Virtual Runner binding, input, resolution, execution and inspection. |
+| `misco/` | MISCO organization behavior: the MISCO Publication dialect. `facade.py` maps the `misco.publication` Profile to it. |
 
-A subpackage imports only itself and the layers above it in this table, never a root module and never another layer's private names; `tests/contracts/test_local_application_layering.py` enforces the order. Its `ROOT_CALLBACKS` lists the three function-level imports of `facade_composition` that remain: services that submit actions through a partial facade (`ContinuationFacade`, `SurveyAnalysisFacade`, `SurveyResponseFacade`).
+A subpackage imports only itself and the layers above it in this table, never a root module and never another layer's private names; `tests/contracts/test_local_application_layering.py` enforces the order. Publication code never branches on a Profile id: it reads a `PublicationDialect` (`publication/publication_dialect.py`), and the composition root passes the organization dialects to `PublicationReleaseService`. Its `ROOT_CALLBACKS` lists the three function-level imports of `facade_composition` that remain: services that submit actions through a partial facade (`ContinuationFacade`, `SurveyAnalysisFacade`, `SurveyResponseFacade`).
 
 Ordinary operator conversation must treat the public Application Facade / CLI as the source of truth. Direct reads of `execution.db`, `operational-trace.sqlite3`, table names, row IDs, or blob-store layout are implementation/debug concerns, not normal operator workflow.
 

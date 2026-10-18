@@ -8,6 +8,7 @@ from copy import deepcopy
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
+from plugins.local_application.misco.publication_dialect import PUBLICATION_DIALECTS
 from plugins.local_application.publication.publication_docx import W
 from plugins.local_application.publication.publication_release_service import (
     PublicationReleaseService,
@@ -89,6 +90,7 @@ class ReaderPresentationTests(unittest.TestCase):
     def render(self, inspection):
         service = object.__new__(PublicationReleaseService)
         service.workspace = Path("unused")
+        service.dialects = PUBLICATION_DIALECTS
         return service._render(inspection)
 
     def test_reader_labels_preserve_exact_cells_image_and_research_input(self):

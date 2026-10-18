@@ -17,6 +17,7 @@ from plugins._infra.file_lock import lock_byte, unlock_byte, write_sentinel_if_e
 from plugins.application_errors import LocalApplicationError
 from plugins.local_durable_store import register_optional_path, require_optional_available
 
+from .publication_dialect import PublicationDialect, dialect_for
 from .publication_exhibits import prepare_exhibits, render_input_digest
 from .publication_input import inspect_inputs
 from .publication_release_requests import PublicationReleaseRequestMixin
@@ -41,7 +42,7 @@ from .publication_render import PublicationRenderMixin
 
 
 class PublicationReleaseService(PublicationReleaseRequestMixin, PublicationRenderMixin):
-    def __init__(self, facade) -> None:
+    def __init__(self, facade, *, dialects: Mapping[str, PublicationDialect] | None = None) -> None:
         if facade._workspace_root is None:
             raise LocalApplicationError(
                 "APPLICATION-PUBLICATION-WORKSPACE-001",
@@ -51,6 +52,10 @@ class PublicationReleaseService(PublicationReleaseRequestMixin, PublicationRende
         self.workspace = Path(facade._workspace_root)
         self.root = self.workspace / ".research-loom" / "publication"
         require_optional_available(self.root, LocalApplicationError)
+        self.dialects = dict(dialects or {})
+
+    def _dialect(self, profile: Mapping[str, Any]) -> PublicationDialect:
+        return dialect_for(profile, self.dialects)
 
     @contextmanager
     def _file_lock(self, name: str):
@@ -356,11 +361,14 @@ class PublicationReleaseService(PublicationReleaseRequestMixin, PublicationRende
 
         with LocalWorkspace.open(self.workspace) as opened:
             project_config = deepcopy(dict(opened.project_config))
-        policy = _publication_policy(package, profile, publication_inputs, project_config)
+        dialect = self._dialect(profile)
+        policy = _publication_policy(
+            package, profile, publication_inputs, project_config, dialect=dialect
+        )
         revision = inspection["revision"]
         inspection["publication_policy"] = policy
         inspection["publication_profile"] = profile
-        inspection["exhibit_blocks"] = prepare_exhibits(inspection, self.workspace)
+        inspection["exhibit_blocks"] = prepare_exhibits(inspection, self.workspace, dialect=dialect)
         build_key = {
             "manuscript_revision_id": revision["revision_id"],
             "manuscript_revision_digest": revision["revision_digest"],
@@ -587,6 +595,7 @@ class PublicationReleaseService(PublicationReleaseRequestMixin, PublicationRende
             _sha(payload),
             machine["page_count"],
             page_ranges=host["page_ranges"],
+            dialect=self._dialect(source.get("publication_profile", {})),
         )
         key = _sha(
             _canonical_bytes(

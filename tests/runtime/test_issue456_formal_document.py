@@ -12,6 +12,7 @@ from pypdf import PdfWriter
 
 import tests.runtime.test_external_desktop_research_intake as intake
 from plugins.local_application import LocalApplicationError
+from plugins.local_application.misco.publication_dialect import MISCO_PUBLICATION_DIALECT
 from plugins.local_application.publication.publication_docx import W, docx_bytes
 from plugins.local_application.publication.publication_formal_report import (
     assemble,
@@ -253,28 +254,47 @@ class FormalDocumentTests(unittest.TestCase):
             review["checks"].append(
                 {"check_id": id_, "status": "passed", "rationale": "Synthetic fixture check."}
             )
-        self.assertEqual(coverage_review(coverage, policy, review, digest, 1)["problems"], [])
-        self.assertIn(
-            "unrecorded-should-deviation:misco-body-length",
-            coverage_review(coverage, policy, review, digest, 1, page_ranges={"body": [10, 13]})[
+        self.assertEqual(
+            coverage_review(coverage, policy, review, digest, 1, dialect=MISCO_PUBLICATION_DIALECT)[
                 "problems"
             ],
+            [],
+        )
+        self.assertIn(
+            "unrecorded-should-deviation:misco-body-length",
+            coverage_review(
+                coverage,
+                policy,
+                review,
+                digest,
+                1,
+                page_ranges={"body": [10, 13]},
+                dialect=MISCO_PUBLICATION_DIALECT,
+            )["problems"],
         )
         deviation = deepcopy(review)
         next(row for row in deviation["checks"] if row["check_id"] == "misco-body-length").update(
             status="warning", rationale="Short synthetic report for rendering acceptance."
         )
         self.assertEqual(
-            coverage_review(coverage, policy, deviation, digest, 1, page_ranges={"body": [10, 13]})[
-                "problems"
-            ],
+            coverage_review(
+                coverage,
+                policy,
+                deviation,
+                digest,
+                1,
+                page_ranges={"body": [10, 13]},
+                dialect=MISCO_PUBLICATION_DIALECT,
+            )["problems"],
             [],
         )
         presenting = deepcopy(policy)
         presenting["formal_report"]["presentation_required"] = True
         self.assertIn(
             "presentation-review-binding",
-            coverage_review(coverage, presenting, review, digest, 1)["problems"],
+            coverage_review(
+                coverage, presenting, review, digest, 1, dialect=MISCO_PUBLICATION_DIALECT
+            )["problems"],
         )
         slides = deepcopy(review)
         slides["presentation_review"] = {
@@ -293,7 +313,12 @@ class FormalDocumentTests(unittest.TestCase):
                 for i in [1, 2]
             ],
         }
-        self.assertEqual(coverage_review(coverage, presenting, slides, digest, 1)["problems"], [])
+        self.assertEqual(
+            coverage_review(
+                coverage, presenting, slides, digest, 1, dialect=MISCO_PUBLICATION_DIALECT
+            )["problems"],
+            [],
+        )
 
         class NonIterableSlides(list):
             def __iter__(self):
@@ -303,18 +328,24 @@ class FormalDocumentTests(unittest.TestCase):
         oversized["presentation_review"]["slides"] = NonIterableSlides([None] * 257)
         self.assertIn(
             "presentation-per-slide-citations",
-            coverage_review(coverage, presenting, oversized, digest, 1)["problems"],
+            coverage_review(
+                coverage, presenting, oversized, digest, 1, dialect=MISCO_PUBLICATION_DIALECT
+            )["problems"],
         )
         mismatched = deepcopy(slides)
         mismatched["presentation_review"]["slides"] = NonIterableSlides([None])
         self.assertIn(
             "presentation-per-slide-citations",
-            coverage_review(coverage, presenting, mismatched, digest, 1)["problems"],
+            coverage_review(
+                coverage, presenting, mismatched, digest, 1, dialect=MISCO_PUBLICATION_DIALECT
+            )["problems"],
         )
         slides["presentation_review"]["slides"][0]["citations"] = []
         self.assertIn(
             "presentation-per-slide-citations",
-            coverage_review(coverage, presenting, slides, digest, 1)["problems"],
+            coverage_review(
+                coverage, presenting, slides, digest, 1, dialect=MISCO_PUBLICATION_DIALECT
+            )["problems"],
         )
         for id_ in ["misco-abstract", "manual-bibliography", "misco-editorial-qa"]:
             broken = deepcopy(review)
@@ -323,12 +354,16 @@ class FormalDocumentTests(unittest.TestCase):
             )
             self.assertIn(
                 "required-check:" + id_,
-                coverage_review(coverage, policy, broken, digest, 1)["problems"],
+                coverage_review(
+                    coverage, policy, broken, digest, 1, dialect=MISCO_PUBLICATION_DIALECT
+                )["problems"],
             )
         broken = deepcopy(review)
         broken["pdf_digest"] = "sha256:" + "b" * 64
         broken["pages"] = []
-        problems = coverage_review(coverage, policy, broken, digest, 1)["problems"]
+        problems = coverage_review(
+            coverage, policy, broken, digest, 1, dialect=MISCO_PUBLICATION_DIALECT
+        )["problems"]
         self.assertIn("review-output-binding", problems)
         self.assertIn("all-page-review-incomplete", problems)
 

@@ -17,6 +17,7 @@ from plugins.application_errors import LocalApplicationError
 from ..research_package.item_listing import require_unlinked
 from ..research_package.png_validation import png_size
 from ..research_package.research_package_format import MAX_ITEM_BYTES, safe_component
+from .publication_dialect import GENERIC_PUBLICATION_DIALECT, PublicationDialect
 
 MAX_ROWS = 512
 MAX_COLUMNS = 8
@@ -171,7 +172,12 @@ def _visual_sources(exhibit, package, *, strict=False):
     return [objects[oid] for oid in sorted(exhibit_sources(exhibit))]
 
 
-def prepare_exhibits(inspection: Mapping[str, Any], workspace: Path) -> dict[str, dict[str, Any]]:
+def prepare_exhibits(
+    inspection: Mapping[str, Any],
+    workspace: Path,
+    *,
+    dialect: PublicationDialect = GENERIC_PUBLICATION_DIALECT,
+) -> dict[str, dict[str, Any]]:
     package = inspection["source_package_document"]
     root = (
         workspace
@@ -202,7 +208,7 @@ def prepare_exhibits(inspection: Mapping[str, Any], workspace: Path) -> dict[str
         return asset_cache[key]
 
     objects = {o["id"]: o for o in package["resolved_content"]["research_objects"]}
-    misco = inspection.get("publication_profile", {}).get("profile_id") == "misco.publication"
+    strict = dialect.strict_visual_sources
     permissions = inspection.get("publication_policy", {}).get("permissions", [])
     all_exhibits = package["resolved_content"]["working_material"]["research_exhibits"]
     for exhibit in all_exhibits:
@@ -300,11 +306,11 @@ def prepare_exhibits(inspection: Mapping[str, Any], workspace: Path) -> dict[str
                     raise ValueError("selected PNG differs from generated Exhibit")
                 width, height = png_size(data)
                 unavailable_code = "VISUAL_SOURCE_METADATA_REQUIRED"
-                citation_sources = _visual_sources(exhibit, package, strict=misco)
+                citation_sources = _visual_sources(exhibit, package, strict=strict)
                 source_ids = {o["id"] for o in citation_sources}
                 from ..research_package.research_package_contents import bibliography_readiness
 
-                if misco and any(
+                if strict and any(
                     not bibliography_readiness(o)[0]
                     or not str(o.get("canonical_locator", "")).strip()
                     for o in citation_sources
@@ -350,7 +356,7 @@ def prepare_exhibits(inspection: Mapping[str, Any], workspace: Path) -> dict[str
                 ]
                 from ..research_package.research_package_contents import bibliography_readiness
 
-                if misco and (
+                if strict and (
                     len(citation_sources) != 1 or not bibliography_readiness(citation_sources[0])[0]
                 ):
                     unavailable_code = "VISUAL_SOURCE_METADATA_REQUIRED"

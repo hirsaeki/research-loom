@@ -31,6 +31,7 @@ LAYERS = (
     "material",
     "survey",
     "virtual_runner",
+    "misco",
 )
 
 

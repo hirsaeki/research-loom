@@ -8,6 +8,7 @@ from pathlib import Path
 from xml.etree import ElementTree as ET
 
 import tests.runtime.test_issue405_research_charts as chart_tests
+from plugins.local_application.misco.publication_dialect import PUBLICATION_DIALECTS
 from plugins.local_application.publication.publication_docx import W
 from plugins.local_application.publication.publication_release_service import (
     PublicationReleaseService,
@@ -160,9 +161,9 @@ class FormalRenderingTests(unittest.TestCase):
         # Reusing an identity keeps its first formal number and literal asset.
         inspection["revision"]["sections"][-1]["exhibit_refs"].append("s2-IMAGE-1")
         before = deepcopy(inspection)
-        markdown, document, issues, _ = PublicationReleaseService.__new__(
-            PublicationReleaseService
-        )._render(inspection)
+        service = PublicationReleaseService.__new__(PublicationReleaseService)
+        service.dialects = PUBLICATION_DIALECTS
+        markdown, document, issues, _ = service._render(inspection)
         self.assertEqual(issues, [])
         self.assertEqual(inspection, before)
         text = markdown.decode("utf-8")
@@ -183,6 +184,7 @@ class FormalRenderingTests(unittest.TestCase):
 
     def test_numbering_source_order_and_references_use_formal_section_scope(self):
         service = PublicationReleaseService.__new__(PublicationReleaseService)
+        service.dialects = PUBLICATION_DIALECTS
         for group in ["G", "M"]:
             inspection = representative_inspection(group)
             markdown, docx, issues, checks = service._render(inspection)

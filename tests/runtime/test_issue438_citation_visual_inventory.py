@@ -225,6 +225,7 @@ class Issue438CitationVisualInventoryTests(unittest.TestCase):
 
     def test_ready_selected_citation_requires_matching_manuscript_source_and_locator(self):
         service = PublicationReleaseService.__new__(PublicationReleaseService)
+        service.dialects = {}
         inspection = {
             "source_package_document": {
                 "project": {"title": "Synthetic citation conformance test"},

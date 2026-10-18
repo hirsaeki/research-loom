@@ -16,6 +16,7 @@ from plugins.local_application import (
     LocalApplicationFacade,
     LocalResearchApplication,
 )
+from plugins.local_application.misco.publication_dialect import MISCO_PUBLICATION_DIALECT
 from plugins.local_application.publication.publication_exhibits import prepare_exhibits
 from tests.runtime.runtime_fixtures import project, rq, seed_state, source
 from tests.runtime.test_research_exhibits import NullResolver, profile_provider
@@ -229,7 +230,9 @@ class SourceBibliographyPublicationAblationTests(unittest.TestCase):
                 "publication_profile": {"profile_id": "misco.publication"},
             }
             self.assertEqual(
-                prepare_exhibits(inspection, workspace)[chart["exhibit_id"]]["code"],
+                prepare_exhibits(inspection, workspace, dialect=MISCO_PUBLICATION_DIALECT)[
+                    chart["exhibit_id"]
+                ]["code"],
                 "VISUAL_SOURCE_METADATA_REQUIRED",
             )
             src = next(o for o in objects if o["kind"] == "source")
@@ -241,7 +244,10 @@ class SourceBibliographyPublicationAblationTests(unittest.TestCase):
                 }
             )
             self.assertEqual(
-                prepare_exhibits(inspection, workspace)[chart["exhibit_id"]]["kind"], "image"
+                prepare_exhibits(inspection, workspace, dialect=MISCO_PUBLICATION_DIALECT)[
+                    chart["exhibit_id"]
+                ]["kind"],
+                "image",
             )
 
 
