@@ -23,6 +23,7 @@ When iterating, it is fine to run only the affected test modules, but run the fu
 ## Conventions
 
 - `core/` stays generic. It must not import `plugins/` and must not contain organization-specific (MISCO) logic. It must pass `mypy --strict`.
+- MISCO-specific behavior lives in `plugins/local_application/misco/`, behind an extension point such as `PublicationDialect`. Generic code must not branch on a MISCO id; `tests/contracts/test_misco_isolation.py` enforces this.
 - `plugins/_infra/` holds low-level helpers (file locks, atomic writes, SQLite PRAGMAs). It must not import other plugins and must pass `mypy --strict`.
 - Plugin packages must not import each other in a cycle (lazy imports count) or import another package's `_private` names; see the plugin layering in [`docs/architecture/monorepo-structure.md`](docs/architecture/monorepo-structure.md). `tests/contracts/test_plugin_layering.py` enforces this.
 - Import test helpers as `tests.runtime.*` / `tests.contracts.*`.

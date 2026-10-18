@@ -211,7 +211,7 @@ def _publication_policy(
     ):
         raise LocalApplicationError(
             "APPLICATION-PUBLICATION-PROFILE-001",
-            "explicit formal_spec_profile conflicts with the pinned MISCO Publication formal-spec resource",
+            "explicit formal_spec_profile conflicts with the pinned Publication formal-spec resource",
         )
     if (
         isinstance(explicit_url_profile, Mapping)
@@ -220,7 +220,7 @@ def _publication_policy(
     ):
         raise LocalApplicationError(
             "APPLICATION-PUBLICATION-PROFILE-001",
-            "explicit url_display_profile conflicts with the pinned MISCO Publication URL-display resource",
+            "explicit url_display_profile conflicts with the pinned Publication URL-display resource",
         )
     formal = explicit_formal if isinstance(explicit_formal, Mapping) else pinned_formal
     url_profile = (

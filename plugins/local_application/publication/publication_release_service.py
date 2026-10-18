@@ -493,7 +493,7 @@ class PublicationReleaseService(PublicationReleaseRequestMixin, PublicationRende
         ):
             raise LocalApplicationError(
                 "PUBLICATION-PDF-INPUT",
-                "PDF finalization requires a complete MISCO formal-report draft under the coverage Profile",
+                "PDF finalization requires a complete formal-report draft under a coverage Profile",
             )
         self._require_current_renderer(source_manifest)
         self._require_current_project_config(source)
