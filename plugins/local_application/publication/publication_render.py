@@ -126,16 +126,10 @@ class PublicationRenderMixin:
             )
         known_sections = {str(row["section_id"]) for row in sections}
         report = policy.get("formal_report")
-        formal_report = (
-            policy.get("document_mode") == "formal_report"
-            and isinstance(report, Mapping)
-            and policy.get("research_group_type") in {"G", "M"}
-        )
+        formal_report = dialect.formal_report_requested(policy)
         formal_outline = {}
         if formal_report:
-            from .publication_formal_report import outline
-
-            formal_outline = outline(
+            formal_outline = dialect.formal_outline(
                 report["structure"], [str(row["section_id"]) for row in sections]
             )
         heading_by_section: dict[str, str] = {}
@@ -593,10 +587,12 @@ class PublicationRenderMixin:
                 "generated DOCX failed native structure/content verification",
             )
         if formal_report:
-            from .publication_formal_report import assemble, inspect_formal
-
-            docx = assemble(docx, dict(report), policy["research_group_type"], layout)
-            failures = inspect_formal(docx, dict(report), policy["research_group_type"], layout)
+            docx = dialect.assemble_formal_report(
+                docx, dict(report), policy["research_group_type"], layout
+            )
+            failures = dialect.inspect_formal_report(
+                docx, dict(report), policy["research_group_type"], layout
+            )
             if failures:
                 raise LocalApplicationError("PUBLICATION-FORMAL-RENDER-001", "; ".join(failures))
             if len(markdown) + len(docx) > MAX_OUTPUT_BYTES:

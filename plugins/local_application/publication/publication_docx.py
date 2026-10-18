@@ -40,7 +40,7 @@ def _text(text: str) -> str:
     return escape(text.replace("\r\n", "\n").replace("\r", "\n"))
 
 
-def _paragraph(
+def paragraph_xml(
     text: str,
     role: str = "body",
     bookmark: tuple[int, str] | None = None,
@@ -103,7 +103,7 @@ def _table(
         for cell in row:
             result.append(
                 f'<w:tc><w:tcPr><w:tcW w:w="{width}" w:type="dxa"/></w:tcPr>'
-                + _paragraph(
+                + paragraph_xml(
                     cell, "header" if index == 0 else "cell", keep_with_next=keep_with_next
                 )
                 + "</w:tc>"
@@ -169,7 +169,7 @@ def docx_bytes(lines: list[tuple[str, Any]], layout: dict[str, Any] | None = Non
     for role, block in lines:
         if role != "exhibit":
             body.append(
-                _paragraph(
+                paragraph_xml(
                     block,
                     role,
                     first_line_indent_twips=int(layout.get("first_line_indent_twips", 0)),
@@ -180,7 +180,7 @@ def docx_bytes(lines: list[tuple[str, Any]], layout: dict[str, Any] | None = Non
             continue
         index += 1
         compact_legend = "legend_rows" in block and len(block["legend_rows"]) <= 8
-        caption = _paragraph(
+        caption = paragraph_xml(
             block["caption"],
             "caption",
             (index, _bookmark(block["ref"])),
@@ -192,19 +192,21 @@ def docx_bytes(lines: list[tuple[str, Any]], layout: dict[str, Any] | None = Non
         if block["kind"] == "table":
             body.append(caption)
             if block.get("source_text"):
-                body.append(_paragraph(block["source_text"], "source_caption", keep_with_next=True))
+                body.append(
+                    paragraph_xml(block["source_text"], "source_caption", keep_with_next=True)
+                )
             body.append(_table(block["rows"], content_width_twips))
             if block.get("explanatory_note"):
-                body.append(_paragraph(block["explanatory_note"], "source_caption"))
+                body.append(paragraph_xml(block["explanatory_note"], "source_caption"))
         elif block["kind"] == "image":
             body.append(_image(block, index, content_width_emu))
             if block.get("explanatory_note"):
                 body.append(
-                    _paragraph(block["explanatory_note"], "source_caption", keep_with_next=True)
+                    paragraph_xml(block["explanatory_note"], "source_caption", keep_with_next=True)
                 )
             body.append(caption)
             if block.get("source_text"):
-                body.append(_paragraph(block["source_text"], "source_caption"))
+                body.append(paragraph_xml(block["source_text"], "source_caption"))
             if "legend_rows" in block:
                 body.append(
                     _table(
@@ -220,12 +222,12 @@ def docx_bytes(lines: list[tuple[str, Any]], layout: dict[str, Any] | None = Non
             )
         else:
             body.append(
-                _paragraph(
+                paragraph_xml(
                     f"[Unavailable exhibit: {block['code']}. Preserve the source and supply a supported representation under a new identity.]"
                 )
             )
         if block.get("note"):
-            body.append(_paragraph(block["note"], "source_caption"))
+            body.append(paragraph_xml(block["note"], "source_caption"))
     header_margin = int(layout.get("header_margin_twips", 720))
     footer_margin = int(layout.get("footer_margin_twips", 720))
     grid = ""

@@ -11,7 +11,7 @@ from xml.etree import ElementTree as ET
 
 from plugins.application_errors import LocalApplicationError
 
-from .publication_docx import PKG, R, W, _paragraph
+from ..publication.publication_docx import PKG, R, W, paragraph_xml
 
 NS = {"w": W}
 V = "urn:schemas-microsoft-com:vml"
@@ -65,7 +65,7 @@ def outline(structure, section_ids):
 
 
 def _p(text, style="Normal"):
-    node = ET.fromstring(f'<root xmlns:w="{W}">' + _paragraph(text, "body") + "</root>")[0]
+    node = ET.fromstring(f'<root xmlns:w="{W}">' + paragraph_xml(text, "body") + "</root>")[0]
     node.find("w:pPr/w:pStyle", NS).set(f"{{{W}}}val", style)
     return node
 
