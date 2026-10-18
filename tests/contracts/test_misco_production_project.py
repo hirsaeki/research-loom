@@ -8,6 +8,7 @@ from pathlib import Path
 import rfc8785
 
 from plugins.local_application.workspace.profile_resolution import resolve_effective_profile_set
+from tests.contracts.test_misco_profile_migration_ledger import current_path
 
 ROOT = Path(__file__).resolve().parents[2]
 PROJECT_CONFIG = ROOT / "projects/misco-ai-2026/project-config.json"
@@ -109,7 +110,9 @@ class MiscoProductionProjectContractTests(unittest.TestCase):
         ]:
             self.assertNotIn(legacy_rq_id, PROJECT_CONFIG.read_text(encoding="utf-8"))
         for ref in config["resource_references"]:
-            source = ROOT / ref["locator"]
+            # The locator is a historical identifier inside the digest-pinned config; a legacy
+            # locator resolves to the archived copy that #499 kept (see the ledger test).
+            source = current_path(ref["locator"])
             self.assertTrue(source.is_file())
             self.assertEqual(
                 ref["digest"], "sha256:" + hashlib.sha256(source.read_bytes()).hexdigest()

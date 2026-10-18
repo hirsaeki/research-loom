@@ -1,0 +1,3 @@
+SOURCE_PACK_HUMAN_APPROVED
+
+Human Review Decision反映済み。新規Style Rule追加なし。Layer B/Cはruntime対象外。
