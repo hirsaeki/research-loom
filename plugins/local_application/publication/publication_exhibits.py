@@ -111,7 +111,7 @@ def _asset(
 
 def _visual_sources(exhibit, package, *, strict=False):
     """Follow existing research and Exhibit provenance, including represented Findings."""
-    from ..research_package.research_package_builder import required_object_refs
+    from ..research_package.research_package_contents import required_object_refs
 
     resolved = package["resolved_content"]
     objects = {o["id"]: o for o in resolved["research_objects"]}
@@ -302,7 +302,7 @@ def prepare_exhibits(inspection: Mapping[str, Any], workspace: Path) -> dict[str
                 unavailable_code = "VISUAL_SOURCE_METADATA_REQUIRED"
                 citation_sources = _visual_sources(exhibit, package, strict=misco)
                 source_ids = {o["id"] for o in citation_sources}
-                from ..research_package.research_package_builder import bibliography_readiness
+                from ..research_package.research_package_contents import bibliography_readiness
 
                 if misco and any(
                     not bibliography_readiness(o)[0]
@@ -348,7 +348,7 @@ def prepare_exhibits(inspection: Mapping[str, Any], workspace: Path) -> dict[str
                     and o.get("canonical_locator")
                     in {capture.get("source_locator"), *(capture.get("source_locators") or [])}
                 ]
-                from ..research_package.research_package_builder import bibliography_readiness
+                from ..research_package.research_package_contents import bibliography_readiness
 
                 if misco and (
                     len(citation_sources) != 1 or not bibliography_readiness(citation_sources[0])[0]

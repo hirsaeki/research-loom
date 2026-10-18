@@ -6,7 +6,7 @@ from plugins.local_application.publication.publication_exhibits import prepare_e
 from plugins.local_application.publication.publication_release_service import (
     PublicationReleaseService,
 )
-from plugins.local_application.research_package.research_package_builder import (
+from plugins.local_application.research_package.research_package_contents import (
     _research_inventories,
 )
 
