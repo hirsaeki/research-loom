@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 from collections.abc import Mapping
 
-from .store import LocalExecutionStoreIntegrityError
+from .store_model import LocalExecutionStoreIntegrityError
 from .verified_artifact_read import VerifiedArtifactReadMixin
 
 

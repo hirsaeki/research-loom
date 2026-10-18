@@ -6,7 +6,7 @@ from typing import Any
 
 from core.execution.models import ExecutionArtifactMetadata
 
-from .store import LocalExecutionStoreIntegrityError
+from .store_model import LocalExecutionStoreIntegrityError
 
 
 def diagnostics_for(

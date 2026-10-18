@@ -10,7 +10,7 @@ from plugins._infra.sqlite import apply_pragmas
 
 from .diagnosed_artifact_read import DiagnosedArtifactReadMixin
 from .retention import LocalExecutionStore as _RetentionLocalExecutionStore
-from .store import (
+from .store_model import (
     _MIGRATION_RE,
     LocalExecutionStoreConfig,
     LocalExecutionStoreError,
