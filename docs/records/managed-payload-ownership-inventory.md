@@ -1,5 +1,7 @@
 # Durable payload ownership and portable store tree
 
+> **Record (#504).** This is the #163 audit at its baseline. Its open gaps were resolved later; for current behavior see [optional durable health](../architecture/optional-durable-health.md), [Parent backup and restore](../architecture/parent-backup-restore.md), [the portable execution/material store](../architecture/portable-execution-material-store.md), [staged material import](../architecture/staged-material-import.md) and [Publication recovery](../architecture/publication-recovery.md).
+
 Issue #163 audits current production persistence against one repository-wide rule:
 
 > Every durable Loom payload must belong to one Loom-managed Parent Durable Store Root tree, and Loom must be able to resolve and verify that payload from durable metadata plus that tree without depending on an original intake path, scratch file, caller-owned temporary file, ordinary export projection, or former host absolute path.
