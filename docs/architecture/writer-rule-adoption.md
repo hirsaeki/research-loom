@@ -9,7 +9,7 @@ figures and audit examples are not distributed. The analysis artifact is
 identified by SHA-256 `9c4a4bcaac6b95cb043d4ae19f4812f6d2784932b8f9278e180cb6f5bf38aff8`;
 no private artifact is needed at runtime.
 
-`profiles/narrative/misco/profile.json` remains the immutable 1.1.0 selection.
+`profiles/narrative/misco/1.1.0/profile.json` remains the immutable 1.1.0 selection.
 Select `misco.writer` version `1.2.0` with manifest
 `profiles/narrative/misco/1.2.0/profile.json` through ordinary Profile resolution.
 No project configuration or existing Workspace is migrated. Existing input

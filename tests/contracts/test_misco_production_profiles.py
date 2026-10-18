@@ -21,13 +21,19 @@ from plugins.local_application.workspace.workspace import LocalWorkspaceError
 from tests.contracts.test_misco_profile_migration_ledger import current_path
 
 ROOT = Path(__file__).resolve().parents[2]
-WRITER_MANIFEST = ROOT / "profiles/narrative/misco/profile.json"
-PUBLICATION_MANIFEST = ROOT / "profiles/publication/misco/profile.json"
-WRITER_ASSET = ROOT / "profiles/narrative/misco/resources/writer-clean-rules.json"
-WRITER_SOURCE_ASSET = ROOT / "profiles/narrative/misco/resources/writer-clean-source-documents.json"
-PUBLICATION_ASSET = ROOT / "profiles/publication/misco/resources/publication-clean-rules.json"
-PUBLICATION_FORMAL_SPEC = ROOT / "profiles/publication/misco/resources/publication-formal-spec.json"
-PUBLICATION_URL_DISPLAY = ROOT / "profiles/publication/misco/resources/publication-url-display.json"
+WRITER_MANIFEST = ROOT / "profiles/narrative/misco/1.1.0/profile.json"
+PUBLICATION_MANIFEST = ROOT / "profiles/publication/misco/1.3.0/profile.json"
+WRITER_ASSET = ROOT / "profiles/narrative/misco/1.1.0/resources/writer-clean-rules.json"
+WRITER_SOURCE_ASSET = (
+    ROOT / "profiles/narrative/misco/1.1.0/resources/writer-clean-source-documents.json"
+)
+PUBLICATION_ASSET = ROOT / "profiles/publication/misco/1.3.0/resources/publication-clean-rules.json"
+PUBLICATION_FORMAL_SPEC = (
+    ROOT / "profiles/publication/misco/1.3.0/resources/publication-formal-spec.json"
+)
+PUBLICATION_URL_DISPLAY = (
+    ROOT / "profiles/publication/misco/1.3.0/resources/publication-url-display.json"
+)
 PROJECT_FIXTURE = ROOT / "projects/fixtures/valid/generic-project-config.json"
 RESEARCH_FIXTURE = (
     ROOT / "profiles/fixtures/research-quality/valid/generic-research-quality.profile.json"

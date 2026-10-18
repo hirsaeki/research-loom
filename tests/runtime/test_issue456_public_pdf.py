@@ -46,7 +46,7 @@ class PublicPdfTests(ResearchPackageAcceptanceSupport):
         )
         effective = resolve_effective_profile_set(
             config,
-            [writer_tests.WRITER_MANIFEST, ROOT / "profiles/publication/misco-v1.4/profile.json"],
+            [writer_tests.WRITER_MANIFEST, ROOT / "profiles/publication/misco/1.4.0/profile.json"],
         )
         cfg, eps = self.root / "config.json", self.root / "profiles.json"
         cfg.write_text(json.dumps(config), encoding="utf-8")
@@ -194,7 +194,7 @@ class PublicPdfTests(ResearchPackageAcceptanceSupport):
         request = {
             "profile_manifest_files": [
                 str(writer_tests.WRITER_MANIFEST),
-                str(ROOT / "profiles/publication/misco-v1.4/profile.json"),
+                str(ROOT / "profiles/publication/misco/1.4.0/profile.json"),
             ],
             "publication_metadata": {"research_group_type": "M"},
             "expected_project_config_digest": before["configuration_digest"],

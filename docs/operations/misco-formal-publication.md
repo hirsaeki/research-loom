@@ -5,7 +5,7 @@ without changing historical `1.3.0` pins, research packages or releases. Select
 the new manifest through the existing profile resolve/advance workflow. Its
 archive digest is
 `c5cc608e7a90499a46ed929b120c4a4e09111de00ebdecc57d8e3d20dd7d1439`.
-`profiles/publication/misco-v1.4/resources/publication-coverage.json` records
+`profiles/publication/misco/1.4.0/resources/publication-coverage.json` records
 source, original clause, applicability, force, consumer and verification.
 The reproducible Host test and page observations are in
 [misco-formal-validation.md](misco-formal-validation.md).

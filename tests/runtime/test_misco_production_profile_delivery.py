@@ -14,8 +14,8 @@ from plugins.local_application.workspace.profile_resolution import resolve_effec
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 ROOT = Path(__file__).resolve().parents[2]
-WRITER_MANIFEST = ROOT / "profiles/narrative/misco/profile.json"
-PUBLICATION_MANIFEST = ROOT / "profiles/publication/misco/profile.json"
+WRITER_MANIFEST = ROOT / "profiles/narrative/misco/1.1.0/profile.json"
+PUBLICATION_MANIFEST = ROOT / "profiles/publication/misco/1.3.0/profile.json"
 
 
 class MiscoProductionProfileDeliveryTests(ResearchPackageAcceptanceSupport):

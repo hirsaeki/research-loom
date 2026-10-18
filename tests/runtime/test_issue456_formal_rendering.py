@@ -27,7 +27,7 @@ def representative_inspection(group="G"):
     )
     if group == "M":
         report.pop("introduction")
-    profile_root = ROOT / "profiles/publication/misco-v1.4/resources"
+    profile_root = ROOT / "profiles/publication/misco/1.4.0/resources"
     formal = json.loads(
         (profile_root / "publication-formal-spec.json").read_text(encoding="utf-8")
     )["formal_spec_profile"]
