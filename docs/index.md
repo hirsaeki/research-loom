@@ -1,6 +1,14 @@
 # Documentation index
 
-Every document under `docs/` is reachable from this page; `tests/contracts/test_docs_links.py` checks that and that relative links resolve. Many `architecture/` documents began as the record of one PR or issue (#504 separates current specifications from those records).
+Every document under `docs/` is reachable from this page; `tests/contracts/test_docs_links.py` checks that and that relative links resolve.
+
+The directories separate current specifications from history (#504):
+
+- `architecture/` — current specifications and decisions. Many began with one PR or issue and still name it; the content is the current contract.
+- `operations/` — operating procedures.
+- `records/` — PR/issue records whose content later documents supersede. Kept unchanged as history.
+- `acceptance/` — acceptance and evidence records. `architecture/misco-integrated-acceptance.md` stays in place because tests and the migration closure cite its path.
+- `migration/` — the frozen #331 migration ledger, its closure, and the legacy archive.
 
 Start with the [repository README](../README.md), the [target monorepo structure](architecture/monorepo-structure.md), and the [contributor guide](../CONTRIBUTING.md).
 
@@ -16,7 +24,7 @@ Start with the [repository README](../README.md), the [target monorepo structure
 - [Research Lineage / Fork / Recovery convergence (PR19)](architecture/research-lineage-fork-recovery.md)
 - [Research Capability contract convergence](architecture/research-capability-convergence.md)
 - [Research Method Capability convergence](architecture/research-method-capability-convergence.md)
-- [Canonical Research Capability execution runtime](capability-execution-runtime.md)
+- [Canonical Research Capability execution runtime](architecture/capability-execution-runtime.md)
 - [Work Conversation / Research Coordinator convergence](architecture/work-conversation-convergence.md)
 - [Production Work Conversation / Research Coordinator runtime (PR25)](architecture/work-conversation-runtime.md)
 
@@ -37,7 +45,6 @@ Start with the [repository README](../README.md), the [target monorepo structure
 - [Production local workspace, application facade, and JSON CLI](architecture/production-local-workspace-application-cli.md)
 - [Production Human Decision Gate](architecture/production-human-decision-gate.md)
 - [Production research resume context](architecture/production-research-resume-context.md)
-- [Durable payload ownership and portable store tree](architecture/managed-payload-ownership-inventory.md)
 - [Portable execution/material child Durable Store Root](architecture/portable-execution-material-store.md)
 - [Optional durable child health and local degradation](architecture/optional-durable-health.md)
 - [Quiesced Parent backup and restore](architecture/parent-backup-restore.md)
@@ -57,7 +64,7 @@ Start with the [repository README](../README.md), the [target monorepo structure
 
 - [Desktop Research capability convergence](architecture/desktop-research-capability-convergence.md)
 - [Production Desktop Research (PR24)](architecture/production-desktop-research.md)
-- [Desktop Research retention edge cases](desktop-research-retention.md)
+- [Desktop Research retention edge cases](architecture/desktop-research-retention.md)
 - [External Desktop Research submission assembly and preflight](architecture/external-desktop-research-submission-preflight.md)
 - [External material exact-content read and export](architecture/external-material-content-read.md)
 - [Staged verified material import](architecture/staged-material-import.md)
@@ -100,6 +107,10 @@ Start with the [repository README](../README.md), the [target monorepo structure
 - [MISCO formal Publication (Issue #456)](operations/misco-formal-publication.md)
 - [Issue #456 implementation validation](operations/misco-formal-validation.md)
 
+## Change records
+
+- [#163 durable payload ownership audit](records/managed-payload-ownership-inventory.md) — superseded by the Workspace and persistence specifications above
+
 ## Migration records
 
 - [MISCO legacy Profile migration ledger](migration/misco-profile-migration-ledger.md)
@@ -108,7 +119,7 @@ Start with the [repository README](../README.md), the [target monorepo structure
 ## Acceptance records
 
 - [MISCO integrated acceptance and migration closure](architecture/misco-integrated-acceptance.md)
-- [Research Package acceptance evidence (Issue #77)](architecture/research-package-acceptance.md)
+- [Research Package acceptance evidence (Issue #77)](acceptance/research-package-acceptance.md)
 - [Late visual live acceptance (#409)](acceptance/late-visual-live-uat.md)
 - [Writer reader-quality trial and evaluation preparation](acceptance/writer-reader-quality/README.md)
 - [#466 現稿レビューの対象一致と部分改稿](acceptance/writer-document-review/README.md)

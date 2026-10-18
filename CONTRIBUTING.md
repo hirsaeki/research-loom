@@ -55,7 +55,7 @@ See [`docs/architecture/monorepo-structure.md`](docs/architecture/monorepo-struc
 
 ## Documentation
 
-- Link every new document under `docs/` from [`docs/index.md`](docs/index.md). `tests/contracts/test_docs_links.py` fails when a document is unreachable from the index, or when a relative link or heading anchor in a tracked Markdown file does not resolve.
+- Put current specifications in `docs/architecture/`, procedures in `docs/operations/`, superseded PR/issue records in `docs/records/`, and acceptance evidence in `docs/acceptance/`. Link every new document under `docs/` from [`docs/index.md`](docs/index.md). `tests/contracts/test_docs_links.py` fails when a document is unreachable from the index, or when a relative link or heading anchor in a tracked Markdown file does not resolve.
 
 ## Pull requests
 

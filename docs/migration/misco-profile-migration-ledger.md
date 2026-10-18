@@ -4,6 +4,8 @@ Status: **Issue #331 design inventory**
 Baseline: `main@1ea6ad38fcf09eab24e44aa7e5bb4b6afec90578` (2026-09-28)
 Machine-readable ledger: [`misco-profile-migration-ledger/index.json`](misco-profile-migration-ledger/index.json)
 
+> **Frozen snapshot (#504).** This ledger records the state at the #331 baseline and is not updated. Its §4 "today" matrix describes that baseline, not the current system; for the final disposition of every migration class see [`misco-profile-migration-closure.json`](misco-profile-migration-closure.json) and the [integrated acceptance record](../architecture/misco-integrated-acceptance.md).
+
 This ledger fixes the migration boundary for #332–#337. It does **not** change runtime behavior and is not evidence that migration is complete.
 
 ## 1. Inventory result
