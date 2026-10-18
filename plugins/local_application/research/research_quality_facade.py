@@ -6,10 +6,10 @@ from typing import Any
 
 from plugins.application_errors import LocalApplicationError
 
-from .research_quality_evaluation import (
+from .research_quality_evaluation import evaluate
+from .research_quality_support import (
     ResearchQualityEvaluationError,
     basis_refs,
-    evaluate,
     normalize_input,
 )
 
