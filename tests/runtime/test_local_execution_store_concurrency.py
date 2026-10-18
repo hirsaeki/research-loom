@@ -203,7 +203,7 @@ class LocalExecutionStoreConcurrencySecurityTests(unittest.TestCase):
 
             try:
                 with patch(
-                    "plugins.local_execution_store.store.os.open",
+                    "plugins.local_execution_store.store_files.os.open",
                     side_effect=racing_open,
                 ) as mocked_open:
                     with patch.object(
