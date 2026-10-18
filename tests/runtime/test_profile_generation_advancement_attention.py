@@ -8,7 +8,9 @@ from unittest import mock
 import tests.runtime.test_external_desktop_research_intake as intake
 from core.conversation import ConversationRuntimeError
 from plugins.local_application import LocalApplicationFacade
-from plugins.local_application.workspace.application import EffectiveResearchAttentionProvider
+from plugins.local_application.workspace.research_attention_handlers import (
+    EffectiveResearchAttentionProvider,
+)
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 from tests.runtime.test_profile_generation_advancement import (
     GENERIC_NARRATIVE,
