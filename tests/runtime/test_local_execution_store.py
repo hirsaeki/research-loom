@@ -546,7 +546,7 @@ class LocalExecutionStoreTests(unittest.TestCase):
                 )
             )
             with patch(
-                "plugins.local_execution_store.store.os.link",
+                "plugins.local_execution_store.store_files.os.link",
                 side_effect=OSError("simulated atomic link failure"),
             ):
                 with self.assertRaises(OSError):
