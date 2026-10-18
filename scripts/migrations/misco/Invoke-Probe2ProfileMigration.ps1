@@ -463,9 +463,9 @@ try {
         Write-JsonFile -Path (Join-Path $targetDir 'project-config.json') -Value $currentGenerationBefore.project_config
         Write-JsonFile -Path (Join-Path $targetDir 'effective-profile-set.json') -Value $currentGenerationBefore.effective_profile_set
         $manifestFiles = @(
-            (Join-Path $repoRoot 'profiles\research\misco-workspace-continuity\profile.json'),
-            (Join-Path $repoRoot 'profiles\narrative\misco\profile.json'),
-            (Join-Path $repoRoot 'profiles\publication\misco\profile.json')
+            (Join-Path $repoRoot 'profiles\research\misco-workspace-continuity\1.0.0\profile.json'),
+            (Join-Path $repoRoot 'profiles\narrative\misco\1.1.0\profile.json'),
+            (Join-Path $repoRoot 'profiles\publication\misco\1.3.0\profile.json')
         )
         $resolution = [pscustomobject][ordered]@{
             schema_version = '0.1.0'

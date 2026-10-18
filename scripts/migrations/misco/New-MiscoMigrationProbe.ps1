@@ -501,8 +501,8 @@ try {
     Assert-Equal -Name 'historical Research Package retains 1.2.0 Profile pins' -Expected $script:ExpectedSourceProfiles -Actual (Get-PackageProfileKeys $before.Package.Value.package.effective_profile_set)
 
     $manifestFiles = @(
-        (Join-Path $repoRoot 'profiles\narrative\misco\profile.json'),
-        (Join-Path $repoRoot 'profiles\publication\misco\profile.json')
+        (Join-Path $repoRoot 'profiles\narrative\misco\1.1.0\profile.json'),
+        (Join-Path $repoRoot 'profiles\publication\misco\1.3.0\profile.json')
     )
     $targetRoot = Join-Path $script:EvidenceRoot 'target-generation'
     $currentArchivedBefore = @(
