@@ -1267,7 +1267,7 @@ class Issue80WriterCompositionTests(ResearchPackageAcceptanceSupport):
         with self.__class__._reopen(self.workspace) as reopened:
             before = set(self.root.glob(".section-input-*"))
             with patch(
-                "plugins.local_application.writer.writer_composition_service.verify_section_input_root",
+                "plugins.local_application.writer.writer_section_input.verify_section_input_root",
                 side_effect=LocalApplicationError(
                     "APPLICATION-WRITER-COMPOSITION-INTEGRITY-001", "fixture"
                 ),
@@ -1412,7 +1412,7 @@ class Issue80WriterCompositionTests(ResearchPackageAcceptanceSupport):
             self.assertEqual((existing / "keep").read_text(), "keep")
             failed = self.root / "failed"
             with patch(
-                "plugins.local_application.writer.writer_composition_service.os.replace",
+                "plugins.local_application.writer.writer_section_input.os.replace",
                 side_effect=OSError("fixture"),
             ):
                 with self.assertRaises(LocalApplicationError):
@@ -1431,7 +1431,7 @@ class Issue80WriterCompositionTests(ResearchPackageAcceptanceSupport):
                     selection_bound.exception.code, "APPLICATION-WRITER-COMPOSITION-BOUND-001"
                 )
             with patch(
-                "plugins.local_application.writer.writer_composition_service.MAX_SECTION_INPUT_BYTES",
+                "plugins.local_application.writer.writer_section_input.MAX_SECTION_INPUT_BYTES",
                 1,
             ):
                 with self.assertRaises(LocalApplicationError) as output_bound:

@@ -14,7 +14,7 @@ import tests.runtime.issue80_writer_composition_suite as writer_comp
 import tests.runtime.test_external_desktop_research_intake as intake
 from plugins.local_application import LocalApplicationError
 from plugins.local_application.workspace.profile_resolution import resolve_effective_profile_set
-from plugins.local_application.writer.writer_composition_service import _writer_profile_delivery
+from plugins.local_application.writer.writer_composition_support import _writer_profile_delivery
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 ROOT = Path(__file__).resolve().parents[2]
