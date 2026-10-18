@@ -16,7 +16,7 @@ Through the production CLI (below) and its application facade a host can:
 
 Late needs found while writing or publishing (a missing figure, a missing warrant) return to research instead of being patched in prose.
 
-The canonical code lives in `core/`, `profiles/`, `plugins/`, `skills/` and `projects/` (see [Target areas](#target-areas)). The legacy `research-harness/` and `research-profile/` trees are migration and reference material only, are not runtime authority, and are scheduled for removal (#500); do not add new concepts to them.
+The canonical code lives in `core/`, `profiles/`, `plugins/`, `skills/` and `projects/` (see [Target areas](#target-areas)). The legacy `research-harness/` and `research-profile/` trees were removed in #500; the `legacy-archive-2026` tag keeps them, and `docs/migration/misco-legacy-sources/` keeps the files the migration ledger pins.
 
 For a human-facing research session driven by Codex or ChatGPT Work, explicitly load [`skills/research-conversation/SKILL.md`](skills/research-conversation/SKILL.md). The repository does not assume either host automatically discovers this skill, and repository development/review tasks should not be routed through it.
 
@@ -24,7 +24,7 @@ For Work deployment, see [runtime readiness, durable continuation and file deliv
 
 ## Production CLI
 
-Research Loom requires Python 3.12+ and `uv`. Root `pyproject.toml` and `uv.lock` are the single repository/application dependency contract. (The legacy `research-harness/` keeps its own manifest for reference only; nothing installs it.)
+Research Loom requires Python 3.12+ and `uv`. Root `pyproject.toml` and `uv.lock` are the single repository/application dependency contract.
 
 For normal harness/host runtime use, provision the root project environment first with `uv sync --frozen` outside the host sandbox, then invoke the repository launcher from the repository root. Runtime launchers execute the pre-synced root `.venv` directly; they do not invoke `uv`, mutate dependencies, or depend on the persistent uv cache.
 

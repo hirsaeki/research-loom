@@ -41,7 +41,7 @@ namespace = true
 target-version = "py312"
 line-length = 100
 # Legacy reference trees are frozen pending removal (#500).
-extend-exclude = ["research-harness", "research-profile"]
+extend-exclude = ["docs/migration/misco-legacy-sources"]
 
 [tool.ruff.lint]
 select = ["E", "W", "F", "I", "UP", "B"]

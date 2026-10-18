@@ -64,7 +64,7 @@ The `contract-checks` GitHub Actions workflow runs these checks. This is intenti
 
 PR 4 still does not:
 
-- modify or delete `research-harness/` or `research-profile/`;
+- modify or delete `research-harness/` or `research-profile/` (these trees were later removed in #500; see the `legacy-archive-2026` tag);
 - create a concrete MISCO Profile;
 - canonicalize concrete research/source-quality policy;
 - define Project Config or CLI override precedence;

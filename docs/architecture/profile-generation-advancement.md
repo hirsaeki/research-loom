@@ -29,7 +29,7 @@ Probe2 also pins the pre-PR82 bytes of `fixture.research-strict@1.1.0`, where `e
 
 ## Legacy publication-writer responsibility mapping
 
-`research-profile/` remains a migration source. Issue #128 only maps the responsibilities needed to understand the A2 transition; it does not migrate the full Human-approved source pack.
+`research-profile/` was a migration source; it was removed in #500 (tag `legacy-archive-2026`). Issue #128 only maps the responsibilities needed to understand the A2 transition; it does not migrate the full Human-approved source pack.
 
 | Legacy source | Current responsibility / convergence status | Issue #128 treatment |
 | --- | --- | --- |

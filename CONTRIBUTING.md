@@ -44,7 +44,7 @@ See [`docs/architecture/monorepo-structure.md`](docs/architecture/monorepo-struc
 
 - `core/` must not import `plugins/`, profiles, projects, or the legacy trees, and must not encode organization-specific (e.g. MISCO) behavior.
 - Organization-specific policy belongs in declarative profiles; imperative extensions belong in `plugins/`.
-- Do not add new concepts to the legacy `research-harness/` or `research-profile/` trees. They are reference material scheduled for removal (#499, #500).
+- The legacy `research-harness/` and `research-profile/` trees were removed in #500 (tag `legacy-archive-2026`). Do not edit `docs/migration/misco-legacy-sources/`, which keeps the ledger-pinned legacy files byte for byte (#499).
 
 ## Pull requests
 
