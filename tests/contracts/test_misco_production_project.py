@@ -8,6 +8,7 @@ from pathlib import Path
 import rfc8785
 
 from plugins.local_application.workspace.profile_resolution import resolve_effective_profile_set
+from scripts import regenerate_project_eps
 from tests.contracts.test_misco_profile_migration_ledger import current_path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -38,6 +39,22 @@ class MiscoProductionProjectContractTests(unittest.TestCase):
         )
         self.assertFalse(
             any(str(x["profile_id"]).startswith("fixture.") for x in actual["effective_profiles"])
+        )
+
+    def test_checked_in_effective_profile_set_is_the_exact_regenerated_bytes(self):
+        # #503: the EPS is a generated projection kept for init; it must be byte-exact.
+        self.assertEqual(
+            regenerate_project_eps.committed(),
+            regenerate_project_eps.build(),
+            "run: uv run --frozen python scripts/regenerate_project_eps.py",
+        )
+        self.assertEqual(
+            (PROJECT_CONFIG, PROJECT_EPS, (WRITER, PUBLICATION)),
+            (
+                regenerate_project_eps.PROJECT_CONFIG,
+                regenerate_project_eps.PROJECT_EPS,
+                regenerate_project_eps.PROFILE_MANIFESTS,
+            ),
         )
 
     def test_continuity_profile_is_migration_only_and_does_not_import_research_policy(self):

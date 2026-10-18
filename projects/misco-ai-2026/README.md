@@ -27,6 +27,9 @@ is no invented MISCO Research/Organization Profile.
 - `profiles/narrative/misco/profile.json`
 - `profiles/publication/misco/profile.json`
 
+Rebuild it with `uv run --frozen python scripts/regenerate_project_eps.py`; `--check` fails when
+the committed bytes differ from a fresh resolution.
+
 A fresh workspace can therefore be initialized through the normal public CLI:
 
 ```text
