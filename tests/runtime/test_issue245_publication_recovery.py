@@ -11,8 +11,8 @@ from plugins.local_application import LocalApplicationError, LocalApplicationFac
 from plugins.local_application.cli import main
 from plugins.local_application.publication.publication_release_service import (
     PublicationReleaseService,
-    _json_bytes,
 )
+from plugins.local_application.publication.publication_release_support import _json_bytes
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 CI_WINDOWS = True

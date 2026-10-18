@@ -15,8 +15,7 @@ import tests.runtime.issue80_writer_composition_suite as composition_support
 import tests.runtime.test_issue219_writer_round_trip as writer
 import tests.runtime.test_research_exhibits as exhibits
 from plugins.local_application import LocalApplicationError
-from plugins.local_application.publication import publication_exhibits
-from plugins.local_application.publication import publication_release_service as publication
+from plugins.local_application.publication import publication_exhibits, publication_release_support
 from plugins.local_application.publication.publication_docx import (
     A,
     W,
@@ -256,7 +255,7 @@ class Issue256NativePublicationTests(ResearchPackageAcceptanceSupport):
         self.assertEqual(built["build"]["verification"]["render_verification"], "failed")
         self.assertIn("UNSUPPORTED_EXHIBIT", shown["preview_markdown"])
         self.assertTrue(
-            publication._verify_docx_bytes(payload)
+            publication_release_support._verify_docx_bytes(payload)
         )  # opens structurally, not a verified graph
         with self.assertRaises(LocalApplicationError):
             facade.request_publication_release(built["build"]["build_id"], "human-256")
@@ -480,7 +479,7 @@ class Issue256NativePublicationTests(ResearchPackageAcceptanceSupport):
             with zipfile.ZipFile(output, "w") as archive:
                 for name, payload in parts.items():
                     archive.writestr(name, payload)
-            self.assertTrue(publication._verify_docx_bytes(output.getvalue()))
+            self.assertTrue(publication_release_support._verify_docx_bytes(output.getvalue()))
             self.assertFalse(verify_native_docx(output.getvalue(), lines), change)
 
     def test_renderer_generation_rebuild_preserves_immutable_release_and_requires_new_approval(
@@ -493,7 +492,7 @@ class Issue256NativePublicationTests(ResearchPackageAcceptanceSupport):
         ]
         approved = facade.release_publication(built["build"]["build_id"], self._approval(request))
         with patch.dict(
-            publication._RENDERER,
+            publication_release_support._RENDERER,
             {"renderer_version": "0.2.1", "tool_digest": "sha256:" + "a" * 64},
         ):
             changed, _, _ = self._build(facade, case)

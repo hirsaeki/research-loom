@@ -19,7 +19,7 @@ from plugins.local_application.publication.publication_formal_report import (
     outline,
 )
 from plugins.local_application.publication.publication_pdf import coverage_review, inspect_pdf
-from plugins.local_application.publication.publication_release_service import (
+from plugins.local_application.publication.publication_release_support import (
     _validate_publication_inputs,
 )
 from plugins.local_application.workspace.profile_advancement import _validate_target_project_delta

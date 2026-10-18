@@ -194,9 +194,16 @@ class GeneratedPublicationTests(ResearchPackageAcceptanceSupport):
                 "provenance": original[eid]["provenance"],
             }
         }
-        with patch(
-            "plugins.local_application.publication.publication_release_service.prepare_exhibits",
-            return_value=removed,
+        # build_preview and the renderer both prepare exhibits; patch each lookup.
+        with (
+            patch(
+                "plugins.local_application.publication.publication_release_service.prepare_exhibits",
+                return_value=removed,
+            ),
+            patch(
+                "plugins.local_application.publication.publication_render.prepare_exhibits",
+                return_value=removed,
+            ),
         ):
             absent = facade.build_publication_preview(cid)
         self.assertEqual(absent["build"]["verification"]["render_verification"], "failed")
@@ -291,7 +298,7 @@ class ChartNativeLegendTests(unittest.TestCase):
 
 class VisualPermissionTests(unittest.TestCase):
     def test_misco_interview_permission_requires_disclosure_and_original_review(self):
-        from plugins.local_application.publication.publication_release_service import (
+        from plugins.local_application.publication.publication_release_support import (
             _publication_policy,
         )
 
