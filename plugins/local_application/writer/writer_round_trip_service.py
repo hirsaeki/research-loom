@@ -22,7 +22,7 @@ from plugins.application_errors import LocalApplicationError
 from plugins.local_durable_store import register_optional_path, require_optional_available
 
 from ..research_package.research_package_format import safe_component
-from .writer_composition_service import _digest_document, _object_index, _package_ref_sets
+from .writer_composition_support import _digest_document, _object_index, _package_ref_sets
 
 SCHEMA_VERSION = "0.1.0"
 MAX_SECTIONS = 64
