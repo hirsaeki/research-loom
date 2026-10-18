@@ -22,10 +22,10 @@ from plugins.local_application import LocalApplicationFacade, LocalWorkspace
 from plugins.local_application.cli import main as cli_main
 from plugins.local_application.workspace.profile_advancement import _ADVANCEMENT_NOTE
 from plugins.local_application.workspace.profile_resolution import (
-    _sha256,
     effective_profile_digest,
     resolve_effective_profile_set,
 )
+from plugins.local_application.workspace.profile_resolution_support import _sha256
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 from tests.runtime.runtime_fixtures import make_request
 from tests.runtime.test_profile_constraint_enforcement import _evidence, _source
@@ -402,10 +402,11 @@ class ProfileGenerationAdvancementTests(ResearchPackageAcceptanceSupport):
         marker_path.unlink()
 
     def test_kody_profile_resolver_bounds_inputs_and_prunes_incompatible_branches(self):
-        from plugins.local_application.workspace import profile_resolution as resolution
+        from plugins.local_application.workspace import profile_resolution_support as support
+        from plugins.local_application.workspace import profile_selection as resolution
 
         over_limit = self._resolve_request(
-            manifests=[str(PUBLICATION)] * (resolution.MAX_PROFILE_MANIFESTS + 1)
+            manifests=[str(PUBLICATION)] * (support.MAX_PROFILE_MANIFESTS + 1)
         )
         over_limit_path = self.root / "over-limit.json"
         over_limit_path.write_text(json.dumps(over_limit), encoding="utf-8")
