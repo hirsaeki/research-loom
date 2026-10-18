@@ -158,8 +158,8 @@ jobs:
         shell: pwsh
         run: |
           foreach ($path in @(
-            'projects/misco-ai-2026/Invoke-Probe2ProfileMigration.ps1',
-            'projects/misco-ai-2026/New-MiscoMigrationProbe.ps1'
+            'scripts/migrations/misco/Invoke-Probe2ProfileMigration.ps1',
+            'scripts/migrations/misco/New-MiscoMigrationProbe.ps1'
           )) {
             $tokens = $null
             $errors = $null
@@ -178,7 +178,7 @@ jobs:
         run: |
           $head = (git rev-parse HEAD).Trim()
           $workspace = Join-Path (Split-Path $env:GITHUB_WORKSPACE -Parent) 'loom-workspaces\probes\misco-profile-migration'
-          .\projects\misco-ai-2026\New-MiscoMigrationProbe.ps1 -ExpectedHead $head -Workspace $workspace
+          .\scripts\migrations\misco\New-MiscoMigrationProbe.ps1 -ExpectedHead $head -Workspace $workspace
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          .\projects\misco-ai-2026\New-MiscoMigrationProbe.ps1 -ExpectedHead $head -Workspace $workspace
+          .\scripts\migrations\misco\New-MiscoMigrationProbe.ps1 -ExpectedHead $head -Workspace $workspace
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

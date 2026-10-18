@@ -104,7 +104,7 @@ The replacement live migration acceptance is therefore a **durable real local
 Workspace** under an operator-controlled non-TEMP path. Run:
 
 ```powershell
-.\projects\misco-ai-2026\New-MiscoMigrationProbe.ps1 `
+.\scripts\migrations\misco\New-MiscoMigrationProbe.ps1 `
   -ExpectedHead <40-character-main-HEAD> `
   -Workspace D:\wsroot\scratch\loom-workspaces\probes\misco-profile-migration
 ```
