@@ -18,6 +18,7 @@ from plugins.local_application import LocalWorkspace
 from plugins.local_application.research_package.research_package_format import profile_resources
 from plugins.local_application.workspace.profile_resolution import resolve_effective_profile_set
 from plugins.local_application.workspace.workspace import LocalWorkspaceError
+from tests.contracts.test_misco_profile_migration_ledger import current_path
 
 ROOT = Path(__file__).resolve().parents[2]
 WRITER_MANIFEST = ROOT / "profiles/narrative/misco/profile.json"
@@ -122,7 +123,7 @@ class MiscoProductionProfileTests(unittest.TestCase):
         for item in writer["items"] + publication["items"]:
             self.assertTrue(item["approval"], item["id"])
             self.assertTrue(item["migration"]["responsibility"], item["id"])
-            self.assertTrue((ROOT / item["source"]["path"]).is_file(), item["id"])
+            self.assertTrue(current_path(item["source"]["path"]).is_file(), item["id"])
         self.assertTrue(
             all(
                 "Layer_B" not in item["source"]["path"] and "Layer_C" not in item["source"]["path"]
@@ -147,7 +148,7 @@ class MiscoProductionProfileTests(unittest.TestCase):
             self.assertEqual(
                 set(row["writer_rule_ids"]), expected_writer_ids_by_source[source_path]
             )
-            raw = (ROOT / source_path).read_bytes().replace(b"\r\n", b"\n")
+            raw = current_path(source_path).read_bytes().replace(b"\r\n", b"\n")
             self.assertEqual(row["content"].encode("utf-8"), raw)
             self.assertEqual(row["byte_length"], len(raw))
             self.assertEqual(row["sha256"], hashlib.sha256(raw).hexdigest())

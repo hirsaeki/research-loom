@@ -6,10 +6,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 LEDGER = ROOT / "docs/migration/misco-profile-migration-ledger"
-PACK = (
-    ROOT
-    / "research-profile/publication/authority/MISCO_Publication_Clean_Source_Pack_v1.0.2_HUMAN_APPROVED"
-)
+# #499 keeps a byte-identical copy of every legacy file the ledger pins, under the
+# legacy path, so the legacy trees can be deleted without losing this evidence.
+LEGACY_ARCHIVE = "docs/migration/misco-legacy-sources"
+LEGACY_TREES = ("research-profile/", "research-harness/")
+PACK_PATH = "research-profile/publication/authority/MISCO_Publication_Clean_Source_Pack_v1.0.2_HUMAN_APPROVED"
 # The ledger is frozen at its #331 baseline commit, so its paths stay as they were then.
 # Historical rows whose file later moved are looked up at the file's current location.
 RELOCATED = {
@@ -18,6 +19,16 @@ RELOCATED = {
         "plugins/local_application/workspace/profile_resolution.py"
     ),
 }
+
+
+def current_path(recorded: str) -> Path:
+    """Where a path the ledger recorded lives now."""
+    if recorded.startswith(LEGACY_TREES):
+        return ROOT / LEGACY_ARCHIVE / recorded
+    return ROOT / RELOCATED.get(recorded, recorded)
+
+
+PACK = current_path(PACK_PATH)
 
 
 def load(name):
@@ -84,7 +95,7 @@ class MiscoProfileMigrationLedgerTests(unittest.TestCase):
             seen.add(row["path"])
             if row["path"] in RELOCATED:
                 self.assertIn(row["role"], historical_roles, row["path"])
-            path = ROOT / RELOCATED.get(row["path"], row["path"])
+            path = current_path(row["path"])
             self.assertTrue(path.is_file(), row["path"])
             if row["role"] in historical_roles:
                 # #331 pinned the then-current implementation as migration evidence.
@@ -97,7 +108,8 @@ class MiscoProfileMigrationLedgerTests(unittest.TestCase):
 
     def test_source_pack_inventory_is_complete(self):
         recorded = {x["path"] for x in source_rows(self.index)}
-        actual = {p.relative_to(ROOT).as_posix() for p in PACK.rglob("*") if p.is_file()}
+        archive = ROOT / LEGACY_ARCHIVE
+        actual = {p.relative_to(archive).as_posix() for p in PACK.rglob("*") if p.is_file()}
         self.assertTrue(actual)
         self.assertEqual(actual - recorded, set())
 
