@@ -97,7 +97,7 @@ class PublicationReviewTests(ResearchPackageAcceptanceSupport):
         self.assertNotEqual(new["request_id"], request["request_id"])
 
     def test_exact_legacy_nonce_request_path_recovers_without_scanning_history(self):
-        from plugins.local_application.publication.publication_release_service import (
+        from plugins.local_application.publication.publication_release_support import (
             _digest,
             _json_bytes,
         )

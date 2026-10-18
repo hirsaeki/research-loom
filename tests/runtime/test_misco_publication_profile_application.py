@@ -14,7 +14,7 @@ import tests.runtime.test_external_desktop_research_intake as intake
 from plugins.local_application import LocalApplicationError
 from plugins.local_application.publication.publication_docx import WP, W, docx_bytes
 from plugins.local_application.publication.publication_input import inspect_inputs
-from plugins.local_application.publication.publication_release_service import _publication_policy
+from plugins.local_application.publication.publication_release_support import _publication_policy
 from plugins.local_application.workspace.profile_resolution import resolve_effective_profile_set
 from tests.runtime.test_misco_writer_profile_application import (
     WRITER_MANIFEST,

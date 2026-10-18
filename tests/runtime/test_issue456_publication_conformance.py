@@ -12,7 +12,7 @@ import tests.runtime.test_external_desktop_research_intake as intake
 import tests.runtime.test_misco_publication_profile_application as publication_tests
 from plugins.local_application import LocalApplicationError
 from plugins.local_application.publication.publication_docx import W, docx_bytes, verify_native_docx
-from plugins.local_application.publication.publication_release_service import (
+from plugins.local_application.publication.publication_release_support import (
     _editorial_status,
     _publication_policy,
 )
