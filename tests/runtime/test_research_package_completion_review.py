@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import tests.runtime.survey_virtual_runner_test_support as vr
 import tests.runtime.test_research_exhibits as exhibits
 from plugins.local_application import LocalApplicationError
-from plugins.local_application.research_package.research_package_builder import (
+from plugins.local_application.research_package.research_package_contents import (
     _collect_exhibit_modes,
 )
 from plugins.local_application.research_package.research_package_format import (
