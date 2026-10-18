@@ -9,7 +9,7 @@ from core.conversation import ConversationRuntimeError
 from core.runtime import canonical_digest
 from plugins.local_application import LocalApplicationFacade, LocalResearchApplication
 from plugins.local_application.facade import LocalApplicationError
-from plugins.local_application.research.conversation_view import candidate_summary
+from plugins.local_application.research.conversation_view_summaries import candidate_summary
 from plugins.local_application.research_package.research_chart import quantitative_input
 from tests.runtime.runtime_fixtures import evidence, project, rq, seed_state, source
 from tests.runtime.test_research_exhibits import NullResolver, profile_provider

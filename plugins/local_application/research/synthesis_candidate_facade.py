@@ -19,12 +19,7 @@ from plugins.local_decision_store.resume import decision_request_for_project
 from .argument_facade import research_argument_proposal_payload
 from .candidate_projection import build_candidate_projection
 from .conversation_view import (
-    ConversationViewError,
-    normalize_view,
-    project_action_result,
     project_collect,
-    project_confirmation_result,
-    project_decision_result,
     project_replay,
     project_resume,
     project_run,
@@ -32,6 +27,13 @@ from .conversation_view import (
     project_synthesis_list,
     project_synthesis_show,
     projection_unavailable,
+)
+from .conversation_view_summaries import (
+    ConversationViewError,
+    normalize_view,
+    project_action_result,
+    project_confirmation_result,
+    project_decision_result,
 )
 from .recommendation_facade import (
     research_recommendation_proposal_payload,
