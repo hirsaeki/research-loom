@@ -101,7 +101,7 @@ This is deliberately smaller than the legacy Harness policy surface. The aim of 
 
 PR 3 does not:
 
-- modify or remove files under `research-harness/` or `research-profile/`;
+- modify or remove files under `research-harness/` or `research-profile/` (these trees were later removed in #500; see the `legacy-archive-2026` tag);
 - create Pydantic/SQLModel models or migrate runtime callers;
 - define SQLite tables, migrations, indexes, or OneDrive behavior;
 - create concrete Research/Organization/Narrative/Publication profiles;

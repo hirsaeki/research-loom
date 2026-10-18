@@ -26,7 +26,7 @@ There is deliberately no empty MISCO Research or Organization Profile. The #331 
 
 `research/misco-workspace-continuity/profile.json` is the one exception in shape but not in policy: it is a **migration-only continuity Profile**, not a fresh-project MISCO Research Profile. It carries only the `CORE-TRACE-001` exact-locator strengthening that an older fixture-bound Workspace already had, so Profile advancement does not weaken Core while removing synthetic Writer/Publication Profiles. Fresh MISCO projects do not select it, and it contains no methodology, source-quality, threshold, or method-choice defaults.
 
-The legacy `research-profile/` tree remains migration/reference material. Production resolution must not read it to recover rule text.
+The legacy `research-profile/` tree was removed in #500 (tag `legacy-archive-2026`); `docs/migration/misco-legacy-sources/` keeps the files the migration ledger pins. Production resolution must not read that archive to recover rule text.
 
 ## Resource delivery
 

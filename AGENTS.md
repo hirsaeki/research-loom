@@ -28,7 +28,7 @@ When iterating, it is fine to run only the affected test modules, but run the fu
 - Plugin packages must not import each other in a cycle (lazy imports count) or import another package's `_private` names; see the plugin layering in [`docs/architecture/monorepo-structure.md`](docs/architecture/monorepo-structure.md). `tests/contracts/test_plugin_layering.py` enforces this.
 - Import test helpers as `tests.runtime.*` / `tests.contracts.*`.
 - Test modules that branch on the platform must declare `CI_WINDOWS = True` or `CI_WINDOWS = False  # reason`.
-- Never edit or extend `research-harness/` or `research-profile/`. They are frozen legacy reference trees.
+- The legacy `research-harness/` and `research-profile/` trees were removed in #500; the `legacy-archive-2026` tag keeps them. Never edit `docs/migration/misco-legacy-sources/`: it holds byte-identical copies of the legacy files that the migration ledger pins.
 - Never change digest-pinned assets (profiles, project configs, effective profile sets, fixtures) unless the task is explicitly about them. Their digests are checked by tests.
 - Keep refactors behavior-preserving, and do not skip, disable, or weaken tests to get CI green.
 - Reference the tracking issue in commits and PRs. The roadmap is [#475](https://github.com/hirsaeki/research-loom/issues/475).

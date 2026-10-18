@@ -40,8 +40,6 @@ research-loom/
 ├─ tests/            # contracts/ and runtime/
 ├─ scripts/          # operational and CI helpers
 │
-├─ research-harness/ # legacy; reference only, removal tracked in #500
-└─ research-profile/ # legacy; reference only, removal tracked in #500
 ```
 
 Concrete profiles and projects belong below these category boundaries. Expected examples include `generic-research`, empirical/case-study research profiles, organization profiles, narrative profiles such as IMRaD or hypothesis-model-validation, publication profiles, and project-specific configuration. They should be introduced by convergence PRs rather than populated speculatively in this structural PR.
@@ -150,7 +148,7 @@ The current local implementation persists canonical state in SQLite stores under
 
 ## Legacy convergence policy
 
-`research-harness/` and `research-profile/` are frozen reference material. Canonical code no longer imports them; the remaining references (a Project Config pin and migration ledger tests) are being re-pointed in #499 before the trees are removed in #500.
+`research-harness/` and `research-profile/` were removed in #500 after #499 re-pointed their last references; the `legacy-archive-2026` tag keeps them. The legacy files the migration ledger and the Project Config pin are kept byte for byte in `docs/migration/misco-legacy-sources/`, and the ledger tests verify them there.
 
 For each convergence PR:
 
