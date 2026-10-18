@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 from plugins.local_application.facade import LocalApplicationError
 from plugins.local_application.material import new_material_group_continuation_service as group
-from plugins.local_application.material.material_reacquisition_facade import RetrievedMaterial
+from plugins.local_application.material.material_reacquisition_service import RetrievedMaterial
 
 CI_WINDOWS = True
 

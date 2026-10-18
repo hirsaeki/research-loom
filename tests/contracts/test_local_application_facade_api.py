@@ -66,7 +66,7 @@ STAGE_ORDER = {
     "show_run": [
         "synthesis_candidate_facade",
         "new_material_continuation_public_facade",
-        "material_reacquisition_public_facade",
+        "material_reacquisition_facade",
         "historical_result_recovery_facade",
         "historical_finding_recovery_facade",
         "virtual_runner_inspection",

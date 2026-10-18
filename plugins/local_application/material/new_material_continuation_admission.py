@@ -16,13 +16,13 @@ from plugins.local_execution_store import (
 )
 
 from .material_content_facade import _artifact_pair_for_capture
-from .material_reacquisition_facade import (
+from .material_reacquisition_service import (
     _CAPABILITY_ID as _MRA_CAPABILITY_ID,
 )
-from .material_reacquisition_facade import (
+from .material_reacquisition_service import (
     _NEW_MATERIAL_ROLES,
 )
-from .material_reacquisition_facade import (
+from .material_reacquisition_service import (
     _RESULT_DIAGNOSTIC as _MRA_RESULT_DIAGNOSTIC,
 )
 

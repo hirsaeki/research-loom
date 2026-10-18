@@ -6,7 +6,7 @@ from unittest.mock import patch
 import tests.runtime.test_external_desktop_research_intake as intake
 from plugins.desktop_research.submission import with_context_extension_digest
 from plugins.local_application import LocalApplicationFacade
-from plugins.local_application.material.material_reacquisition_facade import RetrievedMaterial
+from plugins.local_application.material.material_reacquisition_service import RetrievedMaterial
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 CI_WINDOWS = True
@@ -176,7 +176,7 @@ class Issue127MultiMaterialContinuationTests(ResearchPackageAcceptanceSupport):
             f"<p>new version {index}</p></body></html>"
         ).encode()
         with patch(
-            "plugins.local_application.material.material_reacquisition_facade._retrieve_exact_locator",
+            "plugins.local_application.material.material_reacquisition_service._retrieve_exact_locator",
             return_value=RetrievedMaterial(
                 changed,
                 "text/html",

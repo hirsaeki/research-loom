@@ -9,7 +9,6 @@ directly; they run exactly the layers they used to.
 
 from __future__ import annotations
 
-from .delphi_facade import DelphiMixin
 from .facade import LocalApplicationFacadeCore
 from .material.external_attempt_lifecycle_facade import ExternalAttemptLifecycleMixin
 from .material.external_desktop_facade import ExternalDesktopMixin
@@ -18,7 +17,7 @@ from .material.historical_finding_recovery_facade import HistoricalFindingRecove
 from .material.historical_result_recovery_facade import HistoricalResultRecoveryMixin
 from .material.material_import_facade import MaterialImportMixin
 from .material.material_inventory_facade import MaterialInventoryMixin
-from .material.material_reacquisition_public_facade import MaterialReacquisitionPublicMixin
+from .material.material_reacquisition_facade import MaterialReacquisitionPublicMixin
 from .material.new_material_continuation_public_facade import NewMaterialContinuationPublicMixin
 from .material.retention_facade import RetentionMixin
 from .research.argument_facade import ArgumentMixin
@@ -35,10 +34,11 @@ from .research.source_bibliography_facade import SourceBibliographyMixin
 from .research.synthesis_candidate_facade import SynthesisCandidateMixin
 from .research.visual_facade import VisualMixin
 from .research.visual_need_facade import VisualNeedMixin
-from .survey_analysis_facade import SurveyAnalysisMixin
-from .survey_facade import SurveyMixin
-from .survey_response_facade import SurveyResponseMixin
-from .virtual_runner_facade import VirtualRunnerMixin
+from .survey.delphi_facade import DelphiMixin
+from .survey.survey_analysis_facade import SurveyAnalysisMixin
+from .survey.survey_facade import SurveyMixin
+from .survey.survey_response_facade import SurveyResponseMixin
+from .virtual_runner.virtual_runner_facade import VirtualRunnerMixin
 
 
 class LocalApplicationFacade(

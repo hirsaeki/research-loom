@@ -4,7 +4,7 @@ from copy import deepcopy
 from unittest.mock import patch
 
 from plugins.local_application import LocalApplicationError
-from plugins.local_application.material.material_reacquisition_facade import RetrievedMaterial
+from plugins.local_application.material.material_reacquisition_service import RetrievedMaterial
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 CI_WINDOWS = True
@@ -47,7 +47,7 @@ class Issue171NewMaterialContinuationTests(ResearchPackageAcceptanceSupport):
         facade.list_actions()
         changed = changed_bytes if changed_bytes is not None else exact + b"\r\n"
         with patch(
-            "plugins.local_application.material.material_reacquisition_facade._regenerate_text_rendition",
+            "plugins.local_application.material.material_reacquisition_service._regenerate_text_rendition",
             return_value=RetrievedMaterial(
                 changed,
                 "text/plain",
@@ -92,7 +92,7 @@ class Issue171NewMaterialContinuationTests(ResearchPackageAcceptanceSupport):
             b"<p>Current material version.</p></body></html>"
         )
         with patch(
-            "plugins.local_application.material.material_reacquisition_facade._retrieve_exact_locator",
+            "plugins.local_application.material.material_reacquisition_service._retrieve_exact_locator",
             return_value=RetrievedMaterial(
                 changed,
                 "text/html",

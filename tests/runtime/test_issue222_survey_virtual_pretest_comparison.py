@@ -5,7 +5,7 @@ import unittest
 from copy import deepcopy
 
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade
-from plugins.local_application.survey_virtual_pretest_inspection import (
+from plugins.local_application.survey.survey_virtual_pretest_inspection import (
     _all_aggregate_items,
     _answer_semantics,
     _comparison_item,

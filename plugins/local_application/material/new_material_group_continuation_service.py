@@ -15,10 +15,10 @@ from plugins.desktop_research.attempts import reconstruct_attempts
 
 from . import new_material_continuation_admission as admission
 from .material_content_facade import _artifact_pair_for_capture
-from .material_reacquisition_facade import MaterialReacquisitionRetrievalError
 from .material_reacquisition_pypdf_provider import (
     _regenerate_text_rendition as _regenerate_pinned_text_rendition,
 )
+from .material_reacquisition_service import MaterialReacquisitionRetrievalError
 from .new_material_continuation_service import (
     _CONTINUATION_LOCK,
     NewMaterialContinuationService,

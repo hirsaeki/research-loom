@@ -213,7 +213,7 @@ class _SurveyAnalysisActionHandler:
         self._workspace_root = workspace_root
 
     def execute(self, payload, *, state, actor, proposal):
-        from .facade_composition import SurveyAnalysisFacade
+        from ..facade_composition import SurveyAnalysisFacade
 
         facade = SurveyAnalysisFacade(
             self._application,
