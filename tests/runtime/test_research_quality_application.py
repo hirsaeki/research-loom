@@ -11,9 +11,9 @@ import rfc8785
 import yaml
 
 from plugins.local_application import LocalApplicationFacade
-from plugins.local_application.research.research_quality_evaluation import (
+from plugins.local_application.research.research_quality_evaluation import evaluate
+from plugins.local_application.research.research_quality_support import (
     ResearchQualityEvaluationError,
-    evaluate,
     normalize_input,
 )
 from plugins.local_application.workspace.profile_resolution import resolve_effective_profile_set
