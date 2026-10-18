@@ -97,7 +97,7 @@ Formatting-only commits are listed in `.git-blame-ignore-revs`; run `git config 
 - `plugins/` — imperative adapters: the local application facade and CLI, SQLite stores, capability implementations, and organization-specific extensions
 - `skills/` — host-loaded workflows: `research-conversation`, `writer`, and `publication`
 - `projects/` — project-specific configuration (Project Config and pinned Effective Profile Set)
-- `docs/` — architecture records, operations guides, acceptance records, and migration ledgers
+- `docs/` — architecture records, operations guides, acceptance records, and migration ledgers; start at the [documentation index](docs/index.md)
 - `tests/` — `tests/contracts` (schema and semantic contracts) and `tests/runtime` (behavior); see [Developer checks](#developer-checks)
 - `scripts/` — operational and CI helpers (offline runtime wheelhouse, CI test sharding, MISCO probes)
 

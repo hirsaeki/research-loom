@@ -53,6 +53,10 @@ See [`docs/architecture/monorepo-structure.md`](docs/architecture/monorepo-struc
 - A generated file kept in the repository needs a regeneration command with a `--check` mode, and a test that compares the committed bytes with a fresh build. For example, `projects/misco-ai-2026/effective-profile-set.json` is rebuilt with `uv run --frozen python scripts/regenerate_project_eps.py` and verified by `tests/contracts/test_misco_production_project.py`.
 - A binary kept as a record (such as `docs/acceptance/writer-reader-quality/detached-inputs.zip`) needs its digest recorded next to it and checked by a test.
 
+## Documentation
+
+- Link every new document under `docs/` from [`docs/index.md`](docs/index.md). `tests/contracts/test_docs_links.py` fails when a document is unreachable from the index, or when a relative link or heading anchor in a tracked Markdown file does not resolve.
+
 ## Pull requests
 
 - Work is tracked on the [repository health roadmap (#475)](https://github.com/hirsaeki/research-loom/issues/475) and its epics. Keep one issue per PR and reference it with `Closes #N`.
