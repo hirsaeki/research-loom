@@ -39,7 +39,7 @@ ROOT_CALLBACKS = {
     (f"{PACKAGE}.material.new_material_continuation_service", COMPOSITION): (
         "continuation services submit actions through ContinuationFacade"
     ),
-    (f"{PACKAGE}.survey.survey_analysis_facade", COMPOSITION): (
+    (f"{PACKAGE}.survey.survey_analysis_actions", COMPOSITION): (
         "Survey analysis action handlers run through SurveyAnalysisFacade"
     ),
     (f"{PACKAGE}.survey.survey_response_facade", COMPOSITION): (
