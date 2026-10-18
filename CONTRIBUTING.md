@@ -46,6 +46,13 @@ See [`docs/architecture/monorepo-structure.md`](docs/architecture/monorepo-struc
 - Organization-specific policy belongs in declarative profiles; imperative extensions belong in `plugins/`.
 - The legacy `research-harness/` and `research-profile/` trees were removed in #500 (tag `legacy-archive-2026`). Do not edit `docs/migration/misco-legacy-sources/`, which keeps the ledger-pinned legacy files byte for byte (#499).
 
+## Binary and generated files
+
+- Keep every tracked file under 256 KB. A larger file must be listed in `ALLOWED_LARGE` in `tests/contracts/test_committed_assets.py` with the reason it lives in the repository; the test fails otherwise.
+- Do not use Git LFS. An offline checkout or wheelhouse must not depend on an LFS server.
+- A generated file kept in the repository needs a regeneration command with a `--check` mode, and a test that compares the committed bytes with a fresh build. For example, `projects/misco-ai-2026/effective-profile-set.json` is rebuilt with `uv run --frozen python scripts/regenerate_project_eps.py` and verified by `tests/contracts/test_misco_production_project.py`.
+- A binary kept as a record (such as `docs/acceptance/writer-reader-quality/detached-inputs.zip`) needs its digest recorded next to it and checked by a test.
+
 ## Pull requests
 
 - Work is tracked on the [repository health roadmap (#475)](https://github.com/hirsaeki/research-loom/issues/475) and its epics. Keep one issue per PR and reference it with `Closes #N`.
