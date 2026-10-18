@@ -69,7 +69,7 @@ project`. Profile advancement is not allowed to rewrite that project identity,
 objective, scope, RQs, materials, snapshots, Decisions, or active Attention.
 That is intentional.
 
-Advance only the Profile generation. The checked-in operator request is `probe2-profile-resolve.json`; it replaces only the fixture Narrative/Publication requests and adds the migration-only exact-locator continuity Profile.
+Advance only the Profile generation. The checked-in operator request is `scripts/migrations/misco/probe2-profile-resolve.json`; it replaces only the fixture Narrative/Publication requests and adds the migration-only exact-locator continuity Profile.
 
 `request_additions` is deliberately narrow: it adds an explicit direct Profile
 request while preserving all other Project Config semantics. The continuity
@@ -80,7 +80,7 @@ and is not selected by fresh production projects.
 Then use the existing public flow. For the actual local acceptance, prefer the checked-in deterministic PowerShell probe so the before/after reads, target inspection, advancement and invariance checks are captured without manually copying IDs:
 
 ```powershell
-.\projects\misco-ai-2026\Invoke-Probe2ProfileMigration.ps1 `
+.\scripts\migrations\misco\Invoke-Probe2ProfileMigration.ps1 `
   -ExpectedHead <40-character-main-HEAD>
 ```
 
@@ -101,7 +101,7 @@ For the replacement F7/G3 live migration acceptance, use the deterministic
 durable probe:
 
 ```powershell
-.\projects\misco-ai-2026\New-MiscoMigrationProbe.ps1 `
+.\scripts\migrations\misco\New-MiscoMigrationProbe.ps1 `
   -ExpectedHead <40-character-main-HEAD> `
   -Workspace D:\wsroot\scratch\loom-workspaces\probes\misco-profile-migration
 ```
@@ -136,7 +136,7 @@ on the damaged `%TEMP%` directory must not be relabeled as a migration pass.
 The underlying public commands remain:
 
 ```text
-research-loom profile resolve --workspace WORKSPACE --output TARGET --json projects/misco-ai-2026/probe2-profile-resolve.json
+research-loom profile resolve --workspace WORKSPACE --output TARGET --json scripts/migrations/misco/probe2-profile-resolve.json
 research-loom profile advance --workspace WORKSPACE --json advance.json
 research-loom profile history --workspace WORKSPACE --json
 research-loom resume --workspace WORKSPACE --json

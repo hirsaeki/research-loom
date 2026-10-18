@@ -354,9 +354,9 @@ try {
     $OutputEncoding = New-Object System.Text.UTF8Encoding -ArgumentList $false
     $env:PYTHONIOENCODING = 'utf-8'
 
-    $repoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
+    $repoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..\..')).Path
     $script:Launcher = Join-Path $repoRoot 'research-loom.cmd'
-    $resolveRequest = Join-Path $repoRoot 'projects\misco-ai-2026\probe2-profile-resolve.json'
+    $resolveRequest = Join-Path $repoRoot 'scripts\migrations\misco\probe2-profile-resolve.json'
     $expectedResolveRequestSha256 = '1d898e051aa3483437d1a8aea47e5896bf32b2c328a16b80e4bee02bfd3b3b5b'
 
     $defaultWorkspace = [System.IO.Path]::GetFullPath((Join-Path $env:TEMP 'misco-ai-2026-probe2'))

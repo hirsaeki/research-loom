@@ -4,14 +4,8 @@ param(
     [ValidatePattern('^[0-9a-f]{40}$')]
     [string]$ExpectedHead,
 
-    [string]$Workspace = $(
-        if ($env:RESEARCH_LOOM_WORKSPACES) {
-            Join-Path $env:RESEARCH_LOOM_WORKSPACES 'probes\misco-profile-migration'
-        }
-        else {
-            'D:\wsroot\scratch\loom-workspaces\probes\misco-profile-migration'
-        }
-    ),
+    [Parameter(Mandatory = $true)]
+    [string]$Workspace,
 
     [string]$EvidenceRoot
 )
@@ -425,7 +419,7 @@ try {
     $OutputEncoding = New-Object System.Text.UTF8Encoding -ArgumentList $false
     $env:PYTHONIOENCODING = 'utf-8'
 
-    $repoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
+    $repoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..\..')).Path
     $script:Launcher = Join-Path $repoRoot 'research-loom.cmd'
     $Workspace = [System.IO.Path]::GetFullPath($Workspace)
     $script:ProbeResult.workspace = $Workspace

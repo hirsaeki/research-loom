@@ -16,7 +16,7 @@ PROJECT_EPS = ROOT / "projects/misco-ai-2026/effective-profile-set.json"
 WRITER = ROOT / "profiles/narrative/misco/profile.json"
 PUBLICATION = ROOT / "profiles/publication/misco/profile.json"
 CONTINUITY = ROOT / "profiles/research/misco-workspace-continuity/profile.json"
-PROBE2_RESOLVE = ROOT / "projects/misco-ai-2026/probe2-profile-resolve.json"
+PROBE2_RESOLVE = ROOT / "scripts/migrations/misco/probe2-profile-resolve.json"
 
 
 class MiscoProductionProjectContractTests(unittest.TestCase):
