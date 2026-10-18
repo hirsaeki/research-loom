@@ -33,7 +33,7 @@ if str(ROOT) not in sys.path:
 from core.runtime import canonical_digest  # noqa: E402
 from plugins.local_application import LocalApplicationFacade, LocalResearchApplication  # noqa: E402
 from plugins.local_application.workspace.profile_resolution import resolve_effective_profile_set  # noqa: E402
-from plugins.local_application.writer.writer_round_trip_service import MAX_RESPONSE_BYTES  # noqa: E402
+from plugins.local_application.writer.writer_round_trip_support import MAX_RESPONSE_BYTES  # noqa: E402
 from tests.runtime.runtime_fixtures import seed_state  # noqa: E402
 
 

@@ -70,7 +70,7 @@ class WriterRecoveryTests(ResearchPackageAcceptanceSupport):
         facade.close()
         with LocalApplicationFacade.open_workspace(self.workspace) as reopened:
             with patch(
-                "plugins.local_application.writer.writer_round_trip_service._now",
+                "plugins.local_application.writer.writer_round_trip_import._now",
                 return_value="2099-01-01T00:00:00Z",
             ):
                 retry = reopened.import_writer_response(response)
@@ -137,10 +137,10 @@ class WriterRecoveryTests(ResearchPackageAcceptanceSupport):
         self.assertFalse(replay["research_state_mutation_performed"])
 
     def test_bad_head_or_checkpoint_is_preserved_and_exact_backup_allows_retry(self):
-        from plugins.local_application.writer.writer_round_trip_service import (
+        from plugins.local_application.writer.writer_composition_support import (
             _digest_document as _digest,
         )
-        from plugins.local_application.writer.writer_round_trip_service import (
+        from plugins.local_application.writer.writer_round_trip_support import (
             _json_bytes,
         )
 
@@ -181,10 +181,10 @@ class WriterRecoveryTests(ResearchPackageAcceptanceSupport):
         self.assertEqual(retry["revision_digest"], first["revision_digest"])
 
     def test_legacy_writer_history_recovers_unique_head_and_rejects_ambiguous_successors(self):
-        from plugins.local_application.writer.writer_round_trip_service import (
+        from plugins.local_application.writer.writer_composition_support import (
             _digest_document as _digest,
         )
-        from plugins.local_application.writer.writer_round_trip_service import (
+        from plugins.local_application.writer.writer_round_trip_support import (
             _json_bytes,
         )
 
@@ -252,7 +252,7 @@ class WriterRecoveryTests(ResearchPackageAcceptanceSupport):
                 self.assertEqual(error.exception.code, "APPLICATION-WRITER-ROUND-TRIP-WRITE-001")
             pending = json.loads(service._checkpoint_path(cid).read_bytes())
             with patch(
-                "plugins.local_application.writer.writer_round_trip_service._now",
+                "plugins.local_application.writer.writer_round_trip_import._now",
                 return_value="2099-01-01T00:00:00Z",
             ):
                 retry = facade.import_writer_response(response)

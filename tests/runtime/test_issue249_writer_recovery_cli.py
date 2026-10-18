@@ -39,7 +39,7 @@ class WriterRecoveryCliTests(ResearchPackageAcceptanceSupport):
         facade.close()
 
         with patch(
-            "plugins.local_application.writer.writer_round_trip_service._now",
+            "plugins.local_application.writer.writer_round_trip_import._now",
             return_value="2099-01-01T00:00:00Z",
         ):
             recovered = self._cli(
