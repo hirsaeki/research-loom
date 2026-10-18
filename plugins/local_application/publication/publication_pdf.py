@@ -1,4 +1,4 @@
-"""Bounded PDF inspection and exact-output MISCO review evaluation."""
+"""Bounded PDF inspection and exact-output Publication review evaluation."""
 
 from __future__ import annotations
 
@@ -10,6 +10,8 @@ from jsonschema import FormatChecker
 from pypdf import PdfReader
 
 from plugins.application_errors import LocalApplicationError
+
+from .publication_dialect import GENERIC_PUBLICATION_DIALECT, PublicationDialect
 
 
 def inspect_pdf(data: bytes, *, required_text=(), page_ranges=None, expected_parts=()):
@@ -145,6 +147,15 @@ def inspect_pdf(data: bytes, *, required_text=(), page_ranges=None, expected_par
         ) from exc
 
 
+FINAL_PDF_CHECKS = (
+    "final-pdf-all-pages",
+    "final-pdf-toc",
+    "final-pdf-footnotes",
+    "final-pdf-parity",
+    "final-pdf-cover",
+)
+
+
 def coverage_review(
     coverage: Mapping,
     policy: Mapping,
@@ -153,6 +164,7 @@ def coverage_review(
     page_count: int,
     *,
     page_ranges=None,
+    dialect: PublicationDialect = GENERIC_PUBLICATION_DIALECT,
 ):
     problems = []
     required_keys = {"pdf_digest", "reviewer_id", "reviewed_at", "checks", "pages"}
@@ -271,14 +283,8 @@ def coverage_review(
                 problems.append("presentation-per-slide-citations")
     rows = review.get("checks", [])
     by_id = {}
-    known = {item["id"] for item in coverage["items"]} | {
-        "misco-editorial-qa",
-        "final-pdf-all-pages",
-        "final-pdf-toc",
-        "final-pdf-footnotes",
-        "final-pdf-parity",
-        "final-pdf-cover",
-    }
+    overall = [dialect.editorial_overall_check] if dialect.editorial_overall_check else []
+    known = {item["id"] for item in coverage["items"]} | set(overall) | set(FINAL_PDF_CHECKS)
     for row in rows:
         id_ = row.get("check_id")
         if id_ not in known or id_ in by_id:
@@ -311,28 +317,24 @@ def coverage_review(
                 "review": row,
             }
         )
-    for id_ in [
-        "misco-editorial-qa",
-        "final-pdf-all-pages",
-        "final-pdf-toc",
-        "final-pdf-footnotes",
-        "final-pdf-parity",
-        "final-pdf-cover",
-    ]:
+    for id_ in [*overall, *FINAL_PDF_CHECKS]:
         if by_id.get(id_, {}).get("status") != "passed":
             problems.append("required-check:" + id_)
     body = page_ranges.get("body") if isinstance(page_ranges, Mapping) else None
     if (
-        isinstance(body, list)
+        dialect.body_page_range is not None
+        and isinstance(body, list)
         and len(body) == 2
         and all(type(n) is int for n in body)
         and body[0] <= body[1]
     ):
+        low, high = dialect.body_page_range
+        check = str(dialect.body_length_check)
         if (
-            not 50 <= body[1] - body[0] + 1 <= 60
-            and by_id.get("misco-body-length", {}).get("status") != "warning"
+            not low <= body[1] - body[0] + 1 <= high
+            and by_id.get(check, {}).get("status") != "warning"
         ):
-            problems.append("unrecorded-should-deviation:misco-body-length")
+            problems.append("unrecorded-should-deviation:" + check)
     pages = review.get("pages", [])
     if [row.get("page") for row in pages] != list(range(1, page_count + 1)) or any(
         row.get("status") != "passed" or not str(row.get("rationale", "")).strip() for row in pages

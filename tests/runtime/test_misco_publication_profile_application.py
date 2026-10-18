@@ -306,7 +306,7 @@ class MiscoPublicationProfileApplicationTests(MiscoWriterProfileApplicationTests
             service = facade._publication_release_service()
             profile = service._profile_pin(package)
             inspection["publication_policy"] = _publication_policy(
-                package, profile, self._application_inputs()
+                package, profile, self._application_inputs(), dialect=service._dialect(profile)
             )
             markdown, _docx, _issues, _checks = service._render(inspection)
             text = markdown.decode("utf-8")

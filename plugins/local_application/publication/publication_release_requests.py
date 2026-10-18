@@ -47,8 +47,7 @@ class PublicationReleaseRequestMixin:
         format_ = "pdf" if build.get("publication_policy", {}).get("coverage") else "docx"
         return next((row for row in build["outputs"] if row["format"] == format_), None)
 
-    @staticmethod
-    def _release_checks_pass(build: Mapping[str, Any], preview: Mapping[str, Any]) -> bool:
+    def _release_checks_pass(self, build: Mapping[str, Any], preview: Mapping[str, Any]) -> bool:
         if preview.get("source_epistemic_status") != "EMPIRICAL_RESEARCH_STATE":
             return False
         required_checks = [
@@ -57,8 +56,7 @@ class PublicationReleaseRequestMixin:
             "cross_reference_resolution",
             "render_verification",
         ]
-        if build.get("publication_profile", {}).get("profile_id") == "misco.publication":
-            required_checks.extend(["formal_specification", "editorial_qa"])
+        required_checks.extend(self._dialect(build.get("publication_profile", {})).release_checks)
         if build.get("publication_policy", {}).get("coverage"):
             required_checks.extend(["final_pdf_machine", "final_pdf_human"])
             if PublicationReleaseRequestMixin._formal_output(build) is None:

@@ -11,6 +11,10 @@ from xml.etree import ElementTree as ET
 import tests.runtime.test_external_desktop_research_intake as intake
 import tests.runtime.test_misco_publication_profile_application as publication_tests
 from plugins.local_application import LocalApplicationError
+from plugins.local_application.misco.publication_dialect import (
+    MISCO_EDITORIAL_QA,
+    MISCO_PUBLICATION_DIALECT,
+)
 from plugins.local_application.publication.publication_docx import W, docx_bytes, verify_native_docx
 from plugins.local_application.publication.publication_release_support import (
     _editorial_status,
@@ -53,7 +57,9 @@ class EditorialEvidenceTests(unittest.TestCase):
         for unknown in [None, "", "  ", "\t"]:
             config = intake.bootstrap_config()
             config["publication_metadata"] = {"research_group_type": unknown}
-            policy = _publication_policy(package, profile, inputs, config)
+            policy = _publication_policy(
+                package, profile, inputs, config, dialect=MISCO_PUBLICATION_DIALECT
+            )
             self.assertIn("INPUT-RESEARCH-GROUP-TYPE", policy["missing_inputs"])
             self.assertEqual(
                 policy["host_questions"][0]["question"],
@@ -63,14 +69,26 @@ class EditorialEvidenceTests(unittest.TestCase):
             self.assertTrue(policy["review_conditions"]["interview"])
         config = intake.bootstrap_config()
         with self.assertRaises(LocalApplicationError):
-            _publication_policy(package, profile, {**inputs, "research_group_type": "G1"}, config)
+            _publication_policy(
+                package,
+                profile,
+                {**inputs, "research_group_type": "G1"},
+                config,
+                dialect=MISCO_PUBLICATION_DIALECT,
+            )
         explicit = _publication_policy(
-            package, profile, {**inputs, "research_group_type": "G"}, config
+            package,
+            profile,
+            {**inputs, "research_group_type": "G"},
+            config,
+            dialect=MISCO_PUBLICATION_DIALECT,
         )
         self.assertIn("INPUT-RESEARCH-GROUP-TYPE-SAVE", explicit["missing_inputs"])
         self.assertEqual(explicit["host_questions"], [])
         config["publication_metadata"] = {"research_group_type": "G"}
-        saved = _publication_policy(package, profile, inputs, config)
+        saved = _publication_policy(
+            package, profile, inputs, config, dialect=MISCO_PUBLICATION_DIALECT
+        )
         self.assertEqual(saved["research_group_type"], "G")
         self.assertNotIn("INPUT-RESEARCH-GROUP-TYPE", saved["missing_inputs"])
         self.assertEqual(saved["host_questions"], [])
@@ -90,10 +108,18 @@ class EditorialEvidenceTests(unittest.TestCase):
         ]
         self.assertIn(
             "INPUT-FORMAL-COVERAGE",
-            _publication_policy(legacy, profile, inputs, config)["missing_inputs"],
+            _publication_policy(legacy, profile, inputs, config, dialect=MISCO_PUBLICATION_DIALECT)[
+                "missing_inputs"
+            ],
         )
         with self.assertRaises(LocalApplicationError):
-            _publication_policy(package, profile, {**inputs, "research_group_type": "M"}, config)
+            _publication_policy(
+                package,
+                profile,
+                {**inputs, "research_group_type": "M"},
+                config,
+                dialect=MISCO_PUBLICATION_DIALECT,
+            )
 
     def test_aggregate_review_preserves_non_pass_and_rejects_duplicates(self):
         for status, expected in [
@@ -105,15 +131,19 @@ class EditorialEvidenceTests(unittest.TestCase):
         ]:
             with self.subTest(status=status):
                 review = {"checks": [{"check_id": "misco-editorial-qa", "status": status}]}
-                self.assertEqual(_editorial_status(review, misco=True), expected)
+                self.assertEqual(
+                    _editorial_status(review, overall_check=MISCO_EDITORIAL_QA), expected
+                )
         review = {
             "checks": [
                 {"check_id": "misco-editorial-qa", "status": "passed"},
                 {"check_id": "misco-editorial-qa", "status": "failed"},
             ]
         }
-        self.assertEqual(_editorial_status(review, misco=True), "failed")
-        self.assertEqual(_editorial_status({"checks": []}, misco=True), "failed")
+        self.assertEqual(_editorial_status(review, overall_check=MISCO_EDITORIAL_QA), "failed")
+        self.assertEqual(
+            _editorial_status({"checks": []}, overall_check=MISCO_EDITORIAL_QA), "failed"
+        )
 
 
 class NativeStyleAblationTests(unittest.TestCase):

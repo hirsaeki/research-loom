@@ -17,6 +17,8 @@ from jsonschema import Draft202012Validator, FormatChecker
 from core.resources import resource_path
 from plugins.application_errors import LocalApplicationError
 
+from .publication_dialect import GENERIC_PUBLICATION_DIALECT, PublicationDialect
+
 SCHEMA_VERSION = "0.1.0"
 SERVICE_VERSION = "0.2.0"
 MAX_SECTIONS = 128
@@ -133,7 +135,7 @@ def _validate_publication_inputs(value: Mapping[str, Any] | None) -> dict[str, A
     return normalized
 
 
-def _source_tags(source):
+def source_tags(source):
     return {
         str(source.get(key, "")).lower()
         for key in ["access_classification", "source_classification", "source_type"]
@@ -158,7 +160,7 @@ def _resource_rows(package: Mapping[str, Any], profile: Mapping[str, Any]) -> li
     return selected
 
 
-def _editorial_status(review: Any, *, misco: bool) -> str:
+def _editorial_status(review: Any, *, overall_check: str | None) -> str:
     """Preserve incomplete reviews and reject contradictory aggregate evidence."""
     if not isinstance(review, Mapping):
         return "warning"
@@ -166,8 +168,8 @@ def _editorial_status(review: Any, *, misco: bool) -> str:
     ids = [row.get("check_id") for row in rows]
     if len(ids) != len(set(ids)) or any(row.get("status") == "failed" for row in rows):
         return "failed"
-    if misco:
-        overall = next((row for row in rows if row.get("check_id") == "misco-editorial-qa"), None)
+    if overall_check is not None:
+        overall = next((row for row in rows if row.get("check_id") == overall_check), None)
         if overall is None or overall.get("status") == "not_applicable":
             return "failed"
     if not rows or any(row.get("status") in {"warning", "unevaluated"} for row in rows):
@@ -183,6 +185,8 @@ def _publication_policy(
     profile: Mapping[str, Any],
     inputs: Mapping[str, Any],
     project_config: Mapping[str, Any] | None = None,
+    *,
+    dialect: PublicationDialect = GENERIC_PUBLICATION_DIALECT,
 ) -> dict[str, Any]:
     resources = _resource_rows(package, profile)
     by_role = {str(row.get("role")): row for row in resources}
@@ -192,13 +196,7 @@ def _publication_policy(
     url_row = by_role.get("PUBLICATION_URL_DISPLAY")
     coverage_row = by_role.get("PUBLICATION_COVERAGE")
     coverage = json.loads(coverage_row["content"]) if coverage_row else None
-    if profile.get("profile_id") == "misco.publication" and any(
-        row is None for row in (rules_row, source_row, formal_row, url_row)
-    ):
-        raise LocalApplicationError(
-            "APPLICATION-PUBLICATION-PROFILE-001",
-            "MISCO Publication requires verified rule, source-document, formal-spec, and URL-display resources",
-        )
+    dialect.require_resources(by_role)
     rules = json.loads(rules_row["content"]) if rules_row else {"items": [], "missing_inputs": []}
     formal_resource = json.loads(formal_row["content"]) if formal_row else {}
     url_resource = json.loads(url_row["content"]) if url_row else {}
@@ -248,11 +246,7 @@ def _publication_policy(
                 "PROJECT-CONFIG-STALE-001",
                 "Publication input targets a different Project Config generation",
             )
-        saved = (
-            project_config.get("publication_metadata", {}).get("research_group_type")
-            if profile.get("profile_id") == "misco.publication"
-            else None
-        )
+        saved = dialect.saved_research_group_type(project_config)
         if isinstance(saved, str) and not saved.strip():
             saved = None
         if saved is not None and group_type is not None and saved != group_type:
@@ -263,72 +257,18 @@ def _publication_policy(
         group_type = saved or group_type
     permissions = inputs.get("permissions", [])
     editorial = inputs.get("editorial_review")
-    missing = []
-    if profile.get("profile_id") == "misco.publication":
-        if (
-            document_mode == "formal_report"
-            and group_type is not None
-            and group_type not in {"G", "M"}
-        ):
-            raise LocalApplicationError(
-                "INPUT-RESEARCH-GROUP-TYPE",
-                "MISCO formal report requires an explicit G or M answer",
-            )
-        if document_mode == "formal_report" and not coverage:
-            missing.append("INPUT-FORMAL-COVERAGE")
-        if document_mode == "formal_report" and not isinstance(report, Mapping):
-            missing.append("INPUT-FORMAL-REPORT")
-        if not isinstance(formal, Mapping) or not isinstance(
-            formal.get("research_group_type_required"), bool
-        ):
-            missing.append("INPUT-FORMAL-SPEC")
-        elif (
-            (formal["research_group_type_required"] or document_mode == "formal_report")
-            and document_mode == "formal_report"
-            and not group_type
-        ):
-            missing.append("INPUT-RESEARCH-GROUP-TYPE")
-        if coverage and document_mode == "formal_report" and group_type and saved is None:
-            missing.append("INPUT-RESEARCH-GROUP-TYPE-SAVE")
-        sources = package.get("resolved_content", {}).get("research_objects", [])
-        has_reader_url = any(
-            isinstance(row, Mapping)
-            and row.get("kind") == "source"
-            and str(row.get("canonical_locator") or "").startswith(("http://", "https://"))
-            for row in sources
-        )
-        if has_reader_url and not isinstance(url_profile, Mapping):
-            missing.append("INPUT-URL-DISPLAY")
-        required_permissions = {
-            str(row.get("id"))
-            for row in sources
-            if isinstance(row, Mapping)
-            and row.get("kind") == "source"
-            and bool(_source_tags(row) & {"internal", "non-public", "confidential", "interview"})
-        }
-        permission_by_source = {
-            str(row.get("source_ref")): row for row in permissions if isinstance(row, Mapping)
-        }
-        if any(
-            ref not in permission_by_source
-            or not permission_by_source[ref].get("publication_allowed")
-            or not permission_by_source[ref].get("original_reviewed")
-            or permission_by_source[ref].get("company_disclosure") not in {"allowed", "anonymized"}
-            for ref in required_permissions
-        ):
-            missing.append("INPUT-PERMISSION")
-    if profile.get("profile_id") == "misco.publication" and isinstance(editorial, Mapping):
-        editorial_rows = {
-            str(row.get("check_id")): row
-            for row in editorial.get("checks", [])
-            if isinstance(row, Mapping)
-        }
-        overall = editorial_rows.get("misco-editorial-qa")
-        if overall is None:
-            raise LocalApplicationError(
-                "APPLICATION-PUBLICATION-INPUT-001",
-                "MISCO editorial review must include misco-editorial-qa",
-            )
+    missing = dialect.missing_inputs(
+        package=package,
+        document_mode=document_mode,
+        group_type=group_type,
+        saved_group_type=saved,
+        coverage=coverage,
+        report=report,
+        formal=formal,
+        url_profile=url_profile,
+        permissions=permissions,
+    )
+    dialect.validate_editorial_review(editorial)
     return {
         "rules": {
             "role": rules_row.get("role") if rules_row else None,
@@ -385,12 +325,12 @@ def _publication_policy(
         "permissions": deepcopy(list(permissions)),
         "review_conditions": {
             "interview": any(
-                "interview" in _source_tags(row)
+                "interview" in source_tags(row)
                 for row in package.get("resolved_content", {}).get("research_objects", [])
                 if row.get("kind") == "source"
             ),
             "company_information": any(
-                bool(_source_tags(row) & {"internal", "non-public", "confidential"})
+                bool(source_tags(row) & {"internal", "non-public", "confidential"})
                 for row in package.get("resolved_content", {}).get("research_objects", [])
                 if row.get("kind") == "source"
             ),

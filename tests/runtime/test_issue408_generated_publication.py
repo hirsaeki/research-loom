@@ -14,6 +14,7 @@ import tests.runtime.test_issue219_writer_round_trip as writer
 import tests.runtime.test_issue256_native_publication as native
 import tests.runtime.test_issue405_research_charts as charts
 from plugins.local_application import LocalApplicationError
+from plugins.local_application.misco.publication_dialect import MISCO_PUBLICATION_DIALECT
 from plugins.local_application.publication.publication_docx import (
     A,
     W,
@@ -275,7 +276,9 @@ class ChartNativeLegendTests(unittest.TestCase):
             strict = deepcopy(inspection)
             strict["publication_profile"] = {"profile_id": "misco.publication"}
             self.assertEqual(
-                prepare_exhibits(strict, workspace)[chart["exhibit_id"]]["code"],
+                prepare_exhibits(strict, workspace, dialect=MISCO_PUBLICATION_DIALECT)[
+                    chart["exhibit_id"]
+                ]["code"],
                 "VISUAL_SOURCE_METADATA_REQUIRED",
             )
             block.update(
@@ -342,7 +345,10 @@ class VisualPermissionTests(unittest.TestCase):
             ]
         }
         self.assertNotIn(
-            "INPUT-PERMISSION", _publication_policy(package, profile, inputs)["missing_inputs"]
+            "INPUT-PERMISSION",
+            _publication_policy(package, profile, inputs, dialect=MISCO_PUBLICATION_DIALECT)[
+                "missing_inputs"
+            ],
         )
         for field, value in [
             ("publication_allowed", False),
@@ -352,7 +358,10 @@ class VisualPermissionTests(unittest.TestCase):
             changed = deepcopy(inputs)
             changed["permissions"][0][field] = value
             self.assertIn(
-                "INPUT-PERMISSION", _publication_policy(package, profile, changed)["missing_inputs"]
+                "INPUT-PERMISSION",
+                _publication_policy(package, profile, changed, dialect=MISCO_PUBLICATION_DIALECT)[
+                    "missing_inputs"
+                ],
             )
         self.assertFalse(
             _publication_policy(package, {"profile_id": "generic", "profile_version": "1"}, {})[

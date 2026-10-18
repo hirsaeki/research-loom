@@ -114,7 +114,7 @@ class PublicationRenderMixin:
         self, inspection: Mapping[str, Any]
     ) -> tuple[bytes, bytes, list[dict[str, Any]], dict[str, str]]:
         policy = inspection.get("publication_policy", {})
-        misco = inspection.get("publication_profile", {}).get("profile_id") == "misco.publication"
+        dialect = self._dialect(inspection.get("publication_profile", {}))
         package = inspection["source_package_document"]
         revision = inspection["revision"]
         composition = inspection["composition"]
@@ -232,10 +232,10 @@ class PublicationRenderMixin:
                     continue
                 if str(exhibit.get("kind")) in {"table", "matrix"}:
                     table_count += 1
-                    exhibit_numbers[exhibit_ref] = ("表" if misco else "Table", table_count)
+                    exhibit_numbers[exhibit_ref] = (dialect.table_label, table_count)
                 else:
                     figure_count += 1
-                    exhibit_numbers[exhibit_ref] = ("図" if misco else "Figure", figure_count)
+                    exhibit_numbers[exhibit_ref] = (dialect.figure_label, figure_count)
                 if formal_report:
                     scope = formal_outline[section_id]
                     if not scope["section"]:
@@ -292,7 +292,7 @@ class PublicationRenderMixin:
 
         blocks = inspection.get("exhibit_blocks")
         if blocks is None:
-            blocks = prepare_exhibits(inspection, self.workspace)
+            blocks = prepare_exhibits(inspection, self.workspace, dialect=dialect)
         for diagnostic in inspection.get("visual_diagnostics", []):
             add_issue("VISUAL_ASSET_UNAVAILABLE", diagnostic["path"], None, True)
         title = resolve_text(
@@ -376,9 +376,7 @@ class PublicationRenderMixin:
                     else:
                         structured_citations.append(f"[{number}]")
             if structured_citations:
-                marker = ("出典：" if misco else "Citations: ") + ", ".join(
-                    dict.fromkeys(structured_citations)
-                )
+                marker = dialect.citations_prefix + ", ".join(dict.fromkeys(structured_citations))
                 md.extend([marker, ""])
                 docx_lines.append(("body", marker))
             for ref_value in section.get("exhibit_refs", []):
@@ -428,42 +426,10 @@ class PublicationRenderMixin:
                                 + (spec["period"] or "not applicable")
                                 + "."
                             )
-                            if misco:
-                                unit_labels = list(
-                                    dict.fromkeys(
-                                        v for v in spec["units"].values() if v is not None
-                                    )
-                                )
-                                note = "単位：" + "、".join(unit_labels) + "。"
-                                if spec["caption"] != exhibit.get("title"):
-                                    note = spec["caption"] + "\n" + note
-                                note += (
-                                    "\n対象："
-                                    + (spec["denominator"] or "記載なし")
-                                    + "。対象年："
-                                    + (spec["period"] or "記載なし")
-                                    + "。"
-                                )
-                                if "legend_rows" in block:
-                                    x_unit, y_unit = (
-                                        spec["units"][spec["x_column"]],
-                                        spec["units"][spec["y_column"]],
-                                    )
-                                    x_label = "区分" if spec["chart_type"] == "bar" else "横軸の値"
-                                    block["legend_rows"][0] = [
-                                        "番号",
-                                        x_label + (f"（{x_unit}）" if x_unit else ""),
-                                        "値" + (f"（{y_unit}）" if y_unit else ""),
-                                    ]
+                            note = dialect.chart_note(note, spec, exhibit, block)
                         else:
                             note += "\nRepresentation reviewed against the selected research; no new research conclusion is established by this figure."
-                            if misco:
-                                note = (
-                                    "図に示す内容："
-                                    + "、".join(value["request"]["allowed_labels"])
-                                    + "。"
-                                )
-                                note += "\n既存の研究内容を整理した図であり、新たな研究上の結論を示すものではない。"
+                            note = dialect.diagram_note(note, value)
                     else:
                         visual = exhibit["visual_target"]
                         locator = visual["locator"]
@@ -495,7 +461,7 @@ class PublicationRenderMixin:
                             note += "\n" + str(content_obj.get("value", ""))
                     if block["provenance"].get("citation_sources") and not formal_report:
                         note += "\n" + "\n".join(
-                            ("出典：" if misco else "Source: ")
+                            dialect.source_prefix
                             + self._citation_label(source, source.get("canonical_locator"), policy)
                             + "; "
                             + str(source.get("publisher_or_author") or "")
@@ -661,6 +627,8 @@ class PublicationRenderMixin:
             else "warning"
             if policy.get("coverage")
             else "passed",
-            "editorial_qa": _editorial_status(policy.get("editorial_review"), misco=misco),
+            "editorial_qa": _editorial_status(
+                policy.get("editorial_review"), overall_check=dialect.editorial_overall_check
+            ),
         }
         return markdown, docx, issues, checks

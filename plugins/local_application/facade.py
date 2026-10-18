@@ -196,11 +196,12 @@ class LocalApplicationFacadeCore:
         return self._project_id
 
     def _publication_release_service(self):
+        from plugins.local_application.misco.publication_dialect import PUBLICATION_DIALECTS
         from plugins.local_application.publication.publication_release_service import (
             PublicationReleaseService,
         )
 
-        return PublicationReleaseService(self)
+        return PublicationReleaseService(self, dialects=PUBLICATION_DIALECTS)
 
     def build_publication_preview(
         self,
