@@ -18,9 +18,11 @@ from plugins.local_application.writer.writer_composition_support import _writer_
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 ROOT = Path(__file__).resolve().parents[2]
-WRITER_MANIFEST = ROOT / "profiles/narrative/misco/profile.json"
-WRITER_RULES = ROOT / "profiles/narrative/misco/resources/writer-clean-rules.json"
-WRITER_SOURCES = ROOT / "profiles/narrative/misco/resources/writer-clean-source-documents.json"
+WRITER_MANIFEST = ROOT / "profiles/narrative/misco/1.1.0/profile.json"
+WRITER_RULES = ROOT / "profiles/narrative/misco/1.1.0/resources/writer-clean-rules.json"
+WRITER_SOURCES = (
+    ROOT / "profiles/narrative/misco/1.1.0/resources/writer-clean-source-documents.json"
+)
 
 
 class MiscoWriterProfileApplicationTests(ResearchPackageAcceptanceSupport):

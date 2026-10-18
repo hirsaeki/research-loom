@@ -22,7 +22,7 @@ from tests.runtime.test_misco_writer_profile_application import (
 )
 
 ROOT = Path(__file__).resolve().parents[2]
-PUBLICATION_MANIFEST = ROOT / "profiles/publication/misco/profile.json"
+PUBLICATION_MANIFEST = ROOT / "profiles/publication/misco/1.3.0/profile.json"
 
 
 class MiscoPublicationProfileApplicationTests(MiscoWriterProfileApplicationTests):
@@ -225,7 +225,7 @@ class MiscoPublicationProfileApplicationTests(MiscoWriterProfileApplicationTests
             inputs = self._application_inputs()
             pinned = json.loads(
                 (
-                    ROOT / "profiles/publication/misco/resources/publication-formal-spec.json"
+                    ROOT / "profiles/publication/misco/1.3.0/resources/publication-formal-spec.json"
                 ).read_text(encoding="utf-8")
             )["formal_spec_profile"]
             inputs["formal_spec_profile"] = deepcopy(pinned)
@@ -255,9 +255,9 @@ class MiscoPublicationProfileApplicationTests(MiscoWriterProfileApplicationTests
 
     def test_ablation_formal_layout_changes_output_not_manuscript_text(self):
         layout = json.loads(
-            (ROOT / "profiles/publication/misco/resources/publication-formal-spec.json").read_text(
-                encoding="utf-8"
-            )
+            (
+                ROOT / "profiles/publication/misco/1.3.0/resources/publication-formal-spec.json"
+            ).read_text(encoding="utf-8")
         )["formal_spec_profile"]["docx_layout"]
         lines = [("title", "同一原稿"), ("body", "本文の意味・数値・出典bindingは不変。")]
         control = docx_bytes(lines)
@@ -327,9 +327,9 @@ class MiscoPublicationProfileApplicationTests(MiscoWriterProfileApplicationTests
         from tests.runtime.test_issue256_native_publication import fixture_png
 
         formal = json.loads(
-            (ROOT / "profiles/publication/misco/resources/publication-formal-spec.json").read_text(
-                encoding="utf-8"
-            )
+            (
+                ROOT / "profiles/publication/misco/1.3.0/resources/publication-formal-spec.json"
+            ).read_text(encoding="utf-8")
         )["formal_spec_profile"]
         layout = formal["docx_layout"]
         content_width = (

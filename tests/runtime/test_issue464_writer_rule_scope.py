@@ -18,6 +18,7 @@ from tests.runtime.research_package_acceptance_support import ResearchPackageAcc
 
 ROOT = Path(__file__).resolve().parents[2]
 MANIFEST = ROOT / "profiles/narrative/misco/1.2.0/profile.json"
+PREVIOUS_MANIFEST = ROOT / "profiles/narrative/misco/1.1.0/profile.json"
 
 
 class Issue464WriterRuleScopeTests(ResearchPackageAcceptanceSupport):
@@ -37,9 +38,7 @@ class Issue464WriterRuleScopeTests(ResearchPackageAcceptanceSupport):
         config["configuration_digest"] = (
             "sha256:" + hashlib.sha256(rfc8785.dumps(config)).hexdigest()
         )
-        effective = resolve_effective_profile_set(
-            config, [MANIFEST, MANIFEST.parents[1] / "profile.json"]
-        )
+        effective = resolve_effective_profile_set(config, [MANIFEST, PREVIOUS_MANIFEST])
         cfg, eps = self.root / "config.json", self.root / "profiles.json"
         cfg.write_text(json.dumps(config), encoding="utf-8")
         eps.write_text(json.dumps(effective), encoding="utf-8")
@@ -99,12 +98,12 @@ class Issue464WriterRuleScopeTests(ResearchPackageAcceptanceSupport):
             )
             self.assertEqual({r["review"]["scope"] for r in rules}, {"section", "document"})
             original = json.loads(
-                (MANIFEST.parents[1] / "resources/writer-clean-rules.json").read_text()
+                (PREVIOUS_MANIFEST.parent / "resources/writer-clean-rules.json").read_text()
             )
             self.assertNotIn("review_contract_version", original)
             self.assertEqual({r["id"] for r in rules}, {r["id"] for r in original["items"]})
             self.assertEqual(
-                json.loads((MANIFEST.parents[1] / "profile.json").read_text())["profile_version"],
+                json.loads(PREVIOUS_MANIFEST.read_text())["profile_version"],
                 "1.1.0",
             )
         finally:

@@ -18,9 +18,9 @@ from tests.runtime.research_package_acceptance_support import ResearchPackageAcc
 ROOT = Path(__file__).resolve().parents[2]
 PROJECT_CONFIG = ROOT / "projects/misco-ai-2026/project-config.json"
 PROJECT_EPS = ROOT / "projects/misco-ai-2026/effective-profile-set.json"
-CONTINUITY = ROOT / "profiles/research/misco-workspace-continuity/profile.json"
-WRITER = ROOT / "profiles/narrative/misco/profile.json"
-PUBLICATION = ROOT / "profiles/publication/misco/profile.json"
+CONTINUITY = ROOT / "profiles/research/misco-workspace-continuity/1.0.0/profile.json"
+WRITER = ROOT / "profiles/narrative/misco/1.1.0/profile.json"
+PUBLICATION = ROOT / "profiles/publication/misco/1.3.0/profile.json"
 PROBE2_RESOLVE = ROOT / "scripts/migrations/misco/probe2-profile-resolve.json"
 
 

@@ -24,7 +24,7 @@ from plugins.local_application.publication.publication_release_support import (
 
 class EditorialEvidenceTests(unittest.TestCase):
     def test_unknown_group_save_requirement_and_conditional_permissions(self):
-        root = Path(__file__).resolve().parents[2] / "profiles/publication/misco-v1.4"
+        root = Path(__file__).resolve().parents[2] / "profiles/publication/misco/1.4.0"
         manifest = json.loads((root / "profile.json").read_text(encoding="utf-8"))
         profile = {"profile_id": "misco.publication", "profile_version": "1.4.0"}
         package = {
@@ -150,9 +150,9 @@ class NativeStyleAblationTests(unittest.TestCase):
     def test_single_rule_mutations_are_detected_without_changing_text(self):
         root = Path(__file__).resolve().parents[2]
         layout = json.loads(
-            (root / "profiles/publication/misco/resources/publication-formal-spec.json").read_text(
-                encoding="utf-8"
-            )
+            (
+                root / "profiles/publication/misco/1.3.0/resources/publication-formal-spec.json"
+            ).read_text(encoding="utf-8")
         )["formal_spec_profile"]["docx_layout"]
         lines = [
             ("title", "日本語報告書"),

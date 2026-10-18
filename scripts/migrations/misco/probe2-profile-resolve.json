@@ -1,8 +1,8 @@
 {
   "profile_manifest_files": [
-    "profiles/research/misco-workspace-continuity/profile.json",
-    "profiles/narrative/misco/profile.json",
-    "profiles/publication/misco/profile.json"
+    "profiles/research/misco-workspace-continuity/1.0.0/profile.json",
+    "profiles/narrative/misco/1.1.0/profile.json",
+    "profiles/publication/misco/1.3.0/profile.json"
   ],
   "request_replacements": [
     {

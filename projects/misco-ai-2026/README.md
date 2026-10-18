@@ -24,8 +24,8 @@ is no invented MISCO Research/Organization Profile.
 
 `effective-profile-set.json` is a checked-in deterministic projection of:
 
-- `profiles/narrative/misco/profile.json`
-- `profiles/publication/misco/profile.json`
+- `profiles/narrative/misco/1.1.0/profile.json`
+- `profiles/publication/misco/1.3.0/profile.json`
 
 Rebuild it with `uv run --frozen python scripts/regenerate_project_eps.py`; `--check` fails when
 the committed bytes differ from a fresh resolution.

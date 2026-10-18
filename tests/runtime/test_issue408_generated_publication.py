@@ -318,7 +318,7 @@ class VisualPermissionTests(unittest.TestCase):
             }
         }
         profile = {"profile_id": "misco.publication", "profile_version": "1.3.0"}
-        profile_root = Path(__file__).resolve().parents[2] / "profiles/publication/misco"
+        profile_root = Path(__file__).resolve().parents[2] / "profiles/publication/misco/1.3.0"
         manifest = json.loads((profile_root / "profile.json").read_text())
         resources = []
         for resource in manifest["resources"]:

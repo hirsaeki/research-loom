@@ -79,7 +79,7 @@ class FormalDocumentTests(unittest.TestCase):
         report = representative_report()
         layout = json.loads(
             (
-                ROOT / "profiles/publication/misco-v1.4/resources/publication-formal-spec.json"
+                ROOT / "profiles/publication/misco/1.4.0/resources/publication-formal-spec.json"
             ).read_text(encoding="utf-8")
         )["formal_spec_profile"]["docx_layout"]
         layout["formal_document"] = True
@@ -221,7 +221,7 @@ class FormalDocumentTests(unittest.TestCase):
     def test_coverage_requires_every_applicable_clause_and_exact_pdf_pages(self):
         coverage = json.loads(
             (
-                ROOT / "profiles/publication/misco-v1.4/resources/publication-coverage.json"
+                ROOT / "profiles/publication/misco/1.4.0/resources/publication-coverage.json"
             ).read_text(encoding="utf-8")
         )
         digest = "sha256:" + "a" * 64

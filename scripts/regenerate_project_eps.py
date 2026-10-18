@@ -25,8 +25,8 @@ from plugins.local_application.workspace.profile_resolution import (  # noqa: E4
 PROJECT_CONFIG = ROOT / "projects/misco-ai-2026/project-config.json"
 PROJECT_EPS = ROOT / "projects/misco-ai-2026/effective-profile-set.json"
 PROFILE_MANIFESTS = (
-    ROOT / "profiles/narrative/misco/profile.json",
-    ROOT / "profiles/publication/misco/profile.json",
+    ROOT / "profiles/narrative/misco/1.1.0/profile.json",
+    ROOT / "profiles/publication/misco/1.3.0/profile.json",
 )
 
 
