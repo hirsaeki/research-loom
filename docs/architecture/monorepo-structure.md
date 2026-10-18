@@ -71,6 +71,8 @@ Owns imperative extensions that cannot be expressed as declarative profile data:
 
 Plugins extend narrow core interfaces. Merely changing terminology or requiring a field should not require plugin code.
 
+Organization-specific behavior in the local application lives in its own top layer, `plugins/local_application/misco/`. Generic code reaches it only through an extension point such as `PublicationDialect`, which the composition root maps to the organization's Profile id. `tests/contracts/test_misco_isolation.py` fails if generic code under `core/` or `plugins/` names MISCO in a string literal, or imports the MISCO layer anywhere except the composition root.
+
 ### `skills/`
 
 Owns host-loaded workflows above the research state. Hosts load a skill explicitly; skills reach the harness only through the public CLI / application facade.
