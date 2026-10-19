@@ -621,6 +621,30 @@ class NextStateTests(unittest.TestCase):
         self.assertEqual(codes(issues), ["RT-STATE-005"])
         self.assertEqual(issues[0].affected_refs, ("SNP-1",))
 
+    def test_malformed_members_are_reported_not_raised(self):
+        good = {"kind": "project", "id": "PRJ-1", "revision": 0}
+        cases = {
+            "members not a list": ({"members": "nope"}, [("RT-STATE-003", ("SNP-1",))]),
+            "member not a mapping": (["nope"], [("RT-STATE-003", ("",))]),
+            "revision not an integer": (
+                [{**good, "revision": "x"}],
+                [("RT-STATE-003", ("PRJ-1",))],
+            ),
+            "boolean revision": ([{**good, "revision": True}], [("RT-STATE-003", ("PRJ-1",))]),
+        }
+        for name, (members, expected) in cases.items():
+            with self.subTest(name):
+                if isinstance(members, dict):
+                    snap = snapshot("SNP-1", [project(), rq()])
+                    snap.update(members)
+                    snap = with_content_digest(snap)
+                else:
+                    snap = self.resealed(members)
+                issues = self.check(snap)
+                self.assertEqual(
+                    [(issue.error_code, issue.affected_refs) for issue in issues], expected
+                )
+
     def test_snapshot_without_members(self):
         snap = with_content_digest({"id": "SNP-1", "kind": "snapshot"})
         self.assertEqual(self.check(snap), [])
