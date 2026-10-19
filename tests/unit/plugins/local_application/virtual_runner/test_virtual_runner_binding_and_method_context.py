@@ -29,7 +29,7 @@ from plugins.local_application.virtual_runner.virtual_runner_resolve import (
 from plugins.survey_virtual_runner.contracts import document_digest
 from plugins.survey_virtual_runner.llm_backend import prompt_template_pin
 from tests.runtime.survey_virtual_runner_test_support import METHOD_ID, PROTOCOL_ID
-from tests.runtime.test_unit_local_application_virtual_runner_resolve import (
+from tests.unit.plugins.local_application.virtual_runner.test_virtual_runner_resolve import (
     CONFIG_DIGEST,
     EPS_DIGEST,
     SNAPSHOT,

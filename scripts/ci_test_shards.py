@@ -28,9 +28,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DURATIONS = ROOT / "tests" / "ci_durations.json"
-# The Linux lane runs every runtime module; contracts run in their own job.
-LINUX_ROOTS = ("tests/runtime",)
-WINDOWS_ROOTS = ("tests/runtime", "tests/contracts")
+# The Linux lane runs every runtime and unit module; contracts run in their own job.
+LINUX_ROOTS = ("tests/runtime", "tests/unit")
+WINDOWS_ROOTS = ("tests/runtime", "tests/unit", "tests/contracts")
 MARKER = "CI_WINDOWS"
 
 
@@ -39,7 +39,7 @@ def module_name(path: Path) -> str:
 
 
 def test_modules(roots: tuple[str, ...]) -> list[Path]:
-    return sorted(path for root in roots for path in (ROOT / root).glob("test_*.py"))
+    return sorted(path for root in roots for path in (ROOT / root).rglob("test_*.py"))
 
 
 def windows_marker(path: Path) -> bool | None:
