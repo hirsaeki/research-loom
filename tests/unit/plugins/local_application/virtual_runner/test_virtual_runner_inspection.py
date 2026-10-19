@@ -186,11 +186,32 @@ class ResultArtifactRejectTests(unittest.TestCase):
             "Virtual Runner result artifact is malformed",
         )
 
-    def test_missing_required_extension_field_raises_key_error(self):
-        value = extension()
-        del value["defects"]
-        with self.assertRaises(KeyError):
-            show_run_stage(BareFacade([(meta(), encoded(value))]), proceed_with(VR_COMPLETED), "R")
+    def test_missing_or_mistyped_fields_are_reported_as_malformed(self):
+        # #577: a structurally broken artifact is malformed, not a bare KeyError.
+        def without(key):
+            value = extension()
+            del value[key]
+            return value
+
+        def without_result_key(key):
+            value = extension()
+            del value["virtual_runner_result"][key]
+            return value
+
+        cases = {
+            "missing extension field": without("defects"),
+            "missing virtual_runner_result": without("virtual_runner_result"),
+            "missing result field": without_result_key("execution_trace"),
+            "non-object virtual_runner_result": extension(virtual_runner_result=[1]),
+            "non-object respondent_plan": extension(respondent_plan=[1]),
+        }
+        for name, value in cases.items():
+            with self.subTest(name):
+                self.assert_rejected(
+                    BareFacade([(meta(), encoded(value))]),
+                    VR_COMPLETED,
+                    "Virtual Runner result artifact is malformed",
+                )
 
 
 class ProjectionTests(unittest.TestCase):
