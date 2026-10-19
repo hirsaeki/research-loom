@@ -50,7 +50,9 @@ AUTHORITY = "APPLICATION-DELPHI-AUTHORITY-001"
 FEEDBACK = "APPLICATION-DELPHI-FEEDBACK-001"
 STOPPING = "APPLICATION-DELPHI-STOPPING-001"
 ZERO = "sha256:" + "0" * 64
-LEGACY_FIXTURE = Path(__file__).parent / "fixtures" / "delphi-legacy-mixed-modes.json"
+LEGACY_FIXTURE = (
+    Path(__file__).resolve().parents[4] / "runtime" / "fixtures" / "delphi-legacy-mixed-modes.json"
+)
 
 
 def _assert_code(case: unittest.TestCase, code, call, *args, **kwargs):

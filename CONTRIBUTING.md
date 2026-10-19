@@ -23,7 +23,8 @@ uv run --frozen --group dev mypy                                   # strict, sco
 uv run --frozen python -m unittest discover -t . -s tests -p 'test_*.py'
 ```
 
-- `tests/contracts/` holds schema and semantic contract tests (fast); `tests/runtime/` holds behavior tests (slower, about 20 minutes serially).
+- `tests/contracts/` holds schema and semantic contract tests (fast); `tests/unit/<package>/` holds unit and characterization tests that import one production module directly (for example `tests/unit/core/runtime/test_state_validation.py`); `tests/runtime/` holds integration and acceptance tests (slower, about 20 minutes serially). Put new unit tests under `tests/unit/`.
+- [`docs/test-map.md`](docs/test-map.md) lists which tests import each production module. Regenerate it with `uv run --frozen python scripts/test_map.py` after adding or moving tests; `tests/contracts/test_test_map.py` fails when it is stale.
 - `tests/` is a package. Import shared fixtures as `tests.runtime.<module>` / `tests.contracts.<module>`; no `PYTHONPATH` setup is needed.
 - Narrow a run with `-s tests/runtime`, or pass dotted module names or file paths to `python -m unittest`.
 - Coverage is reported, not enforced (#507). CI runs the contract tests and the Linux runtime shards under `coverage`, and the `coverage-report` job adds the combined branch coverage to the run summary and uploads `coverage.xml`. To measure locally:

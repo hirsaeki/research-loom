@@ -10,7 +10,7 @@ The directories separate current specifications from history (#504):
 - `acceptance/` — acceptance and evidence records. `architecture/misco-integrated-acceptance.md` stays in place because tests and the migration closure cite its path.
 - `migration/` — the frozen #331 migration ledger, its closure, and the legacy archive.
 
-Start with the [repository README](../README.md), the [target monorepo structure](architecture/monorepo-structure.md), the [glossary](glossary.md), and the [contributor guide](../CONTRIBUTING.md).
+Start with the [repository README](../README.md), the [target monorepo structure](architecture/monorepo-structure.md), the [glossary](glossary.md), the generated [test map](test-map.md), and the [contributor guide](../CONTRIBUTING.md).
 
 ## Decisions
 

@@ -44,7 +44,7 @@ from core.runtime import (
     StateView,
 )
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[4]
 FIX = ROOT / "core/fixtures/capabilities/valid"
 DESCRIPTOR = json.loads((FIX / "generic-capability-descriptor.json").read_text(encoding="utf-8"))
 CONTEXT = json.loads((FIX / "generic-capability-context-pack.json").read_text(encoding="utf-8"))
