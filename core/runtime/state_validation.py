@@ -348,13 +348,25 @@ def _validate_next_state(
                 )
             )
         members = snapshot.get("members", ())
+        if not isinstance(members, (list, tuple)):
+            issues.append(_unresolved_member(str(snapshot.get("id", ""))))
+            members = ()
         seen: set[tuple[str, str, int]] = set()
         effective = _object_revision_map(current_state.objects, reduction.object_revisions)
         for member in members:
+            # A malformed member is reported, never raised: it cannot resolve to
+            # an exact object revision.
+            if not isinstance(member, Mapping):
+                issues.append(_unresolved_member(""))
+                continue
+            revision = member.get("revision", -1)
+            if not isinstance(revision, int) or isinstance(revision, bool):
+                issues.append(_unresolved_member(str(member.get("id", ""))))
+                continue
             key = (
                 str(member.get("kind", "")),
                 str(member.get("id", "")),
-                int(member.get("revision", -1)),
+                revision,
             )
             if key in seen:
                 issues.append(
@@ -368,14 +380,7 @@ def _validate_next_state(
             seen.add(key)
             obj = effective.get(key)
             if obj is None:
-                issues.append(
-                    _issue(
-                        "RT-STATE-003",
-                        ValidationStage.NEXT_STATE,
-                        "Snapshot member does not resolve to an exact immutable object revision.",
-                        (key[1],),
-                    )
-                )
+                issues.append(_unresolved_member(key[1]))
             elif member.get("digest") != canonical_digest(obj):
                 issues.append(
                     _issue(
@@ -395,6 +400,15 @@ def _validate_next_state(
                 )
             )
     return issues
+
+
+def _unresolved_member(ref: str) -> ValidationIssue:
+    return _issue(
+        "RT-STATE-003",
+        ValidationStage.NEXT_STATE,
+        "Snapshot member does not resolve to an exact immutable object revision.",
+        (ref,),
+    )
 
 
 def _references_from_object(obj: Mapping[str, Any]) -> Iterable[tuple[str, str]]:
