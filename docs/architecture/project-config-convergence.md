@@ -118,6 +118,8 @@ Regression coverage includes schema boundaries, deterministic digest, local refe
 
 ## Explicit non-goals
 
+> **Superseded (#504):** Later work added the production resolver and [generation advancement](profile-generation-advancement.md), the [Research Attention lifecycle](production-research-attention-lifecycle.md), the MISCO Project Config in `projects/misco-ai-2026/` and [SQLite persistence](sqlite-research-state-persistence.md); the legacy trees were removed in #500.
+
 This PR does not add:
 
 - a concrete MISCO Project Config or Organization Profile;

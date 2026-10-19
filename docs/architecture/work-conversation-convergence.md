@@ -2,6 +2,8 @@
 
 PR 10 establishes the implementation-neutral interaction boundary that lets a Human use natural language around the canonical Research Harness without turning chat into a second source of research authority. It builds on PR 3–9, especially PR 8 Project Config and PR 9 Research Capability Invocation/Handoff. Both legacy trees remain unchanged.
 
+> **Superseded (#504):** Legacy trees: Removed in #500; the `legacy-archive-2026` tag keeps the trees and [`docs/migration/misco-legacy-sources/`](../migration/misco-legacy-sources/README.md) keeps the ledger-pinned files.
+
 ## Canonical boundary
 
 The conversation layer has five closed input classes: `QUERY`, `PROPOSAL`, `COMMITTABLE_ACTION`, `CONFIRMATION`, and `CANCEL`. Natural-language text is input material only. It never directly becomes Evidence, a Research State patch, a Human Decision, a Capability result, or an authoritative Handoff.
@@ -56,6 +58,8 @@ PR9 candidate next actions/methods are surfaced by binding the exact Handoff dig
 
 Aborting an already active Run is not implicit `CANCEL` behavior. If exposed conversationally it is a distinct typed state-changing Harness action that follows the same proposal/confirmation/receipt boundary. Concrete abort/recovery/workspace-lifecycle semantics are deferred.
 
+> **Superseded (#504):** `run.abort` is implemented by the [production Work Conversation runtime](work-conversation-runtime.md).
+
 ## Audit
 
 Every executed, rejected, failed, or cancelled state-changing attempt is represented by an immutable digest-bound `ActionReceipt` that records actor, exact action/proposal binding, before/after state, applicable research pins, confirmation where required, execution route, trace identity, and completion time.
@@ -71,3 +75,5 @@ Not promoted: the legacy concrete action enum; `REGISTER_ATTENTION_DROP`; recove
 `core/fixtures/conversation/valid/generic-conversation-flow.json` covers read-only status, proposal/cancel, committable Capability execution through exact confirmation and PR9 Invocation/Handoff, and proposal-only presentation of PR9 next-action/next-method candidates. `tests/contracts/conversation_oracle.py` is fixture-only executable specification, not a production classifier/coordinator/confirmation service/authorization engine/state reducer.
 
 PR 10 does not implement Work UI automation, a concrete runtime coordinator, Desktop Research/Survey/Case/Delphi/Virtual Runner policy, SQLite, recovery/archive, Writer/Publication, or legacy deletion.
+
+> **Superseded (#504):** The runtime coordinator is now the [production Work Conversation runtime](work-conversation-runtime.md); run replay and recovery are in the [local Workspace application](production-local-workspace-application-cli.md), Writer/Publication in [Deterministic Publication preview and release](deterministic-publication-release.md); the legacy trees were removed in #500.

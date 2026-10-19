@@ -74,6 +74,8 @@ A provisional outline, primary/publication exposition location, literal heading,
 
 Project Config will later determine the canonical home for project-specific Research Attention.
 
+> **Superseded (#504):** Project Config now owns project Research Attention; see the [Research Attention lifecycle](production-research-attention-lifecycle.md).
+
 ## Composition and conflicts
 
 All `narrative.*` paths reuse PR 4 deterministic composition. The canonical paths in PR 7 use monotone `union`: composing Profiles can add stages, minimum dependencies, semantic purposes, preservation obligations, connection obligations, authority prohibitions, and recognized non-normative hint classes.

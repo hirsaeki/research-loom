@@ -84,3 +84,5 @@ A request such as “このVirtual Runの結果で報告書を仮組みして、
 ## Out of scope
 
 Production Writer/Publication runtimes, final Research/Manuscript freeze, final Publication Release, concrete DOCX/PDF renderer implementation, concrete MISCO templates, SQLite, OneDrive publishing, Fork/Branch/Recovery, and legacy deletion remain outside PR18.
+
+> **Superseded (#504):** Production runtimes now exist: [Versioned Writer Composition](versioned-writer-composition.md), [Deterministic Publication release](deterministic-publication-release.md) and [MISCO Publication Profile application](misco-publication-profile-application.md).

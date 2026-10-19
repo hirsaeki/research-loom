@@ -63,6 +63,8 @@ A workspace persists three different things with different authority:
 - **Effective Profile Set** is an already-resolved declarative policy binding. PR27 does not resolve or hot-reload Profiles.
 - **Research State** is the authoritative append-only state managed through the existing runtime and SQLite repository.
 
+> **Superseded (#504):** Profiles are now resolved and advanced through `profile resolve` / `profile advance`; see [Project / Profile generation advancement](profile-generation-advancement.md).
+
 `workspace-binding.json` contains only reopen metadata: format/version, project identity, exact Config/Profile locators and digests, fixed runtime storage locations, and initialization metadata. Evidence, Findings, RQs, current Snapshot membership, Human Decisions, execution results, and Research Exhibits are not duplicated into the binding file.
 
 ## Bootstrap

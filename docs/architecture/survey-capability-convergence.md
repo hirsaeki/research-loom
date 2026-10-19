@@ -40,6 +40,8 @@ Canonical Survey Design + Questionnaire
 
 The future Virtual Runner should consume the same canonical Questionnaire revision and digest. It must not define a separate "Virtual Runner questionnaire".
 
+> **Superseded (#504):** The Virtual Runner now exists; see [production Survey Virtual Runner](production-survey-virtual-runner.md).
+
 Export is a read-only projection. Re-exporting the same persisted revision produces stable ordering and bytes; export-time timestamps are not injected into the semantic payload.
 
 ## Execution and analysis boundaries
@@ -49,3 +51,5 @@ Responses preserve partial/nonresponse/dropout/exclusion/duplicate/missing-data 
 Analysis preserves eligible/response/completion counts, item denominators, missingness/exclusions, aggregation and subgroup-definition provenance, free-text coding refs, limitations/coverage, and candidate response-bias assessment. Statistics are candidate Analysis material, not Findings.
 
 `virtual`/`synthetic_test` are accepted PR12 modes, but PR13/PR40 do not define synthetic respondent/persona generation. Synthetic responses cannot become empirical responses or empirical Evidence. Virtual Runner execution remains a later PR.
+
+> **Superseded (#504):** Synthetic respondents are now provided by the [production Survey Virtual Runner](production-survey-virtual-runner.md) and the [LLM Virtual Respondent](production-survey-llm-virtual-respondent.md).

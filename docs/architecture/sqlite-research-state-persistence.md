@@ -130,6 +130,8 @@ problems. It never "repairs" corruption into a new Research State.
 The adapter depends on `core.runtime`; `core.runtime` does not depend on the
 adapter. Composition-root wiring is intentionally deferred.
 
+> **Superseded (#504):** The adapter is wired into the [local Workspace application](production-local-workspace-application-cli.md); execution artifacts live in the [portable execution/material store](portable-execution-material-store.md) and Writer/Publication runtimes are described in [Versioned Writer Composition](versioned-writer-composition.md) and [Deterministic Publication release](deterministic-publication-release.md).
+
 Artifact bytes, protected raw participant data, exports, publishing,
 OneDrive/SharePoint, review import, backup/restore CLI, encryption-at-rest,
 production Capability executors, Writer/Publication production runtimes, and

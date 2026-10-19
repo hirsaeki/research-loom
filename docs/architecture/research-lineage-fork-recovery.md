@@ -2,6 +2,8 @@
 
 PR19 adds logical Research State ancestry without introducing Git branch semantics or runtime persistence. It extends the canonical contract surface after PR18 while preserving PR3–18 authority boundaries.
 
+> **Superseded (#504):** Runtime persistence now exists; see [Research State runtime](research-state-runtime.md) and [SQLite persistence](sqlite-research-state-persistence.md).
+
 A lineage head is a pointer to an immutable Research Snapshot. Fork/Recovery creates a child lineage from an exact historical baseline and leaves the parent head unchanged. Semantic inheritance is explicit through `PRESERVE`, `RECONFIRM`, and `INVALIDATE`; historical records are never deleted.
 
 Corrective recovery is modeled as a specialized fork. Its Replay Plan is immutable, uses new Run IDs, rebuilds Context Packs from the target lineage, and forbids copying old Capability Handoffs as new results. Impact Assessment intentionally allows `unknown` so the Harness never assumes LLM-computed downstream coverage is complete.

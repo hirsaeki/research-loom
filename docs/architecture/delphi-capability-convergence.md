@@ -15,3 +15,5 @@ Each round preserves exact Protocol / Instrument / RunSpec pins, participation, 
 Stopping may use configured consensus, stability, diminishing information gain, attrition/feasibility, and maximum approved rounds. It remains a recommendation and cannot complete Research or choose the next Method.
 
 `real`, `virtual`, and `synthetic_test` retain PR12 meanings. Synthetic expert/persona generation and Virtual Runner contracts remain out of scope.
+
+> **Superseded (#504):** Virtual Runner contracts are now defined in [Virtual Runner convergence](virtual-runner-cutover-convergence.md); the production Delphi lifecycle is [two-round Delphi](production-delphi-two-round.md).

@@ -303,6 +303,8 @@ PR33 does not change the existing single-RQ behavior for:
 
 ## Explicit non-goals
 
+> **Superseded (#504):** Adopted-RQ revision and closure are now provided by [iterative Research Question review](production-research-question-review.md).
+
 PR33 does not add:
 
 ```text

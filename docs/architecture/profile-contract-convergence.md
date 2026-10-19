@@ -6,6 +6,8 @@ PR 4 is the bounded convergence step immediately above PR 3. Core research-objec
 
 Both imported legacy trees remain unchanged and serve as migration evidence rather than runtime dependencies.
 
+> **Superseded (#504):** Removed in #500; the `legacy-archive-2026` tag keeps the trees and [`docs/migration/misco-legacy-sources/`](../migration/misco-legacy-sources/README.md) keeps the ledger-pinned files.
+
 ## Inputs retained and rejected
 
 The legacy Harness demonstrated separately versioned static Profile packs, manifest identity, hashes, and useful non-Core policy. The legacy Profile repository demonstrated static organization/publication guidance and provenance-sensitive source packs. The convergence inventory separated Research, Organization, Narrative, and Publication concerns and called for composable effective constraints.
@@ -61,6 +63,8 @@ Schema validation alone cannot catch transitive version resolution, property-lev
 The `contract-checks` GitHub Actions workflow runs these checks. This is intentionally not production resolution code.
 
 ## Explicit non-goals
+
+> **Superseded (#504):** Later work added the [Project Config](project-config-convergence.md), the production resolver and [generation advancement](profile-generation-advancement.md), the MISCO Profiles ([Writer](misco-writer-profile-application.md), [Publication](misco-publication-profile-application.md)) and [SQLite persistence](sqlite-research-state-persistence.md).
 
 PR 4 still does not:
 

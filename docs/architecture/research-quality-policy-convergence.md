@@ -6,6 +6,8 @@ PR 6 converges the reusable research-method and research-quality policy that PR 
 
 The two legacy trees remain migration sources and are not modified.
 
+> **Superseded (#504):** Removed in #500; the `legacy-archive-2026` tag keeps the trees and [`docs/migration/misco-legacy-sources/`](../migration/misco-legacy-sources/README.md) keeps the ledger-pinned files.
+
 ## Inputs compared
 
 ### Legacy `research-harness/`
@@ -96,6 +98,8 @@ The fixture suite proves:
 The executable evaluator in `tests/contracts/research_quality_oracle.py` is fixture-only. It is not a production research validator.
 
 ## Deliberate exclusions
+
+> **Superseded (#504):** Later work added the [Project Config](project-config-convergence.md), [runtime Profile resolution](profile-generation-advancement.md), [quality evaluation](research-quality-profile-application.md) and [SQLite persistence](sqlite-research-state-persistence.md). There is still no concrete MISCO Research or Organization Profile.
 
 PR 6 does not:
 

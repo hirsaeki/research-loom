@@ -26,6 +26,8 @@ Project Config + Effective Profile Set + immutable Research Snapshot
 
 Legacy Desktop Research already separated bounded context from execution, returned structured handoff data including counterevidence/unknowns/gaps, proposed rather than selected next methods, and routed adoption back through Harness validation/Human Decision. PR 9 promotes only those capability-independent semantics. Desktop-specific source policy, capture layout, stopping/coverage logic, Work assumptions, and concrete question-impact vocabulary remain deferred.
 
+> **Superseded (#504):** The Desktop Research specifics are now defined in [Desktop Research capability convergence](desktop-research-capability-convergence.md).
+
 ## Descriptor and authorization
 
 A Descriptor declares capability identity/version/kind, functions, modes, compatibility, descriptive availability, and a content digest. `capability_kind` and function IDs remain open vocabularies.
@@ -69,3 +71,5 @@ It also records implementation/run/trace provenance, content digests, exact inpu
 Common contracts belong in Core. Concrete imperative Capability adapters/runtimes belong in `plugins/`. Project Config configures but does not own implementations; Profiles constrain but do not implement them.
 
 PR 9 does not implement Desktop Research details, Survey/Case/Delphi/Virtual Runner behavior, Work Conversation UI/coordinator, a permission engine, SQLite/export/publish, Writer/Publication, or legacy deletion.
+
+> **Superseded (#504):** Later work implemented these: [Desktop Research](desktop-research-capability-convergence.md) and [its production path](production-desktop-research.md), [Survey](survey-capability-convergence.md), [Case Study](case-study-capability-convergence.md), [Delphi](delphi-capability-convergence.md), [Virtual Runner](virtual-runner-cutover-convergence.md), the [Work Coordinator](work-conversation-runtime.md), [SQLite persistence](sqlite-research-state-persistence.md) and [Publication release](deterministic-publication-release.md); the legacy trees were removed in #500.

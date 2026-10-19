@@ -153,3 +153,5 @@ Writer may later receive selected Research Exhibits through a Research Package, 
 Publication may later turn selected analytical material into numbered/rendered
 figures or tables. PR37 intentionally adds neither integration. The registry first
 establishes only durable capture and exact retrieval.
+
+> **Superseded (#504):** Exhibits now reach the [Research Package](production-research-package.md), [Publication](deterministic-publication-release.md) and [visual semantics](research-visual-semantics.md).

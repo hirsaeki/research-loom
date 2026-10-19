@@ -2,6 +2,8 @@
 
 Issue #77 adds a bounded, read-only production projection from persisted Research Loom state and selected working material to the canonical Harness→Writer Research Package. It does not add Outline, Writer, Publication, Capability Run, Handoff, or LLM execution.
 
+> **Superseded (#504):** Writer and Publication now consume the Package: see [Versioned Writer Composition](versioned-writer-composition.md) and [Deterministic Publication release](deterministic-publication-release.md).
+
 ## Public flow
 
 `research-package build` selects one Snapshot/RQ plus explicit Research Objects, Run candidates, Exhibits, Project Inputs, verified Desktop Research text renditions, and unresolved gaps. The resulting immutable package is available through `list` and `show`, then can be `export`ed as `research-package.json`, deterministic `research-package.md`, and exact attachments. `research-package verify --input DIR` validates the exported package without opening the source Workspace, DB, network, or original intake path.

@@ -248,4 +248,6 @@ Work can inspect `research_attention.status`, submit a bounded proposal, then su
 
 ## Non-goals
 
+> **Superseded (#504):** Adopted-RQ revision is now provided by [iterative Research Question review](production-research-question-review.md); optional store health is described in [optional durable health](optional-durable-health.md).
+
 PR30 does not add Attention extraction/distillation LLMs, legacy Attention Drop ingestion, filesystem watchers, Core Attention objects, new transitions or Core decisions, Project Config runtime rewriting, generic hot reload, arbitrary full-map ingress, semantic duplicate detection, automatic RQ/Method/Source/Evidence promotion, Capability Context Pack ABI changes, Writer/Publication work, MCP/WebMCP, OneDrive/M365 integration, adopted-RQ revision, or a workspace migration framework.
