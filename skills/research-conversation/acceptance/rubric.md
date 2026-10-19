@@ -25,3 +25,12 @@ Semantic misdiagnosis, missing explanation, and dependence on a user's correctio
 For a live probe, preserve the raw response alongside the score. Do not use an LLM judge as the required authority for pass/fail.
 
 For live P2 records, also record the selected public view for each Loom call and any exact `candidate show` / `decision show` lookup. A normal-progress call that silently falls back to the omitted/default detail view is a public-read-model failure even if the final prose happens to sound acceptable.
+
+## Reflective review lenses (#590)
+
+For the Reflective Review comparison ([reflective-review.md](reflective-review.md)), score each output on two lenses, each PASS/FAIL with a short note. Never add them into one total. Readability never offsets an unsupported claim, and evidence fidelity never offsets a non-answer.
+
+1. **Purpose fit**: the output answers the human's original request and gives the reader what they need to decide or act. It does not drop an explicit instruction, widen the work beyond the request, or replace the answer with process detail.
+2. **Meaning fidelity**: the output keeps the evidence, the strength of the supported conclusion, material scope and reservations, counterevidence, open questions, and saved/adopted status. Both overstatement and conclusion-erasure fail.
+
+Also record, without scoring: unsupported claims, dropped conclusions, missing conditions, authority errors, unnecessary questions, degradation of a correct original, input size, time and cost. The person scoring decides PASS or FAIL. A model's own scores are notes only.

@@ -134,3 +134,7 @@ Use one Codex host session, at most two frozen cases: S9 (initial chat plus firs
 For fixture-only ablation, remove each added obligation in turn: first-save summary (audit-only negative), evidence-supported diagnosis (S9 negative and S9-content contrast), prior-approval delta (S10-zero versus S10-change). Record which semantic failure becomes unconstrained. Keep authority requirements in every variant. This checks contract coverage, not model response quality; mechanical tests and self-assessment are not independent human acceptance.
 
 Recorded #448 evidence: [initial Codex probe (FAIL retained)](issue448-codex-probe.md) and [explicitly authorized corrective probe](issue448-codex-probe-r2.md). The corrective run separates bootstrap from ordinary stimuli; it does not relabel the initial failure or award migration-wide G4/G5 acceptance.
+
+## Reflective review comparison (#590)
+
+The Reflective Review comparison (#452 stage 1) uses its own frozen cases RR1–RR8, kept separate from S1–S14. See [reflective-review.md](reflective-review.md).
