@@ -340,6 +340,8 @@ class SpecCaptureTests(_Base):
         self.assertEqual(error.message, "SurveyResponseDataset Instrument binding is inconsistent")
 
     def test_state_change_during_capture_is_reported(self) -> None:
+        # The check runs after the spec is stored (a postcondition by design,
+        # #577); the stored spec is immutable and non-authoritative.
         dataset = self._dataset()
         snapshots = iter([{"snapshot_ref": "A"}, {"snapshot_ref": "B"}])
         with patch.object(

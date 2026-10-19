@@ -69,6 +69,17 @@ class SurveyMixin:
         return repository.load_state_view(self._project_id, lineage)
 
     def _capture(self, state, operation):
+        """Persist to an optional-tier Survey registry only while ``state`` is the head.
+
+        A stale head is rejected before anything is written. Callers then compare
+        Research State before and after as a postcondition (the
+        ``...STATE-MUTATION-001`` errors): it checks the write's side effects, so
+        it can only run after the write. If it fails, the record already written
+        stays. That record is immutable, content-addressed and idempotent to
+        capture again, and it is not authoritative, so nothing reaches Research
+        State. The optional tier promises no atomicity with the core tier
+        (ADR 0001).
+        """
         try:
             with guard_research_state_head(
                 self._application.state_repository,
