@@ -182,15 +182,21 @@ _ACTION_VALIDATORS = {
 class _SurveyAnalysisActionHandler:
     """Bridge audited Conversation actions to the shared Survey analysis facade."""
 
-    def __init__(self, application, operation: str, *, workspace_root: Path | None = None) -> None:
+    def __init__(
+        self,
+        application,
+        operation: str,
+        *,
+        facade_class,
+        workspace_root: Path | None = None,
+    ) -> None:
         self._application = application
         self._operation = operation
+        self._facade_class = facade_class
         self._workspace_root = workspace_root
 
     def execute(self, payload, *, state, actor, proposal):
-        from ..facade_composition import SurveyAnalysisFacade
-
-        facade = SurveyAnalysisFacade(
+        facade = self._facade_class(
             self._application,
             state.project_ref,
             workspace_root=self._workspace_root,

@@ -4,17 +4,16 @@
 ``LAYERS`` from the bottom up. A subpackage imports only itself and the
 subpackages below it, never a module left directly in ``local_application``
 (the composition root: CLI, facade and facade composition), and never another
-subpackage's private names. Only the composition root (``ROOT_MODULES``) stays
-directly in ``local_application``.
+subpackage's private names, not even inside a function. Only the composition
+root (``ROOT_MODULES``) stays directly in ``local_application``.
 
-``ROOT_CALLBACKS`` lists the few places where a service builds one of the partial
-facades defined in the composition root. Each is allowed only as an import made
-inside a function, so the root still loads after the layer it imports.
+A service that needs one of the partial facades defined in the composition root
+gets it from the root as a ``_*_facade_class`` attribute rather than importing
+the root (#591).
 """
 
 from __future__ import annotations
 
-import ast
 import unittest
 
 from tests.contracts.test_plugin_layering import ROOT, _imports, _is_private, _module_name
@@ -34,33 +33,8 @@ LAYERS = (
     "misco",
 )
 
-
-COMPOSITION = f"{PACKAGE}.facade_composition"
-ROOT_CALLBACKS = {
-    (f"{PACKAGE}.material.new_material_continuation_service", COMPOSITION): (
-        "continuation services submit actions through ContinuationFacade"
-    ),
-    (f"{PACKAGE}.survey.survey_analysis_actions", COMPOSITION): (
-        "Survey analysis action handlers run through SurveyAnalysisFacade"
-    ),
-    (f"{PACKAGE}.survey.survey_response_facade", COMPOSITION): (
-        "Survey response action handlers run through SurveyResponseFacade"
-    ),
-}
 # Modules left directly in local_application: the composition root and nothing else.
 ROOT_MODULES = {"__init__", "__main__", "cli", "facade", "facade_composition"}
-
-
-def _lazy_import_lines(path) -> set[int]:
-    """Lines of imports made inside a function rather than at module or class level."""
-    tree = ast.parse(path.read_text(encoding="utf-8"))
-    return {
-        node.lineno
-        for func in ast.walk(tree)
-        if isinstance(func, (ast.FunctionDef, ast.AsyncFunctionDef))
-        for node in ast.walk(func)
-        if isinstance(node, (ast.Import, ast.ImportFrom))
-    }
 
 
 def _subpackage(module: str) -> str | None:
@@ -71,16 +45,13 @@ def _subpackage(module: str) -> str | None:
     return rest[0] if rest and (PACKAGE_DIR / rest[0] / "__init__.py").is_file() else ""
 
 
-def _violations(
-    source: str, where: str, imports, *, module: str = "", lazy_lines: frozenset[int] = frozenset()
-) -> list[str]:
+def _violations(source: str, where: str, imports) -> list[str]:
     found = []
     for target, names, line in imports:
         dest = _subpackage(target)
         if dest is None or dest == source:
             continue
-        callback = (module, target) in ROOT_CALLBACKS and line in lazy_lines
-        if (dest == "" and not callback) or (dest and LAYERS.index(dest) > LAYERS.index(source)):
+        if dest == "" or LAYERS.index(dest) > LAYERS.index(source):
             found.append(f"{where}:{line} {source} -> {target}")
         # A private submodule counts whether it is named in the module path
         # (`import ...support._m`, `from ...support._m import y`) or imported as a name.
@@ -100,18 +71,8 @@ def layering_violations() -> list[str]:
         module = _module_name(path)
         source = _subpackage(module)
         if source:
-            found += _violations(
-                source,
-                path.relative_to(ROOT).as_posix(),
-                _imports(path),
-                module=module,
-                lazy_lines=frozenset(_lazy_import_lines(path)),
-            )
+            found += _violations(source, path.relative_to(ROOT).as_posix(), _imports(path))
     return found
-
-
-def _module_path(module: str):
-    return ROOT.joinpath(*module.split(".")).with_suffix(".py")
 
 
 class LocalApplicationLayeringTests(unittest.TestCase):
@@ -126,14 +87,18 @@ class LocalApplicationLayeringTests(unittest.TestCase):
         flat = {path.stem for path in PACKAGE_DIR.glob("*.py")}
         self.assertEqual(ROOT_MODULES, flat, "move feature modules into a subpackage")
 
-    def test_root_callbacks_are_lazy_and_still_needed(self):
-        for module, target in ROOT_CALLBACKS:
-            path = _module_path(module)
-            with self.subTest(module=module):
-                lazy = _lazy_import_lines(path)
-                lines = [line for t, _n, line in _imports(path) if t == target]
-                self.assertTrue(lines, "remove the stale ROOT_CALLBACKS entry")
-                self.assertTrue(set(lines) <= lazy, "a root callback must be imported lazily")
+    def test_composition_root_supplies_the_partial_facades(self):
+        from plugins.local_application import facade_composition as composition
+
+        expected = {
+            "_continuation_facade_class": composition.ContinuationFacade,
+            "_survey_analysis_facade_class": composition.SurveyAnalysisFacade,
+            "_survey_response_facade_class": composition.SurveyResponseFacade,
+        }
+        for facade in composition._COMPOSED:
+            for name, partial in expected.items():
+                with self.subTest(facade=facade.__name__, attribute=name):
+                    self.assertIs(partial, getattr(facade, name))
 
     def test_guard_classifies_modules(self):
         self.assertEqual("support", _subpackage(f"{PACKAGE}.support.stages"))
