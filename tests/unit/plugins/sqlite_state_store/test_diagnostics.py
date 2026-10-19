@@ -29,6 +29,27 @@ from tests.runtime.runtime_fixtures import (
 from tests.runtime.test_sqlite_state_repository import _claim
 
 
+class _FakeIntegrityCursor:
+    """Delegate to a real cursor but report a fixed PRAGMA integrity_check result."""
+
+    def __init__(self, cursor: sqlite3.Cursor, integrity_rows) -> None:
+        self._cursor = cursor
+        self._integrity_rows = integrity_rows
+
+    @property
+    def row_factory(self):
+        return self._cursor.row_factory
+
+    @row_factory.setter
+    def row_factory(self, factory) -> None:
+        self._cursor.row_factory = factory
+
+    def execute(self, sql, *args):
+        if sql.strip() == "PRAGMA integrity_check":
+            return iter(self._integrity_rows)
+        return self._cursor.execute(sql, *args)
+
+
 class _FakeIntegrityConnection:
     """Delegate to a real connection but report a fixed PRAGMA integrity_check result."""
 
@@ -36,10 +57,8 @@ class _FakeIntegrityConnection:
         self._connection = connection
         self._integrity_rows = integrity_rows
 
-    def execute(self, sql, *args):
-        if sql.strip() == "PRAGMA integrity_check":
-            return iter(self._integrity_rows)
-        return self._connection.execute(sql, *args)
+    def cursor(self) -> _FakeIntegrityCursor:
+        return _FakeIntegrityCursor(self._connection.cursor(), self._integrity_rows)
 
 
 class IntegrityIssuesTests(unittest.TestCase):
@@ -330,6 +349,17 @@ class IntegrityIssuesTests(unittest.TestCase):
         closed.close()
         with self.assertRaisesRegex(RepositoryError, "SQLite integrity diagnostics failed"):
             integrity_issues_for(closed)
+
+    def test_connection_without_row_factory_is_supported(self) -> None:
+        plain = sqlite3.connect(f"file:{self.db_path}?mode=ro", uri=True)
+        self.addCleanup(plain.close)
+        self.assertIsNone(plain.row_factory)
+        self.assertEqual(integrity_issues_for(plain), ())
+        self.assertIsNone(plain.row_factory, "the caller's row_factory must not change")
+        # Exercises the row["..."] and row.keys() paths that needed sqlite3.Row.
+        self.corrupt("UPDATE lineages SET head_snapshot_ref = 'SNP-NOPE'")
+        self.assertEqual(integrity_issues_for(plain), self.issues())
+        self.assertIn("lineage-head-missing:LIN-1", integrity_issues_for(plain))
 
     def test_read_only_connection_is_supported(self) -> None:
         read_only = sqlite3.connect(f"file:{self.db_path}?mode=ro", uri=True)

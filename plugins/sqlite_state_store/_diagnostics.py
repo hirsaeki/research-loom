@@ -18,27 +18,42 @@ if TYPE_CHECKING:
     from .adapter import SQLiteResearchStateRepository
 
 
+def _query(
+    connection: sqlite3.Connection, sql: str, params: tuple[Any, ...] = ()
+) -> sqlite3.Cursor:
+    # A fresh cursor per query: nested loops in integrity_issues_for iterate
+    # one result while running another query.
+    cursor = connection.cursor()
+    cursor.row_factory = sqlite3.Row
+    return cursor.execute(sql, params)
+
+
 def integrity_issues_for(connection: sqlite3.Connection) -> tuple[str, ...]:
-    """Return deterministic State diagnostics over any connection, including read-only."""
+    """Return deterministic State diagnostics over any connection, including read-only.
+
+    Rows are read through cursors that use ``sqlite3.Row``, so the caller's
+    ``row_factory`` neither matters nor changes.
+    """
 
     issues: list[str] = []
     try:
-        for row in connection.execute("PRAGMA integrity_check"):
+        for row in _query(connection, "PRAGMA integrity_check"):
             if str(row[0]).lower() != "ok":
                 issues.append(f"sqlite-integrity:{row[0]}")
-        for row in connection.execute("PRAGMA foreign_key_check"):
+        for row in _query(connection, "PRAGMA foreign_key_check"):
             issues.append(
                 "foreign-key:"
                 + ":".join(str(row[key]) for key in row.keys() if row[key] is not None)
             )
 
-        for row in connection.execute(
+        for row in _query(
+            connection,
             """
             SELECT kind, object_id, revision,
                    payload_json, payload_digest, content_digest
             FROM object_revisions
             ORDER BY kind, object_id, revision
-            """
+            """,
         ):
             label = f"{row['kind']}:{row['object_id']}@{row['revision']}"
             try:
@@ -48,7 +63,8 @@ def integrity_issues_for(connection: sqlite3.Connection) -> tuple[str, ...]:
             except RepositoryError as exc:
                 issues.append(f"payload:{label}:{exc}")
 
-        for row in connection.execute(
+        for row in _query(
+            connection,
             """
             SELECT s.snapshot_ref, s.content_digest,
                    o.payload_json, o.payload_digest,
@@ -59,7 +75,7 @@ def integrity_issues_for(connection: sqlite3.Connection) -> tuple[str, ...]:
              AND o.object_id = s.snapshot_ref
              AND o.revision = s.revision
             ORDER BY s.snapshot_ref
-            """
+            """,
         ):
             snapshot_ref = str(row["snapshot_ref"])
             if row["payload_json"] is None:
@@ -86,7 +102,8 @@ def integrity_issues_for(connection: sqlite3.Connection) -> tuple[str, ...]:
                     "revision": int(item["member_revision"]),
                     "digest": str(item["member_content_digest"]),
                 }
-                for item in connection.execute(
+                for item in _query(
+                    connection,
                     """
                     SELECT member_kind, member_id,
                            member_revision, member_content_digest
@@ -100,7 +117,8 @@ def integrity_issues_for(connection: sqlite3.Connection) -> tuple[str, ...]:
             if indexed != list(payload.get("members", ())):
                 issues.append(f"snapshot-member-index-mismatch:{snapshot_ref}")
             for member in indexed:
-                target = connection.execute(
+                target = _query(
+                    connection,
                     """
                     SELECT payload_digest FROM object_revisions
                     WHERE kind = ? AND object_id = ? AND revision = ?
@@ -128,7 +146,8 @@ def integrity_issues_for(connection: sqlite3.Connection) -> tuple[str, ...]:
             ("decisions", "decision_ref", "decision"),
             ("audit_events", "audit_ref", "audit_event"),
         ):
-            for row in connection.execute(
+            for row in _query(
+                connection,
                 f"""
                 SELECT x.{ref_name} AS ref, x.revision
                 FROM {table} x
@@ -143,14 +162,16 @@ def integrity_issues_for(connection: sqlite3.Connection) -> tuple[str, ...]:
             ):
                 issues.append(f"{kind}-object-missing:{row['ref']}")
 
-        for row in connection.execute(
+        for row in _query(
+            connection,
             """
             SELECT lineage_id, head_snapshot_ref,
                    head_snapshot_digest, head_snapshot_revision
             FROM lineages ORDER BY lineage_id
-            """
+            """,
         ):
-            head = connection.execute(
+            head = _query(
+                connection,
                 """
                 SELECT content_digest, revision FROM snapshots
                 WHERE snapshot_ref = ?
@@ -164,7 +185,8 @@ def integrity_issues_for(connection: sqlite3.Connection) -> tuple[str, ...]:
             ) != int(row["head_snapshot_revision"]):
                 issues.append(f"lineage-head-metadata-mismatch:{row['lineage_id']}")
 
-        for row in connection.execute(
+        for row in _query(
+            connection,
             """
             SELECT p.project_ref, p.active_lineage_ref
             FROM project_active_lineage p
@@ -173,18 +195,19 @@ def integrity_issues_for(connection: sqlite3.Connection) -> tuple[str, ...]:
              AND l.project_ref = p.project_ref
             WHERE l.lineage_id IS NULL
             ORDER BY p.project_ref
-            """
+            """,
         ):
             issues.append(f"active-lineage-missing:{row['project_ref']}")
 
-        for row in connection.execute(
+        for row in _query(
+            connection,
             """
             SELECT commit_id, transition_id, bundle_digest,
                    idempotency_key, receipt_json,
                    prior_snapshot_ref, prior_snapshot_digest,
                    new_snapshot_ref, new_snapshot_digest
             FROM commits ORDER BY commit_id
-            """
+            """,
         ):
             try:
                 receipt = receipt_from_json(str(row["receipt_json"]))
