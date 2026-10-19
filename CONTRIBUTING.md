@@ -26,6 +26,14 @@ uv run --frozen python -m unittest discover -t . -s tests -p 'test_*.py'
 - `tests/contracts/` holds schema and semantic contract tests (fast); `tests/runtime/` holds behavior tests (slower, about 20 minutes serially).
 - `tests/` is a package. Import shared fixtures as `tests.runtime.<module>` / `tests.contracts.<module>`; no `PYTHONPATH` setup is needed.
 - Narrow a run with `-s tests/runtime`, or pass dotted module names or file paths to `python -m unittest`.
+- Coverage is reported, not enforced (#507). CI runs the contract tests and the Linux runtime shards under `coverage`, and the `coverage-report` job adds the combined branch coverage to the run summary and uploads `coverage.xml`. To measure locally:
+
+  ```bash
+  uv run --frozen --group coverage coverage run -m unittest discover -t . -s tests -p 'test_*.py'
+  uv run --frozen --group coverage coverage report --sort=cover
+  ```
+
+  Tests that start the CLI in a subprocess are not measured in that subprocess.
 
 ## Windows-sensitive tests
 
