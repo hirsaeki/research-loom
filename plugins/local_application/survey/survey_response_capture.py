@@ -445,6 +445,7 @@ class SurveyResponseCaptureMixin:
             )
         except LocalSurveyResponseStoreError as exc:
             raise LocalApplicationError(exc.code, exc.message) from exc
+        # Postcondition, not a precondition; see SurveyMixin._capture.
         after = _snapshot(self._state())
         if before != after:
             raise LocalApplicationError(
