@@ -20,6 +20,8 @@ dist/
 .coverage
 .coverage.*
 coverage.contracts
+coverage.contracts.*
 coverage.shard-*
+coverage.windows-*
 coverage.xml
 htmlcov/
