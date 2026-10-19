@@ -46,7 +46,8 @@ def _exact(locator: str) -> bool:
     """
     if not locator.strip():
         return False
-    if locator.startswith(("http://", "https://")):
+    # URL schemes are case-insensitive (RFC 3986), so HTTPS://host is a home page too.
+    if locator.lower().startswith(("http://", "https://")):
         parsed = urlparse(locator)
         return bool((parsed.path and parsed.path != "/") or parsed.query or parsed.fragment)
     return True
