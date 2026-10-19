@@ -5,25 +5,25 @@ Use this Skill only after a Writer manuscript revision and its Research Package/
 ## Public workflow
 
 1. Build a Publication preview from the selected Writer composition/revision through the public application operation.
-2. Read the selected Publication Profile resources delivered in the Research Package. For MISCO these are `PUBLICATION_RULES`, `PUBLICATION_SOURCE_DOCUMENTS`, `PUBLICATION_FORMAL_SPEC`, and `PUBLICATION_URL_DISPLAY`; do not read archived legacy material (`docs/migration/misco-legacy-sources/`) or external originals at runtime.
+2. Read every `PUBLICATION_*` resource the selected Publication Profile delivers in the Research Package (its `effective_resources`); do not read the archived migration material under `docs/migration/` or external originals at runtime.
 3. Use the selected Profile resources as authority for pinned formal layout and URL display. Supply runtime inputs only for genuinely project/material/review-specific values with authoritative provenance. Never infer research-group type, permission state, or editorial approval from examples or historical papers.
 4. Inspect the preview/build receipt. A generated DOCX is only a preview until machine checks, required editorial QA, rendered-page review, and the bound human release decision are complete.
 5. If a release request is allowed, inspect the exact rendered bytes named by that request before approving. Release approval applies only to that exact preview/output binding.
 
-## MISCO formal-input boundary
+## Profile-pinned formal inputs
 
-`misco.publication@1.3.0` already pins:
+A Publication Profile may pin its formal layout and reader-facing URL display as resources (for example `PUBLICATION_FORMAL_SPEC` and `PUBLICATION_URL_DISPLAY`), which arrive as:
 
-- `formal_spec_profile` — current MISCO formal specification values and source/approval pin;
-- `url_display_profile` — the Human-approved rule to display long URLs in full in references.
+- `formal_spec_profile` — the formal specification values and their source/approval pin;
+- `url_display_profile` — the approved rule for displaying URLs in references.
 
-Application-specific inputs may still require:
+When the selected Profile pins them, they are the authority; do not re-enter them as runtime values. Application-specific inputs may still require:
 
 - `research_group_type` — only when the outer formal structure branches on it;
 - `permissions` — only for affected non-public/interview/internal material;
-- `editorial_review` — explicit Human/Host review of the approved Publication editorial rules.
+- `editorial_review` — explicit Human/Host review of the Profile's editorial rules.
 
-When a required conditional application input is missing, keep the affected check visibly unresolved and block only the operation that needs it. Do not substitute built-in renderer defaults or inferred permissions/approval for MISCO conformance.
+When a required conditional application input is missing, keep the affected check visibly unresolved and block only the operation that needs it. Do not substitute built-in renderer defaults or inferred permissions/approval for Profile conformance.
 
 ## Authority and preservation
 
@@ -41,6 +41,6 @@ When a missing figure, replacement or removal is requested, preserve this previe
 
 Machine checks cover exact pins, native DOCX structure, cross-references, retained image bytes, citation/exhibit resolution, supported formal inputs, and selected deterministic formatting. Human/Host review covers editorial/semantic presentation and actual rendered-page quality.
 
-For MISCO, `editorial_review` must contain a `misco-editorial-qa` result. `unevaluated` or `warning` is not release approval. The release request separately requires inspection of every rendered page, including tables, images, captions, reference targets, and layout.
+When the selected Profile requires an overall editorial check, `editorial_review` must contain that check's result; `unevaluated` or `warning` is not release approval. `references/misco-profile.md` shows one Profile's required check. The release request separately requires inspection of every rendered page, including tables, images, captions, reference targets, and layout.
 
 See `references/application-input.md` for the explicit input shape and blocked-preview behavior.

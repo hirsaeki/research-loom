@@ -2,7 +2,7 @@
 
 The optional third argument to the public Publication preview operation follows `core/packages/writer-publication/publication-application.schema.json`.
 
-For `misco.publication@1.3.0`, the current formal specification and reader-facing full-URL policy are already delivered as pinned Profile resources. A normal production MISCO run therefore does not invent or re-enter those values as loose runtime defaults.
+When the selected Publication Profile delivers its formal specification and reader-facing URL policy as pinned resources, a normal production run does not invent or re-enter those values as loose runtime defaults.
 
 An explicit `formal_spec_profile` or `url_display_profile` is accepted only when it exactly matches the selected Profile resource. A different value is an authority conflict; change the authoritative Profile/resource under a new version instead of overriding it at runtime.
 
@@ -14,4 +14,4 @@ Application inputs remain the carrier for information that is genuinely project/
 
 Missing conditional inputs block only the formal/release operation that needs them. They do not make renderer defaults authoritative and do not stop unrelated Research or Writer work.
 
-Tests may use explicitly synthetic inputs where a non-production path needs to prove contract mechanics, but synthetic values are never promoted to MISCO production authority.
+Tests may use explicitly synthetic inputs where a non-production path needs to prove contract mechanics, but synthetic values are never promoted to production Profile authority.

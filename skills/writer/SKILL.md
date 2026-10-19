@@ -5,7 +5,7 @@ Use this Skill only after Research has produced a fixed Research Package and a W
 ## Public workflow
 
 1. Export the selected sections with `writer-round-trip export-input` (or the equivalent public Facade operation).
-2. Read only the detached `writer-input.json` and its embedded section inputs. Do not inspect private SQLite state, hidden workspace stores, or archived legacy material (`docs/migration/misco-legacy-sources/`) to recover missing rules.
+2. Read only the detached `writer-input.json` and its embedded section inputs. Do not inspect private SQLite state, hidden workspace stores, or the archived migration material under `docs/migration/` to recover missing rules.
 3. Draft each requested section from the supplied research objects/materials, citation scope, unresolved gaps, Narrative constraints, and communication brief. Apply `references/reader-flow.md` to give the reader a reason to begin, an advancing understanding through the middle, and a useful answer at the end.
 4. Return a `writer_response` that matches `core/packages/writer-publication/writer-round-trip.schema.json`.
 5. Import through `writer-round-trip import-response`. Treat an imported manuscript revision as an immutable writing artifact, not as research adoption or publication approval.
@@ -32,7 +32,7 @@ If the central research judgement, warrant or applicability conditions are missi
 
 Each paragraph must advance one question, claim or contrast. Treat competing paragraph roles as an editorial blocker requiring revision: do not interrupt the main argument with unrelated disclaimers, methodological supplements or repeated caveats. Coexistence of an argument and a qualification is not itself a violation; keep a necessary qualification or a contrast together when it constitutes the paragraph's point. Apply the placement choices and examples in `references/reader-flow.md`. This is an editing obligation, not a new Profile rule ID or a runtime gate blocking draft storage or Research.
 
-This clarification does not silently amend approved MISCO Writer rules. Keep the exact delivered inventory and pins; report a concrete conflict or missing rule through existing Writing Feedback for a separate regular Profile change.
+This clarification does not silently amend approved Profile-delivered Writer rules. Keep the exact delivered inventory and pins; report a concrete conflict or missing rule through existing Writing Feedback for a separate regular Profile change.
 
 ## Profile-delivered Writer rules
 
@@ -56,18 +56,11 @@ For each review group use one of:
 
 A `violation` or `mixed` result must name the exact `violated_rule_ids` and return section-targeted Writing Feedback whose `profile_rule_ids` include those IDs. Use `NARRATIVE_CONSTRAINT_CONFLICT` when a supplied meaning/preservation rule is broken; use another existing feedback category only when it more precisely describes the problem.
 
-## MISCO review responsibilities
+## Review groups
 
-The current MISCO rule inventory maps into eight delivered review groups. Review the actual rule bodies; these labels are only routing aids:
+`review_plan` lists the review groups the selected Profile delivers, each with its exact `rule_ids`. Review every group against the bodies of its delivered `WRITER_RULES` items; a group's name is only a routing aid and adds no requirement of its own. A Profile may describe what its groups cover in its own resources, but the delivered rule text remains the authority.
 
-- `writer-input-contract` — use only approved/supplied inputs and return unresolved research needs instead of filling them in.
-- `writer-pattern` — rhetorical pattern selection must fit the supplied section purpose and material.
-- `writer-transform` — phase/style transformations must preserve the supplied research meaning and strength.
-- `writer-terminology` — render internal vocabulary for readers without hiding necessary technical/source terminology.
-- `narrative-guard` — do not invent causal claims, generalizations, fixed chapter/method patterns, counts, or unsupported relations.
-- `writer-editorial-qa` — perform the approved editorial checklist where applicable.
-- `writer-assembly-view` — respect assembly/return-to-research conditions; do not turn assembly order into Research authority.
-- `writer-qa-boundary` — send validity/support/causal issues back as Writing Feedback rather than deciding them in prose.
+For one concrete Profile's groups, see the example in `references/misco-profile.md`.
 
 ## Figures requested during drafting
 
@@ -79,5 +72,6 @@ When revising one section, base the response on the exact current manuscript rev
 
 See `references/detached-input.md` for the expected detached-input boundary.
 
-See `../../docs/acceptance/writer-reader-quality/comparison.md` for the bounded
-synthetic trial, preserved first outputs and remaining reader-evaluation limits.
+See `../../docs/architecture/versioned-writer-composition.md` for the Writer
+Composition and round-trip contract, and `../../docs/operations/writer-document-review.md`
+for document-scoped review.
