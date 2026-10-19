@@ -230,6 +230,12 @@ class MaterialImportMixin:
         source_capture_id: str,
         destination_run_id: str,
     ) -> Mapping[str, Any]:
+        """Copy one verified staged capture into a RUNNING Desktop Research Run.
+
+        Like external capture, import is an intake operation and does not require
+        a retrieval attempt on the destination Run. The capture/attempt link is
+        checked when the Run is collected (DR-SEARCH-TRACE-001).
+        """
         for name, value in (
             ("source_run_id", source_run_id),
             ("source_capture_id", source_capture_id),

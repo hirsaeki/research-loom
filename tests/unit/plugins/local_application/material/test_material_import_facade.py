@@ -22,6 +22,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import tests.runtime.test_external_desktop_research_intake as intake
+from plugins.desktop_research.attempts import reconstruct_attempts
 from plugins.local_application import LocalApplicationError
 from plugins.local_application.material import material_import_facade
 from plugins.local_application.material.material_import_facade import (
@@ -332,6 +333,14 @@ class ImportTests(_MaterialBase):
         extension = deepcopy(dict(extension))
         mutate(extension)
         return patch.object(self.facade, "_desktop_external_run", return_value=(run, extension))
+
+    def test_import_does_not_require_a_retrieval_attempt(self) -> None:
+        # Specification (#577 item 8): import is an intake operation like
+        # external capture. Capture/attempt consistency is checked at collect
+        # (DR-SEARCH-TRACE-001), not at intake.
+        self.assertEqual(reconstruct_attempts(self.app.operational_store, self.destination_run), {})
+        imported = self._import(self.stage_id)
+        self.assertEqual(imported["status"], "MATERIAL_IMPORTED")
 
     def test_import_copies_verified_pair_as_candidate_material(self) -> None:
         before = self.app.state_repository.load_state_view("PRJ-1", "LIN-1").current_snapshot
