@@ -15,3 +15,11 @@ dist/
 /launcher.stderr
 /direct.stdout
 /direct.stderr
+
+# Coverage data and reports (#507)
+.coverage
+.coverage.*
+coverage.contracts
+coverage.shard-*
+coverage.xml
+htmlcov/
