@@ -183,7 +183,7 @@ Unit tests live in `tests/unit/<package>/`, integration and acceptance tests in
 | `plugins/local_durable_store.py` | `tests/runtime/test_issue248_optional_durable_health.py`<br>`tests/runtime/test_issue248_review_regressions.py`<br>`tests/runtime/test_project_input_registration.py` |
 | `plugins/local_execution_store/atomic.py` | — |
 | `plugins/local_execution_store/capture_query.py` | `tests/runtime/test_issue92_capture_query_review.py` |
-| `plugins/local_execution_store/context_extensions.py` | — |
+| `plugins/local_execution_store/context_extensions.py` | `tests/unit/core/execution/test_context_service.py` |
 | `plugins/local_execution_store/diagnosed_artifact_read.py` | — |
 | `plugins/local_execution_store/inspection.py` | — |
 | `plugins/local_execution_store/intake.py` | — |
