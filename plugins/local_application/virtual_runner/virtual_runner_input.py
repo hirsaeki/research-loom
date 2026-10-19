@@ -366,9 +366,10 @@ def _payload(payload: Mapping[str, Any]) -> dict[str, Any]:
     normalized_profiles = []
     normalized_llm = None
     if generator_backend == "llm":
-        # Profile and backend problems use the LLM runner's own failure codes
-        # (PROFILE_INVALID, BACKEND_UNAVAILABLE), so hosts see one vocabulary for
-        # input-time and run-time LLM failures; the rest stay ...-PAYLOAD-001.
+        # LLM-specific profile and backend checks use the LLM runner's own failure
+        # codes (PROFILE_INVALID, BACKEND_UNAVAILABLE), so hosts see one vocabulary
+        # for input-time and run-time LLM failures. Missing or empty required strings
+        # (via _nonempty) and numeric llm_backend bounds stay ...-PAYLOAD-001.
         if payload["scenario_class"] != "STANDARD":
             raise LocalApplicationError(
                 "APPLICATION-VIRTUAL-PAYLOAD-001",
