@@ -24,6 +24,8 @@ dev = [
     "types-PyYAML",
     "types-jsonschema",
 ]
+# Test runs in CI measure coverage without pulling in the other developer tools (#507).
+coverage = ["coverage==7.16.2"]
 
 [tool.uv]
 # Runtime provisioning (`uv sync --frozen`) stays runtime-only; developer tools need `--group dev`.
@@ -67,3 +69,13 @@ python_version = "3.12"
 explicit_package_bases = true
 files = ["core", "plugins/_infra"]
 strict = true
+
+[tool.coverage.run]
+# Report-only baseline (#507): CI combines the shards and publishes the report.
+branch = true
+relative_files = true
+source = ["core", "plugins", "scripts"]
+
+[tool.coverage.report]
+precision = 1
+skip_empty = true
