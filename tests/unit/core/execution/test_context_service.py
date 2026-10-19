@@ -1,7 +1,8 @@
 """Characterization tests for ``core.execution.context_service`` (#507).
 
 They pin how the Context-extension ``CapabilityExecutionService`` prepares,
-executes and collects Runs: the extension preflight and storage order, the
+executes and collects Runs: the extension preflight and storage order (the extension is stored only after
+authorization and retry checks pass), the
 failure codes and messages it raises, retry/parent handling, and the
 collection-time extension check.
 """
@@ -10,6 +11,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import tempfile
 import unittest
 from copy import deepcopy
 from dataclasses import replace
@@ -42,6 +44,9 @@ from core.runtime import (
     LineageView,
     StateDeltaProposal,
     StateView,
+)
+from plugins.local_execution_store.context_extensions import (
+    LocalCapabilityContextExtensionStore,
 )
 
 ROOT = Path(__file__).resolve().parents[4]
@@ -471,10 +476,12 @@ class PreparePreflightTests(unittest.TestCase):
 
 class RetryTests(unittest.TestCase):
     def setUp(self):
-        self.service, self.traces, _, _ = make_service(ExternalAdapter())
+        self.service, self.traces, self.store, _ = make_service(ExternalAdapter())
         self.service.prepare_external(
             DESCRIPTOR, INVOCATION, CONTEXT, lineage_ref="LIN-1", context_extension=EXTENSION
         )
+        # Forget the first Run's extension so a rejected retry can be seen not to store one.
+        self.store.items.clear()
 
     def prepare(self, invocation):
         return self.service.prepare_external(
@@ -487,6 +494,7 @@ class RetryTests(unittest.TestCase):
         self.assertEqual(cm.exception.issue.code, "INVOCATION_INVALID")
         self.assertEqual(cm.exception.issue.message, message)
         self.assertEqual(set(self.traces.runs), {"RUN-001"})
+        self.assertEqual(self.store.items, {}, "a rejected retry must not store its extension")
 
     def test_retry_after_terminal_parent_increments_attempt(self):
         self.service.abort("RUN-001")
@@ -494,6 +502,7 @@ class RetryTests(unittest.TestCase):
         self.assertEqual(prepared.run.run_id, "RUN-002")
         self.assertEqual(prepared.run.parent_run_id, "RUN-001")
         self.assertEqual(prepared.run.attempt, 2)
+        self.assertEqual(len(self.store.items), 1)
 
     def test_parent_must_be_terminal(self):
         self.assert_invalid(
@@ -528,6 +537,48 @@ class RetryTests(unittest.TestCase):
                     )
                 finally:
                     self.traces.runs["RUN-001"] = original
+
+
+class ContextPackExtensionIdentityTests(unittest.TestCase):
+    """One Context Pack carries exactly one extension (the store key has no Run)."""
+
+    def setUp(self):
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        self.store = LocalCapabilityContextExtensionStore(temp.name)
+        self.addCleanup(self.store.close)
+        self.service, self.traces, _, _ = make_service(ExternalAdapter(), store=self.store)
+        self.service.prepare_external(
+            DESCRIPTOR, INVOCATION, CONTEXT, lineage_ref="LIN-1", context_extension=EXTENSION
+        )
+        self.service.abort("RUN-001")
+
+    def test_retry_with_the_same_extension_reuses_the_stored_one(self):
+        prepared = self.service.prepare_external(
+            DESCRIPTOR,
+            retry_invocation(),
+            CONTEXT,
+            lineage_ref="LIN-1",
+            context_extension=EXTENSION,
+        )
+        self.assertEqual(prepared.run.attempt, 2)
+
+    def test_retry_with_a_different_extension_needs_a_new_context_pack(self):
+        with self.assertRaises(CapabilityExecutionError) as cm:
+            self.service.prepare_external(
+                DESCRIPTOR,
+                retry_invocation(),
+                CONTEXT,
+                lineage_ref="LIN-1",
+                context_extension={**EXTENSION, "value": 2},
+            )
+        self.assertEqual(cm.exception.issue.code, "CONTEXT_INVALID")
+        self.assertEqual(
+            cm.exception.issue.message,
+            "capability Context extension persistence failed: "
+            "immutable capability Context extension identity collision",
+        )
+        self.assertEqual(set(self.traces.runs), {"RUN-001"})
 
 
 class CollectExternalTests(unittest.TestCase):

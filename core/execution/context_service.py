@@ -44,6 +44,11 @@ class CapabilityExecutionService(_BaseCapabilityExecutionService):
     authorization, Handoff capture, and normalization. This subclass only adds
     the capability-neutral extension validation/storage seam required before an
     EXTERNAL Run can enter PREPARED/RUNNING.
+
+    The extension is stored per Context Pack, not per Run: a Context Pack is
+    immutable and carries exactly one extension. Callers create a new Context
+    Pack for each invocation, so a retry with a different extension needs a new
+    Context Pack; reusing one with a different extension is rejected.
     """
 
     def __init__(
@@ -231,23 +236,6 @@ class CapabilityExecutionService(_BaseCapabilityExecutionService):
 
         decision = self._validate_authorization(invocation, context_pack)
 
-        if context_extension is not None:
-            try:
-                cast(CapabilityContextExtensionStore, self._context_extension_store).store(
-                    str(capability["capability_id"]),
-                    str(capability["capability_version"]),
-                    str(capability["function_id"]),
-                    str(context_pack["context_pack_id"]),
-                    deepcopy(dict(context_extension)),
-                )
-            except CapabilityExecutionError:
-                raise
-            except Exception as exc:
-                raise CapabilityExecutionError(
-                    ExecutionFailureCode.CONTEXT_INVALID,
-                    f"capability Context extension persistence failed: {exc}",
-                ) from exc
-
         parent_run_id = invocation["trace"].get("parent_run_id")
         attempt = 1
         if parent_run_id:
@@ -278,6 +266,26 @@ class CapabilityExecutionService(_BaseCapabilityExecutionService):
                     "retry parent Run must be terminal before a new attempt is prepared",
                 )
             attempt = parent.attempt + 1
+
+        # Store only once every check has passed, so a rejected request leaves no
+        # extension behind. Re-storing the same extension for a Context Pack is
+        # idempotent, so a later trace-write failure leaves only an unused row.
+        if context_extension is not None:
+            try:
+                cast(CapabilityContextExtensionStore, self._context_extension_store).store(
+                    str(capability["capability_id"]),
+                    str(capability["capability_version"]),
+                    str(capability["function_id"]),
+                    str(context_pack["context_pack_id"]),
+                    deepcopy(dict(context_extension)),
+                )
+            except CapabilityExecutionError:
+                raise
+            except Exception as exc:
+                raise CapabilityExecutionError(
+                    ExecutionFailureCode.CONTEXT_INVALID,
+                    f"capability Context extension persistence failed: {exc}",
+                ) from exc
 
         now = self._clock.now()
         snapshot = context_pack["pins"]["research_snapshot"]

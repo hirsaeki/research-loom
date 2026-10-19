@@ -34,7 +34,13 @@ class CapabilityContextExtensionValidator(Protocol):
 
 
 class CapabilityContextExtensionStore(Protocol):
-    """Immutable storage for one exact capability/Context Pack extension."""
+    """Immutable storage for one exact capability/Context Pack extension.
+
+    The key is the capability binding plus the Context Pack ID, without the Run:
+    one Context Pack has exactly one extension, and ``collect_external`` reads it
+    back through the Run's Context Pack. Storing a different extension under an
+    existing key must fail; storing the same one again must succeed.
+    """
 
     def store(
         self,
