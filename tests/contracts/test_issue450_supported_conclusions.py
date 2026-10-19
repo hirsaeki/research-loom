@@ -38,7 +38,7 @@ class SupportedConclusionContractTests(unittest.TestCase):
             "central research judgement, warrant or applicability conditions are missing",
             "section-targeted Writing Feedback",
             "inspect existing analysis and its links first",
-            "does not silently amend approved MISCO Writer rules",
+            "does not silently amend approved Profile-delivered Writer rules",
             "exact delivered inventory and pins",
             "writer-round-trip import-response",
             "Do not create new Evidence",
