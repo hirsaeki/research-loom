@@ -49,7 +49,7 @@ Unit tests live in `tests/unit/<package>/`, integration and acceptance tests in
 | `plugins/_infra/sqlite.py` | `tests/runtime/test_sqlite_pragmas.py` |
 | `plugins/application_errors.py` | `tests/unit/plugins/local_application/virtual_runner/test_virtual_runner_binding_and_method_context.py`<br>`tests/unit/plugins/local_application/virtual_runner/test_virtual_runner_execute.py`<br>`tests/unit/plugins/local_application/virtual_runner/test_virtual_runner_facade.py`<br>`tests/unit/plugins/local_application/virtual_runner/test_virtual_runner_input.py`<br>`tests/unit/plugins/local_application/virtual_runner/test_virtual_runner_inspection.py`<br>`tests/unit/plugins/local_application/virtual_runner/test_virtual_runner_profile.py`<br>`tests/unit/plugins/local_application/virtual_runner/test_virtual_runner_resolve.py` |
 | `plugins/desktop_research/adapter.py` | — |
-| `plugins/desktop_research/attempts.py` | `tests/runtime/test_external_desktop_research_attempt_lifecycle.py`<br>`tests/runtime/test_external_material_inventory.py`<br>`tests/runtime/test_run_inspection.py`<br>`tests/unit/plugins/desktop_research/test_result_validation.py` |
+| `plugins/desktop_research/attempts.py` | `tests/runtime/test_external_desktop_research_attempt_lifecycle.py`<br>`tests/runtime/test_external_material_inventory.py`<br>`tests/runtime/test_run_inspection.py`<br>`tests/unit/plugins/desktop_research/test_result_validation.py`<br>`tests/unit/plugins/local_application/material/test_material_import_facade.py` |
 | `plugins/desktop_research/capture.py` | — |
 | `plugins/desktop_research/context_validation.py` | — |
 | `plugins/desktop_research/conversation.py` | — |
