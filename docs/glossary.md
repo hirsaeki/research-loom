@@ -3,11 +3,11 @@
 Terms used across the repository, with the layer that owns each one. **User-facing** says whether a host may use the term in what it tells a human during a research conversation:
 
 - **yes** means the term is fine as is.
-- **no** means the term is internal. The [research-conversation Skill](../skills/research-conversation/SKILL.md) and the Codex Stop hook keep it out of ordinary answers; describe the research meaning instead.
+- **no** means the term is internal. The [research-conversation Skill](../skills/research-conversation/SKILL.md) tells hosts to describe the research meaning instead. The Codex Stop hook blocks only the terms its patterns cover (for example Research Package, Writer round trip, Publication preview and Loom), so it does not catch every **no** term.
 
 ## Spelling and language
 
-- Write **ChatGPT Work** for the host. Do not write "ChatGPT Desktop App Work", "Work mode", or "Work session".
+- Write **ChatGPT Work** for the host. Do not write "ChatGPT Desktop App Work", "Work mode", or "Work session" in current documents (records and acceptance evidence keep their original wording).
 - Write **Effective Profile Set (EPS)** on first use in a document; **EPS** is fine after that.
 - Write **Application Facade** for the public application boundary. `LocalApplicationFacade` is its class name.
 - Write **Skill** for a host-loaded workflow under `skills/`.

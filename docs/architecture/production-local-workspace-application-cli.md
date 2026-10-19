@@ -319,7 +319,7 @@ stdout is always one JSON document. Workflow states such as `CONFIRMATION_REQUIR
 
 ## ChatGPT Work and future transports
 
-ChatGPT Desktop App Work is the MVP human-facing consumer. It owns natural-language reasoning and may translate intent into typed action or Exhibit JSON. Work is not an LLM embedded inside the Harness and has no special Research authority.
+ChatGPT Work is the MVP human-facing consumer. It owns natural-language reasoning and may translate intent into typed action or Exhibit JSON. Work is not an LLM embedded inside the Harness and has no special Research authority.
 
 Files supplied inside a host conversation follow the same rule. A host/session
 attachment is not durable Loom material merely because Work or Codex can read it. If
