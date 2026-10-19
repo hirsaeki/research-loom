@@ -54,4 +54,6 @@ The Descriptor supports PR 9 `real`, `virtual`, and `synthetic_test` modes. PR 9
 
 Interactive Work execution and a future adapter therefore differ only in transport/runtime implementation. They must consume the same exact-bound Context extension and return the same PR 9 Handoff plus result extension. Browser automation, a concrete Work API, production search, Survey/Case/Delphi/Virtual Runner behavior, SQLite, Writer, Publication, and MISCO-specific configuration remain outside PR 11.
 
+> **Superseded (#504):** The external adapter is now implemented; see [production Desktop Research](production-desktop-research.md).
+
 Legacy `research-harness/contracts/capabilities/desktop-research/` was migration/reference material; it was removed in #500 (tag `legacy-archive-2026`). Its useful provenance and stopping semantics are converged here, while its legacy `DesktopResearchHandoff`, Work filesystem layout, and source-type quality defaults are not promoted.

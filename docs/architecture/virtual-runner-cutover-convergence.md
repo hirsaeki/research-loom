@@ -16,3 +16,5 @@ Cutover readiness is intentionally policy-driven. Required run counts and concre
 The PR10 routing fixture demonstrates that natural language such as “このSurveyを仮想実行して問題を洗って” becomes a proposal routed through the PR9 invocation boundary. Additional runs, revisions and REAL cutover remain proposals/candidates; conversational confirmation is never substituted for a Core Human Decision.
 
 Downstream virtual Research Snapshot/Package preview is recognized only as a future candidate projection boundary. Writer/Publication preview details are deferred to PR18 so this PR does not import Writer/Publication semantics into the research execution layer.
+
+> **Superseded (#504):** The preview boundary is defined in [Writer / Publication preview convergence](writer-publication-preview-convergence.md).

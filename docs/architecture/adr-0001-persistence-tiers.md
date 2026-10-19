@@ -69,3 +69,5 @@ Each step is its own issue and PR, in this order. The easy, behavior-preserving 
    - Conversation and Decision gain a `schema_migrations` record (migration `0001` = current schema) without changing their tables.
 4. **Deep integrity in `doctor`** (#533). A `--deep` mode runs State's `integrity_issues()`, plus `integrity_check` on every core and optional store. The default `doctor` output stays as it is.
 5. **Documentation.** `docs/architecture/optional-durable-health.md` and this ADR stay the reference. When E5 reorganizes `docs/`, this file moves to the decision-record location.
+
+> **Superseded (#504):** Steps 1–4 are done (#530–#533; `doctor --deep` is described in [Parent backup and restore](parent-backup-restore.md)). #504 keeps decision records in `docs/architecture/`, so this ADR stays here.

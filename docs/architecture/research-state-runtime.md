@@ -68,3 +68,5 @@ PR20 does not add SQLite schema/migrations, ORM selection, artifact byte stores,
 production run executors, plugin loading, Work UI, Writer/Publication runtime,
 DOCX/PDF rendering, export/publish, OneDrive integration, archive/new-workspace
 flows or legacy deletion.
+
+> **Superseded (#504):** Later work added [SQLite persistence](sqlite-research-state-persistence.md), the [Capability execution runtime](capability-execution-runtime.md), [Writer Composition](versioned-writer-composition.md), [Publication release](deterministic-publication-release.md) and [staged material import](staged-material-import.md); the legacy trees were removed in #500.

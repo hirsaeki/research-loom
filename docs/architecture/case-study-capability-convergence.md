@@ -35,4 +35,6 @@ Case execution is blocked when required input, runtime authorization, Human Deci
 
 ## Explicit non-goals
 
+> **Superseded (#504):** Later work added the [Virtual Runner](virtual-runner-cutover-convergence.md), [Fork/Recovery](research-lineage-fork-recovery.md), [SQLite persistence](sqlite-research-state-persistence.md) and [Publication release](deterministic-publication-release.md); the legacy trees were removed in #500.
+
 No concrete analyzer/runtime, transcription runtime, qualitative-coding LLM, MISCO-specific case, synthetic persona/case generator, Virtual Runner, Fork/Branch/Recovery implementation, SQLite, Writer/Publication, or legacy deletion is introduced here.

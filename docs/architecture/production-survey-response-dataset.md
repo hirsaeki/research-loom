@@ -137,6 +137,8 @@ The `show` actions are read-only. Dataset show accepts bounded `limit` / `offset
 
 ## Explicit non-goals
 
+> **Superseded (#504):** Aggregation, LLM respondents and REAL intake now exist: [shared aggregation](production-survey-shared-aggregation.md), [LLM Virtual Respondent](production-survey-llm-virtual-respondent.md) and [REAL response intake](production-survey-real-response-intake.md).
+
 PR42 does not implement:
 
 - frequency, percentage, cross-tab, mean/median, missing-rate summaries, or charts

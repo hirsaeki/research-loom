@@ -76,6 +76,8 @@ PR22 provides only a test in-memory trace implementation. A production
 filesystem/SQLite trace store and production artifact byte store are future
 adapters.
 
+> **Superseded (#504):** Production trace and artifact storage now exist: see the [portable execution/material store](portable-execution-material-store.md) and [Desktop Research retention](desktop-research-retention.md).
+
 ## Managed and external execution
 
 Managed execution resolves a managed adapter and calls `execute()` with a copy
@@ -121,3 +123,5 @@ Future filesystem trace/workspace adapters must additionally enforce run-root
 confinement, no traversal/symlink escape, exclusive immutable writes, digest
 verification and atomic staging/finalization. Those physical storage mechanics
 are not implemented by PR22.
+
+> **Superseded (#504):** The production store enforces these mechanics; see the [portable execution/material store](portable-execution-material-store.md).

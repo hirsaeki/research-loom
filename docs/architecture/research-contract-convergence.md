@@ -6,6 +6,8 @@ PR 3 performs the first bounded convergence step after the monorepo boundary was
 
 The legacy trees remain migration sources and are not modified or deleted.
 
+> **Superseded (#504):** Removed in #500; the `legacy-archive-2026` tag keeps the trees and [`docs/migration/misco-legacy-sources/`](../migration/misco-legacy-sources/README.md) keeps the ledger-pinned files.
+
 ## Inputs compared
 
 ### Legacy `research-harness/`
@@ -73,6 +75,8 @@ PR 3 follows that split rather than copying either legacy implementation wholesa
 | Chapter map / narrative order | Deferred to Narrative/Profile/Writer | Explicitly provisional in the legacy profile. |
 | Publication style / quote / citation rendering | Deferred to Publication | Not research-state semantics. |
 | SQLite schema / OneDrive export-publish | Deferred | Persistence/projection implementation is intentionally out of scope. |
+
+> **Superseded (#504):** SQLite persistence is now [implemented](sqlite-research-state-persistence.md); Package and Publication formats are in [production Research Package](production-research-package.md) and [Deterministic Publication release](deterministic-publication-release.md).
 
 ## Non-overridable boundary
 

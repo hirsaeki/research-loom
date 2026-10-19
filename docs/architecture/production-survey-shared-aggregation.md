@@ -2,6 +2,8 @@
 
 PR43 adds the production descriptive-analysis boundary for canonical Survey response Datasets. It deliberately does not add a Virtual-only analytics path and it does not create a second response normalization path.
 
+> **Superseded (#504):** The LLM Virtual Respondent and REAL intake now exist: see [LLM Virtual Respondent](production-survey-llm-virtual-respondent.md) and [REAL response intake](production-survey-real-response-intake.md).
+
 ```text
                    structural Virtual
                           │

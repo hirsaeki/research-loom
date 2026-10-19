@@ -109,3 +109,5 @@ The first production slice does not hard-code universal Core thresholds or run c
 ## Out of scope
 
 PR41 itself did not implement Microsoft/Google Forms execution, REAL response intake or participant registry, empirical analysis, LLM respondents, Delphi/Case Study production bindings, dashboards, or distributed runner infrastructure. The later LLM Survey Virtual Respondent slice adds only the semantic synthetic-response backend described above; the remaining non-goals stay unchanged.
+
+> **Superseded (#504):** REAL intake now exists: see [REAL response intake](production-survey-real-response-intake.md).
