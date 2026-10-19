@@ -62,10 +62,12 @@ def _payload(payload: Mapping[str, Any]) -> dict[str, Any]:
 
 
 class NewMaterialContinuationHandler:
-    def __init__(self, application, project_id: str, workspace_root) -> None:
-        self._service = NewMaterialContinuationService(application, project_id, workspace_root)
+    def __init__(self, application, project_id: str, workspace_root, facade_class) -> None:
+        self._service = NewMaterialContinuationService(
+            application, project_id, workspace_root, facade_class
+        )
         self._paired_service = PairedNewMaterialContinuationService(
-            application, project_id, workspace_root
+            application, project_id, workspace_root, facade_class
         )
 
     def execute(
@@ -91,7 +93,9 @@ class NewMaterialContinuationHandler:
         )
 
 
-def ensure_new_material_continuation_action(application, project_id: str, workspace_root) -> None:
+def ensure_new_material_continuation_action(
+    application, project_id: str, workspace_root, facade_class
+) -> None:
     coordinator = application.coordinator
     with _ACTION_REGISTRATION_LOCK:
         definitions = {item.action_type: item for item in coordinator.action_definitions()}
@@ -124,13 +128,18 @@ def ensure_new_material_continuation_action(application, project_id: str, worksp
                 raise
             coordinator._services.register(
                 _ACTION_TYPE,
-                NewMaterialContinuationHandler(application, project_id, workspace_root),
+                NewMaterialContinuationHandler(
+                    application, project_id, workspace_root, facade_class
+                ),
             )
 
 
 def list_actions_stage(facade, proceed: Callable[..., Any]) -> Mapping[str, Any]:
     ensure_new_material_continuation_action(
-        facade._application, facade._project_id, facade._workspace_root
+        facade._application,
+        facade._project_id,
+        facade._workspace_root,
+        facade._continuation_facade_class,
     )
     return proceed()
 
@@ -143,7 +152,10 @@ def submit_action_stage(
     view: str | None = None,
 ) -> Mapping[str, Any]:
     ensure_new_material_continuation_action(
-        facade._application, facade._project_id, facade._workspace_root
+        facade._application,
+        facade._project_id,
+        facade._workspace_root,
+        facade._continuation_facade_class,
     )
     return proceed(draft_input)
 

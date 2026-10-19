@@ -5,6 +5,10 @@ order the former layered facade resolved them, so method resolution, stage
 order (see ``facade.stages_for``) and ``super()`` behave as before. The
 partial facades below are the compositions some services instantiate
 directly; they run exactly the layers they used to.
+
+Feature layers never import this module. The partial facades they need are
+set here, on every composed class, as ``_*_facade_class`` attributes that the
+mixins pass on to their action handlers and services.
 """
 
 from __future__ import annotations
@@ -135,3 +139,11 @@ class SurveyResponseFacade(
     LocalApplicationFacadeCore,
 ):
     """Facade used by the Survey response capability services."""
+
+
+_COMPOSED = (LocalApplicationFacade, ContinuationFacade, SurveyAnalysisFacade, SurveyResponseFacade)
+for _facade in _COMPOSED:
+    _facade._continuation_facade_class = ContinuationFacade
+    _facade._survey_analysis_facade_class = SurveyAnalysisFacade
+    _facade._survey_response_facade_class = SurveyResponseFacade
+del _facade

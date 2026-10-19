@@ -120,6 +120,7 @@ class SurveyAnalysisMixin(SurveyRealIntakeMixin, SurveyVirtualPretestInspectionM
                         _SurveyAnalysisActionHandler(
                             self._application,
                             operation,
+                            facade_class=self._survey_analysis_facade_class,
                             workspace_root=self._workspace_root,
                         ),
                     )

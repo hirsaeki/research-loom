@@ -102,14 +102,13 @@ _ACTION_VALIDATORS = {
 class _SurveyResponseActionHandler:
     """Bridge audited Conversation actions to the transport-neutral Survey facade."""
 
-    def __init__(self, application, operation: str) -> None:
+    def __init__(self, application, operation: str, *, facade_class) -> None:
         self._application = application
         self._operation = operation
+        self._facade_class = facade_class
 
     def execute(self, payload, *, state, actor, proposal):
-        from ..facade_composition import SurveyResponseFacade
-
-        facade = SurveyResponseFacade(self._application, state.project_ref)
+        facade = self._facade_class(self._application, state.project_ref)
         if self._operation == "normalize":
             result = facade.normalize_survey_response(payload)
         elif self._operation == "capture":
@@ -247,5 +246,9 @@ class SurveyResponseMixin(
                         raise
                     service_registry.register(
                         action_type,
-                        _SurveyResponseActionHandler(self._application, operation),
+                        _SurveyResponseActionHandler(
+                            self._application,
+                            operation,
+                            facade_class=self._survey_response_facade_class,
+                        ),
                     )
