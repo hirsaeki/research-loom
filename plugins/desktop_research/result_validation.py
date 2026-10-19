@@ -36,6 +36,14 @@ def _utc(value: str) -> bool:
 
 
 def _exact(locator: str) -> bool:
+    """Reject only locators that cannot name one source.
+
+    That is an empty locator, or an HTTP(S) URL with no path, query or fragment
+    (a site's home page). Any other scheme or form (DOI, URN, archive ID, file
+    path, ``ftp://``) is an opaque identifier and passes: its exactness rests on
+    matching the Handoff locator and the original capture's digest, which the
+    validator checks separately.
+    """
     if not locator.strip():
         return False
     if locator.startswith(("http://", "https://")):
