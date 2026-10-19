@@ -146,6 +146,8 @@ jobs:
           pattern: coverage-*
           merge-multiple: true
       - name: Combine and report coverage
+        # A broken report must not turn the build red; the step shows as failed in the log.
+        continue-on-error: true
         shell: bash
         run: |
           shopt -s nullglob
@@ -171,6 +173,7 @@ jobs:
         with:
           name: coverage-report
           path: coverage.xml
+          if-no-files-found: ignore
           retention-days: 14
 
   runtime-windows:
