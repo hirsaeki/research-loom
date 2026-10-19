@@ -80,6 +80,9 @@ class VirtualRunnerMixin(VirtualRunnerInspectionMixin, VirtualRunnerExecuteMixin
     def _effective_profile_set(self, state) -> Mapping[str, Any]:
         if self._workspace_root is not None:
             binding_path = self._workspace_root / ".research-loom" / "workspace-binding.json"
+            # A malformed binding raises LocalWorkspaceError (WORKSPACE-BINDING-*)
+            # unwrapped, as in the Research Package builder: the Workspace code
+            # names the repair, and the CLI reports it like any application error.
             path = (
                 workspace_document_path(self._workspace_root, "effective_profile_set")
                 if binding_path.is_file()

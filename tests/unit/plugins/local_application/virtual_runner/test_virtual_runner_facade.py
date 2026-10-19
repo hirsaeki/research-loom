@@ -291,6 +291,8 @@ class EffectiveProfileSetTests(unittest.TestCase):
                 )
 
     def test_malformed_binding_error_is_not_wrapped(self):
+        # By design (#577): the Workspace error keeps its own code, which the CLI
+        # reports as an ERROR envelope like any LocalApplicationError.
         (self.root / INTERNAL_DIR).mkdir()
         (self.root / INTERNAL_DIR / BINDING_NAME).write_text("{}", encoding="utf-8")
         with self.assertRaises(LocalWorkspaceError) as caught:
