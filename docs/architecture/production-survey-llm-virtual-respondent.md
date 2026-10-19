@@ -64,6 +64,8 @@ The concrete production adapter is `openai_responses`. It uses the Responses API
 
 The first slice accepts explicit structured profiles only. Profiles use a synthetic namespace such as `SYN-PROFILE-*` and may contain declared project dimensions in `attributes`, a bounded `knowledge_scope`, and optional scenario notes. Direct-identifier keys are rejected recursively, and obvious identifier tokens such as email addresses or employee/staff IDs are rejected from profile free text. The bounded MVP accepts at most eight LLM respondent profiles per Run.
 
+Ingress rejects invalid LLM respondent profiles, including a `population_size` or `minimum_valid_response_count` that does not fit the profile count, with `PROFILE_INVALID` and an unusable `llm_backend` setting with `BACKEND_UNAVAILABLE`. These are the LLM runner's own failure codes, which also appear as `failure_code` in generation reports, so a host handles input-time and run-time failures of the LLM backend with one vocabulary. Every other payload problem, including LLM options outside the profile and backend settings, is `APPLICATION-VIRTUAL-PAYLOAD-001`.
+
 Profile composition is a test configuration. It does not claim to represent an organization or population. Profile generation by another LLM, demographic simulation, population weighting, respondent societies, memory, and model ensembles are out of scope.
 
 Each Run pins:
