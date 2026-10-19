@@ -2,6 +2,8 @@
 
 ## Purpose
 
+Terms are defined in the [glossary](../glossary.md).
+
 This document defines the canonical layout and ownership boundaries of the repository. It was introduced in PR 2 as the convergence target for the two legacy implementations imported in PR 1; the layout below reflects the repository as it stands now, and the original PR 2 scope is kept at the end as a historical note.
 
 ## Canonical layout
@@ -25,7 +27,7 @@ research-loom/
 │  ├─ narrative/
 │  └─ publication/
 │
-├─ plugins/          # local application facade + CLI, stores, capabilities
+├─ plugins/          # local Application Facade + CLI, stores, capabilities
 │
 ├─ skills/
 │  ├─ research-conversation/
@@ -73,7 +75,7 @@ Organization-specific behavior in the local application lives in its own top lay
 
 ### `skills/`
 
-Owns host-loaded workflows above the research state. Hosts load a skill explicitly; skills reach the harness only through the public CLI / application facade.
+Owns host-loaded workflows above the research state. Hosts load a Skill explicitly; Skills reach the harness only through the public CLI / Application Facade.
 
 - `research-conversation/` guides a human-facing research session (Codex or ChatGPT Work) through the public surfaces.
 - `writer/` consumes detached Writer input built from a pinned Research Package and returns manuscript revisions plus structured writing feedback.
@@ -115,7 +117,7 @@ Plugin packages (each top-level package or module under `plugins/`) also depend 
 2. Shared layout and contracts: `local_workspace_layout`, `local_store_schemas`, `application_errors`.
 3. Durable and domain stores and their validation: `local_durable_store`, the `local_*_store` modules, `survey_validation`, `survey_response`, `survey_analysis`, `research_visual_semantics`, and similar.
 4. Capabilities: `desktop_research`, `survey_virtual_runner`, and similar.
-5. `local_application/`: the application facade, services and CLI, which compose everything below.
+5. `local_application/`: the Application Facade, services and CLI, which compose everything below.
 
 A lower layer never imports a higher one, not even inside a function. No package imports another package's private (`_`-prefixed) names. Shared helpers move down a layer instead. `tests/contracts/test_plugin_layering.py` enforces both rules: no import cycle between plugin packages, and no cross-package private import.
 

@@ -24,7 +24,7 @@ Do not load this skill merely because Codex is editing, reviewing, testing, or m
 
 ## ChatGPT Work
 
-In Work mode, explicitly open/read `skills/research-conversation/SKILL.md` from the repository/project before conducting Loom-backed research. Do not assume the `skills/` directory is automatically installed or discovered. Then use Loom through its public CLI/Facade with the same view-selection boundary while Work owns natural-language reasoning and presentation.
+In ChatGPT Work, explicitly open/read `skills/research-conversation/SKILL.md` from the repository/project before conducting Loom-backed research. Do not assume the `skills/` directory is automatically installed or discovered. Then use Loom through its public CLI/Facade with the same view-selection boundary while Work owns natural-language reasoning and presentation.
 
 ### Work non-bypass route
 

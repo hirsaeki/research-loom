@@ -1,6 +1,6 @@
 # Research Conversation Skill
 
-Use this skill only when an external host such as Codex or ChatGPT Work is conducting research through Research Loom for a human. Repository development, code review, issue work, and ordinary software maintenance are not research-conversation tasks and should not be routed through this skill.
+Use this Skill only when an external host such as Codex or ChatGPT Work is conducting research through Research Loom for a human. Repository development, code review, issue work, and ordinary software maintenance are not research-conversation tasks and should not be routed through this skill.
 
 ## Purpose
 
@@ -20,7 +20,7 @@ If evidence is insufficient or genuinely balanced, say that no direction is curr
 
 For live Loom-backed research, choose the public result view by purpose instead of consuming the default/detail envelope for every turn.
 
-- **Ordinary progress, resume, discovery, and result checking:** explicitly request `view="conversation"` from the public Facade or `--view conversation` from the CLI on surfaces that support it. This is the normal input to human-facing reasoning.
+- **Ordinary progress, resume, discovery, and result checking:** explicitly request `view="conversation"` from the public Application Facade or `--view conversation` from the CLI on surfaces that support it. This is the normal input to human-facing reasoning.
 - **Before asking for or resolving a Human Decision:** use the exact references from the conversation result to read the issued request with `decision show --request-id ... --json`; read the persisted candidate with `candidate show --candidate-id ... --json` when its full exact target is needed. Review the exact request/target/current context before binding the human answer.
 - **Explicit diagnostics:** use the exact single-item reads above or `view="detail"` / `--view detail` on a supported surface when the human asks for IDs, digests, codes, bindings, or raw status. Explain the values rather than hiding them.
 

@@ -6,7 +6,7 @@
 
 Research Loom keeps an LLM-assisted research project auditable: the conversation proposes, but only exact, Decision-bound commits change research state, and every material and claim stays traceable to pinned sources.
 
-Through the production CLI (below) and its application facade a host can:
+Through the production CLI (below) and its Application Facade a host can:
 
 - **Bind a workspace** to an exact Project Config and Effective Profile Set (`init`, `status`, `resume`, `doctor`, `profile`).
 - **Run research**: register inputs, propose and review research questions, run capabilities such as Desktop Research, Survey (real and virtual respondents) and Delphi, and inspect runs and captured external materials (`research-input`, `run`, `external`, `survey`, `delphi`, `candidate`, `synthesis-candidate`, `exhibit`).
@@ -94,10 +94,10 @@ Formatting-only commits are listed in `.git-blame-ignore-revs`; run `git config 
 
 - `core/` — generic research semantics: state transitions and validation, capability execution, Work Conversation and Human Decision services, and the versioned package/schema contracts
 - `profiles/` — declarative research, organization, narrative, and publication profiles plus their contracts
-- `plugins/` — imperative adapters: the local application facade and CLI, SQLite stores, capability implementations, and organization-specific extensions
+- `plugins/` — imperative adapters: the local Application Facade and CLI, SQLite stores, capability implementations, and organization-specific extensions
 - `skills/` — host-loaded workflows: `research-conversation`, `writer`, and `publication`
 - `projects/` — project-specific configuration (Project Config and pinned Effective Profile Set)
-- `docs/` — architecture records, operations guides, acceptance records, and migration ledgers; start at the [documentation index](docs/index.md)
+- `docs/` — architecture records, operations guides, acceptance records, and migration ledgers; start at the [documentation index](docs/index.md) and the [glossary](docs/glossary.md)
 - `tests/` — `tests/contracts` (schema and semantic contracts) and `tests/runtime` (behavior); see [Developer checks](#developer-checks)
 - `scripts/` — operational and CI helpers (offline runtime wheelhouse, CI test sharding, MISCO probes)
 
