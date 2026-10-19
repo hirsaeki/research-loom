@@ -86,7 +86,10 @@ class HelperTests(unittest.TestCase):
         self.assertTrue(_exact("https://example.test/page"))
         self.assertTrue(_exact("https://example.test/?q=1"))
         self.assertTrue(_exact("http://example.test/#frag"))
+        # Other schemes are opaque identifiers by design (#577): exactness rests
+        # on the Handoff locator match and the original-capture digest.
         self.assertTrue(_exact("doi:10.1000/xyz"))
+        self.assertTrue(_exact("urn:isbn:9780000000000"))
         self.assertTrue(_exact("ftp://example.test/"))
 
     def test_add_rejects_uncataloged_codes_and_deduplicates(self) -> None:
