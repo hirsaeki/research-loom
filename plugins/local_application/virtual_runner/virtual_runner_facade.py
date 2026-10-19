@@ -20,7 +20,6 @@ from .virtual_runner_resolve import resolve_virtual_inputs
 DESCRIPTOR_PATH = resource_path(
     "core/packages/virtual-runner/virtual-runner-capability-descriptor.json"
 )
-_MAX_PRIOR_VIRTUAL_RUN_IDS = 16
 
 
 def list_actions_stage(facade, proceed: Callable[..., Any]) -> Mapping[str, Any]:
@@ -64,12 +63,8 @@ def submit_action_stage(
                 "APPLICATION-AUTHORITY-001",
                 "caller may not supply Harness authority metadata: " + ", ".join(sorted(forbidden)),
             )
+        # _payload enforces every payload limit, including prior_virtual_run_ids.
         normalized = _payload(payload)
-        if len(normalized["prior_virtual_run_ids"]) > _MAX_PRIOR_VIRTUAL_RUN_IDS:
-            raise LocalApplicationError(
-                "APPLICATION-VIRTUAL-PAYLOAD-001",
-                f"prior_virtual_run_ids may contain at most {_MAX_PRIOR_VIRTUAL_RUN_IDS} Run IDs",
-            )
         return facade.run_survey_virtual(normalized)
     return proceed(draft_input)
 
