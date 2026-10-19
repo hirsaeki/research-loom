@@ -820,6 +820,16 @@ class DelphiMixin:
     def build_delphi_stopping_candidate(
         self, panel_id: str, *, round_result_id: str | None = None, version: str | None = None
     ) -> Mapping[str, Any]:
+        """Build a stopping *candidate* from the panel's Round 2 result.
+
+        The production slice is two-round: Design capture admits only plans whose
+        minimum and maximum approved rounds are both 2. After Round 2 the cap is
+        therefore always reached and the recommendation is always "stop" for that
+        reason. The stability and disagreement goals are still evaluated and
+        recorded in ``basis``; the goal-based "stop" and "continue" branches only
+        apply to a design with more approved rounds, which N-round support would
+        admit. The candidate adopts nothing without a Human Decision.
+        """
         panel_id = _str(panel_id, "panel_id")
         if round_result_id is None:
             if version is not None:

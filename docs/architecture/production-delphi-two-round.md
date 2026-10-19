@@ -171,7 +171,11 @@ result's pinned comparison basis, Design goals, maximum approved round count,
 attrition and missingness. Unassessed disagreement cannot satisfy a disagreement
 goal. A maximum-round cap can still be the stated reason for a stopping
 *candidate*, but no research conclusion or stop is adopted without the existing
-authoritative Human Decision boundary.
+authoritative Human Decision boundary. Because Design capture admits only
+two-round plans, the cap is always reached after Round 2, so the candidate
+always recommends stopping for that reason; the stability and disagreement goal
+results are recorded in its basis, and the goal-based recommendations apply
+only to a design with more approved rounds.
 
 ## Recovery, implementation ownership and validation
 

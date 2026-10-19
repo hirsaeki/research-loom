@@ -931,7 +931,9 @@ class StoppingCandidateTests(_Base):
 
     def test_goal_evaluation_when_more_rounds_remain(self) -> None:
         # Design capture only admits two-round plans, so a stored three-round
-        # plan is reached only by rewriting the loaded record.
+        # plan is reached only by rewriting the loaded record. In production the
+        # cap is always reached after Round 2 (by design, #577); these goal
+        # branches cover a design with more approved rounds.
         def three_rounds(value):
             value["planned_rounds"]["maximum_approved_rounds"] = 3
 
