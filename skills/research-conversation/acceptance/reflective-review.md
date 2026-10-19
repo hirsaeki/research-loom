@@ -75,4 +75,7 @@ If C helps only on one lens or only on some cases, consider narrowing the scope:
 
 ## Run record
 
-Who runs the comparison, with which host and model, and when: **not yet decided** (to be set on #590 before the run).
+- **Runner and scorer:** the repository owner (hirsaeki), who scores every output by hand.
+- **Host:** Codex.
+- **Model, settings and date:** recorded in the run's own `reflective-review-run-<date>.md` when it is carried out.
+- **Status:** not yet run. Its result is reported on #452 before any stage 2 work starts.
