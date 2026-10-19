@@ -160,6 +160,11 @@ class VirtualRunnerExecuteMixin:
         response_dataset = None
         analysis_spec = None
         aggregate_result = None
+        # A COMPLETED Run means generation ran to the end. With the LLM backend,
+        # per-profile backend failures are kept as generation diagnostics, so the
+        # Run can complete with few or no valid responses. Success is decided
+        # here: fewer accepted responses than minimum_valid_response_count (at
+        # least 1) makes the result ERROR and skips analysis.
         completion_ok = result.run.status.value == "COMPLETED"
         if completion_ok:
             response_dataset = self.capture_virtual_run_response_dataset(

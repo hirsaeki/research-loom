@@ -227,6 +227,17 @@ class LlmExecuteTests(ExecuteCase):
         self.assertIsNone(result["analysis_spec"])
         self.assertIsNone(result["aggregate_result"])
 
+    def test_every_profile_failing_completes_the_run_but_reports_error(self):
+        # Specification (#577 7e): per-profile backend failures are generation
+        # diagnostics, so the Run completes; the result status carries failure.
+        self.use_answers({})
+        result = self.facade.run_survey_virtual(llm_payload(self.questionnaire))
+        self.assertEqual(result["status"], "ERROR")
+        self.assertEqual(result["execution_result"]["run"]["status"], "COMPLETED")
+        self.assertEqual(result["response_dataset"]["accepted_count"], 0)
+        self.assertIsNone(result["analysis_spec"])
+        self.assertIsNone(result["aggregate_result"])
+
     def test_failed_run_has_no_response_dataset(self):
         self.facade._virtual_respondent_backend = lambda _payload: CrashingBackend(
             {}, backend_id="openai_responses"

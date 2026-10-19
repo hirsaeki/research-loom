@@ -95,6 +95,8 @@ Retries are bounded independently for transport failure and serialization-only r
 
 A generation report retains respondent profile IDs, attempt count/history, provider request ID where available, sanitized provider output/digest, parsed-answer digest, and failure codes. Partial generation success is allowed. The caller may set a small `minimum_valid_response_count`; shared aggregation is not produced when the canonical Dataset does not meet that minimum, and zero valid responses cannot become a successful aggregate.
 
+The Run status and the result status mean different things. The adapter catches per-profile backend failures and records them as generation diagnostics with their `failure_code`, so the Run is `COMPLETED` once generation has run for every profile, even when every profile failed. The Virtual Runner application result reports whether the run succeeded: its `status` is `ERROR`, with no analysis spec or aggregate, when the canonical Dataset has fewer accepted responses than `minimum_valid_response_count`. That minimum is at least 1, so a Run in which every profile failed always reports `ERROR`. The Dataset with zero accepted responses and the generation report stay available for inspection.
+
 ## Public inspection and durability
 
 The existing public surfaces remain authoritative:
