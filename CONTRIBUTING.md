@@ -57,6 +57,13 @@ See [`docs/architecture/monorepo-structure.md`](docs/architecture/monorepo-struc
 
 - Put current specifications in `docs/architecture/`, procedures in `docs/operations/`, superseded PR/issue records in `docs/records/`, and acceptance evidence in `docs/acceptance/`. Link every new document under `docs/` from [`docs/index.md`](docs/index.md). `tests/contracts/test_docs_links.py` fails when a document is unreachable from the index, or when a relative link or heading anchor in a tracked Markdown file does not resolve.
 
+## Language
+
+- Write specifications, contracts, code, comments and commit messages in English.
+- MISCO manuscripts, acceptance records and operations notes written for Japanese operators may be in Japanese.
+- In a research conversation the host answers in the human's language.
+- Use the spellings in the [glossary](docs/glossary.md) (for example ChatGPT Work, Effective Profile Set (EPS), Application Facade, Skill).
+
 ## Pull requests
 
 - Work is tracked on the [repository health roadmap (#475)](https://github.com/hirsaeki/research-loom/issues/475) and its epics. Keep one issue per PR and reference it with `Closes #N`.

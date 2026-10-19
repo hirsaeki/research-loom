@@ -4,7 +4,7 @@ Use this Skill only after Research has produced a fixed Research Package and a W
 
 ## Public workflow
 
-1. Export the selected sections with `writer-round-trip export-input` (or the equivalent public Facade operation).
+1. Export the selected sections with `writer-round-trip export-input` (or the equivalent public Application Facade operation).
 2. Read only the detached `writer-input.json` and its embedded section inputs. Do not inspect private SQLite state, hidden workspace stores, or the archived migration material under `docs/migration/` to recover missing rules.
 3. Draft each requested section from the supplied research objects/materials, citation scope, unresolved gaps, Narrative constraints, and communication brief. Apply `references/reader-flow.md` to give the reader a reason to begin, an advancing understanding through the middle, and a useful answer at the end.
 4. Return a `writer_response` that matches `core/packages/writer-publication/writer-round-trip.schema.json`.
