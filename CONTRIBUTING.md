@@ -27,14 +27,15 @@ uv run --frozen python -m unittest discover -t . -s tests -p 'test_*.py'
 - [`docs/test-map.md`](docs/test-map.md) lists which tests import each production module. Regenerate it with `uv run --frozen python scripts/test_map.py` after adding or moving tests; `tests/contracts/test_test_map.py` fails when it is stale.
 - `tests/` is a package. Import shared fixtures as `tests.runtime.<module>` / `tests.contracts.<module>`; no `PYTHONPATH` setup is needed.
 - Narrow a run with `-s tests/runtime`, or pass dotted module names or file paths to `python -m unittest`.
-- Coverage is reported, not enforced (#507). CI runs the contract tests and the Linux runtime shards under `coverage`, and the `coverage-report` job adds the combined branch coverage to the run summary and uploads `coverage.xml`. To measure locally:
+- Coverage is reported, not enforced (#507). CI runs the contract tests and the Linux and Windows runtime shards under `coverage`, and the `coverage-report` job combines their data, adds the branch coverage to the run summary and uploads `coverage.xml`. Python subprocesses, such as tests that start the CLI, are measured too (#592). The `windows-misco-migration` job is not measured. To measure locally:
 
   ```bash
   uv run --frozen --group coverage coverage run -m unittest discover -t . -s tests -p 'test_*.py'
+  uv run --frozen --group coverage coverage combine
   uv run --frozen --group coverage coverage report --sort=cover
   ```
 
-  Tests that start the CLI in a subprocess are not measured in that subprocess.
+  Each process writes its own `.coverage.*` data file, so run `coverage combine` before the report.
 
 ## Windows-sensitive tests
 

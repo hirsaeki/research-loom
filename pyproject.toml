@@ -75,6 +75,9 @@ strict = true
 branch = true
 relative_files = true
 source = ["core", "plugins", "scripts"]
+# Measure Python subprocesses too, such as tests that start the CLI (#592).
+# This implies parallel = true, so each process writes its own data file.
+patch = ["subprocess"]
 
 [tool.coverage.report]
 precision = 1
