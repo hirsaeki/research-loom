@@ -268,8 +268,12 @@ class CapabilityExecutionService(_BaseCapabilityExecutionService):
             attempt = parent.attempt + 1
 
         # Store only once every check has passed, so a rejected request leaves no
-        # extension behind. Re-storing the same extension for a Context Pack is
-        # idempotent, so a later trace-write failure leaves only an unused row.
+        # extension behind. A reused Run ID fails here with the trace stores' own
+        # error instead of at create_run. Re-storing the same extension for a
+        # Context Pack is idempotent, so a later trace-write failure (or a racing
+        # create_run) leaves only an unused row.
+        if self._traces.load_run(str(invocation["run_id"])) is not None:
+            raise ValueError(f"Run ID is single-use: {invocation['run_id']}")
         if context_extension is not None:
             try:
                 cast(CapabilityContextExtensionStore, self._context_extension_store).store(

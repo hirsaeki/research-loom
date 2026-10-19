@@ -519,6 +519,12 @@ class RetryTests(unittest.TestCase):
             retry_invocation(run_id="RUN-001", parent="RUN-001"), "retry must use a new Run ID"
         )
 
+    def test_reused_run_id_is_rejected_before_the_extension_is_stored(self):
+        with self.assertRaisesRegex(ValueError, "^Run ID is single-use: RUN-001$"):
+            self.prepare(INVOCATION)
+        self.assertEqual(set(self.traces.runs), {"RUN-001"})
+        self.assertEqual(self.store.items, {})
+
     def test_parent_must_preserve_capability_binding(self):
         self.service.abort("RUN-001")
         for field, value in (
