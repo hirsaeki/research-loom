@@ -10,6 +10,7 @@ import tests.runtime.test_research_exhibits as exhibits
 from plugins.local_application import LocalApplicationError
 from plugins.local_application.research_package.research_package_contents import (
     _collect_exhibit_modes,
+    append_package_attachment,
 )
 from plugins.local_application.research_package.research_package_format import (
     digest_json,
@@ -414,6 +415,51 @@ class ResearchPackageCompletionReviewTests(ResearchPackageAcceptanceSupport):
                 with self.assertRaises(LocalApplicationError) as error:
                     facade.build_research_package(case["build_input"])
             self.assertEqual(error.exception.code, "APPLICATION-RESEARCH-PACKAGE-BOUND-001")
+            self.assertEqual(facade.list_research_packages()["packages"], [])
+        finally:
+            facade.close()
+
+    def test_attachment_budget_is_checked_incrementally_without_partial_package(self):
+        facade, case = self._prepare_case()
+        try:
+            exhibit_ids = []
+            for value in ("first", "second"):
+                result = facade.capture_exhibit(
+                    exhibits.exhibit_payload(
+                        rq_id=case["rq_id"],
+                        title=f"Package attachment budget {value}",
+                        kind="note",
+                        representation="text",
+                        value=value,
+                        source_run_ids=[],
+                        source_artifact_refs=[],
+                        source_object_ids=[],
+                    )
+                )
+                exhibit_ids.append(result["exhibit"]["exhibit_id"])
+            value = deepcopy(case["build_input"])
+            value.update(
+                run_ids=[],
+                exhibit_ids=exhibit_ids,
+                project_input_ids=[],
+                materials=[],
+                gap_ids=[],
+            )
+            with (
+                patch(
+                    "plugins.local_application.research_package.research_package_contents.MAX_TEXT_BYTES",
+                    len(b"first"),
+                ),
+                patch(
+                    "plugins.local_application.research_package.research_package_builder.append_package_attachment",
+                    wraps=append_package_attachment,
+                ) as append_attachment,
+            ):
+                with self.assertRaises(LocalApplicationError) as error:
+                    facade.build_research_package(value)
+            self.assertEqual(error.exception.code, "APPLICATION-RESEARCH-PACKAGE-BOUND-001")
+            self.assertIn("64 MiB per-operation budget", str(error.exception))
+            self.assertEqual(append_attachment.call_count, 2)
             self.assertEqual(facade.list_research_packages()["packages"], [])
         finally:
             facade.close()
