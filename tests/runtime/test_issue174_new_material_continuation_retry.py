@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from core.execution import ExecutionFailureCode, ExecutionIssue, RunStatus
 from plugins.local_application.material import new_material_continuation_admission as admission
@@ -9,6 +9,28 @@ from tests.runtime.research_package_acceptance_support import ResearchPackageAcc
 
 
 class Issue174NewMaterialContinuationRetryTests(ResearchPackageAcceptanceSupport):
+    def test_correlated_attempt_lookup_scans_more_than_sixteen_entries(self):
+        conversation_id = admission._continuation_conversation_id("REACQ-1")
+        store = Mock()
+        store.run_correlations_for_conversation.return_value = tuple(
+            {"run_id": f"RUN-{index}", "proposal_id": f"PROP-{index}", "input_id": "INPUT"}
+            for index in range(17)
+        )
+        store.load_proposal.return_value = None
+        application = Mock(conversation_store=store)
+
+        result = admission._latest_correlated_continuation_attempt(
+            application,
+            project_id="PRJ-1",
+            reacquisition_run_id="REACQ-1",
+            historical_payload={"question_id": "RQ-1"},
+            current_bound_run_id=None,
+        )
+
+        self.assertIsNone(result)
+        store.run_correlations_for_conversation.assert_called_once_with(conversation_id, limit=None)
+        self.assertEqual(store.load_proposal.call_count, 17)
+
     @staticmethod
     def _remove_producer_candidate(facade, case):
         facade._application.conversation_store._db.execute(

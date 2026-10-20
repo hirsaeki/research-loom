@@ -30,7 +30,6 @@ _ROLES = {
     "other",
 }
 _MAX_BYTES = 8 * 1024 * 1024
-_MAX_PROJECT_INPUT_IDS = 64
 _TEXTUAL_MEDIA_TYPES = {
     "application/json",
     "application/ld+json",
@@ -60,11 +59,6 @@ def submit_action_stage(
             if not isinstance(ids, list) or any(not isinstance(item, str) for item in ids):
                 raise LocalApplicationError(
                     "APPLICATION-PROJECT-INPUT-001", "project_input_ids must be an array of IDs"
-                )
-            if len(ids) > _MAX_PROJECT_INPUT_IDS:
-                raise LocalApplicationError(
-                    "APPLICATION-PROJECT-INPUT-001",
-                    f"project_input_ids must contain at most {_MAX_PROJECT_INPUT_IDS} IDs",
                 )
             registry = facade._registry()
             resolved: dict[str, Mapping[str, Any]] = {}

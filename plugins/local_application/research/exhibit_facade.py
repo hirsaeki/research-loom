@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import base64
+import binascii
+import json
 from collections.abc import Mapping
 from copy import deepcopy
 from typing import Any
@@ -41,6 +44,36 @@ _HARNESS_OWNED_FIELDS = {
     "content_digest",
     "captured_at",
 }
+
+
+def _encode_exhibit_cursor(
+    project_id: str, rq_id: str | None, captured_at: str, exhibit_id: str
+) -> str:
+    raw = json.dumps([project_id, rq_id, captured_at, exhibit_id], separators=(",", ":")).encode(
+        "utf-8"
+    )
+    return base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
+
+
+def _decode_exhibit_cursor(cursor: str, *, project_id: str, rq_id: str | None) -> tuple[str, str]:
+    try:
+        padded = cursor + "=" * (-len(cursor) % 4)
+        value = json.loads(base64.urlsafe_b64decode(padded.encode("ascii")).decode("utf-8"))
+    except (ValueError, UnicodeError, json.JSONDecodeError, binascii.Error) as exc:
+        raise LocalApplicationError(
+            "APPLICATION-EXHIBIT-CURSOR-001", "exhibit list cursor is invalid"
+        ) from exc
+    if (
+        not isinstance(value, list)
+        or len(value) != 4
+        or value[0] != project_id
+        or value[1] != rq_id
+        or any(not isinstance(item, str) or not item for item in (value[2], value[3]))
+    ):
+        raise LocalApplicationError(
+            "APPLICATION-EXHIBIT-CURSOR-001", "exhibit list cursor is invalid"
+        )
+    return value[2], value[3]
 
 
 def _string_list(value: Any, field: str, *, required: bool = False) -> list[str]:
@@ -531,11 +564,34 @@ class ExhibitMixin:
             "exhibit": _metadata_projection(document),
         }
 
-    def list_exhibits(self, *, rq_id: str | None = None) -> Mapping[str, Any]:
+    def list_exhibits(
+        self,
+        *,
+        rq_id: str | None = None,
+        limit: int = _EXHIBIT_LIST_LIMIT,
+        cursor: str | None = None,
+    ) -> Mapping[str, Any]:
         if rq_id is not None and (not isinstance(rq_id, str) or not rq_id.strip()):
             raise LocalApplicationError(
                 "APPLICATION-EXHIBIT-INPUT-001", "rq_id must be a non-empty string"
             )
+        if (
+            not isinstance(limit, int)
+            or isinstance(limit, bool)
+            or not 1 <= limit <= _EXHIBIT_LIST_LIMIT
+        ):
+            raise LocalApplicationError(
+                "APPLICATION-EXHIBIT-INPUT-001", "limit must be between 1 and 100"
+            )
+        if cursor is not None and (not isinstance(cursor, str) or not cursor or len(cursor) > 2048):
+            raise LocalApplicationError(
+                "APPLICATION-EXHIBIT-CURSOR-001", "exhibit list cursor is invalid"
+            )
+        after = (
+            None
+            if cursor is None
+            else _decode_exhibit_cursor(cursor, project_id=self._project_id, rq_id=rq_id)
+        )
         if rq_id is not None:
             state = self._current_state()
             self._validate_rqs([rq_id], state)
@@ -545,17 +601,30 @@ class ExhibitMixin:
             probe = store.list_for_project(
                 self._project_id,
                 rq_id=rq_id,
-                limit=_EXHIBIT_LIST_LIMIT + 1,
+                limit=limit + 1,
+                after=after,
             )
         except LocalResearchExhibitStoreError as exc:
             raise LocalApplicationError(exc.code, exc.message) from exc
-        truncated = len(probe) > _EXHIBIT_LIST_LIMIT
+        truncated = len(probe) > limit
+        visible = probe[:limit]
         return {
             "status": "OK",
             "project_id": self._project_id,
             "rq_id": rq_id,
-            "exhibits": [_stored_metadata_projection(item) for item in probe[:_EXHIBIT_LIST_LIMIT]],
+            "exhibits": [_stored_metadata_projection(item) for item in visible],
+            "limit": limit,
             "truncated": truncated,
+            "next_cursor": (
+                _encode_exhibit_cursor(
+                    self._project_id,
+                    rq_id,
+                    str(visible[-1]["captured_at"]),
+                    str(visible[-1]["exhibit_id"]),
+                )
+                if truncated and visible
+                else None
+            ),
         }
 
     def show_exhibit(self, exhibit_id: str) -> Mapping[str, Any]:

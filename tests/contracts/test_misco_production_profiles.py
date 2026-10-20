@@ -383,7 +383,7 @@ class MiscoProductionProfileTests(unittest.TestCase):
             self.assertEqual(len(eps["effective_resources"]), 2)
             self.assertTrue(all(len(row["provenance"]) == 1 for row in eps["effective_resources"]))
 
-    def test_resource_bounds_fail_before_unbounded_reads(self):
+    def test_resource_byte_bounds_and_unbounded_resource_counts(self):
         with patch.object(profile_resolution, "MAX_PROFILE_RESOURCE_BYTES", 1):
             with self.assertRaises(LocalWorkspaceError) as raised:
                 resolve_effective_profile_set(
@@ -414,7 +414,20 @@ class MiscoProductionProfileTests(unittest.TestCase):
             )
             manifest = json.loads(WRITER_MANIFEST.read_text(encoding="utf-8"))
             manifest["profile_id"] = "misco.writer-too-many-resources"
-            manifest["resources"] = manifest["resources"] * 2
+            resource_bytes = b'{"support":true}\n'
+            resource_digest = hashlib.sha256(resource_bytes).hexdigest()
+            manifest["resources"] = []
+            for index in range(33):
+                resource_path = f"resources/support-{index:02}.json"
+                (base / resource_path).write_bytes(resource_bytes)
+                manifest["resources"].append(
+                    {
+                        "path": resource_path,
+                        "role": "WRITER_RULES",
+                        "sha256": resource_digest,
+                    }
+                )
+            self.assertGreater(len(manifest["resources"]), 32)
             path = base / "profile.json"
             path.write_text(json.dumps(manifest, ensure_ascii=False), encoding="utf-8")
             config = {
@@ -431,23 +444,11 @@ class MiscoProductionProfileTests(unittest.TestCase):
                     "publication": [],
                 }
             }
-            with patch.object(profile_resolution, "MAX_PROFILE_RESOURCES", 1):
-                with self.assertRaises(LocalWorkspaceError) as raised:
-                    resolve_effective_profile_set(config, [path])
-            self.assertEqual(raised.exception.code, "PROFILE-RESOURCE-BOUND-001")
-
-        with patch.object(profile_resolution, "MAX_EFFECTIVE_RESOURCES", 1):
-            with patch.object(
-                profile_resolution,
-                "_normalized_resource_bytes",
-                wraps=profile_resolution._normalized_resource_bytes,
-            ) as reader:
-                with self.assertRaises(LocalWorkspaceError) as raised:
-                    resolve_effective_profile_set(
-                        config_for_publication(), [WRITER_MANIFEST, PUBLICATION_MANIFEST]
-                    )
-        self.assertEqual(raised.exception.code, "PROFILE-RESOURCE-BOUND-001")
-        self.assertEqual(reader.call_count, 0)
+            resolved = resolve_effective_profile_set(config, [path])
+            self.assertEqual(
+                len(resolved["effective_resources"]),
+                len({item["path"] for item in manifest["resources"]}),
+            )
 
         with patch.object(profile_resolution, "MAX_EFFECTIVE_RESOURCE_BYTES", 1):
             with patch.object(

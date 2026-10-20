@@ -222,7 +222,7 @@ def normalize_analysis_items(
                     }
                 )
             else:
-                allowed = {"analysis_type", "item_id", "question_id", "max_rows"}
+                allowed = {"analysis_type", "item_id", "question_id", "max_rows", "offset"}
                 if set(raw) - allowed:
                     raise ValueError("free_text_listing analysis item contains unknown fields")
                 if question["question_type"] != "free_text":
@@ -236,14 +236,18 @@ def normalize_analysis_items(
                     raise ValueError(
                         "free_text_listing max_rows must be an integer from 1 through 100"
                     )
-                result.append(
-                    {
-                        "item_id": item_id,
-                        "analysis_type": analysis_type,
-                        "question_id": qid,
-                        "max_rows": max_rows,
-                    }
-                )
+                offset = raw.get("offset", 0)
+                if not isinstance(offset, int) or isinstance(offset, bool) or offset < 0:
+                    raise ValueError("free_text_listing offset must be a non-negative integer")
+                normalized_item = {
+                    "item_id": item_id,
+                    "analysis_type": analysis_type,
+                    "question_id": qid,
+                    "max_rows": max_rows,
+                }
+                if "offset" in raw:
+                    normalized_item["offset"] = offset
+                result.append(normalized_item)
             continue
 
         if analysis_type == "cross_tab":
@@ -496,6 +500,7 @@ def _free_text_listing(
 ) -> dict[str, Any]:
     qid = str(item["question_id"])
     max_rows = int(item["max_rows"])
+    offset = int(item.get("offset", 0))
     rows: list[dict[str, Any]] = []
     non_empty_count = 0
     for response, answers in zip(responses, answer_maps, strict=False):
@@ -508,7 +513,7 @@ def _free_text_listing(
         if not text.strip():
             continue
         non_empty_count += 1
-        if len(rows) < max_rows:
+        if offset <= non_empty_count - 1 < offset + max_rows:
             rows.append(
                 {
                     "question_id": qid,
@@ -519,6 +524,7 @@ def _free_text_listing(
                     "response_origin": str(response["response_origin"]),
                 }
             )
+    next_offset = offset + len(rows) if non_empty_count > offset + len(rows) else None
     return {
         "item_id": str(item["item_id"]),
         "analysis_type": "free_text_listing",
@@ -526,7 +532,9 @@ def _free_text_listing(
         "response_key": stable_response_key(question),
         "non_empty_count": non_empty_count,
         "returned_count": len(rows),
-        "truncated": non_empty_count > len(rows),
+        "offset": offset,
+        "next_offset": next_offset,
+        "truncated": next_offset is not None,
         "rows": rows,
         "provenance": {
             "analysis_item_id": str(item["item_id"]),

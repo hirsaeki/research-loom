@@ -13,9 +13,6 @@ from core.resources import resource_path
 POLICY_PATH = resource_path("profiles/contracts/research-quality-policy.yaml")
 _STATUS = {"conformant", "violation", "unevaluated", "not_applicable"}
 _ORGANIZATION_STATUS = {"conformant", "violation", "not_applicable"}
-_MAX_ASSESSMENT_SUBJECTS = 256
-_MAX_ASSESSMENT_FIELDS = 64
-_MAX_BASIS_REFS = 256
 _MAX_RATIONALE_CHARS = 8192
 
 
@@ -41,16 +38,11 @@ def _objects(state) -> dict[tuple[str, str], Mapping[str, Any]]:
     }
 
 
-def _string_list(value: Any, field: str, *, maximum: int = _MAX_BASIS_REFS) -> list[str]:
+def _string_list(value: Any, field: str) -> list[str]:
     if not isinstance(value, list) or any(not isinstance(item, str) or not item for item in value):
         raise ResearchQualityEvaluationError(
             "APPLICATION-RESEARCH-QUALITY-INPUT-001",
             f"{field} must be an array of non-empty strings",
-        )
-    if len(value) > maximum:
-        raise ResearchQualityEvaluationError(
-            "APPLICATION-RESEARCH-QUALITY-BOUND-001",
-            f"{field} exceeds the evaluation bound",
         )
     if len(value) != len(set(value)):
         raise ResearchQualityEvaluationError(
@@ -105,10 +97,10 @@ def _assessment(value: Any, field: str) -> dict[str, Any]:
 def _assessment_map(value: Any, field: str) -> dict[str, dict[str, dict[str, Any]]]:
     if value is None:
         return {}
-    if not isinstance(value, Mapping) or len(value) > _MAX_ASSESSMENT_SUBJECTS:
+    if not isinstance(value, Mapping):
         raise ResearchQualityEvaluationError(
-            "APPLICATION-RESEARCH-QUALITY-BOUND-001",
-            f"{field} must be a bounded object",
+            "APPLICATION-RESEARCH-QUALITY-INPUT-001",
+            f"{field} must be an object",
         )
     result: dict[str, dict[str, dict[str, Any]]] = {}
     for subject_id, fields in value.items():
@@ -116,11 +108,6 @@ def _assessment_map(value: Any, field: str) -> dict[str, dict[str, dict[str, Any
             raise ResearchQualityEvaluationError(
                 "APPLICATION-RESEARCH-QUALITY-INPUT-001",
                 f"{field} subject entries are invalid",
-            )
-        if len(fields) > _MAX_ASSESSMENT_FIELDS:
-            raise ResearchQualityEvaluationError(
-                "APPLICATION-RESEARCH-QUALITY-BOUND-001",
-                f"{field}.{subject_id} has too many assessment fields",
             )
         result[subject_id] = {
             str(name): _assessment(item, f"{field}.{subject_id}.{name}")
@@ -166,10 +153,10 @@ def normalize_input(value: Mapping[str, Any]) -> dict[str, Any]:
             "APPLICATION-RESEARCH-QUALITY-INPUT-001", "assessments shape is invalid"
         )
     sufficiency = assessments.get("sufficiency") or {}
-    if not isinstance(sufficiency, Mapping) or len(sufficiency) > _MAX_ASSESSMENT_FIELDS:
+    if not isinstance(sufficiency, Mapping):
         raise ResearchQualityEvaluationError(
-            "APPLICATION-RESEARCH-QUALITY-BOUND-001",
-            "assessments.sufficiency must be a bounded object",
+            "APPLICATION-RESEARCH-QUALITY-INPUT-001",
+            "assessments.sufficiency must be an object",
         )
     result["assessments"] = {
         "sources": _assessment_map(assessments.get("sources"), "assessments.sources"),
@@ -183,10 +170,10 @@ def normalize_input(value: Mapping[str, Any]) -> dict[str, Any]:
     }
 
     organization = value.get("organization_assessments", {})
-    if not isinstance(organization, Mapping) or len(organization) > _MAX_ASSESSMENT_SUBJECTS:
+    if not isinstance(organization, Mapping):
         raise ResearchQualityEvaluationError(
-            "APPLICATION-RESEARCH-QUALITY-BOUND-001",
-            "organization_assessments must be a bounded object",
+            "APPLICATION-RESEARCH-QUALITY-INPUT-001",
+            "organization_assessments must be an object",
         )
     normalized_org: dict[str, dict[str, Any]] = {}
     for path, item in organization.items():

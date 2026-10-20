@@ -21,8 +21,8 @@ from .publication_dialect import GENERIC_PUBLICATION_DIALECT, PublicationDialect
 
 SCHEMA_VERSION = "0.1.0"
 SERVICE_VERSION = "0.2.0"
-MAX_SECTIONS = 128
 MAX_OUTPUT_BYTES = 16 * 1024 * 1024
+MAX_APPLICATION_INPUT_BYTES = MAX_OUTPUT_BYTES
 _XREF = re.compile(r"\[\[(section|exhibit|citation):([^\]]+)\]\]")
 _APPLICATION_SCHEMA = resource_path(
     "core/packages/writer-publication/publication-application.schema.json"
@@ -105,7 +105,21 @@ def _validate_preview_manifest(value: Mapping[str, Any]) -> None:
 
 
 def _validate_publication_inputs(value: Mapping[str, Any] | None) -> dict[str, Any]:
-    normalized = {"schema_version": SCHEMA_VERSION} if value is None else deepcopy(dict(value))
+    supplied = {"schema_version": SCHEMA_VERSION} if value is None else dict(value)
+    try:
+        input_size = len(_canonical_bytes(supplied))
+    except (TypeError, ValueError, RecursionError) as exc:
+        raise LocalApplicationError(
+            "APPLICATION-PUBLICATION-INPUT-001",
+            "Publication application input must be JSON-compatible",
+        ) from exc
+    if input_size > MAX_APPLICATION_INPUT_BYTES:
+        raise LocalApplicationError(
+            "APPLICATION-PUBLICATION-INPUT-001",
+            "Publication application input exceeds the 16 MiB operation budget; "
+            "split the report into separately bounded volumes and retry",
+        )
+    normalized = deepcopy(supplied)
     schema = json.loads(_APPLICATION_SCHEMA.read_text(encoding="utf-8"))
     errors = sorted(
         Draft202012Validator(schema, format_checker=FormatChecker()).iter_errors(normalized),

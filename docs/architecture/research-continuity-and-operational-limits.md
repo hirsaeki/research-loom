@@ -38,3 +38,7 @@ recoverable continuation path, such as explicit batching, pagination, retry
 after resources become available, or a supported alternative representation.
 The continuation must preserve the same integrity and authority checks and
 must not imply that the human's research has ended.
+
+The current runtime inventory, including removed count-based rejections,
+remaining work budgets, and paginated views, is maintained in
+[Runtime count and capacity limits inventory](operational-count-limits-inventory.md).

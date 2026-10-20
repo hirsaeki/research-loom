@@ -28,6 +28,7 @@ from plugins.local_execution_store import (
     bind_controlled_import_root,
     child_runs_for_parent,
     diagnostics_for,
+    latest_child_attempt_for_parent,
 )
 from plugins.local_payload_repair import REPAIRABLE
 
@@ -506,47 +507,59 @@ class HistoricalMaterialReacquisitionService:
         kind: str,
         historical_artifact_id: str,
     ):
-        for child in reversed(child_runs_for_parent(self._store, historical_run_id, limit=100)):
-            if child.status is not RunStatus.COMPLETED:
-                continue
-            if not self._matches_target(child, capture_id, kind):
-                continue
-            for item in diagnostics_for(self._store, child.run_id, limit=20):
-                if item.get("kind") != _RESULT_DIAGNOSTIC:
+        before: tuple[int, str, str] | None = None
+        while True:
+            children = child_runs_for_parent(
+                self._store,
+                historical_run_id,
+                limit=100,
+                newest_first=True,
+                before=before,
+            )
+            for child in children:
+                if child.status is not RunStatus.COMPLETED:
                     continue
-                payload = item.get("payload")
-                if not isinstance(payload, Mapping):
+                if not self._matches_target(child, capture_id, kind):
                     continue
-                status = payload.get("status")
-                try:
-                    if status == "IDENTICAL_REACQUISITION":
-                        if payload.get("historical_artifact_id") != historical_artifact_id:
-                            continue
-                        if (
-                            self._store.diagnose_artifact_content(historical_artifact_id).get(
-                                "status"
-                            )
-                            != "verified"
-                        ):
-                            continue
-                    elif status == "NEW_MATERIAL_VERSION":
-                        new_artifact_id = payload.get("new_artifact_id")
-                        if not isinstance(new_artifact_id, str) or not any(
-                            artifact.artifact_id == new_artifact_id
-                            for artifact in self._store.artifacts_for(child.run_id)
-                        ):
-                            continue
-                        if (
-                            self._store.diagnose_artifact_content(new_artifact_id).get("status")
-                            != "verified"
-                        ):
-                            continue
-                    else:
+                for item in diagnostics_for(self._store, child.run_id, limit=20):
+                    if item.get("kind") != _RESULT_DIAGNOSTIC:
                         continue
-                except Exception:
-                    continue
-                return child, dict(payload)
-        return None
+                    payload = item.get("payload")
+                    if not isinstance(payload, Mapping):
+                        continue
+                    status = payload.get("status")
+                    try:
+                        if status == "IDENTICAL_REACQUISITION":
+                            if payload.get("historical_artifact_id") != historical_artifact_id:
+                                continue
+                            if (
+                                self._store.diagnose_artifact_content(historical_artifact_id).get(
+                                    "status"
+                                )
+                                != "verified"
+                            ):
+                                continue
+                        elif status == "NEW_MATERIAL_VERSION":
+                            new_artifact_id = payload.get("new_artifact_id")
+                            if not isinstance(new_artifact_id, str) or not any(
+                                artifact.artifact_id == new_artifact_id
+                                for artifact in self._store.artifacts_for(child.run_id)
+                            ):
+                                continue
+                            if (
+                                self._store.diagnose_artifact_content(new_artifact_id).get("status")
+                                != "verified"
+                            ):
+                                continue
+                        else:
+                            continue
+                    except Exception:
+                        continue
+                    return child, dict(payload)
+            if len(children) < 100:
+                return None
+            last = children[-1]
+            before = (last.attempt, last.prepared_at, last.run_id)
 
     @contextmanager
     def _target_lock(self, historical_run_id: str, capture_id: str, kind: str):
@@ -600,7 +613,7 @@ class HistoricalMaterialReacquisitionService:
             lineage_ref=historical.lineage_ref,
             snapshot_ref=historical.snapshot_ref,
             snapshot_digest=historical.snapshot_digest,
-            attempt=len(child_runs_for_parent(self._store, historical.run_id, limit=100)) + 1,
+            attempt=latest_child_attempt_for_parent(self._store, historical.run_id) + 1,
             parent_run_id=historical.run_id,
             status=RunStatus.PREPARED,
             prepared_at=now,

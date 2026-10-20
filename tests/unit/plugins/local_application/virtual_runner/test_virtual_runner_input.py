@@ -212,7 +212,7 @@ class StructuralPayloadAcceptTests(unittest.TestCase):
             {"population_size": 1},
             {"population_size": 128},
             {"core_method_revision": 0},
-            {"prior_virtual_run_ids": [f"RUN-{i}" for i in range(16)]},
+            {"prior_virtual_run_ids": [f"RUN-{i}" for i in range(17)]},
         ):
             with self.subTest(overrides=overrides):
                 _payload(base_payload(**overrides))
@@ -342,9 +342,10 @@ class StructuralPayloadRejectTests(unittest.TestCase):
         )
 
     def test_prior_virtual_run_ids(self):
-        self.assert_rejected(
-            base_payload(prior_virtual_run_ids=[f"RUN-{i}" for i in range(17)]),
-            "prior_virtual_run_ids may contain at most 16 Run IDs",
+        prior_ids = [f"RUN-{i}" for i in range(17)]
+        self.assertEqual(
+            _payload(base_payload(prior_virtual_run_ids=prior_ids))["prior_virtual_run_ids"],
+            prior_ids,
         )
         self.assert_rejected(
             base_payload(prior_virtual_run_ids="RUN-1"),
@@ -497,17 +498,20 @@ class LlmPayloadRejectTests(unittest.TestCase):
             "stress_faults belong to the structural generator and are not accepted by the LLM backend",
         )
 
-    def test_profile_count_bounds(self):
-        message = (
-            "respondent_profiles must contain 1 through 8 explicit synthetic profiles "
-            "for the bounded LLM backend"
-        )
-        too_many = [{"profile_id": f"SYN-PROFILE-{i}"} for i in range(9)]
-        for profiles in ([], "SYN-PROFILE-A", too_many):
+    def test_profile_list_must_be_non_empty(self):
+        message = "respondent_profiles must contain one or more explicit synthetic profiles for the LLM backend"
+        for profiles in ([], "SYN-PROFILE-A"):
             with self.subTest(profiles=profiles):
                 self.assert_rejected(
                     llm_payload(respondent_profiles=profiles), "PROFILE_INVALID", message
                 )
+
+    def test_llm_profile_list_accepts_more_than_eight_profiles(self):
+        profiles = [{"profile_id": f"SYN-PROFILE-{i}"} for i in range(9)]
+        normalized = _payload(llm_payload(respondent_profiles=profiles))
+
+        self.assertEqual(len(normalized["respondent_profiles"]), 9)
+        self.assertEqual(normalized["population_size"], 9)
 
     def test_profile_shape_and_ids(self):
         cases = (

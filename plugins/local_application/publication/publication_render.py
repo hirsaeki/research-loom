@@ -17,7 +17,6 @@ from .publication_exhibits import prepare_exhibits
 from .publication_release_support import (
     _XREF,
     MAX_OUTPUT_BYTES,
-    MAX_SECTIONS,
     _editorial_status,
     _verify_docx_bytes,
 )
@@ -119,11 +118,6 @@ class PublicationRenderMixin:
         revision = inspection["revision"]
         composition = inspection["composition"]
         sections = list(revision.get("sections", []))
-        if len(sections) > MAX_SECTIONS:
-            raise LocalApplicationError(
-                "APPLICATION-PUBLICATION-BOUND-001",
-                "manuscript section count exceeds Publication bound",
-            )
         known_sections = {str(row["section_id"]) for row in sections}
         report = policy.get("formal_report")
         formal_report = dialect.formal_report_requested(policy)
@@ -579,7 +573,8 @@ class PublicationRenderMixin:
         if len(markdown) + len(docx) > MAX_OUTPUT_BYTES:
             raise LocalApplicationError(
                 "APPLICATION-PUBLICATION-BOUND-001",
-                "Publication outputs exceed supported aggregate size",
+                "Publication outputs exceed the 16 MiB operation budget; "
+                "split the report into separately bounded volumes and retry",
             )
         if not _verify_docx_bytes(docx) or not verify_native_docx(docx, docx_lines, layout):
             raise LocalApplicationError(
@@ -598,7 +593,8 @@ class PublicationRenderMixin:
             if len(markdown) + len(docx) > MAX_OUTPUT_BYTES:
                 raise LocalApplicationError(
                     "APPLICATION-PUBLICATION-BOUND-001",
-                    "Formal report outputs exceed the supported aggregate size",
+                    "Formal report outputs exceed the 16 MiB operation budget; "
+                    "split the report into separately bounded volumes and retry",
                 )
         checks = {
             "citation_resolution": "failed"

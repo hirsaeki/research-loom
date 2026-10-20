@@ -22,10 +22,6 @@ from .visual_package_bindings import validate_visual_package_bindings
 
 SCHEMA_VERSION = "0.2.0"
 TOOL_VERSION = "0.2.0"
-MAX_OBJECTS = 512
-MAX_RUNS = 16
-MAX_INPUTS = 32
-MAX_MATERIALS = 128
 MAX_PACKAGES = 100
 MAX_ITEM_BYTES = 1024 * 1024
 MAX_TEXT_BYTES = 64 * 1024 * 1024
@@ -498,7 +494,7 @@ def safe_component(v: str, field: str) -> str:
     return v
 
 
-def str_list(v: Any, field: str, maximum: int | None = None) -> list[str]:
+def str_list(v: Any, field: str) -> list[str]:
     if v is None:
         return []
     if not isinstance(v, list) or any(not isinstance(x, str) or not x for x in v):
@@ -509,10 +505,6 @@ def str_list(v: Any, field: str, maximum: int | None = None) -> list[str]:
     if len(v) != len(set(v)):
         raise LocalApplicationError(
             "APPLICATION-RESEARCH-PACKAGE-INPUT-001", f"{field} contains duplicates"
-        )
-    if maximum is not None and len(v) > maximum:
-        raise LocalApplicationError(
-            "APPLICATION-RESEARCH-PACKAGE-BOUND-001", f"{field} exceeds bound {maximum}"
         )
     return list(v)
 

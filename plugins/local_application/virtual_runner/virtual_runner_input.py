@@ -80,7 +80,6 @@ _PII_TEXT_PATTERNS = (
 )
 _TRUSTED_LLM_ENDPOINT = "https://api.openai.com/v1/responses"
 _TRUSTED_LLM_CREDENTIAL_ENV = "OPENAI_API_KEY"
-_MAX_LLM_PROFILES = 8
 _MAX_LLM_TIMEOUT_SECONDS = 30
 _ALLOWED_LLM_BACKEND_FIELDS = {
     "backend_id",
@@ -279,11 +278,6 @@ def _payload(payload: Mapping[str, Any]) -> dict[str, Any]:
             "stress_faults contains an unsupported structural fault",
         )
     prior = _string_list(payload.get("prior_virtual_run_ids", []), "prior_virtual_run_ids")
-    if len(prior) > 16:
-        raise LocalApplicationError(
-            "APPLICATION-VIRTUAL-PAYLOAD-001",
-            "prior_virtual_run_ids may contain at most 16 Run IDs",
-        )
     policy = payload.get(
         "readiness_policy",
         {
@@ -380,10 +374,10 @@ def _payload(payload: Mapping[str, Any]) -> dict[str, Any]:
                 "APPLICATION-VIRTUAL-PAYLOAD-001",
                 "stress_faults belong to the structural generator and are not accepted by the LLM backend",
             )
-        if not isinstance(profiles, list) or not profiles or len(profiles) > _MAX_LLM_PROFILES:
+        if not isinstance(profiles, list) or not profiles:
             raise LocalApplicationError(
                 "PROFILE_INVALID",
-                f"respondent_profiles must contain 1 through {_MAX_LLM_PROFILES} explicit synthetic profiles for the bounded LLM backend",
+                "respondent_profiles must contain one or more explicit synthetic profiles for the LLM backend",
             )
         seen_profiles = set()
         for index, profile in enumerate(profiles):

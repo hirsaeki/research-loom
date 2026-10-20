@@ -25,9 +25,6 @@ _REVIEW_INPUT_FIELDS = {
     "project_input_ids",
 }
 _QUESTION_FIELDS = {"text", "rationale", "acceptance_criteria", "scope_limits"}
-_MAX_QUESTION_IDS = 16
-_MAX_SPLIT_QUESTIONS = 16
-_MAX_LIST_ITEMS = 64
 _MAX_ID_LENGTH = 256
 _MAX_TEXT_LENGTH = 8_192
 _MAX_LIST_ITEM_LENGTH = 4_096
@@ -45,20 +42,18 @@ def _non_empty_strings(
     field: str,
     *,
     min_items: int = 0,
-    max_items: int = _MAX_LIST_ITEMS,
     max_length: int = _MAX_LIST_ITEM_LENGTH,
 ) -> None:
     if (
         not isinstance(value, list)
         or len(value) < min_items
-        or len(value) > max_items
         or any(
             not isinstance(item, str) or not item.strip() or len(item) > max_length
             for item in value
         )
     ):
         raise ValueError(
-            f"{field} must be an array of {min_items} through {max_items} non-empty strings "
+            f"{field} must be an array of at least {min_items} non-empty strings "
             f"with at most {max_length} characters each"
         )
     if len(value) != len(set(value)):
@@ -79,7 +74,6 @@ def research_question_review_payload(payload: Mapping[str, Any]) -> None:
         payload.get("question_ids"),
         "question_ids",
         min_items=1,
-        max_items=_MAX_QUESTION_IDS,
         max_length=_MAX_ID_LENGTH,
     )
     question_ids = payload["question_ids"]
@@ -105,12 +99,8 @@ def research_question_review_payload(payload: Mapping[str, Any]) -> None:
 
     if operation == "SPLIT":
         questions = payload.get("questions")
-        if (
-            not isinstance(questions, list)
-            or len(questions) < 2
-            or len(questions) > _MAX_SPLIT_QUESTIONS
-        ):
-            raise ValueError(f"SPLIT requires between 2 and {_MAX_SPLIT_QUESTIONS} questions")
+        if not isinstance(questions, list) or len(questions) < 2:
+            raise ValueError("SPLIT requires at least two questions")
         for index, item in enumerate(questions):
             if not isinstance(item, Mapping) or set(item) - _QUESTION_FIELDS:
                 raise ValueError(f"questions[{index}] contains unknown fields")

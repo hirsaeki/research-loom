@@ -28,7 +28,6 @@ from .material_reacquisition_service import (
 
 _CONTINUATION_BINDING_DIAGNOSTIC = "desktop_research.new_material_continuation.binding"
 _CONTINUATION_CLAIM_DIAGNOSTIC = "desktop_research.new_material_continuation.claim"
-_CONTINUATION_CORRELATION_LIMIT = 16
 
 
 def _continuation_conversation_id(reacquisition_run_id: str) -> str:
@@ -279,7 +278,7 @@ def _latest_correlated_continuation_attempt(
         return None
     expected_payload = deepcopy(dict(historical_payload))
     expected_payload.pop("parent_run_id", None)
-    for correlation in query(conversation_id, limit=_CONTINUATION_CORRELATION_LIMIT):
+    for correlation in query(conversation_id, limit=None):
         run_id = str(correlation.get("run_id") or "")
         if not run_id:
             continue

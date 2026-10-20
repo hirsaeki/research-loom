@@ -13,7 +13,6 @@ from plugins.local_application.workspace.workspace import LocalWorkspaceError
 
 from .profile_resolution_support import (
     CORE_CONTRACTS,
-    MAX_PROFILE_MANIFESTS,
     NARRATIVE_SEMANTICS,
     PROFILE_MANIFEST_SCHEMA,
     RESEARCH_QUALITY_POLICY,
@@ -272,12 +271,7 @@ def _load_candidates(paths: Iterable[str | Path]) -> list[dict[str, Any]]:
     candidates: list[dict[str, Any]] = []
     identities: dict[tuple[str, str, str], str] = {}
     profile_root = resource_path("profiles").resolve()
-    for index, raw_path in enumerate(paths):
-        if index >= MAX_PROFILE_MANIFESTS:
-            raise LocalWorkspaceError(
-                "PROFILE-CANDIDATE-LIMIT-001",
-                f"profile resolution accepts at most {MAX_PROFILE_MANIFESTS} manifest files",
-            )
+    for raw_path in paths:
         path = Path(raw_path).expanduser().resolve(strict=True)
         try:
             path.relative_to(profile_root)

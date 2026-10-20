@@ -50,11 +50,10 @@ def validate_request(value):
         rows = value[field]
         if (
             not isinstance(rows, list)
-            or len(rows) > 64
             or any(not isinstance(s, str) or not s.strip() or len(s) > 2048 for s in rows)
             or len(rows) != len(set(rows))
         ):
-            raise ValueError("explanation " + field + " must be bounded explicit strings")
+            raise ValueError("explanation " + field + " must be explicit non-empty strings")
     if not value["allowed_labels"] or not value["must_not_add"]:
         raise ValueError("explanation must declare allowed labels and forbidden added semantics")
 

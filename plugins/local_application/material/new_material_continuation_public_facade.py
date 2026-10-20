@@ -46,13 +46,12 @@ def _payload(payload: Mapping[str, Any]) -> dict[str, Any]:
     paired = payload.get("paired_reacquisition_run_ids", [])
     if (
         not isinstance(paired, list)
-        or len(paired) > 15
         or any(not isinstance(item, str) or not item for item in paired)
         or len(set(paired)) != len(paired)
         or run_id in paired
     ):
         raise ValueError(
-            "paired_reacquisition_run_ids must contain up to 15 unique non-empty Run IDs "
+            "paired_reacquisition_run_ids must contain unique non-empty Run IDs "
             "different from reacquisition_run_id"
         )
     normalized: dict[str, Any] = {"reacquisition_run_id": run_id}

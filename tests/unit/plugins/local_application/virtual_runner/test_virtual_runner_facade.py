@@ -173,14 +173,6 @@ class SubmitActionStageTests(unittest.TestCase):
             "APPLICATION-VIRTUAL-PAYLOAD-001",
             "scenario_class must be STANDARD or STRESS",
         )
-        self.assert_rejected(
-            {
-                "action_type": ACTION,
-                "payload": valid_payload(prior_virtual_run_ids=[f"RUN-{i}" for i in range(17)]),
-            },
-            "APPLICATION-VIRTUAL-PAYLOAD-001",
-            "prior_virtual_run_ids may contain at most 16 Run IDs",
-        )
 
 
 def profile_set(digest: str = "sha256:" + "e" * 64) -> dict:

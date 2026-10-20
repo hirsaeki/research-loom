@@ -409,6 +409,21 @@ class Issue256NativePublicationTests(ResearchPackageAcceptanceSupport):
         built, _, _ = self._build(facade, case)
         self.assertEqual(built["build"]["verification"]["render_verification"], "failed")
 
+    def test_table_rows_and_columns_are_limited_by_payload_size_not_fixed_counts(self):
+        columns = [f"column-{index}" for index in range(9)]
+        content = {
+            "representation": "json",
+            "value": {
+                "columns": columns,
+                "rows": [["value"] * len(columns) for _ in range(513)],
+            },
+        }
+
+        rows = table_rows(content)
+
+        self.assertEqual(len(rows), 514)
+        self.assertEqual(len(rows[0]), 9)
+
     def test_ablation_structural_xml_alone_misses_flattening_and_wrong_image_relationship(self):
         png = fixture_png()
         table = {

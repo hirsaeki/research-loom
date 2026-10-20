@@ -265,10 +265,50 @@ class ResearchExhibitTests(unittest.TestCase):
                     [a["exhibit"]["exhibit_id"]],
                 )
                 self.assertFalse(listed["truncated"])
+                self.assertIsNone(listed["next_cursor"])
                 self.assertNotIn("content", listed["exhibits"][0])
                 with self.assertRaises(LocalApplicationError) as unknown:
                     facade.list_exhibits(rq_id="RQ-UNKNOWN")
                 self.assertEqual(unknown.exception.code, "APPLICATION-EXHIBIT-RQ-001")
+            finally:
+                app.close()
+
+    def test_list_exhibits_paginates_all_items_without_duplicates(self):
+        with tempfile.TemporaryDirectory() as temp:
+            app = make_app(temp)
+            try:
+                facade = LocalApplicationFacade(app, "PRJ-1")
+                for index in range(103):
+                    facade.capture_exhibit(exhibit_payload(title=f"Exhibit {index:03}"))
+
+                pages = []
+                cursor = None
+                while True:
+                    page = facade.list_exhibits(limit=40, cursor=cursor)
+                    pages.extend(page["exhibits"])
+                    if not page["truncated"]:
+                        self.assertIsNone(page["next_cursor"])
+                        break
+                    cursor = page["next_cursor"]
+                    self.assertIsInstance(cursor, str)
+
+                exhibit_ids = [item["exhibit_id"] for item in pages]
+                self.assertEqual(len(exhibit_ids), 103)
+                self.assertEqual(len(set(exhibit_ids)), 103)
+            finally:
+                app.close()
+
+    def test_exhibit_list_cursor_is_bound_to_project_and_question_filter(self):
+        with tempfile.TemporaryDirectory() as temp:
+            app = make_app(temp)
+            try:
+                facade = LocalApplicationFacade(app, "PRJ-1")
+                for index in range(2):
+                    facade.capture_exhibit(exhibit_payload(title=f"Filtered exhibit {index}"))
+                page = facade.list_exhibits(rq_id="RQ-1", limit=1)
+                with self.assertRaises(LocalApplicationError) as invalid_cursor:
+                    facade.list_exhibits(rq_id="RQ-2", limit=1, cursor=page["next_cursor"])
+                self.assertEqual(invalid_cursor.exception.code, "APPLICATION-EXHIBIT-CURSOR-001")
             finally:
                 app.close()
 

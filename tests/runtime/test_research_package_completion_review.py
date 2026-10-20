@@ -12,7 +12,6 @@ from plugins.local_application.research_package.research_package_contents import
     _collect_exhibit_modes,
 )
 from plugins.local_application.research_package.research_package_format import (
-    MAX_RUNS,
     digest_json,
     safe_component,
     verify_export_root,
@@ -299,10 +298,17 @@ class ResearchPackageCompletionReviewTests(ResearchPackageAcceptanceSupport):
                     safe_component(value, "package_id")
                 self.assertEqual(error.exception.code, "APPLICATION-RESEARCH-PACKAGE-INPUT-001")
 
-    def test_exhibit_source_run_provenance_is_bounded_before_load(self):
+    def test_exhibit_source_run_provenance_accepts_more_than_16_runs(self):
+        loaded = []
+
         class Store:
-            def load_run(self, _run_id):
-                raise AssertionError("source Run must not be loaded after bound failure")
+            def load_run(self, run_id):
+                loaded.append(run_id)
+                return SimpleNamespace(
+                    project_ref="PROJECT-1",
+                    lineage_ref="LINEAGE-1",
+                    execution_mode="real",
+                )
 
         service = SimpleNamespace(
             project_id="PROJECT-1",
@@ -314,12 +320,11 @@ class ResearchPackageCompletionReviewTests(ResearchPackageAcceptanceSupport):
             "exhibit_id": "EX-BIG",
             "project_id": "PROJECT-1",
             "captured_against": {"lineage_ref": "LINEAGE-1"},
-            "source_run_ids": [f"RUN-{index}" for index in range(MAX_RUNS + 1)],
+            "source_run_ids": [f"RUN-{index}" for index in range(17)],
             "derived_from_exhibit_ids": [],
         }
-        with self.assertRaises(LocalApplicationError) as error:
-            _collect_exhibit_modes(service, exhibit, state, set())
-        self.assertEqual(error.exception.code, "APPLICATION-RESEARCH-PACKAGE-BOUND-001")
+        self.assertEqual(_collect_exhibit_modes(service, exhibit, state, set()), {"real"})
+        self.assertEqual(loaded, exhibit["source_run_ids"])
 
     def _provenance_chain(self, count):
         rows = {

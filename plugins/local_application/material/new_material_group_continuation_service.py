@@ -106,7 +106,7 @@ def _latest_correlated_attempt(
         return None
     expected_payload = deepcopy(dict(historical_payload))
     expected_payload.pop("parent_run_id", None)
-    for correlation in query(conversation_id, limit=_GROUP_LIMIT):
+    for correlation in query(conversation_id, limit=None):
         run_id = str(correlation.get("run_id") or "")
         if not run_id:
             continue
@@ -153,7 +153,8 @@ class PairedNewMaterialContinuationService(NewMaterialContinuationService):
         if len(run_ids) < 2 or len(run_ids) > _GROUP_LIMIT or len(set(run_ids)) != len(run_ids):
             raise LocalApplicationError(
                 "APPLICATION-NEW-MATERIAL-CONTINUATION-BINDING-001",
-                "paired continuation requires 2-16 unique reacquisition Runs",
+                "paired continuation accepts 2-16 unique reacquisition Runs per group; "
+                "split remaining Runs into additional groups to continue",
             )
 
         with _CONTINUATION_LOCK, ExitStack() as locks:

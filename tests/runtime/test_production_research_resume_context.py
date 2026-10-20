@@ -7,14 +7,16 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from contextlib import nullcontext
 from copy import deepcopy
 from pathlib import Path
 
 import rfc8785
 
-from core.conversation import ConversationRuntimeError
+from core.conversation import ConversationRuntimeError, canonical_digest
 from core.execution import CapabilityRunRecord, RunLifecycleEvent, RunStatus
 from plugins.local_application import LocalApplicationFacade
+from plugins.local_conversation_store.resume import state_delta_proposals_by_ids_for_project
 
 ROOT = Path(__file__).resolve().parents[2]
 PROJECT_FIXTURE = ROOT / "projects/fixtures/valid/generic-project-config.json"
@@ -107,6 +109,44 @@ def _adopt(facade, proposed, *, disposition="approve_exact"):
 
 
 class ProductionResearchResumeContextTests(unittest.TestCase):
+    def test_candidate_id_lookup_batches_more_than_one_hundred_ids(self):
+        proposal_ids = [f"RQ-CANDIDATE-{index:03}" for index in range(250)]
+        rows_by_id = {}
+        for proposal_id in proposal_ids:
+            payload = {"proposal_id": proposal_id, "project_ref": "PRJ-1"}
+            payload["proposal_digest"] = canonical_digest(payload)
+            rows_by_id[proposal_id] = {
+                "proposal_id": proposal_id,
+                "payload_json": json.dumps(payload),
+            }
+
+        class RecordingDatabase:
+            def __init__(self):
+                self.query_sizes = []
+
+            def execute(self, query, ids):
+                self.query_sizes.append(len(ids))
+                return Cursor([rows_by_id[item] for item in ids if item in rows_by_id])
+
+        class Cursor:
+            def __init__(self, rows):
+                self._rows = rows
+
+            def fetchall(self):
+                return self._rows
+
+        class Store:
+            def __init__(self):
+                self._lock = nullcontext()
+                self._db = RecordingDatabase()
+
+        store = Store()
+        candidates = state_delta_proposals_by_ids_for_project(store, "PRJ-1", proposal_ids)
+
+        self.assertEqual(set(candidates), set(proposal_ids))
+        self.assertEqual(len(store._db.query_sizes), 3)
+        self.assertLessEqual(max(store._db.query_sizes), 100)
+
     def test_fresh_workspace_is_read_only_and_cli_works_without_input(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

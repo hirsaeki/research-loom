@@ -12,7 +12,6 @@ from typing import Any
 
 from core.runtime import canonical_digest
 
-MAX_POINTS = 128
 CHART_TYPES = frozenset({"bar", "line", "scatter"})
 HOST_CHART_SCHEMA = "research-generated-chart/v2"
 
@@ -28,6 +27,8 @@ def quantitative_input(evidence: Mapping[str, Any]) -> dict:
     excerpt = evidence.get("excerpt")
     if not isinstance(excerpt, str):
         raise ValueError("verified Evidence needs an exact structured quantitative excerpt")
+    if len(excerpt.encode("utf-8")) > 65_536:
+        raise ValueError("quantitative Evidence excerpt exceeds the 64 KiB Evidence payload bound")
     try:
         value = json.loads(excerpt)
     except (ValueError, TypeError) as exc:
@@ -45,13 +46,13 @@ def quantitative_input(evidence: Mapping[str, Any]) -> dict:
     columns, rows = value["columns"], value["rows"]
     if (
         not isinstance(columns, list)
-        or not 2 <= len(columns) <= 8
+        or len(columns) < 2
         or any(not isinstance(c, str) or not c.strip() or len(c) > 128 for c in columns)
         or len(columns) != len(set(columns))
     ):
         raise ValueError("quantitative columns must be bounded unique labels")
-    if not isinstance(rows, list) or not 1 <= len(rows) <= MAX_POINTS:
-        raise ValueError("quantitative row count exceeds the bounded chart contract")
+    if not isinstance(rows, list) or not rows:
+        raise ValueError("quantitative excerpt must contain at least one row")
     for row in rows:
         if not isinstance(row, list) or len(row) != len(columns):
             raise ValueError("quantitative rows must be rectangular")

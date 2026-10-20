@@ -401,29 +401,29 @@ class ProfileGenerationAdvancementTests(ResearchPackageAcceptanceSupport):
         self.assertEqual(sentinel.read_text(encoding="utf-8"), "keep\n")
         marker_path.unlink()
 
-    def test_kody_profile_resolver_bounds_inputs_and_prunes_incompatible_branches(self):
-        from plugins.local_application.workspace import profile_resolution_support as support
+    def test_kody_profile_resolver_accepts_duplicate_candidates_and_prunes_incompatible_branches(
+        self,
+    ):
         from plugins.local_application.workspace import profile_selection as resolution
 
-        over_limit = self._resolve_request(
-            manifests=[str(PUBLICATION)] * (support.MAX_PROFILE_MANIFESTS + 1)
-        )
-        over_limit_path = self.root / "over-limit.json"
-        over_limit_path.write_text(json.dumps(over_limit), encoding="utf-8")
-        code, rejected = _run_cli(
+        manifests = self._normal_manifest_files()
+        manifests.extend([manifests[0]] * (129 - len(manifests)))
+        many_duplicate_candidates = self._resolve_request(manifests=manifests)
+        over_limit_path = self.root / "many-duplicate-candidates.json"
+        over_limit_path.write_text(json.dumps(many_duplicate_candidates), encoding="utf-8")
+        code, resolved = _run_cli(
             [
                 "profile",
                 "resolve",
                 "--workspace",
                 self.workspace,
                 "--output",
-                self.root / "over-limit-out",
+                self.root / "many-duplicate-candidates-out",
                 "--json",
                 over_limit_path,
             ]
         )
-        self.assertEqual(code, 2, rejected)
-        self.assertEqual(rejected["issues"][0]["code"], "PROFILE-CANDIDATE-LIMIT-001")
+        self.assertEqual(code, 0, resolved)
 
         def candidate(profile_id, version, *, requires=None):
             return {

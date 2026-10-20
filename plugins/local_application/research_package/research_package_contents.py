@@ -10,11 +10,26 @@ from plugins.application_errors import LocalApplicationError
 
 from .research_package_format import (
     MAX_ITEM_BYTES,
-    MAX_RUNS,
     MAX_TEXT_BYTES,
     digest_bytes,
     safe_component,
 )
+
+
+def append_package_attachment(
+    attachments: list[tuple[str, bytes, str, str]],
+    current_bytes: int,
+    attachment: tuple[str, bytes, str, str],
+) -> int:
+    size = len(attachment[1])
+    if size > MAX_TEXT_BYTES - current_bytes:
+        raise LocalApplicationError(
+            "APPLICATION-RESEARCH-PACKAGE-BOUND-001",
+            "Research Package attachments exceed the 64 MiB per-operation budget; "
+            "split the selected content across multiple Packages and retry",
+        )
+    attachments.append(attachment)
+    return current_bytes + size
 
 
 def required_object_refs(obj: Mapping[str, Any]) -> list[tuple[str, str]]:
@@ -228,12 +243,13 @@ def _visual_extension(media_type: str) -> str:
 def _package_visual_target(
     service,
     exhibit: Mapping[str, Any],
-    attachments: list,
+    attachments: list[tuple[str, bytes, str, str]],
     attachment_paths: dict[tuple[str, str], str],
-) -> Mapping[str, Any]:
+    attachment_bytes: int,
+) -> tuple[Mapping[str, Any], int]:
     target = exhibit.get("visual_target")
     if target is None:
-        return deepcopy(dict(exhibit))
+        return deepcopy(dict(exhibit)), attachment_bytes
     if not isinstance(target, Mapping) or target.get("target_type") != "source_visual":
         raise LocalApplicationError(
             "APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",
@@ -275,10 +291,11 @@ def _package_visual_target(
                 "APPLICATION-RESEARCH-PACKAGE-BOUND-001",
                 f"visual source exceeds per-item bound: {exhibit.get('exhibit_id')}",
             )
-        if sum(len(item[1]) for item in attachments) + source_size > MAX_TEXT_BYTES:
+        if source_size > MAX_TEXT_BYTES - attachment_bytes:
             raise LocalApplicationError(
                 "APPLICATION-RESEARCH-PACKAGE-BOUND-001",
-                f"visual source exceeds detached package output bound: {exhibit.get('exhibit_id')}",
+                "Research Package attachments exceed the 64 MiB per-operation budget; "
+                "split the selected content across multiple Packages and retry",
             )
         source_payload = service.app.execution_store.load_artifact_verified_once(artifact_ref)
         source_bytes = bytes(source_payload.content)
@@ -295,13 +312,15 @@ def _package_visual_target(
             f"attachments/visual/{exhibit_id}/source."
             f"{_visual_extension(str(target['source_media_type']))}"
         )
-        attachments.append(
+        attachment_bytes = append_package_attachment(
+            attachments,
+            attachment_bytes,
             (
                 source_path,
                 source_bytes,
                 str(target["source_media_type"]),
                 f"visual_source:{artifact_ref}",
-            )
+            ),
         )
         attachment_paths[source_key] = source_path
     packaged = deepcopy(dict(exhibit))
@@ -340,10 +359,11 @@ def _package_visual_target(
                     "APPLICATION-RESEARCH-PACKAGE-BOUND-001",
                     f"derived visual artifact exceeds per-item bound: {exhibit.get('exhibit_id')}",
                 )
-            if sum(len(item[1]) for item in attachments) + derived_size > MAX_TEXT_BYTES:
+            if derived_size > MAX_TEXT_BYTES - attachment_bytes:
                 raise LocalApplicationError(
                     "APPLICATION-RESEARCH-PACKAGE-BOUND-001",
-                    f"derived visual artifact exceeds detached package output bound: {exhibit.get('exhibit_id')}",
+                    "Research Package attachments exceed the 64 MiB per-operation budget; "
+                    "split the selected content across multiple Packages and retry",
                 )
             derived_payload = service.app.execution_store.load_artifact_verified_once(derived_ref)
             derived_bytes = bytes(derived_payload.content)
@@ -360,19 +380,21 @@ def _package_visual_target(
                 f"attachments/visual/{exhibit_id}/derived."
                 f"{_visual_extension(str(derived['media_type']))}"
             )
-            attachments.append(
+            attachment_bytes = append_package_attachment(
+                attachments,
+                attachment_bytes,
                 (
                     derived_path,
                     derived_bytes,
                     str(derived["media_type"]),
                     f"visual_derived:{derived_ref}",
-                )
+                ),
             )
             attachment_paths[derived_key] = derived_path
         packaged_target["derived_artifact"] = deepcopy(dict(derived))
         packaged_target["derived_artifact"]["attachment_path"] = derived_path
     packaged["visual_target"] = packaged_target
-    return packaged
+    return packaged, attachment_bytes
 
 
 def _collect_exhibit_modes(
@@ -396,10 +418,17 @@ def _collect_exhibit_modes(
                 f"Research Exhibit provenance belongs to another project/lineage: {exhibit_id}",
             )
         source_run_ids = current.get("source_run_ids", []) or []
-        if not isinstance(source_run_ids, list) or len(source_run_ids) > MAX_RUNS:
+        if (
+            not isinstance(source_run_ids, list)
+            or any(
+                not isinstance(source_run_id, str) or not source_run_id
+                for source_run_id in source_run_ids
+            )
+            or len(source_run_ids) != len(set(source_run_ids))
+        ):
             raise LocalApplicationError(
-                "APPLICATION-RESEARCH-PACKAGE-BOUND-001",
-                "Research Exhibit source Run provenance exceeds supported bound",
+                "APPLICATION-RESEARCH-PACKAGE-INTEGRITY-001",
+                "Research Exhibit source Run provenance is malformed",
             )
         for source_run_id in source_run_ids:
             run = service.app.execution_store.load_run(str(source_run_id))

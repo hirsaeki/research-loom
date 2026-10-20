@@ -260,7 +260,7 @@ class ProfileAdvancementAttentionTests(ResearchPackageAcceptanceSupport):
         self.assertEqual(code, 2, stale)
         self.assertEqual(stale["issues"][0]["code"], "ATTENTION-STALE-001")
 
-    def test_profile_history_index_stops_glob_at_read_limit(self):
+    def test_profile_history_index_reads_event_chains_without_fixed_count_cutoff(self):
         history_root = self.root / "bounded-profile-history"
         events_root = history_root / "events"
         source_digest = "sha256:" + "1" * 64
@@ -268,20 +268,27 @@ class ProfileAdvancementAttentionTests(ResearchPackageAcceptanceSupport):
         target_digest = "sha256:" + "f" * 64
         source_dir = events_root / "by-source" / source_digest.removeprefix("sha256:")
         source_dir.mkdir(parents=True, exist_ok=True)
-        event_path = source_dir / "PGA-BOUND.json"
-        event_path.write_text(
-            json.dumps(
-                {
-                    "event_type": "project_profile_generation_advanced",
-                    "project_id": "PRJ-BOUND",
-                    "old_binding": {"project_config_digest": source_digest},
-                    "new_binding": {"project_config_digest": successor_digest},
-                },
-                sort_keys=True,
+        successor_dir = events_root / "by-source" / successor_digest.removeprefix("sha256:")
+        successor_dir.mkdir(parents=True, exist_ok=True)
+        source_events = [source_dir / f"PGA-BOUND-{index}.json" for index in range(4)]
+        target_event = successor_dir / "PGA-BOUND-TARGET.json"
+        for path, old_digest, new_digest in [
+            *((path, source_digest, successor_digest) for path in source_events),
+            (target_event, successor_digest, target_digest),
+        ]:
+            path.write_text(
+                json.dumps(
+                    {
+                        "event_type": "project_profile_generation_advanced",
+                        "project_id": "PRJ-BOUND",
+                        "old_binding": {"project_config_digest": old_digest},
+                        "new_binding": {"project_config_digest": new_digest},
+                    },
+                    sort_keys=True,
+                )
+                + "\n",
+                encoding="utf-8",
             )
-            + "\n",
-            encoding="utf-8",
-        )
         provider = EffectiveResearchAttentionProvider(None, profile_history_root=history_root)
         real_glob = Path.glob
         observed = {"indexed_yields": 0}
@@ -292,30 +299,29 @@ class ProfileAdvancementAttentionTests(ResearchPackageAcceptanceSupport):
             if path == source_dir and pattern == "PGA-*.json":
 
                 def iterator():
-                    for _ in range(4):
+                    for event_path in source_events:
                         observed["indexed_yields"] += 1
                         yield event_path
-                    raise AssertionError("bounded history traversal consumed beyond limit + 1")
+
+                return iterator()
+            if path == successor_dir and pattern == "PGA-*.json":
+
+                def iterator():
+                    observed["indexed_yields"] += 1
+                    yield target_event
 
                 return iterator()
             return real_glob(path, pattern)
 
-        with (
-            mock.patch.object(
-                EffectiveResearchAttentionProvider,
-                "_PROFILE_HISTORY_EVENT_READ_LIMIT",
-                3,
-            ),
-            mock.patch.object(Path, "glob", new=bounded_glob),
-        ):
+        with mock.patch.object(Path, "glob", new=bounded_glob):
             connected = provider._profile_generation_connects(
                 project_id="PRJ-BOUND",
                 source_config_digest=source_digest,
                 target_config_digest=target_digest,
             )
 
-        self.assertFalse(connected)
-        self.assertEqual(observed["indexed_yields"], 4)
+        self.assertTrue(connected)
+        self.assertEqual(observed["indexed_yields"], 5)
 
     def test_active_attention_accepts_profile_chain_longer_than_256_events(self):
         with LocalApplicationFacade.open_workspace(self.workspace) as facade:
