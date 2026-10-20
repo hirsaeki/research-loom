@@ -320,20 +320,26 @@ class FormalDocumentTests(unittest.TestCase):
             [],
         )
 
-        class NonIterableSlides(list):
-            def __iter__(self):
-                raise AssertionError("Invalid slide counts must be rejected before iteration")
-
         oversized = deepcopy(slides)
-        oversized["presentation_review"]["slides"] = NonIterableSlides([None] * 257)
-        self.assertIn(
+        oversized["presentation_review"]["slide_count"] = 257
+        oversized["presentation_review"]["slides"] = [
+            {
+                "slide": slide_number,
+                "status": "passed",
+                "citations_required": True,
+                "citations": ["Synthetic source, publisher, 2026, https://example.test/source"],
+                "rationale": "Source visible on this specific slide.",
+            }
+            for slide_number in range(1, 258)
+        ]
+        self.assertNotIn(
             "presentation-per-slide-citations",
             coverage_review(
                 coverage, presenting, oversized, digest, 1, dialect=MISCO_PUBLICATION_DIALECT
             )["problems"],
         )
         mismatched = deepcopy(slides)
-        mismatched["presentation_review"]["slides"] = NonIterableSlides([None])
+        mismatched["presentation_review"]["slides"] = slides["presentation_review"]["slides"][:1]
         self.assertIn(
             "presentation-per-slide-citations",
             coverage_review(

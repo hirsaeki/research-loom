@@ -11,9 +11,11 @@ from jsonschema import Draft202012Validator, FormatChecker
 
 import tests.runtime.issue80_writer_composition_suite as writer_comp_support
 from plugins.local_application import LocalApplicationError
+from plugins.local_application.publication.publication_dialect import GENERIC_PUBLICATION_DIALECT
 from plugins.local_application.publication.publication_release_service import (
     PublicationReleaseService,
 )
+from plugins.local_application.publication.publication_render import PublicationRenderMixin
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 from tests.runtime.test_issue219_writer_round_trip import Issue219WriterRoundTripTests
 
@@ -73,6 +75,49 @@ class Issue220PublicationReleaseTests(ResearchPackageAcceptanceSupport):
             "disposition": "approve_release",
             "actor_id": request["human_actor_id"],
         }
+
+    def test_publication_renderer_accepts_more_than_128_sections(self):
+        class Renderer(PublicationRenderMixin):
+            workspace = Path.cwd()
+
+            @staticmethod
+            def _dialect(_profile):
+                return GENERIC_PUBLICATION_DIALECT
+
+        inspection = {
+            "publication_policy": {},
+            "publication_profile": {},
+            "source_package_document": {
+                "resolved_content": {
+                    "research_objects": [],
+                    "working_material": {"research_exhibits": []},
+                    "materials": [],
+                },
+                "inventories": {"citation_inventory": []},
+            },
+            "revision": {
+                "sections": [
+                    {
+                        "section_id": f"SECTION-{index}",
+                        "content": "Section content",
+                        "citations": [],
+                        "exhibit_refs": [],
+                    }
+                    for index in range(129)
+                ],
+                "writing_feedback": {"issues": []},
+            },
+            "composition": {"sections": []},
+        }
+
+        with patch(
+            "plugins.local_application.publication.publication_render.prepare_exhibits",
+            return_value={},
+        ):
+            markdown, _docx, _issues, checks = Renderer()._render(inspection)
+
+        self.assertIn(b"SECTION-128", markdown)
+        self.assertEqual(checks["render_verification"], "passed")
 
     def test_deterministic_preview_docx_and_bound_release_decision(self):
         facade, case, composition, imported, _source_ref = self._prepared()

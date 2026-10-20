@@ -4,6 +4,7 @@ from dataclasses import replace
 from threading import Event, Thread
 from unittest.mock import patch
 
+from core.execution import RunStatus
 from plugins.local_application import LocalApplicationFacade
 from plugins.local_application.material.material_reacquisition_service import (
     HistoricalMaterialReacquisitionService,
@@ -72,6 +73,59 @@ class HistoricalMaterialReacquisitionReviewFixTests(ResearchPackageAcceptanceSup
             second = service.reacquire(case["run_id"], "CAP-1", kind="original")
             self.assertEqual(second["status"], "IDENTICAL_REACQUISITION")
             self.assertNotEqual(second["reacquisition_run_id"], child_id)
+        finally:
+            facade.close()
+
+    def test_reacquisition_history_lookup_and_attempt_number_continue_past_100_children(self):
+        facade, case = self._prepare_case()
+        try:
+            self._remove_producer_candidate(facade, case)
+            self._missing_original(facade, case)
+            store = facade._application.execution_store
+            historical = store.load_run(case["run_id"])
+            assert historical is not None
+
+            def add_aborted_children(first_attempt: int, count: int) -> None:
+                assert historical is not None
+                for attempt in range(first_attempt, first_attempt + count):
+                    store.create_run(
+                        replace(
+                            historical,
+                            run_id=f"RUN-REACQUISITION-COUNT-{attempt:04d}",
+                            invocation_id=f"INV-REACQUISITION-COUNT-{attempt:04d}",
+                            attempt=attempt,
+                            parent_run_id=historical.run_id,
+                            status=RunStatus.ABORTED,
+                            prepared_at="2026-10-20T00:00:00+00:00",
+                        )
+                    )
+
+            add_aborted_children(1, 100)
+            changed = RetrievedMaterial(
+                b"<html>reacquired version after the prior 100 attempts</html>",
+                "text/html",
+                "https://cdn.example.test/source-a-v2",
+                "fake-http",
+                200,
+            )
+            service = HistoricalMaterialReacquisitionService(
+                store,
+                facade.project_id,
+                self.workspace,
+                retriever=lambda _locator: changed,
+            )
+            first = service.reacquire(case["run_id"], "CAP-1", kind="original")
+            self.assertEqual(first["status"], "NEW_MATERIAL_VERSION")
+            child_id = str(first["reacquisition_run_id"])
+            child = store.load_run(child_id)
+            assert child is not None
+            self.assertEqual(child.attempt, 101)
+
+            add_aborted_children(102, 100)
+            repeated = service.reacquire(case["run_id"], "CAP-1", kind="original")
+
+            self.assertTrue(repeated["idempotent_reuse"])
+            self.assertEqual(repeated["reacquisition_run_id"], child_id)
         finally:
             facade.close()
 

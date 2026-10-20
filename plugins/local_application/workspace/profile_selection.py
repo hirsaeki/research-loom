@@ -99,7 +99,10 @@ def _resolve_selected(candidates, requests):
         if visited_states > MAX_PROFILE_RESOLUTION_STATES:
             raise LocalWorkspaceError(
                 "PROFILE-RESOLUTION-LIMIT-001",
-                "Profile dependency resolution exceeded the bounded search budget",
+                f"Profile dependency resolution visited {visited_states} states, exceeding the "
+                f"{MAX_PROFILE_RESOLUTION_STATES}-state search budget; pin dependency versions, "
+                "narrow version ranges, or reduce the candidate set and retry. "
+                "No Effective Profile Set was written.",
             )
         for key, required_versions in requirements.items():
             selected = assignment.get(key)

@@ -25,11 +25,8 @@ CORE_CONTRACTS = {"research_contract": "0.1.0", "invariant_contract": "0.1.0"}
 TYPE_RANK = {
     name: i for i, name in enumerate(("research", "organization", "narrative", "publication"))
 }
-MAX_PROFILE_MANIFESTS = 128
 MAX_PROFILE_RESOLUTION_STATES = 10_000
-MAX_PROFILE_RESOURCES = 32
 MAX_PROFILE_RESOURCE_BYTES = 1_048_576
-MAX_EFFECTIVE_RESOURCES = 128
 MAX_EFFECTIVE_RESOURCE_BYTES = 8_388_608
 _COMPARATOR = re.compile(r"^(>=|>|<=|<|=)(\d+\.\d+\.\d+)$")
 

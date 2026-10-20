@@ -76,7 +76,7 @@ class SurveyAnalysisReviewFixTests(SurveyVirtualRunnerTestBase):
             finally:
                 app.close()
 
-    def test_free_text_listing_keeps_only_max_rows_while_counting_all_matches(self):
+    def test_free_text_listing_paginates_all_matches(self):
         with tempfile.TemporaryDirectory() as temp:
             app = make_virtual_app(temp)
             try:
@@ -98,23 +98,38 @@ class SurveyAnalysisReviewFixTests(SurveyVirtualRunnerTestBase):
                 dataset = facade.capture_survey_response_dataset(
                     intake(questionnaire, responses=responses)
                 )
-                spec = self._spec(
-                    facade,
-                    dataset,
-                    [{"analysis_type": "free_text_listing", "question_id": "Q4", "max_rows": 3}],
-                )
-                shown = facade.show_survey_aggregate_result(
-                    self._aggregate(facade, dataset, spec)["aggregate_result_id"],
-                    limit=100,
-                )
-                listing = find_item(shown, "free_text_listing", "Q4")
-                self.assertEqual(listing["non_empty_count"], 120)
-                self.assertEqual(listing["returned_count"], 3)
-                self.assertTrue(listing["truncated"])
-                self.assertEqual(
-                    [row["response_id"] for row in listing["rows"]],
-                    ["SYN-TEXT-000", "SYN-TEXT-001", "SYN-TEXT-002"],
-                )
+                response_ids = []
+                offset = 0
+                while True:
+                    spec = self._spec(
+                        facade,
+                        dataset,
+                        [
+                            {
+                                "analysis_type": "free_text_listing",
+                                "question_id": "Q4",
+                                "max_rows": 50,
+                                "offset": offset,
+                            }
+                        ],
+                    )
+                    shown = facade.show_survey_aggregate_result(
+                        self._aggregate(facade, dataset, spec)["aggregate_result_id"],
+                        limit=100,
+                    )
+                    listing = find_item(shown, "free_text_listing", "Q4")
+                    self.assertEqual(listing["non_empty_count"], 120)
+                    self.assertEqual(listing["offset"], offset)
+                    response_ids.extend(row["response_id"] for row in listing["rows"])
+                    if not listing["truncated"]:
+                        self.assertIsNone(listing["next_offset"])
+                        break
+                    offset = listing["next_offset"]
+
+                self.assertEqual(len(response_ids), 120)
+                self.assertEqual(len(set(response_ids)), 120)
+                self.assertEqual(response_ids[0], "SYN-TEXT-000")
+                self.assertEqual(response_ids[-1], "SYN-TEXT-119")
             finally:
                 app.close()
 

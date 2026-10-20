@@ -22,15 +22,11 @@ from .research_package_contents import (
     _package_visual_target,
     _research_inventories,
     _validate_selected_reference_closure,
+    append_package_attachment,
 )
 from .research_package_format import (
     ALLOWED,
-    MAX_EXHIBITS,
-    MAX_INPUTS,
     MAX_ITEM_BYTES,
-    MAX_MATERIALS,
-    MAX_OBJECTS,
-    MAX_RUNS,
     MAX_TEXT_BYTES,
     NARRATIVE,
     SCHEMA_VERSION,
@@ -74,7 +70,7 @@ def build_package(service, value: Mapping[str, Any]) -> Mapping[str, Any]:
                 "APPLICATION-RESEARCH-PACKAGE-BINDING-001",
                 f"explicit {field} contradicts persisted binding",
             )
-    requested_object_ids = str_list(value.get("object_ids"), "object_ids", MAX_OBJECTS)
+    requested_object_ids = str_list(value.get("object_ids"), "object_ids")
     objects = service._objects(snapshot, {rqid, *requested_object_ids})
     rq = objects.get(rqid)
     if rq is None or rq.get("kind") != "research_question":
@@ -93,7 +89,7 @@ def build_package(service, value: Mapping[str, Any]) -> Mapping[str, Any]:
         selected.append(deepcopy(dict(objects[oid])))
     _validate_selected_reference_closure(selected)
 
-    run_ids = str_list(value.get("run_ids"), "run_ids", MAX_RUNS)
+    run_ids = str_list(value.get("run_ids"), "run_ids")
     runs = []
     gaps = []
     modes = set()
@@ -149,9 +145,10 @@ def build_package(service, value: Mapping[str, Any]) -> Mapping[str, Any]:
     exhs = []
     inputs = []
     attachments = []
+    attachment_bytes = 0
     exhibit_provenance_seen = set()
     visual_attachment_paths = {}
-    for eid in str_list(value.get("exhibit_ids"), "exhibit_ids", MAX_EXHIBITS):
+    for eid in str_list(value.get("exhibit_ids"), "exhibit_ids"):
         ex = service.facade.show_exhibit(eid).get("exhibit")
         if not isinstance(ex, Mapping):
             raise LocalApplicationError(
@@ -185,8 +182,13 @@ def build_package(service, value: Mapping[str, Any]) -> Mapping[str, Any]:
             )
         modes.update(_collect_exhibit_modes(service, ex, state, exhibit_provenance_seen))
         path = f"attachments/exhibits/{safe_component(eid, 'exhibit_id')}.{ext}"
-        attachments.append((path, data, media, f"research_exhibit:{eid}"))
-        exhs.append(_package_visual_target(service, ex, attachments, visual_attachment_paths))
+        attachment_bytes = append_package_attachment(
+            attachments, attachment_bytes, (path, data, media, f"research_exhibit:{eid}")
+        )
+        packaged_exhibit, attachment_bytes = _package_visual_target(
+            service, ex, attachments, visual_attachment_paths, attachment_bytes
+        )
+        exhs.append(packaged_exhibit)
     try:
         validate_visual_package_bindings(exhs, selected)
     except (TypeError, ValueError) as exc:
@@ -215,12 +217,16 @@ def build_package(service, value: Mapping[str, Any]) -> Mapping[str, Any]:
                 )
             origin_path = f"attachments/visual-origin/{safe_component(origin['package_id'], 'package_id')}.json"
             if not any(a[0] == origin_path for a in attachments):
-                attachments.append(
-                    (origin_path, origin_bytes, "application/json", "visual_generation_context")
+                attachment_bytes = append_package_attachment(
+                    attachments,
+                    attachment_bytes,
+                    (origin_path, origin_bytes, "application/json", "visual_generation_context"),
                 )
             path = f"attachments/visuals/{safe_component(exhibit['exhibit_id'], 'exhibit_id')}.png"
-            attachments.append(
-                (path, png, "image/png", f"generated_visual:{exhibit['exhibit_id']}")
+            attachment_bytes = append_package_attachment(
+                attachments,
+                attachment_bytes,
+                (path, png, "image/png", f"generated_visual:{exhibit['exhibit_id']}"),
             )
             exhibit["generated_visual"] = {
                 "visual_class": exhibit["visual_semantics"]["visual_class"],
@@ -234,7 +240,7 @@ def build_package(service, value: Mapping[str, Any]) -> Mapping[str, Any]:
                     "content_digest": digest_bytes(origin_bytes),
                 },
             }
-    for iid in str_list(value.get("project_input_ids"), "project_input_ids", MAX_INPUTS):
+    for iid in str_list(value.get("project_input_ids"), "project_input_ids"):
         shown = service.facade.show_project_input(iid, format="text")
         item = shown.get("project_input", {})
         content = shown.get("content", {})
@@ -260,8 +266,10 @@ def build_package(service, value: Mapping[str, Any]) -> Mapping[str, Any]:
                 f"Project Input exceeds per-item bound: {iid}",
             )
         path = f"attachments/inputs/{safe_component(iid, 'input_id')}.txt"
-        attachments.append(
-            (path, data, str(content.get("media_type", "text/plain")), f"project_input:{iid}")
+        attachment_bytes = append_package_attachment(
+            attachments,
+            attachment_bytes,
+            (path, data, str(content.get("media_type", "text/plain")), f"project_input:{iid}"),
         )
         packaged_content = deepcopy(dict(content))
         packaged_content["attachment_path"] = path
@@ -269,9 +277,9 @@ def build_package(service, value: Mapping[str, Any]) -> Mapping[str, Any]:
 
     materials = []
     rawm = value.get("materials") or []
-    if not isinstance(rawm, list) or len(rawm) > MAX_MATERIALS:
+    if not isinstance(rawm, list):
         raise LocalApplicationError(
-            "APPLICATION-RESEARCH-PACKAGE-BOUND-001", "materials exceed supported bound"
+            "APPLICATION-RESEARCH-PACKAGE-INPUT-001", "materials must be an array"
         )
     for idx, m in enumerate(rawm):
         if not isinstance(m, Mapping) or set(m) != {"run_id", "capture_id"}:
@@ -337,7 +345,11 @@ def build_package(service, value: Mapping[str, Any]) -> Mapping[str, Any]:
                 f"selected material does not resolve to its capture Source: {rid}:{cid}",
             )
         path = f"attachments/materials/{safe_component(str(rid), 'run_id')}/{safe_component(str(cid), 'capture_id')}.txt"
-        attachments.append((path, data, "text/plain", f"external_material:{rid}:{cid}"))
+        attachment_bytes = append_package_attachment(
+            attachments,
+            attachment_bytes,
+            (path, data, "text/plain", f"external_material:{rid}:{cid}"),
+        )
         material_row = {
             "run_id": rid,
             "historical_binding": {
@@ -409,7 +421,7 @@ def build_package(service, value: Mapping[str, Any]) -> Mapping[str, Any]:
             "selected Sources have no bundled verified material: "
             + ", ".join(missing_source_materials),
         )
-    requested = str_list(value.get("gap_ids"), "gap_ids", MAX_OBJECTS)
+    requested = str_list(value.get("gap_ids"), "gap_ids")
     if requested:
         by = {str(x["gap_id"]): x for x in gaps}
         missing = [x for x in requested if x not in by]
@@ -442,13 +454,15 @@ def build_package(service, value: Mapping[str, Any]) -> Mapping[str, Any]:
     constraints = [deepcopy(dict(x)) for x in eps.get("effective_constraints", [])]
     require_resolved_narrative(constraints)
     sem = NARRATIVE.read_bytes()
-    attachments.append(
+    attachment_bytes = append_package_attachment(
+        attachments,
+        attachment_bytes,
         (
             "attachments/profile/narrative-semantics.yaml",
             sem,
             "application/yaml",
             "canonical_narrative_semantics",
-        )
+        ),
     )
     source_mode = next(
         iter(modes), "virtual" if str(snapshot.get("mode", "real")) == "virtual" else "real"
@@ -579,10 +593,11 @@ def build_package(service, value: Mapping[str, Any]) -> Mapping[str, Any]:
                 "source": source,
             }
         )
-    if sum(len(x[1]) for x in attachments) > MAX_TEXT_BYTES:
+    if attachment_bytes > MAX_TEXT_BYTES:
         raise LocalApplicationError(
             "APPLICATION-RESEARCH-PACKAGE-BOUND-001",
-            "selected attachment content exceeds text bound",
+            "Research Package attachments exceed the 64 MiB per-operation budget; "
+            "split the selected content across multiple Packages and retry",
         )
     md = service._markdown(package).encode()
     package["projections"] = {

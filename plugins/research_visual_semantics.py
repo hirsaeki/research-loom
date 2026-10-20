@@ -60,8 +60,8 @@ def validate_visual_semantics(value: Any, exhibit: Mapping[str, Any]) -> None:
     if value["spec_digest"] != exhibit.get("content_digest") or not _digest(value["spec_digest"]):
         raise ValueError("visual spec must bind exact Exhibit content")
     refs = value["semantic_refs"]
-    if not isinstance(refs, list) or not refs or len(refs) > 64:
-        raise ValueError("visual requires bounded exact semantic references")
+    if not isinstance(refs, list) or not refs:
+        raise ValueError("visual requires non-empty exact semantic references")
     seen = set()
     for ref in refs:
         if not isinstance(ref, Mapping) or set(ref) != {"kind", "id", "digest"}:

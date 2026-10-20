@@ -14,9 +14,7 @@ from .candidate_projection import build_candidate_projection
 _ACTION_REGISTRATION_LOCK = RLock()
 _ACTION_TYPE = "research.recommendation.propose"
 _PAYLOAD_CONTRACT = "research-recommendation-proposal@0.1.0"
-_MAX_FINDING_IDS = 256
 _MAX_SEMANTIC_TEXT_CHARS = 8_192
-_MAX_SEMANTIC_LIST_ITEMS = 64
 _MAX_SEMANTIC_LIST_ITEM_CHARS = 4_096
 _CANDIDATE_PROJECTION_ACTIONS = {
     "research_question.propose",
@@ -47,20 +45,14 @@ def research_recommendation_proposal_payload(payload: Mapping[str, Any]) -> dict
         raise ValueError("finding_ids must be a non-empty array of non-empty IDs")
     if len(set(finding_ids)) != len(finding_ids):
         raise ValueError("finding_ids must not contain duplicate IDs")
-    if len(finding_ids) > _MAX_FINDING_IDS:
-        raise ValueError(f"finding_ids may contain at most {_MAX_FINDING_IDS} IDs")
     normalized["finding_ids"] = list(finding_ids)
     for field in ("conditions", "scope"):
         value = normalized.get(field, [])
-        if (
-            not isinstance(value, list)
-            or len(value) > _MAX_SEMANTIC_LIST_ITEMS
-            or any(
-                not isinstance(item, str)
-                or not item.strip()
-                or len(item) > _MAX_SEMANTIC_LIST_ITEM_CHARS
-                for item in value
-            )
+        if not isinstance(value, list) or any(
+            not isinstance(item, str)
+            or not item.strip()
+            or len(item) > _MAX_SEMANTIC_LIST_ITEM_CHARS
+            for item in value
         ):
             raise ValueError(f"{field} exceeds the bounded semantic-content limits")
         normalized[field] = list(value)

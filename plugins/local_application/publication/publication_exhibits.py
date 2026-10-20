@@ -19,8 +19,6 @@ from ..research_package.png_validation import png_size
 from ..research_package.research_package_format import MAX_ITEM_BYTES, safe_component
 from .publication_dialect import GENERIC_PUBLICATION_DIALECT, PublicationDialect
 
-MAX_ROWS = 512
-MAX_COLUMNS = 8
 MAX_CELL_CHARS = 2048
 
 
@@ -59,8 +57,8 @@ def table_rows(content: Mapping[str, Any]) -> list[list[str]]:
         rows = [value["columns"], *value["rows"]]
     else:
         raise ValueError("unsupported table representation")
-    if not 1 <= len(rows) <= MAX_ROWS or not 1 <= len(rows[0]) <= MAX_COLUMNS:
-        raise ValueError("table shape exceeds supported bounds")
+    if not rows or not rows[0]:
+        raise ValueError("table needs at least one row and one column")
     if any(not isinstance(row, list) or len(row) != len(rows[0]) for row in rows):
         raise ValueError("table is not rectangular")
     if any(not isinstance(cell, str) or len(cell) > MAX_CELL_CHARS for row in rows for cell in row):

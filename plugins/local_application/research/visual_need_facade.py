@@ -245,11 +245,6 @@ class VisualNeedMixin:
                 "represented research changed; use the ordinary current Research Package path",
             )
         ids = _string_list(value["exhibit_ids"], "exhibit_ids")
-        if len(ids) > 31:
-            raise LocalApplicationError(
-                "APPLICATION-VISUAL-NEED-001",
-                "visual resume exceeds the existing Package Exhibit bound",
-            )
         selected = [self.show_exhibit(eid)["exhibit"] for eid in ids]
         for exhibit in selected:
             semantics = exhibit.get("visual_semantics")

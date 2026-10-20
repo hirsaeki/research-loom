@@ -3,15 +3,16 @@ from __future__ import annotations
 import json
 from copy import deepcopy
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import tests.runtime.survey_virtual_runner_test_support as vr
 import tests.runtime.test_research_exhibits as exhibits
 from plugins.local_application import LocalApplicationError
 from plugins.local_application.research_package.research_package_contents import (
     _collect_exhibit_modes,
+    append_package_attachment,
 )
 from plugins.local_application.research_package.research_package_format import (
-    MAX_RUNS,
     digest_json,
     safe_component,
     verify_export_root,
@@ -298,10 +299,17 @@ class ResearchPackageCompletionReviewTests(ResearchPackageAcceptanceSupport):
                     safe_component(value, "package_id")
                 self.assertEqual(error.exception.code, "APPLICATION-RESEARCH-PACKAGE-INPUT-001")
 
-    def test_exhibit_source_run_provenance_is_bounded_before_load(self):
+    def test_exhibit_source_run_provenance_accepts_more_than_16_runs(self):
+        loaded = []
+
         class Store:
-            def load_run(self, _run_id):
-                raise AssertionError("source Run must not be loaded after bound failure")
+            def load_run(self, run_id):
+                loaded.append(run_id)
+                return SimpleNamespace(
+                    project_ref="PROJECT-1",
+                    lineage_ref="LINEAGE-1",
+                    execution_mode="real",
+                )
 
         service = SimpleNamespace(
             project_id="PROJECT-1",
@@ -313,12 +321,148 @@ class ResearchPackageCompletionReviewTests(ResearchPackageAcceptanceSupport):
             "exhibit_id": "EX-BIG",
             "project_id": "PROJECT-1",
             "captured_against": {"lineage_ref": "LINEAGE-1"},
-            "source_run_ids": [f"RUN-{index}" for index in range(MAX_RUNS + 1)],
+            "source_run_ids": [f"RUN-{index}" for index in range(17)],
             "derived_from_exhibit_ids": [],
         }
-        with self.assertRaises(LocalApplicationError) as error:
-            _collect_exhibit_modes(service, exhibit, state, set())
-        self.assertEqual(error.exception.code, "APPLICATION-RESEARCH-PACKAGE-BOUND-001")
+        self.assertEqual(_collect_exhibit_modes(service, exhibit, state, set()), {"real"})
+        self.assertEqual(loaded, exhibit["source_run_ids"])
+
+    def _provenance_chain(self, count):
+        rows = {
+            f"EX-{index}": {
+                "exhibit_id": f"EX-{index}",
+                "project_id": "PROJECT-1",
+                "captured_against": {"lineage_ref": "LINEAGE-1"},
+                "source_run_ids": [],
+                "derived_from_exhibit_ids": [f"EX-{index + 1}"] if index + 1 < count else [],
+            }
+            for index in range(count)
+        }
+        service = SimpleNamespace(
+            project_id="PROJECT-1",
+            app=SimpleNamespace(execution_store=SimpleNamespace(load_run=lambda _: None)),
+            facade=SimpleNamespace(show_exhibit=lambda eid: {"exhibit": rows[eid]}),
+        )
+        return service, SimpleNamespace(active_lineage_ref="LINEAGE-1"), rows
+
+    def test_provenance_accepts_83_128_and_129_unique_exhibits(self):
+        for count in (83, 128, 129):
+            with self.subTest(count=count):
+                service, state, rows = self._provenance_chain(count)
+                visited = set()
+                self.assertEqual(
+                    _collect_exhibit_modes(service, rows["EX-0"], state, visited), set()
+                )
+                self.assertEqual(visited, set(rows))
+
+    def test_provenance_counts_shared_parents_and_cycles_once(self):
+        service, state, rows = self._provenance_chain(129)
+        rows["EX-128"]["derived_from_exhibit_ids"] = ["EX-0"]
+        rows["EX-0"]["derived_from_exhibit_ids"].append("EX-64")
+        visited = set()
+        _collect_exhibit_modes(service, rows["EX-0"], state, visited)
+        _collect_exhibit_modes(service, rows["EX-64"], state, visited)
+        self.assertEqual(visited, set(rows))
+
+    def test_extended_provenance_still_checks_project_and_lineage(self):
+        for field in ("project_id", "lineage_ref"):
+            with self.subTest(field=field):
+                service, state, rows = self._provenance_chain(83)
+                parent = rows["EX-82"]
+                if field == "project_id":
+                    parent[field] = "OTHER-PROJECT"
+                else:
+                    parent["captured_against"][field] = "OTHER-LINEAGE"
+                with self.assertRaises(LocalApplicationError) as error:
+                    _collect_exhibit_modes(service, rows["EX-0"], state, set())
+                self.assertEqual(error.exception.code, "APPLICATION-RESEARCH-PACKAGE-BINDING-001")
+
+    def test_direct_exhibit_selection_accepts_33(self):
+        facade, case = self._prepare_case()
+        try:
+            extra_exhibit_ids = []
+            for index in range(32):
+                result = facade.capture_exhibit(
+                    exhibits.exhibit_payload(
+                        rq_id=case["rq_id"],
+                        title=f"Package capacity exhibit {index}",
+                        kind="note",
+                        representation="text",
+                        value=f"Exhibit {index}",
+                        source_run_ids=[],
+                        source_artifact_refs=[],
+                        source_object_ids=[],
+                    )
+                )
+                extra_exhibit_ids.append(result["exhibit"]["exhibit_id"])
+            value = deepcopy(case["build_input"])
+            value["exhibit_ids"] = [case["exhibit_id"], *extra_exhibit_ids]
+            built = facade.build_research_package(value)
+            package = facade.show_research_package(built["package"]["package_id"])["package"]
+            self.assertEqual(
+                len(package["resolved_content"]["working_material"]["research_exhibits"]), 33
+            )
+        finally:
+            facade.close()
+
+    def test_oversized_build_does_not_persist_partial_package(self):
+        facade, case = self._prepare_case()
+        try:
+            with patch(
+                "plugins.local_application.research_package.research_package_format.MAX_OUTPUT_BYTES",
+                1,
+            ):
+                with self.assertRaises(LocalApplicationError) as error:
+                    facade.build_research_package(case["build_input"])
+            self.assertEqual(error.exception.code, "APPLICATION-RESEARCH-PACKAGE-BOUND-001")
+            self.assertEqual(facade.list_research_packages()["packages"], [])
+        finally:
+            facade.close()
+
+    def test_attachment_budget_is_checked_incrementally_without_partial_package(self):
+        facade, case = self._prepare_case()
+        try:
+            exhibit_ids = []
+            for value in ("first", "second"):
+                result = facade.capture_exhibit(
+                    exhibits.exhibit_payload(
+                        rq_id=case["rq_id"],
+                        title=f"Package attachment budget {value}",
+                        kind="note",
+                        representation="text",
+                        value=value,
+                        source_run_ids=[],
+                        source_artifact_refs=[],
+                        source_object_ids=[],
+                    )
+                )
+                exhibit_ids.append(result["exhibit"]["exhibit_id"])
+            value = deepcopy(case["build_input"])
+            value.update(
+                run_ids=[],
+                exhibit_ids=exhibit_ids,
+                project_input_ids=[],
+                materials=[],
+                gap_ids=[],
+            )
+            with (
+                patch(
+                    "plugins.local_application.research_package.research_package_contents.MAX_TEXT_BYTES",
+                    len(b"first"),
+                ),
+                patch(
+                    "plugins.local_application.research_package.research_package_builder.append_package_attachment",
+                    wraps=append_package_attachment,
+                ) as append_attachment,
+            ):
+                with self.assertRaises(LocalApplicationError) as error:
+                    facade.build_research_package(value)
+            self.assertEqual(error.exception.code, "APPLICATION-RESEARCH-PACKAGE-BOUND-001")
+            self.assertIn("64 MiB per-operation budget", str(error.exception))
+            self.assertEqual(append_attachment.call_count, 2)
+            self.assertEqual(facade.list_research_packages()["packages"], [])
+        finally:
+            facade.close()
 
     def test_detached_verify_rejects_missing_or_malformed_body_rows(self):
         facade, case = self._build()

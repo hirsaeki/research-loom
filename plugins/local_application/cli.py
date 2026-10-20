@@ -245,6 +245,8 @@ def build_parser() -> argparse.ArgumentParser:
     exhibit_list = exhibit_sub.add_parser("list")
     _add_workspace(exhibit_list)
     exhibit_list.add_argument("--rq-id")
+    exhibit_list.add_argument("--limit", type=int, default=100)
+    exhibit_list.add_argument("--cursor")
     _add_output_json(exhibit_list)
 
     exhibit_show = exhibit_sub.add_parser("show")
@@ -750,7 +752,7 @@ def _run(args: argparse.Namespace) -> Mapping[str, Any]:
             if args.exhibit_command == "capture":
                 return facade.capture_exhibit(_read_input(args.json_input))
             if args.exhibit_command == "list":
-                return facade.list_exhibits(rq_id=args.rq_id)
+                return facade.list_exhibits(rq_id=args.rq_id, limit=args.limit, cursor=args.cursor)
             if args.exhibit_command == "show":
                 return facade.show_exhibit(args.exhibit_id)
         if args.command == "research-quality" and args.research_quality_command == "evaluate":

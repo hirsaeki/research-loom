@@ -23,8 +23,6 @@ from plugins.local_attention_store import (
 class EffectiveResearchAttentionProvider:
     """Resolve complete effective guidance without changing Project Config or Research State."""
 
-    _PROFILE_HISTORY_EVENT_READ_LIMIT = 10_000
-
     def __init__(
         self, store: LocalAttentionStore, *, profile_history_root: Path | None = None
     ) -> None:
@@ -80,13 +78,9 @@ class EffectiveResearchAttentionProvider:
             return False
 
         # Pre-merge Issue #128 builds wrote flat PGA-*.json events. Parse that
-        # bounded legacy set once so already-probed workspaces remain reopenable.
+        # legacy set once so already-probed workspaces remain reopenable.
         legacy_by_source: dict[str, set[str]] = {}
-        events_read = 0
         for path in events_root.glob("PGA-*.json"):
-            events_read += 1
-            if events_read > self._PROFILE_HISTORY_EVENT_READ_LIMIT:
-                return False
             try:
                 event = json.loads(path.read_text(encoding="utf-8"))
             except (OSError, ValueError, json.JSONDecodeError):
@@ -119,9 +113,6 @@ class EffectiveResearchAttentionProvider:
             source_dir = events_root / "by-source" / current.removeprefix("sha256:")
             if source_dir.is_dir():
                 for path in source_dir.glob("PGA-*.json"):
-                    events_read += 1
-                    if events_read > self._PROFILE_HISTORY_EVENT_READ_LIMIT:
-                        return False
                     try:
                         event = json.loads(path.read_text(encoding="utf-8"))
                     except (OSError, ValueError, json.JSONDecodeError):

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import json
 import re
 from collections.abc import Mapping
 
@@ -12,17 +13,18 @@ from pypdf import PdfReader
 from plugins.application_errors import LocalApplicationError
 
 from .publication_dialect import GENERIC_PUBLICATION_DIALECT, PublicationDialect
+from .publication_release_support import MAX_OUTPUT_BYTES
 
 
 def inspect_pdf(data: bytes, *, required_text=(), page_ranges=None, expected_parts=()):
-    if len(data) > 16 * 1024 * 1024 or not data.startswith(b"%PDF-"):
+    if len(data) > MAX_OUTPUT_BYTES or not data.startswith(b"%PDF-"):
         raise LocalApplicationError(
             "PUBLICATION-PDF-INVALID", "PDF must be bounded and carry a PDF header"
         )
     try:
         reader = PdfReader(io.BytesIO(data), strict=True)
-        if reader.is_encrypted or not 1 <= len(reader.pages) <= 256:
-            raise ValueError("Encrypted or unsupported page count")
+        if reader.is_encrypted or not reader.pages:
+            raise ValueError("Encrypted or empty PDF")
         texts = []
         footer_texts = []
         fonts = set()
@@ -177,14 +179,23 @@ def coverage_review(
             "PUBLICATION-PDF-INPUT",
             "Review requires exact PDF binding, reviewer, review time, checks and pages",
         )
-    if (
-        not isinstance(review["checks"], list)
-        or len(review["checks"]) > 256
-        or not isinstance(review["pages"], list)
-        or len(review["pages"]) > 256
-    ):
+    try:
+        review_size = len(
+            json.dumps(review, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        )
+    except (TypeError, ValueError, RecursionError) as exc:
         raise LocalApplicationError(
-            "PUBLICATION-PDF-INPUT", "Review checks and page evidence must be bounded arrays"
+            "PUBLICATION-PDF-INPUT", "Review evidence must be JSON-compatible"
+        ) from exc
+    if review_size > MAX_OUTPUT_BYTES:
+        raise LocalApplicationError(
+            "PUBLICATION-PDF-INPUT",
+            "PDF review evidence exceeds the 16 MiB operation budget; "
+            "split the publication into separately bounded volumes and review each in full",
+        )
+    if not isinstance(review["checks"], list) or not isinstance(review["pages"], list):
+        raise LocalApplicationError(
+            "PUBLICATION-PDF-INPUT", "Review checks and page evidence must be arrays"
         )
     for row in review["checks"]:
         if (
@@ -250,13 +261,13 @@ def coverage_review(
                 for key in ["artifact_reference", "software_version"]
             )
             or type(presentation["slide_count"]) is not int
-            or not 1 <= presentation["slide_count"] <= 256
+            or presentation["slide_count"] < 1
             or not isinstance(presentation["slides"], list)
         ):
             problems.append("presentation-review-binding")
         else:
             slides = presentation["slides"]
-            valid = len(slides) == presentation["slide_count"] and len(slides) <= 256
+            valid = len(slides) == presentation["slide_count"]
             for index, slide in enumerate(slides if valid else (), 1):
                 if (
                     not isinstance(slide, Mapping)
@@ -267,7 +278,6 @@ def coverage_review(
                     or slide["status"] != "passed"
                     or type(slide["citations_required"]) is not bool
                     or not isinstance(slide["citations"], list)
-                    or len(slide["citations"]) > 256
                     or any(
                         not isinstance(value, str) or not value.strip() or len(value) > 4000
                         for value in slide["citations"]

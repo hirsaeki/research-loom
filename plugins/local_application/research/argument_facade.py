@@ -11,7 +11,6 @@ from core.runtime import ObjectRef, StateDeltaProposal, TransitionAction, Transi
 _ACTION_REGISTRATION_LOCK = RLock()
 _ACTION_TYPE = "research.argument.propose"
 _PAYLOAD_CONTRACT = "research-argument-proposal@0.1.0"
-_MAX_SUPPORT_IDS = 256
 _LIST_ID_FIELDS = (
     "question_ids",
     "premise_claim_ids",
@@ -58,10 +57,6 @@ def research_argument_proposal_payload(payload: Mapping[str, Any]) -> dict[str, 
         if len(set(value)) != len(value):
             raise ValueError(f"{field} must not contain duplicate IDs")
         normalized[field] = list(value)
-    if sum(len(normalized[field]) for field in _LIST_ID_FIELDS) > _MAX_SUPPORT_IDS:
-        raise ValueError(
-            f"Argument support references may contain at most {_MAX_SUPPORT_IDS} IDs in total"
-        )
     for field in ("conclusion_claim_id", "qualifier", "rationale"):
         if field not in normalized:
             continue

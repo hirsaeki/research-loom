@@ -458,23 +458,11 @@ class ResearchQuestionReviewTests(unittest.TestCase):
                 self.assertFalse(row["bound_to_current_snapshot"])
                 self.assertEqual(row["authoritative_same_ids"], [])
 
-    def test_question_review_payload_is_bounded(self):
+    def test_question_review_payload_retains_text_bound(self):
         with tempfile.TemporaryDirectory() as temp:
             with LocalApplicationFacade.open_workspace(_workspace(Path(temp))) as facade:
                 qid = _adopt_question(facade)
                 invalid_payloads = [
-                    {
-                        "operation": "SPLIT",
-                        "question_ids": [qid],
-                        "rationale": "split",
-                        "questions": [{"text": f"Q{i}"} for i in range(17)],
-                    },
-                    {
-                        "operation": "MERGE",
-                        "question_ids": [f"RQ-{i}" for i in range(17)],
-                        "rationale": "merge",
-                        "text": "Merged",
-                    },
                     {
                         "operation": "REFINE",
                         "question_ids": [qid],
@@ -494,6 +482,42 @@ class ResearchQuestionReviewTests(unittest.TestCase):
                                 "actor_id": "H",
                             }
                         )
+
+    def test_split_and_merge_accept_lists_above_previous_limits(self):
+        with tempfile.TemporaryDirectory() as temp:
+            with LocalApplicationFacade.open_workspace(_workspace(Path(temp))) as facade:
+                qid = _adopt_question(facade)
+                split = facade.submit_action(
+                    {
+                        "action_type": "research_question.review",
+                        "payload": {
+                            "operation": "SPLIT",
+                            "question_ids": [qid],
+                            "rationale": "separate the research questions",
+                            "questions": [{"text": f"Question {i}"} for i in range(17)],
+                        },
+                        "actor_id": "H",
+                    }
+                )
+                split_questions = split["data"]["question_delta"]["questions"]
+                child_ids = [item["id"] for item in split_questions if item["id"] != qid]
+                self.assertEqual(len(child_ids), 17)
+                _apply(facade, split["data"]["state_delta_proposal_id"])
+
+                merge = facade.submit_action(
+                    {
+                        "action_type": "research_question.review",
+                        "payload": {
+                            "operation": "MERGE",
+                            "question_ids": child_ids,
+                            "rationale": "combine the related questions",
+                            "text": "Combined question",
+                        },
+                        "actor_id": "H",
+                    }
+                )
+                merged_questions = merge["data"]["question_delta"]["questions"]
+                self.assertEqual(len(merged_questions), 18)
 
     def test_material_delta_goes_stale_when_head_advances(self):
         with tempfile.TemporaryDirectory() as temp:

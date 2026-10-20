@@ -725,69 +725,68 @@ class LocalResearchExhibitStore:
         *,
         rq_id: str | None = None,
         limit: int,
+        after: tuple[str, str] | None = None,
     ) -> tuple[Mapping[str, Any], ...]:
         if limit <= 0:
             raise ValueError("limit must be positive")
+        if after is not None and (
+            len(after) != 2 or any(not isinstance(item, str) or not item for item in after)
+        ):
+            raise ValueError("after must contain a captured_at and exhibit_id")
         connection = self._connect_read()
         if connection is None:
             return ()
         try:
             if self._metadata_table_exists(connection):
-                if rq_id is None:
-                    rows = connection.execute(
-                        """
-                        SELECT m.exhibit_id, m.project_id, m.captured_at,
-                               m.content_digest, m.metadata_json
-                        FROM research_exhibit_metadata m
-                        WHERE m.project_id=?
-                        ORDER BY m.captured_at DESC, m.exhibit_id DESC
-                        LIMIT ?
-                        """,
-                        (str(project_id), int(limit)),
-                    ).fetchall()
-                else:
-                    rows = connection.execute(
-                        """
-                        SELECT m.exhibit_id, m.project_id, m.captured_at,
-                               m.content_digest, m.metadata_json
-                        FROM research_exhibit_metadata m
-                        JOIN research_exhibit_rqs r ON r.exhibit_id=m.exhibit_id
-                        WHERE m.project_id=? AND r.rq_id=?
-                        ORDER BY m.captured_at DESC, m.exhibit_id DESC
-                        LIMIT ?
-                        """,
-                        (str(project_id), str(rq_id), int(limit)),
-                    ).fetchall()
+                join = (
+                    "JOIN research_exhibit_rqs r ON r.exhibit_id=m.exhibit_id"
+                    if rq_id is not None
+                    else ""
+                )
+                where = "m.project_id=?"
+                params: list[Any] = [str(project_id)]
+                if rq_id is not None:
+                    where += " AND r.rq_id=?"
+                    params.append(str(rq_id))
+                if after is not None:
+                    where += " AND (m.captured_at < ? OR (m.captured_at = ? AND m.exhibit_id < ?))"
+                    params.extend((after[0], after[0], after[1]))
+                params.append(int(limit))
+                rows = connection.execute(
+                    "SELECT m.exhibit_id, m.project_id, m.captured_at, "
+                    "m.content_digest, m.metadata_json "
+                    "FROM research_exhibit_metadata m "
+                    f"{join} WHERE {where} "
+                    "ORDER BY m.captured_at DESC, m.exhibit_id DESC LIMIT ?",
+                    params,
+                ).fetchall()
                 return tuple(self._decode_metadata(row) for row in rows)
 
             # Compatibility with the pre-optimization PR37 0.1 store. This read
             # fallback performs no migration or write; the next capture creates
             # the additive metadata table and backfills these rows.
-            if rq_id is None:
-                rows = connection.execute(
-                    """
-                    SELECT e.exhibit_id, e.project_id, e.captured_at,
-                           e.content_digest, e.document_json
-                    FROM research_exhibits e
-                    WHERE e.project_id=?
-                    ORDER BY e.captured_at DESC, e.exhibit_id DESC
-                    LIMIT ?
-                    """,
-                    (str(project_id), int(limit)),
-                ).fetchall()
-            else:
-                rows = connection.execute(
-                    """
-                    SELECT e.exhibit_id, e.project_id, e.captured_at,
-                           e.content_digest, e.document_json
-                    FROM research_exhibits e
-                    JOIN research_exhibit_rqs r ON r.exhibit_id=e.exhibit_id
-                    WHERE e.project_id=? AND r.rq_id=?
-                    ORDER BY e.captured_at DESC, e.exhibit_id DESC
-                    LIMIT ?
-                    """,
-                    (str(project_id), str(rq_id), int(limit)),
-                ).fetchall()
+            join = (
+                "JOIN research_exhibit_rqs r ON r.exhibit_id=e.exhibit_id"
+                if rq_id is not None
+                else ""
+            )
+            where = "e.project_id=?"
+            params: list[Any] = [str(project_id)]
+            if rq_id is not None:
+                where += " AND r.rq_id=?"
+                params.append(str(rq_id))
+            if after is not None:
+                where += " AND (e.captured_at < ? OR (e.captured_at = ? AND e.exhibit_id < ?))"
+                params.extend((after[0], after[0], after[1]))
+            params.append(int(limit))
+            rows = connection.execute(
+                "SELECT e.exhibit_id, e.project_id, e.captured_at, "
+                "e.content_digest, e.document_json "
+                "FROM research_exhibits e "
+                f"{join} WHERE {where} "
+                "ORDER BY e.captured_at DESC, e.exhibit_id DESC LIMIT ?",
+                params,
+            ).fetchall()
             return tuple(_metadata_from_document(self._decode_document(row)) for row in rows)
         except LocalResearchExhibitStoreError:
             raise

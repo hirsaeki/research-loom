@@ -11,6 +11,7 @@ from plugins.local_application import (
     LocalApplicationFacade,
     LocalResearchApplication,
 )
+from plugins.local_application.virtual_runner.virtual_runner_input import _payload
 from plugins.survey_virtual_runner.llm_backend import DeterministicFakeVirtualRespondentBackend
 from tests.runtime.survey_analysis_test_support import analysis_questionnaire
 from tests.runtime.survey_virtual_runner_test_support import (
@@ -826,9 +827,8 @@ class SurveyLlmVirtualRespondentProductionTests(SurveyVirtualRunnerTestBase):
                     for index in range(9)
                 ]
                 payload["population_size"] = 9
-                with self.assertRaises(LocalApplicationError) as profile_limit:
-                    facade.run_survey_virtual(payload)
-                self.assertEqual(profile_limit.exception.code, "PROFILE_INVALID")
+                normalized = _payload(payload)
+                self.assertEqual(len(normalized["respondent_profiles"]), 9)
 
                 for field, value in (
                     ("timeout_seconds", 31),

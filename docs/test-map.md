@@ -83,15 +83,15 @@ Unit tests live in `tests/unit/<package>/`, integration and acceptance tests in
 | `plugins/local_application/material/retention_facade.py` | — |
 | `plugins/local_application/misco/formal_report.py` | `tests/runtime/test_issue456_formal_document.py` |
 | `plugins/local_application/misco/publication_dialect.py` | `tests/runtime/test_issue408_generated_publication.py`<br>`tests/runtime/test_issue426_source_bibliography.py`<br>`tests/runtime/test_issue433_publication_reader_labels.py`<br>`tests/runtime/test_issue456_formal_document.py`<br>`tests/runtime/test_issue456_formal_rendering.py`<br>`tests/runtime/test_issue456_publication_conformance.py` |
-| `plugins/local_application/publication/publication_dialect.py` | — |
+| `plugins/local_application/publication/publication_dialect.py` | `tests/runtime/test_issue220_publication_release.py` |
 | `plugins/local_application/publication/publication_docx.py` | `tests/runtime/test_issue256_native_publication.py`<br>`tests/runtime/test_issue408_generated_publication.py`<br>`tests/runtime/test_issue430_host_charts.py`<br>`tests/runtime/test_issue433_publication_reader_labels.py`<br>`tests/runtime/test_issue456_formal_document.py`<br>`tests/runtime/test_issue456_formal_rendering.py`<br>`tests/runtime/test_issue456_publication_conformance.py`<br>`tests/runtime/test_misco_publication_profile_application.py` |
 | `plugins/local_application/publication/publication_exhibits.py` | `tests/runtime/test_issue256_native_publication.py`<br>`tests/runtime/test_issue408_generated_publication.py`<br>`tests/runtime/test_issue426_source_bibliography.py`<br>`tests/runtime/test_issue430_host_charts.py`<br>`tests/runtime/test_issue438_citation_visual_inventory.py` |
 | `plugins/local_application/publication/publication_input.py` | `tests/runtime/test_issue408_generated_publication.py`<br>`tests/runtime/test_misco_publication_profile_application.py` |
-| `plugins/local_application/publication/publication_pdf.py` | `tests/runtime/test_issue456_formal_document.py` |
+| `plugins/local_application/publication/publication_pdf.py` | `tests/runtime/test_issue245_publication_review.py`<br>`tests/runtime/test_issue456_formal_document.py` |
 | `plugins/local_application/publication/publication_release_requests.py` | — |
 | `plugins/local_application/publication/publication_release_service.py` | `tests/runtime/test_issue220_publication_release.py`<br>`tests/runtime/test_issue245_publication_recovery.py`<br>`tests/runtime/test_issue433_publication_reader_labels.py`<br>`tests/runtime/test_issue438_citation_visual_inventory.py`<br>`tests/runtime/test_issue456_bibliography.py`<br>`tests/runtime/test_issue456_formal_rendering.py` |
 | `plugins/local_application/publication/publication_release_support.py` | `tests/runtime/test_issue245_publication_approval_binding.py`<br>`tests/runtime/test_issue245_publication_recovery.py`<br>`tests/runtime/test_issue245_publication_review.py`<br>`tests/runtime/test_issue256_native_publication.py`<br>`tests/runtime/test_issue408_generated_publication.py`<br>`tests/runtime/test_issue456_formal_document.py`<br>`tests/runtime/test_issue456_publication_conformance.py`<br>`tests/runtime/test_misco_publication_profile_application.py` |
-| `plugins/local_application/publication/publication_render.py` | — |
+| `plugins/local_application/publication/publication_render.py` | `tests/runtime/test_issue220_publication_release.py` |
 | `plugins/local_application/research/argument_facade.py` | — |
 | `plugins/local_application/research/candidate_projection.py` | `tests/runtime/test_issue292_candidate_projection.py` |
 | `plugins/local_application/research/conversation_view.py` | — |
@@ -120,7 +120,7 @@ Unit tests live in `tests/unit/<package>/`, integration and acceptance tests in
 | `plugins/local_application/research_package/research_chart.py` | `tests/runtime/test_issue405_research_charts.py`<br>`tests/runtime/test_issue420_evidence_qualification.py`<br>`tests/runtime/test_issue430_host_charts.py`<br>`tests/runtime/test_issue456_formal_rendering.py` |
 | `plugins/local_application/research_package/research_chart_png.py` | `tests/runtime/test_issue405_research_charts.py`<br>`tests/runtime/test_issue456_formal_rendering.py` |
 | `plugins/local_application/research_package/research_package_builder.py` | — |
-| `plugins/local_application/research_package/research_package_contents.py` | `tests/runtime/test_issue438_citation_visual_inventory.py`<br>`tests/runtime/test_issue456_bibliography.py`<br>`tests/runtime/test_research_package_completion_review.py` |
+| `plugins/local_application/research_package/research_package_contents.py` | `tests/runtime/test_issue438_citation_visual_inventory.py`<br>`tests/runtime/test_issue456_bibliography.py`<br>`tests/runtime/test_research_package_completion_review.py`<br>`tests/runtime/test_research_package_integration_bounds.py` |
 | `plugins/local_application/research_package/research_package_format.py` | `tests/contracts/test_misco_production_profiles.py`<br>`tests/runtime/test_issue218_visual_evidence.py`<br>`tests/runtime/test_issue254_item_listing.py`<br>`tests/runtime/test_issue404_visual_semantics.py`<br>`tests/runtime/test_issue406_generated_explanations.py`<br>`tests/runtime/test_issue430_host_charts.py`<br>`tests/runtime/test_issue440_reused_sources.py`<br>`tests/runtime/test_research_package_acceptance.py`<br>`tests/runtime/test_research_package_body_metadata_review.py`<br>`tests/runtime/test_research_package_completion_review.py`<br>`tests/runtime/test_research_package_integration_bounds.py`<br>`tests/runtime/test_research_package_review_fixes.py` |
 | `plugins/local_application/research_package/research_package_service.py` | `tests/runtime/test_historical_material_recovery.py`<br>`tests/runtime/test_issue133_windows_acl.py`<br>`tests/runtime/test_issue218_visual_evidence.py`<br>`tests/runtime/test_issue440_reused_sources.py`<br>`tests/runtime/test_research_package_acceptance.py`<br>`tests/runtime/test_research_package_integration_bounds.py`<br>`tests/runtime/test_research_package_review_fixes.py` |
 | `plugins/local_application/research_package/visual_origin.py` | `tests/runtime/test_issue405_research_charts.py` |
@@ -143,7 +143,7 @@ Unit tests live in `tests/unit/<package>/`, integration and acceptance tests in
 | `plugins/local_application/virtual_runner/virtual_runner_binding.py` | `tests/unit/plugins/local_application/virtual_runner/test_virtual_runner_binding_and_method_context.py` |
 | `plugins/local_application/virtual_runner/virtual_runner_execute.py` | `tests/unit/plugins/local_application/virtual_runner/test_virtual_runner_execute.py`<br>`tests/unit/plugins/local_application/virtual_runner/test_virtual_runner_facade.py` |
 | `plugins/local_application/virtual_runner/virtual_runner_facade.py` | `tests/unit/plugins/local_application/virtual_runner/test_virtual_runner_facade.py` |
-| `plugins/local_application/virtual_runner/virtual_runner_input.py` | `tests/unit/plugins/local_application/virtual_runner/test_virtual_runner_binding_and_method_context.py`<br>`tests/unit/plugins/local_application/virtual_runner/test_virtual_runner_facade.py`<br>`tests/unit/plugins/local_application/virtual_runner/test_virtual_runner_input.py` |
+| `plugins/local_application/virtual_runner/virtual_runner_input.py` | `tests/runtime/test_survey_llm_virtual_respondent.py`<br>`tests/runtime/test_survey_virtual_runner_firewall.py`<br>`tests/unit/plugins/local_application/virtual_runner/test_virtual_runner_binding_and_method_context.py`<br>`tests/unit/plugins/local_application/virtual_runner/test_virtual_runner_facade.py`<br>`tests/unit/plugins/local_application/virtual_runner/test_virtual_runner_input.py` |
 | `plugins/local_application/virtual_runner/virtual_runner_inspection.py` | `tests/unit/plugins/local_application/virtual_runner/test_virtual_runner_facade.py`<br>`tests/unit/plugins/local_application/virtual_runner/test_virtual_runner_inspection.py` |
 | `plugins/local_application/virtual_runner/virtual_runner_method_context.py` | `tests/unit/plugins/local_application/virtual_runner/test_virtual_runner_binding_and_method_context.py` |
 | `plugins/local_application/virtual_runner/virtual_runner_profile.py` | `tests/unit/plugins/local_application/virtual_runner/test_virtual_runner_profile.py` |
@@ -173,7 +173,7 @@ Unit tests live in `tests/unit/<package>/`, integration and acceptance tests in
 | `plugins/local_attention_resume.py` | `tests/runtime/test_pr31_review_regressions.py` |
 | `plugins/local_attention_store.py` | `tests/runtime/test_optional_store_write_transactions.py`<br>`tests/runtime/test_pr31_review_regressions.py`<br>`tests/runtime/test_research_attention_lifecycle.py` |
 | `plugins/local_conversation_store/recovery.py` | — |
-| `plugins/local_conversation_store/resume.py` | — |
+| `plugins/local_conversation_store/resume.py` | `tests/runtime/test_production_research_resume_context.py` |
 | `plugins/local_conversation_store/store.py` | `tests/runtime/test_core_store_schema_baseline.py` |
 | `plugins/local_conversation_store/synthesis.py` | — |
 | `plugins/local_decision_store/recovery.py` | — |

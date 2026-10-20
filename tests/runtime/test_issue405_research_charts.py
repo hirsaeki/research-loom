@@ -67,6 +67,32 @@ def chart_spec(obj, kind="bar"):
 
 
 class ChartValidationTests(unittest.TestCase):
+    def test_quantitative_input_accepts_more_rows_and_columns_within_evidence_size(self):
+        columns = [f"column-{index}" for index in range(9)]
+        rows = [[f"row-{index}", *range(8)] for index in range(129)]
+        obj = evidence(verification="verified", evidence_kind="supporting")
+        obj["excerpt"] = json.dumps(
+            {
+                "columns": columns,
+                "rows": rows,
+                "units": {column: None for column in columns},
+                "denominator": None,
+                "period": "2026",
+            }
+        )
+
+        result = quantitative_input(obj)
+
+        self.assertEqual(len(result["columns"]), 9)
+        self.assertEqual(len(result["rows"]), 129)
+
+    def test_quantitative_input_respects_existing_evidence_excerpt_byte_bound(self):
+        obj = chart_evidence()
+        obj["excerpt"] = " " * 65_537
+
+        with self.assertRaisesRegex(ValueError, "64 KiB Evidence payload bound"):
+            quantitative_input(obj)
+
     def test_bar_line_scatter_are_deterministic_real_pngs(self):
         for kind in ("bar", "line", "scatter"):
             obj = chart_evidence(kind != "bar")

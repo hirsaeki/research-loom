@@ -1,4 +1,5 @@
 import plugins.local_application  # noqa: F401  # load first: survey_virtual_runner import cycle (#490)
+from plugins.local_application.virtual_runner.virtual_runner_input import _payload
 from plugins.survey_virtual_runner.generation import generate_records
 from tests.runtime.survey_virtual_runner_test_support import *  # noqa: F403
 
@@ -71,17 +72,8 @@ class SurveyVirtualRunnerProductionTestsA2(SurveyVirtualRunnerTestBase):
                 too_many_prior["prior_virtual_run_ids"] = [
                     f"RUN-PRIOR-{index:02d}" for index in range(17)
                 ]
-                with self.assertRaises(LocalApplicationError) as bounded:
-                    facade.submit_action(
-                        {
-                            "action_type": "virtual_runner.survey.execute",
-                            "payload": too_many_prior,
-                        }
-                    )
-                self.assertEqual(
-                    bounded.exception.code,
-                    "APPLICATION-VIRTUAL-PAYLOAD-001",
-                )
+                normalized_prior = _payload(too_many_prior)
+                self.assertEqual(len(normalized_prior["prior_virtual_run_ids"]), 17)
 
                 q = extended_questionnaire()
                 record = {

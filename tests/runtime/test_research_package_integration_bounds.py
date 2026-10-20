@@ -3,9 +3,10 @@
 import unittest
 
 from plugins.local_application import LocalApplicationError
+from plugins.local_application.research_package.research_package_contents import (
+    append_package_attachment,
+)
 from plugins.local_application.research_package.research_package_format import (
-    MAX_MATERIALS,
-    MAX_OBJECTS,
     MAX_OUTPUT_BYTES,
     MAX_TEXT_BYTES,
     str_list,
@@ -24,15 +25,10 @@ class ResearchPackageIntegrationBoundsTests(unittest.TestCase):
             + [f"SRC-{n:04d}" for n in range(60)]
             + [f"REC-{n:04d}" for n in range(8)]
         )
-        with self.assertRaises(LocalApplicationError):
-            str_list(ids, "object_ids", 64)  # Prior cap: ablation.
-        self.assertEqual(str_list(ids, "object_ids", MAX_OBJECTS), ids)
+        self.assertEqual(str_list(ids, "object_ids"), ids)
         self.assertEqual(len(ids), 211)
-        self.assertEqual(MAX_OBJECTS, 512)
 
     def test_full_manuscript_original_budget(self):
-        self.assertEqual(MAX_MATERIALS, 128)
-        self.assertGreater(MAX_MATERIALS, 60)
         # A collection of 60 moderate-sized renditions can exceed the
         # former 4 MiB aggregate even though every item is below 1 MiB.
         sample_total = 60 * 128 * 1024
@@ -40,13 +36,27 @@ class ResearchPackageIntegrationBoundsTests(unittest.TestCase):
         self.assertLessEqual(sample_total, MAX_TEXT_BYTES)
         self.assertGreater(MAX_OUTPUT_BYTES, MAX_TEXT_BYTES)
 
-    def test_selection_remains_bounded_and_duplicate_safe(self):
-        with self.assertRaises(LocalApplicationError) as oversized:
-            str_list([f"EVD-{n:04d}" for n in range(MAX_OBJECTS + 1)], "object_ids", MAX_OBJECTS)
-        self.assertEqual(oversized.exception.code, "APPLICATION-RESEARCH-PACKAGE-BOUND-001")
+    def test_selection_has_no_item_count_cap_and_remains_duplicate_safe(self):
+        ids = [f"EVD-{n:04d}" for n in range(513)]
+        self.assertEqual(str_list(ids, "object_ids"), ids)
         with self.assertRaises(LocalApplicationError) as duplicate:
-            str_list(["EVD-0001", "EVD-0001"], "object_ids", MAX_OBJECTS)
+            str_list(["EVD-0001", "EVD-0001"], "object_ids")
         self.assertEqual(duplicate.exception.code, "APPLICATION-RESEARCH-PACKAGE-INPUT-001")
+
+    def test_attachment_budget_is_checked_before_retaining_overflow(self):
+        attachments = []
+        total = append_package_attachment(
+            attachments,
+            MAX_TEXT_BYTES - 1,
+            ("attachments/item.txt", b"x", "text/plain", "test"),
+        )
+        self.assertEqual(total, MAX_TEXT_BYTES)
+        with self.assertRaises(LocalApplicationError) as overflow:
+            append_package_attachment(
+                attachments, total, ("attachments/next.txt", b"y", "text/plain", "test")
+            )
+        self.assertEqual(overflow.exception.code, "APPLICATION-RESEARCH-PACKAGE-BOUND-001")
+        self.assertEqual([row[0] for row in attachments], ["attachments/item.txt"])
 
 
 class ResearchPackageBulkAttachmentVerificationTests(ResearchPackageAcceptanceSupport):

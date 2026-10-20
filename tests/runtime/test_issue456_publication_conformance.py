@@ -6,6 +6,7 @@ import unittest
 import zipfile
 from copy import deepcopy
 from pathlib import Path
+from unittest.mock import patch
 from xml.etree import ElementTree as ET
 
 import tests.runtime.test_external_desktop_research_intake as intake
@@ -15,10 +16,12 @@ from plugins.local_application.misco.publication_dialect import (
     MISCO_EDITORIAL_QA,
     MISCO_PUBLICATION_DIALECT,
 )
+from plugins.local_application.publication import publication_release_support
 from plugins.local_application.publication.publication_docx import W, docx_bytes, verify_native_docx
 from plugins.local_application.publication.publication_release_support import (
     _editorial_status,
     _publication_policy,
+    _validate_publication_inputs,
 )
 
 
@@ -211,6 +214,66 @@ class PublicEditorialRegressionTests(publication_tests.MiscoPublicationProfileAp
             self.assertEqual(raised.exception.code, "APPLICATION-PUBLICATION-RELEASE-CHECK-001")
         finally:
             facade.close()
+
+
+class PublicationApplicationCountTests(unittest.TestCase):
+    def test_application_arrays_accept_more_items_than_previous_schema_bounds(self):
+        payload = {
+            "schema_version": "0.1.0",
+            "formal_report": {
+                "research_kind": "research_theme",
+                "title": "Research report",
+                "created_month": "2026-10",
+                "abstract": "Abstract",
+                "activity_record": "Activity",
+                "roster": "Roster",
+                "appendices": [
+                    {"title": f"Appendix {index}", "content": "Content"} for index in range(129)
+                ],
+                "structure": [
+                    {"section_id": f"SECTION-{index}", "level": 1} for index in range(129)
+                ],
+                "footnotes": [
+                    {"section_id": "SECTION-0", "marker": f"N{index}", "text": "Note"}
+                    for index in range(257)
+                ],
+            },
+            "permissions": [
+                {
+                    "source_ref": f"SOURCE-{index}",
+                    "publication_allowed": True,
+                    "company_disclosure": "allowed",
+                    "original_reviewed": True,
+                    "approval_ref": "APPROVAL-1",
+                }
+                for index in range(257)
+            ],
+            "editorial_review": {
+                "reviewer_id": "reviewer-1",
+                "reviewed_at": "2026-10-20T12:00:00Z",
+                "checks": [
+                    {"check_id": f"CHECK-{index}", "status": "passed", "rationale": "Checked"}
+                    for index in range(129)
+                ],
+            },
+        }
+
+        normalized = _validate_publication_inputs(payload)
+
+        self.assertEqual(len(normalized["formal_report"]["appendices"]), 129)
+        self.assertEqual(len(normalized["formal_report"]["structure"]), 129)
+        self.assertEqual(len(normalized["formal_report"]["footnotes"]), 257)
+        self.assertEqual(len(normalized["permissions"]), 257)
+        self.assertEqual(len(normalized["editorial_review"]["checks"]), 129)
+
+    def test_application_payload_capacity_error_precedes_schema_rejection(self):
+        payload = {"schema_version": "0.1.0", "extra": "x" * 65}
+        with patch.object(publication_release_support, "MAX_APPLICATION_INPUT_BYTES", 64):
+            with self.assertRaises(LocalApplicationError) as error:
+                _validate_publication_inputs(payload)
+
+        self.assertEqual(error.exception.code, "APPLICATION-PUBLICATION-INPUT-001")
+        self.assertIn("16 MiB operation budget", error.exception.message)
 
 
 if __name__ == "__main__":

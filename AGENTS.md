@@ -22,6 +22,7 @@ When iterating, it is fine to run only the affected test modules, but run the fu
 
 ## Conventions
 
+- Preserve human research continuity when introducing or changing limits. Follow [Research continuity and operational limits](docs/architecture/research-continuity-and-operational-limits.md) and the [runtime count and capacity limits inventory](docs/architecture/operational-count-limits-inventory.md): operational count/capacity thresholds default to warnings, preserve all data, and never silently truncate. Keep required research/domain, integrity, provenance, security, and authority blockers distinct; unavoidable capacity failures belong to the affected operation and must provide a recoverable continuation path.
 - `core/` stays generic. It must not import `plugins/` and must not contain organization-specific (MISCO) logic. It must pass `mypy --strict`.
 - MISCO-specific behavior lives in `plugins/local_application/misco/`, behind an extension point such as `PublicationDialect`. Generic code must not branch on a MISCO id; `tests/contracts/test_misco_isolation.py` enforces this.
 - `plugins/_infra/` holds low-level helpers (file locks, atomic writes, SQLite PRAGMAs). It must not import other plugins and must pass `mypy --strict`.

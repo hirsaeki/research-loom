@@ -701,6 +701,8 @@
         "response_key",
         "non_empty_count",
         "returned_count",
+        "offset",
+        "next_offset",
         "truncated",
         "rows",
         "provenance"
@@ -724,6 +726,17 @@
         },
         "returned_count": {
           "type": "integer",
+          "minimum": 0
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "next_offset": {
+          "type": [
+            "integer",
+            "null"
+          ],
           "minimum": 0
         },
         "truncated": {

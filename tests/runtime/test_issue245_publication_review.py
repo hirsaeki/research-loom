@@ -1,10 +1,18 @@
 from __future__ import annotations
 
+import io
 from pathlib import Path
 from unittest.mock import patch
 
+from pypdf import PdfWriter
+
 import tests.runtime.test_issue220_publication_release as support
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade
+from plugins.local_application.publication.publication_pdf import (
+    FINAL_PDF_CHECKS,
+    coverage_review,
+    inspect_pdf,
+)
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 CI_WINDOWS = True
@@ -20,6 +28,67 @@ class PublicationReviewTests(ResearchPackageAcceptanceSupport):
             composition["composition_id"], imported["revision_id"]
         )["build"]
         return facade, build["build_id"]
+
+    def test_pdf_inspection_accepts_more_than_256_pages_within_byte_bound(self):
+        writer = PdfWriter()
+        for _ in range(257):
+            writer.add_blank_page(width=595.276, height=841.89)
+        buffer = io.BytesIO()
+        writer.write(buffer)
+
+        result = inspect_pdf(buffer.getvalue())
+
+        self.assertEqual(result["page_count"], 257)
+
+    def test_pdf_review_accepts_complete_page_and_slide_evidence_above_256(self):
+        page_count = 257
+        pdf_digest = "sha256:" + "a" * 64
+        review = {
+            "pdf_digest": pdf_digest,
+            "reviewer_id": "reviewer-1",
+            "reviewed_at": "2026-10-20T12:00:00Z",
+            "checks": [
+                {"check_id": check_id, "status": "passed", "rationale": "Checked"}
+                for check_id in FINAL_PDF_CHECKS
+            ],
+            "pages": [
+                {"page": page, "status": "passed", "rationale": "Checked"}
+                for page in range(1, page_count + 1)
+            ],
+            "presentation_review": {
+                "artifact_digest": pdf_digest,
+                "artifact_reference": "presentation.pptx",
+                "software_version": "1.0",
+                "slide_count": page_count,
+                "slides": [
+                    {
+                        "slide": slide,
+                        "status": "passed",
+                        "citations_required": False,
+                        "citations": [],
+                        "rationale": "Checked",
+                    }
+                    for slide in range(1, page_count + 1)
+                ],
+            },
+        }
+        result = coverage_review(
+            {"items": []},
+            {
+                "formal_report": {
+                    "research_kind": "research_theme",
+                    "presentation_required": True,
+                },
+                "review_conditions": {},
+            },
+            review,
+            pdf_digest,
+            page_count,
+        )
+
+        self.assertNotIn("all-page-review-incomplete", result["problems"])
+        self.assertNotIn("presentation-review-binding", result["problems"])
+        self.assertNotIn("presentation-per-slide-citations", result["problems"])
 
     def test_staging_initialization_errors_are_public_write_diagnostics_and_retryable(self):
         facade, build_id = self._ready()

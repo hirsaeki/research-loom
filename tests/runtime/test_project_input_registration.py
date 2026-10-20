@@ -134,21 +134,36 @@ class ProjectInputRegistrationTests(unittest.TestCase):
                     first["snapshot_id"],
                 )
 
-                with self.assertRaises(LocalApplicationError) as too_many:
-                    facade.submit_action(
+                project_input_ids = [first["input_id"]]
+                for index in range(64):
+                    additional_source = workspace / f"additional-theme-{index}.md"
+                    additional_source.write_text(f"Additional theme {index}", encoding="utf-8")
+                    additional = facade.register_project_input(
                         {
-                            "action_type": "research_question.review",
-                            "payload": {
-                                "operation": "KEEP",
-                                "question_ids": [question_id],
-                                "rationale": "bounded project inputs",
-                                "review_inputs": {
-                                    "project_input_ids": [f"PIN-{i}" for i in range(65)]
-                                },
-                            },
+                            "file": str(additional_source),
+                            "role": "other",
+                            "expected_snapshot_id": current["snapshot_id"],
+                            "expected_snapshot_digest": current["content_digest"],
+                            "provenance": {"supplied_by": "test"},
                         }
-                    )
-                self.assertEqual(too_many.exception.code, "APPLICATION-PROJECT-INPUT-001")
+                    )["project_input"]
+                    project_input_ids.append(additional["input_id"])
+
+                many_inputs = facade.submit_action(
+                    {
+                        "action_type": "research_question.review",
+                        "payload": {
+                            "operation": "KEEP",
+                            "question_ids": [question_id],
+                            "rationale": "review all supplied project inputs",
+                            "review_inputs": {"project_input_ids": project_input_ids},
+                        },
+                    }
+                )
+                self.assertEqual(
+                    many_inputs["data"]["question_review"]["review_inputs"]["project_input_ids"],
+                    project_input_ids,
+                )
             finally:
                 facade.close()
 

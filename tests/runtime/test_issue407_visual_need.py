@@ -9,6 +9,51 @@ from tests.runtime.test_research_exhibits import exhibit_payload, state_signatur
 class VisualNeedTests(ResearchPackageAcceptanceSupport):
     _prepared = native.Issue256NativePublicationTests._prepared
 
+    def test_resume_accepts_more_than_31_exhibits(self):
+        facade, case = self._prepared(matrix=True)
+        need = facade.capture_visual_need(
+            {
+                "origin": {
+                    "stage": "narrative",
+                    "composition_id": case["composition_id"],
+                    "composition_version": 1,
+                },
+                "purpose": "Clarify existing meaning",
+                "semantic_changes": [],
+                "affected_section_ids": ["SEC-FRAME"],
+            }
+        )["exhibit"]["exhibit_id"]
+        added = [
+            facade.capture_exhibit(
+                exhibit_payload(
+                    rq_id=case["rq_id"],
+                    title=f"Existing comparison {index:02d}",
+                    kind="note",
+                    representation="text",
+                    value=f"Existing meaning {index:02d}",
+                    source_object_ids=[],
+                )
+            )["exhibit"]["exhibit_id"]
+            for index in range(31)
+        ]
+        exhibit_ids = [case["exhibit_id"], *added]
+
+        resumed = facade.resume_visual_need(
+            {
+                "need_id": need,
+                "exhibit_ids": exhibit_ids,
+                "section_exhibit_refs": {"SEC-FRAME": exhibit_ids},
+            }
+        )
+
+        self.assertEqual(resumed["status"], "RESUMABLE")
+        self.assertEqual(
+            facade.show_writer_composition(resumed["composition"]["composition_id"], 1)[
+                "composition"
+            ]["sections"][0]["exhibit_refs"],
+            exhibit_ids,
+        )
+
     def test_three_origins_resume_after_reopen_preserving_history_and_authority(self):
         facade, case = self._prepared(matrix=True)
         composition = facade.show_writer_composition(case["composition_id"], 1)["composition"]

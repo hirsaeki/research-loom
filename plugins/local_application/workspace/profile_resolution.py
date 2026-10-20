@@ -21,9 +21,7 @@ from .profile_resolution_support import (
     CORE_INVARIANTS,
     EPS_SCHEMA,
     MAX_EFFECTIVE_RESOURCE_BYTES,
-    MAX_EFFECTIVE_RESOURCES,
     MAX_PROFILE_RESOURCE_BYTES,
-    MAX_PROFILE_RESOURCES,
     TYPE_RANK,
     _flatten_requests,
     _keyver,
@@ -125,21 +123,11 @@ def _normalized_resource_bytes(path: Path) -> bytes:
 def _effective_resources(selected) -> list[dict[str, Any]]:
     profile_root = resource_path("profiles").resolve()
     grouped: dict[tuple[str, str, str], dict[str, Any]] = {}
-    resource_count = 0
     resource_bytes = 0
     for candidate in selected.values():
         manifest = candidate["manifest"]
         manifest_path = Path(candidate["path"])
         declarations = list(manifest.get("resources", []))
-        if len(declarations) > MAX_PROFILE_RESOURCES:
-            raise LocalWorkspaceError(
-                "PROFILE-RESOURCE-BOUND-001", "Profile declares too many resources"
-            )
-        resource_count += len(declarations)
-        if resource_count > MAX_EFFECTIVE_RESOURCES:
-            raise LocalWorkspaceError(
-                "PROFILE-RESOURCE-BOUND-001", "Effective Profile Set declares too many resources"
-            )
         for declaration in declarations:
             declared_path = str(declaration["path"])
             raw_path = manifest_path.parent / declared_path

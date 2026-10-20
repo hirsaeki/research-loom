@@ -11,6 +11,7 @@ _RQ_PRODUCERS = (
     "research_question.propose_many@0.1.0",
 )
 _RQ_REVIEW_PRODUCER = "research_question.review@0.1.0"
+_PROPOSAL_ID_QUERY_BATCH_SIZE = 100
 
 
 def _validated_state_delta(row, *, project_ref: str):
@@ -124,20 +125,25 @@ def state_delta_proposals_by_ids_for_project(
     project_ref: str,
     proposal_ids,
 ):
-    """Load an exact bounded set of candidate documents for one project in one query."""
+    """Load an exact set of candidate documents for one project in bounded queries."""
     ids = tuple(str(item) for item in proposal_ids)
     if not ids:
         return {}
-    if len(ids) > 100 or any(not item for item in ids) or len(set(ids)) != len(ids):
-        raise ValueError("candidate proposal ID query must contain 1-100 unique non-empty IDs")
-    placeholders = ",".join("?" for _ in ids)
+    if any(not item for item in ids) or len(set(ids)) != len(ids):
+        raise ValueError("candidate proposal IDs must be unique and non-empty")
+    rows = []
     try:
         with store._lock:
-            rows = store._db.execute(
-                f"SELECT proposal_id,payload_json FROM state_delta_proposals "
-                f"WHERE proposal_id IN ({placeholders})",
-                ids,
-            ).fetchall()
+            for offset in range(0, len(ids), _PROPOSAL_ID_QUERY_BATCH_SIZE):
+                batch = ids[offset : offset + _PROPOSAL_ID_QUERY_BATCH_SIZE]
+                placeholders = ",".join("?" for _ in batch)
+                rows.extend(
+                    store._db.execute(
+                        f"SELECT proposal_id,payload_json FROM state_delta_proposals "
+                        f"WHERE proposal_id IN ({placeholders})",
+                        batch,
+                    ).fetchall()
+                )
     except sqlite3.Error as exc:
         raise ConversationRuntimeError(
             "RESUME-CANDIDATE-001", "StateDeltaProposal lookup is unreadable"

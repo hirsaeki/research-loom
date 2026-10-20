@@ -222,7 +222,7 @@
   {
     "name": "list_exhibits",
     "kind": "method",
-    "signature": "(self, *, rq_id: 'str | None' = None) -> 'Mapping[str, Any]'"
+    "signature": "(self, *, rq_id: 'str | None' = None, limit: 'int' = 100, cursor: 'str | None' = None) -> 'Mapping[str, Any]'"
   },
   {
     "name": "list_external_materials",
