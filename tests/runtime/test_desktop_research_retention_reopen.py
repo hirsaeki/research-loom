@@ -4,17 +4,15 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import tests.runtime.test_external_desktop_research_intake_atomicity as atomicity_support
 from plugins.local_application import LocalApplicationFacade, LocalResearchApplication
 from plugins.local_execution_store import LocalExecutionStoreConfig
 from tests.runtime.test_external_desktop_research_intake import NullResolver, profile_provider
-from tests.runtime.test_external_desktop_research_intake_atomicity import (
-    ExternalDesktopResearchAtomicityTests,
-)
 
 
 class DesktopResearchRetentionReopenTests(unittest.TestCase):
     def test_large_capture_survives_process_style_reopen(self):
-        helper = ExternalDesktopResearchAtomicityTests()
+        helper = atomicity_support.ExternalDesktopResearchAtomicityTests()
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             app, facade = helper.make_facade(root)
@@ -77,7 +75,7 @@ class DesktopResearchRetentionReopenTests(unittest.TestCase):
                     facade.close()
 
     def test_small_capture_after_large_does_not_charge_large_bytes_to_generic_run_budget(self):
-        helper = ExternalDesktopResearchAtomicityTests()
+        helper = atomicity_support.ExternalDesktopResearchAtomicityTests()
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             app, facade = helper.make_facade(root)

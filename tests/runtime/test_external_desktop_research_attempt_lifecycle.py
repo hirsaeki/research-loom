@@ -8,6 +8,7 @@ from pathlib import Path
 from threading import Event
 from unittest.mock import patch
 
+import tests.runtime.test_external_desktop_research_intake as intake_support
 from plugins.desktop_research.attempts import reconstruct_attempts
 from plugins.local_application import (
     LocalApplicationError,
@@ -16,7 +17,6 @@ from plugins.local_application import (
 )
 from plugins.local_application.facade import LocalApplicationFacadeCore as PreAttemptGuardFacade
 from tests.runtime.test_external_desktop_research_intake import (
-    ExternalDesktopResearchIntakeTests,
     NullResolver,
     golden_submission,
     profile_provider,
@@ -25,7 +25,7 @@ from tests.runtime.test_external_desktop_research_intake import (
 
 class ExternalDesktopResearchAttemptLifecycleTests(unittest.TestCase):
     def test_collect_rejects_in_progress_attempt_and_leaves_run_open_for_completion(self):
-        helper = ExternalDesktopResearchIntakeTests(methodName="runTest")
+        helper = intake_support.ExternalDesktopResearchIntakeTests(methodName="runTest")
         with tempfile.TemporaryDirectory() as temp:
             app, facade = helper.make_facade(Path(temp))
             try:
@@ -57,7 +57,7 @@ class ExternalDesktopResearchAttemptLifecycleTests(unittest.TestCase):
                 app.close()
 
     def test_collect_serializes_attempt_start_through_completed_transition(self):
-        helper = ExternalDesktopResearchIntakeTests(methodName="runTest")
+        helper = intake_support.ExternalDesktopResearchIntakeTests(methodName="runTest")
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             setup_app, setup_facade = helper.make_facade(root)
@@ -190,7 +190,7 @@ class ExternalDesktopResearchAttemptLifecycleTests(unittest.TestCase):
                 inspect_facade.close()
 
     def _completed_historical_run_with_open_attempt(self, root: Path):
-        helper = ExternalDesktopResearchIntakeTests(methodName="runTest")
+        helper = intake_support.ExternalDesktopResearchIntakeTests(methodName="runTest")
         app, facade = helper.make_facade(root)
         run_id = helper.prepare(facade)["run_id"]
         helper.write_capture_files(root)
@@ -273,7 +273,7 @@ class ExternalDesktopResearchAttemptLifecycleTests(unittest.TestCase):
                 app.close()
 
     def test_replay_completed_historical_run_carries_only_unresolved_attempts(self):
-        helper = ExternalDesktopResearchIntakeTests(methodName="runTest")
+        helper = intake_support.ExternalDesktopResearchIntakeTests(methodName="runTest")
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             app, facade = helper.make_facade(root)

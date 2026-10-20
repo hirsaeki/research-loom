@@ -11,21 +11,19 @@ from xml.etree import ElementTree as ET
 import rfc8785
 
 import tests.runtime.test_external_desktop_research_intake as intake
+import tests.runtime.test_misco_writer_profile_application as writer_support
 from plugins.local_application import LocalApplicationError
 from plugins.local_application.publication.publication_docx import WP, W, docx_bytes
 from plugins.local_application.publication.publication_input import inspect_inputs
 from plugins.local_application.publication.publication_release_support import _publication_policy
 from plugins.local_application.workspace.profile_resolution import resolve_effective_profile_set
-from tests.runtime.test_misco_writer_profile_application import (
-    WRITER_MANIFEST,
-    MiscoWriterProfileApplicationTests,
-)
+from tests.runtime.test_misco_writer_profile_application import WRITER_MANIFEST
 
 ROOT = Path(__file__).resolve().parents[2]
 PUBLICATION_MANIFEST = ROOT / "profiles/publication/misco/1.3.0/profile.json"
 
 
-class MiscoPublicationProfileApplicationTests(MiscoWriterProfileApplicationTests):
+class MiscoPublicationProfileApplicationTests(writer_support.MiscoWriterProfileApplicationTests):
     def _write_structured_workspace_inputs(self):
         config = intake.bootstrap_config()
         config["profile_requests"] = {

@@ -14,19 +14,21 @@ Runtime provisioning (`uv sync --frozen`, the offline wheelhouse) stays runtime-
 
 ## Checks
 
-CI runs exactly these; run them before pushing.
+Run these checks before pushing. The test runner covers the same complete discovery set as CI's contracts plus all runtime/unit modules.
 
 ```bash
 uv run --frozen --group dev ruff check .
 uv run --frozen --group dev ruff format --check .
 uv run --frozen --group dev mypy                                   # strict, scoped to core/ and plugins/_infra/
-uv run --frozen python -m unittest discover -t . -s tests -p 'test_*.py'
+uv run --frozen python scripts/run_tests.py --jobs 4
 ```
 
 - `tests/contracts/` holds schema and semantic contract tests (fast); `tests/unit/<package>/` holds unit and characterization tests that import one production module directly (for example `tests/unit/core/runtime/test_state_validation.py`); `tests/runtime/` holds integration and acceptance tests (slower, about 20 minutes serially). Put new unit tests under `tests/unit/`.
 - [`docs/test-map.md`](docs/test-map.md) lists which tests import each production module. Regenerate it with `uv run --frozen python scripts/test_map.py` after adding or moving tests; `tests/contracts/test_test_map.py` fails when it is stale.
 - `tests/` is a package. Import shared fixtures as `tests.runtime.<module>` / `tests.contracts.<module>`; no `PYTHONPATH` setup is needed.
-- Narrow a run with `-s tests/runtime`, or pass dotted module names or file paths to `python -m unittest`.
+- The local runner reuses CI's duration-based partitioner, checks the selected test IDs and their multiplicities against full discovery, and runs contracts plus all runtime/unit modules with `--jobs` workers (four by default). It runs the complete set on Windows too; the opt-in Windows CI lane is only a subset. Use `--jobs 1` on a constrained host or `--plan` to inspect selection without executing tests. Logs, selection and an aggregate `summary.json` go to a new temporary directory printed at startup; `--output <new-directory>` chooses a durable location. A failed shard makes the overall command fail after the other shards finish. Parallel local processes share host resources, so speedup depends on the machine.
+- For serial full discovery, use `uv run --frozen python -m unittest discover -t . -s tests -p 'test_*.py'`. Narrow a run with `-s tests/runtime`, or pass dotted module names or file paths to `python -m unittest`.
+- Import supporting test modules and qualify their TestCase classes. Importing a concrete TestCase directly (including an underscore alias) makes unittest collect its tests again; the selection contract rejects repeated test IDs. Intentional subclass scenarios retain their own test IDs and still run.
 - Coverage is reported, not enforced (#507). CI runs the contract tests and the Linux and Windows runtime shards under `coverage`, and the `coverage-report` job combines their data, adds the branch coverage to the run summary and uploads `coverage.xml`. Python subprocesses, such as tests that start the CLI, are measured too (#592). The `windows-misco-migration` job is not measured. To measure locally:
 
   ```bash

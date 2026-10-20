@@ -15,10 +15,10 @@ uv sync --frozen --group dev
 uv run --frozen --group dev ruff check .
 uv run --frozen --group dev ruff format --check .
 uv run --frozen --group dev mypy
-uv run --frozen python -m unittest discover -t . -s tests -p 'test_*.py'
+uv run --frozen python scripts/run_tests.py --jobs 4
 ```
 
-When iterating, it is fine to run only the affected test modules, but run the full suite before you report the work as done.
+When iterating, it is fine to run only the affected test modules, but run the full suite before you report the work as done. The runner verifies its selection against full unittest discovery before executing contracts and all runtime/unit modules in parallel; this is the full suite on every platform, not the Windows CI subset.
 
 ## Conventions
 

@@ -6,22 +6,20 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+import tests.runtime.test_external_desktop_research_intake as intake_support
+import tests.runtime.test_external_desktop_research_intake_atomicity as atomicity_support
 from plugins.desktop_research import DesktopResearchResultValidator
 from plugins.local_execution_store import LocalExecutionStoreConfig, LocalExecutionStoreError
 from tests.runtime.test_desktop_research import Flow
 from tests.runtime.test_external_desktop_research_intake import (
-    ExternalDesktopResearchIntakeTests,
     golden_submission,
     refresh,
-)
-from tests.runtime.test_external_desktop_research_intake_atomicity import (
-    ExternalDesktopResearchAtomicityTests,
 )
 
 
 class DesktopResearchRetentionTests(unittest.TestCase):
     def test_oversized_original_uses_managed_payload_and_public_reads_hide_locator(self):
-        helper = ExternalDesktopResearchAtomicityTests()
+        helper = atomicity_support.ExternalDesktopResearchAtomicityTests()
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             app, facade = helper.make_facade(root)
@@ -74,7 +72,7 @@ class DesktopResearchRetentionTests(unittest.TestCase):
                 facade.close()
 
     def test_large_original_same_digest_groups_across_runs(self):
-        helper = ExternalDesktopResearchAtomicityTests()
+        helper = atomicity_support.ExternalDesktopResearchAtomicityTests()
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             app, facade = helper.make_facade(root)
@@ -112,7 +110,7 @@ class DesktopResearchRetentionTests(unittest.TestCase):
                 facade.close()
 
     def test_explicit_original_budget_rejects_without_partial_capture(self):
-        helper = ExternalDesktopResearchAtomicityTests()
+        helper = atomicity_support.ExternalDesktopResearchAtomicityTests()
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             app, facade = helper.make_facade(root)
@@ -142,7 +140,7 @@ class DesktopResearchRetentionTests(unittest.TestCase):
                 facade.close()
 
     def test_failed_second_metadata_write_preserves_preexisting_large_payload(self):
-        helper = ExternalDesktopResearchAtomicityTests()
+        helper = atomicity_support.ExternalDesktopResearchAtomicityTests()
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             app, facade = helper.make_facade(root)
@@ -208,7 +206,7 @@ class DesktopResearchRetentionTests(unittest.TestCase):
                 facade.close()
 
     def test_missing_coverage_is_unknown_and_newline_citation_validates_candidate_only(self):
-        helper = ExternalDesktopResearchIntakeTests()
+        helper = intake_support.ExternalDesktopResearchIntakeTests()
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             app, facade = helper.make_facade(root)
