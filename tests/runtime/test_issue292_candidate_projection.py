@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import tempfile
+import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+import tests.runtime.test_issue134_argument_proposal as argument_support
+import tests.runtime.test_issue135_recommendation_proposal as recommendation_support
 from plugins.local_application import LocalApplicationFacade
 from plugins.local_application.research.candidate_projection import build_candidate_projection
-from tests.runtime.test_issue134_argument_proposal import Issue134ArgumentProposalTests
-from tests.runtime.test_issue135_recommendation_proposal import Issue135RecommendationProposalTests
 from tests.runtime.test_research_question_adoption import _init_workspace, _proposal_input
 from tests.runtime.test_research_question_batch_adoption import (
     _apply_to_decision,
@@ -15,6 +16,28 @@ from tests.runtime.test_research_question_batch_adoption import (
     _five_questions,
     _resolve,
 )
+
+
+class CandidateProjectionTests(unittest.TestCase):
+    """Expose the original function-based scenarios to the unittest runner."""
+
+    def test_rq_projection_separates_candidate_target_from_current_state(self):
+        test_rq_projection_separates_candidate_target_from_current_state()
+
+    def test_recommendation_projection_does_not_treat_target_approved_as_current(self):
+        test_recommendation_projection_does_not_treat_target_approved_as_current()
+
+    def test_argument_projection_preserves_schema_without_synthesizing_adoption_state(self):
+        test_argument_projection_preserves_schema_without_synthesizing_adoption_state()
+
+    def test_historical_batch_projection_reports_current_values_without_false_reproposal(self):
+        test_historical_batch_projection_reports_current_values_without_false_reproposal()
+
+    def test_historical_candidate_from_another_lineage_remains_readable(self):
+        test_historical_candidate_from_another_lineage_remains_readable()
+
+    def test_resume_projection_does_not_reload_candidates_one_by_one(self):
+        test_resume_projection_does_not_reload_candidates_one_by_one()
 
 
 def test_rq_projection_separates_candidate_target_from_current_state():
@@ -39,7 +62,7 @@ def test_rq_projection_separates_candidate_target_from_current_state():
 
 
 def test_recommendation_projection_does_not_treat_target_approved_as_current():
-    helper = Issue135RecommendationProposalTests()
+    helper = recommendation_support.Issue135RecommendationProposalTests()
     with tempfile.TemporaryDirectory() as temp:
         facade = helper.make_facade(temp)
         try:
@@ -54,7 +77,7 @@ def test_recommendation_projection_does_not_treat_target_approved_as_current():
 
 
 def test_argument_projection_preserves_schema_without_synthesizing_adoption_state():
-    helper = Issue134ArgumentProposalTests()
+    helper = argument_support.Issue134ArgumentProposalTests()
     with tempfile.TemporaryDirectory() as temp:
         facade = helper.make_facade(temp)
         try:

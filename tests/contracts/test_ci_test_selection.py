@@ -6,6 +6,7 @@ import importlib.util
 import json
 import re
 import unittest
+from collections import Counter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -22,6 +23,24 @@ PLATFORM_SIGNAL = re.compile(
 
 
 class CiTestSelectionTests(unittest.TestCase):
+    def test_full_discovery_does_not_repeat_test_ids(self):
+        def ids(suite):
+            for item in suite:
+                if isinstance(item, unittest.TestSuite):
+                    yield from ids(item)
+                else:
+                    yield item.id()
+
+        loader = unittest.TestLoader()
+        counts = Counter(ids(loader.discover(str(ROOT / "tests"), top_level_dir=str(ROOT))))
+        self.assertEqual([], loader.errors)
+        self.assertEqual(
+            {},
+            {name: count for name, count in counts.items() if count > 1},
+            "import supporting test modules, not their TestCase classes; "
+            "unittest also collects imported classes, even with underscore aliases",
+        )
+
     def test_platform_sensitive_modules_declare_windows_lane(self):
         undeclared = [
             shards_tool.module_name(path)

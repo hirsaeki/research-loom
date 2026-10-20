@@ -3,12 +3,10 @@ from __future__ import annotations
 from copy import deepcopy
 from unittest.mock import patch
 
+import tests.runtime.test_historical_finding_lineage_recovery as lineage_support
 from core.runtime import canonical_digest
 from plugins.local_application import LocalApplicationError
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
-from tests.runtime.test_historical_finding_lineage_recovery import (
-    HistoricalFindingLineageRecoveryTests,
-)
 
 CI_WINDOWS = True
 
@@ -17,7 +15,7 @@ class HistoricalFindingRecoveryReviewFixTests(ResearchPackageAcceptanceSupport):
     def test_missing_proposal_identity_is_bounded_without_full_state_load(self):
         facade, case = self._prepare_case()
         try:
-            legacy = HistoricalFindingLineageRecoveryTests._legacyize(
+            legacy = lineage_support.HistoricalFindingLineageRecoveryTests._legacyize(
                 self, facade, case["proposal"]
             )
             store = facade._application.conversation_store

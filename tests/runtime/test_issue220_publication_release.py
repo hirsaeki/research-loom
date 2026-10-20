@@ -10,6 +10,7 @@ from unittest.mock import patch
 from jsonschema import Draft202012Validator, FormatChecker
 
 import tests.runtime.issue80_writer_composition_suite as writer_comp_support
+import tests.runtime.test_issue219_writer_round_trip as round_trip_support
 from plugins.local_application import LocalApplicationError
 from plugins.local_application.publication.publication_dialect import GENERIC_PUBLICATION_DIALECT
 from plugins.local_application.publication.publication_release_service import (
@@ -17,7 +18,6 @@ from plugins.local_application.publication.publication_release_service import (
 )
 from plugins.local_application.publication.publication_render import PublicationRenderMixin
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
-from tests.runtime.test_issue219_writer_round_trip import Issue219WriterRoundTripTests
 
 ROOT = Path(__file__).resolve().parents[2]
 PREVIEW_SCHEMA = ROOT / "core/packages/writer-publication/publication-preview.schema.json"
@@ -31,7 +31,7 @@ class Issue220PublicationReleaseTests(ResearchPackageAcceptanceSupport):
         structured_citation: bool = True,
         frame_content: str | None = None,
     ):
-        helper = Issue219WriterRoundTripTests()
+        helper = round_trip_support.Issue219WriterRoundTripTests()
         helper.root = self.root
         helper.workspace = self.workspace
         facade, case, composition, _exported, input_doc = helper._build_round_trip()
@@ -336,7 +336,7 @@ class Issue220PublicationReleaseTests(ResearchPackageAcceptanceSupport):
                 composition["composition_id"], ["SEC-FRAME"], output
             )
             input_doc = json.loads((output / "writer-input.json").read_text(encoding="utf-8"))
-            helper = Issue219WriterRoundTripTests()
+            helper = round_trip_support.Issue219WriterRoundTripTests()
             response = helper._response(
                 input_doc,
                 sections=[

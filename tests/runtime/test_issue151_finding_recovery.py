@@ -4,19 +4,19 @@ import json
 from copy import deepcopy
 from unittest.mock import patch
 
+import tests.runtime.test_finding_candidate_recovery as finding_support
 from core.runtime import canonical_digest
 from plugins.local_application import LocalApplicationError
 from plugins.local_application.material import (
     historical_result_recovery_facade as historical_result_recovery,
 )
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
-from tests.runtime.test_finding_candidate_recovery import FindingCandidateRecoveryTests
 
 CI_WINDOWS = True
 
 
 class Issue151AmbiguousCanonicalRecoveryTests(ResearchPackageAcceptanceSupport):
-    _legacyize = FindingCandidateRecoveryTests._legacyize
+    _legacyize = finding_support.FindingCandidateRecoveryTests._legacyize
 
     def _ambiguous_case(self):
         facade, case = self._prepare_case()

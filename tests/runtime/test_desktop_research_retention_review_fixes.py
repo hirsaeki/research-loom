@@ -8,18 +8,16 @@ from pathlib import Path
 from threading import Event
 from unittest.mock import patch
 
+import tests.runtime.test_external_desktop_research_intake_atomicity as atomicity_support
 from plugins.local_application import LocalApplicationFacade, LocalResearchApplication
 from plugins.local_application.facade import LocalApplicationError
 from plugins.local_execution_store import LocalExecutionStoreConfig
 from tests.runtime.test_external_desktop_research_intake import NullResolver, profile_provider
-from tests.runtime.test_external_desktop_research_intake_atomicity import (
-    ExternalDesktopResearchAtomicityTests,
-)
 
 
 class DesktopResearchRetentionReviewFixTests(unittest.TestCase):
     def test_large_fallback_reuses_normal_capture_metadata_validation(self):
-        helper = ExternalDesktopResearchAtomicityTests()
+        helper = atomicity_support.ExternalDesktopResearchAtomicityTests()
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             app, facade = helper.make_facade(root)
@@ -56,7 +54,7 @@ class DesktopResearchRetentionReviewFixTests(unittest.TestCase):
                 facade.close()
 
     def test_large_preflight_rejects_exhausted_quota_before_staging(self):
-        helper = ExternalDesktopResearchAtomicityTests()
+        helper = atomicity_support.ExternalDesktopResearchAtomicityTests()
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             app, facade = helper.make_facade(root)
@@ -106,7 +104,7 @@ class DesktopResearchRetentionReviewFixTests(unittest.TestCase):
                 facade.close()
 
     def test_large_preflight_rejects_identity_collision_before_staging(self):
-        helper = ExternalDesktopResearchAtomicityTests()
+        helper = atomicity_support.ExternalDesktopResearchAtomicityTests()
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             app, facade = helper.make_facade(root)
@@ -156,7 +154,7 @@ class DesktopResearchRetentionReviewFixTests(unittest.TestCase):
                 facade.close()
 
     def test_large_run_reservation_serializes_staging_across_connections(self):
-        helper = ExternalDesktopResearchAtomicityTests()
+        helper = atomicity_support.ExternalDesktopResearchAtomicityTests()
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             app1, facade1 = helper.make_facade(root)

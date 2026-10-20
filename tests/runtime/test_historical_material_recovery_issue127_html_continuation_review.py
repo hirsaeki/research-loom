@@ -4,21 +4,25 @@ from collections.abc import Mapping
 from copy import deepcopy
 from unittest.mock import patch
 
+import tests.runtime.test_issue171_new_material_continuation as continuation_support
 from plugins.local_application.material.new_material_continuation_service import (
     _render_reacquired_html_rendition,
 )
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
-from tests.runtime.test_issue171_new_material_continuation import (
-    Issue171NewMaterialContinuationTests as _Issue171Support,
-)
 
 CI_WINDOWS = True
 
 
 class Issue127HtmlContinuationReviewTests(ResearchPackageAcceptanceSupport):
-    _remove_producer_candidate = staticmethod(_Issue171Support._remove_producer_candidate)
-    _make_original_pair_missing = staticmethod(_Issue171Support._make_original_pair_missing)
-    _make_original_new_version = _Issue171Support._make_original_new_version
+    _remove_producer_candidate = staticmethod(
+        continuation_support.Issue171NewMaterialContinuationTests._remove_producer_candidate
+    )
+    _make_original_pair_missing = staticmethod(
+        continuation_support.Issue171NewMaterialContinuationTests._make_original_pair_missing
+    )
+    _make_original_new_version = (
+        continuation_support.Issue171NewMaterialContinuationTests._make_original_new_version
+    )
 
     def _continue_with_budget(self, facade, case, reacquired, **budget_overrides):
         del case
