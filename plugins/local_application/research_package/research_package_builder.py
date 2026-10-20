@@ -25,7 +25,6 @@ from .research_package_contents import (
 )
 from .research_package_format import (
     ALLOWED,
-    MAX_EXHIBITS,
     MAX_INPUTS,
     MAX_ITEM_BYTES,
     MAX_MATERIALS,
@@ -151,7 +150,7 @@ def build_package(service, value: Mapping[str, Any]) -> Mapping[str, Any]:
     attachments = []
     exhibit_provenance_seen = set()
     visual_attachment_paths = {}
-    for eid in str_list(value.get("exhibit_ids"), "exhibit_ids", MAX_EXHIBITS):
+    for eid in str_list(value.get("exhibit_ids"), "exhibit_ids"):
         ex = service.facade.show_exhibit(eid).get("exhibit")
         if not isinstance(ex, Mapping):
             raise LocalApplicationError(

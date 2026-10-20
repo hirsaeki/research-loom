@@ -9,7 +9,6 @@ from typing import Any
 from plugins.application_errors import LocalApplicationError
 
 from .research_package_format import (
-    MAX_EXHIBITS,
     MAX_ITEM_BYTES,
     MAX_RUNS,
     MAX_TEXT_BYTES,
@@ -387,11 +386,6 @@ def _collect_exhibit_modes(
         if exhibit_id in visited:
             continue
         visited.add(exhibit_id)
-        if len(visited) > MAX_EXHIBITS:
-            raise LocalApplicationError(
-                "APPLICATION-RESEARCH-PACKAGE-BOUND-001",
-                "Research Exhibit provenance exceeds supported bound",
-            )
         captured = current.get("captured_against", {})
         if (
             str(current.get("project_id", service.project_id)) != service.project_id

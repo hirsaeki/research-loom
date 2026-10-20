@@ -24,7 +24,6 @@ SCHEMA_VERSION = "0.2.0"
 TOOL_VERSION = "0.2.0"
 MAX_OBJECTS = 512
 MAX_RUNS = 16
-MAX_EXHIBITS = 32
 MAX_INPUTS = 32
 MAX_MATERIALS = 128
 MAX_PACKAGES = 100
@@ -499,7 +498,7 @@ def safe_component(v: str, field: str) -> str:
     return v
 
 
-def str_list(v: Any, field: str, maximum: int) -> list[str]:
+def str_list(v: Any, field: str, maximum: int | None = None) -> list[str]:
     if v is None:
         return []
     if not isinstance(v, list) or any(not isinstance(x, str) or not x for x in v):
@@ -511,7 +510,7 @@ def str_list(v: Any, field: str, maximum: int) -> list[str]:
         raise LocalApplicationError(
             "APPLICATION-RESEARCH-PACKAGE-INPUT-001", f"{field} contains duplicates"
         )
-    if len(v) > maximum:
+    if maximum is not None and len(v) > maximum:
         raise LocalApplicationError(
             "APPLICATION-RESEARCH-PACKAGE-BOUND-001", f"{field} exceeds bound {maximum}"
         )
