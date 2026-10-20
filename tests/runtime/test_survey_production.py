@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import os
 import sqlite3
 import subprocess
 import tempfile
@@ -30,6 +31,14 @@ SURVEY_FIXTURE = ROOT / "core/fixtures/capabilities/valid/generic-survey-contrac
 EXCHANGE_SCHEMA = ROOT / "core/packages/survey/survey-instrument-exchange.schema.json"
 PROJECT_FIXTURE = ROOT / "projects/fixtures/valid/generic-project-config.json"
 PROFILE_FIXTURE = ROOT / "profiles/fixtures/valid/effective-profile-set.json"
+
+CI_WINDOWS = True
+
+
+def repository_launcher_command(*args: str) -> list[str]:
+    if os.name == "nt":
+        return ["cmd.exe", "/c", str(ROOT / "research-loom.cmd"), *args]
+    return [str(ROOT / "research-loom"), *args]
 
 
 class NullResolver:
@@ -530,7 +539,7 @@ class SurveyProductionCliTests(unittest.TestCase):
 
     def test_repository_launcher_exposes_survey_namespace(self):
         result = subprocess.run(
-            [str(ROOT / "research-loom"), "survey", "--help"],
+            repository_launcher_command("survey", "--help"),
             cwd=ROOT,
             capture_output=True,
             text=True,

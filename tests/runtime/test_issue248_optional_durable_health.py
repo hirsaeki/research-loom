@@ -401,7 +401,7 @@ os._exit(0)
             finally:
                 facade.close()
         finally:
-            helper.tearDown()
+            helper.doCleanups()
 
     def test_directory_access_error_is_local_unreadable_diagnosis(self):
         child = self.internal / "publication"

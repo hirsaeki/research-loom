@@ -21,7 +21,7 @@ class ResearchPackageReviewFixTests(unittest.TestCase):
         self.fixture.setUp()
 
     def tearDown(self) -> None:
-        self.fixture.tearDown()
+        self.fixture.doCleanups()
 
     def test_completed_handoff_material_paths_and_list_summary_read(self) -> None:
         facade, case = self.fixture._build()

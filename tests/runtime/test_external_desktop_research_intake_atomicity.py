@@ -33,7 +33,7 @@ class ExternalDesktopResearchAtomicityTests(unittest.TestCase):
             effective_profile_set_provider=profile_provider,
             seed_state=seed,
         )
-        return app, LocalApplicationFacade(app, "PRJ-1", workspace_root=root)
+        return app, LocalApplicationFacade(app, "PRJ-1", workspace_root=root, owns_application=True)
 
     @staticmethod
     def prepare(facade: LocalApplicationFacade, policy: dict | None = None) -> str:
@@ -158,7 +158,9 @@ class ExternalDesktopResearchAtomicityTests(unittest.TestCase):
                     resolver=NullResolver(),
                     effective_profile_set_provider=profile_provider,
                 )
-                facade2 = LocalApplicationFacade(app2, "PRJ-1", workspace_root=root)
+                facade2 = LocalApplicationFacade(
+                    app2, "PRJ-1", workspace_root=root, owns_application=True
+                )
                 raw1, text1 = self.write_pair(root, "race-a", b"a", b"a")
                 raw2, text2 = self.write_pair(root, "race-b", b"b", b"b")
                 barrier = Barrier(2)

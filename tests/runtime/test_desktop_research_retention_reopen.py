@@ -56,6 +56,7 @@ class DesktopResearchRetentionReopenTests(unittest.TestCase):
                     reopened_app,
                     "PRJ-1",
                     workspace_root=root,
+                    owns_application=True,
                 )
                 shown = reopened.show_run(run_id)
                 original = next(
