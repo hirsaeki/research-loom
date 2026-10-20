@@ -60,6 +60,8 @@ class ResearchPackageIntegrationBoundsTests(unittest.TestCase):
 
 
 class ResearchPackageBulkAttachmentVerificationTests(ResearchPackageAcceptanceSupport):
+    REUSE_INITIAL_WORKSPACE = True
+
     def test_sixty_material_renditions_verify_without_disabling_integrity(self):
         """Use the actual detached verifier with a >4 MiB, 60-body package."""
         import json

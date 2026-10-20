@@ -16,6 +16,8 @@ from tests.runtime.research_package_acceptance_support import ResearchPackageAcc
 
 
 class ReusedSourceTests(ResearchPackageAcceptanceSupport):
+    REUSE_INITIAL_WORKSPACE = True
+
     def adopt(self, facade, proposal):
         pending = facade.submit_action(
             {

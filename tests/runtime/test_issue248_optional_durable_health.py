@@ -360,7 +360,12 @@ os._exit(0)
     def test_publication_registration_and_missing_root_do_not_block_candidate_research(self):
         from tests.runtime.test_issue220_publication_release import Issue220PublicationReleaseTests
 
-        helper = Issue220PublicationReleaseTests()
+        # This scenario removes/restores durable storage, so retain real init
+        # even though ordinary publication scenarios opt into closed seeds.
+        class FreshPublicationFixture(Issue220PublicationReleaseTests):
+            REUSE_INITIAL_WORKSPACE = False
+
+        helper = FreshPublicationFixture()
         helper.setUp()
         try:
             facade, _case, composition, imported, _source = helper._prepared()

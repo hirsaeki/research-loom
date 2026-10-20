@@ -14,6 +14,8 @@ from tests.runtime.research_package_acceptance_support import ResearchPackageAcc
 
 
 class Issue218VisualEvidenceTests(ResearchPackageAcceptanceSupport):
+    REUSE_INITIAL_WORKSPACE = True
+
     def _visual_case(self):
         original = b"\x89PNG\r\n\x1a\nfixture-visual-source"
         facade, case = self._prepare_case(

@@ -15,6 +15,8 @@ CI_WINDOWS = True
 
 
 class ResearchPackageBodyMetadataReviewTests(ResearchPackageAcceptanceSupport):
+    REUSE_INITIAL_WORKSPACE = True
+
     def _verify_mutation_rejected(self, label, mutate):
         facade, case = self._build()
         try:

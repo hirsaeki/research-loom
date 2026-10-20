@@ -7,6 +7,8 @@ from tests.runtime.test_research_exhibits import exhibit_payload, state_signatur
 
 
 class VisualNeedTests(ResearchPackageAcceptanceSupport):
+    REUSE_INITIAL_WORKSPACE = True
+
     _prepared = native.Issue256NativePublicationTests._prepared
 
     def test_resume_accepts_more_than_31_exhibits(self):

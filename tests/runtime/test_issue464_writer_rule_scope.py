@@ -22,6 +22,8 @@ PREVIOUS_MANIFEST = ROOT / "profiles/narrative/misco/1.1.0/profile.json"
 
 
 class Issue464WriterRuleScopeTests(ResearchPackageAcceptanceSupport):
+    REUSE_INITIAL_WORKSPACE = True
+
     _build_round_trip = legacy.MiscoWriterProfileApplicationTests._build_round_trip
 
     def _write_structured_workspace_inputs(self):

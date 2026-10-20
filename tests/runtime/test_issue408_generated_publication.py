@@ -28,6 +28,8 @@ from tests.runtime.test_research_exhibits import state_signature
 
 
 class GeneratedPublicationTests(ResearchPackageAcceptanceSupport):
+    REUSE_INITIAL_WORKSPACE = True
+
     _prepared = native.Issue256NativePublicationTests._prepared
 
     def capture(self, facade, case, png):

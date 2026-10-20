@@ -11,6 +11,8 @@ CI_WINDOWS = True
 
 
 class Issue80WriterCompositionTests(_suite.Issue80WriterCompositionTests):
+    REUSE_INITIAL_WORKSPACE = True
+
     def _build_complete_support_package(
         self, *, include_unrelated=False, include_recommendation=False, include_adverse=False
     ):
