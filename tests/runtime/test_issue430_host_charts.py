@@ -229,6 +229,8 @@ class HostChartTests(unittest.TestCase):
 
 
 class HostChartRoundTripTests(ResearchPackageAcceptanceSupport):
+    REUSE_INITIAL_WORKSPACE = True
+
     def test_actual_package_writer_preview_blocks_pending_and_fail_preserves_history(self):
         facade, case = self._prepare_case()
         self.addCleanup(facade.close)

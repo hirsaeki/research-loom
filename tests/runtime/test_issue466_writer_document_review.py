@@ -13,6 +13,8 @@ from tests.runtime.research_package_acceptance_support import ResearchPackageAcc
 
 
 class Issue466WriterDocumentReviewTests(ResearchPackageAcceptanceSupport):
+    REUSE_INITIAL_WORKSPACE = True
+
     _build_round_trip = scope_tests.Issue464WriterRuleScopeTests._build_round_trip
     _write_structured_workspace_inputs = (
         scope_tests.Issue464WriterRuleScopeTests._write_structured_workspace_inputs

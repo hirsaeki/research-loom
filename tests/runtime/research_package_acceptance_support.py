@@ -21,18 +21,26 @@ from plugins.local_application import (
 )
 from tests.runtime.runtime_fixtures import decision, project, rq, seed_state
 from tests.runtime.test_survey_production import NullResolver
+from tests.runtime.workspace_test_templates import initialize_workspace_from_template
 
 
 class ResearchPackageAcceptanceSupport(unittest.TestCase):
+    # Concrete classes must opt in themselves; inheritance alone never opts in
+    # initialization, migration, locking or recovery regressions added later.
+    REUSE_INITIAL_WORKSPACE = False
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
         # Later application cleanups run first, releasing Windows SQLite handles.
         self.addCleanup(self.temp.cleanup)
         cfg, eps = self._write_structured_workspace_inputs()
-        opened = LocalWorkspace.init(self.root / "workspace", cfg, eps)
-        opened.close()
         self.workspace = self.root / "workspace"
+        if type(self).__dict__.get("REUSE_INITIAL_WORKSPACE", False):
+            initialize_workspace_from_template(self.workspace, cfg, eps)
+        else:
+            opened = LocalWorkspace.init(self.workspace, cfg, eps)
+            opened.close()
 
     def _write_structured_workspace_inputs(self):
         config = intake.bootstrap_config()

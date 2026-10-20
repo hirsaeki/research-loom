@@ -198,6 +198,8 @@ class NativeStyleAblationTests(unittest.TestCase):
 
 
 class PublicEditorialRegressionTests(publication_tests.MiscoPublicationProfileApplicationTests):
+    REUSE_INITIAL_WORKSPACE = True
+
     def test_not_applicable_aggregate_keeps_preview_but_blocks_release_request(self):
         facade, _case, composition, imported = self._prepared_publication()
         try:

@@ -26,6 +26,8 @@ WRITER_SOURCES = (
 
 
 class MiscoWriterProfileApplicationTests(ResearchPackageAcceptanceSupport):
+    REUSE_INITIAL_WORKSPACE = True
+
     def _write_structured_workspace_inputs(self):
         config = intake.bootstrap_config()
         config["profile_requests"] = {

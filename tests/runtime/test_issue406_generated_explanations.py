@@ -159,6 +159,8 @@ class GeneratedExplanationTests(unittest.TestCase):
 
 
 class GeneratedExplanationPackageTests(ResearchPackageAcceptanceSupport):
+    REUSE_INITIAL_WORKSPACE = True
+
     def test_actual_package_retains_candidate_review_and_exact_generation_context(self):
         facade, case = self._build()
         try:

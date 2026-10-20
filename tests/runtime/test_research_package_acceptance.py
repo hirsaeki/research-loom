@@ -15,6 +15,8 @@ CI_WINDOWS = True
 
 
 class ResearchPackageAcceptanceTests(baseline.ResearchPackageAcceptanceTests):
+    REUSE_INITIAL_WORKSPACE = True
+
     def test_rp1_public_cli_round_trip_is_detached_from_workspace(self):
         facade, case = self._prepare_case()
         facade.close()

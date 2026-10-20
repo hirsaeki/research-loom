@@ -17,6 +17,8 @@ CI_WINDOWS = True
 
 
 class PublicationApprovalBindingTests(ResearchPackageAcceptanceSupport):
+    REUSE_INITIAL_WORKSPACE = True
+
     def _released(self):
         helper = publication_support.Issue220PublicationReleaseTests()
         helper.root = self.root

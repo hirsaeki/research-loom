@@ -24,6 +24,8 @@ PREVIEW_SCHEMA = ROOT / "core/packages/writer-publication/publication-preview.sc
 
 
 class Issue220PublicationReleaseTests(ResearchPackageAcceptanceSupport):
+    REUSE_INITIAL_WORKSPACE = True
+
     def _prepared(
         self,
         *,

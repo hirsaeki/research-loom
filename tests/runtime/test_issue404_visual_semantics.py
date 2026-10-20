@@ -116,6 +116,8 @@ class VisualSemanticsTests(unittest.TestCase):
 
 
 class VisualPackageRoundTripTests(ResearchPackageAcceptanceSupport):
+    REUSE_INITIAL_WORKSPACE = True
+
     def test_exact_visual_semantics_survive_package_build_export_verify(self):
         facade, case = self._prepare_case()
         try:

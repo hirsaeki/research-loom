@@ -24,6 +24,8 @@ PUBLICATION_MANIFEST = ROOT / "profiles/publication/misco/1.3.0/profile.json"
 
 
 class MiscoPublicationProfileApplicationTests(writer_support.MiscoWriterProfileApplicationTests):
+    REUSE_INITIAL_WORKSPACE = True
+
     def _write_structured_workspace_inputs(self):
         config = intake.bootstrap_config()
         config["profile_requests"] = {

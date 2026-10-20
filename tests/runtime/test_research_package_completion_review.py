@@ -24,6 +24,8 @@ CI_WINDOWS = True
 
 
 class ResearchPackageCompletionReviewTests(ResearchPackageAcceptanceSupport):
+    REUSE_INITIAL_WORKSPACE = True
+
     def test_selected_finding_requires_complete_support_chain(self):
         facade, case = self._prepare_case()
         try:
