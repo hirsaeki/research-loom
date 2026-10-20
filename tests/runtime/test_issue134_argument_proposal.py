@@ -6,7 +6,6 @@ from unittest.mock import patch
 
 from core.conversation import ConversationRuntimeError
 from plugins.local_application import (
-    LocalApplicationError,
     LocalApplicationFacade,
     LocalResearchApplication,
 )
@@ -26,13 +25,25 @@ def profile_provider(_project_ref, expected_digest):
 
 
 class Issue134ArgumentProposalTests(unittest.TestCase):
-    def make_facade(self, root: str, *, finding_state: str = "approved") -> LocalApplicationFacade:
+    def make_facade(
+        self,
+        root: str,
+        *,
+        finding_state: str = "approved",
+        evidence_count: int = 1,
+    ) -> LocalApplicationFacade:
+        evidence_objects = [
+            evidence(evidence_kind="supporting", verification="unverified")
+            for _ in range(evidence_count)
+        ]
+        for index, item in enumerate(evidence_objects, start=1):
+            item["id"] = f"EVD-{index}"
         seed = seed_state(
             objects=[
                 project(),
                 rq(state="approved"),
                 source(),
-                evidence(evidence_kind="supporting", verification="unverified"),
+                *evidence_objects,
                 finding(state=finding_state),
             ],
             snapshot_id="SNP-ARG-0",
@@ -149,17 +160,19 @@ class Issue134ArgumentProposalTests(unittest.TestCase):
             finally:
                 facade.close()
 
-    def test_arg3_bounds_support_references_before_state_scan(self):
+    def test_arg3_accepts_more_than_256_authoritative_support_references(self):
         with tempfile.TemporaryDirectory() as temp:
-            facade = self.make_facade(temp)
+            evidence_ids = [f"EVD-{index}" for index in range(1, 258)]
+            facade = self.make_facade(temp, evidence_count=len(evidence_ids))
             try:
-                oversized = self.proposal_input(
-                    finding_ids=[],
-                    evidence_ids=[f"EVD-{index}" for index in range(257)],
+                result = facade.submit_action(
+                    self.proposal_input(
+                        finding_ids=[],
+                        evidence_ids=evidence_ids,
+                    )
                 )
-                with self.assertRaises(LocalApplicationError) as raised:
-                    facade.submit_action(oversized)
-                self.assertEqual(raised.exception.code, "APPLICATION-PAYLOAD-001")
+                self.assertEqual(result["status"], "SUCCEEDED")
+                self.assertEqual(result["data"]["argument_candidate"]["evidence_ids"], evidence_ids)
             finally:
                 facade.close()
 

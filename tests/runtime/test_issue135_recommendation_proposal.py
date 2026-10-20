@@ -26,13 +26,23 @@ def profile_provider(_project_ref, expected_digest):
 
 class Issue135RecommendationProposalTests(unittest.TestCase):
     def make_facade(
-        self, root: str, *, finding_state: str = "approved", finding_project: str = "PRJ-1"
+        self,
+        root: str,
+        *,
+        finding_state: str = "approved",
+        finding_project: str = "PRJ-1",
+        finding_count: int = 1,
     ) -> LocalApplicationFacade:
+        findings = [
+            finding(project_id=finding_project, state=finding_state) for _ in range(finding_count)
+        ]
+        for index, item in enumerate(findings, start=1):
+            item["id"] = f"FND-{index}"
         seed = seed_state(
             objects=[
                 project(),
                 rq(state="approved"),
-                finding(project_id=finding_project, state=finding_state),
+                *findings,
             ],
             snapshot_id="SNP-REC-0",
         )
@@ -261,21 +271,22 @@ class Issue135RecommendationProposalTests(unittest.TestCase):
             finally:
                 facade.close()
 
-    def test_payload_rejects_authority_fields_and_unbounded_finding_refs(self):
+    def test_payload_rejects_authority_fields_and_accepts_many_valid_finding_refs(self):
         with tempfile.TemporaryDirectory() as temp:
-            facade = self.make_facade(temp)
+            finding_ids = [f"FND-{index}" for index in range(1, 258)]
+            facade = self.make_facade(temp, finding_count=len(finding_ids))
             try:
                 with self.assertRaises(LocalApplicationError):
                     facade.submit_action(self.proposal_input(decision_ids=["DEC-X"]))
-                with self.assertRaises(LocalApplicationError) as raised:
-                    facade.submit_action(
-                        self.proposal_input(finding_ids=[f"FND-{i}" for i in range(257)])
-                    )
-                self.assertEqual(raised.exception.code, "APPLICATION-PAYLOAD-001")
+                result = facade.submit_action(self.proposal_input(finding_ids=finding_ids))
+                self.assertEqual(result["status"], "SUCCEEDED")
+                self.assertEqual(
+                    result["data"]["recommendation_candidate"]["finding_ids"], finding_ids
+                )
                 for overbound in (
                     {"statement": "x" * 8_193},
                     {"rationale": "x" * 8_193},
-                    {"conditions": ["x"] * 65},
+                    {"conditions": ["x" * 4_097]},
                     {"scope": ["x" * 4_097]},
                 ):
                     with self.assertRaises(LocalApplicationError) as bounded:
