@@ -61,7 +61,7 @@ class ProjectInputHardeningTests(unittest.TestCase):
             workspace = make_workspace(Path(tmp))
             source = workspace / "brief.md"
             content = "保存後も読み直せる本文\n"
-            source.write_text(content, encoding="utf-8")
+            source.write_bytes(content.encode("utf-8"))
             with LocalApplicationFacade.open_workspace(workspace) as facade:
                 registered = self._register(facade, source, role="project_brief")
             source.unlink()

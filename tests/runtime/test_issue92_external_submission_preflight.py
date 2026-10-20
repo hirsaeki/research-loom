@@ -152,7 +152,9 @@ class Issue92ExternalSubmissionPreflightTests(intake.ExternalDesktopResearchInta
                 resolver=intake.NullResolver(),
                 effective_profile_set_provider=intake.profile_provider,
             )
-            reopened = LocalApplicationFacade(reopened_app, "PRJ-1", workspace_root=root)
+            reopened = LocalApplicationFacade(
+                reopened_app, "PRJ-1", workspace_root=root, owns_application=True
+            )
             try:
                 result = reopened.preflight_external(run_id, {"research_result": result_input})
                 self.assertEqual(
@@ -537,7 +539,9 @@ class Issue92ExternalSubmissionPreflightTests(intake.ExternalDesktopResearchInta
                     resource_roles={"REF-SOURCE-1": "candidate_source"},
                     resource_bytes={"REF-SOURCE-1": b"registered source resource bytes"},
                 )
-                facade = LocalApplicationFacade(app, "PRJ-1", workspace_root=root)
+                facade = LocalApplicationFacade(
+                    app, "PRJ-1", workspace_root=root, owns_application=True
+                )
                 try:
                     prepared = facade.submit_action(
                         {

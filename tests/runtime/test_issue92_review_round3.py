@@ -111,7 +111,9 @@ class Issue92ReviewRound3Tests(unittest.TestCase):
                 resource_roles={"REF-SOURCE-1": "candidate_source"},
                 resource_bytes={"REF-SOURCE-1": b"registered source resource bytes"},
             )
-            facade = LocalApplicationFacade(app, "PRJ-1", workspace_root=root)
+            facade = LocalApplicationFacade(
+                app, "PRJ-1", workspace_root=root, owns_application=True
+            )
             try:
                 run_id = facade.submit_action(
                     {

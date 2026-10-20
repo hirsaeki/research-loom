@@ -6,6 +6,7 @@ import os
 import sqlite3
 import tempfile
 import unittest
+from contextlib import closing
 from copy import deepcopy
 from dataclasses import replace
 from pathlib import Path
@@ -426,7 +427,10 @@ class LocalExecutionStoreTests(unittest.TestCase):
 
     def test_unknown_newer_schema_fails_closed(self):
         self.store.close()
-        with sqlite3.connect(self.root / "execution-store" / "execution.db") as connection:
+        with (
+            closing(sqlite3.connect(self.root / "execution-store" / "execution.db")) as connection,
+            connection,
+        ):
             connection.execute(
                 """
                 INSERT INTO schema_migrations(version, name)
@@ -675,7 +679,10 @@ class LocalExecutionStoreTests(unittest.TestCase):
         )
 
     def test_run_scoped_doctor_ignores_unrelated_document_corruption(self):
-        with sqlite3.connect(self.root / "execution-store" / "execution.db") as connection:
+        with (
+            closing(sqlite3.connect(self.root / "execution-store" / "execution.db")) as connection,
+            connection,
+        ):
             connection.execute(
                 """
                 INSERT INTO execution_documents(
@@ -692,7 +699,10 @@ class LocalExecutionStoreTests(unittest.TestCase):
         payload = {"kind": "fixture"}
         payload_json = rfc8785.dumps(payload).decode("utf-8")
         payload_sha = "sha256:" + hashlib.sha256(rfc8785.dumps(payload)).hexdigest()
-        with sqlite3.connect(self.root / "execution-store" / "execution.db") as connection:
+        with (
+            closing(sqlite3.connect(self.root / "execution-store" / "execution.db")) as connection,
+            connection,
+        ):
             connection.execute("PRAGMA foreign_keys = OFF")
             connection.execute(
                 """
@@ -713,7 +723,10 @@ class LocalExecutionStoreTests(unittest.TestCase):
         self.assertIn("DANGLING_DIAGNOSTIC_RUN_REF", codes)
 
     def test_lifecycle_projection_corruption_is_diagnostic_only(self):
-        with sqlite3.connect(self.root / "execution-store" / "execution.db") as connection:
+        with (
+            closing(sqlite3.connect(self.root / "execution-store" / "execution.db")) as connection,
+            connection,
+        ):
             connection.execute("UPDATE runs SET status='COMPLETED' WHERE run_id='RUN-A'")
         codes = {item.code for item in self.store.diagnose_integrity("RUN-A")}
         self.assertIn("RUN_EVENT_PROJECTION_MISMATCH", codes)

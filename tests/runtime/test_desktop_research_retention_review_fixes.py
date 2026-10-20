@@ -183,7 +183,9 @@ class DesktopResearchRetentionReviewFixTests(unittest.TestCase):
                     effective_profile_set_provider=profile_provider,
                 )
                 app2.execution_store.config = config
-                facade2 = LocalApplicationFacade(app2, "PRJ-1", workspace_root=root)
+                facade2 = LocalApplicationFacade(
+                    app2, "PRJ-1", workspace_root=root, owns_application=True
+                )
 
                 raw_a, text_a = helper.write_pair(
                     root,

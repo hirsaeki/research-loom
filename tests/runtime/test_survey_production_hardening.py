@@ -18,12 +18,13 @@ from tests.runtime.test_survey_production import (
     initialize_workspace,
     instrument_payload,
     make_app,
+    repository_launcher_command,
 )
 
 
 def run_launcher(argv: list[str]) -> tuple[int, dict]:
     result = subprocess.run(
-        [str(ROOT / "research-loom"), *argv],
+        repository_launcher_command(*argv),
         cwd=ROOT,
         capture_output=True,
         text=True,

@@ -335,7 +335,7 @@ class ExternalDesktopResearchIntakeTests(unittest.TestCase):
             effective_profile_set_provider=profile_provider,
             seed_state=seed,
         )
-        return app, LocalApplicationFacade(app, "PRJ-1", workspace_root=root)
+        return app, LocalApplicationFacade(app, "PRJ-1", workspace_root=root, owns_application=True)
 
     def prepare(self, facade: LocalApplicationFacade):
         return facade.submit_action(

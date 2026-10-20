@@ -208,17 +208,20 @@ class PR31ReviewRegressionTests(unittest.TestCase):
     def test_active_attention_pointer_must_bind_matching_activation_event(self):
         connection = _activation_connection([_activation_event("ACT-1")])
         store = _ReadStore(connection)
-        with self.assertRaises(LocalAttentionStoreError) as raised:
-            validate_active_attention_binding(
-                store,
-                "PRJ-1",
-                {
-                    "activation_id": "ACT-1",
-                    "map_id": "MAP-OTHER",
-                    "map_digest": _MAP_DIGEST,
-                },
-            )
-        self.assertEqual(raised.exception.code, "ATTENTION-STORE-INTEGRITY-001")
+        try:
+            with self.assertRaises(LocalAttentionStoreError) as raised:
+                validate_active_attention_binding(
+                    store,
+                    "PRJ-1",
+                    {
+                        "activation_id": "ACT-1",
+                        "map_id": "MAP-OTHER",
+                        "map_digest": _MAP_DIGEST,
+                    },
+                )
+            self.assertEqual(raised.exception.code, "ATTENTION-STORE-INTEGRITY-001")
+        finally:
+            connection.close()
 
 
 if __name__ == "__main__":

@@ -71,8 +71,8 @@ class PR26ReviewRegressionTests(unittest.TestCase):
             ),
             clock=CLOCK,
         )
-        self.addCleanup(store.close)
         self.addCleanup(temp.cleanup)
+        self.addCleanup(store.close)
         return service
 
     def test_malformed_response_actor_fails_closed_as_human_decision_error(self):

@@ -30,6 +30,7 @@ class Issue438CitationVisualInventoryTests(unittest.TestCase):
         )
         try:
             facade, case = fixture._build_complete_support_package()
+            fixture.addCleanup(facade.close)
             package = facade.show_research_package(case["package_id"])["package"]
             evidence = next(
                 o
@@ -297,6 +298,7 @@ class Issue438CitationVisualInventoryTests(unittest.TestCase):
         )
         try:
             facade, case = fixture._visual_case()
+            fixture.addCleanup(facade.close)
             package = facade.show_research_package(case["package_id"])["package"]
             self.assertEqual(package["inventories"]["citation_inventory"], [])
             row = package["inventories"]["source_exhibit_inventory"][0]

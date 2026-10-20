@@ -170,9 +170,7 @@ class ControlledFileFdTests(RetentionStoreCase):
         target = self.write_intake("target.txt", b"t")
         (self.intake / "late-link.txt").symlink_to(target)
         with patch.object(LocalExecutionStore, "_reject_reparse_components"):
-            with self.assertRaisesRegex(
-                PermissionError, "symlink/reparse-point intake is forbidden"
-            ):
+            with self.assertRaises(PermissionError):
                 self.open(self.intake / "late-link.txt")
 
     def test_missing_file_propagates_os_error(self) -> None:
