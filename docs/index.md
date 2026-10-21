@@ -94,6 +94,7 @@ Start with the [repository README](../README.md), the [target monorepo structure
 
 ## Operations
 
+- [Reflective Review comparison: Japanese operator procedure and PowerShell helper (#452)](operations/reflective-review-validation.md)
 - [ChatGPT Work runtime, file delivery, and continuity](operations/work-host-runtime.md)
 - [Interrupted Workspace initialization](operations/interrupted-workspace-initialization.md)
 - [Workspace and Profile locks](operations/workspace-profile-locks.md)

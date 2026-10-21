@@ -198,6 +198,21 @@ jobs:
         run: uv sync --frozen --group coverage
       - name: Smoke production Windows launcher
         run: .\research-loom.cmd --help
+      - name: Parse Reflective Review PowerShell helper
+        if: matrix.shard == 0
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path $env:GITHUB_WORKSPACE 'scripts/Invoke-ReflectiveReviewValidation.ps1'),
+            [ref]$tokens,
+            [ref]$errors
+          ) | Out-Null
+          if ($errors.Count -ne 0) {
+            $errors | Format-List | Out-String | Write-Error
+            exit 1
+          }
       # Modules opt in with CI_WINDOWS = True; see scripts/ci_test_shards.py.
       - name: Run Windows-sensitive tests shard ${{ matrix.shard }}
         shell: bash

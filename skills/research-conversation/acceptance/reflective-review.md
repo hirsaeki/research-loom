@@ -7,6 +7,7 @@ Assets:
 - [reflective-review-cases.md](reflective-review-cases.md): eight frozen case inputs (RR1–RR8).
 - [reflective-review-expectations.md](reflective-review-expectations.md): expected findings, scorer-only.
 - [rubric.md](rubric.md): the two Reflective review lenses, scored separately.
+- [Japanese operator procedure and PowerShell helper](../../../docs/operations/reflective-review-validation.md): manual execution, immutable inputs, evidence capture and two-run human-score aggregation. The helper does not call models or grant adoption authority.
 
 ## Conditions
 
