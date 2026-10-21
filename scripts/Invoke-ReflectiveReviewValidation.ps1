@@ -81,7 +81,7 @@ function Hash-File([string]$Path) { return (Get-FileHash -LiteralPath $Path -Alg
 function Write-NewBytes([string]$Path, [byte[]]$Bytes) {
     [IO.Directory]::CreateDirectory((Split-Path -Parent $Path)) | Out-Null
     $stream = [IO.File]::Open($Path, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
-    try { $stream.Write($Bytes) }
+    try { $stream.Write($Bytes, 0, $Bytes.Length) }
     finally { $stream.Dispose() }
 }
 function Write-New([string]$Path, [string]$Text) {
