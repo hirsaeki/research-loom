@@ -146,7 +146,8 @@ function Source-Bytes([string]$Path) {
 function Transcript-Events([string]$Text, [string]$SessionId) {
     # Parse only original response items. Compactions, reasoning, instructions and
     # duplicate UI item_completed events are never substituted for original turns.
-    $events = @(); $sessionFound = $false; $ids = @{}
+    $events = [Collections.Generic.List[object]]::new(); $sessionFound = $false
+    $ids = [Collections.Generic.Dictionary[string, bool]]::new([StringComparer]::Ordinal)
     foreach ($line in ($Text -split "`n")) {
         if ([string]::IsNullOrWhiteSpace($line)) { continue }
         $row = Parse-Json $line
@@ -184,10 +185,10 @@ function Transcript-Events([string]$Text, [string]$SessionId) {
         Assert-That (-not $ids.ContainsKey($id)) "Duplicate original event ID: $id"
         Assert-That (Is-Timestamp $row.timestamp) "Invalid event timestamp: $id"
         $ids[$id] = $true
-        $events += @{ id = $id; at = $row.timestamp; kind = $kind; call_id = $call; text = Normalize-LF $text; nontext = $nontext }
+        $events.Add(@{ id = $id; at = $row.timestamp; kind = $kind; call_id = $call; text = Normalize-LF $text; nontext = $nontext })
     }
     Assert-That $sessionFound 'Transcript needs original session_meta'
-    return ,$events
+    return ,($events.ToArray())
 }
 function Historical-Context($Definition, $Case) {
     $s = $Definition.context
@@ -196,7 +197,7 @@ function Historical-Context($Definition, $Case) {
     $bytes = Source-Bytes $s.path
     Assert-That (([Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($bytes))).ToLowerInvariant() -ceq $s.sha256) 'Transcript source digest mismatch'
     $events = Transcript-Events (Decode-Bytes $bytes) $s.session_id
-    $indexes = @{}
+    $indexes = [Collections.Generic.Dictionary[string, int]]::new([StringComparer]::Ordinal)
     for ($i = 0; $i -lt $events.Count; $i++) { $indexes[$events[$i].id] = $i }
     foreach ($field in @('start_event', 'request_event', 'target_event')) { Assert-That ($indexes.ContainsKey($s[$field])) "Original event not found: $field" }
     $start = $indexes[$s.start_event]; $request = $indexes[$s.request_event]; $end = $indexes[$s.target_event]
@@ -204,7 +205,8 @@ function Historical-Context($Definition, $Case) {
     Assert-That ($events[$request].kind -ceq 'user' -and $events[$request].text -ceq $Case.request) 'Original request does not match case'
     Assert-That ($events[$end].kind -ceq 'assistant' -and $events[$end].text -ceq $Case.target) 'Original target does not match case'
     Assert-That ($s.omissions -is [array] -and $s.transformations -is [array]) 'Explicit omissions and transformations arrays required'
-    $edits = @{}; $omitted = @{}
+    $edits = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::Ordinal)
+    $omitted = [Collections.Generic.Dictionary[string, bool]]::new([StringComparer]::Ordinal)
     foreach ($item in @($s.omissions) + @($s.transformations)) {
         Require-Text $item.reason 'transformation/omission.reason'
         Assert-That ($indexes.ContainsKey($item.event) -and $indexes[$item.event] -ge $start -and $indexes[$item.event] -le $end) 'Transformation outside selected cutoff'
@@ -223,13 +225,18 @@ function Historical-Context($Definition, $Case) {
         foreach ($id in $binding.events) { Assert-That ($indexes.ContainsKey($id) -and $indexes[$id] -le $end) "Field evidence after cutoff or missing: $field" }
     }
     # A selected output must have its call, and every selected call its output.
-    foreach ($event in @($selected | Where-Object { $_.kind -cin @('tool_call', 'tool_output') })) {
+    $toolPairs = [Collections.Generic.Dictionary[string, object]]::new([StringComparer]::Ordinal)
+    for ($i = 0; $i -lt $selected.Count; $i++) {
+        $event = $selected[$i]
+        if ($event.kind -cnotin @('tool_call', 'tool_output')) { continue }
         Require-Text $event.call_id 'tool call_id'
-        $pair = @($selected | Where-Object { $_.call_id -ceq $event.call_id -and $_.kind -cne $event.kind })
-        Assert-That ($pair.Count -eq 1) "Missing or duplicate tool pair: $($event.call_id)"
-        $callIndex = @($selected.id).IndexOf($(if ($event.kind -ceq 'tool_call') { $event.id } else { $pair[0].id }))
-        $outputIndex = @($selected.id).IndexOf($(if ($event.kind -ceq 'tool_output') { $event.id } else { $pair[0].id }))
-        Assert-That ($callIndex -lt $outputIndex) 'Tool output precedes its call'
+        if (-not $toolPairs.ContainsKey($event.call_id)) { $toolPairs[$event.call_id] = @{} }
+        Assert-That (-not $toolPairs[$event.call_id].ContainsKey($event.kind)) "Duplicate tool pair event: $($event.call_id)"
+        $toolPairs[$event.call_id][$event.kind] = $i
+    }
+    foreach ($pair in $toolPairs.GetEnumerator()) {
+        Assert-That ($pair.Value.ContainsKey('tool_call') -and $pair.Value.ContainsKey('tool_output')) "Missing tool pair: $($pair.Key)"
+        Assert-That ($pair.Value.tool_call -lt $pair.Value.tool_output) 'Tool output precedes its call'
     }
     $text = foreach ($event in $selected) {
         $body = if ($edits.ContainsKey($event.id)) { $edits[$event.id].text } else { $event.text }
@@ -279,6 +286,11 @@ function Read-Study {
         Assert-That ($contexts.RR2.text -ceq $contexts.RR5.text -and $contexts.RR2.text -ceq $contexts.RR8.text) 'RR2/RR5/RR8 must use identical constructed context'
     }
     return @{ definition = $study; raw = $bytes; cases = @($cases); contexts = $contexts }
+}
+function Study-Hash($Manifest, $Definition) {
+    $binding = @{ definition = $Definition }
+    foreach ($field in @('study_kind', 'suite_id', 'cases', 'assets', 'order', 'model', 'provider', 'settings')) { $binding[$field] = $Manifest[$field] }
+    return Hash-Text (Json (Canonical $binding))
 }
 function Prepare-Run {
     Require-Text $Model 'Model'; Require-Text $Provider 'Provider'; Require-Text $SettingsFile 'SettingsFile'
@@ -332,11 +344,11 @@ function Prepare-Run {
     $manifest = @{
         schema_version = 2; issue = 452; prepared_at = [DateTimeOffset]::Now.ToString('o')
         study_kind = $study.definition.study_kind; suite_id = $study.definition.suite_id
-        study_sha256 = Hash-Text (Json (Canonical @{ definition = $study.definition; assets = $assets }))
         repository_head = "$head".Trim(); powershell_version = $PSVersionTable.PSVersion.ToString()
         model = $Model; provider = $Provider; settings = $settings
         helper_sha256 = Hash-File $PSCommandPath; sources = @($sources); cases = $cases; assets = $assets; order = $order
     }
+    $manifest.study_sha256 = Study-Hash $manifest $study.definition
     Write-New (Local-Path 'manifest.json') (Json $manifest)
     Write-New (Local-Path 'setup.json') (Json $setup)
     return @{ status = 'PREPARED'; study_kind = $manifest.study_kind; suite_id = $manifest.suite_id; setup = Local-Path 'setup.json'; next = 'Inspect prepared contexts and provenance, record scoped consent and confirmations, then Freeze.' }
@@ -349,6 +361,9 @@ function Read-Manifest {
         Assert-That ((Hash-File (Join-Path $script:Repo $source.path)) -ceq $source.sha256) "Source asset changed: $($source.path)"
     }
     foreach ($asset in $manifest.assets) { Verify-Asset $asset }
+    $definition = Read-Json (Local-Path 'provenance/cases.json')
+    Assert-That ($manifest.study_kind -ceq $definition.study_kind -and $manifest.suite_id -ceq $definition.suite_id) 'Study kind or suite mismatch'
+    Assert-That ($manifest.study_sha256 -ceq (Study-Hash $manifest $definition)) 'Study digest mismatch'
     return $manifest
 }
 function Freeze-Run($Manifest) {

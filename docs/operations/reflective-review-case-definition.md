@@ -80,6 +80,8 @@ $definitions = foreach ($n in 1..8) {
 
 `cases` にHR1等の独立したIDを使い、RR番号は使用しません。各ケースは5フィールド、`field_sources`、`context` を持ちます。5フィールドは空にせず、適用指示なしなら `instructions` は `none` とします。
 
+現行HelperのTargetは原assistantメッセージの本文です。草稿ファイルだけに存在する本文を別のassistant発言として作り直すことはできません。その場合は現行形式では未対応として除外理由を記録します。対応表の候補がすべて利用可能だとは限りません。
+
 ```json
 {
   "id": "HR1",

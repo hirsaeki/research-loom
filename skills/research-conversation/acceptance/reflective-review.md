@@ -58,7 +58,9 @@ Raw originals, provenance and scoring files are never model attachments; only
 the displayed generated input is supplied. Consent covers the actual selected
 text and provider, including any remaining private details, before any send.
 
-All conditions use the same model, the same model settings and the same frozen target for a case.
+All new review and revision calls use the same model and model settings. All
+conditions use the same frozen initial target for a case. A makes no new call;
+historical target generation metadata is recorded separately as described above.
 
 - **A, no review.** The frozen target is the output. This is the baseline score.
 - **B, review with the long working context.** The reviewer receives the C input plus the case's frozen working context (below), as one call.
