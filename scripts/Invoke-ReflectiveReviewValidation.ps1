@@ -253,7 +253,8 @@ function Read-Study {
     Assert-That ($study.suite_id -cmatch '^[A-Za-z0-9][A-Za-z0-9_-]*$') 'Unsafe suite_id'
     Assert-That ($study.exclusions -is [array] -and $study.cases -is [array] -and $study.cases.Count -gt 0) 'Explicit exclusions and nonempty cases arrays required'
     foreach ($exclusion in $study.exclusions) { Require-Text $exclusion 'exclusion reason' }
-    $cases = if ($study.study_kind -ceq 'controlled_fixture') { Get-Cases } else { @() }
+    $cases = @()
+    if ($study.study_kind -ceq 'controlled_fixture') { $cases = Get-Cases }
     if ($study.study_kind -ceq 'controlled_fixture') {
         Assert-That ((@($study.cases.id) -join ',') -ceq (@($cases.id) -join ',')) 'Controlled fixture requires exactly RR1-RR8 in order'
     }
