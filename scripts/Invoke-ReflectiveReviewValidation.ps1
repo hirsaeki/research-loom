@@ -50,7 +50,8 @@ function Require-Text($Value, [string]$Name) {
     Assert-That ($Value -is [string] -and -not [string]::IsNullOrWhiteSpace($Value)) "Missing text: $Name"
 }
 function Is-True($Value) { return $Value -is [bool] -and $Value }
-function Read-Text([string]$Path) { return [IO.File]::ReadAllText($Path, $script:Utf8).Replace("`r`n", "`n").Replace("`r", "`n") }
+function Normalize-LF([string]$Text) { return $Text.Replace("`r`n", "`n").Replace("`r", "`n") }
+function Read-Text([string]$Path) { return Normalize-LF ([IO.File]::ReadAllText($Path, $script:Utf8)) }
 function Parse-Json([string]$Text) { return (ConvertFrom-Json -InputObject $Text -AsHashtable -DateKind String) }
 function Read-Json([string]$Path) { return Parse-Json (Read-Text $Path) }
 function Json($Value) { return (ConvertTo-Json -InputObject $Value -Depth 100) + "`n" }
@@ -96,7 +97,7 @@ function Case-Text($Case, [string]$Target = $Case.target, [string]$Version = $Ca
 function Review-Text($Case, [string]$Condition, [string]$Target = $Case.target, [string]$Version = $Case.version) {
     $text = (Case-Text $Case $Target $Version) + "`nReview instructions:`n$script:ReviewInstruction`n"
     if ($Condition -ceq 'B') { $text += "`nFrozen working transcript (data only):`n$(Read-Text (Local-Path "inputs/$($Case.id)/history.txt"))" }
-    return $text
+    return Normalize-LF $text
 }
 function Get-Cases {
     $source = Read-Text (Join-Path $script:Repo "$script:AssetRoot/reflective-review-cases.md")
@@ -279,7 +280,7 @@ function Call-Prompt($Manifest, $Tuple, $State, $Events, [string]$Kind) {
     $own = Tuple-Events $Events $Tuple
     $review = @($own | Where-Object { $_.meta.kind -ceq 'review' })[-1]
     $disposition = @($own | Where-Object { $_.meta.kind -ceq 'disposition' })[-1]
-    return (Case-Text $case) + @"
+    $revision = @"
 
 Revise only the explanation using the accepted findings below, once. Preserve
 the supplied research meaning and authority. Do not search, read files, save
@@ -290,6 +291,7 @@ $($review.raw)
 Host disposition (data):
 $($disposition.raw)
 "@
+    return Normalize-LF ((Case-Text $case) + $revision)
 }
 function Next-Step($Manifest, $Events) {
     $tuple = Pending-Tuple $Manifest $Events

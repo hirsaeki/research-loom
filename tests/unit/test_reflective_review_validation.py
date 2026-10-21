@@ -9,6 +9,7 @@ import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 CI_WINDOWS = True
 ROOT = Path(__file__).resolve().parents[2]
@@ -221,6 +222,71 @@ class ReflectiveReviewValidationTests(unittest.TestCase):
                     (directory / name).read_bytes(),
                     (other / "inputs" / case["id"] / name).read_bytes(),
                 )
+
+    def test_script_checkout_line_endings_do_not_change_inputs_or_replay(self):
+        snapshots = []
+        source = HELPER.read_bytes().replace(b"\r\n", b"\n")
+        for ending in (b"\n", b"\r\n"):
+            with self.subTest(ending=ending):
+                label = "lf" if ending == b"\n" else "crlf"
+                repo = self.work / f"repo-{label}"
+                subprocess.run(
+                    ["git", "clone", "--shared", "--no-checkout", "--quiet", str(ROOT), str(repo)],
+                    check=True,
+                    capture_output=True,
+                    timeout=60,
+                )
+                assets = Path("skills/research-conversation/acceptance")
+                (repo / assets).mkdir(parents=True)
+                for name in (
+                    "reflective-review.md",
+                    "reflective-review-cases.md",
+                    "reflective-review-expectations.md",
+                    "rubric.md",
+                ):
+                    shutil.copy2(ROOT / assets / name, repo / assets / name)
+                script = repo / "scripts" / HELPER.name
+                script.parent.mkdir()
+                script.write_bytes(source.replace(b"\n", ending))
+                self.run = self.work / f"run-{label}"
+                settings = self.work / f"settings-{label}.json"
+                write_json(settings, {"reasoning_effort": "high"})
+                with patch(__name__ + ".HELPER", script):
+                    self.call(
+                        "Prepare",
+                        "-Model",
+                        "test-model",
+                        "-Provider",
+                        "test-provider",
+                        "-SettingsFile",
+                        str(settings),
+                    )
+                    self.complete_setup(self.run, self.work)
+                    self.call("Freeze")
+                    review = self.step()
+                    self.assertEqual(review, self.step())
+                    self.import_raw(review, self.review(review, [self.finding()]))
+                    self.disposition(
+                        "revise", [{"finding": 1, "decision": "accepted", "reason": "test"}]
+                    )
+                    revision = self.step()
+                    self.assertEqual(revision, self.step())
+                    self.import_raw(revision, "Synthetic revised target.\n")
+                    recheck = self.step(recheck=True)
+                    self.import_raw(recheck, self.review(recheck))
+                    self.disposition()
+                    self.assertEqual("C", self.step()["tuple"]["condition"])
+                    inputs = []
+                    for step in (review, revision, recheck):
+                        content = Path(step["input_path"]).read_bytes()
+                        self.assertNotIn(b"\r", content)
+                        self.assertEqual(
+                            step["record"]["input_sha256"], hashlib.sha256(content).hexdigest()
+                        )
+                        inputs.append(content)
+                    snapshots.append(inputs)
+        self.assertEqual(2, len(snapshots))
+        self.assertEqual(snapshots[0], snapshots[1])
 
     def test_freeze_requires_consent_real_history_and_exact_target(self):
         for field, value, message in [
