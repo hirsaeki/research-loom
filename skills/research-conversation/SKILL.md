@@ -54,11 +54,42 @@ Do not derive a separate "candidate approved" or "human approved" stage from act
 3. Reconcile the persisted checkpoint with current-chat working progress. Do not discard work merely because it has not been persisted yet, and do not promote unpersisted chat work to authoritative research state.
 4. Choose an existing public typed operation. For candidate adoption, operation Confirmation, and Human Decision resolution, use the minimal transport inputs documented in `references/public-surfaces.md`; do not guess payload field names or disposition synonyms. Do not inspect private SQLite files or internal artifact layout as a normal operating path.
 5. After an operation, distinguish operation success, persisted proposal, authoritative adoption, execution completion, retrieval outcome, and publication/release status.
-6. Tell the human what is known, what was saved, what remains uncertain or unpersisted, and what decision is actually required.
+6. Before presenting an important initial plan/answer or ending work because of an unexpected block, follow the selective independent review below. Then tell the human what is known, what was saved, what remains uncertain or unpersisted, and what decision is actually required.
 7. Before asking for a Human Decision, follow the exact `request_id` from the conversation result to `decision show`, and inspect the exact candidate when needed. Bind a human answer only to that issued request, its `request_digest`, actor, disposition, and exact content. Never reuse a vague `OK` for a later request that has not yet been issued.
 8. After an authoritative write, distinguish the commit receipt from current state and perform a fresh public read before saying that the change is current. Use conversation view for ordinary reporting; use detail only when exact binding verification is required.
 
 Do not reread every store on every turn. Recheck at the boundaries above.
+
+## Selective independent review
+
+Return to what the human actually wanted to understand, decide or do. Before an
+important first conclusion/recommendation or a costly plan, and before stopping
+on an unexpected constraint or after a substantive meaning correction, execute
+one independent read-only review as described in
+[the host review procedure](references/reflective-review.md). Do this before
+presenting or executing the candidate, not after waiting for a human correction.
+Routine factual replies and short progress updates do not need a review.
+
+Supply the original human words, applicable explicit instructions, the exact
+candidate, relevant evidence/warrant/counterevidence/constraints and current
+saved/adopted state. Do not send the long working conversation, prior reviews or
+expected answers. If essential facts cannot be supplied, record the unchecked
+scope; do not treat missing context as proof that the candidate is wrong.
+
+The primary host verifies every critique against those words and facts, records
+accept/reject with reasons, and acts: correct the planned actions before starting,
+revise an explanation, continue through existing research/Feedback when substantive
+work is missing, or clarify only a genuine blocking ambiguity. A wording change
+does not complete a research return. Keep useful supported conclusions and actual
+authority/operation constraints. Reviewer advice grants no permission or adoption.
+
+Use at most two review calls and one revision per request/stage, including any
+extra information gathering. Recheck only a malformed response or a concrete
+remaining issue after revision; do not retry to obtain preferred advice. An
+unavailable/failed review stays visibly unreviewed in host records and does not
+permanently block unrelated authorized work. Never substitute the primary host's
+own reflection and label it independent. Keep audit mechanics out of ordinary
+human-facing research replies; present the resulting answer/action and its limits.
 
 ## Human-facing language
 
