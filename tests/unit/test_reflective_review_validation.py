@@ -35,6 +35,8 @@ class ReflectiveReviewValidationTests(unittest.TestCase):
     def setUpClass(cls):
         cls.base_tmp = tempfile.TemporaryDirectory(prefix="rr452-fixture-")
         cls.base = Path(cls.base_tmp.name)
+        cls.case_file = cls.base / "cases.json"
+        cls.make_controlled_study(cls.case_file)
         cls.prepared = cls.base / "prepared"
         settings = cls.base / "settings.json"
         write_json(settings, {"reasoning_effort": "high", "other": {"z": 1, "a": 2}})
@@ -59,6 +61,8 @@ class ReflectiveReviewValidationTests(unittest.TestCase):
 
     @staticmethod
     def invoke(run: Path | str, action: str, *args: str, fails: str | None = None):
+        if action.lower() == "prepare" and "-CaseFile" not in args:
+            args = (*args, "-CaseFile", str(ReflectiveReviewValidationTests.case_file))
         result = subprocess.run(
             [
                 PWSH,
@@ -85,37 +89,45 @@ class ReflectiveReviewValidationTests(unittest.TestCase):
         return json.loads(result.stdout)
 
     @staticmethod
+    def make_controlled_study(path: Path):
+        contexts = []
+        for number in range(1, 9):
+            context = path.parent / f"RR{number}-context.txt"
+            context.write_text("SYNTHETIC TEST ONLY\nScenario working notes.\n", encoding="utf-8")
+            contexts.append(
+                {
+                    "id": f"RR{number}",
+                    "context": {
+                        "kind": "constructed",
+                        "path": str(context),
+                        "construction_note": "Synthetic fixture; no observed conversation claimed",
+                    },
+                }
+            )
+        write_json(
+            path,
+            {
+                "schema_version": 2,
+                "study_kind": "controlled_fixture",
+                "suite_id": "synthetic-fixed-v2",
+                "selection_rule": "All eight fixed cases in order, before any response",
+                "exclusions": [],
+                "cases": contexts,
+            },
+        )
+
+    @staticmethod
     def complete_setup(run: Path, directory: Path):
         setup = read_json(run / "setup.json")
-        manifest = read_json(run / "manifest.json")
         setup.update(
             confirmed_by="test-only",
             confirmed_at="2026-10-21T00:00:00+09:00",
             provider_consent=True,
         )
-        for case in manifest["cases"]:
-            history = directory / f"{case['id']}-history.txt"
-            # Deliberately synthetic test data; never submitted as real comparison evidence.
-            history.write_text(
-                f"SYNTHETIC TEST ONLY\n{case['request']}\nTool: fixture read\nOutput: fixture\n"
-                f"{case['target']}\nHost justification: fixture\n",
-                encoding="utf-8",
-            )
-            setup["histories"][case["id"]] = {
-                "path": str(history),
-                "disposable_workspace": "synthetic-test-only",
-                **dict.fromkeys(
-                    [
-                        "real_transcript",
-                        "request_near_start",
-                        "tools_and_outputs",
-                        "exact_target",
-                        "host_justification",
-                        "no_expected_findings",
-                    ],
-                    True,
-                ),
-            }
+        for context in setup["histories"].values():
+            for field in context:
+                if field != "context_kind":
+                    context[field] = True
         write_json(run / "setup.json", setup)
 
     def setUp(self):
@@ -185,6 +197,363 @@ class ReflectiveReviewValidationTests(unittest.TestCase):
                     "decisions": decisions or [],
                 }
             ),
+        )
+
+    def historical_study(self):
+        # Original-format synthetic events exercise the actual transcript adapter.
+        # This is fixture evidence, never an empirical or real-model result.
+        def message(event_id, role, text):
+            return {
+                "type": "message",
+                "id": event_id,
+                "role": role,
+                "content": [
+                    {"type": "input_text" if role == "user" else "output_text", "text": text}
+                ],
+            }
+
+        payloads = [
+            ("session_meta", {"id": "synthetic-session"}),
+            ("response_item", message("request", "user", "SYNTHETIC: report the saved status.\n")),
+            (
+                "response_item",
+                {
+                    "type": "custom_tool_call",
+                    "call_id": "read",
+                    "name": "fixture-read",
+                    "input": "status",
+                },
+            ),
+            (
+                "response_item",
+                {
+                    "type": "custom_tool_call_output",
+                    "call_id": "read",
+                    "output": "Saved draft only; /private/path",
+                },
+            ),
+            (
+                "response_item",
+                {
+                    "type": "function_call",
+                    "call_id": "read2",
+                    "name": "fixture-read",
+                    "arguments": "{}",
+                },
+            ),
+            (
+                "response_item",
+                {
+                    "type": "function_call_output",
+                    "call_id": "read2",
+                    "output": [{"type": "input_text", "text": "No adoption"}],
+                },
+            ),
+            (
+                "response_item",
+                message(
+                    "target", "assistant", "SYNTHETIC: a draft is saved; adoption is pending.\n"
+                ),
+            ),
+            ("response_item", message("later-correction", "user", "SCORER_SECRET_AFTER_TARGET")),
+            ("compacted", {"message": "COMPACTION_IS_NOT_ORIGINAL"}),
+            ("response_item", message("system", "developer", "HOST_POLICY_IS_NOT_CASE_INPUT")),
+            ("response_item", {"type": "reasoning", "summary": "PRIVATE_REASONING"}),
+        ]
+        rows = [
+            {"timestamp": "2026-10-01T00:00:00Z", "type": kind, "payload": payload}
+            for kind, payload in payloads
+        ]
+        source = self.work / "synthetic-source.jsonl"
+        source.write_bytes(b"\xef\xbb\xbf" + "\r\n".join(json.dumps(r) for r in rows).encode())
+        case = {
+            "id": "HR1",
+            "request": payloads[1][1]["content"][0]["text"],
+            "target": payloads[6][1]["content"][0]["text"],
+            "instructions": "none",
+            "facts": "Draft saved, no adoption",
+            "state": "Draft only",
+            "field_sources": {
+                field: {"events": ["read/tool_output"], "note": "SYNTHETIC source check"}
+                for field in ("instructions", "facts", "state")
+            },
+            "context": {
+                "kind": "historical",
+                "format": "codex-jsonl",
+                "session_id": "synthetic-session",
+                "path": str(source),
+                "sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
+                "start_event": "request",
+                "request_event": "request",
+                "target_event": "target",
+                "author_model": "unknown",
+                "author_settings_note": "Not captured in this synthetic fixture",
+                "omissions": [],
+                "transformations": [
+                    {
+                        "event": "read/tool_output",
+                        "text": "Saved draft only; [path redacted]",
+                        "reason": "Private path",
+                    }
+                ],
+            },
+        }
+        bundle = {
+            "schema_version": 2,
+            "study_kind": "historical_replay",
+            "suite_id": "synthetic-history",
+            "selection_rule": "One original pair chosen before any review",
+            "exclusions": [],
+            "cases": [case],
+        }
+        path = self.work / "historical-cases.json"
+        write_json(path, bundle)
+        return path, bundle, rows
+
+    def prepare_study(self, case_file, run):
+        return self.invoke(
+            run,
+            "Prepare",
+            "-Model",
+            "test-model",
+            "-Provider",
+            "test-provider",
+            "-SettingsFile",
+            str(self.base / "settings.json"),
+            "-CaseFile",
+            str(case_file),
+        )
+
+    def test_historical_cutoff_source_snapshot_transformations_and_study_binding(self):
+        path, bundle, _ = self.historical_study()
+        self.run = self.work / "historical"
+        self.prepare_study(path, self.run)
+        self.complete_setup(self.run, self.work)
+        self.call("Freeze")
+        manifest = read_json(self.run / "manifest.json")
+        self.assertEqual(4, len(manifest["order"]))
+        self.assertEqual("C", manifest["order"][2]["condition"])
+        source = Path(bundle["cases"][0]["context"]["path"])
+        self.assertEqual(source.read_bytes(), (self.run / "inputs/HR1/history.raw").read_bytes())
+        b = (self.run / "inputs/HR1/B.txt").read_text(encoding="utf-8")
+        c = (self.run / "inputs/HR1/C.txt").read_text(encoding="utf-8")
+        self.assertTrue(b.startswith(c))
+        self.assertIn("[path redacted]", b)
+        for secret in (
+            "/private/path",
+            "SCORER_SECRET",
+            "COMPACTION_IS_NOT",
+            "HOST_POLICY",
+            "PRIVATE_REASONING",
+            "author_settings_note",
+            "field_sources",
+        ):
+            self.assertNotIn(secret, b)
+        step = self.step()
+        self.import_raw(
+            step, self.review(step), suite_id="other-suite", fails="Study binding mismatch"
+        )
+        source.write_text("external source changed after Prepare", encoding="utf-8")
+        path.write_text("external definition changed", encoding="utf-8")
+        self.assertEqual(step, self.step())
+        self.import_raw(step, self.review(step))
+        self.disposition()
+        self.assertEqual("C", self.step()["tuple"]["condition"])
+        (self.run / "inputs/HR1/history.raw").write_text("tampered original", encoding="utf-8")
+        self.call("Validate", fails="Changed or missing evidence")
+
+    def test_study_definition_rejects_mixed_origins_and_fixed_field_overrides(self):
+        original = read_json(self.case_file)
+        for number, (field, value, error) in enumerate(
+            [
+                ("context", {"kind": "historical"}, "requires constructed context"),
+                ("target", "changed target", "Cannot override fixed field"),
+                ("id", "RR2", "exactly RR1-RR8"),
+            ]
+        ):
+            with self.subTest(field=field):
+                study = json.loads(json.dumps(original))
+                study["cases"][0][field] = value
+                path = self.work / f"mixed-{number}.json"
+                write_json(path, study)
+                run = self.work / f"mixed-{number}"
+                self.invoke(
+                    run,
+                    "Prepare",
+                    "-Model",
+                    "test-model",
+                    "-Provider",
+                    "test-provider",
+                    "-SettingsFile",
+                    str(self.base / "settings.json"),
+                    "-CaseFile",
+                    str(path),
+                    fails=error,
+                )
+                self.assertFalse(run.exists())
+
+    def test_historical_original_event_validation_negative_controls(self):
+        path, original, rows = self.historical_study()
+        source = Path(original["cases"][0]["context"]["path"])
+        controls = [
+            ("request", "different request", "Original request does not match"),
+            ("target", "different target", "Original target does not match"),
+            ("id", "RR1", "requires separate IDs"),
+            ("context.session_id", "wrong-session", "session ID mismatch"),
+            ("context.sha256", "0" * 64, "source digest mismatch"),
+            ("context.target_event", "request", "cutoff order"),
+            ("context.target_event", "missing", "Original event not found"),
+            (
+                "context.omissions",
+                [{"event": "request", "reason": "hide original"}],
+                "cannot be transformed or omitted",
+            ),
+            (
+                "context.omissions",
+                [{"event": "read/tool_output", "reason": "hide output"}],
+                "tool pair",
+            ),
+            (
+                "context.transformations",
+                [{"event": "later-correction", "text": "later", "reason": "post cutoff"}],
+                "outside selected cutoff",
+            ),
+            (
+                "context.transformations",
+                [{"event": "read/tool_output", "text": "redacted", "reason": ""}],
+                "transformation/omission.reason",
+            ),
+            ("field_sources.facts.events", ["later-correction"], "Field evidence after cutoff"),
+        ]
+        for number, (field, value, error) in enumerate(controls):
+            with self.subTest(field=field, error=error):
+                study = json.loads(json.dumps(original))
+                node = study["cases"][0]
+                parts = field.split(".")
+                for key in parts[:-1]:
+                    node = node[key]
+                node[parts[-1]] = value
+                if field == "context.omissions":
+                    study["cases"][0]["context"]["transformations"] = []
+                write_json(path, study)
+                run = self.work / f"invalid-{number}"
+                self.invoke(
+                    run,
+                    "Prepare",
+                    "-Model",
+                    "test-model",
+                    "-Provider",
+                    "test-provider",
+                    "-SettingsFile",
+                    str(self.base / "settings.json"),
+                    "-CaseFile",
+                    str(path),
+                    fails=error,
+                )
+                self.assertFalse(run.exists())
+        # An output genuinely absent from the original source is rejected too.
+        rows = [r for r in rows if r["payload"].get("type") != "custom_tool_call_output"]
+        source.write_text("\n".join(json.dumps(r) for r in rows), encoding="utf-8")
+        original["cases"][0]["context"]["sha256"] = hashlib.sha256(source.read_bytes()).hexdigest()
+        original["cases"][0]["context"]["transformations"] = []
+        original["cases"][0]["field_sources"]["facts"]["events"] = ["target"]
+        original["cases"][0]["field_sources"]["instructions"]["events"] = []
+        original["cases"][0]["field_sources"]["state"]["events"] = ["target"]
+        write_json(path, original)
+        self.invoke(
+            self.work / "missing-output",
+            "Prepare",
+            "-Model",
+            "test-model",
+            "-Provider",
+            "test-provider",
+            "-SettingsFile",
+            str(self.base / "settings.json"),
+            "-CaseFile",
+            str(path),
+            fails="tool pair",
+        )
+
+    def test_v1_root_is_rejected_without_modification(self):
+        manifest_path = self.run / "manifest.json"
+        manifest = read_json(manifest_path)
+        manifest["schema_version"] = 1
+        write_json(manifest_path, manifest)
+        before = {
+            p.relative_to(self.run): p.read_bytes() for p in self.run.rglob("*") if p.is_file()
+        }
+        self.call("Next", fails="preserve this RunRoot")
+        self.assertEqual(
+            before,
+            {p.relative_to(self.run): p.read_bytes() for p in self.run.rglob("*") if p.is_file()},
+        )
+
+    def test_original_adapter_rejects_duplicate_and_multimodal_selected_events(self):
+        path, original, rows = self.historical_study()
+        source = Path(original["cases"][0]["context"]["path"])
+        for number, error in enumerate(
+            ("Duplicate original event ID", "multimodal event is unsupported")
+        ):
+            with self.subTest(error=error):
+                changed = json.loads(json.dumps(rows))
+                if number == 0:
+                    changed.insert(2, changed[1])
+                else:
+                    changed[1]["payload"]["content"].append(
+                        {"type": "input_image", "image_url": "fixture"}
+                    )
+                source.write_text("\n".join(json.dumps(r) for r in changed), encoding="utf-8")
+                study = json.loads(json.dumps(original))
+                study["cases"][0]["context"]["sha256"] = hashlib.sha256(
+                    source.read_bytes()
+                ).hexdigest()
+                write_json(path, study)
+                self.invoke(
+                    self.work / f"bad-adapter-{number}",
+                    "Prepare",
+                    "-Model",
+                    "test-model",
+                    "-Provider",
+                    "test-provider",
+                    "-SettingsFile",
+                    str(self.base / "settings.json"),
+                    "-CaseFile",
+                    str(path),
+                    fails=error,
+                )
+
+    def test_fixed_controls_share_context_and_prepare_needs_explicit_study(self):
+        self.invoke(
+            self.work / "no-definition",
+            "Prepare",
+            "-Model",
+            "test-model",
+            "-Provider",
+            "test-provider",
+            "-SettingsFile",
+            str(self.base / "settings.json"),
+            "-CaseFile",
+            "",
+            fails="CaseFile (v2)",
+        )
+        study = read_json(self.case_file)
+        separate = self.work / "other-control.txt"
+        separate.write_text("SYNTHETIC altered control context", encoding="utf-8")
+        study["cases"][4]["context"]["path"] = str(separate)
+        path = self.work / "different-controls.json"
+        write_json(path, study)
+        self.invoke(
+            self.work / "different-controls",
+            "Prepare",
+            "-Model",
+            "test-model",
+            "-Provider",
+            "test-provider",
+            "-SettingsFile",
+            str(self.base / "settings.json"),
+            "-CaseFile",
+            str(path),
+            fails="identical constructed context",
         )
 
     def test_inputs_are_self_contained_and_repeatable_without_scorer_material(self):
@@ -290,19 +659,27 @@ class ReflectiveReviewValidationTests(unittest.TestCase):
 
     def test_frozen_history_keeps_original_bytes_separate_from_model_text(self):
         self.run = self.work / "raw-history"
-        shutil.copytree(self.prepared, self.run)
-        setup = read_json(self.run / "setup.json")
-        case = read_json(self.run / "manifest.json")["cases"][0]
+        case_file = self.work / "raw-cases.json"
+        self.make_controlled_study(case_file)
+        study = read_json(case_file)
         source = self.work / "original-history.txt"
-        original = (
-            b"\xef\xbb\xbf"
-            + (
-                f"SYNTHETIC TEST ONLY\r\n{case['request']}\r\n{case['target']}\rHost justification\r\n"
-            ).encode()
-        )
+        original = b"\xef\xbb\xbfSYNTHETIC TEST ONLY\r\nWorking notes\rMore notes\r\n"
         source.write_bytes(original)
-        setup["histories"]["RR1"]["path"] = str(source)
-        write_json(self.run / "setup.json", setup)
+        study["cases"][0]["context"]["path"] = str(source)
+        write_json(case_file, study)
+        self.invoke(
+            self.run,
+            "Prepare",
+            "-Model",
+            "test-model",
+            "-Provider",
+            "test-provider",
+            "-SettingsFile",
+            str(self.base / "settings.json"),
+            "-CaseFile",
+            str(case_file),
+        )
+        self.complete_setup(self.run, self.work)
         self.call("Freeze")
         raw = self.run / "inputs/RR1/history.raw"
         self.assertEqual(original, raw.read_bytes())
@@ -311,7 +688,7 @@ class ReflectiveReviewValidationTests(unittest.TestCase):
         self.assertFalse(normalized.startswith(b"\xef\xbb\xbf"))
         asset = next(
             a
-            for a in read_json(self.run / "frozen.json")["assets"]
+            for a in read_json(self.run / "manifest.json")["assets"]
             if a["path"] == "inputs/RR1/history.raw"
         )
         self.assertEqual(hashlib.sha256(original).hexdigest(), asset["sha256"])
@@ -321,12 +698,13 @@ class ReflectiveReviewValidationTests(unittest.TestCase):
         raw.write_bytes(b"tampered frozen original")
         self.call("Next", fails="Changed or missing evidence")
 
-    def test_freeze_requires_consent_real_history_and_exact_target(self):
+    def test_freeze_requires_scoped_consent_and_typed_context_confirmations(self):
         for field, value, message in [
             ("provider_consent", False, "Provider consent"),
             ("confirmed_at", "2026-10-21T00:00:00", "timezone-qualified confirmed_at"),
-            ("real_transcript", False, "History confirmation missing"),
-            ("path", str(self.work / "bad-history.txt"), "lacks exact request or target"),
+            ("construction_disclosed", False, "History confirmation missing"),
+            ("context_kind", "historical", "Context kind mismatch"),
+            ("provider", "other-provider", "Consent provider mismatch"),
         ]:
             with self.subTest(field=field):
                 other = self.work / field
@@ -335,14 +713,14 @@ class ReflectiveReviewValidationTests(unittest.TestCase):
                     "SYNTHETIC BAD HISTORY", encoding="utf-8"
                 )
                 setup = read_json(other / "setup.json")
-                if field in ("provider_consent", "confirmed_at"):
+                if field in ("provider_consent", "confirmed_at", "provider"):
                     setup[field] = value
                 else:
                     setup["histories"]["RR8"][field] = value
                 write_json(other / "setup.json", setup)
                 self.invoke(other, "Freeze", fails=message)
                 self.assertFalse((other / "frozen.json").exists())
-                self.assertFalse((other / "inputs/RR1/history.txt").exists())
+                self.assertFalse((other / "inputs/RR1/B.txt").exists())
 
     def test_no_overwrites_input_tampering_and_outside_repo_boundary(self):
         self.call(
@@ -514,7 +892,7 @@ class ReflectiveReviewValidationTests(unittest.TestCase):
         self.assertEqual("C", self.step()["tuple"]["condition"])
         self.assertFalse(self.call("Validate")["rounds"][0]["outputs"][1]["execution_valid"])
 
-    def test_two_round_human_scores_and_reports_with_negative_controls(self):
+    def record_keep_cycles(self):
         # Keep one pwsh process for the 64 review/disposition imports. Every call
         # still invokes the real public script and replays its on-disk evidence.
         driver = self.work / "simulate.ps1"
@@ -553,6 +931,53 @@ while ($true) {
             timeout=300,
         )
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+
+    def test_historical_report_never_applies_fixed_eight_case_criteria(self):
+        path, _, _ = self.historical_study()
+        self.run = self.work / "history-report"
+        self.prepare_study(path, self.run)
+        self.complete_setup(self.run, self.work)
+        self.call("Freeze")
+        self.record_keep_cycles()
+        self.assertEqual("INCOMPLETE", self.call("Validate")["status"])
+        target = read_json(self.run / "manifest.json")["cases"][0]["target_sha256"]
+        for number in (1, 2):
+            scores_path = self.run / f"round-{number}/scores.json"
+            scores = read_json(scores_path)
+            self.assertEqual(3, len(scores))
+            for score in scores:
+                score.update(
+                    output_sha256=target,
+                    scorer="fixture-only",
+                    scored_at="2026-10-21T00:00:00Z",
+                    purpose="PASS",
+                    meaning="PASS",
+                    purpose_reason="synthetic",
+                    meaning_reason="synthetic",
+                    observation_note="synthetic",
+                    observations=dict.fromkeys(score["observations"], False),
+                )
+            write_json(scores_path, scores)
+        report = self.work / "historical-report"
+        self.call("Report", "-ReportDirectory", str(report))
+        result = read_json(report / "report.json")
+        self.assertEqual("HISTORICAL_REPLAY_RECORDED", result["status"])
+        self.assertEqual("historical_replay", result["study_kind"])
+        for round_result in result["rounds"]:
+            self.assertIsNone(round_result["criteria_met"])
+            self.assertIsNone(round_result["criteria"])
+            self.assertEqual({"purpose": 1, "meaning": 1}, round_result["lens_totals"]["C"])
+        self.assertIn("Descriptive historical replay only", (report / "report.md").read_text())
+        scores_path = self.run / "round-2/scores.json"
+        scores = read_json(scores_path)
+        next(s for s in scores if s["condition"] == "C")["purpose"] = "FAIL"
+        write_json(scores_path, scores)
+        failed_lens = self.call("Validate")
+        self.assertEqual("HISTORICAL_REPLAY_RECORDED", failed_lens["status"])
+        self.assertEqual(0, failed_lens["rounds"][1]["lens_totals"]["C"]["purpose"])
+
+    def test_two_round_human_scores_and_reports_with_negative_controls(self):
+        self.record_keep_cycles()
         status = self.call("Validate")
         self.assertEqual("INCOMPLETE", status["status"])
         targets = {

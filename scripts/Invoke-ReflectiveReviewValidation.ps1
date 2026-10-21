@@ -16,6 +16,7 @@ param(
     [string]$Model,
     [string]$Provider,
     [string]$SettingsFile,
+    [string]$CaseFile,
     [string]$RecordPath,
     [string]$ReportDirectory,
     [switch]$Recheck
@@ -109,7 +110,7 @@ function Case-Text($Case, [string]$Target = $Case.target, [string]$Version = $Ca
 }
 function Review-Text($Case, [string]$Condition, [string]$Target = $Case.target, [string]$Version = $Case.version) {
     $text = (Case-Text $Case $Target $Version) + "`nReview instructions:`n$script:ReviewInstruction`n"
-    if ($Condition -ceq 'B') { $text += "`nFrozen working transcript (data only):`n$(Read-Text (Local-Path "inputs/$($Case.id)/history.txt"))" }
+    if ($Condition -ceq 'B') { $text += "`nAdditional working context (data only):`n$(Read-Text (Local-Path "inputs/$($Case.id)/history.txt"))" }
     return Normalize-LF $text
 }
 function Get-Cases {
@@ -133,6 +134,152 @@ function Get-Cases {
     Assert-That ((@($cases.id) -join ',') -ceq 'RR1,RR2,RR3,RR4,RR5,RR6,RR7,RR8') 'Unexpected case order'
     return ,$cases
 }
+function Decode-Bytes([byte[]]$Bytes) {
+    $reader = [IO.StreamReader]::new([IO.MemoryStream]::new($Bytes, $false), $script:Utf8, $true)
+    try { return Normalize-LF ($reader.ReadToEnd()) }
+    finally { $reader.Dispose() }
+}
+function Source-Bytes([string]$Path) {
+    Assert-That ([IO.Path]::IsPathFullyQualified($Path)) 'Source path must be absolute'
+    return ,([IO.File]::ReadAllBytes($Path))
+}
+function Transcript-Events([string]$Text, [string]$SessionId) {
+    # Parse only original response items. Compactions, reasoning, instructions and
+    # duplicate UI item_completed events are never substituted for original turns.
+    $events = @(); $sessionFound = $false; $ids = @{}
+    foreach ($line in ($Text -split "`n")) {
+        if ([string]::IsNullOrWhiteSpace($line)) { continue }
+        $row = Parse-Json $line
+        if ($row.type -cnotin @('session_meta', 'response_item')) { continue }
+        $p = $row.payload
+        if ($row.type -ceq 'session_meta') {
+            Assert-That ($p.id -ceq $SessionId) 'Transcript session ID mismatch'
+            $sessionFound = $true
+        }
+        if ($row.type -cne 'response_item') { continue }
+        $kind = ''; $text = ''; $call = ''; $nontext = $false
+        switch -CaseSensitive ($p.type) {
+            'message' {
+                if ($p.role -cin @('user', 'assistant')) {
+                    $kind = $p.role
+                    $parts = @($p.content | Where-Object { $_.type -cin @('input_text', 'output_text') })
+                    $nontext = $parts.Count -ne @($p.content).Count
+                    $text = ($parts | ForEach-Object { $_.text }) -join "`n"
+                }
+            }
+            { $_ -cin @('custom_tool_call', 'function_call') } {
+                $kind = 'tool_call'; $call = $p.call_id
+                $text = "$($p.name)`n" + $(if ($p.type -ceq 'function_call') { $p.arguments } else { $p.input })
+            }
+            { $_ -cin @('custom_tool_call_output', 'function_call_output') } {
+                $kind = 'tool_output'; $call = $p.call_id
+                if ($p.output -is [array]) { $nontext = @($p.output | Where-Object { $_.type -cnotin @('input_text', 'output_text', 'text') }).Count -gt 0 }
+                $text = if ($p.output -is [string]) { $p.output }
+                    else { ($p.output | ForEach-Object { Json $_ }) -join "`n" }
+            }
+        }
+        if (-not $kind) { continue }
+        $id = if ($p['id']) { $p.id } else { "$call/$kind" }
+        Require-Text $id 'event.id'
+        Assert-That (-not $ids.ContainsKey($id)) "Duplicate original event ID: $id"
+        Assert-That (Is-Timestamp $row.timestamp) "Invalid event timestamp: $id"
+        $ids[$id] = $true
+        $events += @{ id = $id; at = $row.timestamp; kind = $kind; call_id = $call; text = Normalize-LF $text; nontext = $nontext }
+    }
+    Assert-That $sessionFound 'Transcript needs original session_meta'
+    return ,$events
+}
+function Historical-Context($Definition, $Case) {
+    $s = $Definition.context
+    Assert-That ($s.format -ceq 'codex-jsonl') 'Only original codex-jsonl transcripts are supported'
+    foreach ($field in @('session_id', 'path', 'sha256', 'start_event', 'request_event', 'target_event', 'author_model', 'author_settings_note')) { Require-Text $s[$field] "context.$field" }
+    $bytes = Source-Bytes $s.path
+    Assert-That (([Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($bytes))).ToLowerInvariant() -ceq $s.sha256) 'Transcript source digest mismatch'
+    $events = Transcript-Events (Decode-Bytes $bytes) $s.session_id
+    $indexes = @{}
+    for ($i = 0; $i -lt $events.Count; $i++) { $indexes[$events[$i].id] = $i }
+    foreach ($field in @('start_event', 'request_event', 'target_event')) { Assert-That ($indexes.ContainsKey($s[$field])) "Original event not found: $field" }
+    $start = $indexes[$s.start_event]; $request = $indexes[$s.request_event]; $end = $indexes[$s.target_event]
+    Assert-That ($start -le $request -and $request -lt $end) 'Invalid request/target cutoff order'
+    Assert-That ($events[$request].kind -ceq 'user' -and $events[$request].text -ceq $Case.request) 'Original request does not match case'
+    Assert-That ($events[$end].kind -ceq 'assistant' -and $events[$end].text -ceq $Case.target) 'Original target does not match case'
+    Assert-That ($s.omissions -is [array] -and $s.transformations -is [array]) 'Explicit omissions and transformations arrays required'
+    $edits = @{}; $omitted = @{}
+    foreach ($item in @($s.omissions) + @($s.transformations)) {
+        Require-Text $item.reason 'transformation/omission.reason'
+        Assert-That ($indexes.ContainsKey($item.event) -and $indexes[$item.event] -ge $start -and $indexes[$item.event] -le $end) 'Transformation outside selected cutoff'
+        Assert-That ($item.event -cnotin @($s.request_event, $s.target_event)) 'Original request and target cannot be transformed or omitted'
+        Assert-That (-not $edits.ContainsKey($item.event)) 'Duplicate transformation/omission'
+        $edits[$item.event] = $item
+    }
+    foreach ($item in $s.omissions) { $omitted[$item.event] = $true }
+    foreach ($item in $s.transformations) { Require-Text $item.text 'transformation.text' }
+    $selected = @($events[$start..$end] | Where-Object { -not $omitted.ContainsKey($_.id) })
+    Assert-That (@($selected | Where-Object { $_.nontext }).Count -eq 0) 'Selected multimodal event is unsupported; do not silently drop content'
+    foreach ($field in @('instructions', 'facts', 'state')) {
+        $binding = $Definition.field_sources[$field]
+        Require-Text $binding.note "field_sources.$field.note"
+        Assert-That ($binding.events -is [array]) "field_sources.$field.events must be an array"
+        foreach ($id in $binding.events) { Assert-That ($indexes.ContainsKey($id) -and $indexes[$id] -le $end) "Field evidence after cutoff or missing: $field" }
+    }
+    # A selected output must have its call, and every selected call its output.
+    foreach ($event in @($selected | Where-Object { $_.kind -cin @('tool_call', 'tool_output') })) {
+        Require-Text $event.call_id 'tool call_id'
+        $pair = @($selected | Where-Object { $_.call_id -ceq $event.call_id -and $_.kind -cne $event.kind })
+        Assert-That ($pair.Count -eq 1) "Missing or duplicate tool pair: $($event.call_id)"
+        $callIndex = @($selected.id).IndexOf($(if ($event.kind -ceq 'tool_call') { $event.id } else { $pair[0].id }))
+        $outputIndex = @($selected.id).IndexOf($(if ($event.kind -ceq 'tool_output') { $event.id } else { $pair[0].id }))
+        Assert-That ($callIndex -lt $outputIndex) 'Tool output precedes its call'
+    }
+    $text = foreach ($event in $selected) {
+        $body = if ($edits.ContainsKey($event.id)) { $edits[$event.id].text } else { $event.text }
+        "[$($event.kind)]`n$body"
+    }
+    return @{ raw = $bytes; text = ($text -join "`n`n") + "`n"; kind = 'historical'; selected_event_ids = @($selected.id) }
+}
+function Read-Study {
+    Require-Text $CaseFile 'CaseFile (v2); preserve old RunRoots and prepare a new directory'
+    $bytes = Source-Bytes $CaseFile
+    $study = Parse-Json (Decode-Bytes $bytes)
+    Assert-That ($study.schema_version -eq 2 -and $study.study_kind -cin @('controlled_fixture', 'historical_replay')) 'Invalid study schema or study_kind'
+    Require-Text $study.suite_id 'suite_id'; Require-Text $study.selection_rule 'selection_rule'
+    Assert-That ($study.suite_id -cmatch '^[A-Za-z0-9][A-Za-z0-9_-]*$') 'Unsafe suite_id'
+    Assert-That ($study.exclusions -is [array] -and $study.cases -is [array] -and $study.cases.Count -gt 0) 'Explicit exclusions and nonempty cases arrays required'
+    foreach ($exclusion in $study.exclusions) { Require-Text $exclusion 'exclusion reason' }
+    $cases = if ($study.study_kind -ceq 'controlled_fixture') { Get-Cases } else { @() }
+    if ($study.study_kind -ceq 'controlled_fixture') {
+        Assert-That ((@($study.cases.id) -join ',') -ceq (@($cases.id) -join ',')) 'Controlled fixture requires exactly RR1-RR8 in order'
+    }
+    $contexts = @{}; $seen = @{}
+    foreach ($definition in $study.cases) {
+        $id = $definition.id
+        Require-Text $id 'case.id'
+        Assert-That ($id -cmatch '^[A-Za-z0-9][A-Za-z0-9_-]*$' -and -not $seen.ContainsKey($id)) 'Unsafe or duplicate case ID'
+        $seen[$id] = $true
+        $c = $definition.context
+        if ($study.study_kind -ceq 'controlled_fixture') {
+            Assert-That ($c.kind -ceq 'constructed') 'Controlled fixture requires constructed context, never a historical claim'
+            # Fixed-case fields are read solely from the unchanged canonical assets.
+            foreach ($field in @('request', 'instructions', 'target', 'facts', 'state')) { Assert-That (-not $definition.ContainsKey($field)) "Cannot override fixed field: $field" }
+            Require-Text $c.path 'constructed context.path'; Require-Text $c.construction_note 'construction_note'
+            $raw = Source-Bytes $c.path; $text = Decode-Bytes $raw
+            Require-Text $text 'constructed context text'
+            $contexts[$id] = @{ raw = $raw; text = "Constructed scenario context; not an observed transcript.`n$text"; kind = 'constructed'; selected_event_ids = @() }
+        }
+        else {
+            Assert-That ($id -cnotmatch '^RR[0-9]+$' -and $c.kind -ceq 'historical') 'Historical replay requires separate IDs and historical context'
+            $case = @{ id = $id; version = "$id-v1" }
+            foreach ($field in @('request', 'instructions', 'target', 'facts', 'state')) { Require-Text $definition[$field] "case.$field"; $case[$field] = Normalize-LF $definition[$field] }
+            $case.target_sha256 = Hash-Text $case.target
+            $contexts[$id] = Historical-Context $definition $case
+            $cases += $case
+        }
+    }
+    if ($study.study_kind -ceq 'controlled_fixture') {
+        Assert-That ($contexts.RR2.text -ceq $contexts.RR5.text -and $contexts.RR2.text -ceq $contexts.RR8.text) 'RR2/RR5/RR8 must use identical constructed context'
+    }
+    return @{ definition = $study; raw = $bytes; cases = @($cases); contexts = $contexts }
+}
 function Prepare-Run {
     Require-Text $Model 'Model'; Require-Text $Provider 'Provider'; Require-Text $SettingsFile 'SettingsFile'
     $settings = Read-Json $SettingsFile
@@ -140,27 +287,32 @@ function Prepare-Run {
     Assert-That (-not (Test-Path -LiteralPath $script:Root)) 'RunRoot already exists; use a new directory'
     $head = & git -C $script:Repo rev-parse HEAD
     Assert-That ($LASTEXITCODE -eq 0) 'Cannot record repository HEAD'
-    $cases = Get-Cases
+    $study = Read-Study; $cases = $study.cases
     $sources = @('reflective-review.md', 'reflective-review-cases.md', 'reflective-review-expectations.md', 'rubric.md') | ForEach-Object {
         @{ path = "$script:AssetRoot/$_"; sha256 = Hash-File (Join-Path $script:Repo "$script:AssetRoot/$_") }
     }
-    $assets = @()
-    $setup = @{ confirmed_by = ''; confirmed_at = ''; provider_consent = $false; histories = @{} }
+    $assets = @(New-RawAsset 'provenance/cases.json' $study.raw)
+    $setup = @{ confirmed_by = ''; confirmed_at = ''; provider_consent = $false; provider = $Provider; histories = @{} }
     foreach ($case in $cases) {
         $assets += New-Asset "inputs/$($case.id)/target.txt" $case.target
         $assets += New-Asset "inputs/$($case.id)/case.txt" (Case-Text $case)
+        $context = $study.contexts[$case.id]
+        $assets += New-RawAsset "inputs/$($case.id)/history.raw" $context.raw
+        $assets += New-Asset "inputs/$($case.id)/history.txt" $context.text
+        $assets += New-Asset "provenance/$($case.id).json" (Json @{ context_kind = $context.kind; selected_event_ids = $context.selected_event_ids })
         $setup.histories[$case.id] = @{
-            path = ''; real_transcript = $false; request_near_start = $false
-            tools_and_outputs = $false; exact_target = $false; host_justification = $false
-            no_expected_findings = $false; disposable_workspace = ''
+            context_kind = $context.kind; no_expected_findings = $false; relevant_facts_complete = $false
+            case_consistent = $false
         }
+        if ($context.kind -ceq 'constructed') { $setup.histories[$case.id].construction_disclosed = $false }
+        else { $setup.histories[$case.id].original_events_verified = $false; $setup.histories[$case.id].transformations_reviewed = $false }
     }
     $order = @()
     foreach ($round in 1..2) {
-        $ids = if ($round -eq 1) { 1..8 } else { 8..1 }
+        $ids = if ($round -eq 1) { 1..$cases.Count } else { $cases.Count..1 }
         foreach ($n in $ids) {
             $conditions = if (($n % 2 -eq 1) -eq ($round -eq 1)) { @('B', 'C') } else { @('C', 'B') }
-            foreach ($condition in $conditions) { $order += @{ round = $round; case = "RR$n"; condition = $condition } }
+            foreach ($condition in $conditions) { $order += @{ round = $round; case = $cases[$n - 1].id; condition = $condition } }
         }
         $scores = foreach ($case in $cases) {
             foreach ($condition in @('A', 'B', 'C')) {
@@ -178,18 +330,20 @@ function Prepare-Run {
         Write-New (Local-Path "round-$round/scores.json") (Json @($scores))
     }
     $manifest = @{
-        schema_version = 1; issue = 452; prepared_at = [DateTimeOffset]::Now.ToString('o')
+        schema_version = 2; issue = 452; prepared_at = [DateTimeOffset]::Now.ToString('o')
+        study_kind = $study.definition.study_kind; suite_id = $study.definition.suite_id
+        study_sha256 = Hash-Text (Json (Canonical @{ definition = $study.definition; assets = $assets }))
         repository_head = "$head".Trim(); powershell_version = $PSVersionTable.PSVersion.ToString()
         model = $Model; provider = $Provider; settings = $settings
         helper_sha256 = Hash-File $PSCommandPath; sources = @($sources); cases = $cases; assets = $assets; order = $order
     }
     Write-New (Local-Path 'manifest.json') (Json $manifest)
     Write-New (Local-Path 'setup.json') (Json $setup)
-    return @{ status = 'PREPARED'; setup = Local-Path 'setup.json'; next = 'Create real B histories, complete setup.json, then Freeze.' }
+    return @{ status = 'PREPARED'; study_kind = $manifest.study_kind; suite_id = $manifest.suite_id; setup = Local-Path 'setup.json'; next = 'Inspect prepared contexts and provenance, record scoped consent and confirmations, then Freeze.' }
 }
 function Read-Manifest {
     $manifest = Read-Json (Local-Path 'manifest.json')
-    Assert-That ($manifest.schema_version -eq 1) 'Unsupported manifest schema'
+    Assert-That ($manifest.schema_version -eq 2) 'Unsupported manifest schema; preserve this RunRoot, use its original helper or prepare a new v2 RunRoot'
     Assert-That ((Hash-File $PSCommandPath) -ceq $manifest.helper_sha256) 'Helper changed; use the helper revision recorded at Prepare'
     foreach ($source in $manifest.sources) {
         Assert-That ((Hash-File (Join-Path $script:Repo $source.path)) -ceq $source.sha256) "Source asset changed: $($source.path)"
@@ -203,26 +357,19 @@ function Freeze-Run($Manifest) {
     Require-Text $setup.confirmed_by 'confirmed_by'; Require-Text $setup.confirmed_at 'confirmed_at'
     Assert-That (Is-Timestamp $setup.confirmed_at) 'Invalid timezone-qualified confirmed_at'
     Assert-That (Is-True $setup.provider_consent) 'Provider consent has not been recorded'
-    # Validate all histories before creating any frozen input.
-    $histories = @{}
+    Assert-That ($setup.provider -ceq $Manifest.provider) 'Consent provider mismatch'
     foreach ($case in $Manifest.cases) {
         $item = $setup.histories[$case.id]
-        foreach ($field in @('real_transcript', 'request_near_start', 'tools_and_outputs', 'exact_target', 'host_justification', 'no_expected_findings')) {
+        $kind = if ($Manifest.study_kind -ceq 'controlled_fixture') { 'constructed' } else { 'historical' }
+        Assert-That ($item.context_kind -ceq $kind) 'Context kind mismatch'
+        $fields = @('no_expected_findings', 'relevant_facts_complete', 'case_consistent')
+        $fields += if ($kind -ceq 'constructed') { @('construction_disclosed') } else { @('original_events_verified', 'transformations_reviewed') }
+        foreach ($field in $fields) {
             Assert-That (Is-True $item[$field]) "History confirmation missing: $($case.id).$field"
         }
-        Require-Text $item.disposable_workspace "$($case.id).disposable_workspace"
-        Require-Text $item.path "$($case.id).path"
-        $bytes = [IO.File]::ReadAllBytes($item.path)
-        $reader = [IO.StreamReader]::new([IO.MemoryStream]::new($bytes, $false), $script:Utf8, $true)
-        try { $history = Normalize-LF ($reader.ReadToEnd()) }
-        finally { $reader.Dispose() }
-        Assert-That ($history.Contains($case.request) -and $history.Contains($case.target)) "History lacks exact request or target: $($case.id)"
-        $histories[$case.id] = @{ text = $history; raw = $bytes }
     }
     $assets = @()
     foreach ($case in $Manifest.cases) {
-        $assets += New-RawAsset "inputs/$($case.id)/history.raw" $histories[$case.id].raw
-        $assets += New-Asset "inputs/$($case.id)/history.txt" $histories[$case.id].text
         foreach ($condition in @('B', 'C')) {
             $assets += New-Asset "inputs/$($case.id)/$condition.txt" (Review-Text $case $condition)
         }
@@ -231,7 +378,7 @@ function Freeze-Run($Manifest) {
     $assets += @{ path = 'setup.json'; sha256 = Hash-File (Local-Path 'setup.json') }
     Write-New (Local-Path 'journal.json') (Json @())
     Write-New (Local-Path 'frozen.json') (Json @{ frozen_at = [DateTimeOffset]::Now.ToString('o'); assets = $assets })
-    return @{ status = 'FROZEN'; next = 'Next'; review_calls_maximum = 64; revisions_maximum = 32 }
+    return @{ status = 'FROZEN'; study_kind = $Manifest.study_kind; suite_id = $Manifest.suite_id; next = 'Next'; review_calls_maximum = 8 * $Manifest.cases.Count; revisions_maximum = 4 * $Manifest.cases.Count }
 }
 function Read-Frozen {
     $frozen = Read-Json (Local-Path 'frozen.json')
@@ -325,7 +472,8 @@ function Next-Step($Manifest, $Events) {
     $case = $Manifest.cases | Where-Object { $_.id -ceq $tuple.case }
     $state = Tuple-State (Tuple-Events $Events $tuple) $case
     if ($Recheck) { $state.kind = 'review' }
-    $record = @{ round = $tuple.round; case = $tuple.case; condition = $tuple.condition; kind = $state.kind; raw_path = '' }
+    $record = @{ round = $tuple.round; case = $tuple.case; condition = $tuple.condition; kind = $state.kind; raw_path = ''
+        study_kind = $Manifest.study_kind; suite_id = $Manifest.suite_id; study_sha256 = $Manifest.study_sha256 }
     if ($state.kind -ceq 'disposition') {
         $review = @((Tuple-Events $Events $tuple) | Where-Object { $_.meta.kind -ceq 'review' })[-1]
         $findings = (Parse-Json $review.raw).findings
@@ -389,6 +537,7 @@ function Validate-Disposition($Meta, [string]$Raw, $Own, $State) {
     Assert-That ($body.outcome -cne 'revise' -or ($State.revisions -eq 0 -and @($body.decisions | Where-Object { $_.decision -ceq 'accepted' }).Count -gt 0)) 'Revision needs an accepted finding and an unused revision budget'
 }
 function Validate-Record($Manifest, $Meta, [string]$Raw, $Events) {
+    foreach ($field in @('study_kind', 'suite_id', 'study_sha256')) { Assert-That ($Meta[$field] -ceq $Manifest[$field]) "Study binding mismatch: $field" }
     Assert-That ($Meta.round -in @(1, 2) -and $Meta.case -cin @($Manifest.cases.id) -and $Meta.condition -cin @('B', 'C')) 'Unknown round, case or condition'
     Assert-That ($Meta.kind -cin @('review', 'disposition', 'revision')) 'Unknown record kind'
     $own = Tuple-Events $Events $Meta
@@ -504,7 +653,8 @@ function Assess-Round($Manifest, $Events, [int]$Round) {
             }
         }
     }
-    if (@($scores).Count -ne 24 -or @($scores | Where-Object { "$($_.case)/$($_.condition)" -cnotin $expected }).Count -gt 0) { $issues += 'Expected exactly 24 score rows' }
+    $rowCount = 3 * $Manifest.cases.Count
+    if (@($scores).Count -ne $rowCount -or @($scores | Where-Object { "$($_.case)/$($_.condition)" -cnotin $expected }).Count -gt 0) { $issues += "Expected exactly $rowCount score rows" }
     foreach ($s in @($scores | Where-Object { $_.condition -ceq 'C' })) {
         $a = @($scores | Where-Object { $_.condition -ceq 'A' -and $_.case -ceq $s.case })
         if ($a.Count -ne 1) { continue }
@@ -516,7 +666,7 @@ function Assess-Round($Manifest, $Events, [int]$Round) {
             }
         }
     }
-    $result = @{ round = $Round; complete = $issues.Count -eq 0; issues = $issues; outputs = $outputs; criteria_met = $false }
+    $result = @{ round = $Round; complete = $issues.Count -eq 0; issues = $issues; outputs = $outputs; criteria_met = $null }
     if ($issues.Count -gt 0) { return $result }
     $improved = 0; $totals = @{ A = @{ purpose = 0; meaning = 0 }; B = @{ purpose = 0; meaning = 0 }; C = @{ purpose = 0; meaning = 0 } }
     foreach ($case in $Manifest.cases) {
@@ -529,6 +679,11 @@ function Assess-Round($Manifest, $Events, [int]$Round) {
         if ($delta -gt 0) { $improved++ }
     }
     foreach ($s in $scores) { foreach ($lens in @('purpose', 'meaning')) { if ($s[$lens] -ceq 'PASS') { $totals[$s.condition][$lens]++ } } }
+    $result.improved_cases = $improved; $result.lens_totals = $totals
+    if ($Manifest.study_kind -ceq 'historical_replay') {
+        $result.criteria = $null
+        return $result
+    }
     $rr5 = $scores | Where-Object { $_.case -ceq 'RR5' -and $_.condition -ceq 'C' }
     $newErrors = @($scores | Where-Object { $_.condition -ceq 'C' -and ($_.observations.new_unsupported_claim -or $_.observations.new_authority_error -or $_.observations.new_dropped_condition) })
     $criteria = @{
@@ -538,16 +693,21 @@ function Assess-Round($Manifest, $Events, [int]$Round) {
         RR5_preserved = $rr5.purpose -ceq 'PASS' -and $rr5.meaning -ceq 'PASS' -and -not $rr5.observations.degradation
         no_new_errors = $newErrors.Count -eq 0
     }
-    $result.improved_cases = $improved; $result.lens_totals = $totals; $result.criteria = $criteria
+    $result.criteria = $criteria
     $result.criteria_met = -not ($criteria.Values -contains $false)
     return $result
 }
 function Assessment($Manifest, $Events) {
     $rounds = @(Assess-Round $Manifest $Events 1; Assess-Round $Manifest $Events 2)
     $status = if (@($rounds | Where-Object { $_.complete }).Count -lt 2) { 'INCOMPLETE' }
+        elseif ($Manifest.study_kind -ceq 'historical_replay') { 'HISTORICAL_REPLAY_RECORDED' }
         elseif ($rounds[0].criteria_met -and $rounds[1].criteria_met) { 'STAGE2_CONSIDERATION_CRITERIA_MET' }
         else { 'CRITERIA_NOT_REPRODUCED' }
-    return @{ status = $status; provisional = -not ($rounds[0].complete -and $rounds[1].complete); rounds = $rounds; formal_adoption = 'Human decision required; this report grants no authority.' }
+    $scope = if ($Manifest.study_kind -ceq 'controlled_fixture') { 'Fixed RR1-RR8 benchmark only; constructed context is not observed working history.' }
+        else { 'Descriptive historical replay only; no five-of-eight or RR5 adoption criterion applies.' }
+    return @{ status = $status; study_kind = $Manifest.study_kind; suite_id = $Manifest.suite_id; study_sha256 = $Manifest.study_sha256
+        case_count = $Manifest.cases.Count; criteria_scope = $scope
+        provisional = -not ($rounds[0].complete -and $rounds[1].complete); rounds = $rounds; formal_adoption = 'Human decision required; this report grants no authority.' }
 }
 
 try {
@@ -582,7 +742,7 @@ try {
                             cost_currency = $_.meta.cost_currency; cost_unknown_reason = $_.meta.cost_unknown_reason }
                     })
                     Write-New (Join-Path $ReportDirectory 'report.json') (Json $result)
-                    $lines = @('# Reflective Review comparison (#452)', '', "Status: $($result.status)", '', "HEAD: $($manifest.repository_head)", "Model/provider: $($manifest.model) / $($manifest.provider)", '', 'Human scoring only; no formal adoption is granted.', '', '| Round | Complete | Improved cases | A purpose/meaning | B purpose/meaning | C purpose/meaning | Criteria met |', '|---|---|---|---|---|---|---|')
+                    $lines = @('# Reflective Review comparison (#452)', '', "Status: $($result.status)", "Study: $($manifest.study_kind) / $($manifest.suite_id)", "Scope: $($result.criteria_scope)", '', "HEAD: $($manifest.repository_head)", "Model/provider: $($manifest.model) / $($manifest.provider)", '', 'Human scoring only; no formal adoption is granted.', '', '| Round | Complete | Improved cases | A purpose/meaning | B purpose/meaning | C purpose/meaning | Criteria met |', '|---|---|---|---|---|---|---|')
                     foreach ($round in $result.rounds) {
                         if ($round.complete) { $t = $round.lens_totals; $lines += "| $($round.round) | yes | $($round.improved_cases) | $($t.A.purpose)/$($t.A.meaning) | $($t.B.purpose)/$($t.B.meaning) | $($t.C.purpose)/$($t.C.meaning) | $($round.criteria_met) |" }
                         else { $lines += "| $($round.round) | no | pending | pending | pending | pending | pending |" }

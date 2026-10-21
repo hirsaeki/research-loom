@@ -2,6 +2,12 @@
 
 These are the fixed, anonymized inputs for the Reflective Review comparison in [reflective-review.md](reflective-review.md). Each case freezes the human's original request, the explicit instructions that still apply, the target under review and the minimum facts a reviewer needs. Expected findings live separately in [reflective-review-expectations.md](reflective-review-expectations.md). Never give that file, or any expected answer, to a reviewer or to the primary host.
 
+These are controlled scenarios, including authored requests and counterfactual
+targets; "verbatim" below refers to the frozen scenario, not a claim that its
+English wording occurred in an original research transcript. Historical replay
+uses separate case IDs and original source/event bindings (#605). No five-field
+case content or expected finding is changed by that distinction.
+
 Each case is self-contained, and its heading is deliberately neutral. A reviewer receives only the five fields of one case, never the heading or this introduction. The existing scenarios a case derives from are listed in the expectations file.
 
 Field meanings:

@@ -11,6 +11,53 @@ Assets:
 
 ## Conditions
 
+### Study kinds and provenance (#605)
+
+Choose one study kind and a versioned suite ID before preparing a run. Never mix
+the kinds in a RunRoot or combine their scores:
+
+- **controlled_fixture** uses the unchanged RR1–RR8 inputs and expectations.
+  They are frozen anonymized scenarios, including newly authored cases and
+  counterfactual controls, not verbatim extracts from one historical session.
+  B receives additional constructed scenario context, disclosed as constructed.
+  Its construction method, any source associations and deviations are recorded
+  privately before review. It must be consistent with the five supplied fields,
+  contain no scorer expectations or proposed correction, and must not claim
+  invented tool events or host justifications were observed. The comparison
+  measures review of these fixed challenges with/without constructed context;
+  it does not establish the effect of an actual primary host's working history.
+- **historical_replay** uses separately identified cases (for example HR1) with
+  the original human request and original assistant target, plus the applicable
+  instructions, facts and state supported at that time. B receives selected
+  original user/assistant turns and paired tool calls/outputs through the target.
+  C receives the same five fields without that history. No original output must
+  be regenerated. Record the original author model/settings as source metadata,
+  or a reason they are unknown; use the run's fixed model/settings for all new
+  review and revision calls. This is replay in fresh conversations, not a
+  recreation of the original host's internal state.
+
+Select historical episodes and exclusions by a written rule before responses or
+scores are observed. Preserve the source transcript's original bytes/digest,
+session and event IDs, start/request/target boundaries, original timestamps,
+field-to-source references and every omission/transformation with its reason.
+The helper currently accepts original Codex JSONL. It does not use compaction
+summaries, reasoning, system/developer messages or duplicate UI events as source
+turns. Unsupported selected multimodal content must not be silently truncated.
+Never append later human corrections, improved responses or post-hoc generated
+justification. Do not fabricate missing tool logs. Source cutoffs are checked
+against original event order, not against a hand-edited text containing the target.
+
+Historical requests and targets remain verbatim (only the documented UTF-8/LF
+decoding is canonicalized). If they require substantive anonymization/translation,
+use a separately disclosed constructed fixture instead. Other context may be
+redacted with event-specific original-to-transformed records. A human confirms
+that omissions/redactions preserve meaning, C contains all decision-relevant
+facts available in B, and no expectations leak to either condition. The helper
+checks source/event bindings and tool pairs, not semantic sufficiency or truth.
+Raw originals, provenance and scoring files are never model attachments; only
+the displayed generated input is supplied. Consent covers the actual selected
+text and provider, including any remaining private details, before any send.
+
 All conditions use the same model, the same model settings and the same frozen target for a case.
 
 - **A, no review.** The frozen target is the output. This is the baseline score.
@@ -32,7 +79,14 @@ Do not substitute the primary host's summary of the human's intent for items 1�
 
 ### B working context
 
-For each case, generate once, in a disposable workspace, a working transcript that contains: the human's request near the start, the tool calls and outputs that produced the target, and the primary host's own justification of the target. Freeze it and record its digest before any review runs. B reuses this frozen transcript for every run. The transcript must not contain the expected findings.
+For a controlled fixture, construct and document the scenario context once; do
+not label it an observed transcript. For historical replay, extract the bounded
+original transcript once, retaining existing justification only if it precedes
+or is part of the target. Neither route requires manufacturing an exact-target
+generation history. Prepare snapshots the context, source and case definition;
+Freeze verifies their digests and the study-specific human confirmations. B
+reuses exactly that context in both rounds. Reviews/revisions use fresh isolated
+conversations and never modify the original research workspace.
 
 ## Review instructions and output
 
@@ -65,7 +119,8 @@ A review that is not run, times out, returns malformed output, or reviews the wr
 
 ## Decision criteria
 
-Decide these before running. Adopt condition C as the basis for stage 2 only if all of these hold:
+The following unchanged criteria apply only to the controlled RR1–RR8 benchmark.
+Decide these before running. Consider condition C as the basis for stage 2 only if all of these hold:
 
 - C passes more lens checks than A on at least five of the eight cases. Both lenses count, scored separately.
 - C is not worse than B on any lens in total.
@@ -73,6 +128,15 @@ Decide these before running. Adopt condition C as the basis for stage 2 only if 
 - C introduces no new unsupported claim, authority error or dropped condition in any case.
 
 If C helps only on one lens or only on some cases, consider narrowing the scope: review only that kind of output, or keep only the context assembly. If C shows no clear gain, or the gain does not repeat on a second run, do not introduce a standing review loop. Record the result in #452 either way.
+
+`STAGE2_CONSIDERATION_CRITERIA_MET` means the fixed benchmark met the criteria
+twice; it grants no authority and is not historical effectiveness evidence.
+Historical replay reports each case, each lens and each round descriptively.
+It has no five-of-eight threshold or RR5 control and cannot produce that status.
+Completed, fully human-scored historical runs return `HISTORICAL_REPLAY_RECORDED`,
+even if outputs fail lenses; missing/invalid executions or scores remain
+`INCOMPLETE`. Do not pool the two study kinds or treat related RR2/RR5/RR8
+controls as independent historical episodes. Formal adoption remains human.
 
 ## Run record
 
