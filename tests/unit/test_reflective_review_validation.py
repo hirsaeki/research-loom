@@ -556,6 +556,118 @@ class ReflectiveReviewValidationTests(unittest.TestCase):
             fails="identical constructed context",
         )
 
+    def test_prepare_binding_is_recomputed_before_freeze(self):
+        for field, error in (
+            ("study_sha256", "Study digest mismatch"),
+            ("cases", "Study digest mismatch"),
+            ("order", "Study digest mismatch"),
+            ("settings", "Study digest mismatch"),
+            ("suite_id", "Study kind or suite mismatch"),
+            ("study_kind", "Study kind or suite mismatch"),
+        ):
+            with self.subTest(field=field):
+                run = self.work / f"changed-{field}"
+                shutil.copytree(self.prepared, run)
+                path = run / "manifest.json"
+                manifest = read_json(path)
+                if field == "cases":
+                    manifest[field][0]["target"] = "Changed target"
+                elif field == "order":
+                    manifest[field].reverse()
+                elif field == "settings":
+                    manifest[field]["reasoning_effort"] = "changed"
+                else:
+                    manifest[field] = "changed"
+                write_json(path, manifest)
+                before = {p.relative_to(run): p.read_bytes() for p in run.rglob("*") if p.is_file()}
+                self.invoke(run, "Freeze", fails=error)
+                self.assertEqual(
+                    before,
+                    {p.relative_to(run): p.read_bytes() for p in run.rglob("*") if p.is_file()},
+                )
+
+    def test_long_interleaved_tool_history_and_pair_order_validation(self):
+        path, bundle, rows = self.historical_study()
+        source = Path(bundle["cases"][0]["context"]["path"])
+
+        def event(kind, call_id, **fields):
+            return {
+                "timestamp": "2026-10-01T00:00:00Z",
+                "type": "response_item",
+                "payload": {"type": kind, "call_id": call_id, **fields},
+            }
+
+        calls = [
+            event("function_call", f"long-{n}", name="fixture", arguments="{}") for n in range(1000)
+        ]
+        outputs = [
+            event("function_call_output", f"long-{n}", output="Synthetic tool output")
+            for n in reversed(range(1000))
+        ]
+        expanded = rows[:6] + calls + outputs + rows[6:]
+        for number, (events, error) in enumerate(
+            (
+                (expanded, None),
+                (
+                    rows[:6]
+                    + [
+                        event("function_call_output", "reversed", output="output"),
+                        event("function_call", "reversed", name="fixture", arguments="{}"),
+                    ]
+                    + rows[6:],
+                    "Tool output precedes its call",
+                ),
+                (
+                    rows[:6]
+                    + [
+                        event(
+                            "function_call",
+                            "read",
+                            name="duplicate",
+                            arguments="{}",
+                            id="different-id",
+                        )
+                    ]
+                    + rows[6:],
+                    "Duplicate tool pair event",
+                ),
+                (
+                    rows[:6]
+                    + [
+                        event("function_call", "CaseID", name="fixture", arguments="{}"),
+                        event("function_call_output", "caseid", output="different ID"),
+                    ]
+                    + rows[6:],
+                    "Missing tool pair",
+                ),
+            )
+        ):
+            with self.subTest(error=error):
+                source.write_text("\n".join(json.dumps(r) for r in events), encoding="utf-8")
+                bundle["cases"][0]["context"]["sha256"] = hashlib.sha256(
+                    source.read_bytes()
+                ).hexdigest()
+                write_json(path, bundle)
+                run = self.work / f"tool-pairs-{number}"
+                if error:
+                    self.invoke(
+                        run,
+                        "Prepare",
+                        "-Model",
+                        "test-model",
+                        "-Provider",
+                        "test-provider",
+                        "-SettingsFile",
+                        str(self.base / "settings.json"),
+                        "-CaseFile",
+                        str(path),
+                        fails=error,
+                    )
+                else:
+                    self.prepare_study(path, run)
+                    selected = read_json(run / "provenance/HR1.json")["selected_event_ids"]
+                    self.assertEqual(2006, len(selected))
+
     def test_inputs_are_self_contained_and_repeatable_without_scorer_material(self):
         other = self.work / "other"
         shutil.copytree(self.prepared, other)
