@@ -163,6 +163,6 @@
   "tests.runtime.test_survey_virtual_runner_iteration": 2.1,
   "tests.runtime.test_work_conversation_runtime": 3.4,
   "tests.runtime.test_writer_reader_quality_probe": 0.8,
-  "tests.unit.test_reflective_review_validation": 181.3,
+  "tests.unit.test_reflective_review_validation": 203.4,
   "tests.unit.test_workspace_test_templates": 3.5
 }

@@ -217,7 +217,7 @@ class ReflectiveReviewValidationTests(unittest.TestCase):
             ]:
                 self.assertNotIn(excluded, c)
             self.assertIn(case["request"], c)
-            for name in ["target.txt", "case.txt", "B.txt", "C.txt", "history.txt"]:
+            for name in ["target.txt", "case.txt", "B.txt", "C.txt", "history.txt", "history.raw"]:
                 self.assertEqual(
                     (directory / name).read_bytes(),
                     (other / "inputs" / case["id"] / name).read_bytes(),
@@ -288,9 +288,43 @@ class ReflectiveReviewValidationTests(unittest.TestCase):
         self.assertEqual(2, len(snapshots))
         self.assertEqual(snapshots[0], snapshots[1])
 
+    def test_frozen_history_keeps_original_bytes_separate_from_model_text(self):
+        self.run = self.work / "raw-history"
+        shutil.copytree(self.prepared, self.run)
+        setup = read_json(self.run / "setup.json")
+        case = read_json(self.run / "manifest.json")["cases"][0]
+        source = self.work / "original-history.txt"
+        original = (
+            b"\xef\xbb\xbf"
+            + (
+                f"SYNTHETIC TEST ONLY\r\n{case['request']}\r\n{case['target']}\rHost justification\r\n"
+            ).encode()
+        )
+        source.write_bytes(original)
+        setup["histories"]["RR1"]["path"] = str(source)
+        write_json(self.run / "setup.json", setup)
+        self.call("Freeze")
+        raw = self.run / "inputs/RR1/history.raw"
+        self.assertEqual(original, raw.read_bytes())
+        normalized = (self.run / "inputs/RR1/history.txt").read_bytes()
+        self.assertNotIn(b"\r", normalized)
+        self.assertFalse(normalized.startswith(b"\xef\xbb\xbf"))
+        asset = next(
+            a
+            for a in read_json(self.run / "frozen.json")["assets"]
+            if a["path"] == "inputs/RR1/history.raw"
+        )
+        self.assertEqual(hashlib.sha256(original).hexdigest(), asset["sha256"])
+        step = self.step()
+        source.write_bytes(b"changed external source")
+        self.assertEqual(step, self.step())
+        raw.write_bytes(b"tampered frozen original")
+        self.call("Next", fails="Changed or missing evidence")
+
     def test_freeze_requires_consent_real_history_and_exact_target(self):
         for field, value, message in [
             ("provider_consent", False, "Provider consent"),
+            ("confirmed_at", "2026-10-21T00:00:00", "timezone-qualified confirmed_at"),
             ("real_transcript", False, "History confirmation missing"),
             ("path", str(self.work / "bad-history.txt"), "lacks exact request or target"),
         ]:
@@ -301,7 +335,7 @@ class ReflectiveReviewValidationTests(unittest.TestCase):
                     "SYNTHETIC BAD HISTORY", encoding="utf-8"
                 )
                 setup = read_json(other / "setup.json")
-                if field == "provider_consent":
+                if field in ("provider_consent", "confirmed_at"):
                     setup[field] = value
                 else:
                     setup["histories"]["RR8"][field] = value
@@ -582,6 +616,39 @@ while ($true) {
                 status = self.call("Validate")
                 self.assertEqual("CRITERIA_NOT_REPRODUCED", status["status"])
                 self.assertFalse(status["rounds"][1]["criteria"][criterion])
+        for timestamp in (
+            "not a timestamp",
+            "2026-10-21T00:00:00",
+            "2026-02-30T00:00:00Z",
+            "2026-10-21T00:00:00Z",
+        ):
+            with self.subTest(timestamp=timestamp):
+                changed = json.loads(json.dumps(original))
+                changed[0]["scored_at"] = timestamp
+                write_json(path, changed)
+                status = self.call("Validate")
+                self.assertEqual(
+                    "STAGE2_CONSIDERATION_CRITERIA_MET"
+                    if timestamp == "2026-10-21T00:00:00Z"
+                    else "INCOMPLETE",
+                    status["status"],
+                )
+        fields = ("new_unsupported_claim", "new_authority_error", "new_dropped_condition")
+        for condition in ("A", "B"):
+            with self.subTest(non_applicable_condition=condition):
+                changed = json.loads(json.dumps(original))
+                row = next(s for s in changed if s["case"] == "RR1" and s["condition"] == condition)
+                row["observations"].update(dict.fromkeys(fields, True))
+                write_json(path, changed)
+                status = self.call("Validate")
+                self.assertEqual("INCOMPLETE", status["status"])
+                for field in fields:
+                    self.assertTrue(
+                        any(
+                            f"non-applicable observation {field}" in issue
+                            for issue in status["rounds"][1]["issues"]
+                        )
+                    )
         write_json(path, original[:-1])
         self.assertEqual("INCOMPLETE", self.call("Validate")["status"])
 

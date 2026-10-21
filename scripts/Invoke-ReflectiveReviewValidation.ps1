@@ -5,7 +5,8 @@ Prepare, freeze and audit the manual Reflective Review comparison (#452).
 .DESCRIPTION
 No model calls or research mutations are performed. See
 docs/operations/reflective-review-validation.md for the operator procedure.
-All JSON and text written by this helper uses UTF-8 without BOM and LF.
+Generated JSON and input text use UTF-8 without BOM and LF. Imported raw
+evidence retains its original bytes.
 #>
 [CmdletBinding()]
 param(
@@ -50,6 +51,11 @@ function Require-Text($Value, [string]$Name) {
     Assert-That ($Value -is [string] -and -not [string]::IsNullOrWhiteSpace($Value)) "Missing text: $Name"
 }
 function Is-True($Value) { return $Value -is [bool] -and $Value }
+function Is-Timestamp($Value) {
+    if ($Value -isnot [string] -or $Value -cnotmatch '(Z|[+-]\d{2}:\d{2})$') { return $false }
+    $parsed = [DateTimeOffset]::MinValue
+    return [DateTimeOffset]::TryParse($Value, [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::None, [ref]$parsed)
+}
 function Normalize-LF([string]$Text) { return $Text.Replace("`r`n", "`n").Replace("`r", "`n") }
 function Read-Text([string]$Path) { return Normalize-LF ([IO.File]::ReadAllText($Path, $script:Utf8)) }
 function Parse-Json([string]$Text) { return (ConvertFrom-Json -InputObject $Text -AsHashtable -DateKind String) }
@@ -72,11 +78,14 @@ function Hash-Text([string]$Text) {
     return [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($script:Utf8.GetBytes($Text))).ToLowerInvariant()
 }
 function Hash-File([string]$Path) { return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant() }
-function Write-New([string]$Path, [string]$Text) {
+function Write-NewBytes([string]$Path, [byte[]]$Bytes) {
     [IO.Directory]::CreateDirectory((Split-Path -Parent $Path)) | Out-Null
     $stream = [IO.File]::Open($Path, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
-    try { $bytes = $script:Utf8.GetBytes($Text.Replace("`r`n", "`n")); $stream.Write($bytes) }
+    try { $stream.Write($Bytes) }
     finally { $stream.Dispose() }
+}
+function Write-New([string]$Path, [string]$Text) {
+    Write-NewBytes $Path ($script:Utf8.GetBytes($Text.Replace("`r`n", "`n")))
 }
 function Local-Path([string]$Relative) {
     $path = [IO.Path]::GetFullPath((Join-Path $script:Root $Relative))
@@ -85,6 +94,10 @@ function Local-Path([string]$Relative) {
 }
 function New-Asset([string]$Relative, [string]$Text) {
     Write-New (Local-Path $Relative) $Text
+    return @{ path = $Relative; sha256 = Hash-File (Local-Path $Relative) }
+}
+function New-RawAsset([string]$Relative, [byte[]]$Bytes) {
+    Write-NewBytes (Local-Path $Relative) $Bytes
     return @{ path = $Relative; sha256 = Hash-File (Local-Path $Relative) }
 }
 function Verify-Asset($Asset) {
@@ -188,6 +201,7 @@ function Freeze-Run($Manifest) {
     Assert-That (-not (Test-Path -LiteralPath (Local-Path 'frozen.json'))) 'Already frozen'
     $setup = Read-Json (Local-Path 'setup.json')
     Require-Text $setup.confirmed_by 'confirmed_by'; Require-Text $setup.confirmed_at 'confirmed_at'
+    Assert-That (Is-Timestamp $setup.confirmed_at) 'Invalid timezone-qualified confirmed_at'
     Assert-That (Is-True $setup.provider_consent) 'Provider consent has not been recorded'
     # Validate all histories before creating any frozen input.
     $histories = @{}
@@ -198,13 +212,17 @@ function Freeze-Run($Manifest) {
         }
         Require-Text $item.disposable_workspace "$($case.id).disposable_workspace"
         Require-Text $item.path "$($case.id).path"
-        $history = Read-Text $item.path
+        $bytes = [IO.File]::ReadAllBytes($item.path)
+        $reader = [IO.StreamReader]::new([IO.MemoryStream]::new($bytes, $false), $script:Utf8, $true)
+        try { $history = Normalize-LF ($reader.ReadToEnd()) }
+        finally { $reader.Dispose() }
         Assert-That ($history.Contains($case.request) -and $history.Contains($case.target)) "History lacks exact request or target: $($case.id)"
-        $histories[$case.id] = $history
+        $histories[$case.id] = @{ text = $history; raw = $bytes }
     }
     $assets = @()
     foreach ($case in $Manifest.cases) {
-        $assets += New-Asset "inputs/$($case.id)/history.txt" $histories[$case.id]
+        $assets += New-RawAsset "inputs/$($case.id)/history.raw" $histories[$case.id].raw
+        $assets += New-Asset "inputs/$($case.id)/history.txt" $histories[$case.id].text
         foreach ($condition in @('B', 'C')) {
             $assets += New-Asset "inputs/$($case.id)/$condition.txt" (Review-Text $case $condition)
         }
@@ -474,9 +492,15 @@ function Assess-Round($Manifest, $Events, [int]$Round) {
             foreach ($field in @('scorer', 'scored_at', 'purpose_reason', 'meaning_reason', 'observation_note')) {
                 if ([string]::IsNullOrWhiteSpace($s[$field])) { $issues += "$key missing $field" }
             }
+            if (-not (Is-Timestamp $s.scored_at)) { $issues += "$key invalid timezone-qualified scored_at" }
             foreach ($lens in @('purpose', 'meaning')) { if ($s[$lens] -cnotin @('PASS', 'FAIL')) { $issues += "$key unscored $lens" } }
             foreach ($field in @('unsupported_claim', 'dropped_conclusion', 'missing_condition', 'authority_error', 'unnecessary_question', 'degradation', 'new_unsupported_claim', 'new_authority_error', 'new_dropped_condition')) {
                 if ($s.observations[$field] -isnot [bool]) { $issues += "$key unrecorded observation $field" }
+            }
+            if ($condition -in @('A', 'B')) {
+                foreach ($field in @('new_unsupported_claim', 'new_authority_error', 'new_dropped_condition')) {
+                    if ($s.observations[$field] -cne $false) { $issues += "$key non-applicable observation $field must be false" }
+                }
             }
         }
     }
