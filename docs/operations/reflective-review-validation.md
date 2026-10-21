@@ -2,65 +2,80 @@
 
 この手順は [#452](https://github.com/hirsaeki/research-loom/issues/452) の段階1を、同じ入力・順序・記録形式で2回実施するためのものです。正本は [比較プロトコル](../../skills/research-conversation/acceptance/reflective-review.md) です。Helper はモデルを呼び出さず、研究状態も変更しません。実行者・採点者はオーナー（hirsaeki）です。自動検査の成功と、人手による意味上の合格は別です。
 
-## 1. 準備する
+## 1. 比較種別とケース定義を準備する（v2、#605）
+
+最初に [ケース定義・実履歴対応表](reflective-review-case-definition.md) に従い、リポジトリ外で `cases.json` と文脈ファイルを作ります。比較用モデル呼出し・採点より前に対象と除外理由を決め、以下のどちらか一方を選びます。同じRunRootに混在させません。
+
+| `study_kind` | ケースとB用文脈 | 結果の範囲 |
+|---|---|---|
+| `controlled_fixture` | 既存RR1〜RR8。Bは作成方法を明示した構成文脈。架空の実行を実履歴と称さない | 既存8件の基準による固定課題の比較 |
+| `historical_replay` | HR1等の別ID。実際の原発言・Targetと、Target時点までの原履歴 | ケース・レンズ・反復ごとの記述的な比較 |
+
+実履歴は再生成しません。後日の訂正をBに追加せず、欠けたツールログや主担当の説明を作り足しません。Targetまでに存在する正当化だけが対象です。実履歴の原発言・Targetを翻訳・匿名化して変更する必要があるなら、別の構成ケースとして扱います。
+
+**旧RunRootは変更・削除しません。** v1の `manifest.json` は新版で拒否されます。元のHelperと資産版で参照するか、そのまま保管します。移行・同意のコピーは行わず、新版のHelper・プロトコル・実際の送信内容に対して新しいRunRootと同意記録を作ります。既存の `reflective-review-2026-10-21` は保持し、以下では別名を使います。
 
 PowerShell **7.5以上**（日時を文字列として読むJSON処理を使用）、Git、対象リポジトリが必要です。追加のPowerShellモジュール、APIキー、Python環境は不要です。`pwsh -NoProfile` でプロファイルを読み込まないセッションを開始し、以下はリポジトリのルートで実行します。全コマンドを同じHelperの版で実施し、途中でHelperや比較資産を更新しないでください。更新が必要なら別のRunRootで新しい比較を準備します。
 
 ```powershell
 $helper = Join-Path (Get-Location) 'scripts/Invoke-ReflectiveReviewValidation.ps1'
-$run = 'D:\wsroot\scratch\reflective-review-2026-10-21'
+$run = 'D:\wsroot\scratch\reflective-review-v2-fixed-2026-10-21'
 $settings = 'D:\wsroot\scratch\reflective-review-settings.json'
+$cases = 'D:\wsroot\scratch\reflective-review-v2-cases.json'
 ```
 
 RunRootは**まだ存在しない、リポジトリ外の専用ディレクトリ**にします。実研究のworkspaceを指定しません。例の名前が存在する場合は別名を選びます。Helperを同時に複数起動しないでください。既存記録は上書きしません。
 
-設定ファイルをJSONオブジェクトとして作成します。使用モデルの識別子、provider、推論設定などの実際のホスト設定を事前に確認します。下記は形式例であり、使用するモデルや設定の推奨値ではありません。
+設定ファイルをJSONオブジェクトとして先に作成します。以下は今回の指定 `gpt-6.1-sol / medium` をCodexで利用する例です。これは設定の記録であり、モデルの選択を自動変更しません。共通指示・利用ホスト版・メモリやツールの扱いなど追加条件も、実際に固定する値を記入します。比較用会話でも同じ設定を選びます。
 
 ```powershell
-@{ reasoning_effort = '実際の値'; other_settings = '実際に固定した設定' } |
+@{ reasoning_effort = 'medium'; host = 'Codex' } |
     ConvertTo-Json | Set-Content -LiteralPath $settings -Encoding utf8NoBOM
-& $helper -Action Prepare -RunRoot $run -Model '実際のモデル識別子' `
-    -Provider '実際のprovider' -SettingsFile $settings
+& $helper -Action Prepare -RunRoot $run -Model 'gpt-6.1-sol' `
+    -Provider 'openai' -SettingsFile $settings -CaseFile $cases
 ```
 
 生成物は次の構成です。
 
 | 保存先 | 内容・編集可否 |
 |---|---|
-| `manifest.json` | HEAD、準備日時、資産とHelperのdigest、設定、8ケース、実行順。編集しない |
-| `inputs/RR*/target.txt` | Aの出力・B/Cの初期Target。編集しない |
-| `inputs/RR*/case.txt` | 原発言・明示指示・Target・事実・状態。編集しない |
-| `setup.json` | 送信同意とB用履歴の事前確認。Freeze前だけ編集する |
+| `manifest.json` | schema 2、比較種別・suite ID・study digest、HEAD、準備日時、資産とHelperのdigest、設定、ケース、実行順。編集しない |
+| `inputs/<case>/target.txt` | Aの出力・B/Cの初期Target。編集しない |
+| `inputs/<case>/case.txt` | 原発言・明示指示・Target・事実・状態。編集しない |
+| `inputs/<case>/history.raw` | 構成文脈原本、または選択元のJSONL全体の原バイト列。モデルへ渡さない |
+| `inputs/<case>/history.txt` | Bへ渡す構成文脈、またはcutoffまでの選択・変換済み原履歴。編集しない |
+| `provenance/cases.json`, `provenance/<case>.json` | 入力ケース定義原本と選択イベントID。モデルへ渡さない |
+| `setup.json` | 送信同意と種別に応じた事前確認。Freeze前だけ編集する |
 | `round-1/scores.json`, `round-2/scores.json` | 人手採点欄。モデルに渡さない |
 
-Targetの外側の引用符はMarkdownの区切りとして除き、本文をUTF-8 BOMなし・LF・末尾改行追加なしで固定します。RR5・RR8のRR2参照は展開済みです。版は `RR1-v1` 等、digestはそのTarget本文のSHA-256です。修正後本文もBOMを除いたテキストの改行をLFに揃えて照合します。**取り込んだ生出力ファイル自体はバイト列のまま保存し、別途digestを記録します。**
+固定ケースではTargetの外側の引用符をMarkdownの区切りとして除き、本文をUTF-8 BOMなし・LF・末尾改行追加なしで固定します。RR5・RR8のRR2参照は展開済みです。実履歴は原文の末尾改行や引用符も保持し、改行だけLFに揃えます。版は `RR1-v1` / `HR1-v1` 等、digestはそのTarget本文のSHA-256です。修正後本文もBOMを除いたテキストの改行をLFに揃えて照合します。**取り込んだ生出力ファイル自体はバイト列のまま保存し、別途digestを記録します。**
 
-## 2. Bの作業文脈を作成し、固定する
+## 2. 入力を確認し、送信同意を記録して固定する
 
-**B用履歴の作成を含め、最初のモデル送信より前に、オーナーがproviderへのケース本文の送信に同意し、その日時と対象providerを記録します。** レビューや期待事項の閲覧より先に、RR1〜RR8それぞれについて、使い捨て環境・別会話でB用履歴を一度だけ作成します。モデル・設定は比較と同じにし、原発言を冒頭近くに置き、実際のツール呼出しと出力、対象Targetを出した過程、主担当によるその説明を保存します。使用するのは当該ケースの情報だけです。研究状態の採用・承認や実研究の再実行は行いません。
+**最初のモデル送信より前に、オーナーが実際に送るケース本文と選択文脈を確認し、対象providerへの送信に同意します。** 実履歴には匿名ケース以外の情報が残る可能性があるため、過去の同意だけを流用しません。Prepareは外部送信しません。文脈作成もローカルの編集・抽出で行い、モデルに生成させません。研究状態の採用・承認や実研究の再実行は行いません。
 
-履歴は実記録をそのまま保存します。ツールログや自己正当化を後から架空の対話として作らないでください。期待事項や他ケースの回答を見せてはいけません。**生成された対象が固定Targetと違う場合は準備未完了です。** 成功するまで再生成したり、ログや固定Targetを書き換えたりせず、差異を残してオーナーがプロトコル上の扱いを判断します。
+`case.txt` と `history.txt`、対応する出所記録を確認します。実履歴は元イベントの原発言・Targetと完全一致することをHelperが検査します。構成文脈にはこの条件を課さず、ケースとの整合性を人が確認します。どちらも期待事項・採点・修正案を含めません。文脈作成者は採点者専用期待事項を参照しません。この実装・採点用会話を比較用の会話として再利用しません。
 
-`setup.json` の `histories.RR1` 等について、履歴ファイルの絶対パス、使い捨て環境の識別情報を記入し、実際に確認できた項目だけ `true` にします。
+`setup.json` の `histories.<case>` で、実際に確認した項目だけ `true` にします。`context_kind` は変更しません。
 
 | フィールド | 確認内容 |
 |---|---|
-| `real_transcript` | 架空の再構成ではなく実履歴である |
-| `request_near_start` | 人間の原発言が冒頭近くにある |
-| `tools_and_outputs` | Targetを出した実際のツール呼出しと出力がある |
-| `exact_target` | 固定Target本文に一致する |
-| `host_justification` | 主担当によるTargetの説明がある |
+| `case_consistent` | 文脈がケースの事実・状態と矛盾しない |
+| `relevant_facts_complete` | Bにある判断上重要な事実・指示がCの5フィールドにも保持されている |
 | `no_expected_findings` | 期待事項・正解・採点記録が混入していない |
+| `construction_disclosed`（構成文脈のみ） | 作成方法・元場面との違いを出所記録に明示し、観測した履歴と称していない |
+| `original_events_verified`（実履歴のみ） | 指定原イベントと当時の対象・時点・ツール対が正しく、後日の訂正を含まない |
+| `transformations_reviewed`（実履歴のみ） | 省略・匿名化と理由、5フィールドの出所を確認し、意味や必要条件が失われていない |
 
-オーナーがproviderへのケース本文の送信に同意した後、`provider_consent` を `true` にし、`confirmed_by` と `confirmed_at`（タイムゾーン付き日時）を記入します。同意前に送信しません。
+オーナーが実際の送信内容に同意した後、`provider_consent` を `true` にし、`provider` がmanifestと一致することを確認して、`confirmed_by` と `confirmed_at`（タイムゾーン付き日時）を記入します。同意前に送信しません。
 
 ```powershell
 & $helper -Action Freeze -RunRoot $run
 ```
 
-8件すべての確認と原発言・Targetの文字列一致を検査してから、B/C入力と `frozen.json` を作成します。各 `inputs/RR*/history.raw` に履歴の原バイト列を保存し、BOM・改行を含めたSHA-256を記録します。モデル入力用の `history.txt` はUTF-8 BOMなし・LFへ正規化した別ファイルです。両方の改変を検査します。履歴の真正性・非混入などは人の確認であり、Helperが独立に証明するものではありません。以後、元の履歴ファイルの更新は比較入力に反映されません。
+全ケースの確認とPrepare済み入力・出所のdigestを検査してから、B/C入力と `frozen.json` を作成します。原バイトとUTF-8 BOMなし・LFのモデル入力を別々に検査します。真正性・意味上の非混入・網羅性は人の確認であり、Helperが独立に証明するものではありません。Prepare後の外部元ファイルの更新は比較入力に反映されません。入力を変える必要があれば、別のRunRootで準備し直します。
 
-実行順は1回目RR1→RR8、奇数ケースB→C・偶数ケースC→B、2回目RR8→RR1、B/C順も逆です。Aではモデルを呼びません。
+実行順は1回目が定義順、奇数位置B→C・偶数位置C→B、2回目がケース順・B/C順とも逆です。固定ケースは従来どおりRR1→RR8／RR8→RR1です。Aではモデルを呼びません。
 
 ## 3. Nextに従い、呼出しと取込みを繰り返す
 
@@ -86,6 +101,7 @@ $next.record | ConvertTo-Json -Depth 30 |
 
 | レコード項目 | 記録する内容 |
 |---|---|
+| `study_kind`, `suite_id`, `study_sha256` | Nextの値を保持する。他の比較種別・ケース群の記録はImportできない |
 | `round`, `case`, `condition`, `kind`, `input_sha256` | Nextの値を保持する |
 | `raw_path` | 初回生出力ファイルの絶対パス |
 | `model`, `provider`, `settings` | 実際に使用した設定。相違を隠してmanifestの値に合わせない |
@@ -168,7 +184,7 @@ $next.record | ConvertTo-Json -Depth 30 |
 & $helper -Action Validate -RunRoot $run
 ```
 
-各 `round-*/scores.json` の24行をオーナーが記入します。採点者だけが [期待事項](../../skills/research-conversation/acceptance/reflective-review-expectations.md) と [2つのレンズ](../../skills/research-conversation/acceptance/rubric.md#reflective-review-lenses-590) を読みます。Aの本文は両反復で同じですが、記録は各反復に残します。
+各 `round-*/scores.json` のケース数×3行をオーナーが記入します。固定ケースでは従来どおり24行で、採点者だけが [期待事項](../../skills/research-conversation/acceptance/reflective-review-expectations.md) を読みます。実履歴はそのケースの原発言・事実・状態に対して採点し、RRの期待事項を転用しません。両種別とも [2つのレンズ](../../skills/research-conversation/acceptance/rubric.md#reflective-review-lenses-590) を使います。Aの本文は両反復で同じですが、記録は各反復に残します。
 
 - `output_sha256` はValidateの `outputs` の値、`scorer` は採点者、`scored_at` はタイムゾーン付き日時を記入する。
 - `purpose`, `meaning` はそれぞれ `PASS` / `FAIL` とし、各 `*_reason` を記入する。未採点は空のままにし、自動合格にしない。
@@ -184,13 +200,17 @@ $next.record | ConvertTo-Json -Depth 30 |
 
 ReportDirectoryも未作成の専用ディレクトリにします。JSONには全条件のレンズ別件数、各基準、欠落、出力binding、呼出しごとの入力文字数・時間・費用と不明理由、証跡digestを残します。Markdownは概要です。入力文字数はUnicodeコードポイント数であり、token数ではありません。
 
-各反復で次を独立に確認します。
+固定ケースの各反復で次を独立に確認します。既存の基準は変更しません。
 
 1. CのPASSレンズ数がAより多いケースが8件中5件以上ある。これは既存基準のケース比較だけに用い、2レンズの総合品質点は作らない。
 2. Purpose合計とMeaning合計のそれぞれで、CがBを下回らない。
 3. RR5のCが両レンズPASSで、原案を劣化させていない。
 4. Cが新たなunsupported claim、authority誤り、条件欠落を導入していない。
 
-両反復で満たした場合だけ `STAGE2_CONSIDERATION_CRITERIA_MET`（段階2の検討基準を充足）です。完了した2反復で再現しなければ `CRITERIA_NOT_REPRODUCED`、欠落・未実施・無効出力・未採点があれば `INCOMPLETE` です。1回だけでは暫定です。Helperの終了コード0は操作成功を示し、比較合格を意味しません。正式採用・段階2着手を自動承認しません。
+固定ケースの両反復で満たした場合だけ `STAGE2_CONSIDERATION_CRITERIA_MET`（固定課題における段階2の検討基準を充足）です。実履歴における有効性の証明ではありません。完了した2反復で再現しなければ `CRITERIA_NOT_REPRODUCED` です。
+
+実履歴はレンズ別・ケース別・反復別に記述的に報告します。全ケースの実行と人手採点が揃えば `HISTORICAL_REPLAY_RECORDED` で、レンズFAILがあってもこの記録完了状態になります。`criteria` / `criteria_met` は `null` であり、5/8やRR5の基準、段階2基準充足を表示しません。固定ケースと合算しません。
+
+両種別とも欠落・未実施・無効出力・未採点は `INCOMPLETE`、1回だけでは暫定です。Helperの終了コード0は操作成功を示し、比較合格を意味しません。正式採用・段階2着手を自動承認しません。
 
 全RunRootとReportを一緒に保管し、オーナーが内容を確認した後、既存プロトコルどおり `skills/research-conversation/acceptance/reflective-review-run-<date>.md` に実施記録を配置します。同日複数回なら同じ記録から各RunRootの識別子を明示します。JSON、初回原出力、修正、採否、採点に到達できる保管先とdigestを記録してください。有利でない結果も#452に報告します。配置・コミット・Issue投稿はこのHelperの動作には含まれません。
