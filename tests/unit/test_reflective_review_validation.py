@@ -324,6 +324,44 @@ class ReflectiveReviewValidationTests(unittest.TestCase):
             str(case_file),
         )
 
+    def test_multiple_historical_cases_preserve_order_targets_and_score_rows(self):
+        path, bundle, _ = self.historical_study()
+        second = json.loads(json.dumps(bundle["cases"][0]))
+        second["id"] = "HR2"
+        bundle["cases"].append(second)
+        write_json(path, bundle)
+        self.run = self.work / "two-historical-cases"
+        self.prepare_study(path, self.run)
+        manifest = read_json(self.run / "manifest.json")
+        self.assertEqual(["HR1", "HR2"], [case["id"] for case in manifest["cases"]])
+        self.assertEqual(
+            [
+                (1, "HR1", "B"),
+                (1, "HR1", "C"),
+                (1, "HR2", "C"),
+                (1, "HR2", "B"),
+                (2, "HR2", "B"),
+                (2, "HR2", "C"),
+                (2, "HR1", "C"),
+                (2, "HR1", "B"),
+            ],
+            [(item["round"], item["case"], item["condition"]) for item in manifest["order"]],
+        )
+        for case in bundle["cases"]:
+            self.assertEqual(
+                case["target"],
+                (self.run / "inputs" / case["id"] / "target.txt").read_text(encoding="utf-8"),
+            )
+        for round_number in (1, 2):
+            scores = read_json(self.run / f"round-{round_number}/scores.json")
+            self.assertEqual(
+                [(case_id, condition) for case_id in ("HR1", "HR2") for condition in "ABC"],
+                [(score["case"], score["condition"]) for score in scores],
+            )
+        self.complete_setup(self.run, self.work)
+        self.call("Freeze")
+        self.assertEqual("HR1", self.step()["tuple"]["case"])
+
     def test_historical_cutoff_source_snapshot_transformations_and_study_binding(self):
         path, bundle, _ = self.historical_study()
         self.run = self.work / "historical"
