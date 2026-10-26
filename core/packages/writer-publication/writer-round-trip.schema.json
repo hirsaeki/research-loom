@@ -213,6 +213,9 @@
         },
         "section_input": {
           "type": "object"
+        },
+        "origin_input_ref": {
+          "$ref": "#/$defs/input_ref"
         }
       }
     },
@@ -230,7 +233,10 @@
       ],
       "properties": {
         "schema_version": {
-          "const": "0.1.0"
+          "enum": [
+            "0.1.0",
+            "0.2.0"
+          ]
         },
         "object_type": {
           "const": "writer_round_trip_input"
@@ -252,10 +258,42 @@
         "authority_boundary": {
           "$ref": "#/$defs/authority_boundary"
         },
+        "shared_material_texts": {
+          "type": "object",
+          "propertyNames": {
+            "$ref": "#/$defs/digest"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
         "input_digest": {
           "$ref": "#/$defs/digest"
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "schema_version": {
+                "const": "0.2.0"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "shared_material_texts"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "shared_material_texts"
+              ]
+            }
+          }
+        }
+      ]
     },
     "input_ref": {
       "type": "object",
@@ -516,6 +554,9 @@
         "origin_revision_id": {
           "$ref": "#/$defs/id"
         },
+        "origin_input_ref": {
+          "$ref": "#/$defs/input_ref"
+        },
         "profile_review": {
           "type": "array",
           "maxItems": 32,
@@ -596,7 +637,10 @@
       ],
       "properties": {
         "schema_version": {
-          "const": "0.1.0"
+          "enum": [
+            "0.1.0",
+            "0.2.0"
+          ]
         },
         "object_type": {
           "const": "writer_manuscript_revision"
@@ -711,6 +755,9 @@
         "response_digest": {
           "$ref": "#/$defs/digest"
         },
+        "response_input_ref": {
+          "$ref": "#/$defs/input_ref"
+        },
         "writer": {
           "$ref": "#/$defs/writer_identity"
         },
@@ -745,7 +792,32 @@
         "document_review": {
           "$ref": "#/$defs/document_review"
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "schema_version": {
+                "const": "0.2.0"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "response_input_ref"
+            ],
+            "properties": {
+              "sections": {
+                "items": {
+                  "required": [
+                    "origin_input_ref"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ]
     },
     "writer_profile_review": {
       "type": "object",

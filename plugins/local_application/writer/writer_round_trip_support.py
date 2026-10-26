@@ -12,12 +12,15 @@ from jsonschema import Draft202012Validator, FormatChecker
 from core.resources import resource_path
 from plugins.application_errors import LocalApplicationError
 
-SCHEMA_VERSION = "0.1.0"
+from .writer_composition_support import MAX_WRITER_EXPORT_OPERATION_BYTES
+
+SCHEMA_VERSION = "0.2.0"
 MAX_SECTIONS = 64
 MAX_FEEDBACK_ISSUES = 128
 MAX_INSPECT_ANCESTRY = 64
 MAX_RESPONSE_BYTES = 8 * 1024 * 1024
-MAX_ROUND_TRIP_INPUT_BYTES = 16 * 1024 * 1024
+# Aggregate bytes actually emitted by one export, including detached sections.
+MAX_EXPORT_OPERATION_BYTES = MAX_WRITER_EXPORT_OPERATION_BYTES
 SCHEMA = resource_path("core/packages/writer-publication/writer-round-trip.schema.json")
 
 

@@ -6,6 +6,8 @@ from unittest.mock import patch
 
 import tests.runtime.issue80_writer_composition_suite as writer_comp_support
 from plugins.local_application import LocalApplicationError
+from plugins.local_application.publication.publication_input import inspect_inputs
+from plugins.local_application.writer.writer_input_bundle import expand_input
 from plugins.local_application.writer.writer_round_trip_service import WriterRoundTripService
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
@@ -212,6 +214,180 @@ class Issue219WriterRoundTripTests(ResearchPackageAcceptanceSupport):
         finally:
             facade.close()
 
+    def test_separate_batches_accumulate_in_composition_order(self):
+        facade, _case, composition, _exported, _input_doc = self._build_round_trip()
+        try:
+            first_dir = self.root / "writer-first-batch"
+            second_dir = self.root / "writer-second-batch"
+            facade.export_writer_round_trip_input(
+                composition["composition_id"], ["SEC-FRAME"], first_dir
+            )
+            facade.export_writer_round_trip_input(
+                composition["composition_id"], ["SEC-VALIDATE"], second_dir
+            )
+            first_input = json.loads((first_dir / "writer-input.json").read_text(encoding="utf-8"))
+            second_input = json.loads(
+                (second_dir / "writer-input.json").read_text(encoding="utf-8")
+            )
+            first = facade.import_writer_response(
+                self._response(
+                    first_input,
+                    response_id="WR-BATCH-1",
+                    sections=[
+                        {
+                            "section_id": "SEC-FRAME",
+                            "content": "First chapter.",
+                            "citations": [],
+                            "exhibit_refs": list(first_input["sections"][0]["exhibit_refs"]),
+                        }
+                    ],
+                    feedback=[],
+                )
+            )
+            second = facade.import_writer_response(
+                self._response(
+                    second_input,
+                    response_id="WR-BATCH-2",
+                    base={key: first[key] for key in ("revision_id", "revision_digest")},
+                    sections=[
+                        {
+                            "section_id": "SEC-VALIDATE",
+                            "content": "Second chapter.",
+                            "citations": [],
+                            "exhibit_refs": list(second_input["sections"][0]["exhibit_refs"]),
+                        }
+                    ],
+                    feedback=[],
+                )
+            )
+            shown = facade.inspect_writer_round_trip(composition["composition_id"])
+            self.assertEqual(second["reused_section_ids"], ["SEC-FRAME"])
+            self.assertEqual(
+                [row["section_id"] for row in shown["revision"]["sections"]],
+                ["SEC-FRAME", "SEC-VALIDATE"],
+            )
+            self.assertEqual(
+                [row["content"] for row in shown["revision"]["sections"]],
+                ["First chapter.", "Second chapter."],
+            )
+            self.assertEqual(len(shown["writer_input"]["sections"]), 2)
+            self.assertEqual(shown["response_input"]["input_id"], second_input["input_id"])
+            self.assertEqual(shown["writer_input"]["schema_version"], "0.2.0")
+            self.assertEqual(
+                [
+                    row["section_id"]
+                    for row in shown["document_review_target"]["material"]["sections"]
+                ],
+                ["SEC-FRAME", "SEC-VALIDATE"],
+            )
+            publication = inspect_inputs(
+                facade, composition["composition_id"], second["revision_id"]
+            )
+            self.assertEqual(
+                [row["section_id"] for row in publication["writer_input"]["sections"]],
+                ["SEC-FRAME", "SEC-VALIDATE"],
+            )
+            stale = self._response(
+                second_input,
+                response_id="WR-BATCH-STALE",
+                base={key: first[key] for key in ("revision_id", "revision_digest")},
+                sections=[
+                    {
+                        "section_id": "SEC-VALIDATE",
+                        "content": "Stale replacement.",
+                        "citations": [],
+                        "exhibit_refs": list(second_input["sections"][0]["exhibit_refs"]),
+                    }
+                ],
+                feedback=[],
+            )
+            with self.assertRaises(LocalApplicationError) as error:
+                facade.import_writer_response(stale)
+            self.assertEqual(error.exception.code, "APPLICATION-WRITER-ROUND-TRIP-STALE-001")
+            current = deepcopy(stale)
+            current["response_id"] = "WR-BATCH-REVIEW"
+            current["base_revision_ref"] = {
+                key: second[key] for key in ("revision_id", "revision_digest")
+            }
+            prepared = facade.prepare_writer_document_review(current)
+            self.assertEqual(prepared["scope_section_ids"], ["SEC-FRAME", "SEC-VALIDATE"])
+            self.assertEqual(
+                [row["content"] for row in prepared["material"]["sections"]],
+                ["First chapter.", "Stale replacement."],
+            )
+        finally:
+            facade.close()
+
+    def test_compact_input_rehydrates_and_legacy_receipt_remains_readable(self):
+        facade, _case, composition, _exported, input_doc = self._build_round_trip()
+        try:
+            service = facade._writer_round_trip_service()
+            canonical = expand_input(input_doc)
+            self.assertEqual(canonical["sections"][0]["section_input"]["schema_version"], "0.1.0")
+            shared = input_doc["shared_material_texts"]
+            self.assertTrue(shared)
+            for row in input_doc["sections"]:
+                for material in row["section_input"]["resolved_materials"]:
+                    rendition = material["text_rendition"]
+                    self.assertNotIn("content", rendition)
+                    self.assertEqual(
+                        canonical["shared_material_texts"][rendition["content_ref"]],
+                        shared[rendition["content_ref"]],
+                    )
+
+            legacy = deepcopy(canonical)
+            legacy.pop("shared_material_texts")
+            legacy["schema_version"] = "0.1.0"
+            from core.runtime import canonical_digest
+            from plugins.local_application.writer.writer_composition_support import _digest_document
+
+            legacy["input_id"] = (
+                "WRI-"
+                + canonical_digest(
+                    {"source": legacy["source"], "sections": legacy["sections"]}
+                ).split(":", 1)[1][:24]
+            )
+            legacy["input_digest"] = _digest_document(legacy, "input_digest")
+            service._write_immutable(service._input_path(legacy["input_id"]), legacy)
+            self.assertEqual(service._load_input(legacy["input_id"]), legacy)
+
+            imported = facade.import_writer_response(self._response(input_doc))
+            revision_path = service._revision_path(
+                composition["composition_id"], imported["revision_id"]
+            )
+            legacy_revision = json.loads(revision_path.read_text(encoding="utf-8"))
+            legacy_revision["schema_version"] = "0.1.0"
+            legacy_revision.pop("response_input_ref")
+            for row in legacy_revision["sections"]:
+                row.pop("origin_input_ref")
+            legacy_revision["revision_digest"] = _digest_document(
+                legacy_revision, "revision_digest"
+            )
+            revision_path.write_text(
+                json.dumps(legacy_revision, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                facade.inspect_writer_round_trip(
+                    composition["composition_id"], imported["revision_id"]
+                )["revision"]["schema_version"],
+                "0.1.0",
+            )
+
+            tampered = deepcopy(input_doc)
+            first_ref = next(iter(tampered["shared_material_texts"]))
+            tampered["shared_material_texts"][first_ref] += " altered"
+            tampered["input_digest"] = _digest_document(tampered, "input_digest")
+            service._input_path(input_doc["input_id"]).write_text(
+                json.dumps(tampered, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            with self.assertRaises(LocalApplicationError) as error:
+                service._load_input(input_doc["input_id"])
+            self.assertEqual(error.exception.code, "APPLICATION-WRITER-ROUND-TRIP-INTEGRITY-001")
+        finally:
+            facade.close()
+
     def test_retry_recovers_head_after_revision_persisted_before_head_update(self):
         facade, _case, composition, _exported, input_doc = self._build_round_trip()
         try:
@@ -294,23 +470,7 @@ class Issue219WriterRoundTripTests(ResearchPackageAcceptanceSupport):
             response = self._response(tampered)
             with self.assertRaises(LocalApplicationError) as error:
                 facade.import_writer_response(response)
-            self.assertEqual(error.exception.code, "APPLICATION-WRITER-ROUND-TRIP-PIN-001")
-
-            # Ablation: without the exact context guard, the same response attaches to a tampered receipt.
-            with patch.object(
-                WriterRoundTripService,
-                "_validate_input_context",
-                return_value=(
-                    facade._writer_composition_service()._load_version(
-                        composition["composition_id"], 1
-                    ),
-                    facade.show_research_package(input_doc["source"]["research_package_id"])[
-                        "package"
-                    ],
-                ),
-            ):
-                imported = facade.import_writer_response(response)
-            self.assertEqual(imported["status"], "IMPORTED")
+            self.assertEqual(error.exception.code, "APPLICATION-WRITER-ROUND-TRIP-INTEGRITY-001")
         finally:
             facade.close()
 
@@ -330,7 +490,7 @@ class Issue219WriterRoundTripTests(ResearchPackageAcceptanceSupport):
             )
             with self.assertRaises(LocalApplicationError) as error:
                 facade.import_writer_response(self._response(tampered))
-            self.assertEqual(error.exception.code, "APPLICATION-WRITER-ROUND-TRIP-PIN-001")
+            self.assertEqual(error.exception.code, "APPLICATION-WRITER-ROUND-TRIP-INTEGRITY-001")
         finally:
             facade.close()
 
@@ -356,7 +516,7 @@ class Issue219WriterRoundTripTests(ResearchPackageAcceptanceSupport):
             )
             with self.assertRaises(LocalApplicationError) as error:
                 facade.import_writer_response(self._response(tampered))
-            self.assertEqual(error.exception.code, "APPLICATION-WRITER-ROUND-TRIP-PIN-001")
+            self.assertEqual(error.exception.code, "APPLICATION-WRITER-ROUND-TRIP-INTEGRITY-001")
         finally:
             facade.close()
 
@@ -385,12 +545,12 @@ class Issue219WriterRoundTripTests(ResearchPackageAcceptanceSupport):
         finally:
             facade.close()
 
-    def test_round_trip_input_has_aggregate_size_bound_and_releases_lock(self):
+    def test_round_trip_export_budget_releases_lock_and_allows_smaller_retry(self):
         facade, _case, composition, _exported, _input_doc = self._build_round_trip()
         try:
             output = self.root / "writer-round-trip-too-large"
             with patch(
-                "plugins.local_application.writer.writer_round_trip_service.MAX_ROUND_TRIP_INPUT_BYTES",
+                "plugins.local_application.writer.writer_round_trip_service.MAX_EXPORT_OPERATION_BYTES",
                 1,
             ):
                 with self.assertRaises(LocalApplicationError) as error:
@@ -403,6 +563,27 @@ class Issue219WriterRoundTripTests(ResearchPackageAcceptanceSupport):
             # A failed bounded export must not poison the destination.
             exported = facade.export_writer_round_trip_input(
                 composition["composition_id"], ["SEC-FRAME"], output
+            )
+            self.assertEqual(exported["status"], "EXPORTED")
+        finally:
+            facade.close()
+
+    def test_detached_section_export_uses_operation_budget_without_partial_output(self):
+        facade, _case, composition, _exported, _input_doc = self._build_round_trip()
+        try:
+            output = self.root / "section-budget-retry"
+            with patch(
+                "plugins.local_application.writer.writer_section_input.MAX_WRITER_EXPORT_OPERATION_BYTES",
+                1,
+            ):
+                with self.assertRaises(LocalApplicationError) as error:
+                    facade.export_writer_section_input(
+                        composition["composition_id"], "SEC-FRAME", output
+                    )
+            self.assertEqual(error.exception.code, "APPLICATION-WRITER-COMPOSITION-BOUND-001")
+            self.assertFalse(output.exists())
+            exported = facade.export_writer_section_input(
+                composition["composition_id"], "SEC-FRAME", output
             )
             self.assertEqual(exported["status"], "EXPORTED")
         finally:
@@ -447,7 +628,7 @@ class Issue219WriterRoundTripTests(ResearchPackageAcceptanceSupport):
             )
             with self.assertRaises(LocalApplicationError) as error:
                 facade.import_writer_response(partial)
-            self.assertEqual(error.exception.code, "APPLICATION-WRITER-ROUND-TRIP-INPUT-001")
+            self.assertEqual(error.exception.code, "APPLICATION-WRITER-ROUND-TRIP-PIN-001")
 
             complete = deepcopy(partial)
             complete["response_id"] = "WR-V2-COMPLETE"

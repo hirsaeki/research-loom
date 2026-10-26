@@ -214,9 +214,16 @@ class WriterRoundTripReviewMixin:
             refuse("Group unevaluated cannot conceal declared violations")
 
     def _validate_response_semantics(
-        self, response: Mapping[str, Any], receipt: Mapping[str, Any], package: Mapping[str, Any]
+        self,
+        response: Mapping[str, Any],
+        receipt: Mapping[str, Any],
+        package: Mapping[str, Any],
+        document_receipt: Mapping[str, Any] | None = None,
     ) -> None:
         section_scope = {str(row["section_id"]): row for row in receipt["sections"]}
+        feedback_scope = {
+            str(row["section_id"]) for row in (document_receipt or receipt)["sections"]
+        }
         response_ids: set[str] = set()
         violations_by_section: dict[str, set[str]] = {}
         for draft in response["sections"]:
@@ -286,7 +293,7 @@ class WriterRoundTripReviewMixin:
         for issue in response.get("feedback", []):
             target_type = issue["target_type"]
             target_id = str(issue["target_id"])
-            if target_type == "section" and target_id not in section_scope:
+            if target_type == "section" and target_id not in feedback_scope:
                 raise LocalApplicationError(
                     "APPLICATION-WRITER-ROUND-TRIP-REFERENCE-001",
                     f"Writer feedback targets an unavailable section: {target_id}",
@@ -498,7 +505,6 @@ class WriterRoundTripReviewMixin:
                 "Writer response does not name the exact exported input digest",
             )
         composition, package = self._validate_input_context(receipt)
-        self._validate_response_semantics(value, receipt, package)
         composition_id = str(composition["composition_id"])
         with self._composition_service()._series_lock(composition_id):
             head = self._head(composition_id)
@@ -526,25 +532,26 @@ class WriterRoundTripReviewMixin:
                         "initial review target must not name a base",
                     )
             drafts = {row["section_id"]: row for row in value["sections"]}
-            required_ids = [row["section_id"] for row in receipt["sections"]]
-            if base is None or base["source"]["input_id"] != receipt["input_id"]:
-                if set(drafts) != set(required_ids):
-                    raise LocalApplicationError(
-                        "APPLICATION-WRITER-ROUND-TRIP-INPUT-001",
-                        "initial or changed-input review target requires all exported sections",
-                    )
+            if len(drafts) != len(value["sections"]):
+                raise LocalApplicationError(
+                    "APPLICATION-WRITER-ROUND-TRIP-INPUT-001", "duplicate Writer response section"
+                )
+            _, effective_receipt = self._effective_input(receipt, base, drafts, composition)
+            self._validate_response_semantics(value, receipt, package, effective_receipt)
+            required_ids = [row["section_id"] for row in effective_receipt["sections"]]
             previous = {row["section_id"]: row for row in base["sections"]} if base else {}
             sections = [
                 deepcopy(drafts[sid] if sid in drafts else previous[sid]) for sid in required_ids
             ]
-            target = self._document_target(receipt, sections)
-            plan, metadata = self._document_plan(receipt)
+            target = self._document_target(effective_receipt, sections)
+            plan, metadata = self._document_plan(effective_receipt)
             return {
                 "status": "PREPARED",
                 **target,
                 "input_ref": deepcopy(value["input_ref"]),
                 "base_revision_ref": deepcopy(value["base_revision_ref"]),
-                "writer_input": deepcopy(receipt),
+                "writer_input": deepcopy(effective_receipt),
+                "response_input": deepcopy(receipt),
                 "review_plan": [
                     {"review_id": key, "rule_ids": sorted(ids)} for key, ids in plan.items()
                 ],

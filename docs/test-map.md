@@ -86,7 +86,7 @@ Unit tests live in `tests/unit/<package>/`, integration and acceptance tests in
 | `plugins/local_application/publication/publication_dialect.py` | `tests/runtime/test_issue220_publication_release.py` |
 | `plugins/local_application/publication/publication_docx.py` | `tests/runtime/test_issue256_native_publication.py`<br>`tests/runtime/test_issue408_generated_publication.py`<br>`tests/runtime/test_issue430_host_charts.py`<br>`tests/runtime/test_issue433_publication_reader_labels.py`<br>`tests/runtime/test_issue456_formal_document.py`<br>`tests/runtime/test_issue456_formal_rendering.py`<br>`tests/runtime/test_issue456_publication_conformance.py`<br>`tests/runtime/test_misco_publication_profile_application.py` |
 | `plugins/local_application/publication/publication_exhibits.py` | `tests/runtime/test_issue256_native_publication.py`<br>`tests/runtime/test_issue408_generated_publication.py`<br>`tests/runtime/test_issue426_source_bibliography.py`<br>`tests/runtime/test_issue430_host_charts.py`<br>`tests/runtime/test_issue438_citation_visual_inventory.py` |
-| `plugins/local_application/publication/publication_input.py` | `tests/runtime/test_issue408_generated_publication.py`<br>`tests/runtime/test_misco_publication_profile_application.py` |
+| `plugins/local_application/publication/publication_input.py` | `tests/runtime/test_issue219_writer_round_trip.py`<br>`tests/runtime/test_issue408_generated_publication.py`<br>`tests/runtime/test_misco_publication_profile_application.py` |
 | `plugins/local_application/publication/publication_pdf.py` | `tests/runtime/test_issue245_publication_review.py`<br>`tests/runtime/test_issue456_formal_document.py` |
 | `plugins/local_application/publication/publication_release_requests.py` | — |
 | `plugins/local_application/publication/publication_release_service.py` | `tests/runtime/test_issue220_publication_release.py`<br>`tests/runtime/test_issue245_publication_recovery.py`<br>`tests/runtime/test_issue433_publication_reader_labels.py`<br>`tests/runtime/test_issue438_citation_visual_inventory.py`<br>`tests/runtime/test_issue456_bibliography.py`<br>`tests/runtime/test_issue456_formal_rendering.py` |
@@ -163,8 +163,9 @@ Unit tests live in `tests/unit/<package>/`, integration and acceptance tests in
 | `plugins/local_application/workspace/workspace_lock.py` | `tests/runtime/test_issue255_workspace_lock.py` |
 | `plugins/local_application/writer/writer_composition_history_service.py` | `tests/runtime/test_issue177_writer_history.py`<br>`tests/runtime/test_issue249_writer_recovery.py` |
 | `plugins/local_application/writer/writer_composition_service.py` | `tests/runtime/test_issue219_writer_round_trip.py`<br>`tests/runtime/test_issue249_writer_recovery.py`<br>`tests/runtime/test_issue254_item_listing.py` |
-| `plugins/local_application/writer/writer_composition_support.py` | `tests/runtime/test_issue249_writer_recovery.py`<br>`tests/runtime/test_misco_writer_profile_application.py` |
+| `plugins/local_application/writer/writer_composition_support.py` | `tests/runtime/test_issue219_writer_round_trip.py`<br>`tests/runtime/test_issue249_writer_recovery.py`<br>`tests/runtime/test_misco_writer_profile_application.py` |
 | `plugins/local_application/writer/writer_composition_validation.py` | — |
+| `plugins/local_application/writer/writer_input_bundle.py` | `tests/runtime/test_issue219_writer_round_trip.py` |
 | `plugins/local_application/writer/writer_round_trip_import.py` | — |
 | `plugins/local_application/writer/writer_round_trip_review.py` | — |
 | `plugins/local_application/writer/writer_round_trip_service.py` | `tests/runtime/test_issue219_writer_round_trip.py`<br>`tests/runtime/test_issue249_writer_recovery.py`<br>`tests/runtime/test_issue464_writer_rule_scope.py`<br>`tests/runtime/test_issue466_writer_document_review.py` |

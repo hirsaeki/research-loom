@@ -16,8 +16,8 @@ from plugins.application_errors import LocalApplicationError
 
 from ..research_package.research_package_format import package_required_refs
 from .writer_composition_support import (
-    MAX_SECTION_INPUT_BYTES,
     MAX_SECTION_REFS,
+    MAX_WRITER_EXPORT_OPERATION_BYTES,
     SCHEMA_VERSION,
     _digest_document,
     _linked_ids,
@@ -300,11 +300,6 @@ class WriterSectionInputMixin:
         payload = (
             json.dumps(input_doc, ensure_ascii=False, sort_keys=True, indent=2) + "\n"
         ).encode("utf-8")
-        if len(payload) > MAX_SECTION_INPUT_BYTES:
-            raise LocalApplicationError(
-                "APPLICATION-WRITER-COMPOSITION-BOUND-001",
-                "section Writer input exceeds output bound; narrow the section material",
-            )
         out = Path(output_dir).expanduser()
         managed = (self.workspace / ".research-loom").resolve(strict=False)
         resolved = out.resolve(strict=False)
@@ -324,10 +319,6 @@ class WriterSectionInputMixin:
                 "APPLICATION-WRITER-COMPOSITION-EXPORT-001",
                 "section input export parent must exist",
             )
-        tmp = Path(tempfile.mkdtemp(prefix=".section-input-", dir=parent))
-        staging = tmp / "payload"
-        staging.mkdir()
-
         manifest = {
             "schema_version": SCHEMA_VERSION,
             "object_type": "section_writer_input_manifest",
@@ -341,12 +332,21 @@ class WriterSectionInputMixin:
         }
         manifest["manifest_digest"] = _digest_document(manifest, "manifest_digest")
         _validate_schema(manifest)
+        manifest_bytes = (
+            json.dumps(manifest, ensure_ascii=False, sort_keys=True, indent=2) + "\n"
+        ).encode("utf-8")
+        operation_bytes = len(payload) + len(manifest_bytes)
+        if operation_bytes > MAX_WRITER_EXPORT_OPERATION_BYTES:
+            raise LocalApplicationError(
+                "APPLICATION-WRITER-COMPOSITION-BOUND-001",
+                f"section Writer export generated {operation_bytes} bytes, above its {MAX_WRITER_EXPORT_OPERATION_BYTES}-byte operation budget; narrow the section in a new composition version",
+            )
+        tmp = Path(tempfile.mkdtemp(prefix=".section-input-", dir=parent))
+        staging = tmp / "payload"
+        staging.mkdir()
         try:
             (staging / "section-writer-input.json").write_bytes(payload)
-            (staging / "manifest.json").write_text(
-                json.dumps(manifest, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            (staging / "manifest.json").write_bytes(manifest_bytes)
             verify_section_input_root(staging)
             os.replace(staging, out)
             shutil.rmtree(tmp, ignore_errors=True)
