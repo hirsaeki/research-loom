@@ -41,14 +41,16 @@ class WriterRoundTripImportMixin:
                 "Writer response does not name the exact exported input digest",
             )
         composition, package = self._validate_input_context(receipt)
-        self._validate_response_semantics(value, receipt, package)
         composition_id = str(composition["composition_id"])
         composer = self._composition_service()
 
         response_digest = canonical_digest(value)
         revision_id = "WMR-" + response_digest.split(":", 1)[1][:24]
-        response_section_ids = {str(row["section_id"]) for row in value["sections"]}
-        receipt_section_ids = {str(row["section_id"]) for row in receipt["sections"]}
+        drafts = {str(row["section_id"]): row for row in value["sections"]}
+        if len(drafts) != len(value["sections"]):
+            raise LocalApplicationError(
+                "APPLICATION-WRITER-ROUND-TRIP-INPUT-001", "duplicate Writer response section"
+            )
         with composer._series_lock(composition_id):
             head, restored = self._reconcile_head(composition_id)
             existing_path = self._revision_path(composition_id, revision_id)
@@ -58,7 +60,7 @@ class WriterRoundTripImportMixin:
                 existing = self._load_revision(composition_id, revision_id)
                 if (
                     existing.get("response_digest") != response_digest
-                    or existing.get("source", {}).get("input_digest") != receipt["input_digest"]
+                    or self._response_input_ref(existing)["input_digest"] != receipt["input_digest"]
                 ):
                     raise LocalApplicationError(
                         "APPLICATION-WRITER-ROUND-TRIP-IMMUTABLE-001",
@@ -98,11 +100,6 @@ class WriterRoundTripImportMixin:
                         "APPLICATION-WRITER-ROUND-TRIP-STALE-001",
                         "initial manuscript response must not name a base revision",
                     )
-                if response_section_ids != receipt_section_ids:
-                    raise LocalApplicationError(
-                        "APPLICATION-WRITER-ROUND-TRIP-INPUT-001",
-                        "initial manuscript response must provide every section in the exported input",
-                    )
                 revision_number = 1
             else:
                 if (
@@ -116,24 +113,19 @@ class WriterRoundTripImportMixin:
                     )
                 base_revision = self._load_revision(composition_id, str(head["revision_id"]))
                 revision_number = int(base_revision["revision_number"]) + 1
-                if (
-                    base_revision["source"]["input_id"] != receipt["input_id"]
-                    and response_section_ids != receipt_section_ids
-                ):
-                    raise LocalApplicationError(
-                        "APPLICATION-WRITER-ROUND-TRIP-INPUT-001",
-                        "a changed Writer input requires a complete fresh section response; unchanged sections are reused only within the same exact input",
-                    )
-
+            effective_raw, effective_receipt = self._effective_input(
+                receipt, base_revision, drafts, composition
+            )
+            self._validate_response_semantics(value, receipt, package, effective_receipt)
             revision_id += "-" + uuid4().hex
-            drafts = {str(row["section_id"]): row for row in value["sections"]}
             sections: list[dict[str, Any]] = []
             base_sections = (
                 {str(row["section_id"]): row for row in base_revision.get("sections", [])}
                 if base_revision is not None
                 else {}
             )
-            for input_section in receipt["sections"]:
+            current_ref = {key: receipt[key] for key in ("input_id", "input_digest")}
+            for input_section in effective_receipt["sections"]:
                 section_id = str(input_section["section_id"])
                 draft = drafts.get(section_id)
                 if draft is None:
@@ -143,7 +135,9 @@ class WriterRoundTripImportMixin:
                             "APPLICATION-WRITER-ROUND-TRIP-INPUT-001",
                             f"Writer response omits section without a reusable base: {section_id}",
                         )
-                    sections.append(deepcopy(dict(base)))
+                    retained = deepcopy(dict(base))
+                    retained.setdefault("origin_input_ref", self._response_input_ref(base_revision))
+                    sections.append(retained)
                     continue
                 row = {
                     "section_id": section_id,
@@ -157,10 +151,11 @@ class WriterRoundTripImportMixin:
                         else {}
                     ),
                     "origin_revision_id": revision_id,
+                    "origin_input_ref": current_ref,
                 }
                 sections.append(row)
 
-            self._validate_document_review(value, receipt, sections)
+            self._validate_document_review(value, effective_receipt, sections)
             feedback = deepcopy(list(value.get("feedback", [])))
             candidate_follow_ups = [
                 {
@@ -177,10 +172,11 @@ class WriterRoundTripImportMixin:
                 "revision_id": revision_id,
                 "revision_number": revision_number,
                 "source": {
-                    "input_id": receipt["input_id"],
-                    "input_digest": receipt["input_digest"],
-                    **receipt["source"],
+                    "input_id": effective_receipt["input_id"],
+                    "input_digest": effective_receipt["input_digest"],
+                    **effective_receipt["source"],
                 },
+                "response_input_ref": current_ref,
                 "parent_revision_ref": deepcopy(dict(base_ref))
                 if isinstance(base_ref, Mapping)
                 else None,
@@ -210,6 +206,10 @@ class WriterRoundTripImportMixin:
             }
             document["revision_digest"] = _digest_document(document, "revision_digest")
             _validate_schema(document)
+            if effective_raw is not None:
+                self._write_immutable(
+                    self._input_path(str(effective_raw["input_id"])), effective_raw
+                )
             # Retain exact immutable facts before either emitted copy. This latest
             # per-series record is also the O(1) pending-write witness on next import.
             self._write_pointer(self._checkpoint_path(composition_id), document)
@@ -274,6 +274,7 @@ class WriterRoundTripImportMixin:
                 "APPLICATION-WRITER-ROUND-TRIP-PIN-001",
                 "manuscript revision source pins do not match its input",
             )
+        self._validate_revision_scope(revision, receipt)
         if "document_review" in revision:
             self._validate_document_review(
                 {
@@ -325,6 +326,9 @@ class WriterRoundTripImportMixin:
                 "sections": deepcopy(composition["sections"]),
             },
             "writer_input": deepcopy(receipt),
+            "response_input": deepcopy(
+                self._load_input(self._response_input_ref(revision)["input_id"])
+            ),
             "effective_constraints": deepcopy(
                 package.get("resolved_profiles", {}).get("effective_constraints", [])
             ),

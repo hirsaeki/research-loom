@@ -67,7 +67,7 @@ verified Research Package
   -> writer-round-trip inspect
 ```
 
-`export-input` reuses the canonical detached one-section Writer input builder for every selected section. The round-trip receipt therefore preserves the exact Research Package, Snapshot, Effective Profile Set, composition version/digest, section digest, resolved profile constraints, research-object closure, material bodies, Exhibit refs, and citation locator scope already verified by the composition path.
+`export-input` reuses the canonical detached one-section Writer input builder for every selected section. The v0.2 round-trip receipt stores each distinct material text once in `shared_material_texts`; section entries use content digests to refer to it. Loading the receipt checks those digests and reconstructs the canonical standalone section inputs. Existing v0.1 receipts remain readable. The receipt preserves the exact Research Package, Snapshot, Effective Profile Set, composition version/digest, section digest, resolved profile constraints, research-object closure, material bodies, Exhibit refs, and citation locator scope already verified by the composition path.
 
 When the selected EPS contains a `WRITER_RULES` resource, each detached section input also carries `writer_profile`: exact Profile pins, the verified `WRITER_*` resources from the same Profile provenance, and a deterministic review plan whose rule IDs exactly cover the delivered Writer rule inventory. For `misco.writer@1.1.0`, this includes both the clean rule inventory and the approved Layer A source-document bytes. The external Writer therefore needs neither the current repository checkout nor legacy Profile storage to recover its instructions. Profiles without Writer resources keep the previous section-input shape.
 
@@ -75,7 +75,9 @@ Writer responses may return a `profile_review` for each section. If a section in
 
 External responses may return draft prose, supplied citation/Exhibit refs, and structured Writing Feedback. Feedback remains non-Evidence candidate follow-up material. Import does not verify Evidence, adopt Findings/Recommendations, or mutate Research State.
 
-Manuscript revisions are immutable. Re-submitting the exact same response verifies and reuses the existing revision. A changed response must name the exact current base revision and creates a new child. Within the same exact exported input, omitted sections reuse their prior immutable section content; after a changed composition/input, all exported sections must be supplied again so stale prose is not silently carried across an outline change.
+Manuscript revisions are immutable. Re-submitting the exact same response verifies and reuses the existing revision. A changed response must name the exact current base revision and creates a new child. The first response supplies every section in its exported batch. Later responses may use another batch from the same pinned composition and Package: drafted sections replace their prior versions, and omitted earlier sections retain their exact content and input origin. Inspection and Publication use the assembled manuscript input in composition order; `response_input` identifies the latest batch. Changing composition or Package pins requires a complete new input and response so stale prose is not carried across an outline change.
+
+An export counts all detached section files, manifests, and the compact receipt against a 64 MiB operation budget. A standalone section export counts its payload and manifest against the same budget. If it is exceeded, retry the round trip with fewer section IDs or narrow an oversized section in a new composition version; no partial export is published. This replaces the former 4 MiB section and 16 MiB aggregate receipt checks.
 
 Public CLI:
 

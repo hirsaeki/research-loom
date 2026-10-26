@@ -18,13 +18,15 @@ from plugins.local_durable_store import register_optional_path, require_optional
 
 from ..research_package.research_package_format import safe_component
 from .writer_composition_support import _digest_document
+from .writer_input_bundle import compact_input, expand_input
 from .writer_round_trip_import import WriterRoundTripImportMixin
 from .writer_round_trip_review import WriterRoundTripReviewMixin
 from .writer_round_trip_support import (
-    MAX_ROUND_TRIP_INPUT_BYTES,
+    MAX_EXPORT_OPERATION_BYTES,
     MAX_SECTIONS,
     SCHEMA_VERSION,
     _json_bytes,
+    _sha256_text,
     _validate_schema,
 )
 
@@ -135,8 +137,53 @@ class WriterRoundTripService(WriterRoundTripReviewMixin, WriterRoundTripImportMi
             raise LocalApplicationError(
                 "APPLICATION-WRITER-ROUND-TRIP-INTEGRITY-001", "Writer input digest mismatch"
             )
-        self._validate_input_context(value)
-        return value
+        expanded = expand_input(value)
+        self._validate_input_context(expanded)
+        self._validate_input_origins(expanded)
+        return expanded
+
+    def _validate_input_origins(self, value: Mapping[str, Any]) -> None:
+        rows = value["sections"]
+        if not any("origin_input_ref" in row for row in rows):
+            return
+        if any("origin_input_ref" not in row for row in rows):
+            raise LocalApplicationError(
+                "APPLICATION-WRITER-ROUND-TRIP-INTEGRITY-001",
+                "assembled Writer input has incomplete section origins",
+            )
+        origins: dict[str, Mapping[str, Any]] = {}
+        for row in rows:
+            ref = row["origin_input_ref"]
+            if ref["input_id"] == value["input_id"]:
+                raise LocalApplicationError(
+                    "APPLICATION-WRITER-ROUND-TRIP-INTEGRITY-001",
+                    "assembled Writer input cannot reference itself",
+                )
+            origin_id = str(ref["input_id"])
+            if origin_id not in origins:
+                raw_origin = self._read_json(
+                    self._input_path(origin_id), message="batch Writer input is unreadable"
+                )
+                if any("origin_input_ref" in item for item in raw_origin.get("sections", [])):
+                    raise LocalApplicationError(
+                        "APPLICATION-WRITER-ROUND-TRIP-PIN-001",
+                        "assembled Writer input must reference original exported batches",
+                    )
+                origins[origin_id] = self._load_input(origin_id)
+            origin = origins[origin_id]
+            if (
+                ref["input_digest"] != origin["input_digest"]
+                or origin["source"] != value["source"]
+                or not any(
+                    item["section_id"] == row["section_id"]
+                    and item["section_input_digest"] == row["section_input_digest"]
+                    for item in origin["sections"]
+                )
+            ):
+                raise LocalApplicationError(
+                    "APPLICATION-WRITER-ROUND-TRIP-PIN-001",
+                    "assembled section does not resolve to its exact batch Writer input",
+                )
 
     def _load_revision(self, composition_id: str, revision_id: str) -> Mapping[str, Any]:
         path = self._revision_path(composition_id, revision_id)
@@ -166,6 +213,50 @@ class WriterRoundTripService(WriterRoundTripReviewMixin, WriterRoundTripImportMi
                 "APPLICATION-WRITER-ROUND-TRIP-INTEGRITY-001",
                 "manuscript revision source composition does not match its storage series",
             )
+
+    def _validate_revision_scope(
+        self, revision: Mapping[str, Any], receipt: Mapping[str, Any]
+    ) -> None:
+        if revision.get("schema_version") != SCHEMA_VERSION:
+            return
+        expected_source = {
+            "input_id": receipt["input_id"],
+            "input_digest": receipt["input_digest"],
+            **receipt["source"],
+        }
+        if revision["source"] != expected_source:
+            raise LocalApplicationError(
+                "APPLICATION-WRITER-ROUND-TRIP-PIN-001",
+                "manuscript source does not match its effective Writer input",
+            )
+        response_ref = self._response_input_ref(revision)
+        response = self._load_input(str(response_ref["input_id"]))
+        if (
+            response_ref["input_digest"] != response["input_digest"]
+            or response["source"] != receipt["source"]
+            or any("origin_input_ref" in row for row in response["sections"])
+        ):
+            raise LocalApplicationError(
+                "APPLICATION-WRITER-ROUND-TRIP-PIN-001",
+                "manuscript response batch does not match its effective input",
+            )
+        rows = revision["sections"]
+        if [row["section_id"] for row in rows] != [
+            row["section_id"] for row in receipt["sections"]
+        ]:
+            raise LocalApplicationError(
+                "APPLICATION-WRITER-ROUND-TRIP-INTEGRITY-001",
+                "manuscript sections do not cover its effective Writer input in order",
+            )
+        for section, scope in zip(rows, receipt["sections"], strict=True):
+            origin_ref = scope.get("origin_input_ref", response_ref)
+            if section["origin_input_ref"] != origin_ref or section[
+                "content_digest"
+            ] != _sha256_text(section["content"]):
+                raise LocalApplicationError(
+                    "APPLICATION-WRITER-ROUND-TRIP-INTEGRITY-001",
+                    "manuscript section content or origin does not match its pinned input",
+                )
 
     def _load_latest_revision(self, composition_id: str) -> Mapping[str, Any] | None:
         # Only used when the continuity record is absent, never on healthy imports.
@@ -237,6 +328,90 @@ class WriterRoundTripService(WriterRoundTripReviewMixin, WriterRoundTripImportMi
     def _revision_ref(revision: Mapping[str, Any]) -> dict[str, Any]:
         return {key: revision[key] for key in ("revision_id", "revision_digest", "revision_number")}
 
+    @staticmethod
+    def _response_input_ref(revision: Mapping[str, Any]) -> dict[str, Any]:
+        source = revision.get("response_input_ref", revision["source"])
+        return {key: source[key] for key in ("input_id", "input_digest")}
+
+    def _effective_input(
+        self,
+        receipt: Mapping[str, Any],
+        base: Mapping[str, Any] | None,
+        drafts: Mapping[str, Mapping[str, Any]],
+        composition: Mapping[str, Any],
+    ) -> tuple[dict[str, Any] | None, Mapping[str, Any]]:
+        """Assemble the exact scope of a batched response before any new write."""
+        batch = {str(row["section_id"]): row for row in receipt["sections"]}
+        if any("origin_input_ref" in row for row in receipt["sections"]):
+            raise LocalApplicationError(
+                "APPLICATION-WRITER-ROUND-TRIP-INPUT-001",
+                "Writer response must name an exported batch input, not an assembled manuscript view",
+            )
+        if not set(drafts) <= set(batch):
+            raise LocalApplicationError(
+                "APPLICATION-WRITER-ROUND-TRIP-PIN-001",
+                "Writer response names a section outside its exported batch",
+            )
+        if base is None:
+            if set(drafts) != set(batch):
+                raise LocalApplicationError(
+                    "APPLICATION-WRITER-ROUND-TRIP-INPUT-001",
+                    "initial manuscript response must provide every section in the exported input",
+                )
+            return None, receipt
+        if {key: base["source"][key] for key in receipt["source"]} != dict(receipt["source"]):
+            if set(batch) != {str(row["section_id"]) for row in composition["sections"]} or set(
+                drafts
+            ) != set(batch):
+                raise LocalApplicationError(
+                    "APPLICATION-WRITER-ROUND-TRIP-PIN-001",
+                    "changed composition or Package pins require a complete new Writer input and response",
+                )
+            return None, receipt
+        previous_batch = self._response_input_ref(base)
+        if previous_batch["input_id"] != receipt["input_id"] and set(drafts) != set(batch):
+            raise LocalApplicationError(
+                "APPLICATION-WRITER-ROUND-TRIP-INPUT-001",
+                "a changed Writer input requires every section of the new batch",
+            )
+        base_receipt = self._load_input(str(base["source"]["input_id"]))
+        previous = {str(row["section_id"]): row for row in base_receipt["sections"]}
+        selected = set(previous) | set(batch)
+        ordered = [
+            str(row["section_id"])
+            for row in sorted(
+                composition["sections"], key=lambda row: (row["order"], row["section_id"])
+            )
+            if str(row["section_id"]) in selected
+        ]
+        if set(ordered) != selected:
+            raise LocalApplicationError(
+                "APPLICATION-WRITER-ROUND-TRIP-PIN-001",
+                "manuscript contains a section outside the pinned composition",
+            )
+        current_ref = {key: receipt[key] for key in ("input_id", "input_digest")}
+        rows: list[dict[str, Any]] = []
+        for section_id in ordered:
+            if section_id in drafts:
+                row = deepcopy(dict(batch[section_id]))
+                origin_ref = current_ref
+            else:
+                if section_id not in previous:
+                    raise LocalApplicationError(
+                        "APPLICATION-WRITER-ROUND-TRIP-INPUT-001",
+                        f"Writer response omits section without a reusable base: {section_id}",
+                    )
+                row = deepcopy(dict(previous[section_id]))
+                origin_ref = row.get("origin_input_ref", previous_batch)
+            row["origin_input_ref"] = deepcopy(dict(origin_ref))
+            rows.append(row)
+        document = compact_input(receipt["source"], rows)
+        _validate_schema(document)
+        expanded = expand_input(document)
+        self._validate_input_context(expanded)
+        self._validate_input_origins(expanded)
+        return document, expanded
+
     def _reconcile_head(self, composition_id: str) -> tuple[Mapping[str, Any] | None, list[str]]:
         checkpoint = self._checkpoint_path(composition_id)
         new_checkpoint = not checkpoint.exists()
@@ -265,6 +440,7 @@ class WriterRoundTripService(WriterRoundTripReviewMixin, WriterRoundTripImportMi
                 "APPLICATION-WRITER-ROUND-TRIP-PIN-001",
                 "Writer continuity record does not match its exact input",
             )
+        self._validate_revision_scope(latest, receipt)
         expected = self._revision_ref(latest)
         parent_ref = latest.get("parent_revision_ref")
         if int(latest["revision_number"]) == 1:
@@ -442,9 +618,12 @@ class WriterRoundTripService(WriterRoundTripReviewMixin, WriterRoundTripImportMi
                         "Writer input receipt summary does not match its canonical section input",
                     )
 
-        fingerprint = canonical_digest({"source": source, "sections": value["sections"]})
-        expected_input_id = "WRI-" + fingerprint.split(":", 1)[1][:24]
-        if value.get("input_id") != expected_input_id:
+        if value.get("schema_version") == "0.1.0" and value.get("input_id") != (
+            "WRI-"
+            + canonical_digest({"source": source, "sections": value["sections"]}).split(":", 1)[1][
+                :24
+            ]
+        ):
             raise LocalApplicationError(
                 "APPLICATION-WRITER-ROUND-TRIP-INTEGRITY-001",
                 "Writer input identity does not match its canonical pinned content",
@@ -523,20 +702,21 @@ class WriterRoundTripService(WriterRoundTripReviewMixin, WriterRoundTripImportMi
                 staging = tmp / "payload"
                 staging.mkdir()
                 section_records: list[dict[str, Any]] = []
-                total_input_bytes = 0
+                operation_bytes = 0
                 sections_root = staging / "sections"
                 sections_root.mkdir()
                 for section_id in section_ids:
                     section_out = sections_root / safe_component(section_id, "section_id")
                     composer.export_section_input(composition_id, section_id, section_out)
                     payload_path = section_out / "section-writer-input.json"
-                    section_bytes = payload_path.read_bytes()
-                    total_input_bytes += len(section_bytes)
-                    if total_input_bytes > MAX_ROUND_TRIP_INPUT_BYTES:
+                    operation_bytes += payload_path.stat().st_size
+                    operation_bytes += (section_out / "manifest.json").stat().st_size
+                    if operation_bytes > MAX_EXPORT_OPERATION_BYTES:
                         raise LocalApplicationError(
                             "APPLICATION-WRITER-ROUND-TRIP-BOUND-001",
-                            "Writer round-trip section inputs exceed supported aggregate size",
+                            f"Writer export generated {operation_bytes} bytes, above its {MAX_EXPORT_OPERATION_BYTES}-byte operation budget; retry with fewer section_ids, or narrow the section in a new composition version",
                         )
+                    section_bytes = payload_path.read_bytes()
                     section_input = json.loads(section_bytes.decode("utf-8"))
                     record = {
                         **dict(self._section_scope(section_input)),
@@ -551,29 +731,15 @@ class WriterRoundTripService(WriterRoundTripReviewMixin, WriterRoundTripImportMi
                     "composition_digest": composition["composition_digest"],
                     **composition["source"],
                 }
-                fingerprint = canonical_digest({"source": source, "sections": section_records})
-                document: dict[str, Any] = {
-                    "schema_version": SCHEMA_VERSION,
-                    "object_type": "writer_round_trip_input",
-                    "input_id": "WRI-" + fingerprint.split(":", 1)[1][:24],
-                    "source": source,
-                    "sections": section_records,
-                    "authority_boundary": {
-                        "research_state_mutation_performed": False,
-                        "evidence_verification_performed": False,
-                        "finding_adoption_performed": False,
-                        "recommendation_adoption_performed": False,
-                    },
-                    "input_digest": "",
-                }
-                document["input_digest"] = _digest_document(document, "input_digest")
+                document = compact_input(source, section_records)
                 _validate_schema(document)
-                self._validate_input_context(document)
+                self._validate_input_context(expand_input(document))
                 receipt_bytes = _json_bytes(document)
-                if len(receipt_bytes) > MAX_ROUND_TRIP_INPUT_BYTES:
+                operation_bytes += len(receipt_bytes)
+                if operation_bytes > MAX_EXPORT_OPERATION_BYTES:
                     raise LocalApplicationError(
                         "APPLICATION-WRITER-ROUND-TRIP-BOUND-001",
-                        "Writer round-trip receipt exceeds supported aggregate size",
+                        f"Writer export generated {operation_bytes} bytes, above its {MAX_EXPORT_OPERATION_BYTES}-byte operation budget; retry with fewer section_ids",
                     )
                 reused = self._write_immutable(self._input_path(document["input_id"]), document)
                 (staging / "writer-input.json").write_bytes(receipt_bytes)

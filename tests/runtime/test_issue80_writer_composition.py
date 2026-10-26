@@ -191,7 +191,7 @@ class Issue80WriterCompositionTests(_suite.Issue80WriterCompositionTests):
             )
 
             with patch(
-                "plugins.local_application.writer.writer_section_input.MAX_SECTION_INPUT_BYTES",
+                "plugins.local_application.writer.writer_section_input.MAX_WRITER_EXPORT_OPERATION_BYTES",
                 1,
             ):
                 with self.assertRaises(LocalApplicationError) as output_bound:

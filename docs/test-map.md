@@ -163,8 +163,9 @@ Unit tests live in `tests/unit/<package>/`, integration and acceptance tests in
 | `plugins/local_application/workspace/workspace_lock.py` | `tests/runtime/test_issue255_workspace_lock.py` |
 | `plugins/local_application/writer/writer_composition_history_service.py` | `tests/runtime/test_issue177_writer_history.py`<br>`tests/runtime/test_issue249_writer_recovery.py` |
 | `plugins/local_application/writer/writer_composition_service.py` | `tests/runtime/test_issue219_writer_round_trip.py`<br>`tests/runtime/test_issue249_writer_recovery.py`<br>`tests/runtime/test_issue254_item_listing.py` |
-| `plugins/local_application/writer/writer_composition_support.py` | `tests/runtime/test_issue249_writer_recovery.py`<br>`tests/runtime/test_misco_writer_profile_application.py` |
+| `plugins/local_application/writer/writer_composition_support.py` | `tests/runtime/test_issue219_writer_round_trip.py`<br>`tests/runtime/test_issue249_writer_recovery.py`<br>`tests/runtime/test_misco_writer_profile_application.py` |
 | `plugins/local_application/writer/writer_composition_validation.py` | — |
+| `plugins/local_application/writer/writer_input_bundle.py` | `tests/runtime/test_issue219_writer_round_trip.py` |
 | `plugins/local_application/writer/writer_round_trip_import.py` | — |
 | `plugins/local_application/writer/writer_round_trip_review.py` | — |
 | `plugins/local_application/writer/writer_round_trip_service.py` | `tests/runtime/test_issue219_writer_round_trip.py`<br>`tests/runtime/test_issue249_writer_recovery.py`<br>`tests/runtime/test_issue464_writer_rule_scope.py`<br>`tests/runtime/test_issue466_writer_document_review.py` |
