@@ -23,6 +23,7 @@ Every production manifest lives at `<profile_type>/<name>/<version>/profile.json
 | --- | --- | --- |
 | `narrative/misco/1.1.0/profile.json` | `misco.writer@1.1.0` | yes, transitively by `misco.publication@1.3.0` in `projects/misco-ai-2026` |
 | `narrative/misco/1.2.0/profile.json` | `misco.writer@1.2.0` | no; opt-in #464 classified Writer rules |
+| `narrative/misco/1.3.0/profile.json` | `misco.writer@1.3.0` | no; opt-in concrete recommendation writing requested on 2026-10-31 |
 | `publication/misco/1.3.0/profile.json` | `misco.publication@1.3.0` | yes, requested by `projects/misco-ai-2026` |
 | `publication/misco/1.4.0/profile.json` | `misco.publication@1.4.0` | no; opt-in #456 formal report conformance through profile generation |
 | `research/misco-workspace-continuity/1.0.0/profile.json` | `misco.workspace-continuity.exact-locator@1.0.0` | no; migration only |
@@ -58,6 +59,15 @@ A manifest resource is resolved relative to its manifest, must remain inside can
 Layer B audit material, Layer C Human Review material, and synthetic few-shot examples are not production resources. For `misco.writer@1.1.0`, `WRITER_RULES` is the rule inventory and `WRITER_SOURCE_DOCUMENTS` carries the normalized UTF-8 bytes of the eight approved Layer A documents actually referenced by those runtime rules. For `misco.publication@1.3.0`, `PUBLICATION_FORMAL_SPEC` and `PUBLICATION_URL_DISPLAY` carry the approved production application policy in addition to the clean rule/source-document resources; the formal binary originals remain external and are identified by exact digests in the resource. Detached inputs project these resources and exact Profile pins; a host must not recover missing policy from `research-profile/`, historical examples, or the network.
 
 ## Composition
+
+Writer 1.3.0 additionally delivers the user-requested
+[recommendation writing guide](../docs/architecture/misco-recommendation-writing.md),
+including explicitly labeled synthetic editorial examples. This is a new
+editorial refinement, not the excluded legacy few-shot specification or new
+research Evidence. Its rule bodies preserve 1.2.0 review scope and authority
+boundaries. The original papers are not bundled. Build and verify these
+resources with `uv run --frozen python scripts/build_misco_writer_recommendations.py`
+and `--check`, respectively.
 
 `extends` is same-profile-type inheritance. Cross-type dependencies use `requires`; `requires` never creates override precedence. Cross-category last-write-wins is forbidden: ambiguous collisions are errors.
 

@@ -14,3 +14,11 @@ Its rule inventory maps into eight review groups:
 - `writer-qa-boundary` — send validity/support/causal issues back as Writing Feedback rather than deciding them in prose.
 
 The groups and rule IDs that apply to a section are exactly those in its `review_plan`; a later Profile version may change them.
+
+When `misco.writer@1.3.0` is delivered, its source-document resource includes
+concrete recommendation guidance and synthetic editorial examples. Read that
+delivered guide with PUB-RC-01/02/04/05: express the research team's distinctive
+answer, connect the supplied reason to a tangible action or strategic position,
+and preserve conditions across summary and body. Do not invent implementation
+details or treat the examples as current research. Earlier Profile selections
+do not acquire these rules through this routing reference.

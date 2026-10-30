@@ -11,9 +11,10 @@ import rfc8785
 import tests.runtime.issue80_writer_composition_suite as composition_tests
 import tests.runtime.test_external_desktop_research_intake as intake
 import tests.runtime.test_misco_writer_profile_application as legacy
-from plugins.local_application import LocalApplicationError
+from plugins.local_application import LocalApplicationError, LocalWorkspace
 from plugins.local_application.workspace.profile_resolution import resolve_effective_profile_set
 from plugins.local_application.writer.writer_round_trip_service import WriterRoundTripService
+from scripts.build_misco_writer_recommendations import build
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -28,19 +29,21 @@ class Issue464WriterRuleScopeTests(ResearchPackageAcceptanceSupport):
 
     def _write_structured_workspace_inputs(self):
         config = intake.bootstrap_config()
+        manifest = getattr(self, "writer_manifest", MANIFEST)
+        version = json.loads(manifest.read_text(encoding="utf-8"))["profile_version"]
         config["profile_requests"] = {
             "research": [],
             "organization": [],
             "publication": [],
             "narrative": [
-                {"profile_id": "misco.writer", "profile_type": "narrative", "version": "1.2.0"}
+                {"profile_id": "misco.writer", "profile_type": "narrative", "version": version}
             ],
         }
         config.pop("configuration_digest", None)
         config["configuration_digest"] = (
             "sha256:" + hashlib.sha256(rfc8785.dumps(config)).hexdigest()
         )
-        effective = resolve_effective_profile_set(config, [MANIFEST, PREVIOUS_MANIFEST])
+        effective = resolve_effective_profile_set(config, [manifest, PREVIOUS_MANIFEST])
         cfg, eps = self.root / "config.json", self.root / "profiles.json"
         cfg.write_text(json.dumps(config), encoding="utf-8")
         eps.write_text(json.dumps(effective), encoding="utf-8")
@@ -119,6 +122,47 @@ class Issue464WriterRuleScopeTests(ResearchPackageAcceptanceSupport):
                 for r in detached["sections"][0]["section_input"]["writer_profile"]["resources"]
             )
         )
+
+    def test_concrete_recommendation_guide_is_delivered_without_source_papers(self):
+        self.writer_manifest = ROOT / "profiles/narrative/misco/1.3.0/profile.json"
+        cfg, eps = self._write_structured_workspace_inputs()
+        self.workspace = self.root / "recommendation-workspace"
+        opened = LocalWorkspace.init(self.workspace, cfg, eps)
+        opened.close()
+        for path, expected in build().items():
+            self.assertEqual(path.read_bytes(), expected, str(path))
+        facade, _, _, input_doc, _ = self._build_round_trip()
+        try:
+            delivery = input_doc["sections"][0]["section_input"]["writer_profile"]
+            self.assertEqual({p["profile_version"] for p in delivery["profile_pins"]}, {"1.3.0"})
+            resources = {r["role"]: json.loads(r["content"]) for r in delivery["resources"]}
+            previous = json.loads(
+                (MANIFEST.parent / "resources/writer-clean-rules.json").read_text(encoding="utf-8")
+            )
+            old = {r["id"]: r for r in previous["items"]}
+            current = {r["id"]: r for r in resources["WRITER_RULES"]["items"]}
+            self.assertEqual(set(current), set(old))
+            guide = next(
+                d
+                for d in resources["WRITER_SOURCE_DOCUMENTS"]["source_documents"]
+                if d["path"] == "docs/architecture/misco-recommendation-writing.md"
+            )
+            self.assertEqual(guide["content"], (ROOT / guide["path"]).read_text(encoding="utf-8"))
+            self.assertEqual(len(guide["writer_rule_ids"]), 4)
+            self.assertIn("synthetic teaching material", guide["content"])
+            for rule_id, rule in current.items():
+                self.assertEqual(rule["review"], old[rule_id]["review"])
+                if rule_id in guide["writer_rule_ids"]:
+                    self.assertIn(rule["body"], guide["content"])
+                    self.assertNotEqual(rule["body"], old[rule_id].get("body"))
+                else:
+                    self.assertEqual(rule, old[rule_id])
+            for source in resources["WRITER_SOURCE_DOCUMENTS"]["source_documents"]:
+                raw = source["content"].encode()
+                self.assertEqual(source["sha256"], hashlib.sha256(raw).hexdigest())
+                self.assertFalse(source["path"].endswith(".pdf"))
+        finally:
+            facade.close()
 
     def test_structural_success_preserves_semantically_wrong_draft_as_unevaluated(self):
         facade, _, composition, doc, _ = self._build_round_trip()
