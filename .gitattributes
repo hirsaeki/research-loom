@@ -1,0 +1,2 @@
+# Keep the application-trusted Word helper identical to its versioned resource.
+scripts/appendix_toc_word_helper.ps1 text eol=lf
