@@ -20,23 +20,26 @@ PROFILES = ROOT / "profiles"
 # Synthetic contract material, not production Profiles.
 NON_PROFILE_TREES = ("contracts", "fixtures")
 KNOWN_DUPLICATES = {
-    # misco.publication 1.4.0 kept the 1.3.0 rules, sources and URL policy unchanged.
+    # 1.4.0 and 1.5.0 retain the historical rules, sources and URL policy.
     frozenset(
         {
             "publication/misco/1.3.0/resources/publication-clean-rules.json",
             "publication/misco/1.4.0/resources/publication-clean-rules.json",
+            "publication/misco/1.5.0/resources/publication-clean-rules.json",
         }
     ),
     frozenset(
         {
             "publication/misco/1.3.0/resources/publication-clean-source-documents.json",
             "publication/misco/1.4.0/resources/publication-clean-source-documents.json",
+            "publication/misco/1.5.0/resources/publication-clean-source-documents.json",
         }
     ),
     frozenset(
         {
             "publication/misco/1.3.0/resources/publication-url-display.json",
             "publication/misco/1.4.0/resources/publication-url-display.json",
+            "publication/misco/1.5.0/resources/publication-url-display.json",
         }
     ),
 }
