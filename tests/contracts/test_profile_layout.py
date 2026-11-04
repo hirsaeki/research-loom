@@ -26,6 +26,7 @@ KNOWN_DUPLICATES = {
             "publication/misco/1.3.0/resources/publication-clean-rules.json",
             "publication/misco/1.4.0/resources/publication-clean-rules.json",
             "publication/misco/1.5.0/resources/publication-clean-rules.json",
+            "publication/misco/1.6.0/resources/publication-clean-rules.json",
         }
     ),
     frozenset(
@@ -33,6 +34,7 @@ KNOWN_DUPLICATES = {
             "publication/misco/1.3.0/resources/publication-clean-source-documents.json",
             "publication/misco/1.4.0/resources/publication-clean-source-documents.json",
             "publication/misco/1.5.0/resources/publication-clean-source-documents.json",
+            "publication/misco/1.6.0/resources/publication-clean-source-documents.json",
         }
     ),
     frozenset(
@@ -40,6 +42,13 @@ KNOWN_DUPLICATES = {
             "publication/misco/1.3.0/resources/publication-url-display.json",
             "publication/misco/1.4.0/resources/publication-url-display.json",
             "publication/misco/1.5.0/resources/publication-url-display.json",
+            "publication/misco/1.6.0/resources/publication-url-display.json",
+        }
+    ),
+    frozenset(
+        {
+            "publication/misco/1.5.0/resources/publication-coverage.json",
+            "publication/misco/1.6.0/resources/publication-coverage.json",
         }
     ),
 }

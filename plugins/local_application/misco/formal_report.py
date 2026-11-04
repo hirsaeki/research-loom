@@ -12,7 +12,7 @@ from xml.etree import ElementTree as ET
 from plugins.application_errors import LocalApplicationError
 
 from ..publication.publication_docx import PKG, R, W, paragraph_xml
-from . import cover_profile
+from . import appendix_toc, cover_profile
 
 NS = {"w": W}
 V = "urn:schemas-microsoft-com:vml"
@@ -263,7 +263,18 @@ def assemble(data: bytes, report: dict, group: str, layout: dict) -> bytes:
     nodes.append(_p(""))
     _end_section(nodes, _section(base, "front_divider_reverse"))
     nodes.append(_p("目次", "FormalFrontTitle"))
-    nodes.append(_field('TOC \\o "1-3" \\h \\z \\u', "TOC1"))
+    separate_tocs = bool(layout.get("misco_appendix_toc"))
+    if separate_tocs:
+        nodes.append(_field('TOC \\b AUTO_BODY \\o "1-3" \\h \\z \\u', "TOC1"))
+        nodes.append(_p("付録目次", "FormalFrontTitle"))
+        nodes.append(_field('TOC \\b AUTO_APPENDIX \\t "FormalAppendixTitle,1" \\h \\z', "TOC1"))
+        maximum_id = max(
+            (int(n.get(f"{{{W}}}id")) for n in document.findall(".//w:bookmarkStart", NS)),
+            default=0,
+        )
+        appendix_toc.mark_range(native, "AUTO_BODY", maximum_id + 1)
+    else:
+        nodes.append(_field('TOC \\o "1-3" \\h \\z \\u', "TOC1"))
     _end_section(nodes, _section(base, "contents"))
     if introduction_required:
         nodes.append(_p("はじめに", "FormalFrontTitle"))
@@ -277,6 +288,7 @@ def assemble(data: bytes, report: dict, group: str, layout: dict) -> bytes:
     _end_section(nodes, _section(base, "back_divider"))
     nodes.append(_p(""))
     _end_section(nodes, _section(base, "back_divider_reverse"))
+    appendix_start = len(nodes)
     for appendix in report.get("appendices", []):
         nodes.append(_p(appendix["title"], "FormalAppendixTitle"))
         nodes.extend(_front(appendix["content"]))
@@ -286,7 +298,11 @@ def assemble(data: bytes, report: dict, group: str, layout: dict) -> bytes:
     ]:
         nodes.append(_p(title, "FormalAppendixTitle"))
         nodes.extend(_front(report[field]))
-    _end_section(nodes, _section(base, "appendix", numbered=True))
+    appendix_section = _section(base, "appendix", numbered=True)
+    if separate_tocs:
+        appendix_toc.mark_range(nodes[appendix_start:], "AUTO_APPENDIX", maximum_id + 2)
+        appendix_section.find("w:footerReference", NS).set(f"{{{R}}}id", "rIdFormalAppendixFooter")
+    _end_section(nodes, appendix_section)
     copyright_name = (
         "Mitsui Interbusiness Research Institute"
         if commissioned
@@ -426,11 +442,20 @@ def assemble(data: bytes, report: dict, group: str, layout: dict) -> bytes:
             ET.SubElement(rp, f"{{{W}}}b")
     relations = ET.fromstring(parts["word/_rels/document.xml.rels"])
     types = ET.fromstring(parts["[Content_Types].xml"])
+    extra_parts = []
+    if separate_tocs:
+        appendix_footer = deepcopy(footer)
+        paragraph = appendix_footer.find("w:p", NS)
+        prefix = ET.Element(f"{{{W}}}r")
+        ET.SubElement(prefix, f"{{{W}}}t").text = "付"
+        paragraph.insert(1, prefix)
+        parts["word/footer-appendix.xml"] = ET.tostring(appendix_footer)
+        extra_parts.append(("footer-appendix.xml", "footer", "rIdFormalAppendixFooter"))
     for name, kind, id_ in [
         ("footer1.xml", "footer", "rIdFormalFooter"),
         ("footer-empty.xml", "footer", "rIdFormalEmptyFooter"),
         ("footnotes.xml", "footnotes", "rIdFormalFootnotes"),
-    ]:
+    ] + extra_parts:
         ET.SubElement(
             relations, f"{{{PKG}}}Relationship", {"Id": id_, "Type": R + "/" + kind, "Target": name}
         )
@@ -445,7 +470,10 @@ def assemble(data: bytes, report: dict, group: str, layout: dict) -> bytes:
             },
         )
     meta = ET.Element("formalReport", {"xmlns": "urn:research-loom:publication-formal-report"})
-    meta.text = json.dumps({"report": report, "research_group_type": group}, ensure_ascii=False)
+    metadata = {"report": report, "research_group_type": group}
+    if separate_tocs:
+        metadata["word_toc_helper_sha256"] = layout["misco_appendix_toc"]["helper_sha256"]
+    meta.text = json.dumps(metadata, ensure_ascii=False)
     parts.update(
         {
             "word/document.xml": ET.tostring(document),
@@ -545,9 +573,10 @@ def inspect_formal(data: bytes, report: dict, group: str, layout: dict) -> list[
                     problems.append("actual-40-grid:" + str(part))
                 numbered = part in {"body", "appendix"}
                 footer_ref = section.find("w:footerReference", NS)
-                if footer_ref is None or footer_ref.get(f"{{{R}}}id") != (
-                    "rIdFormalFooter" if numbered else "rIdFormalEmptyFooter"
-                ):
+                expected_footer = "rIdFormalFooter" if numbered else "rIdFormalEmptyFooter"
+                if part == "appendix" and layout.get("misco_appendix_toc"):
+                    expected_footer = "rIdFormalAppendixFooter"
+                if footer_ref is None or footer_ref.get(f"{{{R}}}id") != expected_footer:
                     problems.append("page-number-applicability:" + str(part))
                 if numbered:
                     restart = section.find("w:pgNumType", NS)
@@ -674,6 +703,12 @@ def inspect_formal(data: bytes, report: dict, group: str, layout: dict) -> list[
                         problems.append("heading-before-blank:" + name)
                 previous = paragraph
             cover_shapes = document.findall(".//{%s}shape" % V)
+            if layout.get("misco_appendix_toc"):
+                problems.extend(
+                    appendix_toc.inspect(
+                        document, ET.fromstring(archive.read("word/footer-appendix.xml"))
+                    )
+                )
             expected_boxes = [
                 (163, 20, "会員会社限"),
                 (25, 70, report["title"]),

@@ -27,6 +27,7 @@ Every production manifest lives at `<profile_type>/<name>/<version>/profile.json
 | `publication/misco/1.3.0/profile.json` | `misco.publication@1.3.0` | yes, requested by `projects/misco-ai-2026` |
 | `publication/misco/1.4.0/profile.json` | `misco.publication@1.4.0` | no; opt-in #456 formal report conformance through profile generation |
 | `publication/misco/1.5.0/profile.json` | `misco.publication@1.5.0` | no; opt-in cover interpretation and rendering correction confirmed on 2026-11-04 |
+| `publication/misco/1.6.0/profile.json` | `misco.publication@1.6.0` | no; opt-in scoped appendix TOC and pinned Word update tools |
 | `research/misco-workspace-continuity/1.0.0/profile.json` | `misco.workspace-continuity.exact-locator@1.0.0` | no; migration only |
 
 Moving the directories in #498 left every manifest byte-identical, so `manifest_sha256` pins and existing Workspaces are unaffected. A newly resolved EPS records the new paths in `effective_resources[].path`; an EPS that a Workspace already holds keeps its old paths and stays valid. Requests that name a manifest must use the new path:

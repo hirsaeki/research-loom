@@ -283,7 +283,7 @@ def _publication_policy(
         permissions=permissions,
     )
     dialect.validate_editorial_review(editorial)
-    return {
+    policy = {
         "rules": {
             "role": rules_row.get("role") if rules_row else None,
             "sha256": rules_row.get("sha256") if rules_row else None,
@@ -353,6 +353,10 @@ def _publication_policy(
         "missing_inputs": missing,
         "release_blocked": bool(missing),
     }
+    tools_row = by_role.get("PUBLICATION_WORD_TOOLS")
+    if tools_row:
+        policy["word_tools"] = json.loads(tools_row["content"])
+    return policy
 
 
 def _verify_docx_bytes(data: bytes) -> bool:
