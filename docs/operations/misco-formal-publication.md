@@ -21,7 +21,11 @@ uv run --frozen python scripts/export_publication_word_tools.py --workspace WORK
 Paste the exported BAS into a standard module to run it manually on the active
 document, or pass the exported PowerShell helper to
 `scripts/render_publication_word.ps1 -TocHelperPath FILE` for PDF rendering.
-The renderer checks its SHA256 against the DOCX metadata before loading it.
+The renderer checks its SHA256 against both DOCX metadata and the shipped
+`scripts/appendix_toc_word_helper.ps1`, then loads only the shipped copy.
+The DOCX's self-reported digest alone is not a trust root. Managed-document
+validation runs before loading any helper. Supporting another helper version
+requires an application code update, not just a new hash in an input document.
 No VBA project injection, Normal.dotm installation, docm conversion, or Word
 security setting change is performed. BAS uses ASCII and `ChrW` for the prefix.
 

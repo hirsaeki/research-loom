@@ -1,6 +1,8 @@
 import hashlib
 import io
 import json
+import os
+import subprocess
 import tempfile
 import unittest
 import zipfile
@@ -22,6 +24,7 @@ from plugins.local_application.workspace.profile_resolution import resolve_effec
 from tests.runtime.test_issue456_formal_document import representative_report
 
 ROOT = Path(__file__).resolve().parents[4]
+CI_WINDOWS = True
 
 
 class AppendixTocProfileTests(unittest.TestCase):
@@ -90,6 +93,10 @@ class AppendixTocProfileTests(unittest.TestCase):
             row for row in self.policy["word_tools"]["files"] if row["filename"].endswith(".ps1")
         )
         self.assertEqual(metadata["word_toc_helper_sha256"], helper["sha256"])
+        self.assertEqual(
+            (ROOT / "scripts/appendix_toc_word_helper.ps1").read_bytes(),
+            helper["content"].encode("utf-8"),
+        )
         bookmark = document.find('.//w:bookmarkStart[@w:name="AUTO_APPENDIX"]', {"w": W})
         bookmark.set(f"{{{W}}}name", "AUTO_APPENDIX_BACKUP")
         self.assertIn("toc-bookmark:AUTO_APPENDIX", appendix_toc.inspect(document, footer))
@@ -117,3 +124,58 @@ class AppendixTocProfileTests(unittest.TestCase):
                 with self.assertRaises(LocalApplicationError):
                     export_word_tools({"build": {"publication_policy": policy}}, output)
                 self.assertFalse(output.exists())
+
+    @unittest.skipUnless(os.name == "nt", "Windows PowerShell renderer preflight")
+    def test_self_declared_helper_digest_cannot_authorize_code_execution(self):
+        report = representative_report()
+        report.pop("introduction")
+        report["footnotes"] = []
+        self.layout["formal_document"] = True
+        output = assemble(
+            docx_bytes([("title", report["title"]), ("body", "本文。")], self.layout),
+            report,
+            "M",
+            self.layout,
+        )
+        payload = b"throw 'UNTRUSTED_HELPER_EXECUTED'\n"
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            helper = root / "untrusted.ps1"
+            helper.write_bytes(payload)
+            source = root / "untrusted.docx"
+            with (
+                zipfile.ZipFile(io.BytesIO(output)) as archive,
+                zipfile.ZipFile(source, "w") as target,
+            ):
+                for name in archive.namelist():
+                    data = archive.read(name)
+                    if name == "customXml/formal-report.xml":
+                        meta = ET.fromstring(data)
+                        value = json.loads(meta.text)
+                        value["word_toc_helper_sha256"] = hashlib.sha256(payload).hexdigest()
+                        meta.text = json.dumps(value)
+                        data = ET.tostring(meta)
+                    target.writestr(name, data)
+            result = subprocess.run(
+                [
+                    "pwsh.exe",
+                    "-NoProfile",
+                    "-File",
+                    str(ROOT / "scripts/render_publication_word.ps1"),
+                    "-SourceDocx",
+                    str(source),
+                    "-OutputPdf",
+                    str(root / "output.pdf"),
+                    "-ReceiptPath",
+                    str(root / "receipt.json"),
+                    "-TocHelperPath",
+                    str(helper),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("application-trusted", result.stderr)
+            self.assertNotIn("UNTRUSTED_HELPER_EXECUTED", result.stderr)
+            self.assertFalse((root / "output.pdf").exists())

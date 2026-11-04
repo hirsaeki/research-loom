@@ -27,16 +27,21 @@ try {
         $helperDigest = ($meta.DocumentElement.InnerText | ConvertFrom-Json).word_toc_helper_sha256
     }
 } finally { $archive.Dispose() }
+if ($parts.Count -lt 12 -or @($parts | Where-Object { -not $_ }).Count) {
+    throw 'Source is not a managed formal Publication DOCX.'
+}
 if ($requiresTocHelper) {
     if (-not $TocHelperPath) { throw 'This DOCX requires its pinned Word TOC helper; export Word tools and pass -TocHelperPath.' }
     $helper = (Resolve-Path -LiteralPath $TocHelperPath).Path
     if ((Get-FileHash -LiteralPath $helper -Algorithm SHA256).Hash.ToLowerInvariant() -ne $helperDigest) {
         throw 'Word TOC helper digest does not match the source DOCX.'
     }
-    . $helper
-}
-if ($parts.Count -lt 12 -or @($parts | Where-Object { -not $_ }).Count) {
-    throw 'Source is not a managed formal Publication DOCX.'
+    $trustedHelper = Join-Path $PSScriptRoot 'appendix_toc_word_helper.ps1'
+    if ((Get-FileHash -LiteralPath $trustedHelper -Algorithm SHA256).Hash.ToLowerInvariant() -ne $helperDigest) {
+        throw 'Word TOC helper is not an application-trusted implementation.'
+    }
+    # Only execute shipped application code, never the caller-supplied file.
+    . $trustedHelper
 }
 $word = New-Object -ComObject Word.Application
 $word.Visible = $false
