@@ -1,5 +1,37 @@
 # MISCO formal Publication (Issue #456)
 
+## Profile 1.5.0: cover interpretation supplement
+
+`profiles/publication/misco/1.5.0/profile.json` adds a profile-driven cover for
+MISCO research-theme reports. Select it through the existing profile
+resolve/advance workflow; adding the version does not automatically upgrade
+an existing workspace, package, or released document. Historical versions and
+commissioned-report covers retain their existing behavior.
+
+The pinned formal resource contains `docx_layout.misco_cover`: separate
+`三井情報システム協議会(MISCO)` / `報告書` identification at 24pt, the actual
+`formal_report.title` and optional `subtitle` in the 18pt theme block, real
+issue month and optional assigned number, annotation-first organization font,
+membership-box insets and paragraph spacing. No report number or subtitle is
+invented. `created_month` is formatted with full-width digits (Reiwa dates also
+show the era year). Long themes still require explicit line/layout review.
+
+The supplement identifies the separately inspected attachment-5 PPT by digest
+`aca50a88ea5f616016b5622717fd2af7f33eba43008d1f906f35ab3464302536` and pages
+1, 6–9. It does not claim byte identity with the historical archive member or
+replace its provenance. The user confirmed the report/theme hierarchy and
+annotation-first fonts on 2026-11-04. The original example object's MS PGothic
+organization setting does not override the explicit MS Gothic annotation.
+
+Box coordinates are calibrated Word rendering inputs, **not** the page-1 text
+position targets. The 70/200/230mm dimension lines refer to the upper text area;
+inspect the final native PDF at the correct A4 aspect ratio, including glyph
+metrics, centering, margins, spacing, clipping and actual metadata. The
+supplement retains the screenshot reference positions separately. The XML
+checker detects lost profile settings, but does not establish final PDF
+conformance. The existing output-bound cover/typography review remains
+required; photo-position exceptions are not applied automatically.
+
 `misco.publication@1.4.0` adds the original ZIP's eight-member clause coverage
 without changing historical `1.3.0` pins, research packages or releases. Select
 the new manifest through the existing profile resolve/advance workflow. Its

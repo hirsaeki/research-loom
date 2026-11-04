@@ -12,6 +12,7 @@ from xml.etree import ElementTree as ET
 from plugins.application_errors import LocalApplicationError
 
 from ..publication.publication_docx import PKG, R, W, paragraph_xml
+from . import cover_profile
 
 NS = {"w": W}
 V = "urn:schemas-microsoft-com:vml"
@@ -238,6 +239,8 @@ def assemble(data: bytes, report: dict, group: str, layout: dict) -> bytes:
         "\n" + report["department"] + "\n" + report["committee"] if commissioned else ""
     )
     nodes.append(_cover_box(cover_organization, 25, 230, 160, 20, "ＭＳ ゴシック"))
+    if not commissioned and layout.get("misco_cover"):
+        nodes = cover_profile.build_boxes(report, layout["misco_cover"])
     _end_section(nodes, _section(base, "cover"))
     nodes.append(_p(""))
     _end_section(nodes, _section(base, "cover_reverse"))
@@ -562,7 +565,9 @@ def inspect_formal(data: bytes, report: dict, group: str, layout: dict) -> list[
             organization = (
                 "三井業際研究所"
                 if report["research_kind"] == "commissioned"
-                else "三井情報システム協議会（ＭＩＳＣＯ）"
+                else layout.get("misco_cover", {}).get(
+                    "organization", "三井情報システム協議会（ＭＩＳＣＯ）"
+                )
             )
             for value in [
                 report["title"],
@@ -676,6 +681,8 @@ def inspect_formal(data: bytes, report: dict, group: str, layout: dict) -> list[
                 (25, 230, organization),
             ]
             for x, y, value in expected_boxes:
+                if report["research_kind"] == "research_theme" and layout.get("misco_cover"):
+                    break
                 if not any(
                     f"margin-left:{x}mm;" in node.get("style", "")
                     and f"margin-top:{y}mm;" in node.get("style", "")
@@ -683,6 +690,10 @@ def inspect_formal(data: bytes, report: dict, group: str, layout: dict) -> list[
                     for node in cover_shapes
                 ):
                     problems.append("cover-position:" + value[:40])
+            if report["research_kind"] == "research_theme" and layout.get("misco_cover"):
+                problems.extend(
+                    cover_profile.inspect_boxes(document, report, layout["misco_cover"])
+                )
             # Fields are intentionally unmaterialized in a native draft. Final
             # conformance must additionally inspect the Host-produced PDF/TOC.
     except (OSError, KeyError, ValueError, zipfile.BadZipFile, ET.ParseError):
