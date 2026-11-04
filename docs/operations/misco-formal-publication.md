@@ -1,5 +1,41 @@
 # MISCO formal Publication (Issue #456)
 
+## Profile 1.6.0: appendix TOC Word tools
+
+`misco.publication@1.6.0` retains the 1.5.0 cover and adds a scoped `AUTO_BODY`
+TOC, an `AUTO_APPENDIX` TOC over appendix titles, and a separate `付{ PAGE }`
+footer restarted at 1. Both TOCs remain native Word fields derived from styles.
+Historical profile output remains unchanged. Appendix content is still supplied
+through the existing formal-report input; this does not reinterpret plain text
+as new heading styles.
+
+The `PUBLICATION_WORD_TOOLS` resource pins VBA, a PowerShell equivalent and
+operator instructions. These bodies travel with the effective resources and
+the verified preview policy; no installed checkout is needed to recover their
+exact contents. Export them without installation or execution:
+
+```bash
+uv run --frozen python scripts/export_publication_word_tools.py --workspace WORKSPACE --build-id PUB-ID --output NEW-DIRECTORY
+```
+
+Paste the exported BAS into a standard module to run it manually on the active
+document, or pass the exported PowerShell helper to
+`scripts/render_publication_word.ps1 -TocHelperPath FILE` for PDF rendering.
+The renderer checks its SHA256 against the DOCX metadata before loading it.
+No VBA project injection, Normal.dotm installation, docm conversion, or Word
+security setting change is performed. BAS uses ASCII and `ChrW` for the prefix.
+
+The helper locates exactly one TOC with `\b AUTO_APPENDIX`, unlocks it, updates
+native TOCs, repaginates and refreshes all numeric PAGEREF results before adding
+any prefixes. This two-pass order avoids stale page values and later reference
+updates erasing earlier prefixes. It adds `付` only to appendix results, removes footer gaps and
+relocks the appendix fields before PDF export. Repeated execution must not add
+duplicate prefixes. Missing/ambiguous scope or missing PAGEREF results is an
+error, not a successful update. Use this workflow after content/page changes;
+ordinary Word field updates alone do not maintain the cached prefix. Check the
+final PDF after updates, including appendix first/last entries and both footer
+and TOC numbering. A cached preview is not a final rendered-layout approval.
+
 ## Profile 1.5.0: cover interpretation supplement
 
 `profiles/publication/misco/1.5.0/profile.json` adds a profile-driven cover for

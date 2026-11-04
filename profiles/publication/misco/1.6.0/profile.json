@@ -1,0 +1,50 @@
+{
+  "schema_version": "0.1.0",
+  "profile_id": "misco.publication",
+  "profile_type": "publication",
+  "profile_version": "1.6.0",
+  "description": "MISCO formal publication with scoped body/appendix TOCs, appendix page prefixes and pinned opt-in Word update tools.",
+  "core_compatibility": {
+    "research_contract": ">=0.1.0 <0.2.0",
+    "invariant_contract": ">=0.1.0 <0.2.0"
+  },
+  "requires": [
+    {
+      "profile_id": "misco.writer",
+      "profile_type": "narrative",
+      "version": ">=1.1.0 <2.0.0"
+    }
+  ],
+  "resources": [
+    {
+      "path": "resources/publication-clean-rules.json",
+      "role": "PUBLICATION_RULES",
+      "sha256": "6fa73e10a81de1d5b123c6cc76bab3bc936cb03c2b3ad2d6946dae80bb8ffdf4"
+    },
+    {
+      "path": "resources/publication-clean-source-documents.json",
+      "role": "PUBLICATION_SOURCE_DOCUMENTS",
+      "sha256": "2d28e91cb46ff52b9a9a832bc7d6f84005917a2bb011b9b5954c278af3b78aee"
+    },
+    {
+      "path": "resources/publication-formal-spec.json",
+      "role": "PUBLICATION_FORMAL_SPEC",
+      "sha256": "710490d398d45d9bbc45b5f8223a3c01896af519058583a2d8ff5a112075a776"
+    },
+    {
+      "path": "resources/publication-url-display.json",
+      "role": "PUBLICATION_URL_DISPLAY",
+      "sha256": "06a5f9e99e6a8cb7cfff98f63e8d17ea80f84a42e16051760abb102430cc95ca"
+    },
+    {
+      "path": "resources/publication-coverage.json",
+      "role": "PUBLICATION_COVERAGE",
+      "sha256": "5b90e89dde1030552439dfc92c5eb49f5fa3b0b2d4d5ea2058b3ca7cd161dfb2"
+    },
+    {
+      "path": "resources/publication-word-tools.json",
+      "role": "PUBLICATION_WORD_TOOLS",
+      "sha256": "700e8b8547cb03b537f3432397a3f011747d78fedc7c76165614c1ffdbede495"
+    }
+  ]
+}

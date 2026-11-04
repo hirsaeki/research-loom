@@ -2,7 +2,8 @@
 param(
     [Parameter(Mandatory)][string]$SourceDocx,
     [Parameter(Mandatory)][string]$OutputPdf,
-    [Parameter(Mandatory)][string]$ReceiptPath
+    [Parameter(Mandatory)][string]$ReceiptPath,
+    [string]$TocHelperPath
 )
 $ErrorActionPreference = 'Stop'
 $source = (Resolve-Path -LiteralPath $SourceDocx).Path
@@ -19,7 +20,21 @@ try {
     $ns = [Xml.XmlNamespaceManager]::new($xml.NameTable)
     $ns.AddNamespace('w', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main')
     $parts = @($xml.SelectNodes('//w:sectPr', $ns) | ForEach-Object { $_.GetAttribute('part', 'urn:research-loom:publication') })
+    $requiresTocHelper = $null -ne $xml.SelectSingleNode('//w:bookmarkStart[@w:name="AUTO_APPENDIX"]', $ns)
+    if ($requiresTocHelper) {
+        $reader = [IO.StreamReader]::new($archive.GetEntry('customXml/formal-report.xml').Open())
+        try { [xml]$meta = $reader.ReadToEnd() } finally { $reader.Dispose() }
+        $helperDigest = ($meta.DocumentElement.InnerText | ConvertFrom-Json).word_toc_helper_sha256
+    }
 } finally { $archive.Dispose() }
+if ($requiresTocHelper) {
+    if (-not $TocHelperPath) { throw 'This DOCX requires its pinned Word TOC helper; export Word tools and pass -TocHelperPath.' }
+    $helper = (Resolve-Path -LiteralPath $TocHelperPath).Path
+    if ((Get-FileHash -LiteralPath $helper -Algorithm SHA256).Hash.ToLowerInvariant() -ne $helperDigest) {
+        throw 'Word TOC helper digest does not match the source DOCX.'
+    }
+    . $helper
+}
 if ($parts.Count -lt 12 -or @($parts | Where-Object { -not $_ }).Count) {
     throw 'Source is not a managed formal Publication DOCX.'
 }
@@ -71,6 +86,7 @@ try {
             }
             # Exporting bookmarks materializes Word's final print pagination.
             # The only overwritten PDF is this invocation's own first export.
+            if ($requiresTocHelper) { $tocStats = Invoke-TocAppendixPrefixOnDocument -Document $document -UpdateNativeTocs }
             $document.ExportAsFixedFormat($pdf, 17, $false, 0, 0, 1, 1, 0, $true, $true, 2)
             $ranges = @{}
             for ($i = 0; $i -lt $parts.Count; $i++) {
@@ -95,6 +111,7 @@ try {
         if ($ranges['body'][0] % 2) { throw 'Body still does not open on a left physical page.' }
         $pdfDigest = 'sha256:' + (Get-FileHash -LiteralPath $pdf -Algorithm SHA256).Hash.ToLowerInvariant()
         $hostReceipt = @{source_docx_digest=$sourceDigest; pdf_digest=$pdfDigest; software='Microsoft Word'; software_version=$word.Version; fields_updated=$true; page_ranges=$ranges}
+        if ($requiresTocHelper) { $hostReceipt.appendix_toc = $tocStats; $hostReceipt.toc_helper_sha256 = $helperDigest }
         $hostReceipt | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $receipt -Encoding utf8
     } finally { $document.Close(0) }
 } finally { $word.Quit() }
