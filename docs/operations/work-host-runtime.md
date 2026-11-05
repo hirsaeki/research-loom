@@ -91,6 +91,23 @@ Scratch is an execution location, not the sole durable research record. Use the
 existing [stopped Parent backup and restore procedure](../architecture/parent-backup-restore.md).
 There is no second Work research store and no live SQLite file synchronization.
 
+Use `<workspace>/intake/working/` for disposable trial, conversion, and rendering
+files. A host may create and remove these files without registering each trial or
+seeking a disposal decision. If that directory is not writable, report the failure
+and stop the affected operation; do not silently choose another writable directory.
+The existing `intake/chat/` and `intake/material-sources/` paths retain their
+specific ingress purposes. None of these intake paths is a durable payload store.
+
+For each selected result, persist the bytes needed to read, verify, and reuse that
+result through its Loom ingress before calling the save complete. This includes
+selected manuscript revisions, supporting material, and required originals or
+images according to the result being saved; it does not require preserving every
+trial. Verify the saved object through its public read after persistence. Source
+paths may remain as provenance, but must never be the active locator for saved
+content. A failed import or verification leaves that result unsaved, even if a
+working file or export still exists. The completed result must remain usable after
+`intake/working/` is removed.
+
 1. Stop all users/writers of the workspace and close every application handle.
 2. Keep it stopped, run public `doctor`, and record the result and repository HEAD.
 3. Copy the **complete** `.research-loom` Parent tree to a new backup-set directory

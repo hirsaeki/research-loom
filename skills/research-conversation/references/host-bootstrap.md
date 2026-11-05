@@ -102,6 +102,16 @@ Treat the decision request as a conversational hard stop: after stating the mean
 
 ## Supplied attachment intake
 
+Use `<workspace>/intake/working/` for disposable trials, conversions, and render
+checks. These files need no individual research registration or disposal approval.
+If the selected working location cannot be written, report the failure; do not
+silently redirect work to another writable path. Save selected results through
+their public Loom ingress and verify the managed read before treating them as
+saved. Retained source paths describe provenance only. A saved result must remain
+readable and reusable after its working files are deleted; failed verification
+means the save is incomplete. Preserve only the inputs needed for the selected
+result, not every trial.
+
 When the human supplies a file during a research conversation and asks Loom-backed
 research to use it, do not leave the only copy in host/session context.
 
