@@ -47,6 +47,10 @@ class ProjectInputRegistrationTests(unittest.TestCase):
                     first["content_digest"], "sha256:" + hashlib.sha256(content).hexdigest()
                 )
                 self.assertEqual(len(facade.list_project_inputs()["project_inputs"]), 1)
+                source.unlink()
+                saved = facade.show_project_input(first["input_id"], format="text")
+                self.assertEqual(saved["content"]["value"], content.decode("utf-8"))
+                self.assertEqual(saved["project_input"]["source_path"], str(source))
                 self.assertEqual(
                     facade.show_project_input(first["input_id"])["project_input"]["role"], "theme"
                 )

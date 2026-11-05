@@ -220,6 +220,9 @@ class ProjectInputMixin:
                     snapshot_id=snapshot_id,
                     snapshot_digest=snapshot_digest,
                 )
+                # Registration is complete only when the managed copy resolves
+                # independently of the caller's disposable source file.
+                self._registry().verify_content(str(document["input_id"]), self._project_id)
         except StaleHeadError as exc:
             raise LocalApplicationError(
                 "APPLICATION-PROJECT-INPUT-STALE-001",
