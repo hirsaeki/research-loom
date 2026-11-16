@@ -86,6 +86,7 @@ Start with the [repository README](../README.md), the [target monorepo structure
 ## Research Package, Writer and Publication
 
 - [MISCO concrete recommendation writing](architecture/misco-recommendation-writing.md)
+- [MISCO recommendations that retain the research answer](architecture/misco-recommendation-answer.md)
 - [Production self-contained Research Package](architecture/production-research-package.md)
 - [Versioned evidence-linked Writer Composition](architecture/versioned-writer-composition.md)
 - [Writer continuity and interrupted persistence](architecture/writer-recovery.md)
