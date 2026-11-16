@@ -24,6 +24,7 @@ Every production manifest lives at `<profile_type>/<name>/<version>/profile.json
 | `narrative/misco/1.1.0/profile.json` | `misco.writer@1.1.0` | yes, transitively by `misco.publication@1.3.0` in `projects/misco-ai-2026` |
 | `narrative/misco/1.2.0/profile.json` | `misco.writer@1.2.0` | no; opt-in #464 classified Writer rules |
 | `narrative/misco/1.3.0/profile.json` | `misco.writer@1.3.0` | no; opt-in concrete recommendation writing requested on 2026-10-31 |
+| `narrative/misco/1.4.0/profile.json` | `misco.writer@1.4.0` | no; opt-in recommendation answer clarification requested on 2026-11-16 |
 | `publication/misco/1.3.0/profile.json` | `misco.publication@1.3.0` | yes, requested by `projects/misco-ai-2026` |
 | `publication/misco/1.4.0/profile.json` | `misco.publication@1.4.0` | no; opt-in #456 formal report conformance through profile generation |
 | `publication/misco/1.5.0/profile.json` | `misco.publication@1.5.0` | no; opt-in cover interpretation and rendering correction confirmed on 2026-11-04 |
@@ -61,6 +62,15 @@ A manifest resource is resolved relative to its manifest, must remain inside can
 Layer B audit material, Layer C Human Review material, and synthetic few-shot examples are not production resources. For `misco.writer@1.1.0`, `WRITER_RULES` is the rule inventory and `WRITER_SOURCE_DOCUMENTS` carries the normalized UTF-8 bytes of the eight approved Layer A documents actually referenced by those runtime rules. For `misco.publication@1.3.0`, `PUBLICATION_FORMAL_SPEC` and `PUBLICATION_URL_DISPLAY` carry the approved production application policy in addition to the clean rule/source-document resources; the formal binary originals remain external and are identified by exact digests in the resource. Detached inputs project these resources and exact Profile pins; a host must not recover missing policy from `research-profile/`, historical examples, or the network.
 
 ## Composition
+
+Writer 1.4.0 adds the user-requested
+[recommendation answer clarification](../docs/architecture/misco-recommendation-answer.md)
+to its pinned rule and source resources, including complete synthetic contrasts
+for procedural drift, a supported recommendation and unsupported forcefulness.
+This is a Profile-only refinement: generic Writer instructions, earlier versions
+and project selections are unchanged. Regenerate and verify it with
+`uv run --frozen python scripts/build_misco_writer_recommendation_answer.py`
+and `--check`, respectively.
 
 Writer 1.3.0 additionally delivers the user-requested
 [recommendation writing guide](../docs/architecture/misco-recommendation-writing.md),

@@ -14,6 +14,7 @@ import tests.runtime.test_misco_writer_profile_application as legacy
 from plugins.local_application import LocalApplicationError, LocalWorkspace
 from plugins.local_application.workspace.profile_resolution import resolve_effective_profile_set
 from plugins.local_application.writer.writer_round_trip_service import WriterRoundTripService
+from scripts.build_misco_writer_recommendation_answer import build as build_answer_profile
 from scripts.build_misco_writer_recommendations import build
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 
@@ -161,6 +162,71 @@ class Issue464WriterRuleScopeTests(ResearchPackageAcceptanceSupport):
                 raw = source["content"].encode()
                 self.assertEqual(source["sha256"], hashlib.sha256(raw).hexdigest())
                 self.assertFalse(source["path"].endswith(".pdf"))
+        finally:
+            facade.close()
+
+    def test_answer_profile_delivers_clarifications_without_changing_research_authority(self):
+        self.writer_manifest = ROOT / "profiles/narrative/misco/1.4.0/profile.json"
+        cfg, eps = self._write_structured_workspace_inputs()
+        self.workspace = self.root / "answer-workspace"
+        opened = LocalWorkspace.init(self.workspace, cfg, eps)
+        opened.close()
+        for path, expected in build_answer_profile().items():
+            self.assertEqual(path.read_bytes(), expected, str(path))
+        facade, _, _, doc, _ = self._build_round_trip()
+        try:
+            delivery = doc["sections"][0]["section_input"]["writer_profile"]
+            self.assertEqual({p["profile_version"] for p in delivery["profile_pins"]}, {"1.4.0"})
+            resources = {r["role"]: json.loads(r["content"]) for r in delivery["resources"]}
+            previous_root = ROOT / "profiles/narrative/misco/1.3.0/resources"
+            previous = json.loads(
+                (previous_root / "writer-clean-rules.json").read_text(encoding="utf-8")
+            )
+            old = {r["id"]: r for r in previous["items"]}
+            current = {r["id"]: r for r in resources["WRITER_RULES"]["items"]}
+            self.assertEqual(set(current), set(old))
+            sources = resources["WRITER_SOURCE_DOCUMENTS"]["source_documents"]
+            old_sources = json.loads(
+                (previous_root / "writer-clean-source-documents.json").read_text(encoding="utf-8")
+            )["source_documents"]
+            self.assertEqual(sources[:-1], old_sources)
+            guide = sources[-1]
+            self.assertEqual(guide["content"], (ROOT / guide["path"]).read_text(encoding="utf-8"))
+            self.assertEqual(
+                set(guide["writer_rule_ids"]), {"PUB-RC-01", "PUB-RC-02", "PUB-RC-04", "PUB-RC-05"}
+            )
+            for rule_id, rule in current.items():
+                self.assertEqual(rule["review"], old[rule_id]["review"])
+                if rule_id in guide["writer_rule_ids"]:
+                    prefix = old[rule_id]["body"] + "\n\n"
+                    self.assertTrue(rule["body"].startswith(prefix))
+                    addition = rule["body"][len(prefix) :]
+                    self.assertTrue(addition)
+                    self.assertIn(addition, guide["content"])
+                    self.assertEqual(
+                        rule["additional_sources"][:-1], old[rule_id]["additional_sources"]
+                    )
+                    self.assertEqual(rule["additional_sources"][-1]["path"], guide["path"])
+                else:
+                    self.assertEqual(rule, old[rule_id])
+            for source in sources:
+                raw = source["content"].encode()
+                self.assertEqual(source["sha256"], hashlib.sha256(raw).hexdigest())
+            # Delivery does not evaluate semantics or reject an unresolved draft.
+            response = self._response(doc)
+            response["sections"][0]["content"] = (
+                "The intervention has proved universally effective."
+            )
+            result = facade.import_writer_response(response)
+            self.assertEqual(result["status"], "IMPORTED")
+            self.assertFalse(result["research_state_mutation_performed"])
+            self.assertTrue(
+                all(
+                    group["outcome"] == "unevaluated"
+                    for section in response["sections"]
+                    for group in section["profile_review"]
+                )
+            )
         finally:
             facade.close()
 
