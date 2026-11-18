@@ -1,5 +1,11 @@
 # MISCO formal Publication (Issue #456)
 
+Optional [local bibliography selection](../architecture/local-bibliography-selection.md)
+can retain citation provenance while omitting complete local source displays from
+section-end lists. The default remains repeat; this is a per-build application
+input, not an automatic Profile upgrade. Review manual displays against the current
+preview digest and inspect the final PDF as usual.
+
 ## Profile 1.6.0: appendix TOC Word tools
 
 `misco.publication@1.6.0` retains the 1.5.0 cover and adds a scoped `AUTO_BODY`

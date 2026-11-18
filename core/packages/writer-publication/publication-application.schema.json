@@ -11,6 +11,117 @@
     "schema_version": {
       "const": "0.1.0"
     },
+    "bibliography": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "repeat",
+            "omit_complete_local"
+          ]
+        },
+        "keep_sources": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "displays": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "display_id",
+              "section_id",
+              "source_ref",
+              "marker",
+              "placement",
+              "method"
+            ],
+            "properties": {
+              "display_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "section_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "source_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "locator_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "locator_exception": {
+                "type": "string",
+                "minLength": 1
+              },
+              "marker": {
+                "type": "string",
+                "minLength": 1
+              },
+              "placement": {
+                "enum": [
+                  "inline",
+                  "footnote"
+                ]
+              },
+              "method": {
+                "enum": [
+                  "generated",
+                  "reviewed"
+                ]
+              },
+              "review": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "content_digest",
+                  "status",
+                  "reviewer_id",
+                  "reviewed_at",
+                  "rationale"
+                ],
+                "properties": {
+                  "content_digest": {
+                    "$ref": "#/$defs/sha"
+                  },
+                  "status": {
+                    "enum": [
+                      "sufficient",
+                      "insufficient",
+                      "unevaluated"
+                    ]
+                  },
+                  "reviewer_id": {
+                    "type": "string",
+                    "pattern": "\\S"
+                  },
+                  "reviewed_at": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "rationale": {
+                    "type": "string",
+                    "pattern": "\\S"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "document_mode": {
       "enum": [
         "body_preview",

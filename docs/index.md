@@ -38,6 +38,7 @@ Start with the [repository README](../README.md), the [target monorepo structure
 - [Narrative Profile convergence](architecture/narrative-profile-convergence.md)
 - [MISCO Writer Profile application](architecture/misco-writer-profile-application.md)
 - [MISCO Publication Profile application](architecture/misco-publication-profile-application.md)
+- [Optional local bibliography selection](architecture/local-bibliography-selection.md)
 - [Writer rule adoption and review scope (Issue 464)](architecture/writer-rule-adoption.md)
 
 ## Local Workspace, application and persistence

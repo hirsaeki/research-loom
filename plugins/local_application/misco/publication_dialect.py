@@ -27,6 +27,18 @@ class MiscoPublicationDialect(PublicationDialect):
     editorial_overall_check: str | None = MISCO_EDITORIAL_QA
     body_page_range: tuple[int, int] | None = (50, 60)
     body_length_check: str | None = "misco-body-length"
+    supports_local_references: bool = True
+
+    def local_reference_sufficient(self, source, locator, locator_exception, *, reviewed=False):
+        # Conservative automatic path: exceptions need explicit displayed review,
+        # and absent bibliographic fields never count as a complete generated label.
+        fields = ("author", "title", "publisher", "publication_or_update_date")
+        exceptions = source.get("bibliography_exceptions", {})
+        return all(
+            str(source.get(key) or "").strip()
+            or (reviewed and key != "title" and str(exceptions.get(key) or "").strip())
+            for key in fields
+        ) and bool((isinstance(locator, str) and locator.strip()) or locator_exception.strip())
 
     def require_resources(self, by_role: Mapping[str, Any]) -> None:
         roles = (
