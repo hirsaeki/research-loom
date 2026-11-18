@@ -368,6 +368,12 @@ class PublicationReleaseService(PublicationReleaseRequestMixin, PublicationRende
         revision = inspection["revision"]
         inspection["publication_policy"] = policy
         inspection["publication_profile"] = profile
+        if "bibliography" in policy:
+            from .reference_selection import select_references
+
+            policy["bibliography_decisions"] = select_references(
+                inspection, dialect, self._citation_label
+            )
         inspection["exhibit_blocks"] = prepare_exhibits(inspection, self.workspace, dialect=dialect)
         build_key = {
             "manuscript_revision_id": revision["revision_id"],

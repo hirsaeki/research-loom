@@ -23,6 +23,35 @@ class PublicPdfTests(ResearchPackageAcceptanceSupport):
     _review = staticmethod(writer_tests.MiscoWriterProfileApplicationTests._review)
     _response = classmethod(writer_tests.MiscoWriterProfileApplicationTests._response.__func__)
 
+    def test_local_reference_policy_and_decisions_survive_public_build_and_reuse(self):
+        facade, draft = self.draft()
+        try:
+            old = draft["build"]
+            inputs = {
+                "schema_version": "0.1.0",
+                "document_mode": "formal_report",
+                "formal_report": old["publication_policy"]["formal_report"],
+                "bibliography": {"mode": "omit_complete_local"},
+            }
+            result = facade.build_publication_preview(
+                old["source_manuscript"]["composition_id"],
+                old["source_manuscript"]["revision_id"],
+                inputs,
+            )
+            built = result["build"]
+            self.assertIn("bibliography_decisions", built["publication_policy"])
+            self.assertNotEqual(built["build_id"], old["build_id"])
+            repeated = facade.build_publication_preview(
+                old["source_manuscript"]["composition_id"],
+                old["source_manuscript"]["revision_id"],
+                inputs,
+            )
+            self.assertEqual(repeated["status"], "VERIFIED_REUSE")
+            self.assertEqual(repeated["build"]["publication_policy"], built["publication_policy"])
+            self.assertFalse(result["research_state_mutation_performed"])
+        finally:
+            facade.close()
+
     def _write_structured_workspace_inputs(self):
         config = intake.bootstrap_config()
         config["profile_requests"] = {
