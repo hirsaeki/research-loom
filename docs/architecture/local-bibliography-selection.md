@@ -59,6 +59,10 @@ Automatic sufficiency requires nonblank author, original title, publisher and
 publication/update date, plus a nonblank locator. Existing inline tokens show
 the complete local locator set; missing locators prevent automatic omission.
 For explicit displays, web URLs must occur in full in the displayed text.
+Automatic displays must actually render each registered locator. A non-HTTP
+canonical locator suppressed by the existing label formatter therefore retains
+the list entry that preserves it. Inline displays overlapping any native-footnote
+replacement span are ineligible, including partial overlaps after token expansion.
 
 `method: reviewed` uses exact-text human/host review instead of approximate
 natural-language matching. The reviewer checks source identity, necessary
@@ -86,7 +90,7 @@ The placeholder is not a valid digest. Copy the actual preview digest only after
 performing the review. `insufficient` and `unevaluated` never qualify.
 
 Review binds the complete section (including citation registrations), source
-object, display definition, corresponding note, formal structure and formal-spec
+object, display definition, all native notes in that section, formal structure and formal-spec
 settings. Changes invalidate it conservatively; the source returns to the list.
 An unrelated section edit does not invalidate this review unless structure or
 formal settings also change. A new immutable build records the new result;
