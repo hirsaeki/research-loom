@@ -264,3 +264,51 @@ class ReferenceSelectionTests(unittest.TestCase):
         self.assertEqual(current["bibliography"], config)
         config["mode"] = "repeat"
         self.assertEqual(current["bibliography"]["mode"], "omit_complete_local")
+
+    def test_nonweb_canonical_locator_must_actually_be_rendered_before_omission(self):
+        for canonical in ["urn:isbn:9780000000000", "D:/materials/report.pdf"]:
+            with self.subTest(canonical=canonical):
+                self.setUp()
+                self.source["canonical_locator"] = canonical
+                self.section["citations"][0]["locator_ref"] = canonical
+                self.assertFalse(self.local_result()["omitted"])
+                rendered = self.service._render(self.inspection)[0].decode()
+                self.assertIn(canonical, rendered)
+                self.assertIn("＜参考文献＞", rendered)
+
+    def test_generated_explicit_display_cannot_claim_an_unrendered_canonical_locator(self):
+        self.source["canonical_locator"] = "urn:isbn:9780000000000"
+        display = self.display("inline", "generated")
+        self.section["citations"][0]["locator_ref"] = self.source["canonical_locator"]
+        display["locator_ref"] = self.source["canonical_locator"]
+        label = self.service._citation_label(self.source, display["locator_ref"], self.policy)
+        self.section["content"] = label
+        display["marker"] = label
+        self.assertFalse(self.local_result()["sufficient"])
+
+    def test_native_note_replacement_invalidates_inline_review_and_retains_source(self):
+        display = self.display("inline", "reviewed")
+        self.confirm(display)
+        old_digest = self.local_result()["displays"][0]["review_digest"]
+        self.policy["formal_report"]["footnotes"].append(
+            {"section_id": "s2", "marker": display["marker"], "text": "Unrelated note."}
+        )
+        result = self.local_result()
+        self.assertFalse(result["sufficient"])
+        self.assertNotEqual(result["displays"][0]["review_digest"], old_digest)
+
+    def test_generated_inline_and_token_cannot_overlap_native_note_replacement(self):
+        for kind in ["generated_inline", "token", "partial_overlap"]:
+            with self.subTest(kind=kind):
+                self.setUp()
+                label = self.service._citation_label(self.source, "51頁", self.policy)
+                if kind != "token":
+                    self.display("inline", "generated")
+                self.policy["formal_report"]["footnotes"].append(
+                    {
+                        "section_id": "s2",
+                        "marker": "本文（" + label[:5] if kind == "partial_overlap" else label,
+                        "text": "Unrelated note.",
+                    }
+                )
+                self.assertFalse(self.local_result()["sufficient"])

@@ -20,11 +20,27 @@ def review_digest(section, source, display, note, policy):
         "source": source,
         "display": {k: v for k, v in display.items() if k != "review"},
         "note": note,
+        "section_footnotes": [
+            n
+            for n in policy.get("formal_report", {}).get("footnotes", [])
+            if n["section_id"] == section["section_id"]
+        ],
         "structure": policy.get("formal_report", {}).get("structure"),
         "formal_spec": policy.get("formal_spec_profile"),
     }
     encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return "sha256:" + hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+
+def consumed_by_note(text, rendered, notes):
+    """Detect even partial overlap with a native-note replacement span."""
+    displays = list(re.finditer(re.escape(text), rendered))
+    return any(
+        a.start() < b.end() and b.start() < a.end()
+        for a in displays
+        for note in notes
+        for b in re.finditer(re.escape(note["marker"]), rendered)
+    )
 
 
 def select_references(inspection, dialect, label):
@@ -65,6 +81,22 @@ def select_references(inspection, dialect, label):
         sid = section["section_id"]
         content = section["content"]
         tokens = Counter(TOKEN.findall(content))
+        section_notes = [n for n in notes if n["section_id"] == sid]
+
+        def expand_token(match):
+            ref = match.group(1)
+            if ref not in sources:
+                return match.group(0)
+            locs = list(
+                dict.fromkeys(
+                    c["locator_ref"]
+                    for c in section.get("citations", [])
+                    if c["source_ref"] == ref and c.get("locator_ref")
+                )
+            )
+            return "（" + label(sources[ref], "；".join(locs) or None, policy) + "）"
+
+        rendered = TOKEN.sub(expand_token, content)
         refs = list(dict.fromkeys(c["source_ref"] for c in section.get("citations", [])))
         for ref in refs:
             if ref not in sources:
@@ -77,7 +109,11 @@ def select_references(inspection, dialect, label):
             # Every inline token renders the complete set of registered locators.
             locators = list(dict.fromkeys(c.get("locator_ref") for c in citations))
             if tokens[ref]:
-                ok = all(dialect.local_reference_sufficient(source, loc, "") for loc in locators)
+                emitted = label(source, "；".join(loc for loc in locators if loc) or None, policy)
+                ok = all(
+                    dialect.local_reference_sufficient(source, loc, "") and loc in emitted
+                    for loc in locators
+                ) and not consumed_by_note("（" + emitted + "）", rendered, section_notes)
                 evaluated.append({"kind": "inline_tokens", "count": tokens[ref], "sufficient": ok})
                 if ok:
                     covered.extend(locators * tokens[ref])
@@ -112,6 +148,10 @@ def select_references(inspection, dialect, label):
                 )
                 if display["placement"] == "footnote":
                     structural = structural and note is not None
+                else:
+                    structural = structural and not consumed_by_note(
+                        marker, rendered, section_notes
+                    )
                 eligible = dialect.local_reference_sufficient(
                     source,
                     locator,
@@ -122,7 +162,13 @@ def select_references(inspection, dialect, label):
                 if canonical.startswith(("https://", "http://")) and canonical not in text:
                     eligible = False
                 expected = label(source, locator, policy)
-                generated = display["method"] == "generated" and text == expected and not review
+                generated = (
+                    display["method"] == "generated"
+                    and text == expected
+                    and not review
+                    and bool(locator)
+                    and locator in text
+                )
                 sufficient = structural and eligible and (generated or reviewed)
                 reason = (
                     "complete_local_display"
