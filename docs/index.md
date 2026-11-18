@@ -126,5 +126,6 @@ Start with the [repository README](../README.md), the [target monorepo structure
 - [MISCO integrated acceptance and migration closure](architecture/misco-integrated-acceptance.md)
 - [Research Package acceptance evidence (Issue #77)](acceptance/research-package-acceptance.md)
 - [Late visual live acceptance (#409)](acceptance/late-visual-live-uat.md)
+- [Appendix PDF numbering and Word revalidation (#621)](acceptance/appendix-pdf-numbering.md)
 - [Writer reader-quality trial and evaluation preparation](acceptance/writer-reader-quality/README.md)
 - [#466 現稿レビューの対象一致と部分改稿](acceptance/writer-document-review/README.md)

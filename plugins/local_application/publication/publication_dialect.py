@@ -31,6 +31,10 @@ class PublicationDialect:
     body_length_check: str | None = None
     supports_local_references: bool = False
 
+    def appendix_page_prefix(self, policy: Mapping[str, Any]) -> str:
+        """Expected appendix footer prefix from the selected formal layout (#621)."""
+        return ""
+
     def local_reference_sufficient(self, source, locator, locator_exception, *, reviewed=False):
         """Whether local source metadata meets this dialect's bibliography requirements."""
         return False
