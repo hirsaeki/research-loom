@@ -11,6 +11,7 @@ from pypdf import PdfWriter
 import tests.runtime.test_external_desktop_research_intake as intake
 import tests.runtime.test_misco_writer_profile_application as writer_tests
 from plugins.local_application import LocalApplicationError, LocalApplicationFacade, LocalWorkspace
+from plugins.local_application.publication.publication_pdf import inspect_pdf
 from plugins.local_application.workspace.profile_resolution import resolve_effective_profile_set
 from tests.runtime.research_package_acceptance_support import ResearchPackageAcceptanceSupport
 from tests.runtime.test_issue456_formal_document import representative_report
@@ -53,6 +54,7 @@ class PublicPdfTests(ResearchPackageAcceptanceSupport):
             facade.close()
 
     def _write_structured_workspace_inputs(self):
+        publication_version = getattr(self, "publication_version", "1.4.0")
         config = intake.bootstrap_config()
         config["profile_requests"] = {
             "research": [],
@@ -64,7 +66,7 @@ class PublicPdfTests(ResearchPackageAcceptanceSupport):
                 {
                     "profile_id": "misco.publication",
                     "profile_type": "publication",
-                    "version": "1.4.0",
+                    "version": publication_version,
                 }
             ],
         }
@@ -75,7 +77,10 @@ class PublicPdfTests(ResearchPackageAcceptanceSupport):
         )
         effective = resolve_effective_profile_set(
             config,
-            [writer_tests.WRITER_MANIFEST, ROOT / "profiles/publication/misco/1.4.0/profile.json"],
+            [
+                writer_tests.WRITER_MANIFEST,
+                ROOT / f"profiles/publication/misco/{publication_version}/profile.json",
+            ],
         )
         cfg, eps = self.root / "config.json", self.root / "profiles.json"
         cfg.write_text(json.dumps(config), encoding="utf-8")
@@ -162,7 +167,12 @@ class PublicPdfTests(ResearchPackageAcceptanceSupport):
             with self.assertRaises(LocalApplicationError):
                 facade.request_publication_release(build["build_id"], "reviewer")
             input_ = self.finalization_input(build)
-            failed = facade.finalize_publication_pdf(build["build_id"], input_)
+            with patch(
+                "plugins.local_application.publication.publication_pdf.inspect_pdf",
+                wraps=inspect_pdf,
+            ) as inspector:
+                failed = facade.finalize_publication_pdf(build["build_id"], input_)
+            self.assertEqual(inspector.call_args.kwargs["appendix_page_prefix"], "")
             self.assertEqual(failed["build"]["verification"]["final_pdf_machine"], "failed")
             with self.assertRaises(LocalApplicationError):
                 facade.request_publication_release(failed["build"]["build_id"], "reviewer")
@@ -254,3 +264,30 @@ class PublicPdfTests(ResearchPackageAcceptanceSupport):
         self.assertEqual(
             json.loads((same / "project-config.json").read_text(encoding="utf-8")), current
         )
+
+
+class PrefixedPublicPdfTests(ResearchPackageAcceptanceSupport):
+    publication_version = "1.6.0"
+    _write_structured_workspace_inputs = PublicPdfTests._write_structured_workspace_inputs
+    _build_round_trip = PublicPdfTests._build_round_trip
+    _review = staticmethod(PublicPdfTests._review)
+    _response = classmethod(PublicPdfTests._response.__func__)
+    draft = PublicPdfTests.draft
+    finalization_input = PublicPdfTests.finalization_input
+
+    def test_finalization_uses_pinned_prefix_but_still_rejects_blank_pdf(self):
+        facade, draft = self.draft()
+        try:
+            build = draft["build"]
+            inputs = self.finalization_input(build)
+            with patch(
+                "plugins.local_application.publication.publication_pdf.inspect_pdf",
+                wraps=inspect_pdf,
+            ) as inspector:
+                failed = facade.finalize_publication_pdf(build["build_id"], inputs)
+            self.assertEqual(inspector.call_args.kwargs["appendix_page_prefix"], "付")
+            self.assertEqual(failed["build"]["verification"]["final_pdf_machine"], "failed")
+            with self.assertRaises(LocalApplicationError):
+                facade.request_publication_release(failed["build"]["build_id"], "reviewer")
+        finally:
+            facade.close()

@@ -583,6 +583,7 @@ class PublicationReleaseService(PublicationReleaseRequestMixin, PublicationRende
             required_text=required,
             page_ranges=host["page_ranges"],
             expected_parts=expected_parts,
+            appendix_page_prefix=dialect.appendix_page_prefix(policy),
         )
         review = input_["review"]
         if (
