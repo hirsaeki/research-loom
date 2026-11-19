@@ -1,0 +1,699 @@
+{
+  "authority": "SYNTHETIC_TEST_ONLY",
+  "baseline_projection": "Reproduction of main 91d0825's omission, not an export run under that historical checkout.",
+  "cases": [
+    {
+      "authority": "SYNTHETIC_TEST_ONLY",
+      "case_id": "adopted-operation-unmeasured-effect",
+      "composition": {
+        "audience": [
+          "受付運用の責任者"
+        ],
+        "base_digest": null,
+        "base_version": null,
+        "change_reason": "initial composition",
+        "composition_digest": "sha256:f53c094af6fc8937920c5c2b63f074ea59622c1143428a2f9f91a59270884d36",
+        "composition_id": "COMP-a0473319350a4d0c8149ae5b93f339d6",
+        "created_at": "2026-11-19T21:59:05.755450Z",
+        "created_by": {
+          "instruction": "SYNTHETIC_TEST_ONLY; no real research adoption",
+          "type": "human_or_external_llm"
+        },
+        "evidence_verification_performed": false,
+        "finding_adoption_performed": false,
+        "object_type": "writer_composition",
+        "purpose": "固定された合成材料から読者の問いに答える短稿。",
+        "research_state_mutation_performed": false,
+        "schema_version": "0.1.0",
+        "sections": [
+          {
+            "argument_refs": [
+              "ARG-DUP"
+            ],
+            "citation_bindings": [],
+            "citation_requirements": [],
+            "closing_intent": "固定された方法を示す次節へつなぐ。",
+            "contribution_refs": [],
+            "counter_review_refs": [],
+            "detailed": true,
+            "evidence_refs": [],
+            "exhibit_bindings": [],
+            "exhibit_pins": [],
+            "exhibit_refs": [],
+            "finding_refs": [
+              "FND-DUP"
+            ],
+            "gap_pins": [],
+            "gap_refs": [],
+            "heading": "問いと判断の焦点",
+            "length_hint": null,
+            "limitation_refs": [],
+            "material_refs": [],
+            "messages": [
+              "運用変更の提言は採択済み、効果は未測定",
+              "受付運用の責任者",
+              "架空の受付チームは、通常案件で同じ顧客アカウント項目を受付票とトリアージ票に二重入力している。変更はまだ実施していない。"
+            ],
+            "narrative_stage_refs": [
+              "framing"
+            ],
+            "next_section_id": "SEC-METHOD",
+            "opening_intent": "読者の判断課題から始める。",
+            "order": 1,
+            "parent_section_id": null,
+            "previous_section_id": null,
+            "prohibited_claims": [
+              "全体処理時間の短縮や誤入力の減少が実証された。",
+              "本人確認を廃止できる。",
+              "変更は実施済みである。"
+            ],
+            "purpose": "読者の判断課題と、この短稿で得られる答えを示す。",
+            "qualifier_refs": [],
+            "reader_question": "受付項目をどう変更すべきか。残す確認は何か。",
+            "recommendation_refs": [
+              "REC-DUP"
+            ],
+            "section_digest": "sha256:5c06f82c07d5b4d38eaee446f58a2a321c6606e2e4705350e3d494bef3cb07d5",
+            "section_id": "SEC-FRAMING",
+            "semantic_purpose_refs": [
+              "frame_problem"
+            ],
+            "source_refs": [],
+            "unresolved_items": [
+              "変更後の全体処理時間と誤入力率は未測定。",
+              "例外案件の入力と本人確認は維持する。"
+            ]
+          },
+          {
+            "argument_refs": [
+              "ARG-DUP"
+            ],
+            "citation_bindings": [],
+            "citation_requirements": [],
+            "closing_intent": "この条件から何が観察されたかへ進む。",
+            "contribution_refs": [],
+            "counter_review_refs": [],
+            "detailed": true,
+            "evidence_refs": [],
+            "exhibit_bindings": [],
+            "exhibit_pins": [],
+            "exhibit_refs": [],
+            "finding_refs": [
+              "FND-DUP"
+            ],
+            "gap_pins": [],
+            "gap_refs": [],
+            "heading": "方法と条件",
+            "length_hint": null,
+            "limitation_refs": [],
+            "material_refs": [],
+            "messages": [
+              "架空の受付チームは、通常案件で同じ顧客アカウント項目を受付票とトリアージ票に二重入力している。変更はまだ実施していない。",
+              "4週間の受付ログ300件を観察した。介入比較は実施していない。"
+            ],
+            "narrative_stage_refs": [
+              "formation"
+            ],
+            "next_section_id": "SEC-RESULTS",
+            "opening_intent": "必要な方法条件を説明する。",
+            "order": 2,
+            "parent_section_id": null,
+            "previous_section_id": "SEC-FRAMING",
+            "prohibited_claims": [
+              "全体処理時間の短縮や誤入力の減少が実証された。",
+              "本人確認を廃止できる。",
+              "変更は実施済みである。"
+            ],
+            "purpose": "方法の性質と判断範囲を明確にする。",
+            "qualifier_refs": [],
+            "reader_question": "どの材料を、どの条件で確認したのか。",
+            "recommendation_refs": [
+              "REC-DUP"
+            ],
+            "section_digest": "sha256:79e8fa602273df070d2511f2a33daa23dcca19a83cb24d932a87b72946c69280",
+            "section_id": "SEC-METHOD",
+            "semantic_purpose_refs": [
+              "expose_argument"
+            ],
+            "source_refs": [],
+            "unresolved_items": [
+              "変更後の全体処理時間と誤入力率は未測定。",
+              "例外案件の入力と本人確認は維持する。"
+            ]
+          },
+          {
+            "argument_refs": [
+              "ARG-DUP"
+            ],
+            "citation_bindings": [],
+            "citation_requirements": [],
+            "closing_intent": "入力済み解釈の範囲を保ったまま判断へ向かう。",
+            "contribution_refs": [],
+            "counter_review_refs": [],
+            "detailed": true,
+            "evidence_refs": [],
+            "exhibit_bindings": [],
+            "exhibit_pins": [],
+            "exhibit_refs": [],
+            "finding_refs": [
+              "FND-DUP"
+            ],
+            "gap_pins": [],
+            "gap_refs": [],
+            "heading": "観察された結果と限界",
+            "length_hint": null,
+            "limitation_refs": [],
+            "material_refs": [],
+            "messages": [
+              "架空の受付チームは、通常案件で同じ顧客アカウント項目を受付票とトリアージ票に二重入力している。変更はまだ実施していない。",
+              "4週間の受付ログ300件を観察した。介入比較は実施していない。",
+              "通常案件300件中96件で同じアカウント項目の二重入力が記録された。",
+              "二重入力96件における再入力時間の中央値は2分だった。",
+              "項目再利用後の全体処理時間と誤入力率は未測定である。例外案件の必要項目は通常案件と異なる。"
+            ],
+            "narrative_stage_refs": [
+              "validation"
+            ],
+            "next_section_id": "SEC-IMPLICATION",
+            "opening_intent": "方法と結果の関係を示す。",
+            "order": 3,
+            "parent_section_id": null,
+            "previous_section_id": "SEC-METHOD",
+            "prohibited_claims": [
+              "全体処理時間の短縮や誤入力の減少が実証された。",
+              "本人確認を廃止できる。",
+              "変更は実施済みである。"
+            ],
+            "purpose": "結果、条件、未解決点を同時に保つ。",
+            "qualifier_refs": [],
+            "reader_question": "固定された事実から何が言え、何はまだ言えないか。",
+            "recommendation_refs": [
+              "REC-DUP"
+            ],
+            "section_digest": "sha256:629766ad9dca3ba8302b554f1e8f2a6a0ed038a8b913f989426857765b1b9462",
+            "section_id": "SEC-RESULTS",
+            "semantic_purpose_refs": [
+              "test_and_qualify"
+            ],
+            "source_refs": [],
+            "unresolved_items": [
+              "変更後の全体処理時間と誤入力率は未測定。",
+              "例外案件の入力と本人確認は維持する。"
+            ]
+          },
+          {
+            "argument_refs": [
+              "ARG-DUP"
+            ],
+            "citation_bindings": [],
+            "citation_requirements": [],
+            "closing_intent": "適用範囲と次の確認事項を明示して結ぶ。",
+            "contribution_refs": [],
+            "counter_review_refs": [],
+            "detailed": true,
+            "evidence_refs": [],
+            "exhibit_bindings": [],
+            "exhibit_pins": [],
+            "exhibit_refs": [],
+            "finding_refs": [
+              "FND-DUP"
+            ],
+            "gap_pins": [],
+            "gap_refs": [],
+            "heading": "判断と次の一手",
+            "length_hint": null,
+            "limitation_refs": [],
+            "material_refs": [],
+            "messages": [
+              "通常案件では受付済みの共通アカウント項目をトリアージへ再利用し、二重入力をやめるべきである。例外案件の入力と本人確認は従来どおり維持する。この提言は合成ケースで採択済みだが、実施済みではない。",
+              "通常案件で既存の共通項目を再利用すれば同じ項目を再入力する手順を除けるため、その変更を選ぶ。効果の大きさの実証とは別の選択理由である。"
+            ],
+            "narrative_stage_refs": [
+              "implication"
+            ],
+            "next_section_id": null,
+            "opening_intent": "冒頭の問いへ戻る。",
+            "order": 4,
+            "parent_section_id": null,
+            "previous_section_id": "SEC-RESULTS",
+            "prohibited_claims": [
+              "全体処理時間の短縮や誤入力の減少が実証された。",
+              "本人確認を廃止できる。",
+              "変更は実施済みである。"
+            ],
+            "purpose": "提言を冒頭の判断課題と観察へ結びつける。",
+            "qualifier_refs": [],
+            "reader_question": "問いにどう答え、次に何を確かめるか。",
+            "recommendation_refs": [
+              "REC-DUP"
+            ],
+            "section_digest": "sha256:fc9bf3879c7068406bd2ac01a55377b61e4aaf24f699fc749c0ba8b8fffba410",
+            "section_id": "SEC-IMPLICATION",
+            "semantic_purpose_refs": [
+              "present_implications"
+            ],
+            "source_refs": [],
+            "unresolved_items": [
+              "変更後の全体処理時間と誤入力率は未測定。",
+              "例外案件の入力と本人確認は維持する。"
+            ]
+          }
+        ],
+        "source": {
+          "authoritative_research_freeze": false,
+          "effective_profile_set_digest": "sha256:5fdc4b6506f0122a3606a3b80aaa154e91077d53175e965ebe8805c63f433129",
+          "effective_profile_set_ref": "EPS-1",
+          "lineage_ref": "LIN-1",
+          "package_mode": "preview",
+          "preview_only": true,
+          "project_id": "PRJ-WRQ-DUP",
+          "release_eligible": false,
+          "research_package_digest": "sha256:75a9a9304be8e9f38e47a8c82c81f756802d4541974f3a57e08595cad3207aaa",
+          "research_package_id": "RP-bb378ad9e68d4271827cef1982f8e3b9",
+          "research_snapshot_digest": "sha256:cfbb9093e155680243abb385c3990315d827dfd65d31374746245aa27d37e99a",
+          "research_snapshot_id": "SNP-WRQ-DUP",
+          "source_epistemic_status": "SYNTHETIC_TEST_ONLY"
+        },
+        "validation": {
+          "diagnostics": [],
+          "status": "VALID"
+        },
+        "version": 1
+      },
+      "package": {
+        "package_digest": "sha256:75a9a9304be8e9f38e47a8c82c81f756802d4541974f3a57e08595cad3207aaa",
+        "package_id": "RP-bb378ad9e68d4271827cef1982f8e3b9",
+        "preview_only": true,
+        "project_id": "PRJ-WRQ-DUP",
+        "release_eligible": false,
+        "rq_ids": [
+          "RQ-DUP"
+        ],
+        "schema_version": "0.2.0",
+        "snapshot_id": "SNP-WRQ-DUP",
+        "source_epistemic_status": "SYNTHETIC_TEST_ONLY"
+      },
+      "profile_pins": [
+        {
+          "manifest_sha256": "458ddd2acf32095c79d7669eb0b2e0e98afd62bb2cac9f9f7fdb3f8980317723",
+          "profile_id": "misco.writer",
+          "profile_type": "narrative",
+          "profile_version": "1.4.0",
+          "selection_provenance": [
+            {
+              "relation": "requested",
+              "required_version": "1.4.0"
+            },
+            {
+              "introduced_by": {
+                "manifest_sha256": "80073b479deaa334225903b859695c234e82ab32d5844dc9b2374c7671b4e585",
+                "profile_id": "misco.publication",
+                "profile_type": "publication",
+                "profile_version": "1.3.0"
+              },
+              "relation": "requires",
+              "required_version": ">=1.1.0 <2.0.0"
+            }
+          ]
+        },
+        {
+          "manifest_sha256": "80073b479deaa334225903b859695c234e82ab32d5844dc9b2374c7671b4e585",
+          "profile_id": "misco.publication",
+          "profile_type": "publication",
+          "profile_version": "1.3.0",
+          "selection_provenance": [
+            {
+              "relation": "requested",
+              "required_version": "1.3.0"
+            }
+          ]
+        }
+      ],
+      "project_id": "PRJ-WRQ-DUP",
+      "research_snapshot_digest": "sha256:cfbb9093e155680243abb385c3990315d827dfd65d31374746245aa27d37e99a",
+      "workspace": "D:\\wsroot\\scratch\\epic624-627-current\\cases\\adopted-operation-unmeasured-effect\\workspace",
+      "writer_input": {
+        "input_digest": "sha256:869a6bf4d3b197e25d622cc37d53173df1db9d7ad471228ceaf27aff7380de3b",
+        "input_id": "WRI-a994ff783c9d49b7cd0511c0",
+        "path": "D:\\wsroot\\scratch\\epic624-627-current\\inputs\\adopted-operation-unmeasured-effect\\writer-input.json"
+      }
+    },
+    {
+      "authority": "SYNTHETIC_TEST_ONLY",
+      "case_id": "legitimate-hold-counterresult",
+      "composition": {
+        "audience": [
+          "受付運用の責任者"
+        ],
+        "base_digest": null,
+        "base_version": null,
+        "change_reason": "initial composition",
+        "composition_digest": "sha256:6d279c02e3cf8aed32c444ebf7ada094befbab47f9224bfd22dc22e325c1cad7",
+        "composition_id": "COMP-f5a58dd47b9d4530b463a2d119e6c67c",
+        "created_at": "2026-11-19T21:59:07.592918Z",
+        "created_by": {
+          "instruction": "SYNTHETIC_TEST_ONLY; no real research adoption",
+          "type": "human_or_external_llm"
+        },
+        "evidence_verification_performed": false,
+        "finding_adoption_performed": false,
+        "object_type": "writer_composition",
+        "purpose": "固定された合成材料から読者の問いに答える短稿。",
+        "research_state_mutation_performed": false,
+        "schema_version": "0.1.0",
+        "sections": [
+          {
+            "argument_refs": [
+              "ARG-CONCEPT"
+            ],
+            "citation_bindings": [],
+            "citation_requirements": [],
+            "closing_intent": "固定された方法を示す次節へつなぐ。",
+            "contribution_refs": [],
+            "counter_review_refs": [],
+            "detailed": true,
+            "evidence_refs": [],
+            "exhibit_bindings": [],
+            "exhibit_pins": [],
+            "exhibit_refs": [],
+            "finding_refs": [
+              "FND-CONCEPT"
+            ],
+            "gap_pins": [],
+            "gap_refs": [],
+            "heading": "問いと判断の焦点",
+            "length_hint": null,
+            "limitation_refs": [],
+            "material_refs": [],
+            "messages": [
+              "通常案件は改善、例外案件は悪化し一律展開を保留",
+              "受付運用の責任者",
+              "架空の受付チームで通常案件と例外案件に同じチェックリストを用いた。"
+            ],
+            "narrative_stage_refs": [
+              "framing"
+            ],
+            "next_section_id": "SEC-METHOD",
+            "opening_intent": "読者の判断課題から始める。",
+            "order": 1,
+            "parent_section_id": null,
+            "previous_section_id": null,
+            "prohibited_claims": [
+              "全体平均が改善した。",
+              "チェックリストが通常案件を改善させ、例外案件を悪化させたと因果断定する。",
+              "一律展開を直ちに進めるべきである。",
+              "例外案件の上昇は案件の複雑さが原因である。"
+            ],
+            "purpose": "読者の判断課題と、この短稿で得られる答えを示す。",
+            "qualifier_refs": [],
+            "reader_question": "チェックリストを一律展開すべきか。次に何を確かめるか。",
+            "recommendation_refs": [
+              "REC-CONCEPT"
+            ],
+            "section_digest": "sha256:77d6a78297174e6ad970f0dee614b89f6ad56d9b96d455044a98501284e10314",
+            "section_id": "SEC-FRAMING",
+            "semantic_purpose_refs": [
+              "frame_problem"
+            ],
+            "source_refs": [],
+            "unresolved_items": [
+              "例外案件で平均処理時間が上昇した原因。",
+              "案件構成と同時期の変更の寄与。",
+              "他の対象への適用範囲。"
+            ]
+          },
+          {
+            "argument_refs": [
+              "ARG-CONCEPT"
+            ],
+            "citation_bindings": [],
+            "citation_requirements": [],
+            "closing_intent": "この条件から何が観察されたかへ進む。",
+            "contribution_refs": [],
+            "counter_review_refs": [],
+            "detailed": true,
+            "evidence_refs": [],
+            "exhibit_bindings": [],
+            "exhibit_pins": [],
+            "exhibit_refs": [],
+            "finding_refs": [
+              "FND-CONCEPT"
+            ],
+            "gap_pins": [],
+            "gap_refs": [],
+            "heading": "方法と条件",
+            "length_hint": null,
+            "limitation_refs": [],
+            "material_refs": [],
+            "messages": [
+              "架空の受付チームで通常案件と例外案件に同じチェックリストを用いた。",
+              "導入前1週間と導入後1週間の前後観察。通常・例外の各区分で各期間20件の完了案件を記録した。無作為割付はなく、案件構成と同時期の変更は統制していない。"
+            ],
+            "narrative_stage_refs": [
+              "formation"
+            ],
+            "next_section_id": "SEC-RESULTS",
+            "opening_intent": "必要な方法条件を説明する。",
+            "order": 2,
+            "parent_section_id": null,
+            "previous_section_id": "SEC-FRAMING",
+            "prohibited_claims": [
+              "全体平均が改善した。",
+              "チェックリストが通常案件を改善させ、例外案件を悪化させたと因果断定する。",
+              "一律展開を直ちに進めるべきである。",
+              "例外案件の上昇は案件の複雑さが原因である。"
+            ],
+            "purpose": "方法の性質と判断範囲を明確にする。",
+            "qualifier_refs": [],
+            "reader_question": "どの材料を、どの条件で確認したのか。",
+            "recommendation_refs": [
+              "REC-CONCEPT"
+            ],
+            "section_digest": "sha256:fd585e704f3f547a9b2fbda6537851f593f9c8ece546231228bf58e8e8c36172",
+            "section_id": "SEC-METHOD",
+            "semantic_purpose_refs": [
+              "expose_argument"
+            ],
+            "source_refs": [],
+            "unresolved_items": [
+              "例外案件で平均処理時間が上昇した原因。",
+              "案件構成と同時期の変更の寄与。",
+              "他の対象への適用範囲。"
+            ]
+          },
+          {
+            "argument_refs": [
+              "ARG-CONCEPT"
+            ],
+            "citation_bindings": [],
+            "citation_requirements": [],
+            "closing_intent": "入力済み解釈の範囲を保ったまま判断へ向かう。",
+            "contribution_refs": [],
+            "counter_review_refs": [],
+            "detailed": true,
+            "evidence_refs": [],
+            "exhibit_bindings": [],
+            "exhibit_pins": [],
+            "exhibit_refs": [],
+            "finding_refs": [
+              "FND-CONCEPT"
+            ],
+            "gap_pins": [],
+            "gap_refs": [],
+            "heading": "観察された結果と限界",
+            "length_hint": null,
+            "limitation_refs": [],
+            "material_refs": [],
+            "messages": [
+              "架空の受付チームで通常案件と例外案件に同じチェックリストを用いた。",
+              "導入前1週間と導入後1週間の前後観察。通常・例外の各区分で各期間20件の完了案件を記録した。無作為割付はなく、案件構成と同時期の変更は統制していない。",
+              "通常案件の平均処理時間は8分/件から6分/件へ低下した。",
+              "例外案件の平均処理時間は4分/件から5分/件へ上昇した。",
+              "案件構成と同時期の変更は測定・統制していない。"
+            ],
+            "narrative_stage_refs": [
+              "validation"
+            ],
+            "next_section_id": "SEC-IMPLICATION",
+            "opening_intent": "方法と結果の関係を示す。",
+            "order": 3,
+            "parent_section_id": null,
+            "previous_section_id": "SEC-METHOD",
+            "prohibited_claims": [
+              "全体平均が改善した。",
+              "チェックリストが通常案件を改善させ、例外案件を悪化させたと因果断定する。",
+              "一律展開を直ちに進めるべきである。",
+              "例外案件の上昇は案件の複雑さが原因である。"
+            ],
+            "purpose": "結果、条件、未解決点を同時に保つ。",
+            "qualifier_refs": [],
+            "reader_question": "固定された事実から何が言え、何はまだ言えないか。",
+            "recommendation_refs": [
+              "REC-CONCEPT"
+            ],
+            "section_digest": "sha256:0550d11077cc793bcc621331b75363098c533ded0aadfdb3f960b42a61cbb669",
+            "section_id": "SEC-RESULTS",
+            "semantic_purpose_refs": [
+              "test_and_qualify"
+            ],
+            "source_refs": [],
+            "unresolved_items": [
+              "例外案件で平均処理時間が上昇した原因。",
+              "案件構成と同時期の変更の寄与。",
+              "他の対象への適用範囲。"
+            ]
+          },
+          {
+            "argument_refs": [
+              "ARG-CONCEPT"
+            ],
+            "citation_bindings": [],
+            "citation_requirements": [],
+            "closing_intent": "適用範囲と次の確認事項を明示して結ぶ。",
+            "contribution_refs": [],
+            "counter_review_refs": [],
+            "detailed": true,
+            "evidence_refs": [],
+            "exhibit_bindings": [],
+            "exhibit_pins": [],
+            "exhibit_refs": [],
+            "finding_refs": [
+              "FND-CONCEPT"
+            ],
+            "gap_pins": [],
+            "gap_refs": [],
+            "heading": "判断と次の一手",
+            "length_hint": null,
+            "limitation_refs": [],
+            "material_refs": [],
+            "messages": [
+              "全案件への一律展開を保留する。例外案件の案件構成と同時期の変更を調べ、案件構成を記録した比較の後に適用範囲を判断する。これは合成ケースで採択済みの提言である。",
+              "例外案件では逆方向の結果があり原因も分離されていないため、一律展開を保留し、例外案件の比較を次の作業にする。"
+            ],
+            "narrative_stage_refs": [
+              "implication"
+            ],
+            "next_section_id": null,
+            "opening_intent": "冒頭の問いへ戻る。",
+            "order": 4,
+            "parent_section_id": null,
+            "previous_section_id": "SEC-RESULTS",
+            "prohibited_claims": [
+              "全体平均が改善した。",
+              "チェックリストが通常案件を改善させ、例外案件を悪化させたと因果断定する。",
+              "一律展開を直ちに進めるべきである。",
+              "例外案件の上昇は案件の複雑さが原因である。"
+            ],
+            "purpose": "提言を冒頭の判断課題と観察へ結びつける。",
+            "qualifier_refs": [],
+            "reader_question": "問いにどう答え、次に何を確かめるか。",
+            "recommendation_refs": [
+              "REC-CONCEPT"
+            ],
+            "section_digest": "sha256:e08cfd88c3e8943ede4f48779ae6f59bfcc3dfe60de03f45a06396171fd9ed4e",
+            "section_id": "SEC-IMPLICATION",
+            "semantic_purpose_refs": [
+              "present_implications"
+            ],
+            "source_refs": [],
+            "unresolved_items": [
+              "例外案件で平均処理時間が上昇した原因。",
+              "案件構成と同時期の変更の寄与。",
+              "他の対象への適用範囲。"
+            ]
+          }
+        ],
+        "source": {
+          "authoritative_research_freeze": false,
+          "effective_profile_set_digest": "sha256:5fdc4b6506f0122a3606a3b80aaa154e91077d53175e965ebe8805c63f433129",
+          "effective_profile_set_ref": "EPS-1",
+          "lineage_ref": "LIN-1",
+          "package_mode": "preview",
+          "preview_only": true,
+          "project_id": "PRJ-WRQ-CONCEPT",
+          "release_eligible": false,
+          "research_package_digest": "sha256:e913d21c3558f58a1201e84c5fea1ece9aadf4e383b99bb5e4548c156cd09e9c",
+          "research_package_id": "RP-caec264934e24fe0882652160ef768a4",
+          "research_snapshot_digest": "sha256:8460611d84eefa3cc765bf4a1c46d0de3643738ac6a922b6ff8652deb97f10de",
+          "research_snapshot_id": "SNP-WRQ-CONCEPT",
+          "source_epistemic_status": "SYNTHETIC_TEST_ONLY"
+        },
+        "validation": {
+          "diagnostics": [],
+          "status": "VALID"
+        },
+        "version": 1
+      },
+      "package": {
+        "package_digest": "sha256:e913d21c3558f58a1201e84c5fea1ece9aadf4e383b99bb5e4548c156cd09e9c",
+        "package_id": "RP-caec264934e24fe0882652160ef768a4",
+        "preview_only": true,
+        "project_id": "PRJ-WRQ-CONCEPT",
+        "release_eligible": false,
+        "rq_ids": [
+          "RQ-CONCEPT"
+        ],
+        "schema_version": "0.2.0",
+        "snapshot_id": "SNP-WRQ-CONCEPT",
+        "source_epistemic_status": "SYNTHETIC_TEST_ONLY"
+      },
+      "profile_pins": [
+        {
+          "manifest_sha256": "458ddd2acf32095c79d7669eb0b2e0e98afd62bb2cac9f9f7fdb3f8980317723",
+          "profile_id": "misco.writer",
+          "profile_type": "narrative",
+          "profile_version": "1.4.0",
+          "selection_provenance": [
+            {
+              "relation": "requested",
+              "required_version": "1.4.0"
+            },
+            {
+              "introduced_by": {
+                "manifest_sha256": "80073b479deaa334225903b859695c234e82ab32d5844dc9b2374c7671b4e585",
+                "profile_id": "misco.publication",
+                "profile_type": "publication",
+                "profile_version": "1.3.0"
+              },
+              "relation": "requires",
+              "required_version": ">=1.1.0 <2.0.0"
+            }
+          ]
+        },
+        {
+          "manifest_sha256": "80073b479deaa334225903b859695c234e82ab32d5844dc9b2374c7671b4e585",
+          "profile_id": "misco.publication",
+          "profile_type": "publication",
+          "profile_version": "1.3.0",
+          "selection_provenance": [
+            {
+              "relation": "requested",
+              "required_version": "1.3.0"
+            }
+          ]
+        }
+      ],
+      "project_id": "PRJ-WRQ-CONCEPT",
+      "research_snapshot_digest": "sha256:8460611d84eefa3cc765bf4a1c46d0de3643738ac6a922b6ff8652deb97f10de",
+      "workspace": "D:\\wsroot\\scratch\\epic624-627-current\\cases\\legitimate-hold-counterresult\\workspace",
+      "writer_input": {
+        "input_digest": "sha256:c6da4ac6230165c826609c07614d8c1516e5d7473e6320840464b26b0e6bbdd1",
+        "input_id": "WRI-842d2d29a6459eb3e80d0457",
+        "path": "D:\\wsroot\\scratch\\epic624-627-current\\inputs\\legitimate-hold-counterresult\\writer-input.json"
+      }
+    }
+  ],
+  "cases_sha256": "9a3114d72db59e9f5865b02a8294470293e34caf399d21ea361e41facf881f49",
+  "common_prompt": "固定入力から、日本語の短稿を初回一稿だけ作成してください。\n各ケースは別の文書です。各文書は入力の4節を使い、全体3000〜4500字を目標とします。\nskills/writer/SKILL.mdと同references/reader-flow.mdを読み、そのWriter手順に従ってください。\n各writer-input.jsonの配信済みWRITER_*資料・規則と節入力を読み、供給された意味だけを文章化してください。\n公開されたdetached入力が材料の全体です。非公開のWorkspace、他の条件、過去の稿、採点資料は読まないでください。\n提言・根拠・必要条件・未解決点を保持し、読みやすい日本語本文を作成してください。\n採択済みの提言を、新たな研究判断や実施済みの施策として扱わないでください。\n合成材料である旨は文書冒頭で示し、各段落へ同じ監査説明を反復する必要はありません。\n返却ファイルはケースごとにsections[{section_id,content}]のみのJSONとしてください。\n意味・編集レビューは別段階なので、本文の改善反復やProfileのPASS申告は行わないでください。\n初回出力を書き出した後に書き換えず、試行回数は各ケース一回としてください。\n",
+  "condition": "current",
+  "host_files": {
+    "skills/writer/SKILL.md": "9fbbc112dbc7c374e4c04c1ebca27447fbcee7595c882e3692b3b6ed606fa2d0",
+    "skills/writer/references/reader-flow.md": "15eb4eb743b1030352f463fcf3e743c8af37e169fc7c75b5f7f9262f6097119f"
+  },
+  "positive_brief_delivery": true,
+  "preparation_head": "baf1fc191e2c702dc9256d751b84e5274ae3de63",
+  "prepared_at": "2026-11-19T21:59:09Z",
+  "prose_generation_performed": false,
+  "publication_version": "1.3.0",
+  "writer_version": "1.4.0"
+}

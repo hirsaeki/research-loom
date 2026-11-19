@@ -1,0 +1,145 @@
+{
+  "authority": "SYNTHETIC_TEST_ONLY",
+  "recorded_date": "2026-11-20",
+  "host": "Codex fresh-context subagents",
+  "generated_initial_drafts": 5,
+  "context_isolation": "fork_turns=none; one generation agent per condition; no condition crossover",
+  "model_override_used": false,
+  "backend_model_version": null,
+  "sampling_configuration": null,
+  "seed": null,
+  "model_settings_limit": "Inherited parent configuration; precise backend/version/sampling/seed not exposed to generators.",
+  "generation_task_constraints": [
+    "Read only the fixed prompt, Writer entry and reader-flow, and the two assigned detached inputs.",
+    "Read all delivered WRITER resources, section contracts and research objects; deduplicate repeated resources only.",
+    "No other condition, case/scoring files, private Workspace or past drafts; no recursive delegation.",
+    "Four supplied sections per manuscript, 3000-4500 Japanese character target, one initial saved draft per case, no improvement iteration.",
+    "Return prose-only sections[{section_id,content}], no semantic PASS or experimental score."
+  ],
+  "generation_agents": {
+    "baseline": "baseline_first_drafts",
+    "current": "current_first_drafts",
+    "transport-control": "control_first_draft"
+  },
+  "length_target": {
+    "min": 3000,
+    "max": 4500,
+    "counting": "Unicode code points in section content including headings/newlines"
+  },
+  "preparation_driver_source_commit": "52b95e9",
+  "preparation_limit": "Initial conditions record baf1fc1 as HEAD because the driver was then uncommitted; exact bytes are in preparation-driver-initial.py.txt and commit 52b95e9. Control uses the separately preserved preparation-driver-control.py.txt, then uncommitted on d1bc736.",
+  "baseline_limit": "Reconstructed old communication projection, not a run under a historical checkout.",
+  "assessor": {
+    "method": "fresh_context_model_proxy",
+    "agent": "blind_manuscript_assessment",
+    "labels": "M/N crossed between cases; mapping not supplied to assessor",
+    "human_reader": false,
+    "backend_model_version": null,
+    "seed": null
+  },
+  "parent_assessment": "All five drafts read; parent knew the condition mapping. The original blind assessor continued with label P for the control and was not a second independent assessor.",
+  "additional_control_C": {
+    "executed": true,
+    "initial_drafts": 1,
+    "case_id": "legitimate-hold-counterresult",
+    "trigger": "Blind model-proxy concern about baseline-only unsupported equal weighting; conservatively treated as a possible failure under the existing trigger.",
+    "context_limit": "Control generator receives one case and has no preceding case manuscript, unlike the initial two-case generators.",
+    "unused_prepared_case": "adopted-operation-unmeasured-effect was exported by the fixed two-case driver but never supplied to the control generator and no control prose was generated for it."
+  },
+  "work_acceptance_executed": false,
+  "reader_effect_measured": false,
+  "research_adoption_performed": false,
+  "publication_approval_performed": false,
+  "cases": [
+    {
+      "case_id": "adopted-operation-unmeasured-effect",
+      "characters": 3209,
+      "condition": "baseline",
+      "label": "M",
+      "sha256": "7f516870590eed553ae37790e290154a292790b0e81f96c0f6bc53a126db3403",
+      "archive": "baseline-adopted-operation-unmeasured-effect.zip",
+      "initial_prose": "initial-baseline-adopted-operation-unmeasured-effect.json",
+      "operations": {
+        "import": "IMPORTED",
+        "replay": "VERIFIED_REUSE"
+      }
+    },
+    {
+      "case_id": "legitimate-hold-counterresult",
+      "characters": 3110,
+      "condition": "baseline",
+      "label": "N",
+      "sha256": "e921cc4208d997e8ab5f068f17ca9eda78d3dea83a9db6db11adebb4ed6b86f9",
+      "archive": "baseline-legitimate-hold-counterresult.zip",
+      "initial_prose": "initial-baseline-legitimate-hold-counterresult.json",
+      "operations": {
+        "import": "IMPORTED",
+        "replay": "VERIFIED_REUSE"
+      }
+    },
+    {
+      "case_id": "adopted-operation-unmeasured-effect",
+      "characters": 2703,
+      "condition": "current",
+      "label": "N",
+      "sha256": "2b4c47ebbe8def9ed2da61416d7cdb83bb0123426cf190ec762913db0319ad1f",
+      "archive": "current-adopted-operation-unmeasured-effect.zip",
+      "initial_prose": "initial-current-adopted-operation-unmeasured-effect.json",
+      "operations": {
+        "import": "IMPORTED",
+        "replay": "VERIFIED_REUSE"
+      }
+    },
+    {
+      "case_id": "legitimate-hold-counterresult",
+      "characters": 2741,
+      "condition": "current",
+      "label": "M",
+      "sha256": "42babb3a7a6e5208221fe639acd5a7c2cbcc6837ff51cd2b409e9c6b18564523",
+      "archive": "current-legitimate-hold-counterresult.zip",
+      "initial_prose": "initial-current-legitimate-hold-counterresult.json",
+      "operations": {
+        "import": "IMPORTED",
+        "replay": "VERIFIED_REUSE"
+      }
+    },
+    {
+      "case_id": "legitimate-hold-counterresult",
+      "label": "P",
+      "condition": "transport-control",
+      "sha256": "39218252ec73c864c50eddcbdc61d6ace55cccf7fae91371d41f9bfa1cc39db9",
+      "characters": 2776,
+      "archive": "transport-control-legitimate-hold-counterresult.zip",
+      "initial_prose": "initial-transport-control-legitimate-hold-counterresult.json",
+      "operations": {
+        "import": "IMPORTED",
+        "replay": "VERIFIED_REUSE"
+      }
+    }
+  ],
+  "files": {
+    "baseline-adopted-operation-unmeasured-effect.zip": "a9af9d4fdcd96eac6f463d171eaab5f9caf31d2b021fa86c3e1ef97cac3e52bf",
+    "baseline-legitimate-hold-counterresult.zip": "4804488e737b7d64afa8e80dd2ab5773df2ccee6f5f0f5a67ff79e394bac8d6b",
+    "blind-control-packet.json": "db38e9cf256ab233620ba4b4d045a08e8f9e7b0e9326bda1eda6b92dd176b766",
+    "blind-packet.json": "433c0fdc6136f9f977a1723e82b98564e6c9708d7e3a1823af74ca92908f5990",
+    "blind-prompt.txt": "4e07cbce55e8529731461966d779a66969baa133f14a9d7acb2053114e53f614",
+    "condition-mapping.json": "ad62c05ad18465564d3a6369774758241fe82bee596933821ada59695b612eea",
+    "conditions-baseline.json": "9b38b3e896582780ffa782ad345dcf6a703cb93c64f3bde3d6b3d81238a406c1",
+    "conditions-current.json": "c4ac7b89fa2f3ecd5a8abc76c75b8f96ff8abd60717bd2f0020a6491c4e2971c",
+    "conditions-transport-control.json": "1a233de9104a6e79f839fc6fa358100966e60b6276a16ae810aed2e669f3a8cd",
+    "current-adopted-operation-unmeasured-effect.zip": "31fcb7dd858d885705d424dbb769445317619007eecd0090f585632337699955",
+    "current-legitimate-hold-counterresult.zip": "fd9862950d613753e29db7acc411d5f27ec2d4834ec3564860743a88499436b1",
+    "host-reader-flow.txt": "15eb4eb743b1030352f463fcf3e743c8af37e169fc7c75b5f7f9262f6097119f",
+    "host-writer.txt": "9fbbc112dbc7c374e4c04c1ebca27447fbcee7595c882e3692b3b6ed606fa2d0",
+    "initial-baseline-adopted-operation-unmeasured-effect.json": "7f516870590eed553ae37790e290154a292790b0e81f96c0f6bc53a126db3403",
+    "initial-baseline-legitimate-hold-counterresult.json": "e921cc4208d997e8ab5f068f17ca9eda78d3dea83a9db6db11adebb4ed6b86f9",
+    "initial-current-adopted-operation-unmeasured-effect.json": "2b4c47ebbe8def9ed2da61416d7cdb83bb0123426cf190ec762913db0319ad1f",
+    "initial-current-legitimate-hold-counterresult.json": "42babb3a7a6e5208221fe639acd5a7c2cbcc6837ff51cd2b409e9c6b18564523",
+    "initial-transport-control-legitimate-hold-counterresult.json": "39218252ec73c864c50eddcbdc61d6ace55cccf7fae91371d41f9bfa1cc39db9",
+    "model-assessment-control.json": "a8addd10f922ddd2aa5ad01b7b5dfd89ea800bf641fa04c2c4824deac8bc2c16",
+    "model-assessment.json": "6d68ed2b8ed14cf6a819af3b5a269782d19c3c2f5c49f98e0a5c734db505e39f",
+    "preparation-driver-control.py.txt": "2559992a22d55d24df7d8258af909413836161df776fa3cb1a07172f0dc423ec",
+    "preparation-driver-initial.py.txt": "f1c6b215bc61676d07553f628c354f68219c46bcfa4b28cc847e6cf157d2b42a",
+    "transport-control-legitimate-hold-counterresult.zip": "3769af8daf74a04169ca14f37f503e225de5bd4fb3c9cc345a671d9ffa9cab05"
+  }
+}

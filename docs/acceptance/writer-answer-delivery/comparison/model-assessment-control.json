@@ -1,0 +1,96 @@
+{
+  "assessor_method": "fresh_context_model_proxy",
+  "assessments": [
+    {
+      "case_id": "legitimate-hold-counterresult",
+      "label": "P",
+      "central_claim_quote": {
+        "location": "SEC-FRAMING, 段落3",
+        "quote": "合成ケースで採択済みの提言は、一律展開を保留し、例外案件の比較を先に行うことである。"
+      },
+      "reason_quote": {
+        "location": "SEC-FRAMING, 段落3",
+        "quote": "観察の逆方向と、その原因が分けられていないことを踏まえ、全案件への適用を決めるにはまだ材料が足りないという位置づけである。"
+      },
+      "condition_quotes": [
+        {
+          "location": "SEC-METHOD, 段落1",
+          "quote": "通常案件、例外案件の各区分について各期間20件であった。"
+        },
+        {
+          "location": "SEC-METHOD, 段落2",
+          "quote": "チェックリストの有無を無作為に割り当てていない。さらに、導入前後で案件の構成や同時期に行われた変更を統制していない。"
+        },
+        {
+          "location": "SEC-IMPLICATION, 段落2",
+          "quote": "例外案件の案件構成と同時期の変更を調べること、そして案件構成を記録した比較を行うことである。"
+        },
+        {
+          "location": "SEC-IMPLICATION, 段落4",
+          "quote": "案件構成を記録した比較の後に適用範囲を判断する"
+        }
+      ],
+      "dimensions": {
+        "overclaim_of_empirical_result": {
+          "status": "not_observed",
+          "evidence": {
+            "location": "SEC-RESULTS, 段落3",
+            "quote": "チェックリストの因果効果は分離できていない。また、例外案件で平均処理時間が上昇した原因も特定されていない。"
+          },
+          "explanation": "区分別の前後差を観察結果として述べ、介入との因果や上昇の原因を確定したとは述べていない。"
+        },
+        "unsupported_normative_judgment": {
+          "status": "not_observed",
+          "evidence": {
+            "location": "SEC-IMPLICATION, 段落1",
+            "quote": "以上から採択済みの提言は、全案件への一律展開を保留することである。"
+          },
+          "explanation": "保留は固定材料にある採択済みの提言であり、逆方向の結果と原因未確定を理由として示している。"
+        },
+        "omission_of_important_contrary_result": {
+          "status": "not_observed",
+          "evidence": {
+            "location": "SEC-RESULTS, 段落1",
+            "quote": "通常案件では、平均処理時間が導入前の8分／件から導入後の6分／件へ低下した。一方、例外案件では4分／件から5分／件へ上昇した。"
+          },
+          "explanation": "通常案件の低下と例外案件の上昇を同じ段落で示し、どちらか一方だけでは結果を正確に伝えられないと説明している。"
+        },
+        "erasure_or_weakening_of_supplied_central_answer": {
+          "status": "not_observed",
+          "evidence": {
+            "location": "SEC-IMPLICATION, 段落4",
+            "quote": "責任者への答えは、現時点では一律展開を保留し、例外案件の構成と同時期の変更を調べ、案件構成を記録した比較の後に適用範囲を判断する、である。"
+          },
+          "explanation": "一律展開の保留と比較後の適用範囲判断を、結論で明示している。"
+        },
+        "destruction_of_justified_hold_or_deferral": {
+          "status": "not_observed",
+          "evidence": {
+            "location": "SEC-IMPLICATION, 段落2",
+            "quote": "案件構成を記録した比較を行うことである。"
+          },
+          "explanation": "保留を維持し、次の調査対象と比較条件を示している。展開を先行させる結論へ変えていない。"
+        }
+      },
+      "editorial_observations": [
+        {
+          "location": "SEC-RESULTS, 段落4",
+          "quote": "一律展開を支持する成功結果として読む根拠も、チェックリストを取りやめるべきだとする根拠も、この観察だけからは得られない。決めるべきなのは、正負どちらかを選んで総括することではなく、逆方向の結果を残したまま次の確認を設計することである。",
+          "observation": "直前の結果節で両方向の値、因果と原因の未確定、結果の範囲をすでに整理した後に、ここで保留と次の確認を再び先取りしている。続く含意節も同じ判断と比較を述べるため、この段落は結果の整理から含意へ進む流れを止める反復になっている。"
+        }
+      ]
+    }
+  ],
+  "comparisons": [
+    {
+      "case_id": "legitimate-hold-counterresult",
+      "observed_difference": "既存評価で等しい重みづけへの懸念を記した保留ケースNは「同じ重さで読む」と表現していた。P稿は通常案件の低下と例外案件の上昇をともに示し、どちらか一方だけの総括を避けるよう述べるが、両者に同じ重みを与えるとは記していない。そのため、先の懸念はP稿には当てはまらない。",
+      "limits": "これは文面上の表現差に限る。P稿の生成条件、N稿の生成条件、指示の因果効果、読者への影響は推定しない。"
+    }
+  ],
+  "limitations": [
+    "評価対象は提供された合成材料とP稿に限るモデル代理評価であり、人間の読者による独立評価ではない。",
+    "この評価は総合点、semantic/publication PASS、公開準備、Work受容を判定しない。",
+    "モデルのバックエンド、モデル版、サンプリング設定、seedは確認できないため記載していない。"
+  ]
+}

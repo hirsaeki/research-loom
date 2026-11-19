@@ -1,0 +1,30 @@
+[
+  {
+    "case_id": "adopted-operation-unmeasured-effect",
+    "characters": 3209,
+    "condition": "baseline",
+    "label": "M",
+    "sha256": "7f516870590eed553ae37790e290154a292790b0e81f96c0f6bc53a126db3403"
+  },
+  {
+    "case_id": "adopted-operation-unmeasured-effect",
+    "characters": 2703,
+    "condition": "current",
+    "label": "N",
+    "sha256": "2b4c47ebbe8def9ed2da61416d7cdb83bb0123426cf190ec762913db0319ad1f"
+  },
+  {
+    "case_id": "legitimate-hold-counterresult",
+    "characters": 2741,
+    "condition": "current",
+    "label": "M",
+    "sha256": "42babb3a7a6e5208221fe639acd5a7c2cbcc6837ff51cd2b409e9c6b18564523"
+  },
+  {
+    "case_id": "legitimate-hold-counterresult",
+    "characters": 3110,
+    "condition": "baseline",
+    "label": "N",
+    "sha256": "e921cc4208d997e8ab5f068f17ca9eda78d3dea83a9db6db11adebb4ed6b86f9"
+  }
+]

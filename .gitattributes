@@ -1,2 +1,7 @@
 # Keep the application-trusted Word helper identical to its versioned resource.
 scripts/appendix_toc_word_helper.ps1 text eol=lf
+
+# Preserve the exact initial prose, prompts and model-assessment record bytes.
+docs/acceptance/writer-answer-delivery/comparison/** -text
+# This observed assessment packet was created with Windows CRLF endings.
+docs/acceptance/writer-answer-delivery/comparison/blind-control-packet.json whitespace=cr-at-eol
