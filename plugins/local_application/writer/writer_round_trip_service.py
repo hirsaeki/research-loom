@@ -598,6 +598,15 @@ class WriterRoundTripService(WriterRoundTripReviewMixin, WriterRoundTripImportMi
                 version=int(composition["version"]),
                 digest=str(composition["composition_digest"]),
             )
+            # Retained receipts predating positive-brief delivery omitted this
+            # field. Reconstruct only that historical projection; all other
+            # content, pins and receipt identities still require exact equality.
+            if "must_include" not in embedded.get("communication", {}):
+                expected = deepcopy(expected)
+                expected["communication"].pop("must_include", None)
+                expected["section_input_digest"] = _digest_document(
+                    expected, "section_input_digest"
+                )
             if dict(embedded) != dict(expected):
                 raise LocalApplicationError(
                     "APPLICATION-WRITER-ROUND-TRIP-PIN-001",
