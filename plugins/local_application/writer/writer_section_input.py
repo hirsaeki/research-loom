@@ -244,6 +244,11 @@ class WriterSectionInputMixin:
                 "purpose": document["purpose"],
                 "audience": document["audience"],
                 "core_message": package.get("communication_brief", {}).get("core_message"),
+                **(
+                    {"must_include": deepcopy(package["communication_brief"]["must_include"])}
+                    if package.get("communication_brief", {}).get("must_include")
+                    else {}
+                ),
                 "must_not_claim": list(
                     dict.fromkeys(
                         package.get("communication_brief", {}).get("must_not_claim", [])
