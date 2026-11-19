@@ -16,6 +16,54 @@ RECORDS = ROOT / "docs/acceptance/writer-answer-delivery"
 
 
 class WriterAnswerDeliveryRecordsTests(unittest.TestCase):
+    def test_comparison_records_keep_first_prose_and_exact_round_trip(self):
+        manifest = json.loads((RECORDS / "comparison-manifest.json").read_text(encoding="utf-8"))
+        evidence = RECORDS / "comparison"
+        self.assertFalse(manifest["work_acceptance_executed"])
+        self.assertFalse(manifest["reader_effect_measured"])
+        self.assertEqual(manifest["generated_initial_drafts"], len(manifest["cases"]))
+        for name, digest in manifest["files"].items():
+            self.assertEqual(hashlib.sha256((evidence / name).read_bytes()).hexdigest(), digest)
+        for row in manifest["cases"]:
+            raw = (evidence / row["initial_prose"]).read_bytes()
+            self.assertEqual(hashlib.sha256(raw).hexdigest(), row["sha256"])
+            prose = json.loads(raw)
+            self.assertEqual(len(prose["sections"]), 4)
+            self.assertEqual(sum(len(s["content"]) for s in prose["sections"]), row["characters"])
+            with zipfile.ZipFile(evidence / row["archive"]) as bundle:
+                doc = json.loads(bundle.read("writer-input.json"))
+                response_names = [
+                    name for name in bundle.namelist() if name.startswith("responses/")
+                ]
+                self.assertEqual(len(response_names), 1)
+                response = json.loads(bundle.read(response_names[0]))
+                operations = [
+                    json.loads(bundle.read(name))
+                    for name in bundle.namelist()
+                    if name.startswith("receipts/response-")
+                ]
+            self.assertEqual(
+                [
+                    {key: section[key] for key in ("section_id", "content")}
+                    for section in response["sections"]
+                ],
+                prose["sections"],
+            )
+            self.assertEqual(response["input_ref"]["input_digest"], doc["input_digest"])
+            self.assertEqual(
+                {op["operation"]: op["result"]["status"] for op in operations},
+                {"import": "IMPORTED", "replay": "VERIFIED_REUSE"},
+            )
+            self.assertTrue(
+                all(not op["result"]["research_state_mutation_performed"] for op in operations)
+            )
+            self.assertFalse(doc["source"]["release_eligible"])
+            self.assertEqual(doc["source"]["source_epistemic_status"], "SYNTHETIC_TEST_ONLY")
+            for section in response["sections"]:
+                self.assertTrue(
+                    all(review["outcome"] == "unevaluated" for review in section["profile_review"])
+                )
+
     def test_diagnostic_exports_retain_exact_pins_priorities_and_authority(self):
         record = json.loads((RECORDS / "diagnosis.json").read_text(encoding="utf-8"))
         self.assertFalse(record["actual_research_workspace_verified"])

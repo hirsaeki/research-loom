@@ -52,8 +52,8 @@ _CURRENT_BUILD = WriterSectionInputMixin._build_section_input_document
 
 
 def prepare(run_root: Path, condition: str) -> None:
-    if condition not in {"baseline", "current"}:
-        raise ValueError("condition must be baseline or current")
+    if condition not in {"baseline", "current", "transport-control"}:
+        raise ValueError("unsupported fixed experimental condition")
     run_root = run_root.resolve()
     run_root.mkdir(parents=True, exist_ok=False)
     cases = previous._read_json(CASES)
@@ -115,7 +115,7 @@ def prepare(run_root: Path, condition: str) -> None:
                 patch.object(
                     WriterSectionInputMixin, "_build_section_input_document", historical_projection
                 )
-                if condition == "baseline"
+                if condition != "current"
                 else nullcontext()
             )
             with context:
@@ -177,7 +177,9 @@ def prepare(run_root: Path, condition: str) -> None:
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--run-root", type=Path, required=True)
-    parser.add_argument("--condition", choices=("baseline", "current"), required=True)
+    parser.add_argument(
+        "--condition", choices=("baseline", "current", "transport-control"), required=True
+    )
     args = parser.parse_args(argv)
     prepare(args.run_root, args.condition)
     return 0

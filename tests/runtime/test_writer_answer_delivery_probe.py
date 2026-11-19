@@ -12,7 +12,10 @@ from scripts import writer_answer_delivery_probe as probe
 class WriterAnswerDeliveryProbeTests(unittest.TestCase):
     def test_conditions_preserve_research_and_contracts_and_never_overwrite(self):
         with TemporaryDirectory() as directory:
-            roots = {name: Path(directory) / name for name in ("baseline", "current")}
+            roots = {
+                name: Path(directory) / name
+                for name in ("baseline", "current", "transport-control")
+            }
             for name, root in roots.items():
                 probe.prepare(root, name)
             records = {
@@ -26,6 +29,7 @@ class WriterAnswerDeliveryProbeTests(unittest.TestCase):
                 records["baseline"]["cases_sha256"], records["current"]["cases_sha256"]
             )
             self.assertEqual(records["baseline"]["host_files"], records["current"]["host_files"])
+            self.assertEqual(records["transport-control"]["writer_version"], "1.4.0")
             for old, new in zip(
                 records["baseline"]["cases"], records["current"]["cases"], strict=True
             ):
@@ -57,6 +61,31 @@ class WriterAnswerDeliveryProbeTests(unittest.TestCase):
                             payload["source"]["source_epistemic_status"], "SYNTHETIC_TEST_ONLY"
                         )
                         self.assertFalse(payload["source"]["release_eligible"])
+            for current, control in zip(
+                records["current"]["cases"], records["transport-control"]["cases"], strict=True
+            ):
+                self.assertEqual(current["profile_pins"], control["profile_pins"])
+                self.assertEqual(
+                    current["research_snapshot_digest"], control["research_snapshot_digest"]
+                )
+                documents = [
+                    json.loads(Path(row["writer_input"]["path"]).read_text(encoding="utf-8"))
+                    for row in (current, control)
+                ]
+                for left, right in zip(
+                    documents[0]["sections"], documents[1]["sections"], strict=True
+                ):
+                    before, after = (
+                        deepcopy(left["section_input"]),
+                        deepcopy(right["section_input"]),
+                    )
+                    self.assertEqual(before["writer_profile"], after["writer_profile"])
+                    self.assertTrue(before["communication"].pop("must_include"))
+                    # Opaque operation identities differ; domain content does not.
+                    for value in (before, after):
+                        value.pop("source")
+                        value.pop("section_input_digest")
+                    self.assertEqual(before, after)
             original = (roots["baseline"] / "conditions.json").read_bytes()
             with self.assertRaises(FileExistsError):
                 probe.prepare(roots["baseline"], "baseline")
