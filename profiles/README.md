@@ -19,6 +19,45 @@ The canonical contracts live under `contracts/`:
 
 Every production manifest lives at `<profile_type>/<name>/<version>/profile.json`, with its resources in `resources/` beside it (#498). A version is immutable: a manifest pins each resource by a path relative to itself and a SHA-256, so versions never share resource files. Byte-identical copies between versions are allowed and listed in `tests/contracts/test_profile_layout.py`.
 
+### Current available MISCO versions
+
+| Concern | Current available Profile | Selection |
+| --- | --- | --- |
+| Writer | `misco.writer@1.4.0` | Explicit opt-in; retains the supplied research answer in recommendations |
+| Publication | `misco.publication@1.6.0` | Explicit opt-in; scoped TOCs and prefixed appendix pages |
+
+These are available versions, not an automatic migration of a Project Config or
+Workspace. The bundled `projects/misco-ai-2026` example still pins Publication
+1.3.0 and transitively Writer 1.1.0. Publication's compatible Writer dependency
+does not pin Writer to 1.4.0. To use the current pair, request both
+versions and supply both manifests through normal Profile resolution:
+
+```json
+{
+  "research": [],
+  "organization": [],
+  "narrative": [{"profile_id": "misco.writer", "profile_type": "narrative", "version": "1.4.0"}],
+  "publication": [{"profile_id": "misco.publication", "profile_type": "publication", "version": "1.6.0"}]
+}
+```
+
+This is the `profile_requests` portion of a Project Config, not a complete
+configuration. The manifests are `narrative/misco/1.4.0/profile.json` and
+`publication/misco/1.6.0/profile.json`, relative to this directory.
+
+The optional [local bibliography selection](../docs/architecture/local-bibliography-selection.md)
+and the [appendix PDF validation correction](../docs/acceptance/appendix-pdf-numbering.md)
+are application/runtime updates. They do not revise Profile assets or allocate
+new Profile versions. Use an updated application for those fixes; bibliography
+omission still needs its explicit per-build option. Historical Profile versions
+and existing selections remain valid.
+
+`profile_version` identifies the selected manifest. Resource `asset_version`
+fields and the embedded formal-spec version identify separate resources and may
+differ from it; they do not override the selected Writer or Publication version.
+
+### All retained versions
+
 | Manifest | Profile | Selected by default |
 | --- | --- | --- |
 | `narrative/misco/1.1.0/profile.json` | `misco.writer@1.1.0` | yes, transitively by `misco.publication@1.3.0` in `projects/misco-ai-2026` |
