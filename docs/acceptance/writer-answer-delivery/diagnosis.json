@@ -1,0 +1,191 @@
+{
+  "actual_research_workspace_verified": false,
+  "authority": "SYNTHETIC_TEST_ONLY",
+  "records": [
+    {
+      "communication": {
+        "audience": [
+          "増員を前提にできない業務チームの運用責任者。"
+        ],
+        "core_message": "重複入力は繰り返し観察された限定的な摩擦であり、試行対象の候補になる。追加確認は別の観察項目で、重複入力が原因とは確認されていない。",
+        "must_include": [
+          "4週間の受付記録300件を確認した観察的なログ調査。介入群・比較群を設けた試験ではない。",
+          "未解決点",
+          "限定された提言"
+        ],
+        "must_not_claim": [
+          "重複入力の解消で全体処理時間が短縮した、または誤入力が減ると実証された。",
+          "追加確認24件が重複入力に起因した。",
+          "人員削減、増員不要の確定、全業務への適用が決まった。"
+        ],
+        "purpose": "SYNTHETIC_TEST_ONLY profile delivery diagnosis"
+      },
+      "input_digest": "sha256:a3a7e495b4f886ee87e1c10fa5db89632ab76a29de30e328d083d689f8184029",
+      "input_id": "WRI-1262252a0f17ef2c07b105ef",
+      "profile_pins": [
+        {
+          "manifest_sha256": "08de4b27085a56e10abf0662f367e97db315048fdd809c71c1583412ae0d2b08",
+          "profile_id": "misco.writer",
+          "profile_type": "narrative",
+          "profile_version": "1.1.0",
+          "selection_provenance": [
+            {
+              "relation": "requested",
+              "required_version": "1.1.0"
+            },
+            {
+              "introduced_by": {
+                "manifest_sha256": "b0d02a52c6f80fc86fe3b41ff14840d009f866c0c189168835a7c321fa9e807b",
+                "profile_id": "misco.publication",
+                "profile_type": "publication",
+                "profile_version": "1.6.0"
+              },
+              "relation": "requires",
+              "required_version": ">=1.1.0 <2.0.0"
+            }
+          ]
+        },
+        {
+          "manifest_sha256": "b0d02a52c6f80fc86fe3b41ff14840d009f866c0c189168835a7c321fa9e807b",
+          "profile_id": "misco.publication",
+          "profile_type": "publication",
+          "profile_version": "1.6.0",
+          "selection_provenance": [
+            {
+              "relation": "requested",
+              "required_version": "1.6.0"
+            }
+          ]
+        }
+      ],
+      "section_digests": [
+        "sha256:873d9a8c7e555e75f5ffb8d3d2cb31ea23875608b23f2e53993dd80309fcb310",
+        "sha256:f3b9d695484c5a98743e65f4217c798ea36c31a4211cd312d48ed1a3d13a65ce",
+        "sha256:133a4fcccf60ef718ead92ab7c5315e9d82c35beee0524491c5eedb00e288613",
+        "sha256:31596630008bdfa81384137d3ff1fbb99819e1a25cc6fe07a57f6809d290edf3"
+      ],
+      "source": {
+        "authoritative_research_freeze": false,
+        "composition_digest": "sha256:c9366baf5765b8ba9ea4033e0248d2d892d0465d645082d2076667a6f1d09662",
+        "composition_id": "COMP-664f85a6cb344c89969cc5639b75e74f",
+        "composition_version": 1,
+        "effective_profile_set_digest": "sha256:ec73aed8e75855794c11c70d730520737d67d7ee3b65562c3287d934871b23a4",
+        "effective_profile_set_ref": "EPS-1",
+        "lineage_ref": "LIN-1",
+        "package_mode": "preview",
+        "preview_only": true,
+        "project_id": "PRJ-WRQ-DUP",
+        "release_eligible": false,
+        "research_package_digest": "sha256:eaf88ecdd8f10e298e9f1db1194afea6e40c8e07b552804277c791f915387f45",
+        "research_package_id": "RP-93c998b3860b47b99934d66c2a662077",
+        "research_snapshot_digest": "sha256:7f5c2b2e02e82068d7be819c380d372f6aa27648c0a44f52e4d132993549976a",
+        "research_snapshot_id": "SNP-WRQ-DUP",
+        "source_epistemic_status": "SYNTHETIC_TEST_ONLY"
+      },
+      "version": "1.1.0",
+      "writer_profile_keys": [
+        "profile_pins",
+        "resources",
+        "review_plan",
+        "rule_count"
+      ]
+    },
+    {
+      "communication": {
+        "audience": [
+          "増員を前提にできない業務チームの運用責任者。"
+        ],
+        "core_message": "重複入力は繰り返し観察された限定的な摩擦であり、試行対象の候補になる。追加確認は別の観察項目で、重複入力が原因とは確認されていない。",
+        "must_include": [
+          "4週間の受付記録300件を確認した観察的なログ調査。介入群・比較群を設けた試験ではない。",
+          "未解決点",
+          "限定された提言"
+        ],
+        "must_not_claim": [
+          "重複入力の解消で全体処理時間が短縮した、または誤入力が減ると実証された。",
+          "追加確認24件が重複入力に起因した。",
+          "人員削減、増員不要の確定、全業務への適用が決まった。"
+        ],
+        "purpose": "SYNTHETIC_TEST_ONLY profile delivery diagnosis"
+      },
+      "input_digest": "sha256:cccb3afad81c7cd817feb6bd43273bf54bbbb54a2cf55d17437e7ca2fd410a4f",
+      "input_id": "WRI-ba90d93522a440ed59dcc2e0",
+      "profile_pins": [
+        {
+          "manifest_sha256": "458ddd2acf32095c79d7669eb0b2e0e98afd62bb2cac9f9f7fdb3f8980317723",
+          "profile_id": "misco.writer",
+          "profile_type": "narrative",
+          "profile_version": "1.4.0",
+          "selection_provenance": [
+            {
+              "relation": "requested",
+              "required_version": "1.4.0"
+            },
+            {
+              "introduced_by": {
+                "manifest_sha256": "b0d02a52c6f80fc86fe3b41ff14840d009f866c0c189168835a7c321fa9e807b",
+                "profile_id": "misco.publication",
+                "profile_type": "publication",
+                "profile_version": "1.6.0"
+              },
+              "relation": "requires",
+              "required_version": ">=1.1.0 <2.0.0"
+            }
+          ]
+        },
+        {
+          "manifest_sha256": "b0d02a52c6f80fc86fe3b41ff14840d009f866c0c189168835a7c321fa9e807b",
+          "profile_id": "misco.publication",
+          "profile_type": "publication",
+          "profile_version": "1.6.0",
+          "selection_provenance": [
+            {
+              "relation": "requested",
+              "required_version": "1.6.0"
+            }
+          ]
+        }
+      ],
+      "section_digests": [
+        "sha256:4279efb0ee93ebb9b39bd26d92d35550f0d62da0ac93adeaece3dc5808174f7d",
+        "sha256:47542e7e8cbe793dede82ae7270b0e89db189c548999c33960e826df8d78dd4a",
+        "sha256:fe9b8478861329bf560765a40b1efde5fa3c5aeb2f11a17336c233bdefbd559c",
+        "sha256:dae5dc65118c13914ecb5cbb6c4c45ef71a1f9bd149257cdb61dce2a45498d22"
+      ],
+      "source": {
+        "authoritative_research_freeze": false,
+        "composition_digest": "sha256:b593efe614d8b81857a9e6731b5a6c07f715c236b84ab0b18ae92c9c32c88e4b",
+        "composition_id": "COMP-a9d9dfa9bbff427b95d4a204af4f4636",
+        "composition_version": 1,
+        "effective_profile_set_digest": "sha256:c53564e41ce47e84bcd522f6752249fa2cacb2b8954764dee9d6e34a8e713355",
+        "effective_profile_set_ref": "EPS-1",
+        "lineage_ref": "LIN-1",
+        "package_mode": "preview",
+        "preview_only": true,
+        "project_id": "PRJ-WRQ-DUP",
+        "release_eligible": false,
+        "research_package_digest": "sha256:824378510955b3bb67d35b49119ac4a6d6e058ae416452fc10f18a5068e4af93",
+        "research_package_id": "RP-f8f6d13b26cd4f4c9ff499ba82991b80",
+        "research_snapshot_digest": "sha256:7f5c2b2e02e82068d7be819c380d372f6aa27648c0a44f52e4d132993549976a",
+        "research_snapshot_id": "SNP-WRQ-DUP",
+        "source_epistemic_status": "SYNTHETIC_TEST_ONLY"
+      },
+      "version": "1.4.0",
+      "writer_profile_keys": [
+        "profile_pins",
+        "resources",
+        "review_plan",
+        "rule_count"
+      ]
+    }
+  ],
+  "skills": {
+    "skills/writer/SKILL.md": "9fbbc112dbc7c374e4c04c1ebca27447fbcee7595c882e3692b3b6ed606fa2d0",
+    "skills/writer/references/reader-flow.md": "15eb4eb743b1030352f463fcf3e743c8af37e169fc7c75b5f7f9262f6097119f"
+  },
+  "work_host_verified": false,
+  "archives": {
+    "diagnosis-1.1.0.zip": "ef81b2f0a94340b531d835784b9ad1f9aa45794e02c3d053405195907a32370d",
+    "diagnosis-1.4.0.zip": "60d0a1acefb045c9ea88b7e2e696c40eb5901f07d0a9937f7fbb012ae9a8866a"
+  }
+}
