@@ -1,6 +1,29 @@
 # MISCO formal Publication (Issue #456)
 
+Optional [local bibliography selection](../architecture/local-bibliography-selection.md)
+can retain citation provenance while omitting complete local source displays from
+section-end lists. The default remains repeat; this is a per-build application
+input, not an automatic Profile upgrade. Review manual displays against the current
+preview digest and inspect the final PDF as usual.
+
 ## Profile 1.6.0: appendix TOC Word tools
+
+Final PDF inspection derives the appendix footer prefix from the pinned layout
+through the Publication dialect (#621). Profile 1.6.0 requires `付1`, `付2`, ...;
+historical layouts without the appendix TOC supplement retain numeric `1`, `2`, ... .
+The inspector checks exact prefixes and sequential ordinals, leaving body and
+front-matter checks unchanged. It never infers the required format from the PDF
+being inspected or accepts both formats interchangeably.
+
+Existing finalized builds remain immutable. An exact retry reuses the historical
+receipt, including a prior failed result; after rechecking the exact PDF, supply
+a fresh review timestamp to create a new finalization record with the corrected
+validator. Do not edit or delete the old receipt.
+
+The isolated Word fixture script supports `--publication-version 1.6.0` for both
+generation and `--inspect`; its default remains the historical 1.4.0 fixture.
+Pass `-TocHelperPath scripts/appendix_toc_word_helper.ps1` to the Word renderer
+for a 1.6.0 fixture. Use the same version for generation and inspection.
 
 `misco.publication@1.6.0` retains the 1.5.0 cover and adds a scoped `AUTO_BODY`
 TOC, an `AUTO_APPENDIX` TOC over appendix titles, and a separate `付{ PAGE }`

@@ -356,6 +356,8 @@ def _publication_policy(
     tools_row = by_role.get("PUBLICATION_WORD_TOOLS")
     if tools_row:
         policy["word_tools"] = json.loads(tools_row["content"])
+    if "bibliography" in inputs:
+        policy["bibliography"] = deepcopy(inputs["bibliography"])
     return policy
 
 

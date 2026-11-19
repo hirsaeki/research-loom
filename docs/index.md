@@ -38,6 +38,7 @@ Start with the [repository README](../README.md), the [target monorepo structure
 - [Narrative Profile convergence](architecture/narrative-profile-convergence.md)
 - [MISCO Writer Profile application](architecture/misco-writer-profile-application.md)
 - [MISCO Publication Profile application](architecture/misco-publication-profile-application.md)
+- [Optional local bibliography selection](architecture/local-bibliography-selection.md)
 - [Writer rule adoption and review scope (Issue 464)](architecture/writer-rule-adoption.md)
 
 ## Local Workspace, application and persistence
@@ -126,5 +127,6 @@ Start with the [repository README](../README.md), the [target monorepo structure
 - [MISCO integrated acceptance and migration closure](architecture/misco-integrated-acceptance.md)
 - [Research Package acceptance evidence (Issue #77)](acceptance/research-package-acceptance.md)
 - [Late visual live acceptance (#409)](acceptance/late-visual-live-uat.md)
+- [Appendix PDF numbering and Word revalidation (#621)](acceptance/appendix-pdf-numbering.md)
 - [Writer reader-quality trial and evaluation preparation](acceptance/writer-reader-quality/README.md)
 - [#466 現稿レビューの対象一致と部分改稿](acceptance/writer-document-review/README.md)

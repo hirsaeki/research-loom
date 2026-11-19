@@ -13,6 +13,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+from plugins.local_application.misco.publication_dialect import MISCO_PUBLICATION_DIALECT
 from plugins.local_application.publication.publication_pdf import inspect_pdf
 from plugins.local_application.publication.publication_release_service import (
     PublicationReleaseService,
@@ -24,6 +25,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("output_directory", type=Path)
     parser.add_argument("--inspect", action="store_true")
+    parser.add_argument(
+        "--publication-version",
+        choices=["1.4.0", "1.6.0"],
+        default="1.4.0",
+        help="Select the existing formal fixture layout; 1.6.0 uses prefixed appendix pages",
+    )
     parser.add_argument(
         "--grid-probe",
         action="store_true",
@@ -37,9 +44,21 @@ def main():
     args = parser.parse_args()
     args.output_directory.mkdir(parents=True, exist_ok=True)
     for group in ["G", "M"]:
+        policy = {
+            "formal_spec_profile": json.loads(
+                (
+                    ROOT
+                    / "profiles/publication/misco"
+                    / args.publication_version
+                    / "resources/publication-formal-spec.json"
+                ).read_text(encoding="utf-8")
+            )["formal_spec_profile"]
+        }
         if not args.inspect:
             service = PublicationReleaseService.__new__(PublicationReleaseService)
+            service.dialects = {"misco.publication": MISCO_PUBLICATION_DIALECT}
             fixture = representative_inspection(group)
+            fixture["publication_policy"].update(policy)
             if args.grid_probe:
                 fixture["revision"]["sections"][7]["content"] += "\n\n" + "あ" * 4000
             if args.boundary_case:
@@ -86,7 +105,12 @@ def main():
                     "back_cover_reverse",
                 ]
             )
-            inspection = inspect_pdf(pdf, page_ranges=host["page_ranges"], expected_parts=parts)
+            inspection = inspect_pdf(
+                pdf,
+                page_ranges=host["page_ranges"],
+                expected_parts=parts,
+                appendix_page_prefix=MISCO_PUBLICATION_DIALECT.appendix_page_prefix(policy),
+            )
             print(
                 json.dumps(
                     {

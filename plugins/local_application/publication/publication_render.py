@@ -20,6 +20,7 @@ from .publication_release_support import (
     _editorial_status,
     _verify_docx_bytes,
 )
+from .reference_selection import filter_references, select_references
 
 
 class PublicationRenderMixin:
@@ -121,6 +122,7 @@ class PublicationRenderMixin:
         known_sections = {str(row["section_id"]) for row in sections}
         report = policy.get("formal_report")
         formal_report = dialect.formal_report_requested(policy)
+        reference_decisions = select_references(inspection, dialect, self._citation_label)
         formal_outline = {}
         if formal_report:
             formal_outline = dialect.formal_outline(
@@ -304,6 +306,9 @@ class PublicationRenderMixin:
         def append_reference_list(
             section_id: str, source_refs: list[str], scope_ids: list[str] | None = None
         ) -> None:
+            source_refs = filter_references(
+                source_refs, scope_ids or [section_id], reference_decisions
+            )
             if not source_refs:
                 return
             md.extend([f"### {reference_heading}", ""])
@@ -354,6 +359,13 @@ class PublicationRenderMixin:
             for citation in section.get("citations", []):
                 source_ref = str(citation.get("source_ref", ""))
                 number = citation_numbers.get(source_ref)
+                if policy.get("bibliography", {}).get("mode") == "omit_complete_local" and any(
+                    row["section_id"] == sid
+                    and row["source_ref"] == source_ref
+                    and row["sufficient"]
+                    for row in reference_decisions
+                ):
+                    continue
                 if number is not None and source_ref not in inline_citations:
                     if formal_report:
                         structured_citations.append(

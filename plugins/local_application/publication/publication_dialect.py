@@ -29,6 +29,15 @@ class PublicationDialect:
     # Body page range a final PDF should meet, and the check recording a deviation.
     body_page_range: tuple[int, int] | None = None
     body_length_check: str | None = None
+    supports_local_references: bool = False
+
+    def appendix_page_prefix(self, policy: Mapping[str, Any]) -> str:
+        """Expected appendix footer prefix from the selected formal layout (#621)."""
+        return ""
+
+    def local_reference_sufficient(self, source, locator, locator_exception, *, reviewed=False):
+        """Whether local source metadata meets this dialect's bibliography requirements."""
+        return False
 
     def require_resources(self, by_role: Mapping[str, Any]) -> None:
         """Reject a Profile whose pinned Publication resources are incomplete."""

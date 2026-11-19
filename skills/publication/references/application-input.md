@@ -11,6 +11,8 @@ Application inputs remain the carrier for information that is genuinely project/
 - `research_group_type` when an outer-structure rule requires it;
 - `permissions` for affected non-public/interview/internal material;
 - `editorial_review` for the explicit Human/Host editorial QA result.
+- `bibliography` for opt-in local source sufficiency and reference-list selection;
+  see [local bibliography selection](../../../docs/architecture/local-bibliography-selection.md).
 
 Missing conditional inputs block only the formal/release operation that needs them. They do not make renderer defaults authoritative and do not stop unrelated Research or Writer work.
 

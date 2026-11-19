@@ -16,7 +16,9 @@ from .publication_dialect import GENERIC_PUBLICATION_DIALECT, PublicationDialect
 from .publication_release_support import MAX_OUTPUT_BYTES
 
 
-def inspect_pdf(data: bytes, *, required_text=(), page_ranges=None, expected_parts=()):
+def inspect_pdf(
+    data: bytes, *, required_text=(), page_ranges=None, expected_parts=(), appendix_page_prefix=""
+):
     if len(data) > MAX_OUTPUT_BYTES or not data.startswith(b"%PDF-"):
         raise LocalApplicationError(
             "PUBLICATION-PDF-INVALID", "PDF must be bounded and carry a PDF header"
@@ -126,8 +128,9 @@ def inspect_pdf(data: bytes, *, required_text=(), page_ranges=None, expected_par
             if body[0] % 2:
                 problems.append("body-not-left-page")
             for part, span in [("body", body), ("appendix", appendix)]:
+                prefix = appendix_page_prefix if part == "appendix" else ""
                 for ordinal, physical in enumerate(range(span[0], span[1] + 1), 1):
-                    if footer_texts[physical - 1] != str(ordinal):
+                    if footer_texts[physical - 1] != prefix + str(ordinal):
                         problems.append(f"page-number:{part}:{physical}")
             numbered_pages = set(range(body[0], body[1] + 1)) | set(
                 range(appendix[0], appendix[1] + 1)
