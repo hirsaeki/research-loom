@@ -130,4 +130,6 @@ Start with the [repository README](../README.md), the [target monorepo structure
 - [Late visual live acceptance (#409)](acceptance/late-visual-live-uat.md)
 - [Appendix PDF numbering and Word revalidation (#621)](acceptance/appendix-pdf-numbering.md)
 - [Writer reader-quality trial and evaluation preparation](acceptance/writer-reader-quality/README.md)
+- [Selected Writer versions and input diagnosis (#625)](acceptance/writer-answer-delivery/diagnosis.md)
+- [ChatGPT Work acceptance handoff (#628; not executed)](acceptance/writer-answer-delivery/work-handoff.md)
 - [#466 現稿レビューの対象一致と部分改稿](acceptance/writer-document-review/README.md)
