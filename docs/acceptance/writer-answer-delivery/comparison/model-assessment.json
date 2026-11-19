@@ -1,0 +1,311 @@
+{
+  "assessor_method": "fresh_context_model_proxy",
+  "assessments": [
+    {
+      "case_id": "adopted-operation-unmeasured-effect",
+      "label": "M",
+      "central_claim_quote": {
+        "location": "SEC-FRAMING, 段落1",
+        "quote": "通常案件では受付済みの共通アカウント項目をトリアージへ再利用し、同じ項目の入力を重ねないことである。"
+      },
+      "reason_quote": {
+        "location": "SEC-RESULTS, 段落1",
+        "quote": "反復している入力の存在と、その対象範囲に限った時間の記録は、どの手順を見直すかを選ぶ材料になる。"
+      },
+      "condition_quotes": [
+        {
+          "location": "SEC-FRAMING, 段落1",
+          "quote": "例外案件で必要な入力と本人確認は従来どおり維持する。"
+        },
+        {
+          "location": "SEC-IMPLICATION, 段落1",
+          "quote": "提言はこの合成ケースで採択済みだが、施策はまだ実施されていない。"
+        },
+        {
+          "location": "SEC-IMPLICATION, 段落4",
+          "quote": "変更後の全体処理時間と誤入力率は未測定のままであり"
+        }
+      ],
+      "dimensions": {
+        "overclaim_of_empirical_result": {
+          "status": "not_observed",
+          "evidence": {
+            "location": "SEC-RESULTS, 段落2",
+            "quote": "変更後の全体処理時間と誤入力率は未測定であり、介入比較もないからである。"
+          },
+          "explanation": "観察済みの二重入力と未測定の変更後効果を区別し、処理時間短縮や誤入力減少を実績として述べていない。"
+        },
+        "unsupported_normative_judgment": {
+          "status": "not_observed",
+          "evidence": {
+            "location": "SEC-RESULTS, 段落1",
+            "quote": "だからこそ、通常案件では受付済みの共通項目を再利用し、重ねて入力する手順をなくす提言が示されている。"
+          },
+          "explanation": "提言は、固定材料にある重複の観察と、その重複手順を除くという採択済みの選択理由に沿っている。"
+        },
+        "omission_of_important_contrary_result": {
+          "status": "not_observed",
+          "evidence": {
+            "location": "SEC-RESULTS, 段落1",
+            "quote": "通常案件300件の中に、同じアカウント項目を受付票とトリアージ票へ入力した記録が96件あり、その96件での再入力時間の中央値が2分だった"
+          },
+          "explanation": "固定材料にある二つの観察値を示し、変更後の効果が未測定であることも記載している。固定材料にはこれと反対向きの測定済み結果はない。"
+        },
+        "erasure_or_weakening_of_supplied_central_answer": {
+          "status": "not_observed",
+          "evidence": {
+            "location": "SEC-IMPLICATION, 段落1",
+            "quote": "通常案件については、受付済みの共通アカウント項目をトリアージへ再利用し、同じ項目の二重入力をやめることを提案する。"
+          },
+          "explanation": "通常案件の共通項目を再利用するという答えを明示し、例外案件と本人確認の条件も維持している。"
+        },
+        "destruction_of_justified_hold_or_deferral": {
+          "status": "not_observed",
+          "evidence": {
+            "location": "SEC-IMPLICATION, 段落1",
+            "quote": "通常案件については、受付済みの共通アカウント項目をトリアージへ再利用"
+          },
+          "explanation": "固定材料の中心回答は再利用の提言であり、一律展開の保留や効果測定まで待つ判断ではない。本文は未測定効果を理由にその提言を取り消していない。"
+        }
+      },
+      "editorial_observations": [
+        {
+          "location": "SEC-RESULTS, 段落5",
+          "quote": "中央値は、その96件における再入力時間の中央を表す要約値である。したがって、個々の案件すべてが同じ時間だったと置き換えたり、変更によって中央値と同じだけの時間が必ず減ると読み替えたりすることはできない。",
+          "observation": "直前の段落までに中央値の対象と未測定効果の区別を述べた後、この段落が同じ中央値の範囲と読み替え防止を再説明している。結果節の要約から判断節へ進む流れをいったん戻す反復と見られる。"
+        }
+      ]
+    },
+    {
+      "case_id": "adopted-operation-unmeasured-effect",
+      "label": "N",
+      "central_claim_quote": {
+        "location": "SEC-FRAMING, 段落2",
+        "quote": "本稿の提言は、通常案件では受付済みの共通アカウント項目をトリアージへ再利用し、二重入力をやめることである。"
+      },
+      "reason_quote": {
+        "location": "SEC-FRAMING, 段落2",
+        "quote": "二つの票に同じ項目を書く摩擦が観察されており、既存の記録を使えば、その項目をもう一度入力する手順を除ける。"
+      },
+      "condition_quotes": [
+        {
+          "location": "SEC-FRAMING, 段落3",
+          "quote": "例外案件では必要な入力項目が通常案件と異なるため、その案件の入力は従来どおりに扱う。また、本人確認も維持する。"
+        },
+        {
+          "location": "SEC-FRAMING, 段落4",
+          "quote": "項目を再利用した後の全体処理時間と誤入力率は未測定である。"
+        },
+        {
+          "location": "SEC-FRAMING, 段落4",
+          "quote": "運用変更はまだ実施されていない。"
+        }
+      ],
+      "dimensions": {
+        "overclaim_of_empirical_result": {
+          "status": "not_observed",
+          "evidence": {
+            "location": "SEC-RESULTS, 段落3",
+            "quote": "ログには介入比較がなく、再利用後の全体処理時間も測っていないからである。"
+          },
+          "explanation": "観察結果を変更後の効果と読み替えず、時間短縮と誤入力率の改善を実証済みとは述べていない。"
+        },
+        "unsupported_normative_judgment": {
+          "status": "not_observed",
+          "evidence": {
+            "location": "SEC-RESULTS, 段落3",
+            "quote": "通常案件で既存の共通アカウント項目を再利用するなら、同じ項目を書き直す段取りを外せるという点にある。"
+          },
+          "explanation": "手順変更の理由を、観察された重複に対する操作上の対応として説明している。固定材料にない実証効果や新たな規範を根拠にしていない。"
+        },
+        "omission_of_important_contrary_result": {
+          "status": "not_observed",
+          "evidence": {
+            "location": "SEC-RESULTS, 段落1",
+            "quote": "通常案件の96件で同じ顧客アカウント項目の二重入力が記録されていた。"
+          },
+          "explanation": "固定材料の観察値を示し、変更後の効果は未測定と明記している。固定材料には別の向きの測定済み結果はない。"
+        },
+        "erasure_or_weakening_of_supplied_central_answer": {
+          "status": "not_observed",
+          "evidence": {
+            "location": "SEC-IMPLICATION, 段落1",
+            "quote": "通常案件では共通アカウント項目を再利用し、二重入力をやめる。"
+          },
+          "explanation": "採択済みの中心回答を直接述べ、適用範囲も通常案件の共通項目に限っている。"
+        },
+        "destruction_of_justified_hold_or_deferral": {
+          "status": "not_observed",
+          "evidence": {
+            "location": "SEC-IMPLICATION, 段落1",
+            "quote": "処理時間や誤入力が改善したと結論づけることではない。"
+          },
+          "explanation": "固定材料の中心回答は二重入力をやめる提言であり、効果測定まで判断を保留する答えではない。本文も未測定効果を実績として付け加えていない。"
+        }
+      },
+      "editorial_observations": []
+    },
+    {
+      "case_id": "held-rollout-conflicting-subgroups",
+      "label": "M",
+      "central_claim_quote": {
+        "location": "SEC-FRAMING, 段落2",
+        "quote": "全案件への一律展開を保留し、例外案件の扱いを比較してから適用範囲を判断することである。"
+      },
+      "reason_quote": {
+        "location": "SEC-FRAMING, 段落2",
+        "quote": "通常案件と例外案件で異なる方向が観察され、差の理由も分かっていないことに応じた判断である。"
+      },
+      "condition_quotes": [
+        {
+          "location": "SEC-IMPLICATION, 段落2",
+          "quote": "例外案件の案件構成と同時期の変更を調べ、案件構成を記録した比較を行った後に適用範囲を判断することである。"
+        },
+        {
+          "location": "SEC-METHOD, 段落2",
+          "quote": "この比較は無作為割付によるものではない。"
+        },
+        {
+          "location": "SEC-METHOD, 段落2",
+          "quote": "案件構成が同じだったか、またその間に同時期の変更があったかは統制されていない。"
+        }
+      ],
+      "dimensions": {
+        "overclaim_of_empirical_result": {
+          "status": "not_observed",
+          "evidence": {
+            "location": "SEC-RESULTS, 段落1",
+            "quote": "通常案件では、平均処理時間が導入前の8分／件から導入後の6分／件へ低下した。これに対し、例外案件では4分／件から5分／件へ上昇した。"
+          },
+          "explanation": "両区分の前後差を観察結果として示し、無作為割付や統制がないため因果効果は特定できないと続けている。"
+        },
+        "unsupported_normative_judgment": {
+          "status": "not_observed",
+          "evidence": {
+            "location": "SEC-IMPLICATION, 段落1",
+            "quote": "全案件への一律展開は保留する。"
+          },
+          "explanation": "保留と次の比較は固定材料に採択済みの提言であり、通常・例外の逆方向の結果と未解決要因に結びつけている。"
+        },
+        "omission_of_important_contrary_result": {
+          "status": "not_observed",
+          "evidence": {
+            "location": "SEC-RESULTS, 段落1",
+            "quote": "通常案件では、平均処理時間が導入前の8分／件から導入後の6分／件へ低下した。これに対し、例外案件では4分／件から5分／件へ上昇した。"
+          },
+          "explanation": "判断を変えうる両区分の逆方向の結果を同じ段落に併記し、保留の理由としている。"
+        },
+        "erasure_or_weakening_of_supplied_central_answer": {
+          "status": "not_observed",
+          "evidence": {
+            "location": "SEC-IMPLICATION, 段落1",
+            "quote": "全案件への一律展開は保留する。"
+          },
+          "explanation": "一律展開の保留を明確に保ち、その後の適用範囲判断を比較後に置いている。"
+        },
+        "destruction_of_justified_hold_or_deferral": {
+          "status": "not_observed",
+          "evidence": {
+            "location": "SEC-IMPLICATION, 段落2",
+            "quote": "案件構成を記録した比較を行った後に適用範囲を判断することである。"
+          },
+          "explanation": "保留を単なる遅延に置き換えず、固定材料が指定する比較条件と判断順序を維持している。"
+        }
+      },
+      "editorial_observations": []
+    },
+    {
+      "case_id": "held-rollout-conflicting-subgroups",
+      "label": "N",
+      "central_claim_quote": {
+        "location": "SEC-FRAMING, 段落1",
+        "quote": "一律展開を保留し、例外案件の案件構成と同時期の変更を調べ、案件構成を記録した比較の後に適用範囲を判断することである。"
+      },
+      "reason_quote": {
+        "location": "SEC-FRAMING, 段落1",
+        "quote": "通常案件の低下だけを取り出して全体の改善と読むことはできず、例外案件の上昇だけから悪化の原因を決めることもできない。"
+      },
+      "condition_quotes": [
+        {
+          "location": "SEC-METHOD, 段落1",
+          "quote": "通常案件、例外案件のそれぞれについて、各期間に完了した案件を20件ずつ記録している。"
+        },
+        {
+          "location": "SEC-METHOD, 段落1",
+          "quote": "案件を無作為に割り付けた比較ではない。"
+        },
+        {
+          "location": "SEC-IMPLICATION, 段落2",
+          "quote": "例外案件の案件構成と同時期の変更を調べ、案件構成を記録した比較の後に、どの範囲へ適用するかを判断する。"
+        }
+      ],
+      "dimensions": {
+        "overclaim_of_empirical_result": {
+          "status": "not_observed",
+          "evidence": {
+            "location": "SEC-RESULTS, 段落1",
+            "quote": "観察された平均処理時間は、通常案件で導入前の8分／件から導入後の6分／件へ低下した。一方、例外案件では4分／件から5分／件へ上昇した。"
+          },
+          "explanation": "区分別の観察値を示し、チェックリストの因果効果や原因を確定したとは述べていない。"
+        },
+        "unsupported_normative_judgment": {
+          "status": "concern",
+          "evidence": {
+            "location": "SEC-FRAMING, 段落4",
+            "quote": "例外案件の上昇も同じ重さで読む。"
+          },
+          "explanation": "両方向の結果を判断から落とさないことは固定材料に沿うが、「同じ重さ」は各区分の判断上の重みを等しくする追加の規範としても読める。固定材料には全体の案件構成や適用判断での重みづけがなく、この等重みまでは定められていない。"
+        },
+        "omission_of_important_contrary_result": {
+          "status": "not_observed",
+          "evidence": {
+            "location": "SEC-RESULTS, 段落1",
+            "quote": "通常案件で導入前の8分／件から導入後の6分／件へ低下した。一方、例外案件では4分／件から5分／件へ上昇した。"
+          },
+          "explanation": "通常案件の低下と例外案件の上昇を結果節で併記し、冒頭でも両方を示している。"
+        },
+        "erasure_or_weakening_of_supplied_central_answer": {
+          "status": "not_observed",
+          "evidence": {
+            "location": "SEC-IMPLICATION, 段落4",
+            "quote": "全案件への一律展開を今すぐ進めないことである。"
+          },
+          "explanation": "保留を直接答えとして示し、例外案件の調査と比較を経て適用範囲を判断する順序を維持している。"
+        },
+        "destruction_of_justified_hold_or_deferral": {
+          "status": "not_observed",
+          "evidence": {
+            "location": "SEC-IMPLICATION, 段落2",
+            "quote": "案件構成を記録した比較の後に、どの範囲へ適用するかを判断する。"
+          },
+          "explanation": "固定材料の保留と比較条件を維持し、導入を先に進める結論へ変えていない。"
+        }
+      },
+      "editorial_observations": [
+        {
+          "location": "SEC-FRAMING, 段落4",
+          "quote": "この提言は、通常案件の低下を無視するためのものではない。8分から6分への変化は結果の一部として残し、同じ材料にある例外案件の上昇も同じ重さで読む。",
+          "observation": "直前までに両区分の結果と保留理由を述べ、節の進行も予告した後で、同じ結果と反対結果を判断に残す説明へ戻っている。段落全体はすでに示した理由の再弁護にあたり、「同じ重さ」という追加の重みづけ表現も含むため、方法節へ移る流れを止めている。"
+        }
+      ]
+    }
+  ],
+  "comparisons": [
+    {
+      "case_id": "adopted-operation-unmeasured-effect",
+      "observed_difference": "MとNはどちらも通常案件の共通項目再利用を答えとして保ち、例外案件の入力・本人確認と未測定の変更後効果を明記する。Mには中央値の範囲と読み替え防止を結果節の最後でもう一度説明する段落があり、Nはその段落を置かず、結果から判断へ進んでいる。",
+      "limits": "この差は提示された文章上の反復に関する観察であり、読者の理解、因果的な執筆指示の効果、Profile間の優劣を示さない。"
+    },
+    {
+      "case_id": "held-rollout-conflicting-subgroups",
+      "observed_difference": "MとNはともに一律展開の保留、両区分の逆方向の結果、原因未確定、比較後に適用範囲を判断する条件を保つ。Nは冒頭で両結果を『同じ重さ』で読むと付け加え、Mは両方を併記しつつ等しい重みづけは述べない。Nには、節の進行予告後にこの点を再説明する段落もある。",
+      "limits": "『同じ重さ』は等しい判断上の重みづけを指す場合に限って懸念となる表現であり、文面だけから意図を確定できない。比較はこの二稿に限られ、人による独立評価、理解改善、公開準備、Work受容を示さない。"
+    }
+  ],
+  "limitations": [
+    "これは提示された合成材料と二稿だけを対象にした、新規文脈でのモデル代理評価である。人間の読者評価ではない。",
+    "画面または材料からモデルのバックエンド、モデル版、サンプリング設定、seedは確認できないため記載していない。",
+    "M/Nと生成条件の対応は提示されていない。この評価からProfileの勝者や指示の因果効果を推定しない。",
+    "この評価は総合点、semantic/publication PASS、公開準備、Work受容を判定しない。"
+  ]
+}

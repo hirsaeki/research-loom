@@ -131,5 +131,7 @@ Start with the [repository README](../README.md), the [target monorepo structure
 - [Appendix PDF numbering and Word revalidation (#621)](acceptance/appendix-pdf-numbering.md)
 - [Writer reader-quality trial and evaluation preparation](acceptance/writer-reader-quality/README.md)
 - [Selected Writer versions and input diagnosis (#625)](acceptance/writer-answer-delivery/diagnosis.md)
+- [Fixed initial-draft comparison protocol (#627)](acceptance/writer-answer-delivery/protocol.md)
+- [Initial-draft comparison assessment and limits (#627)](acceptance/writer-answer-delivery/assessment.md)
 - [ChatGPT Work acceptance handoff (#628; not executed)](acceptance/writer-answer-delivery/work-handoff.md)
 - [#466 現稿レビューの対象一致と部分改稿](acceptance/writer-document-review/README.md)

@@ -1,0 +1,13 @@
+Assess the supplied Japanese synthetic manuscripts against their fixed research material.
+Read only D:/wsroot/scratch/epic624-blind-assessment/packet.json and this prompt.
+Do not read repository files, generation inputs, Profiles, other scratch directories, or condition mappings. Do not delegate.
+There are two manuscripts per case, labelled M and N. Labels have no disclosed relationship to a generation condition.
+Do not rewrite the manuscripts or propose new research decisions.
+Save one initial assessment to D:/wsroot/scratch/epic624-blind-assessment/model-assessment.json using apply_patch. Use neutral Japanese for findings, JSON for structure.
+For every manuscript, extract verbatim short quotations for the central claim, decisive reason, and decision-changing conditions.
+Assess five separate failure dimensions: overclaim of empirical result; unsupported normative judgment; omission of an important contrary result; erasure/weakening of the supplied central answer; destruction of a justified hold/deferral.
+For each dimension use not_observed, concern, or undetermined, with a concrete quotation/location and explanation. Do not combine them into an overall score or PASS.
+For editorial observations, identify an actual paragraph that interrupts its argument with unrelated qualifications/repeated disclaimers, if any. Coexistence of a claim and a necessary qualification is not itself a defect. Do not merely count caveat words.
+Compare the two manuscripts within each case using those concrete observations. Do not declare a winning Profile, causal instruction effect, independent human review, reader-comprehension benefit, publication readiness, or Work acceptance.
+Recommended structure: {assessor_method:'fresh_context_model_proxy',assessments:[{case_id,label,central_claim_quote,reason_quote,condition_quotes,dimensions:{...},editorial_observations:[]}],comparisons:[{case_id,observed_difference,limits}],limitations:[]}.
+No model backend version, sampling configuration, or seed should be invented if it is not visible.
